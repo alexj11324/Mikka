@@ -6,7 +6,8 @@ import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { AppShellContent } from '@/components/app-shell'
+import { SettingsContentFrame } from '@ui-slot/settings-content'
+import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -15,9 +16,6 @@ import { MembersPanel } from '@/components/settings/members-panel'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
-import { SubscriptionSettings } from '@/components/settings/subscription-settings'
-import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
-import { ApiKeyFallbackSetting, useApiKeyList } from '@/components/settings/api-key-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
@@ -33,8 +31,6 @@ import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
-import { ModelOrderSettings } from '@/components/settings/model-order-settings'
-import { FactoryProfilesSettings } from '@/components/settings/factory-profiles-settings'
 import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -102,13 +98,13 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
 
   return <>
     <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
-    <AppShellContent parent={t('title')} title={title} variant="settings">
+    <SettingsContentFrame parent={t('title')} title={title}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
-    </AppShellContent>
+    </SettingsContentFrame>
   </>
 }
 
@@ -140,31 +136,6 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
   }
 }
 
-/**
- * 模型与订阅 (decision 2026-11-02-1400): the subscriptions and the API keys
- * (connect, status, 重新获取模型) and API-key fallback belong to the account.
- * The person's thread defaults, run location and sharing choices below are
- * scoped to the workspace open here. 付款 is under 计费 only.
- */
-function ApiAndSubscriptions({ workspaceId, workspaceName, team }: { workspaceId: string; workspaceName?: string; team: boolean }) {
-  const scopeT = useTranslations('Settings.modelScope')
-  const apiKeys = useApiKeyList(workspaceId)
-  return <>
-    <section aria-labelledby="account-models-scope" className="flex flex-col gap-6">
-      <h2 id="account-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('account')}</h2>
-      <SubscriptionSettings workspaceId={workspaceId} workspaceName={workspaceName} />
-      {apiKeys.section}
-      <ApiKeyFallbackSetting workspaceId={workspaceId} />
-    </section>
-    {apiKeys.dialogs}
-    <section aria-labelledby="workspace-models-scope" className="flex flex-col gap-6">
-      <h2 id="workspace-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('workspace', { name: workspaceName ?? scopeT('currentWorkspace') })}</h2>
-      <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
-      <FactoryProfilesSettings key={`profiles-${workspaceId}`} workspaceId={workspaceId} />
-      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />}
-    </section>
-  </>
-}
 
 function AppearanceSection() {
   const t = useTranslations('Settings.appearance')

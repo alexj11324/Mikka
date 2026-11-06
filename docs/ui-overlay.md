@@ -27,11 +27,17 @@ A missing directory, or one outside the repository, fails the build.
 | Slot | Default | Props | Callers import |
 | --- | --- | --- | --- |
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
+| `settings-frame` | app rail and window bar around settings (`AppFrame`) | `SettingsFrameProps` in `components/slots/settings-frame-contract.ts` | `SettingsFrame` from `@/components/settings/settings-shell` |
+| `settings-sidebar` | settings section list | `SettingsSidebarProps` in `components/slots/settings-sidebar-contract.ts` | `SettingsSidebar` from `@/components/settings/settings-sidebar` |
+| `settings-content` | heading and card around a section (`AppShellContent variant="settings"`) | `SettingsContentFrameProps` in `components/slots/settings-content-contract.ts` | `SettingsView` |
+| `settings-models` | 模型与订阅 body (subscriptions, API keys, fallback, model order, profiles, sharing) | `SettingsModelsProps` in `components/slots/settings-models-contract.ts` | `SettingsView` |
 
 A slot changes how something looks, never what it does. Data, state and
 behaviour stay in this repository and reach the slot as props. A layer slot
 exports the same named component as the default, takes the same props and is
 a client component (`'use client'`).
+
+The settings slots are filled together: a layer's frame draws the whole settings page, and its sidebar and content slots hand it their section list and title rather than drawing their own.
 
 Adding a slot: move today's component to `components/slots/<name>.tsx`, put
 its props in a contract file next to it, keep the public import path
