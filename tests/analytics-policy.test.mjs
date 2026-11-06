@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto'
 import { chmod, mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { frontendRuntimeSource } from '../apps/frontend/scripts/frontend-runtime.mjs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 import { analyticsEnvironment, analyticsKey, analyticsPaths, inspectAnalyticsBuild, localAnalyticsRequest, requiredRuntimeResources, syntheticPostHogRequest, verifyRuntimeResources } from '../scripts/check-analytics-ssr.mjs'
@@ -84,7 +86,16 @@ test('the 电脑 tab has its own kill switch, apart from the cloud computer roll
 test('the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker', () => {
   const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
   assert.match(source('apps/frontend/src/index.tsx'), /import 'mikka:frontend-runtime'[\s\S]*await import\('\.\.\/\.\.\/desktop\/src\/renderer\/index'\)/)
-  assert.match(source('apps/frontend/scripts/application-plugin.mjs'), /target === 'web'[\s\S]*src\/web\/runtime\.ts/)
+  const plugin = source('apps/frontend/scripts/application-plugin.mjs')
+  assert.match(plugin, /import \{ frontendRuntimeSource \} from '\.\/frontend-runtime\.mjs'/)
+  assert.match(plugin, /if \(id === '\\0mikka:frontend-runtime'\) \{\s*return frontendRuntimeSource\(target, \{ development, frontend, renderer \}\)/)
+  const frontend = fileURLToPath(new URL('../apps/frontend', import.meta.url))
+  const renderer = fileURLToPath(new URL('../apps/desktop/src/renderer', import.meta.url))
+  for (const development of [false, true]) {
+    const code = frontendRuntimeSource('web', { development, frontend, renderer })
+    const prefix = development ? 'globalThis[Symbol.for("openui.devtools.autoMount")] = true;\n' : ''
+    assert.equal(code, `${prefix}import ${JSON.stringify(join(frontend, 'src/web/runtime.ts'))};\n`)
+  }
   assert.match(source('apps/frontend/src/web/runtime.ts'), /import '@\/instrumentation-client'/)
   assert.match(source('instrumentation-client.ts'), /posthog\.init\(posthogConfig\.token/)
   assert.match(source('instrumentation-client.ts'), /capture_pageview: false/)
