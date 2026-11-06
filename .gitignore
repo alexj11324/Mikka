@@ -71,5 +71,5 @@ next-env.d.ts
 # Private chat-attachment acceptance state and generated screenshots.
 /.cache/attachments/
 
-# Private UI checkout in official CI; never part of the public tree.
+# hosted UI layer checkout (docs/ui-overlay.md)
 /.hosted-ui/
