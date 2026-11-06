@@ -113,7 +113,9 @@ test('停止 while the before-tool audit waits prevents the tool body and closes
   })
   const tools = timedTools(instrumented, [], () => 0, stop.signal)
   // WorkflowAgent passes its effective abort signal through the execute context.
-  const run = tools.web_search.execute!({}, { toolCallId: 'call-stopped', messages: [], abortSignal: stop.signal })
+  const context = { toolCallId: 'call-stopped', messages: [], abortSignal: stop.signal }
+  const execute = tools.web_search.execute as unknown as (input: unknown, options: typeof context) => Promise<unknown>
+  const run = execute({}, context)
   await begun
   stop.abort(); release()
   assert.deepEqual(await run, { error: 'stopped' })

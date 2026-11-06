@@ -58,7 +58,7 @@ export function withCacheBreakpoints(prompt: Prompt, key: 'openaiCompatible' | '
   return prompt.map((message, index) => {
     let next: Message = message
     const hint = message.providerOptions?.anthropic?.cacheControl
-    if (index === system || (message.role === 'system' && hint && typeof hint === 'object' && !Array.isArray(hint) && hint.type === 'ephemeral')) next = mark(next)
+    if (index === system || (message.role === 'system' && hint && typeof hint === 'object' && !Array.isArray(hint) && 'type' in hint && hint.type === 'ephemeral')) next = mark(next)
     if (index === last) {
       next = mark(next)
       if (Array.isArray(next.content) && next.content.length) {

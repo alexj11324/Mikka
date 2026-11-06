@@ -86,7 +86,7 @@ test('start cancellation retains its cause and does not become a generation fail
   if (model.specificationVersion !== 'v4') throw new Error('expected current SDK model')
   const cancelled = new WorkerRefusal('subscription_cancelled')
   fixture.failAtStart(cancelled)
-  await assert.rejects(model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'synthetic' }] }], abortSignal: fixture.stop.signal }), error => error instanceof Error && error.name === 'AbortError' && hasCause(error, cancelled))
+  await assert.rejects(async () => model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'synthetic' }] }], abortSignal: fixture.stop.signal }), (error: unknown) => error instanceof Error && error.name === 'AbortError' && hasCause(error, cancelled))
   assert.equal(fixture.starts, 1)
   assert.equal(logs.length, 0)
 })
