@@ -5,8 +5,11 @@ import { Check, Loader2, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { CodeBlock, CodeBlockCopyButton, CodeBlockHeader } from '@/components/reui/code-block/code-block'
 import { STEPS, stepStates } from '@/lib/device-ssh-view'
+import { firstRealError } from '@/lib/local-setup-failure'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 
 /**
@@ -53,9 +56,32 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
     <ItemContent className="min-w-0">
       <ItemTitle>{state.status === 'online' ? t('local.online') : state.status === 'failed' ? t('local.failed') : t('local.adding')}</ItemTitle>
       {state.status === 'failed' && state.reason
-        ? <ItemDescription className="truncate text-destructive-foreground" title={state.reason}>{state.reason}</ItemDescription>
+        ? <SetupFailure reason={state.reason} />
         : state.status === 'running' && current && <ItemDescription>{t(`ssh.steps.${current}`)}</ItemDescription>}
     </ItemContent>
     {state.status === 'failed' && <ItemActions><Button size="sm" variant="secondary" disabled={retrying} onClick={() => { void retry() }}>{t('local.retry')}</Button></ItemActions>}
   </Item>
+}
+
+/**
+ * The failure as a person reads it: the real error line(s) without npm's
+ * warnings, wrapped, not truncated. The whole output folds under 查看完整日志,
+ * copyable. Copy per failure code follows once the installer reports codes (#1517).
+ */
+function SetupFailure({ reason }: { reason: string }) {
+  const t = useTranslations('Devices')
+  const summary = firstRealError(reason) || reason
+  return <>
+    <ItemDescription className="line-clamp-none whitespace-pre-line break-words text-destructive-foreground">{summary}</ItemDescription>
+    {summary !== reason.trim() && <Collapsible>
+      <CollapsibleTrigger render={<Button variant="link" size="xs" className="h-auto px-0 py-0.5 text-xs text-muted-foreground" />}>{t('local.details')}</CollapsibleTrigger>
+      <CollapsibleContent className="pt-1.5">
+        <CodeBlock code={reason.trim()} highlight={false} defaultWrap maxLines={14} className="border-0 bg-muted [--code-block-bg:var(--muted)]">
+          <CodeBlockHeader className="border-b-0">
+            <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('local.copyLog'), copied: t('local.logCopied') }} />
+          </CodeBlockHeader>
+        </CodeBlock>
+      </CollapsibleContent>
+    </Collapsible>}
+  </>
 }

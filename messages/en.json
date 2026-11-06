@@ -951,7 +951,10 @@
       "adding": "Adding this computer",
       "online": "This computer is online",
       "failed": "Couldn't add this computer",
-      "retry": "Retry"
+      "retry": "Retry",
+      "details": "View full log",
+      "copyLog": "Copy log",
+      "logCopied": "Copied"
     },
     "loading": "Loading devices"
   },

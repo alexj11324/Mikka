@@ -951,7 +951,10 @@
       "adding": "正在添加这台电脑",
       "online": "这台电脑已上线",
       "failed": "无法添加这台电脑",
-      "retry": "重试"
+      "retry": "重试",
+      "details": "查看完整日志",
+      "copyLog": "复制日志",
+      "logCopied": "已复制"
     },
     "loading": "正在加载设备"
   },
