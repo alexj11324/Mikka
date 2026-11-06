@@ -35,6 +35,34 @@
       "workerSha": "33c825990d3f0ae27b71441a9db6854abab584b1",
       "failure": "fresh candidate --probe-models command exceeded its 45-second deadline",
       "published": false
+    },
+    {
+      "sourceCommit": "8180f687d19e117437403b865692388a9c05b554",
+      "runId": "42310651657",
+      "runAttempt": 1,
+      "buildJobId": "128211149917",
+      "workerSha": "33c825990d3f0ae27b71441a9db6854abab584b1",
+      "workerShaProvenance": "Derived with the immutable-source build-template.py worker_hash projection; no candidate report was published.",
+      "startedAt": "2026-11-06T23:15:31Z",
+      "completedObservedAt": "2026-11-06T23:23:23Z",
+      "failure": "fresh candidate --probe-models command exceeded its 45-second deadline",
+      "errorCode": "TimeoutException",
+      "published": false,
+      "originalCleanup": {
+        "jobId": "128213881208",
+        "conclusion": "success",
+        "evidenceLimitation": "The old alias-as-ID absent receipt did not prove deletion. The exact-ID recovery below supersedes it.",
+        "artifacts": [
+          {
+            "id": 13549205779,
+            "sha256": "beb30686df5e3308ec62d0b1c8335eaf5b85c8aef0d48f3aece68c4e1d4a483d"
+          },
+          {
+            "id": 13548825737,
+            "sha256": "c5d6d7b6f0ff55fc46fb21cfd093917aa7faf216844e51d3292779e0d99072fe"
+          }
+        ]
+      }
     }
   ],
   "cleanupDefect": {
@@ -42,7 +70,7 @@
     "correctLookup": "GET /templates/aliases/{alias} resolves templateID; inspect the exact ID and name/private status, DELETE that ID, then verify ID 404. If a recorded ID is known, alias 404 cannot replace the ID lookup.",
     "officialApi": "https://github.com/e2b-dev/runtime/blob/main/spec/openapi.yml",
     "correctionCommit": "687bdcbeb5d4cbd2a0ad447011d449d889debede",
-    "historicalConclusion": "All 37 exact private template IDs below were still present when recovered. Earlier name-as-ID absent receipts did not prove deletion. Sandbox enumeration and termination evidence is separate."
+    "historicalConclusion": "All 40 exact private template IDs below were still present when recovered. Earlier name-as-ID absent receipts did not prove deletion. Sandbox enumeration and termination evidence is separate."
   },
   "anonymousProbe": {
     "workflowSource": "6360b9e28eb72a49a584e71e371952660428b334",
@@ -857,6 +885,217 @@
         "GET 404": 9
       },
       "createdSandboxes": 0
+    },
+    {
+      "scope": "3 exact private images from the naturally completed failed 8180 release",
+      "runId": "42312458940",
+      "jobId": "128216976240",
+      "sourceRunId": "42310651657",
+      "sourceRunAttempt": 1,
+      "sourceCommit": "8180f687d19e117437403b865692388a9c05b554",
+      "cleanupEngineCommit": "8c58b1a64f0b29cdcdcb229fa8fcf5acb45a2d97",
+      "cleanupCommit": "7a433e8a47533816a972ff6125ccd623d24a37fb",
+      "recordedAt": "2026-11-06T23:31:46.2459417Z",
+      "artifact": {
+        "id": 13549600442,
+        "sha256": "766d7964071a9d91a06d9310e9125388b6e4cb0a04a3c01290f86f1450be5e41"
+      },
+      "templates": [
+        {
+          "name": "mikka-8180f687d19e-42310651657-1-desktop",
+          "kind": "desktop",
+          "templateId": "ladqtdbp166wbimapm4i",
+          "status": "deleted"
+        },
+        {
+          "name": "mikka-8180f687d19e-42310651657-1-claude",
+          "kind": "claude",
+          "templateId": "potox03paq1jim5t5zar",
+          "status": "deleted"
+        },
+        {
+          "name": "mikka-8180f687d19e-42310651657-1-codex",
+          "kind": "codex",
+          "templateId": "lhxj94qagybkv8gxzle8",
+          "status": "deleted"
+        }
+      ],
+      "privateProofs": [
+        {
+          "kind": "desktop",
+          "templateId": "ladqtdbp166wbimapm4i",
+          "idMatched": true,
+          "nameMatched": true,
+          "public": false,
+          "isDefault": false
+        },
+        {
+          "kind": "claude",
+          "templateId": "potox03paq1jim5t5zar",
+          "idMatched": true,
+          "nameMatched": true,
+          "public": false,
+          "isDefault": false
+        },
+        {
+          "kind": "codex",
+          "templateId": "lhxj94qagybkv8gxzle8",
+          "idMatched": true,
+          "nameMatched": true,
+          "public": false,
+          "isDefault": false
+        }
+      ],
+      "readback": [
+        {
+          "kind": "desktop",
+          "templateId": "ladqtdbp166wbimapm4i",
+          "name": "mikka-8180f687d19e-42310651657-1-desktop",
+          "aliasStatus": 404,
+          "idStatus": 404
+        },
+        {
+          "kind": "claude",
+          "templateId": "potox03paq1jim5t5zar",
+          "name": "mikka-8180f687d19e-42310651657-1-claude",
+          "aliasStatus": 404,
+          "idStatus": 404
+        },
+        {
+          "kind": "codex",
+          "templateId": "lhxj94qagybkv8gxzle8",
+          "name": "mikka-8180f687d19e-42310651657-1-codex",
+          "aliasStatus": 404,
+          "idStatus": 404
+        }
+      ],
+      "requests": [
+        {
+          "kind": "desktop",
+          "endpoint": "alias",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "kind": "desktop",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "kind": "desktop",
+          "endpoint": "id",
+          "method": "DELETE",
+          "status": 204
+        },
+        {
+          "kind": "desktop",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "claude",
+          "endpoint": "alias",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "kind": "claude",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "kind": "claude",
+          "endpoint": "id",
+          "method": "DELETE",
+          "status": 204
+        },
+        {
+          "kind": "claude",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "codex",
+          "endpoint": "alias",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "kind": "codex",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "kind": "codex",
+          "endpoint": "id",
+          "method": "DELETE",
+          "status": 204
+        },
+        {
+          "kind": "codex",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "desktop",
+          "endpoint": "alias",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "desktop",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "claude",
+          "endpoint": "alias",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "claude",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "codex",
+          "endpoint": "alias",
+          "method": "GET",
+          "status": 404
+        },
+        {
+          "kind": "codex",
+          "endpoint": "id",
+          "method": "GET",
+          "status": 404
+        }
+      ],
+      "requestCounts": {
+        "GET 200": 6,
+        "DELETE 204": 3,
+        "GET 404": 9
+      },
+      "sandboxes": [],
+      "remainingSandboxes": [],
+      "createdSandboxes": 0,
+      "status": "passed",
+      "errors": [],
+      "helperBranchCleanup": {
+        "branch": "ops/1505-cleanup-runtime-8180f687",
+        "expectedSha": "7a433e8a47533816a972ff6125ccd623d24a37fb",
+        "deleteStatus": 204,
+        "jobReadbackStatus": 404,
+        "independentReadbackStatus": 404
+      }
     }
   ],
   "limits": [

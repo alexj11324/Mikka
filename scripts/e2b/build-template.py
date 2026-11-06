@@ -488,6 +488,68 @@ def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_
         sandbox.kill()
 
 
+CONSERVATION_DIAGNOSTIC_MAX_BYTES = 262144
+CONSERVATION_DIAGNOSTIC_MAX_CHANGES = 512
+
+
+def conservation_diagnostic(error, kind, stage):
+    """Only the guard's bounded metadata may cross the SDK error boundary."""
+    stages = {'preload_receipts', 'preload_validation', 'fresh_scan', 'fresh_receipt', 'fresh_validation'}
+    codes = {'official_manifest_invalid', 'official_conservation_invalid', 'official_conservation_missing',
+             'official_files_removed', 'e2b_certificate_target_invalid'}
+    message = error.args[0] if error.args else None
+    detail = {'kind': kind if kind in KINDS else 'unknown', 'stage': stage if stage in stages else 'unknown',
+              'code': message if isinstance(message, str) and message in codes else 'conservation_failed'}
+    exit_code = getattr(error, 'exit_code', None)
+    if type(exit_code) is int and -255 <= exit_code <= 255:
+        detail['exitCode'] = exit_code
+    stderr = getattr(error, 'stderr', '')
+    if not isinstance(stderr, str):
+        return detail
+    if len(stderr) > CONSERVATION_DIAGNOSTIC_MAX_BYTES or len(stderr.encode('utf-8', errors='replace')) > CONSERVATION_DIAGNOSTIC_MAX_BYTES:
+        return {**detail, 'code': 'conservation_diagnostic_too_large'}
+    kinds = {'file', 'link', 'directory', 'special'}
+    fields = {'kind', 'sha256', 'mode', 'uid', 'gid', 'target', 'type', 'device'}
+    def path(value, absolute=False):
+        return (isinstance(value, str) and 0 < len(value) <= 2048
+                and re.fullmatch(r'[A-Za-z0-9_./@+~()=: -]+', value)
+                and (not absolute or (value.startswith('/') and '..' not in Path(value).parts)))
+    def field(key, value):
+        if value is None: return True
+        if key == 'kind': return isinstance(value, str) and value in kinds
+        if key == 'sha256': return isinstance(value, str) and re.fullmatch(r'[a-f0-9]{64}', value)
+        if key == 'target': return path(value)
+        return type(value) is int and 0 <= value <= (4095 if key == 'mode' else 2**64 - 1)
+    for line in stderr.splitlines():
+        for code in ('official_files_changed', 'official_files_removed'):
+            marker = 'RuntimeError: ' + code + ' '
+            if not line.startswith(marker):
+                continue
+            try:
+                parsed = json.loads(line[len(marker):])
+                if code == 'official_files_removed':
+                    if not isinstance(parsed, dict) or set(parsed) != {'path'} or not path(parsed['path'], absolute=True):
+                        raise ValueError('conservation_metadata_invalid')
+                    return {**detail, 'code': code, 'missing': parsed}
+                if not isinstance(parsed, list) or not 0 < len(parsed) <= CONSERVATION_DIAGNOSTIC_MAX_CHANGES:
+                    raise ValueError('conservation_metadata_invalid')
+                for row in parsed:
+                    if (not isinstance(row, dict) or set(row) - {'path', 'kind', 'before', 'after', 'resolvedSha256'}
+                            or not {'path', 'kind', 'before', 'after'}.issubset(row)
+                            or not path(row['path'], absolute=True) or not isinstance(row['kind'], str) or row['kind'] not in kinds
+                            or not isinstance(row['before'], dict) or not row['before'] or not isinstance(row['after'], dict)
+                            or row['before'].keys() != row['after'].keys() or set(row['before']) - fields
+                            or not all(field(key, value) for side in ('before', 'after') for key, value in row[side].items())
+                            or ('resolvedSha256' in row and (row['resolvedSha256'] is None or not field('sha256', row['resolvedSha256'])))):
+                        raise ValueError('conservation_metadata_invalid')
+                return {**detail, 'code': code, 'changes': parsed}
+            except (ValueError, TypeError, KeyError, RecursionError):
+                return {**detail, 'code': 'conservation_metadata_invalid'}
+        if line.startswith('RuntimeError: ') and line.removeprefix('RuntimeError: ') in codes:
+            detail['code'] = line.removeprefix('RuntimeError: ')
+    return detail
+
+
 def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
     """Check the final image on a disposable instance, never a timed instance.
 
@@ -505,21 +567,32 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         print('mikka-conservation-stage ' + json.dumps({'kind': kind, 'phase': name, 'elapsedMs': round((now - began) * 1000)}, separators=(',', ':')), file=sys.stderr, flush=True)
         began = now
     stage('create')
+    phase = 'preload_receipts'
     try:
         conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
         stage('preload_receipts')
+        phase = 'preload_validation'
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
+        phase = 'fresh_scan'
         result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
                                       user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
         stage('fresh_scan')
+        phase = 'fresh_receipt'
         conservation['preloadFinalization'] = conservation['finalization']
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
         stage('fresh_receipt')
+        phase = 'fresh_validation'
         return guard.validate_receipt(conservation, kind)
+    except Exception as error:
+        # Emit before finally destroys the disposable instance. Never print
+        # SDK stdout/stderr or exception messages; keep the original failure.
+        print('mikka-conservation-failed ' + json.dumps(conservation_diagnostic(error, kind, phase), separators=(',', ':')),
+              file=sys.stderr, flush=True)
+        raise
     finally:
         sandbox.kill()
 

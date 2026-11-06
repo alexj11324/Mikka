@@ -2,6 +2,7 @@
 import importlib.util
 import io
 import copy
+from contextlib import redirect_stderr
 import hashlib
 import json
 import unittest
@@ -62,6 +63,86 @@ class ModelSandbox:
     def kill(self): self.calls.append(('kill',))
 
 class Publish(unittest.TestCase):
+    def test_conservation_failure_logs_safe_metadata_before_kill_and_keeps_the_original_exception(self):
+        digest = {'entries': 5, 'sha256': 'f' * 64}
+        final = {'kind': 'codex', 'policySha256': bt.official_files_guard().finalization_policy('codex')[1],
+                 'before': digest, 'after': digest, 'originalBefore': digest, 'originalAfter': digest, 'providerChanges': []}
+        change = {'path': '/usr/local/bin/codex', 'kind': 'file',
+                  'before': {'sha256': 'a' * 64, 'mode': 0o755}, 'after': {'sha256': 'b' * 64, 'mode': 0o644}}
+        secret = 'DO-NOT-LOG-CREDENTIAL-OR-PROVIDER-TEXT'
+        failure = RuntimeError(secret)
+        failure.__cause__ = ValueError(secret)
+        failure.exit_code = 1
+        failure.stdout = secret
+        failure.stderr = secret + '\nRuntimeError: official_files_changed ' + json.dumps([change]) + '\n' + secret
+        output, killed = io.StringIO(), []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, path, **_):
+                return json.dumps(final if path.endswith('ready.json') else {'before': digest, 'after': digest})
+            def run(self, *_args, **_options): raise failure
+            def kill(self): killed.append(output.getvalue())
+        with redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+            bt.probe_conservation('candidate', secret, 'codex', lambda *_, **__: Probe())
+        self.assertIs(raised.exception, failure)
+        self.assertIs(raised.exception.__cause__, failure.__cause__)
+        self.assertEqual(len(killed), 1)
+        self.assertIn('mikka-conservation-failed ', killed[0])
+        row = json.loads(next(line.removeprefix('mikka-conservation-failed ') for line in output.getvalue().splitlines()
+                              if line.startswith('mikka-conservation-failed ')))
+        self.assertEqual(row, {'kind': 'codex', 'stage': 'fresh_scan', 'code': 'official_files_changed',
+                               'exitCode': 1, 'changes': [change]})
+        self.assertNotIn(secret, output.getvalue())
+
+    def test_conservation_diagnostics_accept_only_closed_bounded_metadata(self):
+        secret = 'DO-NOT-LOG-SECRET'
+        error = RuntimeError(secret)
+        error.exit_code, error.stdout = 137, secret
+        error.stderr = 'arbitrary stderr ' + secret
+        self.assertEqual(bt.conservation_diagnostic(error, 'desktop', 'fresh_scan'),
+                         {'kind': 'desktop', 'stage': 'fresh_scan', 'code': 'conservation_failed', 'exitCode': 137})
+        error.stderr = 'RuntimeError: official_files_removed ' + json.dumps({'path': '/usr/local/bin/claude'})
+        self.assertEqual(bt.conservation_diagnostic(error, 'claude', 'fresh_scan')['missing'], {'path': '/usr/local/bin/claude'})
+        row = {'path': '/usr/local/bin/claude', 'kind': 'file', 'before': {'sha256': 'a' * 64}, 'after': {'sha256': 'b' * 64}}
+        invalid = [
+            {'path': '/usr/local/bin/claude', 'token': secret},
+            [dict(row, token=secret)],
+            [{**row, 'before': {'token': secret}, 'after': {'token': secret}}],
+            [{**row, 'after': {'sha256': secret}}],
+            [{**row, 'resolvedSha256': None}],
+            [{**row, 'kind': secret}],
+            [{**row, 'path': '/' + 'x' * 2048}],
+            [row] * (bt.CONSERVATION_DIAGNOSTIC_MAX_CHANGES + 1),
+        ]
+        for value in invalid:
+            code = 'official_files_removed' if isinstance(value, dict) else 'official_files_changed'
+            error.stderr = 'RuntimeError: ' + code + ' ' + json.dumps(value)
+            with self.subTest(value_type=type(value).__name__):
+                actual = bt.conservation_diagnostic(error, 'desktop', 'fresh_scan')
+                self.assertEqual(actual['code'], 'conservation_metadata_invalid')
+                self.assertNotIn('changes', actual)
+                self.assertNotIn('missing', actual)
+                self.assertNotIn(secret, json.dumps(actual))
+        error.stderr = secret + 'x' * bt.CONSERVATION_DIAGNOSTIC_MAX_BYTES
+        actual = bt.conservation_diagnostic(error, 'desktop', 'fresh_scan')
+        self.assertEqual(actual['code'], 'conservation_diagnostic_too_large')
+        self.assertNotIn(secret, json.dumps(actual))
+
+    def test_conservation_receipt_validation_failures_keep_the_stage_and_cleanup(self):
+        killed = []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, *_args, **_options): return '{}'
+            def run(self, *_args, **_options): raise AssertionError('invalid build proof must stop before scanning')
+            def kill(self): killed.append(True)
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+            bt.probe_conservation('candidate', 'fixture-key', 'desktop', lambda *_, **__: Probe())
+        row = json.loads(next(line.removeprefix('mikka-conservation-failed ') for line in output.getvalue().splitlines()
+                              if line.startswith('mikka-conservation-failed ')))
+        self.assertEqual(row, {'kind': 'desktop', 'stage': 'preload_validation', 'code': 'official_conservation_invalid'})
+        self.assertEqual(killed, [True])
+
     def test_conservation_reads_build_receipts_and_rechecks_a_fresh_disposable_image(self):
         calls = []
         digest = {'entries': 5, 'sha256': 'f' * 64}
