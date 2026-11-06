@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
 import { createHash, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto'
+import { createWriteStream } from 'node:fs'
 import { copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -32,19 +33,32 @@ const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 3, 
 const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-1512-'))
 const evidenceDirectory = resolve(process.env.MIKKA_TRACE_EVIDENCE_DIR ?? join(root, '.cache/trace-acceptance', `${revision.slice(0, 12)}-${randomUUID()}`))
 await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 })
+const privateLogDirectory = join(evidenceDirectory, 'private-logs')
+await mkdir(privateLogDirectory, { recursive: true, mode: 0o700 })
 const children = [], results = [], collectors = []
 let accounts, services, collector, phase = 'starting', failure
 const checkpoint = value => { phase = value; console.info(`trace-acceptance ${value}`) }
-const child = (args, env) => {
+const child = (label, args, env) => {
   const job = spawn(process.execPath, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
-  // Application logs can contain fixtures and account details; never copy raw
-  // output into acceptance evidence or the parent terminal.
-  job.stdout.on('data', () => {}); job.stderr.on('data', () => {})
+  // Keep bounded diagnostics privately: never copy these files into evidence
+  // artifacts or print them. They can contain account and model fixture data.
+  const log = createWriteStream(join(privateLogDirectory, `${label}.log`), { flags: 'wx', mode: 0o600 })
+  job.label = label; job.logBytes = 0
+  log.on('error', () => { job.logFailed = true })
+  const capture = chunk => {
+    if (job.logFailed) return
+    const kept = chunk.subarray(0, Math.max(0, 8_000_000 - job.logBytes))
+    job.logBytes += kept.length
+    if (kept.length) log.write(kept)
+  }
+  job.stdout.on('data', capture); job.stderr.on('data', capture)
+  job.once('close', () => log.end())
   job.on('error', () => { job.startFailed = true })
   children.push(job)
   return job
 }
 async function stop(job) {
+  job.stopping = true
   if (job.exitCode !== null || job.signalCode !== null) return
   job.kill('SIGTERM')
   await Promise.race([new Promise(resolve => job.once('exit', resolve)), delay(5_000)])
@@ -54,6 +68,7 @@ async function until(read, timeout = 90_000) {
   const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
     assert.ok(!children.some(job => job.startFailed), 'OWNED_PROCESS_START_FAILED')
+    assert.ok(!children.some(job => !job.stopping && (job.exitCode !== null || job.signalCode !== null)), 'OWNED_PROCESS_EXITED')
     const value = await read()
     if (value) return value
     await delay(250)
@@ -72,9 +87,9 @@ try {
   const workflowDirectory = join(directory, 'workflow')
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const preload = pathToFileURL(join(root, 'tests/mvp/trace-preload.mjs')).href
-  const app = child(['apps/api/scripts/dev.mjs', '--port', '3100', '--host', 'localhost'], {
+  const app = child('api', ['apps/api/scripts/dev.mjs', '--port', '3100', '--host', 'localhost'], {
     ...process.env, NODE_OPTIONS: `--import ${preload}`, WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_TRACE_MODE: 'continuous',
-    WORKFLOW_LOCAL_BASE_URL: `${MVP_ORIGIN}/mikka`, WORKFLOW_LOCAL_DATA_DIR: workflowDirectory,
+    WORKFLOW_LOCAL_BASE_URL: MVP_ORIGIN, WORKFLOW_LOCAL_DATA_DIR: workflowDirectory,
     MIKKA_BYOS_ENABLED: '1', MIKKA_BYOS_WORKER_BINARY: join(root, 'tests/mvp/subscription-worker.mjs'),
     MIKKA_BYOS_INFISICAL_ORIGIN: MVP_SERVICES, MIKKA_BYOS_INFISICAL_PROJECT: 'mvp-synthetic', MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'test',
     MIKKA_BYOS_INFISICAL_PATH: '/custody', MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/access',
@@ -86,6 +101,10 @@ try {
     assert.equal(app.exitCode, null, 'API_PROCESS_EXITED')
     return fetch(`${MVP_ORIGIN}/mikka/api/version`, { signal: AbortSignal.timeout(2_000) }).then(async response => { const ok = response.ok; await response.body?.cancel(); return ok }, () => false)
   }, 240_000)
+  checkpoint('workflow-ready')
+  const health = await fetch(`${MVP_ORIGIN}/.well-known/workflow/v1/flow?__health`, { signal: AbortSignal.timeout(10_000) })
+  assert.equal(health.status, 200, 'WORKFLOW_ROUTE_UNAVAILABLE')
+  assert.equal((await health.json()).healthy, true, 'WORKFLOW_ROUTE_UNAVAILABLE')
   checkpoint('account-lease')
   accounts = await acquireTestAccounts({ database: pool, environment, runId: randomUUID(), workerId: 'trace-1512', requestId: randomUUID() })
   const ownerId = accounts.owner.userId
@@ -110,7 +129,7 @@ try {
     const credential = `orv_${randomBytes(32).toString('base64url')}`, tokenId = randomUUID()
     await recordAuthenticationSecrets([credential], { environment })
     await pool.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash") VALUES ($1,$2,$3,$4)', [tokenId, ownerId, 'Trace acceptance daemon', createHash('sha256').update(credential).digest('hex')])
-    const daemon = child(['--import', 'tsx', 'tests/mvp/start-trace-daemon.mts'], {
+    const daemon = child(`daemon-${kind}`, ['--import', 'tsx', 'tests/mvp/start-trace-daemon.mts'], {
       ...process.env, NODE_OPTIONS: '', MIKKA_E2E_DEVICE_TOKEN: credential, MIKKA_E2E_DAEMON_DIR: daemonDirectory,
       MIKKA_TRACE_FIXTURES_DIR: fixtureDirectory, MIKKA_TRACE_FIXTURE_CONTEXT: JSON.stringify({ traceparent, sessionId, posthogDistinctId: ownerId }),
       GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_COUNT: '2',
@@ -192,6 +211,8 @@ try {
   for (const current of collectors) await current.close()
   await pool.end()
   const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, cases: results,
+    processes: children.map(job => ({ label: job.label, exitCode: job.exitCode, signal: job.signalCode,
+      privateLogRetained: !job.logFailed, privateLogBytes: job.logBytes })),
     counts: collector ? { spans: collector.evidence.spans.length, logs: collector.evidence.logs.length,
       syntheticGenerations: collector.evidence.generations.length, realProviderGenerations: 0,
       privacyViolations: collector.evidence.privacyViolations, malformed: collector.evidence.malformed, dropped: collector.evidence.dropped } : {},

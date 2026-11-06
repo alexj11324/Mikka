@@ -59,6 +59,8 @@ reported as live Claude, Codex or Cursor acceptance.
 The final line gives the path of a mode-0600 `trace-chain.json` containing only
 metadata, stage names, safe identifiers, numeric telemetry and stated boundaries.
 Child stdout/stderr, authentication files, source prompts, responses and raw OTLP
-bodies are not copied into that report. Account leases are quarantined, device
+bodies are not copied into that report. Bounded child diagnostics are retained as
+mode-0600 files under `private-logs/`; they must never be published or printed
+without inspection and redaction. Account leases are quarantined, device
 credentials are revoked, and only the runner's own processes are stopped. Private
 fixture/workflow directories remain available for authorized inspection.

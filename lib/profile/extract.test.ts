@@ -1,6 +1,7 @@
 import { after, before, beforeEach, mock, test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
+import { clearFlagCache as clearRealFlagCache, serverFlagEnabled as readRealFlag } from '../posthog-server'
 
 // Every switch in proactive.md § 3 stops the model call: the deployment
 // switch, the PostHog flag (off or unavailable), 记忆 and the daily cap.
@@ -17,12 +18,18 @@ mock.module(new URL('../abuse/model.ts',import.meta.url).href,{namedExports:{
 }})
 mock.module(new URL('../execution-settings.ts',import.meta.url).href,{namedExports:{executionWorkspace:async()=> 'fixture-workspace'}})
 mock.module('ai', { namedExports: { generateText } })
-mock.module('posthog-node', { namedExports: { PostHog: class { getFeatureFlag() { return flag() } capture(message: unknown) { captured.push(message) } async flush() {} } } })
+// Inject the fake at our application boundary: mocking a dual-export SDK's
+// package name alone can miss the import selected by a TypeScript loader.
+const posthog = { getFeatureFlag: async () => flag(), capture(message: unknown) { captured.push(message) }, flush: async () => {} }
+mock.module(new URL('../posthog-server.ts', import.meta.url).href, { namedExports: {
+  clearFlagCache: clearRealFlagCache,
+  serverFlagEnabled: (key: string, userId: string) => readRealFlag(key, userId, { posthog }),
+  serverPostHog: () => posthog,
+} })
 mock.module(new URL('./store.ts', import.meta.url).href, { namedExports: store })
 let extractFacts: typeof import('./extract')['extractFacts']
 let clearFlagCache: typeof import('@/lib/posthog-server')['clearFlagCache']
 before(async () => {
-  process.env.NEXT_PUBLIC_POSTHOG_KEY ??= 'phc_test_only'
   ;({ extractFacts } = await import('./extract'))
   ;({ clearFlagCache } = await import('@/lib/posthog-server'))
 })
