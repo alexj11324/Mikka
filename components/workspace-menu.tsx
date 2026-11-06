@@ -1,17 +1,9 @@
 'use client'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
-import { useEffect, useState } from 'react'
-import useSWR from 'swr'
+import { useState } from 'react'
 import { Check, ChevronDown, LogOut, Plus, Settings, UserPlus, type LucideIcon } from 'lucide-react'
-import { toast } from 'sonner'
-import { authClient } from '@/lib/auth-client'
-import { withBasePath } from '@/lib/base-path'
-import { getPathname } from '@/i18n/navigation'
-import { fetchSettingsData } from '@/lib/settings-data'
-import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
-import { switchWorkspace } from '@/app/actions/workspace'
-import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
+import { useWorkspaceSwitcher } from '@/hooks/use-workspace-switcher'
 import { useShortcutLabel } from '@/components/shortcut-keys'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -58,71 +50,13 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   onBeforeChange?: (action: () => Promise<void>) => void
 }) {
   const i18nText = useTranslations();
-  const locale = useLocale()
   const { setOpenMobile } = useSidebar()
-  const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const [menuOpen, setMenuOpen] = useState(false)
-  const [pending, setPending] = useState(false)
   const settingsShortcut = useShortcutLabel(['mod', ','])
-  // While the switcher loads or fails, the avatar keeps the workspace's last known initial, never the placeholder
-  // word's first character (「工」 from 工作区); with none known, the avatar stays blank.
-  const nameKey = `mikka:workspace-name:${user.email}`
-  const [lastName, setLastName] = useState<string | null>(null)
-  useEffect(() => {
-    try {
-      if (data) window.localStorage.setItem(nameKey, data.workspace.name)
-      else setLastName(window.localStorage.getItem(nameKey))
-    } catch { /* storage unavailable */ }
-  }, [data, nameKey])
-  const knownName = data?.workspace.name ?? lastName ?? ''
-  const workspaceName = knownName || i18nText("Settings.groups.workspace")
-  const busy = pending || signingOut
-  useEffect(() => {
-    function shortcut(event: KeyboardEvent) {
-      if (event.isComposing || event.keyCode === 229 || event.repeat || pending || signingOut || event.altKey || event.shiftKey) return
-      if (!(event.ctrlKey || event.metaKey) || event.code !== 'Comma') return
-      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"]')) return
-      event.preventDefault()
-      setMenuOpen(false)
-      onSettings('/settings')
-      setOpenMobile(false)
-    }
-    window.addEventListener('keydown', shortcut)
-    return () => window.removeEventListener('keydown', shortcut)
-  }, [onSettings, pending, setOpenMobile, signingOut])
+  const { data, error, mutate, busy, knownName, workspaceName, selectWorkspace, addAccount, newWorkspace } = useWorkspaceSwitcher({ user, onSettings, signingOut, onBeforeChange, onShortcut: () => { setMenuOpen(false); setOpenMobile(false) } })
   function settings(href = '/settings') {
     onSettings(href)
     setOpenMobile(false)
-  }
-  function run(action: () => Promise<void>) {
-    if (busy) return
-    if (onBeforeChange) onBeforeChange(action)
-    else void action()
-  }
-  function selectWorkspace(accountId: string, workspaceId?: string) {
-    if (accountId === data?.accounts[0]?.id && workspaceId === data.workspace.id) return
-    run(async () => {
-      setPending(true)
-      try {
-        const result = await switchWorkspace({ accountId, workspaceId })
-        if (!result.ok) { toast.error(result.error); return }
-        await clearPersistentReadCaches()
-        window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
-      } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
-      finally { setPending(false) }
-    })
-  }
-  function addAccount() {
-    run(async () => {
-      setPending(true)
-      try {
-        const session = await authClient.getSession({ query: { disableCookieCache: true } })
-        if (session.error || !session.data?.user) throw new Error('Session unavailable')
-        if ((data?.accounts.length ?? 0) >= 5) { toast.error(i18nText("FeatureCopy.c_a2a50802")); return }
-        window.location.assign(withBasePath('/sign-in?addAccount=1'))
-      } catch { toast.error(i18nText("FeatureCopy.c_c9988ff5")) }
-      finally { setPending(false) }
-    })
   }
   return <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
     {compact ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-lg" aria-label={i18nText("Nav.workspaceMenu")} title={workspaceName} />}>
@@ -155,7 +89,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
         </DropdownMenuGroup>}
       </div>
       <DropdownMenuGroup>
-        <DropdownMenuItem disabled={busy} onClick={() => run(async () => { setOpenMobile(false); window.location.assign(withBasePath('/workspaces/new')) })}>
+        <DropdownMenuItem disabled={busy} onClick={() => newWorkspace(() => setOpenMobile(false))}>
           <ItemIcon icon={Plus} />{i18nText("FeatureCopy.c_d92d1b8d")}
         </DropdownMenuItem>
       </DropdownMenuGroup>
