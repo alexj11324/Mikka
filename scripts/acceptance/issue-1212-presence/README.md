@@ -46,3 +46,27 @@ Run `MIKKA_PRESENCE_MODE=baseline` against the exact currently served build, wit
 On a successful baseline, the driver closes all sockets and consumers, revokes its short-lived credential and verifies a real 401. It retains exactly the disabled nonce-marked device, with no installed daemon, harness or live connection. The receipt includes its IDs and original-preservation checks; it contains no raw credential.
 
 After the Worker and client are deployed, use `MIKKA_PRESENCE_MODE=after`, the new exact source/build, the same run key, `MIKKA_PRESENCE_FIXTURE_RECEIPT` pointing to that baseline report, and `MIKKA_PRESENCE_RECEIPT_SHA256` from the trusted recorded artifact. The driver verifies the digest, exact receipt shape, marker, device, disabled state and prior revoked token. It obtains a new normal enrollment credential and registers **only that same fixture ID**. After waits past the new registration/heartbeat window again; it cannot produce a zero-read result merely from a fresh HTTP heartbeat. It records both application SHAs and idle counts, then removes the retained device and revokes the new credential. It never borrows a user device or persists a raw token between jobs.
+# Baseline transport diagnostics (v3)
+
+The baseline adapter records only fixed failure causes and bounded numeric or
+boolean transport evidence: socket open/close times, core-initiated versus
+cleanup-initiated close, close code and clean flag, ticket lifetime remaining at
+close, and ping/pong counts and times. It never records close reasons, error
+messages, frame content, URLs, tickets or credentials. Times ending in `Ms` in a
+tab's `transport` object are relative to that worker's start; network timestamps
+and failure `observedAtMs` use the parent's monotonic clock. They are not directly
+interchangeable.
+
+A socket error, unexpected close or reconnect still fails the finite continuous
+health case. Diagnostics do not allow an interrupted connection to pass. If an
+idle window fails, `live.phases` retains its completed HTTP read count with
+`healthVerified: false` and `completed: false`; the top-level run remains failed.
+Ordinary final cleanup is distinguished from a core-initiated close. A normal
+ticket renewal is outside this shorter-than-ticket-lifetime acceptance window
+and still invalidates its continuous-health claim.
+
+The baseline diagnostics suite uses the exact pinned old `LiveChannels` under a
+virtual clock and a test-only socket. It covers 180 seconds of healthy transport,
+missing pong, remote close, socket error, ticket expiry and failure-window read
+retention. This is local evidence, not a production transport diagnosis.
+

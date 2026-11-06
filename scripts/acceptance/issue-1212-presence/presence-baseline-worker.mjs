@@ -12,8 +12,12 @@ const pending = new Map(), timers = new Set()
 let next = 0, closing = false, mainSubscription, fallbackSubscription, channels
 let current = { ...initialRead, requestedAt: performance.now() }, activeRefreshes = 0, firstReadSettled = false, transportReady = false
 const metadata = { refreshCalls: 0, networkReads: 0, devicePushes: 0, threadPushes: 0, socketCount: 0, nullTicketAttempts: 0 }
+const startedAt = performance.now(), elapsed = () => Math.max(0, Math.round(performance.now() - startedAt))
+const transport = { createdAtMs: null, openedAtMs: null, pings: 0, pongs: 0, lastPingAtMs: null, lastPongAtMs: null,
+  coreCloseAtMs: null, cleanupCloseAtMs: null, closedAtMs: null, errorAtMs: null, closeCode: null, closeWasClean: null,
+  ticketLifetimeMs: null, ticketRemainingAtCloseMs: null, readyState: null }
 const post = value => parentPort.postMessage({ ...value, tabId })
-const state = () => post({ type: 'state', ...metadata, activeRefreshes, ready: transportReady && firstReadSettled,
+const state = () => post({ type: 'state', ...metadata, transport, activeRefreshes, ready: transportReady && firstReadSettled && transport.readyState === 1,
   online: current.devices.find(row => row.id === fixtureId)?.online, fallbackActive: !!fallbackSubscription })
 const request = (method, signal) => new Promise((resolve, reject) => {
   const id = ++next
@@ -46,7 +50,7 @@ async function refresh(requestedKey) {
     if (value?.live?.ownerId !== ownerId || value.live.workspaceId !== home || !Array.isArray(value.devices)
       || !value.devices.some(row => row.id === fixtureId)) throw new Error('presence_baseline_scope_invalid')
     current = { ...value, requestedAt }; update()
-  } catch { fatal() }
+  } catch { fatal('refresh_failed') }
   finally { activeRefreshes--; firstReadSettled = true; state() }
 }
 function dispose() {
@@ -57,14 +61,29 @@ function dispose() {
   for (const [id, waiter] of pending) { post({ type: 'cancel', id }); waiter.reject() }
   pending.clear()
 }
-function fatal() { if (!closing) { post({ type: 'fatal' }); dispose() } }
+function fatal(cause) { if (!closing) { post({ type: 'fatal', cause, elapsedMs: elapsed() }); dispose() } }
 channels = new LiveChannels(scope => ({
   ticket: signal => { if (!scope) { metadata.nullTicketAttempts++; return Promise.resolve(null) } return request('ticket', signal) },
   socket(ticket) {
-    if (++metadata.socketCount !== 1) { fatal(); throw new Error('presence_baseline_reconnect_outside_case') }
+    if (++metadata.socketCount !== 1) { fatal('reconnect_attempt'); throw new Error('presence_baseline_reconnect_outside_case') }
     const socket = new WebSocket(ticket.url, ticket.protocol)
+    transport.createdAtMs = elapsed(); transport.ticketLifetimeMs = Math.max(0, Math.round(ticket.expiresAt - Date.now()))
+    transport.readyState = socket.readyState
+    const send = socket.send.bind(socket), close = socket.close.bind(socket)
+    socket.send = value => {
+      if (value === 'ping') { transport.pings++; transport.lastPingAtMs = elapsed(); state() }
+      return send(value)
+    }
+    socket.close = (...args) => {
+      const field = closing ? 'cleanupCloseAtMs' : 'coreCloseAtMs'
+      transport[field] ??= elapsed()
+      transport.ticketRemainingAtCloseMs ??= Math.max(0, Math.round(ticket.expiresAt - Date.now()))
+      state(); return close(...args)
+    }
+    socket.addEventListener('open', () => { transport.openedAtMs = elapsed(); transport.readyState = socket.readyState; state() })
     socket.addEventListener('message', message => {
-      if (closing || typeof message.data !== 'string' || message.data.length > 2_048 || message.data === 'pong') return
+      if (closing || typeof message.data !== 'string' || message.data.length > 2_048) return
+      if (message.data === 'pong') { transport.pongs++; transport.lastPongAtMs = elapsed(); state(); return }
       let parsed
       try { parsed = JSON.parse(message.data) } catch { return }
       const readiness = liveReadiness(parsed)
@@ -76,7 +95,14 @@ channels = new LiveChannels(scope => ({
       }
       queueMicrotask(state)
     })
-    socket.addEventListener('error', fatal); socket.addEventListener('close', () => { if (!closing) fatal() })
+    socket.addEventListener('error', () => { transport.errorAtMs ??= elapsed(); transport.readyState = socket.readyState; state(); fatal('socket_error') })
+    socket.addEventListener('close', event => {
+      transport.closedAtMs ??= elapsed(); transport.readyState = socket.readyState
+      transport.ticketRemainingAtCloseMs ??= Math.max(0, Math.round(ticket.expiresAt - Date.now()))
+      transport.closeCode = Number.isSafeInteger(event.code) ? event.code : null
+      transport.closeWasClean = typeof event.wasClean === 'boolean' ? event.wasClean : null
+      state(); fatal('socket_close')
+    })
     return socket
   },
   visible: () => !closing, watchVisibility: () => () => {}, now: Date.now, monotonicNow: () => performance.now(),
@@ -88,7 +114,7 @@ parentPort.on('message', message => {
     const waiter = pending.get(message.id); if (!waiter) return
     pending.delete(message.id); if (message.ok) waiter.resolve(message.value); else waiter.reject()
   } else if (message?.type === 'close') {
-    dispose(); post({ type: 'closed', ...metadata, activeRefreshes }); parentPort.close()
+    dispose(); post({ type: 'closed', ...metadata, transport, activeRefreshes }); parentPort.close()
   }
 })
 mainSubscription = channels.subscribe(home, 'device_list', home, [key], refresh, options())

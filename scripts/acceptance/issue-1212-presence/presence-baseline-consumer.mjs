@@ -3,6 +3,26 @@ import { normalDeviceRead, validateLiveTicket } from './presence-consumer.mjs'
 const fail = code => { throw Object.assign(new Error(code), { code }) }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const milliseconds = () => Math.round(performance.now())
+const workerCauses = new Set(['refresh_failed', 'reconnect_attempt', 'socket_error', 'socket_close'])
+// Only bounded numeric/boolean metadata crosses into retained reports. Never
+// retain a CloseEvent reason, Error.message, URL, ticket, frame or credential.
+function transportEvidence(value) {
+  if (!value || typeof value !== 'object') return null
+  const result = {}
+  for (const field of ['createdAtMs', 'openedAtMs', 'lastPingAtMs', 'lastPongAtMs', 'coreCloseAtMs', 'cleanupCloseAtMs',
+    'closedAtMs', 'errorAtMs', 'ticketLifetimeMs', 'ticketRemainingAtCloseMs']) {
+    if (value[field] !== null && (!Number.isSafeInteger(value[field]) || value[field] < 0 || value[field] > 3_600_000)) return null
+    result[field] = value[field]
+  }
+  for (const field of ['pings', 'pongs']) {
+    if (!Number.isSafeInteger(value[field]) || value[field] < 0 || value[field] > 1_000) return null
+    result[field] = value[field]
+  }
+  if (value.closeCode !== null && (!Number.isSafeInteger(value.closeCode) || value.closeCode < 0 || value.closeCode > 4_999)) return null
+  if (value.closeWasClean !== null && typeof value.closeWasClean !== 'boolean') return null
+  if (value.readyState !== null && ![0, 1, 2, 3].includes(value.readyState)) return null
+  return { ...result, closeCode: value.closeCode, closeWasClean: value.closeWasClean, readyState: value.readyState }
+}
 
 export function validateBaselineRead(value, fixture, ownerId) {
   const own = value?.devices?.find(row => row.id === fixture.deviceId)
@@ -17,12 +37,15 @@ export async function openBaselineConsumers(session, initialRead, { fixture, sou
   const ownerId = session.identity.userId, home = initialRead.live.workspaceId, tabCount = 3
   validateBaselineRead(initialRead, fixture, ownerId)
   const report = { schemaVersion: 1, case: 'old-device-client-three-native-workers', applicationSha: expectedSha,
-    sourceCommit: source.sourceBase, sourceHashes: source.hashes, tabCount, network: [], tabs: [], phases: [],
+    sourceCommit: source.sourceBase, sourceHashes: source.hashes, tabCount, network: [], tabs: [], phases: [], failures: [],
     adaptation: { nativeWebSocket: true, independentHeaps: true, cookieInParentOnly: true, actualOldLiveChannels: true,
       oldHomeAndNullSubscriptions: true, tabShare: false, reactSWRRendered: false, installedDaemon: false }, closed: false }
   const workers = [], states = new Map(), active = new Map(), listeners = new Set()
   let phase = 'initial', fault = null, closing = false, closePromise
   const seen = () => { checkpoint(report); for (const listener of [...listeners]) listener() }
+  const recordFailure = (tabId, cause, elapsedMs = null) => {
+    if (report.failures.length < 16) report.failures.push({ tabId, cause, phase, observedAtMs: milliseconds(), workerElapsedMs: elapsedMs })
+  }
   const waitUntil = (predicate, timeoutMs, honorFault = true) => new Promise(resolve => {
     let done = false
     const finish = value => { if (done) return; done = true; clearTimeout(timer); listeners.delete(check); resolve(value) }
@@ -55,6 +78,7 @@ export async function openBaselineConsumers(session, initialRead, { fixture, sou
       row.status = 'completed'; worker.postMessage({ type: 'response', id: message.id, ok: true, value })
     } catch {
       row.status = 'failed'; if (!closing) fault ??= 'presence_baseline_proxy_failed'
+      if (!closing) recordFailure(tabId, message.method === 'ticket' ? 'ticket_request_failed' : 'device_request_failed')
       worker.postMessage({ type: 'response', id: message.id, ok: false })
     } finally { active.delete(id); row.finishedAtMs = milliseconds(); seen() }
   }
@@ -65,10 +89,20 @@ export async function openBaselineConsumers(session, initialRead, { fixture, sou
       void proxy(worker, tabId, message); return
     }
     if (message.type === 'cancel') { active.get(tabId + ':' + message.id)?.abort(); return }
-    if (message.type === 'fatal') { if (!closing) fault ??= 'presence_baseline_worker_failed'; seen(); return }
+    if (message.type === 'fatal') {
+      if (!closing) {
+        fault ??= 'presence_baseline_worker_failed'
+        const valid = workerCauses.has(message.cause) && Number.isSafeInteger(message.elapsedMs) && message.elapsedMs >= 0 && message.elapsedMs <= 3_600_000
+        recordFailure(tabId, valid ? message.cause : 'invalid_diagnostic', valid ? message.elapsedMs : null)
+      }
+      seen(); return
+    }
     if (message.type !== 'state' && message.type !== 'closed') return
     const value = { ...states.get(tabId), tabId, closed: message.type === 'closed',
       ...(message.type === 'state' ? { online: message.online, ready: message.ready === true, fallbackActive: message.fallbackActive === true } : {}) }
+    const transport = transportEvidence(message.transport)
+    if (!transport) { fault ??= 'presence_baseline_metadata_invalid'; seen(); return }
+    value.transport = transport
     for (const name of ['refreshCalls', 'networkReads', 'devicePushes', 'threadPushes', 'socketCount', 'nullTicketAttempts', 'activeRefreshes']) {
       if (!Number.isSafeInteger(message[name]) || message[name] < 0) { fault ??= 'presence_baseline_metadata_invalid'; seen(); return }
       value[name] = message[name]
@@ -90,8 +124,8 @@ export async function openBaselineConsumers(session, initialRead, { fixture, sou
       }, env: {} })
       workers.push(worker)
       worker.on('message', message => receive(worker, tabId, message))
-      worker.on('error', () => { if (!closing) fault ??= 'presence_baseline_worker_failed'; seen() })
-      worker.on('exit', code => { if (!closing && code) { fault ??= 'presence_baseline_worker_exited'; seen() } })
+      worker.on('error', () => { if (!closing) { fault ??= 'presence_baseline_worker_failed'; recordFailure(tabId, 'worker_error') } seen() })
+      worker.on('exit', code => { if (!closing && code) { fault ??= 'presence_baseline_worker_exited'; recordFailure(tabId, 'worker_exit') } seen() })
     }
     if (!await waitUntil(ready, readyTimeoutMs) || fault) fail('presence_baseline_ready_failed')
     return { report,
@@ -103,12 +137,15 @@ export async function openBaselineConsumers(session, initialRead, { fixture, sou
         await new Promise(resolve => setTimeout(resolve, durationMs))
         const elapsedMs = milliseconds() - start
         phase = 'after-idle'
-        if (!await waitUntil(() => active.size === 0 && ready(), 20_000) || fault) fail('presence_baseline_read_failed')
+        const settled = await waitUntil(() => active.size === 0 && ready(), 20_000)
         const measured = report.network.slice(index).filter(row => row.phase === 'healthy-idle' && row.method === 'devices')
         const byTab = Object.fromEntries([...states.keys()].map(id => [id, measured.filter(row => row.tabId === id).length]))
         const value = { name: 'healthy-idle', elapsedMs, actualReads: measured.length, byTab,
-          allOldFallbacksActive: baselineReady(), allReadsSucceeded: measured.every(row => row.status === 'completed'), adopted: 0 }
+          allOldFallbacksActive: baselineReady(), allReadsSucceeded: measured.every(row => row.status === 'completed'), adopted: 0,
+          healthVerified: settled && !fault && baselineReady(), completed: false }
+        value.completed = value.healthVerified && value.allReadsSucceeded && Object.values(byTab).every(count => count >= 1)
         report.phases.push(value); seen()
+        if (!settled || fault) fail('presence_baseline_read_failed')
         if (!value.allOldFallbacksActive || !value.allReadsSucceeded || Object.values(byTab).some(count => count < 1)) fail('presence_baseline_window_invalid')
         return value
       }, close }
