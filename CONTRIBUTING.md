@@ -113,18 +113,19 @@ under Alex's identity (a GitHub App install, an OAuth consent) or a session
 permission prompt may be asked of him. The named accounts set up outside the
 pool: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
-Cloud machines start from new instances of E2B's official `desktop`, `claude`
-and `codex` templates. The Mikka worker is added in its own directory on the
-instance; the official templates are not changed
-([decision 2026-11-03-1430](docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
-A push to `main` that changes the worker paths runs
-`.github/workflows/e2b-official-runtime.yml`. It validates new official
-instances and publishes only the application configuration to Vercel
-Production. The older `e2b-template.yml`, which built derived templates, is
-paused and must not be resumed
-([`.github/workflows/README.md`](.github/workflows/README.md#cloud-worker-template-release)).
-Never change the production templates or Vercel's production variables by
-hand ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
+Cloud machines use versioned Mikka templates derived from E2B's official
+`desktop`, `claude` and `codex` templates. Node, the worker and its dependencies
+are preinstalled under `/opt/mikka`. Add files, never delete or overwrite an
+original official CLI, Node/npm or system file
+([decision 2026-11-03-1430, clarified in #1505](docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
+A worker change on `main` runs `.github/workflows/e2b-official-runtime.yml`.
+The release requires unchanged original-file checksums and real Claude Code
+and Codex subscription executions on the exact candidates before making them
+public or selecting them in production. Keep the previous templates and the
+paired configuration for rollback. The historical `e2b-template.yml` is now the
+reusable candidate builder; it cannot publish production configuration.
+See [the release workflow](.github/workflows/README.md#cloud-worker-template-release)
+and [`docs/dev-workflow.md`](docs/dev-workflow.md) § 7.
 
 ## License
 

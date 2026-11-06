@@ -1,6 +1,6 @@
-name: E2B official instance runtime
-# The historical e2b-template.yml remains disabled and unchanged. This workflow
-# only creates disposable official instances and publishes matching app config.
+name: E2B additive runtime release
+# Build private candidates, preserve official files, prove both subscriptions,
+# then publish through the same version-bound Web deployment queue.
 on:
   push:
     branches: [main]
@@ -19,6 +19,9 @@ on:
       - 'scripts/e2b/publish-template-env.mjs'
       - 'lib/computer/official-runtime.ts'
       - '.github/workflows/e2b-official-runtime.yml'
+      - '.github/workflows/e2b-template.yml'
+      - 'scripts/e2b/validate-template-subscriptions.mjs'
+      - 'scripts/acceptance/cloud-startup.mjs'
       - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
       - 'scripts/release/build-vercel.mjs'
@@ -54,9 +57,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
+      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
+      - run: python3 scripts/e2b/build-template.test.py
+      - run: python3 scripts/e2b/official-files.test.py
       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
-      - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+      - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh
   # Unchanged runtime content skips validation unless its release-control path
   # changed in this push, or an operator explicitly requested a full refresh.
   check:
@@ -109,50 +114,10 @@ jobs:
   validate:
     needs: [test, check]
     if: needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
     permissions:
       contents: read
       id-token: write
-    outputs:
-      source-sha: ${{ steps.validate.outputs.source-sha }}
-      template-models: ${{ steps.validate.outputs.template-models }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - name: Install the pinned E2B SDK
-        run: |
-          python3 -m venv "$RUNNER_TEMP/e2b"
-          "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
-      - name: Read the existing E2B validation key
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: E2B_API_KEY
-          include-imports: false
-      - name: Validate new official instances without template mutation
-        id: validate
-        run: |
-          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/validate-official-instances.py --source-ref "$GITHUB_SHA" --output "$RUNNER_TEMP/official-runtime.json"
-          node --input-type=module - "$RUNNER_TEMP/official-runtime.json" <<'JS'
-          import { readFileSync, appendFileSync } from 'node:fs'
-          const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
-          if (report.sourceCommit !== process.env.GITHUB_SHA || !/^[a-f0-9]{40}$/.test(report.workerSha)) throw Error('Runtime source mismatch')
-          const models = {}
-          for (const kind of ['desktop', 'claude', 'codex']) {
-            const row = report.templates[kind]
-            if (row.templateId !== kind || JSON.stringify(row.before) !== JSON.stringify(row.after)) throw Error('Official files changed')
-            models[kind] = row.models
-            console.log(`${kind}: ${row.before.entries} preserved entries, manifest ${row.before.sha256}`)
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\n`)
-          JS
+    uses: ./.github/workflows/e2b-template.yml
   # Do not take web-deploy-production here: the matching Web job needs that
   # queue to finish its GitHub build and upload while this read-only job waits.
   await-web:
@@ -173,8 +138,94 @@ jobs:
         run: node scripts/release/web-deploy.mjs await-web
         env:
           GITHUB_TOKEN: ${{ github.token }}
-  publish:
+  subscriptions:
     needs: [validate, await-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      release-evidence: ${{ steps.publish.outputs.release-evidence }}
+      template-ids: ${{ steps.publish.outputs.template-ids }}
+    env:
+      # Existing ACME-owned workspace and dedicated test Bot, never a real task.
+      MIKKA_ACCEPTANCE_WORKSPACE_ID: de300001-ece6-4021-8214-c986ea306bde
+      MIKKA_ACCEPTANCE_BOT_ID: bc925088-d87f-47b8-a786-c1c317ac005f
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Refuse an obsolete source before real subscription work
+        run: node scripts/release/web-deploy.mjs main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Install only the pinned gate SDKs
+        run: |
+          npm install --prefix "$RUNNER_TEMP/e2b-js" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
+          ln -s "$RUNNER_TEMP/e2b-js/node_modules" node_modules
+          python3 -m venv "$RUNNER_TEMP/e2b"
+          "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Read the existing candidate E2B key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Read the authorized acceptance account email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          include-imports: false
+      - name: Read the authorized acceptance account password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          include-imports: false
+      - name: Require real Claude Code and Codex subscriptions on the private candidates
+        run: |
+          node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
+          import { writeFileSync } from 'node:fs'
+          writeFileSync(process.argv[2], process.env.CANDIDATE_REPORT, { mode: 0o600 })
+          JS
+          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/accepted.json"
+        env:
+          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+      - name: Make only fully accepted candidates public
+        id: publish
+        run: |
+          node scripts/release/web-deploy.mjs main
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --publish-verified "$RUNNER_TEMP/accepted.json" > "$RUNNER_TEMP/release.json"
+          node --input-type=module - "$RUNNER_TEMP/release.json" <<'JS'
+          import { readFileSync, appendFileSync } from 'node:fs'
+          const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
+          const ids = Object.fromEntries(Object.entries(report.templates).map(([kind, row]) => [kind, row.templateId]))
+          appendFileSync(process.env.GITHUB_OUTPUT, `release-evidence=${JSON.stringify(report)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
+          JS
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+  publish:
+    needs: [validate, await-web, subscriptions]
     permissions:
       contents: read
       id-token: write
@@ -183,3 +234,5 @@ jobs:
       runtime-refresh: true
       runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
       runtime-template-models: ${{ needs.validate.outputs.template-models }}
+      runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
+      runtime-release-evidence: ${{ needs.subscriptions.outputs.release-evidence }}

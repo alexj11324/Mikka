@@ -19,6 +19,8 @@ let initialRevision = ''
 before(async () => {
   await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid NOT NULL, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "agentId" uuid NOT NULL, "agentDefinition" jsonb, "botId" uuid)`)
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "issueId" uuid`)
+  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "machineAuthority" boolean NOT NULL DEFAULT false,
+    ADD COLUMN cli_policy_hierarchy jsonb, ADD COLUMN "updatedAt" timestamptz NOT NULL DEFAULT now()`)
   await pool.query(`CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text NOT NULL,"sourceEventId" uuid NOT NULL,status text NOT NULL);
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid NOT NULL,"runId" uuid NOT NULL,output jsonb NOT NULL);
     CREATE TABLE factory_events (id uuid PRIMARY KEY,"taskId" uuid NOT NULL,request jsonb NOT NULL,result jsonb NOT NULL)`)

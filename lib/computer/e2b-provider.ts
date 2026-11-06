@@ -50,7 +50,7 @@ export async function computerState(workspaceId: string, id: string, observed?: 
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
-/** Official E2B desktop base with the Mikka worker and pinned CLIs baked in. */
+/** Verified additive desktop image, or the original official base for rollback. */
 export async function createComputer(workspaceId: string, operationId: string) {
   // Flag on: only the public template from E2B_BYO_COMPUTER_TEMPLATE; a 404 becomes e2b_template_unavailable.
   const template = computerTemplate()
@@ -63,7 +63,7 @@ export async function createComputer(workspaceId: string, operationId: string) {
     metadata: { application: 'mikka', workspaceId },
     lifecycle: { onTimeout: 'pause', autoResume: false },
   }))
-  await bootstrapOfficialInstance(sandbox, 'desktop')
+  if (template === 'desktop') await bootstrapOfficialInstance(sandbox, 'desktop')
   return sandbox
 }
 

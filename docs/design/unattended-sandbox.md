@@ -2,35 +2,38 @@
 
 Decision: Alex, 2026-10-29. Implements the unattended sandbox scope tracked in #404.
 
-Status (2026-11-03): runs no longer use a sandbox, a Docker container or a
-network relay, and nothing is asked per tool or destination
-([1312](decisions/2026-11-01-1312-cloud-runs-without-docker.md),
-[2335](decisions/2026-11-01-2335-e2b-official-templates.md)). The sections
-below say what holds now.
+Status (2026-11-06): the runtime contract is now
+[one task, one machine](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)
+(#1505). The older Docker/sandbox, isolated HOME, provider-custody proxy and
+per-call permission-gate requirements are superseded. The browser service's
+own saved-login and human-viewer policy is a separate concern below.
 
 ## Execution defaults
 
-An authenticated, owned cloud device receives public web egress by default.
-An unbound or local worker receives bounded local network defaults. A model,
-request payload or a device owned by another account cannot select cloud authority.
-Existing explicit ask/deny choices, read-only runs and administrator ceilings remain
-binding. Project dependency installation is allowed by default within the sandbox;
-project shell execution does not require Git publication permission.
+One task owns one E2B VM. Claude Code and Codex run as its ordinary user with
+normal HOME, environment, credential files and the actual Git repository.
+There is no Docker container, read-only root, shadow `.git`, isolated GitHub
+configuration or HTTP/CONNECT/provider relay around the CLI. Local worktrees
+preserve the person's repository and unrelated work without adding another
+remote authorization check before each call.
+
+Prepare the task's real subscription login, GitHub credential and model key
+up front, or once when first needed. Official CLIs connect directly to their
+providers. Agent tools use Claude Code `bypassPermissions` or Codex approvals
+`never`; a read-only task is an instruction to the Agent. The machine receives
+its resolved authority at admission. Revocation persists and pushes a stop,
+or stops/reclaims the VM, rather than checking authority again before each
+provider or tool operation. Natural token renewal happens in the background.
 
 Agents reach the open internet by default
-([1230](decisions/2026-11-01-1230-network-open-by-default.md)). A run asks for
-no per-host grant: Claude Code runs in `bypassPermissions` and Codex with
-approvals `never` (2335). The daemon's live gate
-(`packages/daemon/src/agents/tool-approval.ts`) still stops a run whose lease,
-owner or policy is no longer live. Publication and other external effects
-retain their own host-controlled authorization.
-
-Each hosted task runs on its own E2B machine, which is the isolation between
-tasks; there is no Docker container, read-only root or HTTP/CONNECT relay.
-Provider credentials stay outside the task: the CLI reaches the model only
-through the run's broker.
+([1230](decisions/2026-11-01-1230-network-open-by-default.md)). The reusable
+image contains no account credentials. Private task state stays with that
+owner's VM and is never reused for another task.
 
 ## Browser tasks
+
+These rules describe operations of the browser service itself; they do not
+add a permission-preflight request to the task runtime.
 
 The planner receives a current screenshot as an actual image input and chooses a
 structured mouse, keyboard, scroll or drag operation. DOM evidence may assist the

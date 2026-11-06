@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42277103323",
+  "controlSourceCommit": "292b7968c1c6280cc42bcba83d2e54902fc29db3",
+  "common": {
+    "/.e2b": { "sha256": "per-boot" },
+    "/usr/local/share/e2b/ssl-certs.tar": { "mode": { "before": 420, "after": 511 } },
+    "/var/lib/systemd/random-seed": { "sha256": "per-boot" }
+  },
+  "templates": {
+    "claude": {
+      "/etc/ssl/certs/ca-certificates.crt": { "sha256": "per-boot" },
+      "/usr/local/share/ca-certificates/e2b-ca.crt": { "mode": { "before": 420, "after": 511 } },
+      "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db": { "sha256": "per-boot" },
+      "/var/lib/docker/buildkit/cache.db": { "sha256": "per-boot" },
+      "/var/lib/docker/image/identity-cache.db": { "sha256": "per-boot" },
+      "/var/lib/docker/network/files/local-kv.db": { "sha256": "per-boot" },
+      "/var/lib/docker/volumes/metadata.db": { "sha256": "per-boot" }
+    },
+    "codex": {},
+    "desktop": {
+      "/etc/ssl/certs/ca-certificates.crt": { "sha256": "per-boot" },
+      "/usr/local/share/ca-certificates/e2b-ca.crt": { "mode": { "before": 420, "after": 511 } }
+    }
+  }
+}

@@ -132,6 +132,21 @@ it("delivers an access-only lease through the native input without reading host 
   expect(JSON.stringify(events)).not.toContain("fixture-access")
 })
 
+it('answers the actual SDK oauth_token_refresh control request from its prepared token cache', async () => {
+  let reads = 0
+  const token = vi.fn(async () => ({ accountId: 'fixture-account',
+    accessToken: ++reads === 1 ? 'fixture-access' : 'fixture-access-rotated',
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString() }))
+  const { adapter, options, processReceipt } = await fixture({ accountId: 'fixture-account', automaticRefresh: true, token })
+  const session = await adapter.start({ ...options, prompt: 'REFRESH' })
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(token).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(readFileSync(join(processReceipt, '..', 'fixture-refresh.json'), 'utf8'))).toEqual({ accepted: true })
+  expect(JSON.stringify(events)).not.toMatch(/fixture-access/)
+})
+
 it('accepts the older explicit no-API-key response too', async () => {
   const { adapter, options } = await fixture({ accountId: 'fixture-account', token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-legacy', expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
   const session = await adapter.start(options)

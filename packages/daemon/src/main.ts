@@ -342,7 +342,7 @@ export class Daemon {
     if (this.runControlPush) this.options.link.setRunControlMode?.('fallback')
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
-    if (this.localComputerDriver && this.options.link.syncComputerReviews && this.options.link.localComputerAuthority) {
+    if (this.localComputerDriver && this.options.link.syncComputerReviews) {
       this.localComputerBroker = new ComputerBroker({
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
@@ -358,9 +358,9 @@ export class Daemon {
           const initial = this.journal.get(runId)?.assignment.localComputer
           if (!initial || display !== undefined) throw new Error('Local computer unavailable')
           const recheck = async () => {
-            const current = await this.options.link.localComputerAuthority!(this.device.deviceId!, runId)
+            const current = this.journal.get(runId)?.assignment.localComputer
             context.assertLive()
-            if (current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
+            if (!this.supervisor.computerRunAllowed(runId) || !current || current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
               throw new Error('Local computer authority changed')
           }
           try {
@@ -550,12 +550,12 @@ export class Daemon {
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
         publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
-          assignment.github?.branch && assignment.mcp ? agentPublishedReceipt({
+          assignment.github?.branch && (assignment.github.token || assignment.mcp) ? agentPublishedReceipt({
             runId, repoPath: repo.path, worktree, tree,
-            github: { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId },
+            github: { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId },
             privateDir: join(paths.adapterState, 'pids'),
             ...(hosted ? { hosted: true } : {}),
-            env: githubReceiptEnvironment(),
+            env: hosted ? process.env : githubReceiptEnvironment(),
           }) : publishRun({
             runId,
             repoPath: repo.path,
