@@ -60,13 +60,15 @@ jobs:
             timeRange:{start:'2026-11-06T20:05:14.236Z',end:'2026-11-06T20:06:51.492Z'},
             select:['deploymentId','environment','message','truncated'],limit:1,
             filter:'deploymentId:"dpl_9dfpxYacqybW7U2PcpviMu83ruSg" AND environment:production AND ("wrun_41M6S7EH0Q0GHTKW08JP0XJPQE") AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)'};
-          for(const order of ['asc','desc']){
+          const variants=[{name:'full',filter:base.filter},{name:'deployment',filter:'deploymentId:"dpl_9dfpxYacqybW7U2PcpviMu83ruSg" AND environment:production'},{name:'scope_only',filter:undefined}];
+          for(const variant of variants){
+            const order='desc';
             const response=await fetch('https://api.vercel.com/v1/observability/events?teamId=team_C7lwxVVvnUicFli6112mvxpv',{
               method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json','x-vercel-observability-query-reason':'cli/logs-runtime'},
-              body:JSON.stringify({...base,order}),redirect:'error',signal:AbortSignal.timeout(20000)});
+              body:JSON.stringify({...base,order,filter:variant.filter}),redirect:'error',signal:AbortSignal.timeout(20000)});
             const value=await response.json();
             const error=response.ok?undefined:{code:typeof value.error?.code==='string'?value.error.code.slice(0,80):null,
-              message:typeof value.error?.message==='string'?value.error.message.replaceAll(token,'[REDACTED]').slice(0,800):null};
-            console.log(JSON.stringify({logQueryDiagnostic:{order,status:response.status,eventCount:Array.isArray(value.events)?value.events.length:null,error}}));
+              details:JSON.stringify(value.error??value).replaceAll(token,'[REDACTED]').slice(0,3000)};
+            console.log(JSON.stringify({logQueryDiagnostic:{variant:variant.name,order,status:response.status,eventCount:Array.isArray(value.events)?value.events.length:null,error}}));
           }
           JS
