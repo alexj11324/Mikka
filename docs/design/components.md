@@ -52,7 +52,7 @@ component covers.
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
 | Status | StatusBadge set; `components/nav/status-dot.tsx` for devices | R-24, R-34 |
 | People avatars | `components/nav/letter-avatar.tsx`, `components/user-avatar.tsx` | |
-| Bot avatars | `BotAvatar` (`components/nav/bot-avatar.tsx`, bloub, Figma `196:3571`) | R-36 |
+| Bot avatars | `BotAvatar` (`components/nav/bot-avatar.tsx`, bloub, Figma `196:3571`); its look is the `bot-avatar` UI slot (`components/slots/bot-avatar.tsx`, [`docs/ui-overlay.md`](../ui-overlay.md)) | R-36 |
 | A list that failed to load (inline) | `InlineLoadError` (`components/load-error.tsx`): error line and a ghost `xs` 重试 | Settings use `SettingsSaveError`; a whole page that failed uses `Empty` with an outline 重试 |
 | Buttons, badges, dialogs, menus, tabs, switches | reUI first, then `components/ui/*` | Figma style guide rule 4 |
 | Segmented control (scope, view switch, theme, any one-of-N option) | `ToggleGroup variant="segment" spacing={0.5}` (`components/ui/toggle-group.tsx`); for tabs with panels, `TabsList` (`components/ui/tabs.tsx`). Both draw the selected pill with `SegmentIndicator`, which glides on `SPRING_LAYOUT` | One `--control` track at the button height (28px at `sm`), 8px radius, pressed item raised; no per-call height, radius or grey overrides (R-31, R-33; ui-policy `style/segment-track`) |

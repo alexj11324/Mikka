@@ -23,7 +23,7 @@ const WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', 
 /** A member row: people with their letter, bots with their bloub (R-36), then the name. */
 function MemberRow({ member }: { member: GroupMember }) {
   return <li className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-sm">
-    {member.memberType === 'bot' ? <BotAvatar color={member.color} shape={member.shape} size="row" still /> : <LetterAvatar name={member.name} size="row" />}
+    {member.memberType === 'bot' ? <BotAvatar id={member.id} color={member.color} shape={member.shape} size="row" still /> : <LetterAvatar name={member.name} size="row" />}
     <span className="truncate">{member.name}</span>
   </li>
 }

@@ -399,7 +399,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
                     {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {t('selectedBy', { workspace: workspaceName ?? scopeT('currentWorkspace') })}
-                      {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
+                      {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
                     </span>}
                   </div>}
                 </div>
