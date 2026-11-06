@@ -33,3 +33,35 @@ test('the actual Gateway SDK transport refuses a real HTTP redirect without send
     await new Promise<void>(resolve => server.close(() => resolve()))
   }
 })
+
+test('the actual ZeroCat transport refuses a real HTTP redirect without sending the second request', async () => {
+  let requests = 0, redirected = 0
+  const server = createServer((request, response) => {
+    requests++
+    if (request.url === '/redirected') { redirected++; response.writeHead(200).end('{}'); return }
+    response.writeHead(307, { location: '/redirected' }).end()
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address() as { port: number }
+  const nativeFetch = globalThis.fetch
+  globalThis.fetch = (async (input, init) => {
+    const original = new URL(input instanceof Request ? input.url : String(input))
+    assert.equal(original.origin, 'https://zero.cat')
+    assert.equal(original.pathname, '/v1/chat/completions')
+    assert.equal(init?.redirect, 'error')
+    return nativeFetch(`http://127.0.0.1:${address.port}${original.pathname}`, init)
+  }) as typeof fetch
+  try {
+    const { createZeroCatModel } = await import('../abuse/zerocat')
+    const model = createZeroCatModel({ ZEROCAT_BASE_URL: 'https://zero.cat/v1', ZEROCAT_API_KEY: 'synthetic-zerocat-test-key' })
+    assert.equal(model.modelId, 'deepseek-v4.1-flash')
+    await assert.rejects(Promise.resolve(model.doGenerate({ prompt: [] })))
+    assert.equal(requests, 1)
+    assert.equal(redirected, 0)
+  } finally {
+    globalThis.fetch = nativeFetch
+    server.closeAllConnections()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+})

@@ -2,11 +2,13 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { gateway, type LanguageModel } from 'ai'
 import { modelAdmission } from '@/lib/model-admission/runtime'
-import { GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, type GatewayAdmission } from '@/lib/model-admission/contract'
+import { GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, ZEROCAT_MODEL_ENDPOINT, type GatewayAdmission } from '@/lib/model-admission/contract'
 import { hostedBillingScope } from './context'
 import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
 import { withSharedCredits } from '@/lib/credit-shares'
+import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { createZeroCatModel, gatewayCredential, recordModelRoute, zeroCatConfig, zeroCatCost, zeroCatErrorStatus, zeroCatFailureReason, ZEROCAT_FIRST_TOKEN_TIMEOUT_MS, type ZeroCatFallbackReason } from './zerocat'
 import {
   gatewayCost,
   gatewayGenerationId,
@@ -25,6 +27,33 @@ export async function createTrustedGatewayModel(modelId: string, apiKey?: string
   trustedGatewayModels.add(model)
   return model
 }
+/**
+ * The default model (COORDINATOR_MODEL) goes to ZeroCat first and to its AI
+ * Gateway route only as a fallback; every other hosted model id keeps Gateway.
+ */
+export function isZeroCatModel(modelId: string) { return modelId === COORDINATOR_MODEL }
+
+/** Whether a ZeroCat admission refusal leaves the Gateway fallback to decide. */
+const routeDenied = (error: unknown) => error instanceof ModelAdmissionError && error.code === 'modelRouteDenied'
+
+/**
+ * Admission for a hosted model before any paid work. The default model passes
+ * when either of its routes (ZeroCat, else Gateway) is admitted.
+ */
+export async function admitHostedModel(scope: { workspaceId: string; ownerId?: string }, modelId: string,
+  options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<GatewayAdmission | null> {
+  if (isZeroCatModel(modelId) && zeroCatConfig()) {
+    try { await modelAdmission.zeroCat(scope, modelId, ZEROCAT_MODEL_ENDPOINT, options); return null }
+    catch (error) { if (!routeDenied(error)) throw error }
+  }
+  return modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, options)
+}
+
+type CallArgs = Parameters<Model['doGenerate']>[0]
+type StreamPart = Awaited<ReturnType<Model['doStream']>>['stream'] extends ReadableStream<infer P> ? P : never
+/** The first part a consumer could act on; before it the call can still change provider. */
+const COMMITTED = new Set(['text-delta', 'reasoning-delta', 'tool-input-start', 'tool-input-delta', 'tool-call', 'tool-result', 'file', 'source'])
+
 /** Every SDK tool step reaches this model boundary, including compaction. */
 export async function hostedModel(
   workspaceId: string,
@@ -33,6 +62,15 @@ export async function hostedModel(
   ownerId?: string,
 ): Promise<Model> {
   await withSharedCredits(workspaceId, canUseMikkaPaid)
+  const zeroCat = isZeroCatModel(modelId)
+  // The default model's fallback is its own Gateway route; a caller may hand in
+  // only the trusted Gateway transport for it, never an arbitrary provider.
+  if (zeroCat && provider && !trustedGatewayModels.has(provider)) throw new ModelAdmissionError('modelRouteDenied')
+  let primary: Model | undefined, unavailable: ZeroCatFallbackReason | undefined
+  if (zeroCat) {
+    try { primary = createZeroCatModel() }
+    catch (error) { unavailable = error instanceof PaidResourceError && error.detail === 'zerocat_endpoint_unexpected' ? 'endpoint_unexpected' : 'unconfigured' }
+  }
   const model = provider ?? gateway(modelId)
   const billing = hostedBillingScope.getStore()
   const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
@@ -42,12 +80,16 @@ export async function hostedModel(
     if (provider && !trustedGatewayModels.has(provider)) throw new ModelAdmissionError('modelRouteDenied')
     return provider ?? (managed ??= await createTrustedGatewayModel(modelId))
   }
-  const reserve = async (
-    id: string,
-    args: Parameters<Model['doGenerate']>[0],
-  ) => {
-    const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal, auditAllowed: false })
-    await executionModel(admission)
+  /** True when ZeroCat may serve this call; false sends it to the Gateway fallback. */
+  const admitZeroCat = async (signal: AbortSignal | undefined, auditAllowed?: boolean) => {
+    if (!primary) return false
+    try { await modelAdmission.zeroCat(scope, modelId, ZEROCAT_MODEL_ENDPOINT, { signal, auditAllowed }); return true }
+    catch (error) { if (routeDenied(error)) return false; throw error }
+  }
+  const admitGateway = (signal: AbortSignal | undefined, auditAllowed?: boolean) =>
+    modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal, auditAllowed })
+  const reserve = async (id: string, args: CallArgs) => {
+    if (!zeroCat || !await admitZeroCat(args.abortSignal, false)) await executionModel(await admitGateway(args.abortSignal, false))
     // An input-size boundary, not a prepaid or estimated-cost balance check.
     const promptBytes = Buffer.byteLength(
       JSON.stringify({ prompt: args.prompt, tools: args.tools }),
@@ -56,40 +98,72 @@ export async function hostedModel(
       throw new PaidResourceError('usage_cost_unavailable')
     await withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, modelId, id, process.env))
   }
-  const options = (value: Parameters<Model['doGenerate']>[0], admission: GatewayAdmission | null) => ({
+  const bounded = (value: CallArgs, signals: AbortSignal[] = []) => ({
+    maxOutputTokens: Math.min(value.maxOutputTokens ?? 4096, 4096),
+    abortSignal: AbortSignal.any([
+      AbortSignal.timeout(HOSTED_CALL_TIMEOUT_MS),
+      ...(value.abortSignal ? [value.abortSignal] : []),
+      ...signals,
+    ]),
+  })
+  const options = (value: CallArgs, admission: GatewayAdmission | null) => ({
     ...value,
     providerOptions: {
       ...value.providerOptions,
       gateway: admission ? { ...managedGatewayOptions(admission), user: workspaceId } : { ...value.providerOptions?.gateway, user: workspaceId },
     },
-    maxOutputTokens: Math.min(value.maxOutputTokens ?? 4096, 4096),
-    abortSignal: AbortSignal.any([
-      AbortSignal.timeout(HOSTED_CALL_TIMEOUT_MS),
-      ...(value.abortSignal ? [value.abortSignal] : []),
-    ]),
+    ...bounded(value),
   })
+  // Gateway routing options mean nothing to ZeroCat, and a caller's must not reach it.
+  const zeroCatOptions = (value: CallArgs, signals: AbortSignal[] = []) => ({ ...value, providerOptions: withoutGatewayOptions(value.providerOptions), ...bounded(value, signals) })
+  const cancelled = (args: CallArgs) => {
+    if (args.abortSignal?.aborted) throw args.abortSignal.reason ?? new DOMException('Model request cancelled', 'AbortError')
+  }
+  const fallbackFrom = (args: CallArgs, error: unknown, firstTokenTimedOut = false): ZeroCatFallbackReason => {
+    // A person's stop or the caller's own deadline ends the call; it is not a ZeroCat failure.
+    cancelled(args)
+    return zeroCatFailureReason(error, firstTokenTimedOut)
+  }
+  const route = (served: 'zerocat' | 'gateway', reason?: ZeroCatFallbackReason, error?: unknown, metadata?: unknown) => {
+    if (zeroCat) recordModelRoute({ model: modelId, route: served, reason, status: zeroCatErrorStatus(error), credential: served === 'gateway' ? gatewayCredential(metadata) : undefined })
+  }
   return new Proxy(model, {
     get(target, key) {
       if (key === 'doGenerate')
-        return async (args: Parameters<Model['doGenerate']>[0]) => {
+        return async (args: CallArgs) => {
           const id = randomUUID()
           await reserve(id, args)
           let requestStarted = false
           try {
             await checkAbuseAlerts()
-            const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
-            const selected = await executionModel(admission)
-            const prepared = options(args, admission)
-            if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
-            requestStarted = true
-            const result = await selected.doGenerate(prepared)
-            const cost = gatewayCost(result.providerMetadata)
+            let reason = unavailable, failure: unknown
+            let result: Awaited<ReturnType<Model['doGenerate']>> | undefined
+            if (zeroCat && !reason) {
+              if (await admitZeroCat(args.abortSignal)) {
+                const prepared = zeroCatOptions(args)
+                if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+                requestStarted = true
+                try { result = await primary!.doGenerate(prepared) }
+                catch (error) { reason = fallbackFrom(args, error); failure = error }
+              } else reason = 'route_denied'
+            }
+            const served = result ? 'zerocat' : 'gateway'
+            if (!result) {
+              const admission = await admitGateway(args.abortSignal)
+              const selected = await executionModel(admission)
+              const prepared = options(args, admission)
+              if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+              requestStarted = true
+              result = await selected.doGenerate(prepared)
+            }
+            route(served, reason, failure, result.providerMetadata)
+            const cost = served === 'zerocat' ? zeroCatCost(result.usage) : gatewayCost(result.providerMetadata)
             await hostedUsage.settle(
               id,
               cost,
               result.usage.inputTokens.total ?? 0,
               result.usage.outputTokens.total ?? 0,
-              gatewayGenerationId(result.providerMetadata),
+              served === 'gateway' ? gatewayGenerationId(result.providerMetadata) : undefined,
             )
             await checkAbuseAlerts()
             if (cost === null)
@@ -107,16 +181,52 @@ export async function hostedModel(
           let requestStarted = false
           try {
             await checkAbuseAlerts()
-            const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
-            const selected = await executionModel(admission)
-            const prepared = options(args, admission)
-            if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
-            requestStarted = true
-            const result = await selected.doStream(prepared)
+            let reason = unavailable, failure: unknown
+            let opened: { result: Awaited<ReturnType<Model['doStream']>>; reader: ReadableStreamDefaultReader<StreamPart>; buffered: StreamPart[] } | undefined
+            if (zeroCat && !reason) {
+              if (await admitZeroCat(args.abortSignal)) {
+                const firstToken = new AbortController()
+                const timer = setTimeout(() => firstToken.abort(new DOMException('ZeroCat sent no first token in time', 'TimeoutError')), ZEROCAT_FIRST_TOKEN_TIMEOUT_MS)
+                const prepared = zeroCatOptions(args, [firstToken.signal])
+                if (prepared.abortSignal.aborted) { clearTimeout(timer); throw new DOMException('Model request cancelled', 'AbortError') }
+                requestStarted = true
+                let reader: ReadableStreamDefaultReader<StreamPart> | undefined
+                try {
+                  const result = await primary!.doStream(prepared)
+                  reader = result.stream.getReader()
+                  // Hold everything up to the first token: until then nothing has
+                  // reached the consumer, so a failure can still go to Gateway.
+                  const buffered: StreamPart[] = []
+                  for (;;) {
+                    const { value, done } = await reader.read()
+                    if (done) break
+                    if (value.type === 'error') throw value.error
+                    buffered.push(value)
+                    if (COMMITTED.has(value.type) || value.type === 'finish') break
+                  }
+                  opened = { result, reader, buffered }
+                } catch (error) {
+                  void reader?.cancel(error).catch(() => {})
+                  reason = fallbackFrom(args, error, firstToken.signal.aborted)
+                  failure = error
+                } finally { clearTimeout(timer) }
+              } else reason = 'route_denied'
+            }
+            const served = opened ? 'zerocat' : 'gateway'
+            if (!opened) {
+              const admission = await admitGateway(args.abortSignal)
+              const selected = await executionModel(admission)
+              const prepared = options(args, admission)
+              if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+              requestStarted = true
+              const result = await selected.doStream(prepared)
+              opened = { result, reader: result.stream.getReader(), buffered: [] }
+            }
+            const { result, reader, buffered } = opened
             let finished = false
             let consumerCancelled = false
             let generationId: string | undefined
-            const reader = result.stream.getReader()
+            let routed = false
             const interrupt = async (reason: unknown) => {
               // Stop provider work immediately, even when accounting is waiting
               // for a database connection or row lock. Still await both outcomes.
@@ -127,20 +237,22 @@ export async function hostedModel(
               if (settlement.status === 'rejected') throw settlement.reason
               if (upstream.status === 'rejected') throw upstream.reason
             }
+            if (served === 'zerocat') { route('zerocat'); routed = true }
             return {
               ...result,
               stream: new ReadableStream({
                 async pull(controller) {
                   try {
-                    const { value: chunk, done } = await reader.read()
+                    const { value: chunk, done } = buffered.length ? { value: buffered.shift()!, done: false } : await reader.read()
                     if (done) {
+                      if (!routed) { route(served, reason, failure); routed = true }
                       if (!finished && !consumerCancelled) await hostedUsage.settle(id, null, 0, 0, generationId)
                       if (!consumerCancelled) controller.close()
                       return
                     }
                     // Gateway exposes its lookup ID on the first content chunk,
                     // before a finish receipt can be lost to interruption.
-                    if (chunk.type !== 'finish' && 'providerMetadata' in chunk) {
+                    if (served === 'gateway' && chunk.type !== 'finish' && 'providerMetadata' in chunk) {
                       const observed = gatewayGenerationId(chunk.providerMetadata)
                       if (observed && observed !== generationId) {
                         await hostedUsage.recordGeneration(id, observed)
@@ -148,13 +260,14 @@ export async function hostedModel(
                       }
                     }
                     if (chunk.type === 'finish') {
-                      const cost = gatewayCost(chunk.providerMetadata)
+                      if (!routed) { route(served, reason, failure, chunk.providerMetadata); routed = true }
+                      const cost = served === 'zerocat' ? zeroCatCost(chunk.usage) : gatewayCost(chunk.providerMetadata)
                       await hostedUsage.settle(
                         id,
                         cost,
                         chunk.usage.inputTokens.total ?? 0,
                         chunk.usage.outputTokens.total ?? 0,
-                        gatewayGenerationId(chunk.providerMetadata) ?? generationId,
+                        served === 'gateway' ? gatewayGenerationId(chunk.providerMetadata) ?? generationId : undefined,
                       )
                       finished = true
                       await checkAbuseAlerts()
@@ -183,4 +296,10 @@ export async function hostedModel(
       return typeof value === 'function' ? value.bind(target) : value
     },
   })
+}
+
+function withoutGatewayOptions(options: CallArgs['providerOptions']) {
+  if (!options) return undefined
+  const { gateway: _gateway, ...rest } = options
+  return rest
 }

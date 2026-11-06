@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 
-const savedKey = process.env.AI_GATEWAY_API_KEY
+const saved = { gateway: process.env.AI_GATEWAY_API_KEY, zeroCat: process.env.ZEROCAT_API_KEY, url: process.env.ZEROCAT_BASE_URL }
 let allowed = true
 let task: { title: string; content: unknown; shortTitle: string | null } | null = null
 let landed = true
 let answer: () => Promise<{ text: string }> = async () => ({ text: '{"title":"登录回调修复"}' })
-const writes: unknown[] = [], pushed: unknown[][] = [], keys: unknown[] = []
+const writes: unknown[] = [], pushed: unknown[][] = [], models: unknown[] = []
 const generateText = mock.fn(async () => answer())
 mock.module('ai', { namedExports: { generateText } })
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: {
@@ -17,26 +17,30 @@ mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db
 } } })
 mock.module(new URL('./live/lists.ts', import.meta.url).href, { namedExports: { issueListChanged: async (...args: unknown[]) => { pushed.push(args.slice(1)) } } })
 mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExports: { executionWorkspace: async () => 'fixture-workspace' } })
-mock.module(new URL('./model-admission/runtime.ts', import.meta.url).href, { namedExports: { modelAdmission: { gateway: async () => { if (!allowed) throw new Error('modelRouteDenied'); return null } } } })
 mock.module(new URL('./abuse/model.ts', import.meta.url).href, { namedExports: {
-  createTrustedGatewayModel: async (modelId: string, key: string) => { keys.push(key); return { modelId } },
-  hostedModel: async (workspace: string, _id: string, provider: object, owner: string) => { assert.equal(workspace, 'fixture-workspace'); assert.equal(owner, 'owner'); return provider },
+  admitHostedModel: async () => { if (!allowed) throw new Error('modelRouteDenied'); return null },
+  hostedModel: async (workspace: string, modelId: string, provider: unknown, owner: string) => {
+    assert.equal(workspace, 'fixture-workspace'); assert.equal(owner, 'owner'); assert.equal(provider, undefined); models.push(modelId); return { modelId } },
 } })
 
 let writeShortTitle: typeof import('./short-title-server').writeShortTitle
 before(async () => { writeShortTitle = (await import('./short-title-server')).writeShortTitle })
 beforeEach(() => {
   process.env.AI_GATEWAY_API_KEY = 'synthetic-short-title-key'
+  delete process.env.ZEROCAT_API_KEY; delete process.env.ZEROCAT_BASE_URL
   allowed = true; landed = true
   task = { title: 'ALEX-1470: 登录回调在真机上失效，需要检查 OAuth proxy 回跳 2026-11-06', content: { type: 'doc', content: [] }, shortTitle: null }
   answer = async () => ({ text: '{"title":"登录回调修复"}' })
-  writes.length = 0; pushed.length = 0; keys.length = 0; generateText.mock.resetCalls()
+  writes.length = 0; pushed.length = 0; models.length = 0; generateText.mock.resetCalls()
 })
-after(() => { if (savedKey === undefined) delete process.env.AI_GATEWAY_API_KEY; else process.env.AI_GATEWAY_API_KEY = savedKey })
+after(() => {
+  for (const [name, value] of [['AI_GATEWAY_API_KEY', saved.gateway], ['ZEROCAT_API_KEY', saved.zeroCat], ['ZEROCAT_BASE_URL', saved.url]] as const)
+    if (value === undefined) delete process.env[name]; else process.env[name] = value
+})
 
 test('a new task gets one short title, written with the title it came from, and the title change is pushed', async () => {
   await writeShortTitle('task', 'owner')
-  assert.deepEqual(keys, [undefined], 'the app\'s one gateway credential, no key of its own')
+  assert.deepEqual(models, ['deepseek/deepseek-v4.1-flash'], 'the default model, which picks ZeroCat or its Gateway fallback')
   assert.equal(generateText.mock.callCount(), 1)
   assert.deepEqual(writes, [{ shortTitle: '登录回调修复', shortTitleFrom: task!.title }])
   assert.deepEqual(pushed, [['task', true]])
@@ -72,8 +76,15 @@ test('a denied route, an unusable answer, a failure or a missing task leave the 
   assert.equal(pushed.length, 0)
 })
 
-test('without a gateway credential nothing is called', async () => {
+test('with neither a ZeroCat nor a gateway credential nothing is called', async () => {
   delete process.env.AI_GATEWAY_API_KEY
   await writeShortTitle('task', 'owner')
   assert.equal(generateText.mock.callCount(), 0)
+})
+
+test('ZeroCat alone is enough to name a task', async () => {
+  delete process.env.AI_GATEWAY_API_KEY
+  process.env.ZEROCAT_API_KEY = 'synthetic-zerocat-key'; process.env.ZEROCAT_BASE_URL = 'https://zero.cat/v1'
+  await writeShortTitle('task', 'owner')
+  assert.equal(generateText.mock.callCount(), 1)
 })

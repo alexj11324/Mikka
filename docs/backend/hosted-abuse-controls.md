@@ -102,7 +102,34 @@ and transaction preservation without Stripe calls.
 
 ## Scope and accounting
 
-All new Gateway text calls are admitted before provider I/O. Default Workflow
+The default model (`COORDINATOR_MODEL`, `deepseek/deepseek-v4.1-flash`) is
+served first by ZeroCat's OpenAI-compatible API (`https://zero.cat/v1`, model
+`deepseek-v4.1-flash`, `lib/abuse/zerocat.ts`). `ZEROCAT_BASE_URL` and
+`ZEROCAT_API_KEY` come from Infisical `prod:/vercel`, synced to Vercel
+Production. Its fallback is the same id on Vercel AI Gateway, used when ZeroCat
+is unconfigured (or set to another base URL), when its admission rule refuses
+it, or when the call fails before the first token: a network error, a timeout
+(20 s to the first streamed token, 60 s for a whole call), 429, 402 (quota),
+5xx, any other HTTP refusal, or a stream error. Once a token has reached the
+caller the call stays on ZeroCat, and a stopped call never moves. A caller may
+hand in only the trusted Gateway transport for this model, and only as its
+fallback. Gateway routing options (`providerOptions.gateway`) are dropped from
+ZeroCat requests. Each call writes one `model.route` span
+([tracing](../operations/tracing.md)) with the route, the fallback reason and
+which credential Gateway served with.
+
+Gateway bills the fallback with Vercel's own (system) credentials. The team's
+Gateway may still hold a DeepSeek BYOK key on an account with no balance; this
+change leaves that dashboard configuration alone. Gateway retries a failed BYOK
+attempt on system credentials within the same request, so such a call is still
+answered and billed by Vercel; `mikka.model.gateway_credential` records which
+credential served each fallback, so a call billed to BYOK would show as `byok`.
+
+Admission: ZeroCat is a `zerocat` route (`ModelAdmissionStore.zeroCat`), the
+fallback the existing `vercel-gateway` route; a workspace rule decides each
+separately, and the call is refused only when neither is admitted.
+
+All new hosted text calls are admitted before provider I/O. Default Workflow
 turns (Coordinator/bot and Slack), frozen hosted snapshots, live evaluations,
 compaction, group replies, action-title generation and profile extraction use
 the metered model seam. Triage, group routing/correction, and notification
@@ -169,7 +196,12 @@ compaction keeps its existing 30-second timeout. Inputs over 16 MB are refused;
 these transport bounds do not reserve money. Subscription calls keep their
 existing capabilities.
 Actual Gateway `providerMetadata.gateway.cost` is rounded upwards to integer
-microdollars. Missing cost or an interrupted provider call retains its
+microdollars. ZeroCat returns token counts and no cost, so a default-model call served by
+ZeroCat settles from its usage at `ZEROCAT_PRICE_USD_PER_MILLION` (input 0.12, cached
+input 0.012, output 1.00, reasoning included), the rates Gateway billed for this
+model, rounded up; missing token counts leave the cost unknown, as below. A
+fallback call settles from Gateway's receipt like any Gateway call; the failed
+ZeroCat attempt is not charged. Missing cost or an interrupted provider call retains its
 receipt record and keeps its hold until reconciled, rather than treating unknown
 usage as free. Operators can reconcile the same call ID with
 `HostedUsageStore.settle(id, actualMicroUsd, ...)` after checking the Gateway
