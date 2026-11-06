@@ -1,0 +1,42 @@
+name: Issue 1415 cancel obsolete desktop 509
+on:
+  push:
+    branches:
+      - ops/issue1415-cancel-obsolete-desktop-509
+permissions:
+  contents: read
+concurrency:
+  group: issue1415-cancel-obsolete-desktop-509-controller
+  cancel-in-progress: false
+jobs:
+  cancel:
+    if: >-
+      github.repository == 'alexj11324/Mikka' &&
+      github.repository_owner_id == '183887963' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/issue1415-cancel-obsolete-desktop-509'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: read
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Cancel only obsolete 509 after two exact guard snapshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ops/cancel-obsolete-desktop-509.mjs
+      - name: Retain only the closed controller result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1415-cancel-obsolete-desktop-509-${{ github.run_id }}
+          path: obsolete-desktop-cancel-report/result.json
+          retention-days: 14
+          if-no-files-found: error
