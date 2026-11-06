@@ -1,0 +1,655 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "scope": "read-only inventory from this issue's exact workflow branch and immutable artifacts; no E2B calls or mutations",
+  "excludedCurrentReleaseIds": [
+    "tlq998jd860bby3vvixn",
+    "dz0z0z9x1le01ji2e2m0",
+    "4xcmm3p44plzgion3ti7"
+  ],
+  "branch": "ops/1505-template-benchmark",
+  "runs": [
+    {
+      "id": 42293802095,
+      "head_sha": "11702ba4fdee7a554afa90fbb5da4f42a3ca6370",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-06T21:05:23Z",
+      "updatedAt": "2026-11-06T21:16:01Z"
+    },
+    {
+      "id": 42292116205,
+      "head_sha": "ef19d287662e3179b93826e1f8391587a588c7ac",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "attempt": 1,
+      "createdAt": "2026-11-06T20:53:15Z",
+      "updatedAt": "2026-11-06T21:01:11Z"
+    },
+    {
+      "id": 42285968840,
+      "head_sha": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-06T20:09:51Z",
+      "updatedAt": "2026-11-06T20:44:47Z"
+    },
+    {
+      "id": 42281127309,
+      "head_sha": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "attempt": 1,
+      "createdAt": "2026-11-06T19:36:31Z",
+      "updatedAt": "2026-11-06T19:56:43Z"
+    },
+    {
+      "id": 42279407055,
+      "head_sha": "ff87767ff9b85e2ca97bb23029b1fd4dc74614e7",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "attempt": 1,
+      "createdAt": "2026-11-06T19:24:55Z",
+      "updatedAt": "2026-11-06T19:31:30Z"
+    },
+    {
+      "id": 42277103323,
+      "head_sha": "292b7968c1c6280cc42bcba83d2e54902fc29db3",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-06T19:09:15Z",
+      "updatedAt": "2026-11-06T19:14:15Z"
+    },
+    {
+      "id": 42271072200,
+      "head_sha": "348049c77bf188b95ce2ce9992fe223e9842aa14",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "attempt": 1,
+      "createdAt": "2026-11-06T18:28:48Z",
+      "updatedAt": "2026-11-06T18:43:35Z"
+    },
+    {
+      "id": 42270726566,
+      "head_sha": "f2db1c2555f99c1a74046fd6dbe5070b168a87ca",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "attempt": 1,
+      "createdAt": "2026-11-06T18:26:29Z",
+      "updatedAt": "2026-11-06T18:27:01Z"
+    }
+  ],
+  "templates": [
+    {
+      "runId": 42293802095,
+      "runAttempt": 1,
+      "sourceCommit": "11702ba4fdee7a554afa90fbb5da4f42a3ca6370",
+      "jobId": 128153709036,
+      "kind": "desktop",
+      "category": "component",
+      "alias": "mikka-1505-component-42293802095-1-desktop",
+      "templateId": "3bpfdol46ki6ab0kxl01",
+      "buildId": "d1021ebf-0394-44ea-8f4b-f0b041fb300b",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42293802095/jobs/128153709036",
+        "requestLine": 2062,
+        "createdLine": 2063,
+        "requestText": "2026-11-06T21:06:24.5071210Z [desktop] [2026-11-06T21:06:24.506907] [info] Requesting build for template: mikka-1505-component-42293802095-1-desktop",
+        "createdText": "2026-11-06T21:06:24.5548752Z [desktop] [2026-11-06T21:06:24.554598] [info] Template created with ID: 3bpfdol46ki6ab0kxl01, Build ID: d1021ebf-0394-44ea-8f4b-f0b041fb300b"
+      },
+      "historicalCleanup": "invalid_absent_evidence_alias_passed_as_id"
+    },
+    {
+      "runId": 42292116205,
+      "runAttempt": 1,
+      "sourceCommit": "ef19d287662e3179b93826e1f8391587a588c7ac",
+      "jobId": 128147916052,
+      "kind": "desktop",
+      "category": "component",
+      "alias": "mikka-1505-component-42292116205-1-desktop",
+      "templateId": "yheu2vpy350my9jdvfs1",
+      "buildId": "286f2b88-4ec7-4ad8-96dc-4b069fe25448",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42292116205/jobs/128147916052",
+        "requestLine": 2056,
+        "createdLine": 2059,
+        "requestText": "2026-11-06T20:53:57.3221293Z [desktop] [2026-11-06T20:53:57.322013] [info] Requesting build for template: mikka-1505-component-42292116205-1-desktop",
+        "createdText": "2026-11-06T20:53:57.4260742Z [desktop] [2026-11-06T20:53:57.425911] [info] Template created with ID: yheu2vpy350my9jdvfs1, Build ID: 286f2b88-4ec7-4ad8-96dc-4b069fe25448"
+      },
+      "historicalCleanup": "invalid_absent_evidence_alias_passed_as_id"
+    },
+    {
+      "runId": 42292116205,
+      "runAttempt": 1,
+      "sourceCommit": "ef19d287662e3179b93826e1f8391587a588c7ac",
+      "jobId": 128147916052,
+      "kind": "claude",
+      "category": "component",
+      "alias": "mikka-1505-component-42292116205-1-claude",
+      "templateId": "n5egwssffahwzsqr1vij",
+      "buildId": "6d5958dd-8deb-4b55-a584-1b353168e560",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42292116205/jobs/128147916052",
+        "requestLine": 2061,
+        "createdLine": 2062,
+        "requestText": "2026-11-06T20:53:57.4741038Z [claude] [2026-11-06T20:53:57.473993] [info] Requesting build for template: mikka-1505-component-42292116205-1-claude",
+        "createdText": "2026-11-06T20:53:57.5754376Z [claude] [2026-11-06T20:53:57.575262] [info] Template created with ID: n5egwssffahwzsqr1vij, Build ID: 6d5958dd-8deb-4b55-a584-1b353168e560"
+      },
+      "historicalCleanup": "invalid_absent_evidence_alias_passed_as_id"
+    },
+    {
+      "runId": 42292116205,
+      "runAttempt": 1,
+      "sourceCommit": "ef19d287662e3179b93826e1f8391587a588c7ac",
+      "jobId": 128147916052,
+      "kind": "codex",
+      "category": "component",
+      "alias": "mikka-1505-component-42292116205-1-codex",
+      "templateId": "r1onf5ri3xgn5qg6wl0x",
+      "buildId": "81b2bd3e-929f-41b4-b4e7-fb4900954971",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42292116205/jobs/128147916052",
+        "requestLine": 2058,
+        "createdLine": 2065,
+        "requestText": "2026-11-06T20:53:57.4061279Z [codex] [2026-11-06T20:53:57.405957] [info] Requesting build for template: mikka-1505-component-42292116205-1-codex",
+        "createdText": "2026-11-06T20:53:57.7541143Z [codex] [2026-11-06T20:53:57.753945] [info] Template created with ID: r1onf5ri3xgn5qg6wl0x, Build ID: 81b2bd3e-929f-41b4-b4e7-fb4900954971"
+      },
+      "historicalCleanup": "invalid_absent_evidence_alias_passed_as_id"
+    },
+    {
+      "runId": 42285968840,
+      "runAttempt": 1,
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "jobId": 128126756111,
+      "kind": "codex",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42285968840-1-codex",
+      "templateId": "vqnqe3bzmk6au7mz807e",
+      "buildId": "b2be43ac-6bef-4b82-a7fe-f1fb174853c8",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42285968840/jobs/128126756111",
+        "requestLine": 2042,
+        "createdLine": 2044,
+        "requestText": "2026-11-06T20:10:25.9378008Z [codex] [2026-11-06T20:10:25.935937] [info] Requesting build for template: mikka-1505-official-control-42285968840-1-codex",
+        "createdText": "2026-11-06T20:10:26.0783791Z [codex] [2026-11-06T20:10:26.078167] [info] Template created with ID: vqnqe3bzmk6au7mz807e, Build ID: b2be43ac-6bef-4b82-a7fe-f1fb174853c8"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42285968840,
+      "runAttempt": 1,
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "jobId": 128126756111,
+      "kind": "claude",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42285968840-1-claude",
+      "templateId": "kkhfzo6vyu3j6s9gpw14",
+      "buildId": "8401d155-5303-4a49-8021-8b3f98859f88",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42285968840/jobs/128126756111",
+        "requestLine": 2043,
+        "createdLine": 2045,
+        "requestText": "2026-11-06T20:10:25.9382635Z [claude] [2026-11-06T20:10:25.937330] [info] Requesting build for template: mikka-1505-official-control-42285968840-1-claude",
+        "createdText": "2026-11-06T20:10:26.0827712Z [claude] [2026-11-06T20:10:26.082642] [info] Template created with ID: kkhfzo6vyu3j6s9gpw14, Build ID: 8401d155-5303-4a49-8021-8b3f98859f88"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42285968840,
+      "runAttempt": 1,
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "jobId": 128126756111,
+      "kind": "desktop",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42285968840-1-desktop",
+      "templateId": "mdm31y2c5mt9m4o0tg8o",
+      "buildId": "3f55748f-ce81-4e1e-9f86-9de1499986dd",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42285968840/jobs/128126756111",
+        "requestLine": 2041,
+        "createdLine": 2046,
+        "requestText": "2026-11-06T20:10:25.9360031Z [desktop] [2026-11-06T20:10:25.935886] [info] Requesting build for template: mikka-1505-official-control-42285968840-1-desktop",
+        "createdText": "2026-11-06T20:10:26.0956050Z [desktop] [2026-11-06T20:10:26.095471] [info] Template created with ID: mdm31y2c5mt9m4o0tg8o, Build ID: 3f55748f-ce81-4e1e-9f86-9de1499986dd"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42285968840,
+      "runAttempt": 1,
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "jobId": 128126756111,
+      "kind": "claude",
+      "category": "component",
+      "alias": "mikka-1505-component-42285968840-1-claude",
+      "templateId": "wws7svldv0pcnr4v6k3k",
+      "buildId": "1a540999-6723-4950-9a45-ca6c79757db9",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42285968840/jobs/128126756111",
+        "requestLine": 2477,
+        "createdLine": 2480,
+        "requestText": "2026-11-06T20:17:45.8183243Z [claude] [2026-11-06T20:17:45.818171] [info] Requesting build for template: mikka-1505-component-42285968840-1-claude",
+        "createdText": "2026-11-06T20:17:45.8922492Z [claude] [2026-11-06T20:17:45.892021] [info] Template created with ID: wws7svldv0pcnr4v6k3k, Build ID: 1a540999-6723-4950-9a45-ca6c79757db9"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42285968840,
+      "runAttempt": 1,
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "jobId": 128126756111,
+      "kind": "codex",
+      "category": "component",
+      "alias": "mikka-1505-component-42285968840-1-codex",
+      "templateId": "ikel6ytxcospvfcb4ijm",
+      "buildId": "ed8ce7a7-f5fe-4863-8a60-0c13692d87e3",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42285968840/jobs/128126756111",
+        "requestLine": 2479,
+        "createdLine": 2483,
+        "requestText": "2026-11-06T20:17:45.8296938Z [codex] [2026-11-06T20:17:45.829603] [info] Requesting build for template: mikka-1505-component-42285968840-1-codex",
+        "createdText": "2026-11-06T20:17:45.9084530Z [codex] [2026-11-06T20:17:45.908363] [info] Template created with ID: ikel6ytxcospvfcb4ijm, Build ID: ed8ce7a7-f5fe-4863-8a60-0c13692d87e3"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42285968840,
+      "runAttempt": 1,
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+      "jobId": 128126756111,
+      "kind": "desktop",
+      "category": "component",
+      "alias": "mikka-1505-component-42285968840-1-desktop",
+      "templateId": "072gwb5a1nayvnajart0",
+      "buildId": "9ebbaffe-e652-4110-95d4-ac1d1dc18f47",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42285968840/jobs/128126756111",
+        "requestLine": 2482,
+        "createdLine": 2485,
+        "requestText": "2026-11-06T20:17:45.9078660Z [desktop] [2026-11-06T20:17:45.907765] [info] Requesting build for template: mikka-1505-component-42285968840-1-desktop",
+        "createdText": "2026-11-06T20:17:45.9776245Z [desktop] [2026-11-06T20:17:45.977524] [info] Template created with ID: 072gwb5a1nayvnajart0, Build ID: 9ebbaffe-e652-4110-95d4-ac1d1dc18f47"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42281127309,
+      "runAttempt": 1,
+      "sourceCommit": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "jobId": 128110044502,
+      "kind": "desktop",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42281127309-1-desktop",
+      "templateId": "z0fmbf1bpkm0l3vs8r55",
+      "buildId": "6a4b5b92-cb1e-4a3b-b30b-5dd830316b6d",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42281127309/jobs/128110044502",
+        "requestLine": 2035,
+        "createdLine": 2036,
+        "requestText": "2026-11-06T19:37:07.8947899Z [desktop] [2026-11-06T19:37:07.894233] [info] Requesting build for template: mikka-1505-official-control-42281127309-1-desktop",
+        "createdText": "2026-11-06T19:37:08.1862480Z [desktop] [2026-11-06T19:37:08.186053] [info] Template created with ID: z0fmbf1bpkm0l3vs8r55, Build ID: 6a4b5b92-cb1e-4a3b-b30b-5dd830316b6d"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42281127309,
+      "runAttempt": 1,
+      "sourceCommit": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "jobId": 128110044502,
+      "kind": "claude",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42281127309-1-claude",
+      "templateId": "ydn9auxouo402utzweee",
+      "buildId": "293b6217-8a38-4d53-8929-c0a92c246072",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42281127309/jobs/128110044502",
+        "requestLine": 2034,
+        "createdLine": 2037,
+        "requestText": "2026-11-06T19:37:07.8947009Z [claude] [2026-11-06T19:37:07.893807] [info] Requesting build for template: mikka-1505-official-control-42281127309-1-claude",
+        "createdText": "2026-11-06T19:37:08.1894598Z [claude] [2026-11-06T19:37:08.189342] [info] Template created with ID: ydn9auxouo402utzweee, Build ID: 293b6217-8a38-4d53-8929-c0a92c246072"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42281127309,
+      "runAttempt": 1,
+      "sourceCommit": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "jobId": 128110044502,
+      "kind": "codex",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42281127309-1-codex",
+      "templateId": "nl8rehm7kfmo12xsow3i",
+      "buildId": "6d433797-f583-4e93-81c6-84ee31805c98",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42281127309/jobs/128110044502",
+        "requestLine": 2033,
+        "createdLine": 2038,
+        "requestText": "2026-11-06T19:37:07.8924670Z [codex] [2026-11-06T19:37:07.892333] [info] Requesting build for template: mikka-1505-official-control-42281127309-1-codex",
+        "createdText": "2026-11-06T19:37:08.1956432Z [codex] [2026-11-06T19:37:08.195513] [info] Template created with ID: nl8rehm7kfmo12xsow3i, Build ID: 6d433797-f583-4e93-81c6-84ee31805c98"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42281127309,
+      "runAttempt": 1,
+      "sourceCommit": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "jobId": 128110044502,
+      "kind": "desktop",
+      "category": "component",
+      "alias": "mikka-1505-component-42281127309-1-desktop",
+      "templateId": "i8f7m7nwnequ2bz5ulff",
+      "buildId": "55d36187-fbf6-4c95-ad18-13ffc6a040ec",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42281127309/jobs/128110044502",
+        "requestLine": 2455,
+        "createdLine": 2458,
+        "requestText": "2026-11-06T19:44:15.9716250Z [desktop] [2026-11-06T19:44:15.971463] [info] Requesting build for template: mikka-1505-component-42281127309-1-desktop",
+        "createdText": "2026-11-06T19:44:16.0202857Z [desktop] [2026-11-06T19:44:16.020117] [info] Template created with ID: i8f7m7nwnequ2bz5ulff, Build ID: 55d36187-fbf6-4c95-ad18-13ffc6a040ec"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42281127309,
+      "runAttempt": 1,
+      "sourceCommit": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "jobId": 128110044502,
+      "kind": "claude",
+      "category": "component",
+      "alias": "mikka-1505-component-42281127309-1-claude",
+      "templateId": "41lwsdd76853hl7gvtbc",
+      "buildId": "2322622d-2510-4ea8-b1f1-459fcde3e39b",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42281127309/jobs/128110044502",
+        "requestLine": 2457,
+        "createdLine": 2459,
+        "requestText": "2026-11-06T19:44:15.9859459Z [claude] [2026-11-06T19:44:15.985802] [info] Requesting build for template: mikka-1505-component-42281127309-1-claude",
+        "createdText": "2026-11-06T19:44:16.0329941Z [claude] [2026-11-06T19:44:16.032851] [info] Template created with ID: 41lwsdd76853hl7gvtbc, Build ID: 2322622d-2510-4ea8-b1f1-459fcde3e39b"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42281127309,
+      "runAttempt": 1,
+      "sourceCommit": "3af3f70269dcd1747f3f9ae730dd3a552988bc0c",
+      "jobId": 128110044502,
+      "kind": "codex",
+      "category": "component",
+      "alias": "mikka-1505-component-42281127309-1-codex",
+      "templateId": "oittuj5pd010wqpygvdy",
+      "buildId": "50e11896-ae0c-4d3b-9c87-56cabcc78624",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42281127309/jobs/128110044502",
+        "requestLine": 2477,
+        "createdLine": 2478,
+        "requestText": "2026-11-06T19:44:16.3629910Z [codex] [2026-11-06T19:44:16.362856] [info] Requesting build for template: mikka-1505-component-42281127309-1-codex",
+        "createdText": "2026-11-06T19:44:16.4102571Z [codex] [2026-11-06T19:44:16.410111] [info] Template created with ID: oittuj5pd010wqpygvdy, Build ID: 50e11896-ae0c-4d3b-9c87-56cabcc78624"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42279407055,
+      "runAttempt": 1,
+      "sourceCommit": "ff87767ff9b85e2ca97bb23029b1fd4dc74614e7",
+      "jobId": 128104128734,
+      "kind": "desktop",
+      "category": "component",
+      "alias": "mikka-1505-component-42279407055-1-desktop",
+      "templateId": "vy2vb4ael057yq8pwlm2",
+      "buildId": "788ba160-3245-4727-b150-9a0e13c45c28",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42279407055/jobs/128104128734",
+        "requestLine": 2026,
+        "createdLine": 2027,
+        "requestText": "2026-11-06T19:25:26.9279318Z [desktop] [2026-11-06T19:25:26.927793] [info] Requesting build for template: mikka-1505-component-42279407055-1-desktop",
+        "createdText": "2026-11-06T19:25:27.0304991Z [desktop] [2026-11-06T19:25:27.030330] [info] Template created with ID: vy2vb4ael057yq8pwlm2, Build ID: 788ba160-3245-4727-b150-9a0e13c45c28"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42279407055,
+      "runAttempt": 1,
+      "sourceCommit": "ff87767ff9b85e2ca97bb23029b1fd4dc74614e7",
+      "jobId": 128104128734,
+      "kind": "codex",
+      "category": "component",
+      "alias": "mikka-1505-component-42279407055-1-codex",
+      "templateId": "eu3puplwvueu7zlbg7yn",
+      "buildId": "ab424bef-1c82-47f8-b14f-35597cbaba44",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42279407055/jobs/128104128734",
+        "requestLine": 2029,
+        "createdLine": 2030,
+        "requestText": "2026-11-06T19:25:27.0855022Z [codex] [2026-11-06T19:25:27.085369] [info] Requesting build for template: mikka-1505-component-42279407055-1-codex",
+        "createdText": "2026-11-06T19:25:27.1990901Z [codex] [2026-11-06T19:25:27.198909] [info] Template created with ID: eu3puplwvueu7zlbg7yn, Build ID: ab424bef-1c82-47f8-b14f-35597cbaba44"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42279407055,
+      "runAttempt": 1,
+      "sourceCommit": "ff87767ff9b85e2ca97bb23029b1fd4dc74614e7",
+      "jobId": 128104128734,
+      "kind": "claude",
+      "category": "component",
+      "alias": "mikka-1505-component-42279407055-1-claude",
+      "templateId": "a860joo533xtb7y9vqvt",
+      "buildId": "0c562fb7-d510-4795-9f94-eaec7c93c46b",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42279407055/jobs/128104128734",
+        "requestLine": 2032,
+        "createdLine": 2034,
+        "requestText": "2026-11-06T19:25:27.3357635Z [claude] [2026-11-06T19:25:27.335594] [info] Requesting build for template: mikka-1505-component-42279407055-1-claude",
+        "createdText": "2026-11-06T19:25:27.4469609Z [claude] [2026-11-06T19:25:27.446677] [info] Template created with ID: a860joo533xtb7y9vqvt, Build ID: 0c562fb7-d510-4795-9f94-eaec7c93c46b"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42277103323,
+      "runAttempt": 1,
+      "sourceCommit": "292b7968c1c6280cc42bcba83d2e54902fc29db3",
+      "jobId": 128096132391,
+      "kind": "desktop",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42277103323-1-desktop",
+      "templateId": "8ipbcg3ne7od4s2zlywc",
+      "buildId": "ce867a7c-aaf8-4d1f-820c-5fb6589ee4f8",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42277103323/jobs/128096132391",
+        "requestLine": 2028,
+        "createdLine": 2031,
+        "requestText": "2026-11-06T19:09:51.2243886Z [desktop] [2026-11-06T19:09:51.224224] [info] Requesting build for template: mikka-1505-official-control-42277103323-1-desktop",
+        "createdText": "2026-11-06T19:09:51.4309180Z [desktop] [2026-11-06T19:09:51.430655] [info] Template created with ID: 8ipbcg3ne7od4s2zlywc, Build ID: ce867a7c-aaf8-4d1f-820c-5fb6589ee4f8"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42277103323,
+      "runAttempt": 1,
+      "sourceCommit": "292b7968c1c6280cc42bcba83d2e54902fc29db3",
+      "jobId": 128096132391,
+      "kind": "codex",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42277103323-1-codex",
+      "templateId": "8hn57f9oxipaofhecfyi",
+      "buildId": "c838a7c1-4221-424c-b2e0-ead8add3019b",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42277103323/jobs/128096132391",
+        "requestLine": 2029,
+        "createdLine": 2032,
+        "requestText": "2026-11-06T19:09:51.2262938Z [codex] [2026-11-06T19:09:51.226156] [info] Requesting build for template: mikka-1505-official-control-42277103323-1-codex",
+        "createdText": "2026-11-06T19:09:51.4331619Z [codex] [2026-11-06T19:09:51.433029] [info] Template created with ID: 8hn57f9oxipaofhecfyi, Build ID: c838a7c1-4221-424c-b2e0-ead8add3019b"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42277103323,
+      "runAttempt": 1,
+      "sourceCommit": "292b7968c1c6280cc42bcba83d2e54902fc29db3",
+      "jobId": 128096132391,
+      "kind": "claude",
+      "category": "official-control",
+      "alias": "mikka-1505-official-control-42277103323-1-claude",
+      "templateId": "v569is0g2znt9i7k4497",
+      "buildId": "c878f94f-e526-48e4-b51c-25404e5ed600",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42277103323/jobs/128096132391",
+        "requestLine": 2030,
+        "createdLine": 2033,
+        "requestText": "2026-11-06T19:09:51.2266389Z [claude] [2026-11-06T19:09:51.226527] [info] Requesting build for template: mikka-1505-official-control-42277103323-1-claude",
+        "createdText": "2026-11-06T19:09:51.4395311Z [claude] [2026-11-06T19:09:51.439404] [info] Template created with ID: v569is0g2znt9i7k4497, Build ID: c878f94f-e526-48e4-b51c-25404e5ed600"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42271072200,
+      "runAttempt": 1,
+      "sourceCommit": "348049c77bf188b95ce2ce9992fe223e9842aa14",
+      "jobId": 128075472133,
+      "kind": "desktop",
+      "category": "component",
+      "alias": "mikka-1505-component-42271072200-1-desktop",
+      "templateId": "8z2a8y1gnaio2ifj6653",
+      "buildId": "b7b76a18-613e-4508-9a4e-92f373979209",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42271072200/jobs/128075472133",
+        "requestLine": 2021,
+        "createdLine": 2022,
+        "requestText": "2026-11-06T18:29:25.6032761Z [desktop] [2026-11-06T18:29:25.603121] [info] Requesting build for template: mikka-1505-component-42271072200-1-desktop",
+        "createdText": "2026-11-06T18:29:25.6968877Z [desktop] [2026-11-06T18:29:25.696651] [info] Template created with ID: 8z2a8y1gnaio2ifj6653, Build ID: b7b76a18-613e-4508-9a4e-92f373979209"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42271072200,
+      "runAttempt": 1,
+      "sourceCommit": "348049c77bf188b95ce2ce9992fe223e9842aa14",
+      "jobId": 128075472133,
+      "kind": "codex",
+      "category": "component",
+      "alias": "mikka-1505-component-42271072200-1-codex",
+      "templateId": "m4n99jw5x8jwlw2yiko6",
+      "buildId": "3127df62-a303-46be-954a-e18f8a2f6a44",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42271072200/jobs/128075472133",
+        "requestLine": 2024,
+        "createdLine": 2027,
+        "requestText": "2026-11-06T18:29:25.7499802Z [codex] [2026-11-06T18:29:25.749842] [info] Requesting build for template: mikka-1505-component-42271072200-1-codex",
+        "createdText": "2026-11-06T18:29:25.8588190Z [codex] [2026-11-06T18:29:25.858576] [info] Template created with ID: m4n99jw5x8jwlw2yiko6, Build ID: 3127df62-a303-46be-954a-e18f8a2f6a44"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    },
+    {
+      "runId": 42271072200,
+      "runAttempt": 1,
+      "sourceCommit": "348049c77bf188b95ce2ce9992fe223e9842aa14",
+      "jobId": 128075472133,
+      "kind": "claude",
+      "category": "component",
+      "alias": "mikka-1505-component-42271072200-1-claude",
+      "templateId": "b7k1dqizpuji6lrviyoj",
+      "buildId": "888fd46c-2f21-4092-90fe-6a346bf32456",
+      "evidence": {
+        "source": "github_sdk_creation_logs",
+        "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42271072200/jobs/128075472133",
+        "requestLine": 2026,
+        "createdLine": 2028,
+        "requestText": "2026-11-06T18:29:25.8587517Z [claude] [2026-11-06T18:29:25.784214] [info] Requesting build for template: mikka-1505-component-42271072200-1-claude",
+        "createdText": "2026-11-06T18:29:25.8885149Z [claude] [2026-11-06T18:29:25.888355] [info] Template created with ID: b7k1dqizpuji6lrviyoj, Build ID: 888fd46c-2f21-4092-90fe-6a346bf32456"
+      },
+      "historicalCleanup": "not_proven_by_old_cleanup_summary"
+    }
+  ],
+  "runsWithoutCreationEvidence": [
+    {
+      "runId": 42270726566,
+      "runAttempt": 1,
+      "sourceCommit": "f2db1c2555f99c1a74046fd6dbe5070b168a87ca",
+      "jobId": 128074275568,
+      "evidence": "no_template_build_request_or_created_id_in_complete_job_log",
+      "requestCount": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 13538924302,
+      "runId": 42285968840,
+      "sha256": "440390af576f154acd62f3f2e623136cc061ecb15237f6a5ee3d30c379bdd2e1"
+    },
+    {
+      "id": 13540522309,
+      "runId": 42292116205,
+      "sha256": "3aa57ac0a71d1d98e9866964ca6599b11b1ecc702a091ddaf7b1d83476d9532f"
+    },
+    {
+      "id": 13541516401,
+      "runId": 42293802095,
+      "sha256": "c7579f2f1e7f7f5d4f5fe8e39f80fde29b0244ed98dc3d8de4d568ca33898863"
+    },
+    {
+      "id": 13534550400,
+      "runId": 42277103323,
+      "sha256": "60f36a8b8fd3e563d4bf45085b92016d77f73fa6fd4a1d336ac04047e4dffdf0"
+    },
+    {
+      "id": 13533978965,
+      "runId": 42279407055,
+      "sha256": "8462ee4a454ca80116d79ee19356b61ec915f1a16c34ab728f8615065db3b18d"
+    },
+    {
+      "id": 13536282657,
+      "runId": 42281127309,
+      "sha256": "6fe7235da685a2dd3847e502fbd67f9f0920da1a7302824e27fc269163a680e5"
+    }
+  ],
+  "corrections": [
+    {
+      "file": "docs/design/research/2026-11-06-e2b-component-benchmark.json",
+      "path": "cleanup.privateCandidatesDeleted",
+      "old": true,
+      "assessment": "not proven; requires correct alias-to-ID lookup plus ID lookup/delete confirmation"
+    },
+    {
+      "file": "docs/design/research/2026-11-06-e2b-natural-cache-comparison.json",
+      "path": "runs[*].cleanup.templates[*].status",
+      "old": "absent",
+      "assessment": "invalid absence evidence; old lookup treated alias as template ID"
+    },
+    {
+      "scope": "remainingSandboxes",
+      "assessment": "separate sandbox enumeration evidence is unaffected by the template alias endpoint bug"
+    }
+  ]
+}
