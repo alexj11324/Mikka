@@ -1,0 +1,123 @@
+{
+  "checksPassed": 29,
+  "checks": [
+    {
+      "name": "task approval/passed r30",
+      "passed": true
+    },
+    {
+      "name": "unchanged task id",
+      "passed": true
+    },
+    {
+      "name": "unchanged task issueId",
+      "passed": true
+    },
+    {
+      "name": "unchanged task sourceEventId",
+      "passed": true
+    },
+    {
+      "name": "unchanged task botId",
+      "passed": true
+    },
+    {
+      "name": "unchanged task candidateId",
+      "passed": true
+    },
+    {
+      "name": "unchanged task kind",
+      "passed": true
+    },
+    {
+      "name": "unchanged task sha",
+      "passed": true
+    },
+    {
+      "name": "unchanged task producerRunId",
+      "passed": true
+    },
+    {
+      "name": "unchanged task deliverableHead",
+      "passed": true
+    },
+    {
+      "name": "unchanged task baselineHead",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint 6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint 6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint f5269f72-0103-4d34-864a-0018c60195fc",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint af4309f0-c48f-463a-8552-1b04c6e33595",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint 4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint 0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint b7c23eb8-2faf-4f90-8fb7-e300c2050e81",
+      "passed": true
+    },
+    {
+      "name": "unchanged full report/fingerprint c06d15b0-061c-46a7-8e8f-f6bb17409fbb",
+      "passed": true
+    },
+    {
+      "name": "old expired question unconsumed fields preserved",
+      "passed": true
+    },
+    {
+      "name": "sleeping parent and lastActiveAt preserved",
+      "passed": true
+    },
+    {
+      "name": "single acceptance; no active run/lease",
+      "passed": true
+    },
+    {
+      "name": "HTTP200 accepted",
+      "passed": true
+    },
+    {
+      "name": "single original Owner receipt matches actual API response",
+      "passed": true
+    },
+    {
+      "name": "associated issue done",
+      "passed": true
+    },
+    {
+      "name": "own session signed out",
+      "passed": true
+    },
+    {
+      "name": "native claim unchanged 8",
+      "passed": true
+    },
+    {
+      "name": "native claim unchanged 9",
+      "passed": true
+    }
+  ],
+  "ownerAccepted": true,
+  "transport": "Normal authenticated application API; no UI click claimed"
+}

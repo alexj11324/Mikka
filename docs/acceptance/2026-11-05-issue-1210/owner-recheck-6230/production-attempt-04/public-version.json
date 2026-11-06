@@ -1,0 +1,13 @@
+{
+  "queriedFrom": "2026-11-06T10:44:36.586003+00:00",
+  "queriedThrough": "2026-11-06T10:44:37.731645+00:00",
+  "url": "https://app.aspectlylabs.com/mikka/api/version",
+  "status": 200,
+  "body": {
+    "build": "184a375fe9bdfee7d4da915eaa4c91be6f6e372e",
+    "minMobileBuild": 0,
+    "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+    "minDesktopVersion": null
+  },
+  "boundary": "Current public version only; the 02:17/02:20 runs used the historically recorded 04b4 deployment. No new product deploy was made in this handoff."
+}

@@ -1,0 +1,30 @@
+{
+  "sentAt": "2026-11-06T10:48:28.465929+00:00",
+  "receivedAt": "2026-11-06T10:48:30.350373+00:00",
+  "transport": "Authenticated application Owner accept API, not an automated UI click. Exactly one accept request, no retry.",
+  "request": {
+    "operation": "accept",
+    "input": {
+      "binding": {
+        "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+        "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+        "attemptId": "6a0df23a-3f18-4b36-9d7b-0610101a0c05",
+        "revision": 29,
+        "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb"
+      },
+      "eventId": "c9d23153-be04-4bdb-893c-46df18331cb2"
+    }
+  },
+  "status": 200,
+  "body": {
+    "status": "accepted",
+    "acceptanceId": "981bee43-e495-4131-9643-5dbecf3ebd46",
+    "binding": {
+      "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+      "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+      "attemptId": "6a0df23a-3f18-4b36-9d7b-0610101a0c05",
+      "revision": 30,
+      "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb"
+    }
+  }
+}

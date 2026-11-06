@@ -1,0 +1,12 @@
+{
+  "queriedAt": "2026-11-06T10:48:28.465536+00:00",
+  "transport": "Normal email/password sign-in through Better Auth, session cookie held only in process; same-origin application API used by the Owner acceptance button. No UI click is claimed.",
+  "httpStatus": 200,
+  "binding": {
+    "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+    "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+    "attemptId": "6a0df23a-3f18-4b36-9d7b-0610101a0c05",
+    "revision": 29,
+    "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb"
+  }
+}

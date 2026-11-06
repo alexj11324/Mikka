@@ -1,0 +1,148 @@
+{
+  "source": "Validation of the captured 10:42 UTC read-only transaction, not a new production execution.",
+  "checksPassed": 35,
+  "checks": [
+    {
+      "name": "expected bytes and hash",
+      "passed": true
+    },
+    {
+      "name": "same candidate, epoch, baseline and delivery HEAD",
+      "passed": true
+    },
+    {
+      "name": "approval pending, not Owner accepted",
+      "passed": true
+    },
+    {
+      "name": "no active run or lease",
+      "passed": true
+    },
+    {
+      "name": "sleeping parent preserved",
+      "passed": true
+    },
+    {
+      "name": "old expired question and eight unconsumed fields preserved",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint 6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint 6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint f5269f72-0103-4d34-864a-0018c60195fc",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint af4309f0-c48f-463a-8552-1b04c6e33595",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint 4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "passed": true
+    },
+    {
+      "name": "unchanged historical report and fingerprint 0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "passed": true
+    },
+    {
+      "name": "actual original native claim review",
+      "passed": true
+    },
+    {
+      "name": "actual original native claim verify",
+      "passed": true
+    },
+    {
+      "name": "independent review and verify SID",
+      "passed": true
+    },
+    {
+      "name": "review mcp__mikka__inspect_artifact paired output and fixed HEAD",
+      "passed": true
+    },
+    {
+      "name": "review mcp__mikka__inspect_artifact exact artifact bytes and committed content",
+      "passed": true
+    },
+    {
+      "name": "review mcp__mikka__inspect_repository paired output and fixed HEAD",
+      "passed": true
+    },
+    {
+      "name": "review mcp__mikka__inspect_repository only target file changed",
+      "passed": true
+    },
+    {
+      "name": "verify mcp__mikka__inspect_artifact paired output and fixed HEAD",
+      "passed": true
+    },
+    {
+      "name": "verify mcp__mikka__inspect_artifact exact artifact bytes and committed content",
+      "passed": true
+    },
+    {
+      "name": "verify mcp__mikka__inspect_repository paired output and fixed HEAD",
+      "passed": true
+    },
+    {
+      "name": "verify mcp__mikka__inspect_repository only target file changed",
+      "passed": true
+    },
+    {
+      "name": "stage 8 complete original summary and lifecycle",
+      "passed": true
+    },
+    {
+      "name": "stage 8 continuation contains only ToolSearch and submit",
+      "passed": true
+    },
+    {
+      "name": "stage 8 receipt-bound three pre-question Bash records",
+      "passed": true
+    },
+    {
+      "name": "stage 9 complete original summary and lifecycle",
+      "passed": true
+    },
+    {
+      "name": "stage 9 continuation contains only ToolSearch and submit",
+      "passed": true
+    },
+    {
+      "name": "stage 9 receipt-bound three pre-question Bash records",
+      "passed": true
+    },
+    {
+      "name": "verify received complete same-candidate preceding review observations",
+      "passed": true
+    },
+    {
+      "name": "verify prior review IO equals persisted pair a0ad4e77-19ae-4d80-ab15-da0eb380c190",
+      "passed": true
+    },
+    {
+      "name": "verify prior review IO equals persisted pair 8ae34347-10e3-4caf-9aa5-d0a43a9e7ee3",
+      "passed": true
+    },
+    {
+      "name": "six criteria passed in actual report review",
+      "passed": true
+    },
+    {
+      "name": "six criteria passed in actual report verify",
+      "passed": true
+    }
+  ],
+  "ownerAccepted": false,
+  "runtimeVmSamplingBoundary": "This collection is after the two runs finished. It cannot establish verify VM state at a running instant."
+}

@@ -1,0 +1,6 @@
+{
+  "startedAt": "2026-11-06T10:48:26.111823+00:00",
+  "finishedAt": "2026-11-06T10:48:31.194673+00:00",
+  "signOutStatus": 200,
+  "boundary": "Only the session issued by this process was signed out. No shared token was revoked. Cookie jar cleared and never persisted."
+}

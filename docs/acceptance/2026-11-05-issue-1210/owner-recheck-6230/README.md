@@ -506,3 +506,13 @@ verify原报告把唯一false/unverified列在AC5，reason明确为自己的fres
 [恢复审计报告](production-attempt-03/recovery-audit-report.md)、[公开投影边界](production-attempt-03/publication-notes.json)、[逐文件来源和变换清单](production-attempt-03/evidence-manifest.json)、[脱敏扫描](production-attempt-03/sanitization-audit.json)分别保留来源、必要字段选择、原/公开字节哈希与扫描限制。原件名称出现在审计报告中时指其恢复工作目录中的输入；实际公开文件与对应映射见publication-notes。
 
 本节基于已发布证据commit **`a0318e023f27d4773ce7e60512cf6aa9e7f648b8`** 追加。原README全部61,380字节作为未改动前缀保留，其他143个历史文件的Git blob SHA、mode和path原样继承；30张历史PNG全部保留，且仍只证明各自隔离UI版本。此次没有新增可发布的生产截图，不把旧图当作第三轮生产画面。本节固定第三轮失败和新恢复取证的边界，Owner接受仍未完成。
+
+
+## production-attempt-04：Codex接手只读核查
+
+第四轮review和verify均已真实通过；10:42 UTC新采样为approval/pending r29，Owner acceptance=0。六项语义与原始工具IO、完整summary、前序review观察、七份旧报告不变的核查见[完整第四轮证据](production-attempt-04/README.md)。本轮没有新模型请求或产品发布，正常Owner接受仍待完成。
+
+
+### production-attempt-04 最终追加：已接受
+
+Owner通过正常email/password登录与同源应用验收API于2026-11-06 **10:48:29.474 UTC** 接受，唯一回执`981bee43-e495-4131-9643-5dbecf3ebd46`。10:48:48 UTC独立只读核对为approval/passed r30、关联issue done、acceptance=1、active run/lease=0/0；九份报告保持不变。[最终请求/响应、数据库读回与前后核验](production-attempt-04/README.md#最终追加正常-owner-接受已完成)。未冒称UI点击，未改生产数据库补结果。
