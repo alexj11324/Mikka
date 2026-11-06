@@ -83,7 +83,7 @@ function SetupFailure({ state }: { state: SshInstallState }) {
       <CollapsibleContent className="pt-1.5">
         <CodeBlock code={log} highlight={false} defaultWrap maxLines={14} className="border-0 bg-muted [--code-block-bg:var(--muted)]">
           <CodeBlockHeader className="border-b-0">
-            <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('local.copyLog'), copied: t('copied') }} />
+            <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('local.copyLog'), copied: t('local.logCopied') }} />
           </CodeBlockHeader>
         </CodeBlock>
       </CollapsibleContent>

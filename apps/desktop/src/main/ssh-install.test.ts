@@ -232,7 +232,7 @@ test('cancel during host discovery and fingerprint confirmation never installs',
   }
 })
 
-function localInstaller(flavor: 'prod' | 'dev', status = '{"server":"online","deviceId":"this-mac"}', respond?: (script: string) => string | undefined) {
+function localInstaller(flavor: 'prod' | 'dev', status = '{"server":"online","deviceId":"this-mac"}', respond?: (script: string) => string | undefined | void) {
   const events: SshInstallState[] = []
   const calls: { command: string; args: string[]; input?: string }[] = []
   let minted = 0
@@ -244,7 +244,7 @@ function localInstaller(flavor: 'prod' | 'dev', status = '{"server":"online","de
   }, async (command, args, input) => {
     calls.push({ command, args, input })
     const answer = respond?.(args.at(-1) ?? '')
-    if (answer !== undefined) return answer
+    if (typeof answer === 'string') return answer
     if (args.at(-1)?.includes('mikka daemon status')) return status
     return ''
   }, '/home/nobody', undefined, undefined, flavor, { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)

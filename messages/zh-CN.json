@@ -953,7 +953,8 @@
       "failed": "无法添加这台电脑",
       "retry": "重试",
       "details": "详情",
-      "copyLog": "复制日志"
+      "copyLog": "复制日志",
+      "logCopied": "已复制"
     },
     "loading": "正在加载设备"
   },
@@ -4994,7 +4995,7 @@
     "desktop_rpc_request_rejected": { "default": "Mikka 无法接受此请求" },
     "desktop_rpc_response_invalid": { "default": "无法读取 Mikka 返回的数据" },
     "desktop_rpc_value_invalid": { "default": "无法发送此内容" },
-    "desktop_local_setup_failed": { "default": "无法添加这台电脑", "cancelled": "已取消", "timeout": "这一步超时了，重试一次", "online_timeout": "守护进程已装好，但 30 秒内没连上 Mikka", "owner_mismatch": "这台电脑的守护进程登录的是另一个 Mikka 账号", "owner_unconfirmed": "暂时无法确认这台电脑属于哪个账号，稍后重试", "unsupported_os": "只支持 macOS 和 Linux", "node_missing": "需要 Node {required}，登录 shell 里找不到 node。装好 Node {required} 后重试", "node_too_old": "需要 Node {required}，你的登录 shell 里是 Node {found}（{path}）。升级这个 Node，或把 Node {required} 放到 PATH 前面后重试", "npm_directory_not_empty": "上次安装留下的目录没清理掉：{path}。删除它后重试", "npm_permission": "npm 没有权限写入 {path}。让 npm 全局目录归你所有，或改用 Homebrew 或 nvm 装的 Node 后重试", "npm_package_not_found": "npm 上找不到 Mikka 守护进程包", "network": "连不上 npm（{code}）。检查网络或代理后重试", "command_missing": "已安装，但登录 shell 的 PATH 里找不到 mikka。把 npm 的全局 bin 目录加进 PATH 后重试", "service_failed": "无法启动后台服务", "other": "无法添加这台电脑" },
+    "desktop_local_setup_failed": { "default": "无法添加这台电脑", "cancelled": "已取消", "timeout": "这一步超时了", "online_timeout": "守护进程已装好，但 30 秒内没连上 Mikka", "owner_mismatch": "这台电脑的守护进程登录的是另一个 Mikka 账号", "owner_unconfirmed": "暂时无法确认这台电脑属于哪个账号", "unsupported_os": "只支持 macOS 和 Linux", "node_missing": "需要 Node {required}，登录 shell 里找不到 node。装好 Node {required}", "node_too_old": "需要 Node {required}，你的登录 shell 里是 Node {found}（{path}）。升级这个 Node，或把 Node {required} 放到 PATH 前面", "npm_directory_not_empty": "上次安装留下的目录没清理掉：{path}。删除它", "npm_permission": "npm 没有权限写入 {path}。让 npm 全局目录归你所有，或改用 Homebrew 或 nvm 装的 Node", "npm_package_not_found": "npm 上找不到 Mikka 守护进程包", "network": "连不上 npm（{code}）。检查网络或代理", "command_missing": "已安装，但登录 shell 的 PATH 里找不到 mikka。把 npm 的全局 bin 目录加进 PATH", "service_failed": "无法启动后台服务", "other": "无法添加这台电脑" },
     "subscription_local_runtime_unavailable": {
       "default": "本机订阅运行无法启动",
       "assignment_invalid": "线程的订阅设置已失效，请重新选择模型",
