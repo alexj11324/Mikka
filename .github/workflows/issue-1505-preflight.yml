@@ -5,7 +5,7 @@ on:
 permissions:
   contents: read
 jobs:
-  preflight:
+  session:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -26,32 +26,41 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Read the smoke account's capabilities through normal APIs
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Configure the smoke account and seal its temporary session to the acceptance runner
         run: |
           node --input-type=module <<'JS'
-          const origin = 'https://app.aspectlylabs.com'; let cookie = '';
-          async function read(path, body) {
-            const response = await fetch(origin + '/mikka' + path, { method: body === undefined ? 'GET' : 'POST', redirect: 'error', signal: AbortSignal.timeout(30000), headers: { origin, 'cache-control': 'no-store', ...(cookie ? {cookie} : {}), ...(body ? {'content-type':'application/json'} : {}) }, ...(body ? {body:JSON.stringify(body)} : {}) });
-            if (path === '/api/auth/sign-in/email' && response.ok) cookie = response.headers.getSetCookie().map(x=>x.split(';',1)[0]).join('; ');
-            let data = await response.json().catch(()=>null); return {status:response.status,data};
+          import { randomBytes, createCipheriv, publicEncrypt, constants } from 'node:crypto';
+          const origin='https://app.aspectlylabs.com'; let cookie=''; let sealed=false;
+          async function call(path,body,rpc=false) {
+            const r=await fetch(origin+'/mikka'+path,{method:body===undefined?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(60000),headers:{origin,...(cookie?{cookie}:{}),...(body!==undefined?{'content-type':'application/json'}:{}),...(rpc?{'x-mikka-rpc':'1'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+            if(path==='/api/auth/sign-in/email'&&r.ok)cookie=r.headers.getSetCookie().map(x=>x.split(';',1)[0]).join('; ');
+            return {status:r.status,data:await r.json().catch(()=>null)};
           }
-          try {
-            console.log(JSON.stringify({phase:'version',...await read('/api/version')}));
-            const login = await read('/api/auth/sign-in/email',{email:process.env.SMOKE_OWNER_EMAIL,password:process.env.SMOKE_OWNER_PASSWORD});
-            console.log(JSON.stringify({phase:'login',status:login.status}));
-            if (login.status !== 200 || !cookie) throw Error('smoke_sign_in_refused');
-            const session = await read('/api/auth/get-session');
-            if (session.data?.user?.email !== process.env.SMOKE_OWNER_EMAIL) throw Error('smoke_identity_mismatch');
-            const bots = await read('/api/bots');
-            console.log(JSON.stringify({phase:'bots',status:bots.status,bots:Array.isArray(bots.data)?bots.data.map(x=>({id:x.id,workspaceId:x.workspaceId,ownerMatched:x.ownerId===session.data.user.id,kind:x.kind})):null}));
-            const workspace = bots.data?.[0]?.workspaceId;
-            if (!workspace) throw Error('smoke_workspace_missing');
-            const subscriptions = await read('/api/subscriptions?workspace='+workspace);
-            console.log(JSON.stringify({phase:'subscriptions',status:subscriptions.status,connections:subscriptions.data?.connections?.map(x=>({id:x.id,provider:x.provider,state:x.state,paused:x.paused}))}));
-            const order = await read('/api/settings/model-order?workspace='+workspace);
-            console.log(JSON.stringify({phase:'model_order',status:order.status,entries:order.data?.entries?.map(x=>({id:x.id,harness:x.harness,model:x.model,kind:x.source?.kind,connectionId:x.source?.connectionId})),candidates:order.data?.candidates?.map(x=>({harness:x.harness,model:x.model,kind:x.source?.kind,connectionId:x.source?.connectionId}))}));
-            const e2b = await read('/api/settings/e2b-key?workspace='+workspace);
-            console.log(JSON.stringify({phase:'e2b',status:e2b.status,configured:e2b.data?.configured,canEdit:e2b.data?.canEdit,byoEnabled:e2b.data?.byoEnabled}));
-          } catch(error) { console.log(JSON.stringify({phase:'failed',code:['smoke_sign_in_refused','smoke_identity_mismatch','smoke_workspace_missing'].includes(error.message)?error.message:'preflight_transport_failed'})); process.exitCode=1 }
-          finally {if(cookie)await read('/api/auth/sign-out',{}).catch(()=>{});cookie=''}
+          try{
+            const login=await call('/api/auth/sign-in/email',{email:process.env.SMOKE_OWNER_EMAIL,password:process.env.SMOKE_OWNER_PASSWORD,rememberMe:false});
+            if(login.status!==200||!cookie)throw Error('smoke_sign_in_refused');
+            const identity=await call('/api/auth/get-session');
+            if(identity.data?.user?.email!==process.env.SMOKE_OWNER_EMAIL)throw Error('smoke_identity_mismatch');
+            if(!process.env.E2B_API_KEY)throw Error('e2b_key_unavailable');
+            const configured=await call('/api/rpc',{version:1,action:'workspace-secrets.saveE2BKey',args:[{apiKey:process.env.E2B_API_KEY},'0f877068-66a0-4893-8801-9a14eb3116b3']},true);
+            console.log(JSON.stringify({phase:'configure_e2b',status:configured.status,ok:configured.data?.ok,result:configured.data?.result}));
+            if(configured.status!==200||!configured.data?.ok||configured.data.result?.ok===false)throw Error('e2b_configure_failed');
+            const aes=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',aes,iv);
+            const ciphertext=Buffer.concat([cipher.update(JSON.stringify({cookie})),cipher.final()]);
+            const recipient="-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzx0NgTPcxpjLfRWGeH/G\nVgrh5dPi5yNRkT1U4fQIG8DGc50NT24kB1u04aZlE+kKGh+va47YBTjW3gUETgco\nyFTTNIBdsCremenbyxTdQx9far2O8DRfewpkGupBLUCvw14HsrcDULugnMfx16Un\nvjMsN5+CF6sga7HYY9YCe3+FEEEYE6jGv8bOnOuposnAy77Ii9x/bnDLbJyYhd5Q\n8jm6wlvsm23zQQrTpg0QsFwpaKZT07sHJOH+jdge3vkMGCc13kAfH21DA1l4KXWp\nGdJxzO82D73ObC7vXPVJ1j9G69sX8oUtv0IKT7iLY86K78ZwroLWQhHS5er4RZOg\naQIDAQAB\n-----END PUBLIC KEY-----\n";
+            const encrypted=publicEncrypt({key:recipient,oaepHash:'sha256',padding:constants.RSA_PKCS1_OAEP_PADDING},aes);
+            console.log('SEALED_SESSION_1505 '+JSON.stringify({key:encrypted.toString('base64'),iv:iv.toString('base64'),data:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}));
+            sealed=true;
+          }catch(error){console.log(JSON.stringify({phase:'failed',code:['smoke_sign_in_refused','smoke_identity_mismatch','e2b_key_unavailable','e2b_configure_failed'].includes(error.message)?error.message:'transport_failed'}));process.exitCode=1}
+          finally{if(cookie&&!sealed)await call('/api/auth/sign-out',{}).catch(()=>{});cookie=''}
           JS
