@@ -15,6 +15,32 @@ export interface ModelDisplayName {
   family: string | null
   /** Its version with dots (「5.5」, 「V4.1」), or null. */
   version: string | null
+  /** Who makes it, for a picker grouped by vendor; `other` when neither the id nor its prefix says. */
+  vendor: ModelVendor
+}
+
+export const MODEL_VENDORS = ['anthropic', 'openai', 'google', 'deepseek', 'moonshot', 'alibaba', 'zhipu', 'mistral', 'meta', 'xai', 'other'] as const
+export type ModelVendor = typeof MODEL_VENDORS[number]
+
+/** A vendor from an id's own name (claude-…, gpt-…) or the prefix a gateway puts before it (anthropic/…). */
+const VENDOR_PATTERNS: [RegExp, ModelVendor][] = [
+  [/^(?:anthropic|claude)(?![a-z])|^(?:fable|opus|sonnet|haiku)$/, 'anthropic'],
+  [/^(?:openai|gpt|chatgpt|o\d)(?![a-z])|^codex(?![a-z])/, 'openai'],
+  [/^(?:google|gemini|gemma)(?![a-z])/, 'google'],
+  [/^deepseek(?![a-z])/, 'deepseek'],
+  [/^(?:moonshot(?:ai)?|kimi)(?![a-z])/, 'moonshot'],
+  [/^(?:alibaba|qwen|qwq)(?![a-z])/, 'alibaba'],
+  [/^(?:zhipu(?:ai)?|z-ai|glm)(?![a-z])/, 'zhipu'],
+  [/^(?:mistral(?:ai)?|codestral|devstral|magistral)(?![a-z])/, 'mistral'],
+  [/^(?:meta(?:-llama)?|llama)(?![a-z])/, 'meta'],
+  [/^(?:x-ai|xai|grok)(?![a-z])/, 'xai'],
+]
+
+/** Who makes a model: its id first, then any gateway prefix (`openrouter/anthropic/…`); `other` when none says. */
+export function modelVendor(id: string): ModelVendor {
+  const parts = id.trim().toLowerCase().split('/').filter(Boolean).reverse()
+  for (const part of parts) for (const [pattern, vendor] of VENDOR_PATTERNS) if (pattern.test(part)) return vendor
+  return 'other'
 }
 
 const CLAUDE_FAMILIES: Record<string, string> = { fable: 'Fable', opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' }
@@ -31,6 +57,10 @@ export function cleanModelId(id: string): string {
 }
 
 export function modelDisplayName(id: string): ModelDisplayName {
+  return { ...modelName(id), vendor: modelVendor(id) }
+}
+
+function modelName(id: string): Omit<ModelDisplayName, 'vendor'> {
   const clean = cleanModelId(id)
   const lower = clean.toLowerCase()
 

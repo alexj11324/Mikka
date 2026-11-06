@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cleanModelId, groupByModelFamily, modelDisplayName } from './model-display-name'
+import { cleanModelId, groupByModelFamily, modelDisplayName, modelVendor } from './model-display-name'
 
 const name = (id: string) => modelDisplayName(id).name
 
@@ -20,7 +20,7 @@ test('names the ids seen in Mikka screenshots', () => {
 })
 
 test('drops release dates and provider prefixes', () => {
-  assert.deepEqual(modelDisplayName('claude-fable-5-1-20261015'), { name: 'Fable 5.1', family: 'Fable', version: '5.1' })
+  assert.deepEqual(modelDisplayName('claude-fable-5-1-20261015'), { name: 'Fable 5.1', family: 'Fable', version: '5.1', vendor: 'anthropic' })
   assert.equal(name('claude-opus-4-5-20251101'), 'Opus 4.5')
   assert.equal(name('anthropic/claude-opus-5-5'), 'Opus 5.5')
   assert.equal(name('openai/gpt-6-luna'), 'GPT-6 Luna')
@@ -32,11 +32,11 @@ test('drops release dates and provider prefixes', () => {
 test('reads the older Claude order and the CLI aliases', () => {
   assert.equal(name('claude-3-5-sonnet-20241022'), 'Sonnet 3.5')
   assert.equal(name('opus'), 'Opus')
-  assert.deepEqual(modelDisplayName('sonnet'), { name: 'Sonnet', family: 'Sonnet', version: null })
+  assert.deepEqual(modelDisplayName('sonnet'), { name: 'Sonnet', family: 'Sonnet', version: null, vendor: 'anthropic' })
 })
 
 test('leaves an unrecognised id cleaned, never guessed', () => {
-  assert.deepEqual(modelDisplayName('kimi-k3-turbo'), { name: 'kimi-k3-turbo', family: null, version: null })
+  assert.deepEqual(modelDisplayName('kimi-k3-turbo'), { name: 'kimi-k3-turbo', family: null, version: null, vendor: 'moonshot' })
   assert.equal(name('my-org/custom-model-20260101'), 'custom-model')
   assert.equal(name('o4-mini'), 'o4-mini')
   assert.equal(name('  '), '')
@@ -45,4 +45,17 @@ test('leaves an unrecognised id cleaned, never guessed', () => {
 test('groups by series and keeps the order inside each', () => {
   const ids = ['gpt-6-luna', 'claude-sonnet-5-5', 'kimi-k3', 'claude-opus-5-5', 'deepseek-v4.1-flash', 'claude-opus-5', 'claude-fable-5-1']
   assert.deepEqual(groupByModelFamily(ids, id => id), ['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5', 'gpt-6-luna', 'deepseek-v4.1-flash', 'kimi-k3'])
+})
+
+test('names the vendor from the id or its gateway prefix, else other', () => {
+  assert.equal(modelVendor('claude-opus-5-5'), 'anthropic')
+  assert.equal(modelVendor('opus'), 'anthropic')
+  assert.equal(modelVendor('gpt-6-luna'), 'openai')
+  assert.equal(modelVendor('o4-mini'), 'openai')
+  assert.equal(modelVendor('deepseek-v4.1-flash'), 'deepseek')
+  assert.equal(modelVendor('gemini-3-pro'), 'google')
+  assert.equal(modelVendor('qwen3-coder'), 'alibaba')
+  assert.equal(modelVendor('openrouter/anthropic/some-new-model'), 'anthropic')
+  assert.equal(modelVendor('my-org/custom-model'), 'other')
+  assert.equal(modelVendor('orca-mini'), 'other')
 })
