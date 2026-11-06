@@ -210,7 +210,7 @@ export async function collectProductionTimings(report, { token, deploymentId, fe
       if (page === 9 || !next || cursors.has(next)) fail('pagination_incomplete')
       cursors.add(next); cursor = next
     }
-  } catch (error) { collection.status = 'failed'; collection.error = safeError(error) }
+  } catch (error) { collection.status = 'failed'; collection.error = /^vercel_api_(?:http_[1-5][0-9]{2}|network_unavailable|response_invalid)$/.test(error?.message ?? '') ? error.message : safeError(error) }
   collection.records = logs.length
   collection.coverage = 'completed_log_query_is_not_proof_of_zero_native_calls'
   report.serverTimingLogs = logs

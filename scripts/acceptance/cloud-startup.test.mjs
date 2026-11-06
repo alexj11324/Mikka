@@ -86,7 +86,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           if (stopRace) return Response.json({ version: 1, ok: false, error: { code: 'runChainEnded' } }, { status: 409 })
           return rpc({ stoppedRunIds: [args[0]] })
         }
-        if (action === 'issues.getIssue') return rpc({ id: current.issueId, title: current.title, revision: 2 })
+        if (action === 'issues.getIssue') return rpc({ issue: { id: current.issueId, title: current.title, revision: 2 } })
         if (action === 'issue-operations.setIssueDeleted') {
           assert.equal(args[0].id, current.issueId)
           if (failDelete) return Response.json({ error: 'PRIVATE_FAILURE' }, { status: 500 })
@@ -102,7 +102,9 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       if (path.startsWith('/api/factory/agent-profiles/')) { assert.equal(init.method, 'DELETE'); return json({ archived: true }) }
       if (path === '/api/coordinator/stream') {
         const output = JSON.stringify({ runId: current.runId, arbitraryLongField: 'truncated '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }).slice(0, 200)
-        const events = [{ type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'running', at: 0 },
+        const events = [{ type: 'tool', name: 'dispatch_run', call: 'stale', state: 'running', input: JSON.stringify({issueId: id(999)}) },
+          { type: 'tool', name: 'dispatch_run', call: 'stale', state: 'error', errorCode: 'staleDispatch' },
+          { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'running', quote: `Read README then STARTUP_OK_${current.marker}`, at: 0 },
           { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'done', output }]
         return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n',
           { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': current.workflowRunId } })

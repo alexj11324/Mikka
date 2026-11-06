@@ -51,6 +51,8 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
+      - name: Clean only the first failed batch fixtures
+        run: node scripts/acceptance/cleanup-first-batch.mjs
       - name: Measure three fresh repository starts on each official subscription
         run: |
           node --check scripts/acceptance/cloud-startup.mjs
@@ -72,7 +74,7 @@ jobs:
           await writeFile('acceptance-results/cloud-startup-baseline.md',markdown(report),{mode:0o600});
           console.log(JSON.stringify({status:report.status,applicationBuild:report.build,revision:report.revision,workerRelease:report.workerRelease,
             serverLogCollection:report.serverLogCollection,summary:report.summary,
-            samples:report.samples.map(sample=>({sampleId:sample.sampleId,status:sample.status,error:sample.error,runId:sample.runId,
+            samples:report.samples.map(sample=>({sampleId:sample.sampleId,status:sample.status,error:sample.error,dispatchRefusal:sample.dispatchRefusal,issueId:sample.issueId,runId:sample.runId,
               workflowRunId:sample.workflowRunId,runIdHash:sample.runIdHash,requestTraceId:sample.requestTraceId,harness:sample.harness,
               agentStart:sample.agentStart,firstProviderChunk:sample.firstProviderChunk,stages:sample.stages,daemonStartupTiming:sample.daemonStartupTiming,
               toolCalls:sample.toolCalls,replyVerified:sample.replyVerified,cleanup:sample.cleanup,timing:sample.timing,
