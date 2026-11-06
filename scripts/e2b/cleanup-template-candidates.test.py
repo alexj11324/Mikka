@@ -8,6 +8,33 @@ spec = importlib.util.spec_from_file_location('cleanup', Path(__file__).with_nam
 cleanup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cleanup)
 ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
+CANDIDATE = {'kind': 'codex', 'name': 'mikka-fixture-codex', 'templateId': 'owned-id'}
+
+
+class TemplateAPI:
+    """The alias and ID endpoints have distinct response contracts."""
+    def __init__(self, info=None, alias=None, *, id_absent=False, alias_absent=False, delete_effective=True):
+        self.info = {'templateID': 'owned-id', 'aliases': [CANDIDATE['name']], 'public': False, **(info or {})}
+        self.alias = {'templateID': 'owned-id', 'public': False, **(alias or {})}
+        self.id_absent = id_absent
+        self.alias_absent = alias_absent
+        self.delete_effective = delete_effective
+        self.calls = []
+
+    def __call__(self, method, path, api_key):
+        self.calls.append((method, path))
+        if method == 'GET' and path == '/templates/aliases/' + CANDIDATE['name']:
+            if not self.alias_absent:
+                return self.alias
+        elif method == 'GET' and path == '/templates/owned-id':
+            if not self.id_absent:
+                return self.info
+        elif method == 'DELETE' and path == '/templates/owned-id':
+            self.id_absent = self.delete_effective
+            return None
+        elif method != 'GET':
+            raise AssertionError('unexpected_template_mutation')
+        raise HTTPError(path, 404, 'private-response-contents', {}, None)
 
 
 class Cleanup(unittest.TestCase):
@@ -25,21 +52,74 @@ class Cleanup(unittest.TestCase):
             cleanup.identities({})
 
     def test_only_the_exact_private_name_and_id_are_deleted_and_absence_is_verified(self):
-        candidate = {'kind': 'codex', 'name': 'mikka-fixture-codex', 'templateId': 'owned-id'}
         for mutation, expected in [({}, 'deleted'), ({'public': True}, 'retained_public'),
                                    ({'templateID': 'different-id'}, 'failed'), ({'aliases': ['previous']}, 'failed'),
                                    ({'public': None}, 'failed'), ({'isDefault': True}, 'failed')]:
-            calls = []
-            info = {'templateID': 'owned-id', 'aliases': [candidate['name']], 'public': False, **mutation}
-            def request(method, path, api_key):
-                calls.append((method, path))
-                if method == 'DELETE': return None
-                if len(calls) == 3: raise HTTPError(path, 404, 'gone', {}, None)
-                return info
-            result = cleanup.builder.cleanup_templates([candidate], 'fixture', request)
-            self.assertEqual(result[0]['status'], expected)
-            self.assertEqual(sum(method == 'DELETE' for method, _ in calls), int(expected == 'deleted'))
-            if expected == 'deleted': self.assertEqual(calls[-1], ('GET', '/templates/owned-id'))
+            with self.subTest(mutation=mutation):
+                api = TemplateAPI(info=mutation)
+                result = cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', api)
+                self.assertEqual(result[0]['status'], expected)
+                self.assertEqual(sum(method == 'DELETE' for method, _ in api.calls), int(expected == 'deleted'))
+                if expected == 'deleted':
+                    self.assertEqual(api.calls, [('GET', '/templates/owned-id'),
+                                                ('GET', '/templates/aliases/' + CANDIDATE['name']),
+                                                ('DELETE', '/templates/owned-id'), ('GET', '/templates/owned-id')])
+
+    def test_existing_id_with_missing_or_rebound_alias_is_not_reported_absent(self):
+        for options in ({'alias_absent': True}, {'alias': {'templateID': 'different-id'}},
+                        {'alias': {'templateID': '../foreign'}}, {'alias': {'public': None}}):
+            with self.subTest(options=options):
+                api = TemplateAPI(**options)
+                result = cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', api)
+                self.assertEqual(result[0]['status'], 'failed')
+                self.assertEqual(api.calls[0], ('GET', '/templates/owned-id'))
+                self.assertFalse(any(method == 'DELETE' for method, _ in api.calls))
+                self.assertNotIn('private-response-contents', str(result))
+
+    def test_known_id_absence_is_verified_by_id_without_following_a_rebound_alias(self):
+        api = TemplateAPI(id_absent=True, alias={'templateID': 'different-id'})
+        result = cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', api)
+        self.assertEqual(result, [{**CANDIDATE, 'status': 'absent'}])
+        self.assertEqual(api.calls, [('GET', '/templates/owned-id')])
+
+    def test_partial_creation_is_recovered_through_the_exact_alias_then_id(self):
+        candidate = {key: value for key, value in CANDIDATE.items() if key != 'templateId'}
+        api = TemplateAPI()
+        result = cleanup.builder.cleanup_templates([candidate], 'fixture', api)
+        self.assertEqual(result, [{**CANDIDATE, 'status': 'deleted'}])
+        self.assertEqual(api.calls, [('GET', '/templates/aliases/' + CANDIDATE['name']),
+                                    ('GET', '/templates/owned-id'), ('DELETE', '/templates/owned-id'),
+                                    ('GET', '/templates/owned-id')])
+        missing = TemplateAPI(alias_absent=True)
+        self.assertEqual(cleanup.builder.cleanup_templates([candidate], 'fixture', missing),
+                         [{**candidate, 'status': 'absent'}])
+        self.assertEqual(missing.calls, [('GET', '/templates/aliases/' + CANDIDATE['name'])])
+
+    def test_namespaced_name_requires_the_same_exact_alias_binding(self):
+        info = {'aliases': [], 'names': ['owned-team/' + CANDIDATE['name']]}
+        api = TemplateAPI(info=info)
+        self.assertEqual(cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', api)[0]['status'], 'deleted')
+        rebound = TemplateAPI(info=info, alias={'templateID': 'different-id'})
+        self.assertEqual(cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', rebound)[0]['status'], 'failed')
+        self.assertFalse(any(method == 'DELETE' for method, _ in rebound.calls))
+
+    def test_public_alias_and_unconfirmed_deletion_are_never_reported_deleted(self):
+        public = TemplateAPI(alias={'public': True})
+        self.assertEqual(cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', public)[0]['status'], 'retained_public')
+        self.assertFalse(any(method == 'DELETE' for method, _ in public.calls))
+        still_exists = TemplateAPI(delete_effective=False)
+        result = cleanup.builder.cleanup_templates([CANDIDATE], 'fixture', still_exists)
+        self.assertEqual(result[0]['status'], 'failed')
+        self.assertEqual(result[0]['error'], 'RuntimeError')
+        self.assertEqual(still_exists.calls[-1], ('GET', '/templates/owned-id'))
+
+    def test_invalid_expected_id_does_not_fall_back_to_name_only_recovery(self):
+        for template_id in ('../foreign', '', None):
+            with self.subTest(template_id=template_id):
+                api = TemplateAPI()
+                result = cleanup.builder.cleanup_templates([{**CANDIDATE, 'templateId': template_id}], 'fixture', api)
+                self.assertEqual(result[0]['status'], 'failed')
+                self.assertEqual(api.calls, [])
 
     def test_cleanup_refuses_a_mismatched_list_result_and_continues_after_a_kill_error(self):
         metadata, _ = cleanup.identities(ENV)

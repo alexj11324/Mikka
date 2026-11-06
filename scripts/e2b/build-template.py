@@ -330,7 +330,7 @@ def assert_new_template(name, api_key):
     if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
         raise ValueError('template_name_invalid')
     try:
-        _request('GET', f'/templates/{name}', api_key)
+        _request('GET', f'/templates/aliases/{name}', api_key)
     except HTTPError as error:
         if error.code == 404:
             return
@@ -358,24 +358,51 @@ def cleanup_templates(candidates, api_key, request=None):
         try:
             if not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
                 raise ValueError('cleanup_name_invalid')
+            template_id = candidate.get('templateId')
+            if 'templateId' in candidate:
+                if not isinstance(template_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id):
+                    raise ValueError('cleanup_candidate_identity_mismatch')
+                row['templateId'] = template_id
+                # A missing alias cannot prove that a known candidate was deleted.
+                try:
+                    info = request('GET', '/templates/' + template_id, api_key)
+                except HTTPError as error:
+                    if error.code == 404:
+                        receipts.append({**row, 'status': 'absent'})
+                        continue
+                    raise
             try:
-                info = request('GET', '/templates/' + name, api_key)
+                alias = request('GET', '/templates/aliases/' + name, api_key)
             except HTTPError as error:
-                if error.code == 404:
+                if error.code == 404 and template_id is None:
                     receipts.append({**row, 'status': 'absent'})
                     continue
                 raise
-            names = (info.get('names') or []) + (info.get('aliases') or [])
-            template_id = info.get('templateID')
-            if (name not in names or info.get('isDefault') is True or not isinstance(template_id, str)
-                    or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id)
-                    or (candidate.get('templateId') and template_id != candidate['templateId'])):
+            alias_id = alias.get('templateID')
+            if (not isinstance(alias_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', alias_id)
+                    or (template_id is not None and alias_id != template_id)):
                 raise ValueError('cleanup_candidate_identity_mismatch')
-            row['templateId'] = template_id
-            if info.get('public') is True:
+            if template_id is None:
+                # Recover a build that created its alias before writing a report.
+                template_id = alias_id
+                row['templateId'] = template_id
+                try:
+                    info = request('GET', '/templates/' + template_id, api_key)
+                except HTTPError as error:
+                    if error.code == 404:
+                        receipts.append({**row, 'status': 'absent'})
+                        continue
+                    raise
+            names = (info.get('names') or []) + (info.get('aliases') or [])
+            # E2B names may be namespace/alias. The exact, team-scoped alias
+            # lookup above must independently bind that name to this same ID.
+            if (not any(isinstance(value, str) and re.fullmatch(r'(?:[^/]+/)?' + re.escape(name), value) for value in names)
+                    or info.get('isDefault') is True or info.get('templateID') != template_id):
+                raise ValueError('cleanup_candidate_identity_mismatch')
+            if info.get('public') is True or alias.get('public') is True:
                 receipts.append({**row, 'status': 'retained_public'})
                 continue
-            if info.get('public') is not False:
+            if info.get('public') is not False or alias.get('public') is not False:
                 raise ValueError('cleanup_candidate_visibility_unknown')
             request('DELETE', '/templates/' + template_id, api_key)
             try:
