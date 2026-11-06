@@ -63,7 +63,7 @@ export const pollingAllowlist = {
   'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
   'apps/mobile/components/beui/components/loading-states/reasoning-text.tsx': ui('reasoning text animation', 2),
   'apps/mobile/components/beui/components/tool-result/tool-result.tsx': ui('elapsed-time clock', 1),
-  'components/settings/subscription-settings.tsx': ui('the 30 s setInterval only ages the meters\' "updated" label; the meters themselves read on the model_settings push and on focus once older than 5 min', 1),
+  'hooks/settings/use-subscriptions.ts': ui('the 30 s setInterval only ages the meters\' "updated" label; the meters themselves read on the model_settings push and on focus once older than 5 min', 1),
   'apps/mobile/features/chat/screens/chat-screen.tsx': ui('the 1 s elapsed clock of a reply in progress; the chat and its proposals are pushed (lib/live.ts)', 1),
   'components/version-guard.tsx': ui('checks the public build metadata once a minute (decision 2026-11-03-1437); no database read', 1),
 }
