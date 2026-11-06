@@ -12,7 +12,7 @@ import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { tasksLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
 import { openOnWeb } from '@/lib/web'
-import { colors } from '@/lib/theme'
+import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 import { CLOSED_SHOWN, ListSectionHeader, ShowAllRow } from '@/shared/components/list-section'
 
 /** The web's task statuses (lib/issue-meta.ts) in board order, with their names; the closed ones last. */
@@ -98,8 +98,8 @@ export const listStyles = StyleSheet.create({
 })
 
 const styles = StyleSheet.create({
-  /** One line per row (Alex 2026-11-06): 52 pt tall, the pressed surface 10 pt in from each side. */
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, marginHorizontal: 10, paddingHorizontal: 10, borderRadius: 10 },
+  /** One line per row (Alex 2026-11-06): 52 pt tall, text 16 pt in from each edge (lib/theme.ts LIST_INSET). */
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10 },
   icon: { width: 22, alignItems: 'center' },
   mark: { width: 18, height: 18, borderRadius: 9 },
   half: { borderWidth: 2, borderColor: colors.orange, overflow: 'hidden', flexDirection: 'row' },

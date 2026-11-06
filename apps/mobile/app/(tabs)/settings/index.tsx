@@ -17,7 +17,7 @@ import { authClient } from '@/lib/auth'
 import { clearApiCache } from '@/lib/useApi'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
-import { colors } from '@/lib/theme'
+import { colors, GROUP_INSET } from '@/lib/theme'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
 const icon = (name: SymbolName, Icon: typeof Bell, background: string) => (
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
           <CardButton label="重试" onPress={() => void reload()} />
         </View>
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
-        <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
+        <ScrollView {...underBar} contentContainerStyle={{ paddingHorizontal: GROUP_INSET, paddingTop: 16, paddingBottom: insets.bottom + 24 }}>
           <ReadNotice error={error} hasData label="设置" onRetry={reload} />
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />

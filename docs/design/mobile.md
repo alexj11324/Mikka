@@ -59,6 +59,9 @@ their counts as the system's tab badges.
 workspaces with a check on the open one; a tap switches and goes back. 编辑 shows
 handles that arrange them on this device.
 
+**Side margins** (Alex 2026-11-06, HIG layout margins; `lib/theme.ts`): a plain list's content starts 16 pt in from
+each edge (对话, 线程, 任务, 建议, 搜索), an inset grouped list's cards 20 pt (插件, 设置, 工作区, the 新建 sheets).
+
 **线程** (designs 13, 15) has a 线程 | 任务 segment under its large title, then one list. Each row is one line: the
 status icon and the title, at 17 pt, cut with an ellipsis; a title's leading issue key (ALEX-12, #1408) and trailing
 date or time are not shown (Alex 2026-11-06, `lib/display-title.ts`). A floating glass switcher above the tab bar

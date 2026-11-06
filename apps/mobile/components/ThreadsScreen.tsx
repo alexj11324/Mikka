@@ -14,7 +14,7 @@ import { openChat } from '@/lib/navigate'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { botPageLive, threadsLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
-import { colors } from '@/lib/theme'
+import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 import { displayTitle } from '@/lib/display-title'
 import { CLOSED_SHOWN, ListSectionHeader, ShowAllRow } from '@/shared/components/list-section'
 import { ThreadLink } from '@/shared/components/thread-link'
@@ -128,21 +128,25 @@ type Row = { key: string; thread: Thread } | { key: string; title: string } | { 
 export function ThreadRow({ thread, onStopped }: { thread: Thread; onStopped?: () => void }) {
   const waiting = thread.status === 'waiting'
   return (
-    <ThreadLink thread={thread} onStopped={onStopped} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      <View style={styles.rowInner}>
-        <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} /></View>
-        <Text style={styles.rowTitle} numberOfLines={1}>{displayTitle(thread.name)}</Text>
-        {waiting ? <Dot /> : null}
-      </View>
-    </ThreadLink>
+    // The side margin sits on a plain View: on iOS the row's press is inside a Link, which may not pass a style on.
+    <View style={styles.row}>
+      <ThreadLink thread={thread} onStopped={onStopped} style={({ pressed }) => [styles.rowPress, pressed && { backgroundColor: colors.pressed }]}>
+        <View style={styles.rowInner}>
+          <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} /></View>
+          <Text style={styles.rowTitle} numberOfLines={1}>{displayTitle(thread.name)}</Text>
+          {waiting ? <Dot /> : null}
+        </View>
+      </ThreadLink>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  segment: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
-  row: { marginHorizontal: 10, paddingHorizontal: 10, borderRadius: 10 },
-  rowInner: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
+  segment: { paddingHorizontal: LIST_INSET, paddingTop: 4, paddingBottom: 12 },
+  row: { marginHorizontal: ROW_SURFACE_INSET },
+  rowPress: { borderRadius: 10 },
+  rowInner: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET },
   rowIcon: { width: 22, alignItems: 'center' },
   rowTitle: { flex: 1, minWidth: 0, fontSize: 17, lineHeight: 22 },
   center: { paddingTop: 40, alignItems: 'center' },

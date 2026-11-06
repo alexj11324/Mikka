@@ -11,7 +11,7 @@ import { Text } from '@/components/Text'
 import { useWorkspaces } from '@/features/workspace/model/use-workspaces'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { prefetch, useRefresh } from '@/lib/useApi'
-import { colors } from '@/lib/theme'
+import { colors, LIST_INSET } from '@/lib/theme'
 import { ChatDragProvider } from '../components/chat-drag'
 import { HomeChatRow } from '../components/home-chat-row'
 import { PinnedGrid } from '../components/pinned-grid'
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   workspace: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble, maxWidth: 200 },
   workspaceName: { fontSize: 17, fontWeight: '600', color: colors.ink, flexShrink: 1 },
-  hidden: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 20, marginTop: 12 },
+  hidden: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: LIST_INSET, marginTop: 12 },
   hiddenText: { flex: 1, fontSize: 15, color: colors.secondary },
   hiddenCount: { fontSize: 15, color: colors.tertiary },
 })

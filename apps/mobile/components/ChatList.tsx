@@ -9,7 +9,7 @@ import { useHome } from '@/lib/home'
 import type { GroupSummary, HomeBot } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { listRef } from '@/lib/live'
-import { colors } from '@/lib/theme'
+import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 
 export type ChatRow = { kind: 'bot'; bot: HomeBot; at: string } | { kind: 'group'; group: GroupSummary; at: string }
 
@@ -74,9 +74,9 @@ export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode
 }
 
 const styles = StyleSheet.create({
-  /** The pressed surface sits 10 pt in from each side, rounded 10 (Comma's list rows). */
-  press: { marginHorizontal: 10, borderRadius: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, paddingVertical: 9 },
+  /** The pressed surface sits 6 pt in from each side, rounded 10; the row's text lands 16 pt in (lib/theme.ts). */
+  press: { marginHorizontal: ROW_SURFACE_INSET, borderRadius: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, paddingVertical: 9 },
   body: { flex: 1, minWidth: 0, gap: 2 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flex: 1, fontSize: 17, lineHeight: 22, fontWeight: '600' },

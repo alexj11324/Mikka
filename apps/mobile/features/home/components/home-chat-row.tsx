@@ -10,7 +10,7 @@ import { Text } from '@/components/Text'
 import { tap, warn } from '@/lib/haptics'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { SNAP_BACK } from '@/lib/springs'
-import { colors } from '@/lib/theme'
+import { colors, ROW_SURFACE_INSET } from '@/lib/theme'
 import { armedAt, settleSwipe, SWIPE_REVEAL } from '../model/pin-swipe'
 import type { HomeChat, useHomeChats } from '../model/use-home-chats'
 import { ChatBadge } from './chat-badge'
@@ -81,9 +81,12 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
         onHide={() => { close(); void actions.setHidden(chat, true) }} />
       <GestureDetector gesture={gesture}>
         <Reanimated.View ref={drag.ref} collapsable={false} style={[styles.surface, moved]}>
-          <ChatLink chat={chat} actions={actions} ignore={() => swiping.current || drag.active()} style={({ pressed }) => [styles.press, pressed && { backgroundColor: colors.pressed }]}>
-            <ChatRowContent row={chat.row} badge={<ChatBadge chat={chat} />} />
-          </ChatLink>
+          {/* The side margin sits on a plain View: on iOS the press is inside a Link, which may not pass a style on. */}
+          <View style={styles.inset}>
+            <ChatLink chat={chat} actions={actions} ignore={() => swiping.current || drag.active()} style={({ pressed }) => [styles.press, pressed && { backgroundColor: colors.pressed }]}>
+              <ChatRowContent row={chat.row} badge={<ChatBadge chat={chat} />} />
+            </ChatLink>
+          </View>
           {/* An open row: a tap on it closes it rather than opening the chat. */}
           {open ? <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="收起" onPress={close} /> : null}
         </Reanimated.View>
@@ -119,8 +122,9 @@ function Capsule({ label, color, icon, onPress }: { label: string; color: string
 const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   surface: { backgroundColor: colors.page },
-  /** The pressed surface sits 10 pt in from each side, rounded 10 (Comma's list rows). */
-  press: { marginHorizontal: 10, borderRadius: 10 },
+  /** The pressed surface sits 6 pt in from each side, rounded 10; the row's text lands 16 pt in (lib/theme.ts). */
+  inset: { marginHorizontal: ROW_SURFACE_INSET },
+  press: { borderRadius: 10 },
   actions: { position: 'absolute', right: 0, top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingRight: 14 },
   capsuleButton: { alignItems: 'center', gap: 4 },
   capsule: { width: 58, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
