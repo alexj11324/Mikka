@@ -50,7 +50,7 @@ def claim_sql(source, values):
 
 
 def run():
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from e2b import Sandbox
     import psycopg
     spec = importlib.util.spec_from_file_location('build_template', HERE / 'build-template.py')
@@ -70,7 +70,7 @@ def run():
     report = {'version': 1, 'scope': 'component-only; no dispatch or agent execution',
               'sourceCommit': sha, 'workerSha': worker, 'poolSourceCommit': POOL_SOURCE,
               'poolClaimSourceBlob': POOL_BLOB, 'runsPerKindAndStrategy': 3,
-              'sameRunnerAndApiKey': True, 'templates': {}, 'samples': [], 'cleanup': []}
+              'sameRunnerAndApiKey': True, 'templates': {}, 'samples': [], 'buildErrors': [], 'cleanup': []}
     instances = set()
     templates = {}
     output = HERE / 'component-benchmark.json'
@@ -115,7 +115,18 @@ def run():
                           'baseTemplate': kind, 'preinstalled': True, 'resources': allocation,
                           'conservation': proof, 'models': models}
         with ThreadPoolExecutor(max_workers=3) as executor:
-            report['templates'] = dict(executor.map(build_one, ['claude', 'codex', 'desktop']))
+            pending = {executor.submit(build_one, kind): kind for kind in ['claude', 'codex', 'desktop']}
+            for future in as_completed(pending):
+                kind = pending[future]
+                try:
+                    _, built = future.result()
+                    report['templates'][kind] = built
+                except Exception as error:
+                    report['buildErrors'].append({'kind': kind, 'error': type(error).__name__})
+                    print('mikka-component-build-failed ' + json.dumps({'kind': kind, 'error': type(error).__name__}), flush=True)
+                save()
+        if not report['templates']:
+            raise RuntimeError('no_component_candidates_ready')
         save()
         with psycopg.connect(dsn, autocommit=True) as db:
             db.execute('CREATE TABLE "user" (id text PRIMARY KEY)')
@@ -178,7 +189,9 @@ def run():
             'medianMs': statistics.median(row['requestToReadyMs'] for row in report['samples'] if row['kind'] == kind and row['strategy'] == strategy),
             'maxMs': max(row['requestToReadyMs'] for row in report['samples'] if row['kind'] == kind and row['strategy'] == strategy),
         } for strategy in ('derived', 'pool')} for kind in report['templates']}
-        report['status'] = 'component_comparison_passed'
+        report['status'] = 'component_comparison_passed' if not report['buildErrors'] else 'component_comparison_incomplete'
+        if report['buildErrors']:
+            raise RuntimeError('component_candidate_build_failed')
     except BaseException as error:
         report['status'] = 'failed'
         report['error'] = type(error).__name__

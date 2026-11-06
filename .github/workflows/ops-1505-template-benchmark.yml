@@ -23,7 +23,7 @@ jobs:
           POSTGRES_DB: mikka_1505_components
         ports: [5432:5432]
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U benchmark -d mikka_1505_components"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
@@ -47,6 +47,8 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
+      - name: Repeat official-only preservation at preload and fresh create
+        run: '"$RUNNER_TEMP/e2b-benchmark/bin/python" scripts/e2b/diagnose-template-conservation.py'
       - name: Compare derived templates and the actual pool claim SQL
         env:
           BENCHMARK_DATABASE_URL: postgresql://benchmark:benchmark@127.0.0.1:5432/mikka_1505_components
@@ -56,6 +58,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: issue-1505-component-benchmark
-          path: scripts/e2b/component-benchmark.json
+          path: |
+            scripts/e2b/component-benchmark.json
+            scripts/e2b/official-control.json
           if-no-files-found: warn
           retention-days: 7

@@ -46,11 +46,14 @@ def main():
             built = Template.build(template, name=prefix+'-'+kind, cpu_count=2, memory_mb=4096,
                                    skip_cache=True, api_key=key,
                                    on_build_logs=lambda entry: print(f'[{kind}] {entry}', flush=True))
-            sandbox = Sandbox.create(built.template_id, api_key=key, timeout=120,
+            sandbox = Sandbox.create(built.template_id, api_key=key, timeout=240,
                                      metadata={'application': 'mikka-1505-official-control', 'run': os.environ['GITHUB_RUN_ID']})
             sandboxes.add(sandbox.sandbox_id)
             try:
-                result = json.loads(sandbox.files.read('/opt/mikka/ready-diagnostic.json', user='root'))
+                preloaded = json.loads(sandbox.files.read('/opt/mikka/ready-diagnostic.json', user='root', request_timeout=30))
+                command = DIAGNOSE.replace("Path('/opt/mikka/ready-diagnostic.json').write_text(json.dumps(receipt)+'\\n')", 'print(json.dumps(receipt))').replace('exec sleep infinity', '')
+                current = sandbox.commands.run(command, user='root', timeout=180, request_timeout=185)
+                result = {'preloaded': preloaded, 'created': json.loads(current.stdout)}
                 versions = sandbox.commands.run("for cli in claude codex; do command -v \"$cli\" >/dev/null 2>&1 && \"$cli\" --version || true; done", user='user', timeout=30)
                 result['officialCliVersions'] = versions.stdout.strip().splitlines()
                 print('mikka-official-control ' + json.dumps({'kind': kind, **result}), flush=True)
@@ -77,7 +80,7 @@ def main():
                 if getattr(error,'code',None)!=404:
                     report['cleanup'].append({'resource':'control-template','kind':kind,'error':type(error).__name__})
         report['remainingSandboxes']=sorted(sandboxes)
-        (HERE/'component-benchmark.json').write_text(json.dumps(report,indent=2)+'\n')
+        (HERE/'official-control.json').write_text(json.dumps(report,indent=2)+'\n')
         print('mikka-control-cleanup '+json.dumps({'remainingSandboxes':sorted(sandboxes),'cleanup':report['cleanup']}),flush=True)
     if sandboxes or report['cleanup']:
         raise RuntimeError('diagnostic_cleanup_incomplete')

@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+from urllib.error import HTTPError
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -277,6 +278,7 @@ def source_context(directory, ref):
 
 def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cpu_count=2, memory_mb=4096):
     from e2b import Template
+    assert_new_template(name, api_key)
     recipe = KINDS[kind]
     with tempfile.TemporaryDirectory(prefix='mikka-e2b-template-') as temp:
         context = Path(temp)
@@ -316,6 +318,19 @@ def _request(method, path, api_key, body=None, opener=urllib.request.urlopen):
         raw = response.read()
         return json.loads(raw) if raw else None
 
+
+def assert_new_template(name, api_key):
+    """A versioned build must never update an existing official or Mikka alias."""
+    if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
+        raise ValueError('template_name_invalid')
+    try:
+        _request('GET', f'/templates/{name}', api_key)
+    except HTTPError as error:
+        if error.code == 404:
+            return
+        raise
+    raise ValueError('template_name_already_exists')
+
 def probe_models(template_id, kind, api_key, sandbox_factory=None):
     """Read the built image's actual CLI catalogues, never a handwritten model list."""
     if sandbox_factory is None:
@@ -341,17 +356,27 @@ def probe_models(template_id, kind, api_key, sandbox_factory=None):
 
 
 def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
-    """Read the mandatory build receipt from a disposable candidate instance."""
+    """Check the final image on a disposable instance, never a timed instance.
+
+    E2B also performs provider setup after its start/ready command. Keep the
+    preloaded receipt and independently verify the image a fresh create sees.
+    """
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
-    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60)
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=180)
     try:
-        result = sandbox.commands.run("python3 - <<'PY'\nimport json\nfrom pathlib import Path\nproof=json.loads(Path('/opt/mikka/official-files-conservation.json').read_text())\nproof['finalization']=json.loads(Path('/opt/mikka/official-files-ready.json').read_text())\nprint(json.dumps(proof))\nPY", user='root', timeout=15)
+        conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
+        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
+        guard = official_files_guard()
+        guard.validate_receipt(conservation, kind)
+        result = sandbox.commands.run(f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}',
+                                      user='root', timeout=120, request_timeout=125)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
-        conservation = json.loads(result.stdout)
-        return official_files_guard().validate_receipt(conservation, kind)
+        conservation['preloadFinalization'] = conservation['finalization']
+        conservation['finalization'] = json.loads(result.stdout)
+        return guard.validate_receipt(conservation, kind)
     finally:
         sandbox.kill()
 
