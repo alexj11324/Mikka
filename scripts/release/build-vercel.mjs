@@ -5,15 +5,14 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseEnv } from 'node:util'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
-import { buildEnvironment } from './web-deploy.mjs'
+import { buildEnvironmentValues } from './web-deploy.mjs'
 
 export function productionBuildEnvironment({ text, env, sourceSha, nodeVersion = process.version }) {
   if (!nodeVersion.startsWith('v24.')) throw new Error('webDeploy:node24Required')
   if (!/^[a-f0-9]{40}$/.test(sourceSha ?? '') || sourceSha !== env.GITHUB_SHA
     || (env.VERCEL_GIT_COMMIT_SHA && env.VERCEL_GIT_COMMIT_SHA !== sourceSha)) throw new Error('webDeploy:sourceMismatch')
-  const values = parseEnv(buildEnvironment(text, env))
+  const values = buildEnvironmentValues(text, env)
   const deploymentId = configuredDeploymentId(env)
   if (!deploymentId) throw new Error('webDeploy:deploymentIdRequired')
   const build = { ...env, ...values, NODE_ENV: 'production', VERCEL: '1', VERCEL_ENV: 'production',
