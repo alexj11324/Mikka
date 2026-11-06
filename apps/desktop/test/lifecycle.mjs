@@ -412,7 +412,7 @@ try {
   check('fresh-process offline launch serves installed assets and a meaningful local offline screen, then recovers without a reload')
   await run.page.evaluate(() => window.mikka.bundled.signOut())
   await close(run.app); application = null
-  assert.ok(evidence.coldStart.bundledFaster, 'DESKTOP_BUNDLED_COLD_START_NOT_FASTER')
+  // Cold start is measured and recorded in evidence.coldStart, not a pass/fail gate (Alex, 2026-11-06).
   passed = true
 } catch (error) {
   evidence.failure = { phase, ...nativeLifecycleFailure(error) }

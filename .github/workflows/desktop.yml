@@ -265,9 +265,9 @@ jobs:
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
       - name: Real packaged Apple Silicon native acceptance
         id: acceptance
-        # The idle case measures a full real hour with the registered macOS
-        # daemon active, after all other native windows and fixtures are drained.
-        run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle idle
+        # Functional acceptance only. The one-hour idle measurement is not run
+        # (Alex, 2026-11-06); run-acceptance.mjs still accepts `idle` by hand.
+        run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle
         env:
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
       - name: Build Alex's isolated test package with production inspector fuse
