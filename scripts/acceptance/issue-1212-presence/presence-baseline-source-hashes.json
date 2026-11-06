@@ -1,0 +1,21 @@
+{
+  "sourceBase": "2f84230d24f28c6b5d1ef78669f7d6cbaf438bfc",
+  "runtime": [
+    "lib/live/channel.ts",
+    "lib/live/channels.ts",
+    "lib/live/revisions.ts",
+    "lib/live/events.ts"
+  ],
+  "hashes": {
+    "lib/live/channel.ts": "48e528f513b7058a3973aa39c69996fa2e11f696dec6812a32cd7518a49c929b",
+    "lib/live/channels.ts": "962b23278dd4aa360dc1d39458614bf80c61aebb192d7a7897882d2944d26f60",
+    "lib/live/revisions.ts": "934d10dcd483a9ffccec8a9689076f6beaaa1133f84af0d3fc0ca436bc3bc708",
+    "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "hooks/use-live-key.tsx": "d38a32357df1b3126efa7727171ca8b8395c5582d37a3dc9d7ddf9a49a21baf6",
+    "components/devices/devices-settings.tsx": "8985f51ee7409eaa36c9718509b8cbc488de8d45319392d7bb82c17a84f65ca3",
+    "lib/live/browser-runtime.ts": "f702483426421445ff00fafe245a743ed9e16840146620952752513aa1b56219",
+    "lib/live/list-read.ts": "4e0e35529b7421b42b7e13dfb443b6d7e567b18046302c39622076a99c0a2fb7",
+    "packages/protocol/src/device.ts": "6c63072e7ff69371d1547673927f0af9e3ba204b48e850d287e4f84212b30aa6",
+    "packages/protocol/src/daemon.ts": "8fa7015227c26b46c871166b6bacbc45f37fd1a0e031c514efa258a1115afaff"
+  }
+}

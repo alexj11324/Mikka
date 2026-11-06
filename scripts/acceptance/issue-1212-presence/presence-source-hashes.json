@@ -1,0 +1,19 @@
+{
+  "sourceBase": "9659e55a2d503efb62cbe1e5f9aa32586e6fd42d",
+  "clientPatchSha256": "163b70b7604fcd4fb8a64c5961b13422a1df223f7437c2c0b1c381693f52b570",
+  "hashes": {
+    "lib/live/channel.ts": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+    "lib/live/tab-share.ts": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "lib/live/revisions.ts": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "lib/live/presence.ts": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "lib/swr/persistent-cache.ts": "d1e65d589ea138d3fde4e2287a5945a28697222e7b5d5efb9967e6de5fe0650a",
+    "lib/swr/cache-policy.ts": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+    "lib/swr/indexed-db.ts": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "hooks/use-live-key.tsx": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
+    "components/devices/devices-settings.tsx": "1f4c27f799b38a8f59988b164b793f6d09e5348cf7645eaa794fefea76d3fdfa",
+    "hooks/use-live-lists.ts": "2a8fb2be629a5cd80178502fe84862207de4aa0446535fc8f93ffa8b7f1d5afb",
+    "packages/protocol/src/device.ts": "6c63072e7ff69371d1547673927f0af9e3ba204b48e850d287e4f84212b30aa6",
+    "packages/protocol/src/daemon.ts": "8fa7015227c26b46c871166b6bacbc45f37fd1a0e031c514efa258a1115afaff"
+  }
+}
