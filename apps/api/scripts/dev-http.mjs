@@ -26,6 +26,16 @@ export const developmentDocument = (request, render) => pageResponse(request, re
 
 export function developmentPages({ root, origin }) {
   return { name: 'mikka-development-pages', configureServer(server) {
+    // Vite checks its slash-terminated base before post middlewares. Preserve the
+    // public request while letting its normal Host/CORS and base checks run.
+    server.middlewares.use((incoming, _outgoing, next) => {
+      const target = incoming.url
+      if (target === '/mikka' || target?.startsWith('/mikka?')) {
+        incoming.originalUrl ??= target
+        incoming.url = `/mikka/${target.slice('/mikka'.length)}`
+      }
+      next()
+    })
     return () => server.middlewares.use(async (incoming, outgoing, next) => {
       try {
         const request = developmentRequest(incoming, origin)

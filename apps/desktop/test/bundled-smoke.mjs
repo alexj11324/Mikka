@@ -9,6 +9,7 @@ import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
+import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { nativeCleanupFailure, recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
@@ -34,12 +35,14 @@ let browser
 let scope
 let nativeResources
 let releaseObserver
+let generatedWorkspaceName
 let passed = false
 let failure
 
 try {
   scope = await acquireTestAccounts({ runId: `desktop-${started}`, workerId: 'bundled-smoke', requestId: `desktop-${started}`, ttlMs: 300_000 })
   releaseObserver = await observeAccountRelease(scope)
+  generatedWorkspaceName = await captureGeneratedWorkspaceName(scope)
   nativeResources = await captureNativeResources(scope)
   application = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
@@ -154,6 +157,10 @@ try {
   }
   if (drained && nativeResources) {
     try { evidence.nativeCleanup = await cleanup('native-resources', () => nativeResources.cleanup({ drained: true })) } catch (error) { failedCleanup(error) }
+  }
+  if (drained && evidence.nativeCleanup?.cleaned && generatedWorkspaceName) {
+    try { await cleanup('workspace-generated-name', () => generatedWorkspaceName.restore({ drained: true })) } catch (error) { failedCleanup(error) }
+    finally { evidence.workspaceNameCleanup = generatedWorkspaceName.read() }
   }
   if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(failedCleanup)
   evidence.accountObservation = releaseObserver?.read() ?? { observed: false }

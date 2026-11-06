@@ -274,7 +274,41 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       const storageStatePath = join(statesDirectory, `${lease.id}-${lease.generation}-${slot.role}.json`)
       await writePrivate(storageStatePath, { cookies: [...cookies.values()], origins: [] })
       stateFiles.push(storageStatePath)
-      scope[slot.role] = { userId, slotId: slot.slotId, namespace: slot.namespace, role: slot.role, storageStatePath, request }
+      // Cleanup may run after a native sign-out revoked the same ordinary
+      // browser session. Reauthenticate only this already bound lease account;
+      // credentials remain inside the original closure and cookie jar.
+      async function reauthenticate() {
+        if (arguments.length !== 0) fail('TEST_ACCOUNT_REAUTH_ARGUMENTS_FORBIDDEN')
+        await assertActive()
+        let settled
+        const pending = new Promise(resolve => { settled = resolve })
+        pendingRequests.add(pending)
+        try {
+          const login = await request('/api/auth/sign-in/email', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: credential.email, password: credential.password }),
+          })
+          if (!login.ok) fail('ACCOUNT_LOGIN_FAILED')
+          const result = await login.json()
+          if (result?.user?.id !== userId || result.user.email !== credential.email) fail('ACCOUNT_IDENTITY_MISMATCH')
+          const check = await request('/api/auth/get-session')
+          if (!check.ok) fail('ACCOUNT_SESSION_INVALID')
+          const session = await check.json()
+          if (session?.user?.id !== userId || session?.user?.email !== credential.email
+            || typeof session.session?.id !== 'string' || !session.session.id) fail('ACCOUNT_SESSION_INVALID')
+          const tokens = [result.token, session.session.token].filter(value => typeof value === 'string' && value.length >= 12)
+          if (tokens.length) await writePrivate(auditFile, { values: tokens }, { append: true })
+          await pool.recordResource(lease, { type: 'session', id: session.session.id, ownerId: userId })
+          await assertActive()
+        } catch (error) {
+          tainted = true
+          throw safeError(error)
+        } finally {
+          pendingRequests.delete(pending)
+          settled()
+        }
+      }
+      scope[slot.role] = { userId, slotId: slot.slotId, namespace: slot.namespace, role: slot.role, storageStatePath, request, reauthenticate }
     }
     return scope
   } catch (error) {
