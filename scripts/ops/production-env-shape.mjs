@@ -11,7 +11,7 @@ import { buildEnvironment, buildEnvironmentValues, REQUIRED } from '../release/w
 import { productionBuildEnvironment } from '../release/build-vercel.mjs'
 import { directDatabaseURL } from '../postgres-connection.mjs'
 
-const APPLICATION = 'ce512e77f01589f56729c31d00750c0203e46ed9'
+const APPLICATION = '857061bbab7dced2285fd8bb4a47b71a48d865fa'
 const OLD_APPLICATION = '62281b1995cb8fef16e7604dc1ea9a29c4dbbe32'
 const REPOSITORY = 'alexj11324/Mikka'
 const REF = 'refs/heads/ops/issue1415-production-env-shape'

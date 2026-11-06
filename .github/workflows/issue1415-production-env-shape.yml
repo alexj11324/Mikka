@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 8
     env:
-      APPLICATION_SHA: ce512e77f01589f56729c31d00750c0203e46ed9
+      APPLICATION_SHA: 857061bbab7dced2285fd8bb4a47b71a48d865fa
       ENV_SHAPE_DEPENDENCIES: /tmp/issue1415-env-shape-deps-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
