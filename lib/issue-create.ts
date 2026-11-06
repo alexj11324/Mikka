@@ -9,6 +9,7 @@ import type { ActivityActor } from '@/lib/activity-actor'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { issueListChanged } from './live/lists'
+import { scheduleShortTitle } from './short-title-schedule'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -47,5 +48,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     ...actor,
   })
   await issueListChanged(tx, id)
+  // A short title for the lists, written once after this commits (lib/short-title-schedule.ts).
+  scheduleShortTitle(tx, id, userId)
   return issueView(issue, tx)
 }

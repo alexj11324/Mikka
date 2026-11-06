@@ -1,6 +1,7 @@
 'use client'
 
 import { useViewScroll } from '@/lib/hooks/view-state'
+import { displayTaskTitle } from '@/lib/short-title'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -138,7 +139,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     </div>
     <div className="flex min-w-0 items-start gap-[3px]">
       <CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>
-      <h3 data-slot="kanban-task-title" className={cn('line-clamp-2 min-w-0 flex-1 text-[13px] leading-5 font-medium break-words', done && 'text-muted-foreground')}>{task.title}</h3>
+      <h3 data-slot="kanban-task-title" className={cn('line-clamp-2 min-w-0 flex-1 text-[13px] leading-5 font-medium break-words', done && 'text-muted-foreground')} title={task.title}>{displayTaskTitle(task)}</h3>
     </div>
     {chips.length > 0 && <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-5">{chips}</div>}
     {show('createdAt') && <div className="pl-5"><CardCreatedAt createdAt={task.createdAt} /></div>}
