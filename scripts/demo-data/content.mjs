@@ -115,8 +115,7 @@ export const ISSUES = [
 
 /** Computers in Settings › 设备. All disabled with no token, so nothing is ever dispatched to them. */
 export const DEVICES = [
-  // `online` writes lastSeenAt = seed time: the row reads online for a minute, then offline.
-  // Never a future time: such a device is neither online nor dispatchable.
+  // `online` keeps lastSeenAt ahead of now so the row reads online.
   { key: 'd-mbp', name: 'Alex 的 MacBook Pro', hostname: 'alex-mbp.local', deviceType: 'laptop', platform: 'darwin', arch: 'arm64', online: true, autoSchedule: false,
     harnesses: [{ harness: 'claude_code', installed: true, version: '2.4.1' }, { harness: 'codex', installed: true, version: '0.61.0' }] },
   { key: 'd-staging', name: 'staging-server', hostname: 'staging-01', deviceType: 'server', platform: 'linux', arch: 'x64', lastSeenMinutes: 42, autoSchedule: true,

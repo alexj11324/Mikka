@@ -55,8 +55,8 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
     </ItemMedia>
     <ItemContent className="min-w-0">
       <ItemTitle>{state.status === 'online' ? t('local.online') : state.status === 'failed' ? t('local.failed') : t('local.adding')}</ItemTitle>
-      {state.status === 'failed' && (state.reason || state.detail)
-        ? <SetupFailure state={state} />
+      {state.status === 'failed' && state.reason
+        ? <SetupFailure reason={state.reason} />
         : state.status === 'running' && current && <ItemDescription>{t(`ssh.steps.${current}`)}</ItemDescription>}
     </ItemContent>
     {state.status === 'failed' && <ItemActions><Button size="sm" variant="secondary" disabled={retrying} onClick={() => { void retry() }}>{t('local.retry')}</Button></ItemActions>}
@@ -64,24 +64,19 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
 }
 
 /**
- * The failure as a person reads it: the copy for a known cause (which Node the
- * login shell found, the directory npm could not write), else the real error
- * line without npm's warnings. The whole output folds under 详情, copyable.
+ * The failure as a person reads it: the real error line(s) without npm's
+ * warnings, wrapped, not truncated. The whole output folds under 查看完整日志,
+ * copyable. Copy per failure code follows once the installer reports codes (#1517).
  */
-function SetupFailure({ state }: { state: SshInstallState }) {
+function SetupFailure({ reason }: { reason: string }) {
   const t = useTranslations('Devices')
-  const run = useTranslations('RunErrors.desktop_local_setup_failed')
-  const values = { required: '24', found: '?', path: 'node', code: '', ...state.values }
-  // An older desktop sends the raw stderr tail as the reason: show its real error line.
-  const summary = state.detail ? state.reason : state.reason && (firstRealError(state.reason) || state.reason)
-  const message = state.detail && state.detail !== 'other' ? run(state.detail, values) : summary || run('default')
-  const log = state.log || (state.reason && state.reason !== message ? state.reason : undefined)
+  const summary = firstRealError(reason) || reason
   return <>
-    <ItemDescription className="line-clamp-none whitespace-pre-line break-words text-destructive-foreground">{message}</ItemDescription>
-    {log && <Collapsible>
+    <ItemDescription className="line-clamp-none whitespace-pre-line break-words text-destructive-foreground">{summary}</ItemDescription>
+    {summary !== reason.trim() && <Collapsible>
       <CollapsibleTrigger render={<Button variant="link" size="xs" className="h-auto px-0 py-0.5 text-xs text-muted-foreground" />}>{t('local.details')}</CollapsibleTrigger>
       <CollapsibleContent className="pt-1.5">
-        <CodeBlock code={log} highlight={false} defaultWrap maxLines={14} className="border-0 bg-muted [--code-block-bg:var(--muted)]">
+        <CodeBlock code={reason.trim()} highlight={false} defaultWrap maxLines={14} className="border-0 bg-muted [--code-block-bg:var(--muted)]">
           <CodeBlockHeader className="border-b-0">
             <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('local.copyLog'), copied: t('local.logCopied') }} />
           </CodeBlockHeader>

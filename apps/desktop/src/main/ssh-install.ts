@@ -5,7 +5,6 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import daemonPackage from '../../../../packages/daemon/package.json' with { type: 'json' }
 import { daemonCommands } from '../../../../lib/daemon-commands'
-import { CommandFailed, setupError } from '../../../../lib/local-setup-failure'
 
 export const INSTALL_STEPS = ['login', 'check', 'install', 'service', 'connect'] as const
 export type InstallStep = typeof INSTALL_STEPS[number]
@@ -62,7 +61,7 @@ export function runProcess(command: string, args: string[], input?: string, time
     // must not start a new installation while the old command is still alive.
     const timer = setTimeout(() => { timedOut = true; stop() }, timeout)
     child.stdout.on('data', chunk => { output = (output + chunk).slice(-65536) })
-    child.stderr.on('data', chunk => { error = (error + chunk).slice(-32768) })
+    child.stderr.on('data', chunk => { error = (error + chunk).slice(-4096) })
     child.on('error', reason => { closed = true; clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(reason) })
     child.on('close', code => {
       closed = true
@@ -71,7 +70,7 @@ export function runProcess(command: string, args: string[], input?: string, time
       if (signal?.aborted) { reject(new Error('cancelled')); return }
       if (timedOut) { reject(new Error('SSH operation timed out')); return }
       if (code === 0) resolve(output.trim())
-      else reject(new CommandFailed(code, error))
+      else reject(new Error(error.trim() || `Remote command failed (${code})`))
     })
     child.stdin.on('error', () => {})
     child.stdin.end(input)
@@ -91,8 +90,6 @@ export class SshInstaller {
   /** Set by beginLocal / restartLocal: the steps run on this computer, not over SSH. */
   private local = false
   private localOwnerId?: string
-  /** PATH entries this install found it needs (shell-quoted): a new enough Node, the user npm prefix. */
-  private paths: string[] = []
   constructor(
     private appUrl: string,
     private mintToken: () => Promise<string>,
@@ -223,7 +220,7 @@ export class SshInstaller {
   async cancel(id: string) {
     if (this.current?.id !== id || !['running', 'fingerprint'].includes(this.current.status)) throw new Error('No active installation')
     this.controller.abort()
-    this.report({ status: 'failed', reason: 'cancelled', detail: 'cancelled', retryable: true })
+    this.report({ status: 'failed', reason: 'cancelled', retryable: true })
     await this.pending
     return this.state()
   }
@@ -235,49 +232,11 @@ export class SshInstaller {
     return output
   }
   private fail(error: unknown) {
-    if (this.controller.signal.aborted || !this.current) return
-    const { failure } = setupError(error)
-    this.report({ status: 'failed', retryable: true, reason: failure.summary || 'SSH installation failed', detail: failure.detail, values: failure.values, ...(failure.log ? { log: failure.log } : {}) })
+    if (!this.controller.signal.aborted && this.current) this.report({ status: 'failed', retryable: true, reason: error instanceof Error ? error.message : 'SSH installation failed' })
   }
   private remote(command: string, input?: string, timeout?: number) {
-    // Directories found during this install (a newer Node, the user npm prefix) come first in PATH.
-    const script = this.paths.length ? `PATH=${this.paths.join(':')}:"$PATH"; ${command}` : command
-    if (this.local) return this.run(this.shell.command, this.shell.args(script), input, timeout)
-    return this.run('ssh', [...this.options, this.destination, script], input, timeout)
-  }
-  /**
-   * The login shell's Node is missing or too old (a non-interactive login shell
-   * skips .zshrc, so nvm's Node is absent and Homebrew's older one comes
-   * first). Use the newest installed Node that is new enough, if there is one.
-   */
-  private async findNode(minimum: number) {
-    // /bin/sh: an unmatched glob stays literal there, while zsh would abort the whole line.
-    const found = await this.remote(`/bin/sh -c 'for d in "$HOME"/.nvm/versions/node/*/bin "$HOME"/.local/share/fnm/node-versions/*/installation/bin "$HOME"/.volta/bin /opt/homebrew/opt/node@*/bin /opt/homebrew/opt/node/bin /usr/local/opt/node@*/bin /usr/local/opt/node/bin /opt/homebrew/bin /usr/local/bin; do [ -x "$d/node" ] && echo "$("$d/node" --version 2>/dev/null) $d"; done; true'`).catch(() => '')
-    const best = found.split('\n').map(line => /^v(\d+)\.\S* (\/\S.*)$/.exec(line.trim())).filter(match => match && +match[1] >= minimum)
-      .sort((a, b) => +b![1] - +a![1])[0]
-    return best ? best[2] : null
-  }
-  /**
-   * npm cannot write where it installs: a root-owned global prefix (the
-   * nodejs.org installer, apt) or a cache left root-owned by an earlier
-   * `sudo npm`. Retry with Mikka's own cache, then also its own prefix,
-   * whose bin then comes first in PATH for the later steps.
-   */
-  private async npmInstall(command: string) {
-    const attempts = [command, `${command} --cache "$HOME/.mikka/npm-cache"`, `${command} --cache "$HOME/.mikka/npm-cache" --prefix "$HOME/.mikka/npm"`]
-    for (let index = 0; ; index++) {
-      try {
-        await this.remote(attempts[index], undefined, 300_000)
-        if (index === 2) this.paths.push('"$HOME/.mikka/npm/bin"')
-        return
-      } catch (error) {
-        if (this.installCommand || this.controller.signal.aborted || index === 2) throw error
-        const failure = setupError(error).failure
-        if (failure.detail !== 'npm_permission') throw error
-        // Only the cache was refused: a private cache is enough. Otherwise skip to the private prefix.
-        if (index === 0 && !/_cacache/.test(failure.log)) index = 1
-      }
-    }
+    if (this.local) return this.run(this.shell.command, this.shell.args(command), input, timeout)
+    return this.run('ssh', [...this.options, this.destination, command], input, timeout)
   }
   /** `--dev` for a dev desktop's own daemon on this computer; a remote host runs the production one. */
   private flags() {
@@ -290,22 +249,11 @@ export class SshInstaller {
       const engine = daemonPackage.engines.node
       const minimum = /^>=(\d+)$/.exec(engine)?.[1]
       if (!minimum) throw new Error('Unsupported daemon Node engine range')
-      // The failure names the Node the login shell found (Homebrew's can come first in PATH).
-      const check = `case "$(uname -s)" in Linux|Darwin) ;; *) echo 'Linux or macOS required' >&2; exit 1;; esac; command -v node >/dev/null || { echo 'Node.js ${engine} required (node not found)' >&2; exit 1; }; node -e 'if (+process.versions.node.split(".")[0] < ${minimum}) { console.error("Node.js ${engine} required (found v" + process.versions.node + " at " + process.execPath + ")"); process.exit(1) }'`
-      this.paths = []
-      try { await this.remote(check) }
-      catch (error) {
-        const detail = setupError(error).failure.detail
-        if (detail !== 'node_too_old' && detail !== 'node_missing') throw error
-        const node = await this.findNode(+minimum)
-        if (!node) throw error
-        this.paths.push(quote(node))
-        await this.remote(check)
-      }
+      await this.remote(`case "$(uname -s)" in Linux|Darwin) ;; *) echo 'Linux or macOS required' >&2; exit 1;; esac; command -v node >/dev/null || { echo 'Node.js ${engine} required' >&2; exit 1; }; node -e 'if (+process.versions.node.split(".")[0] < ${minimum}) { console.error("Node.js ${engine} required"); process.exit(1) }'`)
       this.report({ step: 'install' })
       const url = new URL(this.appUrl)
       const commands = daemonCommands({ origin: url.origin, basePath: url.pathname.replace(/\/$/, ''), packageName: '@aspectlylabs/mikka' })
-      await this.npmInstall(this.installCommand ?? commands.install)
+      await this.remote(this.installCommand ?? commands.install, undefined, 300_000)
       this.report({ step: 'service' })
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type ${deviceType}${this.flags()}`)
       await this.connect()

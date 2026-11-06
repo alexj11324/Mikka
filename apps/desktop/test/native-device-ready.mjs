@@ -48,7 +48,7 @@ export async function nativeDeviceSnapshot() {
       status: install === null ? 'absent' : select(install?.status, ['fingerprint', 'running', 'online', 'failed']),
       step: install === null ? 'absent' : select(install?.step, ['login', 'check', 'install', 'service', 'connect']),
       target: install === null ? 'absent' : select(install?.target, ['this-computer', 'this-computer-reconnect']),
-      reason: reason(install?.reason), detail: install === null ? 'absent' : select(install?.detail, [undefined, 'cancelled', 'timeout', 'online_timeout', 'owner_mismatch', 'owner_unconfirmed', 'unsupported_os', 'node_missing', 'node_too_old', 'npm_directory_not_empty', 'npm_permission', 'npm_package_not_found', 'network', 'command_missing', 'service_failed', 'other']) ?? 'none', bootstrapErrorCode: bootstrapErrorCode(install?.reason), retryable: install?.retryable === true },
+      reason: reason(install?.reason), bootstrapErrorCode: bootstrapErrorCode(install?.reason), retryable: install?.retryable === true },
   }
 }
 

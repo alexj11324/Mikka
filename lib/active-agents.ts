@@ -1,9 +1,9 @@
-import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { agentRuns, agents, coordinatorBots, coordinatorSessions, devices, bots, conversations, groupTurns } from '@/lib/db/schema'
 import type * as schema from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
-import { DEVICE_CLOCK_SKEW_MS, DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { WORKING_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runBotName } from '@/lib/run-bot-name'
 
@@ -57,7 +57,6 @@ export function sortActiveAgents(list: ActiveAgent[]): ActiveAgent[] {
 
 export async function listActiveAgents(database: Database, userId: string, now = new Date(), workspaceId?: string): Promise<ActiveAgent[]> {
   const onlineSince = new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)
-  const onlineUntil = new Date(now.getTime() + DEVICE_CLOCK_SKEW_MS)
   const startedAt = sql<Date>`coalesce(${agentRuns.startedAt}, ${agentRuns.createdAt})`.mapWith(agentRuns.createdAt)
   const [rows, [session], workingBots] = await Promise.all([
     database.select({ agentId: agents.id, name: runBotName, runId: agentRuns.id, issueId: agentRuns.issueId, status: agentRuns.status, startedAt })
@@ -67,7 +66,7 @@ export async function listActiveAgents(database: Database, userId: string, now =
       .where(and(
         eq(agentRuns.userId, userId),
         inArray(agentRuns.status, [...WORKING_RUN_STATUSES]),
-        or(gt(agentRuns.leaseExpiresAt, now), and(isNull(agentRuns.leaseExpiresAt), gt(devices.lastSeenAt, onlineSince), lte(devices.lastSeenAt, onlineUntil))),
+        or(gt(agentRuns.leaseExpiresAt, now), and(isNull(agentRuns.leaseExpiresAt), gt(devices.lastSeenAt, onlineSince))),
       )),
     // The Coordinator's chat is its bot row's (coordinator_bots).
     database.select({ botId: coordinatorBots.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, updatedAt: coordinatorSessions.updatedAt })

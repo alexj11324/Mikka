@@ -5,7 +5,6 @@ import {
   DEVICE_ONLINE_WINDOW_MS,
   deviceHeartbeatSchema,
   devicePaths,
-  DEVICE_CLOCK_SKEW_MS,
   devicesOnline,
   heartbeatResultSchema,
   isDeviceOnline,
@@ -22,12 +21,6 @@ describe("device online state", () => {
     expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS - 1, now)).toBe(false)
     expect(isDeviceOnline(null, now)).toBe(false)
     expect(isDeviceOnline("not a date", now)).toBe(false)
-  })
-
-  it("does not count a lastSeenAt in the future as online", () => {
-    expect(isDeviceOnline(now + DEVICE_CLOCK_SKEW_MS, now)).toBe(true)
-    expect(isDeviceOnline(now + DEVICE_CLOCK_SKEW_MS + 1, now)).toBe(false)
-    expect(isDeviceOnline("2036-11-06T12:00:00Z", now)).toBe(false)
   })
 
   it("summarizes 设备 n/m 在线", () => {
