@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { collectProductionTimings, sanitizeTimingLog, summarizeTimings } from './cloud-startup-report.mjs'
+
+const epoch = Date.parse('2026-11-06T12:00:00.000Z'), hash = 'a'.repeat(16), workflow = 'wrun_TEST1', deploymentId = 'dpl_Test'
+const scope = { hashes: new Set([hash]), workflows: new Set([workflow]) }
+const dispatch = { msg: 'dispatch_timing', workflowRunId: workflow, stepId: 'step_1', attempt: 1,
+  startedAt: epoch, endedAt: epoch + 2000, totalMs: 2000, failed: false, phases: [{ phase: 'ensureThreadMachine', ms: 1500 }], github: { requests: 1, ms: 25 } }
+const native = { msg: 'subscription_native_timing', runIdHash: hash, operation: 'request', startedAt: epoch + 2500, endedAt: epoch + 2620,
+  ms: 120, outcome: 'ok', truncated: false, phases: [{ phase: 'binding', startMs: 0, ms: 8, outcome: 'ok' },
+    { phase: 'access', startMs: 8, ms: 12, outcome: 'ok' }, { phase: 'provider_headers', startMs: 20, ms: 100, outcome: 'ok' }],
+  traceId: 'b'.repeat(32), spanId: 'c'.repeat(16) }
+const report = () => ({ startedAt: new Date(epoch).toISOString(), build: 'd'.repeat(40), mode: 'baseline', requestedStrategy: 'official', maxStartupMs: 5000,
+  cleanup: { errors: [] }, samples: [{ sampleId: 'test', harness: 'claude_code', runIdHash: hash, workflowRunId: workflow,
+    status: 'execution_proved_awaiting_server_timing', cleanup: { status: 'passed' }, execution: { credentialType: 'subscription' },
+    agentStart: { storedAt: new Date(epoch + 3500).toISOString() }, firstProviderChunk: { storedAt: new Date(epoch + 8000).toISOString() } }] })
+
+test('keeps fixed numeric phases, rejects foreign identities, and drops private log attributes', () => {
+  const sanitized = sanitizeTimingLog({ ...native, credential: 'PRIVATE', payload: 'PRIVATE', phases: native.phases.map(phase => ({ ...phase, prompt: 'PRIVATE' })) }, scope)
+  assert.deepEqual(sanitized, native)
+  assert.doesNotMatch(JSON.stringify(sanitized), /PRIVATE|credential|payload|prompt/)
+  assert.equal(sanitizeTimingLog({ ...native, runIdHash: '0'.repeat(16) }, scope), null)
+  assert.equal(sanitizeTimingLog({ ...native, phases: [{ phase: 'PRIVATE', ms: 1, startMs: 0, outcome: 'ok' }] }, scope), null)
+})
+
+test('aligns exact dispatch evidence and reports raw median/max with honest proxy lower-bound semantics', () => {
+  const aligned = summarizeTimings(report(), [dispatch, native])
+  assert.equal(aligned.status, 'baseline_recorded')
+  assert.equal(aligned.samples[0].nativeProviderCalls[0].measuredPreparationLowerBoundMs, 20)
+  assert.equal(aligned.samples[0].nativeProviderCalls[0].providerHeadersIncludingUpstreamMs, 100)
+  assert.deepEqual(aligned.summary.groups[0].dispatchToAgentStart, { valuesMs: [3500], medianMs: 3500, maxMs: 3500 })
+  assert.equal(aligned.samples[0].timing.dispatchToFirstProviderChunkMs, 8000)
+  assert.doesNotMatch(JSON.stringify(aligned.summary), /p95/i)
+})
+
+test('uses bounded read-only provider queries and never retains raw envelopes or missing logs as zero calls', async () => {
+  const calls = []
+  const read = async (path, body) => {
+    calls.push({ path, body })
+    if (path.startsWith('/v13/')) return { gitSource: { sha: 'd'.repeat(40) }, readyState: 'READY', target: 'production' }
+    assert.equal(path, '/v1/observability/events')
+    assert.match(body.filter, new RegExp(hash)); assert.match(body.filter, new RegExp(workflow))
+    return { events: [dispatch, native].map(log => ({ deploymentId, environment: 'production', message: JSON.stringify({ ...log, PRIVATE: 'PRIVATE' }),
+      rawHeaders: { authorization: 'PRIVATE' } })), pagination: { hasMore: false } }
+  }
+  const result = await collectProductionTimings(report(), { token: 'PRIVATE', deploymentId, now: () => epoch + 10000, read })
+  assert.equal(result.status, 'baseline_recorded'); assert.equal(result.serverLogCollection.status, 'query_complete')
+  assert.equal(calls.length, 2); assert.doesNotMatch(JSON.stringify(result), /PRIVATE|rawHeaders|authorization/)
+  const missing = await collectProductionTimings(report(), { token: 'PRIVATE', deploymentId, now: () => epoch + 10000,
+    read: async path => path.startsWith('/v13/') ? { gitSource: { sha: 'd'.repeat(40) }, readyState: 'READY', target: 'production' }
+      : { events: [], pagination: { hasMore: false } } })
+  assert.equal(missing.status, 'failed'); assert.match(missing.serverLogCollection.coverage, /not_proof_of_zero/)
+})
