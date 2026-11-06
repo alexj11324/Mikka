@@ -10,8 +10,8 @@ import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, onPreferredAgent, planDispatch, whyNoDevice,
-  type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
+  type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
 /**
@@ -53,6 +53,11 @@ export interface OrderView {
   /** 云端: the person's own E2B cloud would take a run now. */
   cloudReady: boolean
   cloudModels: Record<string, CloudModelState>
+  /**
+   * The 运行位置 chain, in dispatch order: 云端 (only when it is the location), then servers,
+   * then computers, each device with how far it is from taking a run and why not.
+   */
+  places: { cloud: 'ready' | 'noKey' | null; devices: { id: string; name: string; server: boolean; stage: DeviceStage; lastSeenAt: number | null }[] }
   /** 会先用: where a new run would go now, by the same plan as dispatch; null when nowhere. */
   first: { kind: 'cloud' } | { kind: 'device'; id: string; name: string; server: boolean } | null
   /** Devices that can run the same list now, including credential readiness. */
@@ -268,7 +273,7 @@ export async function poolDevices(query: Query, ownerId: string): Promise<PoolDe
   const presence = await deviceOnlineStates(rows)
   return rows.map(row => ({
     id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
-    server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(),
+    server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,
   }))
 }
 
@@ -301,6 +306,11 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
     devices: devices.filter(device => device.enabled).length,
     cloudReady: ready,
     cloudModels,
+    places: {
+      cloud: order.location === 'cloud' ? ready ? 'ready' : 'noKey' : null,
+      devices: [...devices].sort((a, b) => Number(b.server) - Number(a.server)).map(device => ({ id: device.id, name: device.name, server: device.server,
+        stage: placeStage(device, runnable.filter(entry => credential(entry).usable), order.preferredHarness), lastSeenAt: device.lastSeenAt ?? null })),
+    },
     first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
     readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
     deviceModels: Object.fromEntries(devices.map(device => [device.id,
