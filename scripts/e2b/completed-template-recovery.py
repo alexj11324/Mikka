@@ -1,4 +1,4 @@
-"""Recover only exact images from two completed failed main release runs."""
+"""Recover only exact images from one completed failed main release run."""
 import importlib.util
 import json
 import os
@@ -11,9 +11,8 @@ spec = importlib.util.spec_from_file_location('builder', HERE / 'build-template.
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 templates = json.loads((HERE / 'completed-template-inventory.json').read_text())
-expected = {'42305731896': '71a2438a844e35f1c191806cca735665db272d02',
-            '42306491421': '24c232b168b0c0d22d228655386d10874d555188'}
-if len(templates) != 6 or len({row['templateId'] for row in templates}) != 6:
+expected = {'42307542412': 'b8045b5661bcbf51eeecc74ceef19eceead93a10'}
+if len(templates) != 3 or len({row['templateId'] for row in templates}) != 3:
     raise ValueError('completed_inventory_count_mismatch')
 for run_id, source in expected.items():
     request = urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/actions/runs/' + run_id,

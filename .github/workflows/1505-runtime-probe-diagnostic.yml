@@ -27,7 +27,7 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Recover exact IDs only after both failed release runs completed
+      - name: Recover exact IDs only after the failed release run completed
         timeout-minutes: 8
         run: python3 scripts/e2b/completed-template-recovery.py
         env:

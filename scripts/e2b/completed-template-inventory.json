@@ -1,56 +1,29 @@
 [
   {
-    "kind": "claude",
-    "name": "mikka-71a2438a844e-42305731896-1-claude",
-    "templateId": "0kumr4pg2l2xs482fs1e",
-    "buildId": "a70524a2-7350-476b-9fa8-e05c791af246",
-    "sourceCommit": "71a2438a844e35f1c191806cca735665db272d02",
-    "runId": "42305731896",
-    "runAttempt": "1"
-  },
-  {
-    "kind": "codex",
-    "name": "mikka-71a2438a844e-42305731896-1-codex",
-    "templateId": "dqj8aklvgcm6wgzfyb91",
-    "buildId": "934f65d8-b54e-44a6-85f2-747c2ff845e8",
-    "sourceCommit": "71a2438a844e35f1c191806cca735665db272d02",
-    "runId": "42305731896",
-    "runAttempt": "1"
-  },
-  {
     "kind": "desktop",
-    "name": "mikka-71a2438a844e-42305731896-1-desktop",
-    "templateId": "r6b2cgjmyhuc995kmkiu",
-    "buildId": "c1c02b15-c646-4ea8-bd94-8cceaf62630c",
-    "sourceCommit": "71a2438a844e35f1c191806cca735665db272d02",
-    "runId": "42305731896",
-    "runAttempt": "1"
-  },
-  {
-    "kind": "desktop",
-    "templateId": "an914pxcfwux2i4wz8sr",
-    "buildId": "f6b4c437-d0f4-4837-9cb9-8a8f72f3671c",
-    "name": "mikka-24c232b168b0-42306491421-1-desktop",
-    "sourceCommit": "24c232b168b0c0d22d228655386d10874d555188",
-    "runId": "42306491421",
+    "templateId": "1d32x3k6q5cic1o2d8n8",
+    "buildId": "a2978817-a127-4fde-acec-31d04e02e95e",
+    "name": "mikka-b8045b5661bc-42307542412-1-desktop",
+    "sourceCommit": "b8045b5661bcbf51eeecc74ceef19eceead93a10",
+    "runId": "42307542412",
     "runAttempt": "1"
   },
   {
     "kind": "claude",
-    "templateId": "z2qvqjo70w7fduhokymo",
-    "buildId": "dcf98c64-b80d-49c4-aa38-abc67dbe4298",
-    "name": "mikka-24c232b168b0-42306491421-1-claude",
-    "sourceCommit": "24c232b168b0c0d22d228655386d10874d555188",
-    "runId": "42306491421",
+    "templateId": "73xzqa16qv1s7icu6a15",
+    "buildId": "e70ab806-681f-42ca-861c-c3670210df8b",
+    "name": "mikka-b8045b5661bc-42307542412-1-claude",
+    "sourceCommit": "b8045b5661bcbf51eeecc74ceef19eceead93a10",
+    "runId": "42307542412",
     "runAttempt": "1"
   },
   {
     "kind": "codex",
-    "templateId": "79ekbonwoiohzk429d2d",
-    "buildId": "b9ec8224-1046-4611-b7b3-a6f8d591691c",
-    "name": "mikka-24c232b168b0-42306491421-1-codex",
-    "sourceCommit": "24c232b168b0c0d22d228655386d10874d555188",
-    "runId": "42306491421",
+    "templateId": "gkvj6xlynv42k0e8dyu7",
+    "buildId": "8ce16f56-6837-4a3a-b951-9fe1efb8d646",
+    "name": "mikka-b8045b5661bc-42307542412-1-codex",
+    "sourceCommit": "b8045b5661bcbf51eeecc74ceef19eceead93a10",
+    "runId": "42307542412",
     "runAttempt": "1"
   }
 ]
