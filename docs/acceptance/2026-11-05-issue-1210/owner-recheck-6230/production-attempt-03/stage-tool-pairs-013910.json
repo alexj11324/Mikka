@@ -1,0 +1,91 @@
+{
+  "actualQueriedFrom": "2026-11-06T01:39:10.493Z",
+  "actualQueriedThrough": "2026-11-06T01:39:10.524Z",
+  "source": "recovered-read-response.json/result[5]",
+  "pairs": [
+    {
+      "actualQueriedAt": "2026-11-06T01:39:10.503Z",
+      "position": 6,
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "inputChunkId": "91b51be7-1789-4feb-ae3d-d4e634ae1aff",
+      "outputChunkId": "2cda993a-6c02-494d-9630-133ae16986f4",
+      "inputSeq": 9,
+      "outputSeq": 10,
+      "inputAt": "2026-11-06T01:07:39.909Z",
+      "outputAt": "2026-11-06T01:07:40.242Z",
+      "toolName": "mcp__mikka__inspect_artifact",
+      "inputToolCallId": "toolu_01Ed2kTmhxhEiNwv1oqkzpoj",
+      "outputToolCallId": "toolu_01Ed2kTmhxhEiNwv1oqkzpoj",
+      "input": {
+        "path": "mikka-question-recovery-cc-20261104-1237.txt",
+        "expectedUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n"
+      },
+      "outputType": "tool-output-available",
+      "output": "{\"path\":\"mikka-question-recovery-cc-20261104-1237.txt\",\"bytes\":52,\"sha256\":\"05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"committedSha256\":\"05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6\",\"contentMatchesGit\":true,\"contentUtf8\":\"mikka-group-policy-v3\\npath=claude-code\\nstatus=ready\\n\",\"textUnavailable\":null,\"matchesExpectedUtf8\":true}"
+    },
+    {
+      "actualQueriedAt": "2026-11-06T01:39:10.503Z",
+      "position": 6,
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "inputChunkId": "48cc61f1-56a1-4b1f-974c-294586b8a311",
+      "outputChunkId": "a4ac1096-1ca9-4853-8c76-b67d6bf6eaf2",
+      "inputSeq": 11,
+      "outputSeq": 12,
+      "inputAt": "2026-11-06T01:07:40.242Z",
+      "outputAt": "2026-11-06T01:07:40.242Z",
+      "toolName": "mcp__mikka__inspect_repository",
+      "inputToolCallId": "toolu_01Rnu3Ju1LgZ7AZocSDUBosr",
+      "outputToolCallId": "toolu_01Rnu3Ju1LgZ7AZocSDUBosr",
+      "input": {
+        "path": ".",
+        "baseCommit": "054e64ce6167427aecf937e6dc2410af677df32d"
+      },
+      "outputType": "tool-output-available",
+      "output": "{\"path\":\".\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"repository\":null,\"comparison\":{\"baseCommit\":\"054e64ce6167427aecf937e6dc2410af677df32d\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"changes\":[{\"status\":\"A\",\"path\":\"mikka-question-recovery-cc-20261104-1237.txt\"}],\"truncated\":false},\"origin\":null,\"status\":{\"dirty\":false,\"porcelain\":\"\",\"truncated\":false},\"entries\":[{\"name\":\"mikka-question-recovery-cc-20261104-1237.txt\",\"kind\":\"file\"}],\"truncated\":false}"
+    },
+    {
+      "actualQueriedAt": "2026-11-06T01:39:10.503Z",
+      "position": 7,
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "inputChunkId": "2486f42f-4a0a-4519-ac5e-f67213596f58",
+      "outputChunkId": "1648f633-fdaf-4870-8476-92cd714618fb",
+      "inputSeq": 12,
+      "outputSeq": 13,
+      "inputAt": "2026-11-06T01:09:31.780Z",
+      "outputAt": "2026-11-06T01:09:32.119Z",
+      "toolName": "mcp__mikka__inspect_artifact",
+      "inputToolCallId": "toolu_01EQWqZGHD4qpdQAFZDvewJX",
+      "outputToolCallId": "toolu_01EQWqZGHD4qpdQAFZDvewJX",
+      "input": {
+        "path": "mikka-question-recovery-cc-20261104-1237.txt",
+        "expectedUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n"
+      },
+      "outputType": "tool-output-available",
+      "output": "{\"path\":\"mikka-question-recovery-cc-20261104-1237.txt\",\"bytes\":52,\"sha256\":\"05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"committedSha256\":\"05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6\",\"contentMatchesGit\":true,\"contentUtf8\":\"mikka-group-policy-v3\\npath=claude-code\\nstatus=ready\\n\",\"textUnavailable\":null,\"matchesExpectedUtf8\":true}"
+    },
+    {
+      "actualQueriedAt": "2026-11-06T01:39:10.503Z",
+      "position": 7,
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "inputChunkId": "917e6755-11ff-437b-97ff-899f70e60125",
+      "outputChunkId": "6a64a36d-fe2f-49cc-8f27-a605063fed81",
+      "inputSeq": 14,
+      "outputSeq": 15,
+      "inputAt": "2026-11-06T01:09:32.119Z",
+      "outputAt": "2026-11-06T01:09:32.119Z",
+      "toolName": "mcp__mikka__inspect_repository",
+      "inputToolCallId": "toolu_019354bGNV3N7ERQKLfA3kRL",
+      "outputToolCallId": "toolu_019354bGNV3N7ERQKLfA3kRL",
+      "input": {
+        "path": ".",
+        "baseCommit": "054e64ce6167427aecf937e6dc2410af677df32d"
+      },
+      "outputType": "tool-output-available",
+      "output": "{\"path\":\".\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"repository\":null,\"comparison\":{\"baseCommit\":\"054e64ce6167427aecf937e6dc2410af677df32d\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"changes\":[{\"status\":\"A\",\"path\":\"mikka-question-recovery-cc-20261104-1237.txt\"}],\"truncated\":false},\"origin\":null,\"status\":{\"dirty\":false,\"porcelain\":\"\",\"truncated\":false},\"entries\":[{\"name\":\"mikka-question-recovery-cc-20261104-1237.txt\",\"kind\":\"file\"}],\"truncated\":false}"
+    }
+  ]
+}

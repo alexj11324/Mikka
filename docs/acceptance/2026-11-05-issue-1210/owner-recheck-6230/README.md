@@ -401,3 +401,108 @@ reviewer 未编写产品 UI，按 `ux-heuristics` 和 `cognitive-walkthrough` �
 发布选择及每个原/新SHA、字节数、变换说明见[本轮清单](production-attempt-02/evidence-manifest.json)。sample01响应与history-baseline各有一处Owner账户ID被替换为显式占位符；四份SQL中的同一账户ID也只作显式脱敏，原件哈希保留，发布副本标明不可执行。所有运行、回执、候选、native binding与来源字段保持原值。runtime只摘录这个run的初始超时、内部handoff、PID提示和最终handoff成功；不收录全量无关runtime/provider日志。完整部署日志只保留其既有证明中的原件哈希及必要摘录，不附凭据、cookie或会话文件。[扫描记录](production-attempt-02/sanitization-audit.json)列出实际模式检查及限制。
 
 本轮没有新增可发布的生产截图；既有30PNG仍只证明各自隔离UI版本。独立审计自身的四次只读事务与root实际Owner点击、Mikka原生模型运行分别计数，不能把审计的`modelInvocations=0`说成本轮没有真实模型执行。此次记录固定第二轮失败事实；后续修复、下一次检查和最终接受均不包含在本轮完成声明中。
+
+## production-attempt-03（2026-11-06，verify失败；01:39恢复后新取证）
+
+**第三轮未通过，未发生Owner接受。** 环境恢复后的单次实际只读快照在 **2026-11-06 01:39:10.493–01:39:10.524 UTC** 读到原task为 **`verify/failed，revision22`**，activeRuns=0、activeLeases=0、acceptanceCount=0。pos6新review在Factory中记为passed，但其报告承认未独立核验完整ask_human summary；pos7新verify因未得到前一review的artifact IO，将原AC5记为false/unverified并在Factory中failed。两条原生run的`succeeded/submitted`只表示提交完成，不能据此认定原六项已充分通过。[本次快照公开投影](production-attempt-03/snapshot-013910.public.json)、[七份完整报告](production-attempt-03/seven-reports-013910.json)保留全部原始报告字段和数据库fingerprint字符串。
+
+本节对应#1464产品source **`4e588871ac2211d2b6ee825d2a6c3a981efcada2`** 上的本轮操作。ALEX43仍使用原candidate `2f338962-c690-4ba7-bc63-6c73a9de3acb`、request epoch `4ad02e70-8015-5eac-87f4-a96fbd775d14`，交付HEAD **`d05417e7848871e511141e10a282ffb7998b0a79`**，producer基线 **`054e64ce6167427aecf937e6dc2410af677df32d`**。产品发布版本和候选仓库版本分别记录；后续修复或部署结论不纳入本轮失败事实。
+
+### 原件恢复范围：已发表旧记录与01:39新快照分别归档
+
+工作执行环境中断后，原未发布的75文件暂存、00:55/01:03设置与before原件、pending/running/proof02原响应，以及01:14终态原响应暂不可访问。这些文件没有被按记忆重建，也没有把01:39查询改标为旧时间。本节通过GitHub重新读取以下三条已发表评论，保留其id、URL、创建/修改时间和正文；正文与root恢复出的原发表正文一致，账户作者信息从公开副本省略。
+
+| 已发表记录 | 记录的历史事实与当前可复核边界 |
+| --- | --- |
+| [6673850974，01:06:38发表](https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6673850974) / [正文快照](production-attempt-03/issuecomment-6673850974.json) | 记录#1464最终发布、00:55真实双列表、正常UI移除额外Codex项及01:03恢复单一Haiku；记录当时204项比较无差异和01:05:31.043唯一一次Retry review。01:06的实际状态为pending、run/SID/native/VM均NULL。旧原始响应现不可访问，本次不声称重新完成204项比较；pending不当作已观察到native run。 |
+| [6673951257，01:13:12发表](https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6673951257) / [正文快照](production-attempt-03/issuecomment-6673951257.json) | 记录两阶段run/SID、实际工具证据与AC3/AC5缺口；01:10:44时task为verify/failed r22、Owner acceptance=0、activeRuns=0但还有1条未到期lease。记录review曾在01:07:32取得运行期VM样本，verify未取得running时点样本。该旧时点状态不被改写成01:39值。 |
+| [6674105740，01:23:27发表](https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6674105740) / [正文快照](production-attempt-03/issuecomment-6674105740.json) | 记录当时01:14终态采样、168项受保护字段比较无差异、activeRuns/activeLeases/acceptance均0，以及随后执行环境不可用。原01:14响应与比较文件没有恢复，本次不重做或冒领该168项结论。工作环境中断发生在生产verify失败之后，不能作为该失败的原因。 |
+
+Root另从原会话内存恢复了#1464最终Vercel与runtime jobs连接器响应。新生产取证只执行了**一个有限只读事务**，含`SET TRANSACTION READ ONLY`、5秒statement timeout和16条限定作用域的SELECT；其数据库采样时间为01:39，而事务起止是01:39:09.035–01:39:10.609。[实际执行时间](production-attempt-03/recovered-read-timing.json)、[请求来源与语句哈希](production-attempt-03/recovered-request.public.json)、[结果索引](production-attempt-03/recovered-query-index.json)及[查询来源说明](production-attempt-03/query-provenance.json)分别保存。公开[SQL副本](production-attempt-03/recovered-read.public.sql)已脱敏并标为不可执行。
+
+这次取证没有重跑Mikka任务、触发模型、执行浏览器动作或写生产数据。审计自身的`modelInvocations=0`不被扩写成本轮没有实际原生模型运行。完整原始MCP响应的SHA256为`fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa`，144,546字节；公开文件是明确标注的必要数据投影，完整七报告、实际工具IO和宿主片段保持原字段值，无关设置组只保留哈希。
+
+### #1464最终发布：实际恢复的响应与评论记载分开标注
+
+[发布证明必要投影](production-attempt-03/pr1464-release.public.json)来自恢复出的原连接器响应，没有重新读取或操作生产部署/资源，也没有附带creator账号信息。
+
+| 证明来源 | 可确认事实 |
+| --- | --- |
+| 恢复的Vercel原响应 | 最终deployment **`dpl_EBjybjtxVuG4PgRo8MxptkDhf1xP`**，target=production，state/readyState=READY；meta source为完整`4e588…`；原epoch毫秒字段换算为 **00:53:45.808 UTC READY**。这是本轮最终runtime-refresh部署。 |
+| 恢复的最终jobs原响应 | official-runtime run **42138447076** 的test、check、validate、await-web与publish/deploy **5个jobs全部completed/success**；最后publish/deploy job为 **127635336258**。原响应没有独立保存的读取时刻，未补造该时间。 |
+| 当时已发表的6673850974 | 记录source `4e588…` / worker **`7f6c48300157bef7f0a95e037e9a24adffe6f966`**、main CI **42138447104** 的12 jobs成功，以及root在 **00:54:31.382629 UTC** 单次普通公开GET返回HTTP200和完整4e588 build。原worker配对日志、main CI小片段和公开GET原件未恢复，本节将这些细节明确归于该已发表评论。 |
+
+发布就绪是本轮正常点击的前置记录；本轮最终结果由下面的真实attempt、报告与工具证据确定。没有把首次Web READY替换成最终部署，也没有为恢复丢失材料而补造旧文件哈希。
+
+### 正常UI设置恢复与唯一Retry：历史动作有回执，新设置按新时间采样
+
+6673850974记录：00:55的`Factory 双订阅验收 1122`实际保存了原Haiku与额外Codex备用项；root通过正常UI移除额外项、恢复Claude Code首选，01:03:53.798独立读回单一原Haiku。该评论还记录当时其他设置、8个Bot聊天选择、9个Bot元数据、4个Profile记录不变。由于旧双列表和恢复后的原始响应现在不可访问，本节保留这项**历史报告**，不把它升级成当前已重新核验的前后相等结论。
+
+**01:39的新设置实际值**是：Model order只有原`claude-haiku-5-5`订阅条目，preferredHarness=`claude_code`；三个未归档Profile均disabled，另一个已归档Profile也disabled。[当前设置公开投影](production-attempt-03/settings-013910.public.json)保留实际model-order条目和设置，其他8/9/4行数据组分别保留完整查询值的规范JSON哈希及必要行数。无关Bot名称、模型名和API-key引用ID不公开；查询本身未读取Profile正文或凭据。当前设置作为01:39新基线，未与丢失的01:03原件重新比较。
+
+Root唯一一次本轮正常`Retry review`的历史点击时间为 **01:05:31.043 UTC**。01:39重新读到的不可变普通retry回执是 **`46d68fa6-95d6-44d6-9942-5dbb3a55cdbd`**，原createdAt **01:05:32.027 UTC**，request绑定task revision16；其历史resultTask仍为`review/pending revision17`，不改成现在的revision22。原owner recheck anchor **`6c485476-b3b5-4d1e-a7e7-47865d34affa`**亦保留。当前数据库计数是ownerRecheckCount=1、该起点后的普通retry/recheck control=1；这些计数不被解释为包含此前被拒绝、未落库的所有UI点击。
+
+### 两个新阶段的真实身份与当前终态
+
+以下起止时间是01:39读取到的历史run字段，`actualQueriedAt`另列于原件，不能把事件发生时间与取证时间混用。
+
+| 阶段 | 实际run / SID | 原生与Factory结果 |
+| --- | --- | --- |
+| pos6 review | run **`4c609155-c3cb-4c1a-81cc-dfa85f26eadc`**；SID **`bcb2058a-8cfa-472f-a284-50bd70335ee9`**；attempt `d8dc17d0-a41d-4cea-9d0b-7b5ce4f34ef7` | 01:06:58.330–01:08:30.751；原生succeeded/submitted，Factory passed。报告AC3的未观察说明仍保留，不能由passed标签替代充分核验。 |
+| pos7 verify | run **`0fad0e8b-1ea8-40b2-8e78-40b8b09a515a`**；SID **`e04b9ce3-533a-4875-abbc-a7518893e82d`**；attempt `8bd4fa88-5098-4e8d-818f-2de2afa84b5d` | 01:08:51.260–01:10:26.311；原生succeeded/submitted，Factory **failed**。报告原AC5为false/unverified。 |
+
+这两个SID互异，且不同于此前五个run的SID；retryOf、continuesRunId、questionContinuation均NULL。两条新run实际native claim都仍使用原binding `0e5edf2d-2653-475e-8693-b53ceafa7c11`、connection `93b6ab23-900b-4e18-9ea0-baccf2d104ce` revision2、route=`claude_code_cli`、model=`claude-haiku-5-5`。API claim=false，providerObservedModel=NULL；没有把请求模型填成provider alias实际观测值。[当前审计投影](production-attempt-03/current-audit.public.json)及[独立离线字段核对](production-attempt-03/validation.json)保存上述检查。
+
+本次机器终态读到review关联行ended且sandboxId=NULL，verify关联同task VM **`i773iwx0ulev7nvbomyyk`** 为paused；runningSince为NULL。历史评论记录review曾有运行期采样，但对应旧原响应未恢复；verify当时没有取得running时点数据库样本，这个限制继续保留。新终态不能被用来补造历史live-running或fresh VM观察。A43需要新的独立SID和无continuation；此前四个NEW任务的fresh VM要求与同task artifact VM复用分别处理。
+
+父机 **`ipa60du803guuiqnyzqan`** 在本次读到sleeping、runtimeReady=true、deviceEnabled=true，lastActiveAt字段为 **2026-11-05T14:48:42.215Z**。旧verify问题在本次仍记录expired/revision3，八项答案或消费字段NULL。全部attempt=7、activeRuns=0、activeLeases=0、Owner acceptance=0；这些都是01:39时点的新实读值。
+
+### 四对实际只读工具IO：完整文件与commit范围已取证
+
+[完整工具输入输出](production-attempt-03/stage-tool-pairs-013910.json)来自本次查询保留的历史run chunks。两阶段各有一对`inspect_artifact`和一对`inspect_repository`，4对toolCallId唯一且input/output匹配、sequence递增；没有生成或修补任何chunk ID。
+
+| 阶段/工具 | input → output chunk | 实际sequence与历史工具时间 |
+| --- | --- | --- |
+| review artifact | `91b51be7-1789-4feb-ae3d-d4e634ae1aff` → `2cda993a-6c02-494d-9630-133ae16986f4` | 9→10；01:07:39.909→01:07:40.242 |
+| review repository | `48cc61f1-56a1-4b1f-974c-294586b8a311` → `a4ac1096-1ca9-4853-8c76-b67d6bf6eaf2` | 11→12；01:07:40.242 |
+| verify artifact | `2486f42f-4a0a-4519-ac5e-f67213596f58` → `1648f633-fdaf-4870-8476-92cd714618fb` | 12→13；01:09:31.780→01:09:32.119 |
+| verify repository | `917e6755-11ff-437b-97ff-899f70e60125` → `6a64a36d-fe2f-49cc-8f27-a605063fed81` | 14→15；01:09:32.119 |
+
+两个artifact输入均带完整`mikka-group-policy-v3\npath=claude-code\nstatus=ready\n` expectedUtf8，输出保留完整contentUtf8；独立按实际UTF-8字节复算得到 **52 bytes、3个LF且含末行LF、无BOM**，SHA256为 **`05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6`**。两者head都为d054，committedSha256相同，contentMatchesGit=true、matchesExpectedUtf8=true、textUnavailable=NULL。
+
+两个repository输入均为path=`.`、baseCommit=`054e64ce6167427aecf937e6dc2410af677df32d`。实际comparison到d054，完整changes只有 **`A mikka-question-recovery-cc-20261104-1237.txt`**，comparison/status/listing均truncated=false、工作树dirty=false。以上是已经存在的两阶段工具IO；新取证没有重跑这些工具或文件命令。
+
+### 原六项的实际边界：两个报告缺口保持失败语义
+
+| 原合同项目 | 本轮实际证据与剩余边界 |
+| --- | --- |
+| AC1：仅目标文件，精确52B/UTF-8/LF/hash | 两阶段actual artifact与完整committed scope均取得上述结果；两报告均记passed。 |
+| AC2：提问前真实Bash创建、读取、字节/哈希、Git范围和退出 | 实际保存的host片段含原同次执行的三条提问前命令记录及真实chunk/receipt身份；它们作为历史输入保存，没有被称为本轮新执行。 |
+| AC3：精确decision问题、如实summary、结束等待Owner | 原ask_human真实input/output现完整读出，含原560字符summary；两份检查报告却承认summary未独立核验，并仍把整项标passed。summary本来就是原AC3要求，这部分缺证与判定问题必须保留。 |
+| AC4：正常回答后同任务继续，不重跑文件命令 | 实际host片段保留原human answer、question_resume回执和producer工具观察；本次只是读取现存历史记录，没有再次派发旧执行。 |
+| AC5：两个独立检查各自实际inspect_artifact | 外部审计取得两阶段的真实IO，但verify当时报告没有收到前review的artifact输出，因此AC5仍是false/unverified；审计者现在能同时读到两对IO，不等于verify当时已获得它们。 |
+| AC6：严格回执绑定的直接前驱与真实引用 | [当前宿主证据](production-attempt-03/host-evidence-013910.json)保留实际producer/native/API回执投影、lifecycle与提问前命令来源。恢复审计复算lifecycle digest与冻结值相同，为`5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea`，watermark为source29/producer20；绑定数据正确仍不能消除AC3/AC5缺口。 |
+
+**AC3的原summary确实存在。** [历史原生ask_human完整输入输出](production-attempt-03/original-native-ask-013910.json)是在01:39重新读取的持久记录，其原input时间为 **2026-11-04 19:35:31.321 UTC**，input chunk=`f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3`，output chunk=`fddaaa05-97f6-4227-9f8f-65f18ca998f8`；不是一次新问题或新生成的summary。两份实际hostEvidencePrompt片段的nativeQuestion都没有summary，且不含该summary全文。
+
+hostEvidencePrompt的SQL范围是从“Host-recorded producer execution assignment”开始、到“Producing run report”之前的**片段**，并非完整prompt。这里关于summary缺失的判断限于该实际片段，加上两份报告自己明确承认未独立观察；不会据此断言历史真实summary不存在。问题在于检查器证据交付与充分性判断。
+
+verify原报告把唯一false/unverified列在AC5，reason明确为自己的fresh检查通过、前review检查输出未进入输入。原report的`reviewVerdict="passed"`、`verify.status="not_run"`、`nextStep`等字段也一并保留；Factory实际结果以对应attempt/runs为准，不能挑选报告某个标签改判，也不能把模型原文提到Owner acceptance视为Owner已执行接受。
+
+### 七份完整报告的新基线与发布保全
+
+| position | run | Factory attempt | 原生状态 / stopReason | 本次数据库原始reportFingerprint |
+| --- | --- | --- | --- | --- |
+| 1 | `6658f0ef-d446-4d8f-813d-7b7734bb02f3` | waiting | stopped / asked_human | `0cead4fbbb809e52fb255fb69195e5a2` |
+| 2 | `d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11` | passed | succeeded / submitted | `5062d38944649948b1340c430f289e03` |
+| 3 | `6fc099f4-8f04-47b1-8be8-f95edd54fde0` | passed | succeeded / submitted | `b4929bfc76737566bc1deeabb5f75a34` |
+| 4 | `f5269f72-0103-4d34-864a-0018c60195fc` | waiting | stopped / asked_human | `cf7aeb42f3ad41ca0e9c64bcd76309b0` |
+| 5 | `af4309f0-c48f-463a-8552-1b04c6e33595` | failed | succeeded / submitted | `f5592902b28ecb8fb0576e97aa024063` |
+| 6 | `4c609155-c3cb-4c1a-81cc-dfa85f26eadc` | passed | succeeded / submitted | `cb5e98c828706a2d29e17f3412615514` |
+| 7 | `0fad0e8b-1ea8-40b2-8e78-40b8b09a515a` | failed | succeeded / submitted | `4042668ddd9c45cb9b21f703b66eeb52` |
+
+[完整七报告](production-attempt-03/seven-reports-013910.json)与本次MCP结果中的七个report对象逐字段相同；原fingerprint不按预期长度补齐、不规范化、不用客户端哈希替换。[验证记录](production-attempt-03/validation.json)另列每份完整report的规范JSON SHA256，以便后续实际比较。七份报告构成新的01:39基线；这不冒称恢复了01:03/01:14丢失的前后比较。
+
+[恢复审计报告](production-attempt-03/recovery-audit-report.md)、[公开投影边界](production-attempt-03/publication-notes.json)、[逐文件来源和变换清单](production-attempt-03/evidence-manifest.json)、[脱敏扫描](production-attempt-03/sanitization-audit.json)分别保留来源、必要字段选择、原/公开字节哈希与扫描限制。原件名称出现在审计报告中时指其恢复工作目录中的输入；实际公开文件与对应映射见publication-notes。
+
+本节基于已发布证据commit **`a0318e023f27d4773ce7e60512cf6aa9e7f648b8`** 追加。原README全部61,380字节作为未改动前缀保留，其他143个历史文件的Git blob SHA、mode和path原样继承；30张历史PNG全部保留，且仍只证明各自隔离UI版本。此次没有新增可发布的生产截图，不把旧图当作第三轮生产画面。本节固定第三轮失败和新恢复取证的边界，Owner接受仍未完成。

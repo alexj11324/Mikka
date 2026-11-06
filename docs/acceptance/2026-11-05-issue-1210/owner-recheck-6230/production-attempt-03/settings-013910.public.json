@@ -1,0 +1,52 @@
+{
+  "actualQueriedFrom": "2026-11-06T01:39:10.493Z",
+  "actualQueriedThrough": "2026-11-06T01:39:10.524Z",
+  "source": {
+    "path": "settings-013910.json",
+    "bytes": 7855,
+    "sha256": "93c3633b0f70937c813de906440db6754ec2637216e568245d17919138d0b3de"
+  },
+  "modelOrder": [
+    {
+      "actualQueriedAt": "2026-11-06T01:39:10.518Z",
+      "location": "cloud",
+      "customized": true,
+      "preferredHarness": "claude_code",
+      "autoModelRouting": true
+    }
+  ],
+  "entries": [
+    {
+      "actualQueriedAt": "2026-11-06T01:39:10.519Z",
+      "id": "75b8fa4c-1bb1-4b5b-9ba0-f1a9c5319d21",
+      "position": 0,
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "sourceKind": "subscription",
+      "sourceId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+    }
+  ],
+  "otherQueriedGroups": {
+    "bot_chat_choices": {
+      "rowsOmitted": true,
+      "rowCount": 8,
+      "completeQueriedGroupCanonicalSha256": "ddcf5392642de2698d36116a28a612979e2627818878bd7f02908fb03164ec88",
+      "reason": "Unrelated Bot/model names, API-key reference IDs and Profile metadata omitted from public evidence."
+    },
+    "bot_models": {
+      "rowsOmitted": true,
+      "rowCount": 9,
+      "completeQueriedGroupCanonicalSha256": "35e69b10d92c07f8b3aecd30be4874d023d281f4125a6c413dd9a70655f1bf83",
+      "reason": "Unrelated Bot/model names, API-key reference IDs and Profile metadata omitted from public evidence."
+    },
+    "profile_settings": {
+      "rowsOmitted": true,
+      "rowCount": 4,
+      "completeQueriedGroupCanonicalSha256": "2719de7a38a1f3138dfdb5dcecd906c201e5240cc4e3c1db46cbd1f3bf79a2ab",
+      "reason": "Unrelated Bot/model names, API-key reference IDs and Profile metadata omitted from public evidence.",
+      "enabledRowCount": 0,
+      "unarchivedRowCount": 3
+    }
+  },
+  "boundary": "Only current settings are attested. Lost00:55/01:03 snapshots and their comparison are not recreated; no full Profile definition was queried."
+}

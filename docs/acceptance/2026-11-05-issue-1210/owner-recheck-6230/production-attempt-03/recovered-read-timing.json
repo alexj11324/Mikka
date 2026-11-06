@@ -1,0 +1,13 @@
+{
+  "startedAt": "2026-11-06T01:39:09.035Z",
+  "finishedAt": "2026-11-06T01:39:10.609Z",
+  "purpose": "new finite recovery-only readonly snapshot after environment replacement",
+  "historicalObservationNotReconstructed": "01:14 attempt03 audit was previously observed; original unpersisted raw is currently inaccessible. This response is newly queried.",
+  "readOnly": true,
+  "statementTimeout": "5s",
+  "transactionCountThisRecovery": 1,
+  "providerRefresh": false,
+  "modelInvoked": false,
+  "browserAction": false,
+  "allRawStoredBeforeFilesystemWrite": true
+}

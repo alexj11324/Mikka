@@ -1,0 +1,140 @@
+{
+  "scannedAt": "2026-11-06T02:08:26.906721+00:00",
+  "scope": "Selected attempt03 recovered failure files; full source raw retained privately with hashes.",
+  "patterns": [
+    "owner_account_id",
+    "private_key",
+    "github_token",
+    "api_secret_prefix",
+    "jwt",
+    "authorization_value",
+    "cookie_value",
+    "password_in_database_url",
+    "aws_access_key",
+    "email_address"
+  ],
+  "findings": [],
+  "files": [
+    {
+      "path": "snapshot-013910.public.json",
+      "bytes": 131806,
+      "sha256": "1e1c9006ca32838c2db5c9bf679360cf8006b6c04173aa10bb21527c04893782",
+      "ownerAccountIdRedactionCount": 2
+    },
+    {
+      "path": "seven-reports-013910.json",
+      "bytes": 45116,
+      "sha256": "24b4d5e1d226eb3d7a650b5ccdd2e4e9999224a6660b280cd9a29a19e8fad71a",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "stage-tool-pairs-013910.json",
+      "bytes": 5360,
+      "sha256": "a0894858e7f9413a202f9d47dc7242e19f76ec8b96baeb801430cca9b14a0d21",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "host-evidence-013910.json",
+      "bytes": 38651,
+      "sha256": "96e0ec888e138a41c012fd08fc4a7945a26f64ffcb39fe867ab70566bb11969e",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "original-native-ask-013910.json",
+      "bytes": 2153,
+      "sha256": "7e48ef494f2a62601e4a08017173dae5b011dc6daa9afa880c5b530fcac9d050",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "recovered-read-timing.json",
+      "bytes": 565,
+      "sha256": "74362635e99b137056e311cbd89a3a16c7a47f05cc98838056012bbf753bbc7f",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "recovered-query-index.json",
+      "bytes": 1576,
+      "sha256": "ea002cd242fc4bc35116a5a0ce549fa92dfd5ec4b6971dd0a24e72ed7ea1d27e",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "query-provenance.json",
+      "bytes": 1721,
+      "sha256": "dd7299b232b451172275d8234bd767a99f39d1f7d2ac9dc3b0fce3e30877f6bd",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "settings-013910.public.json",
+      "bytes": 1972,
+      "sha256": "87d827462c0dc46285f3579ebade5421e2ff5f44ee3aca8bbbed2c1511196480",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "recovered-read.public.sql",
+      "bytes": 12714,
+      "sha256": "da0433865d6625fa5dfa0a948148e2d3a57be1c18eb4a372b3a9134717bb0b1c",
+      "ownerAccountIdRedactionCount": 16
+    },
+    {
+      "path": "recovered-request.public.json",
+      "bytes": 2912,
+      "sha256": "78b5fc8527ea8e75f753d4f9364f7c776b500355f774d6262e5b21713670fdfa",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "current-audit.public.json",
+      "bytes": 11207,
+      "sha256": "391c921e0b0130e3ffd3475f1c94e2c069efc6ceaffb9f301ccd323a8f3a2ae2",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "recovery-audit-report.md",
+      "bytes": 8690,
+      "sha256": "719457c68aa19263ada3b624ac76654568cca17adcfec1cdba36d4e3c8c1eb0c",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "issuecomment-6673850974.json",
+      "bytes": 2612,
+      "sha256": "411b648023d505cf1df468b959f8aa218002a3ea231c2e6d87e16c72b7a755a5",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "issuecomment-6673951257.json",
+      "bytes": 3053,
+      "sha256": "0f226100c641cc8a74254daf855447a8556b378d3e444df9b1081dab5a52906d",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "issuecomment-6674105740.json",
+      "bytes": 1853,
+      "sha256": "abb6efb55f2b615798ad2266b01777c00dd69f36be80aeb31a6bd79831426f45",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "pr1464-release.public.json",
+      "bytes": 2638,
+      "sha256": "75ec8fe738079fe42a8d97ff7f9434787135b41a557b77a4abea1dba7b5cb21b",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "validation.json",
+      "bytes": 7296,
+      "sha256": "fd761a42366f0a3a26fa924eb4bb391f187be22bac61e6b3ba263963643c6bde",
+      "ownerAccountIdRedactionCount": 0
+    },
+    {
+      "path": "publication-notes.json",
+      "bytes": 2364,
+      "sha256": "df62beed8109e382697de3e248cc558954bf1744850aca30286dd48ac32beb6d",
+      "ownerAccountIdRedactionCount": 0
+    }
+  ],
+  "privacyProjectionChecks": {
+    "unrelatedBotNamesAbsentFromSnapshot": true,
+    "unrelatedSettingsGroupsHashBound": true,
+    "allSevenFullReportObjectsUnchanged": true,
+    "creatorAccountNotPublished": true
+  },
+  "limits": "Pattern scan plus selected-field review; not a guarantee against every unknown secret type. Existing published144-file history remains untouched."
+}

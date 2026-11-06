@@ -1,0 +1,77 @@
+{
+  "kind": "Necessary-field projection of original final connector responses recovered from root memory; no new deployment/resource read.",
+  "sources": [
+    {
+      "path": "root-memory/pr1464-root-final-status-0.json",
+      "bytes": 1521,
+      "sha256": "0f3e0f390f5f9d540d6700f7fe9181f2b1d62decda28c07bbf8648267a54c089"
+    },
+    {
+      "path": "root-memory/pr1464-root-final-status-1.json",
+      "bytes": 12374,
+      "sha256": "401f683304c20ca4e133a3ab33a04770e3ddc5d92fdc696831ff27239a8ec8b9"
+    }
+  ],
+  "deployment": {
+    "id": "dpl_EBjybjtxVuG4PgRo8MxptkDhf1xP",
+    "url": "mikka-3qmlxnol0-mikka-dev.vercel.app",
+    "state": "READY",
+    "readyState": "READY",
+    "target": "production",
+    "ready": 1793926425808,
+    "createdAt": 1793926370490,
+    "aliasError": null
+  },
+  "sourceCommit": "4e588871ac2211d2b6ee825d2a6c3a981efcada2",
+  "readyAtUtc": "2026-11-06T00:53:45.808+00:00",
+  "jobs": [
+    {
+      "id": 127632418754,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42138447076
+    },
+    {
+      "id": 127632487769,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42138447076
+    },
+    {
+      "id": 127632635399,
+      "name": "validate",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42138447076
+    },
+    {
+      "id": 127634011621,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42138447076
+    },
+    {
+      "id": 127635336258,
+      "name": "publish / deploy",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42138447076
+    }
+  ],
+  "originalResponseObservationTimestampAvailable": false,
+  "publishedHistoricalClaims": {
+    "source": "issuecomment-6673850974.json",
+    "workerShaReported": "7f6c48300157bef7f0a95e037e9a24adffe6f966",
+    "normalPublicGetReportedAt": "2026-11-06T00:54:31.382629Z",
+    "normalPublicGetReportedStatus": 200,
+    "normalPublicGetReportedBuild": "4e588871ac2211d2b6ee825d2a6c3a981efcada2",
+    "mainCiReportedRun": 42138447104,
+    "mainCiReportedSuccessfulJobs": 12,
+    "rawWorkerPairLogAndPublicGetResponseAvailableInThisPackage": false
+  },
+  "privacy": "Creator account, project metadata, unrelated aliases/regions, raw steps and account fields omitted.",
+  "boundary": "Recovered raw deployment/jobs support READY and five completed runtime jobs. Worker-pair/main-CI/public-GET details above are attributed to the published historical comment; their lost raw files are not reconstructed. No later fix or acceptance success is asserted."
+}

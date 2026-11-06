@@ -1,0 +1,42 @@
+{
+  "phase": "production-attempt-03 actual failure, newly archived from01:39 recovery snapshot",
+  "baseEvidenceCommit": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8",
+  "currentRawResponse": {
+    "path": "recovered-read-response.json",
+    "bytes": 144546,
+    "sha256": "fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa"
+  },
+  "currentQueryTime": {
+    "from": "2026-11-06T01:39:10.493Z",
+    "through": "2026-11-06T01:39:10.524Z"
+  },
+  "fullRawMcpResponsePublished": false,
+  "publicSnapshot": "snapshot-013910.public.json",
+  "publicDataBoundary": "Full seven reports and task-related fields/IO are preserved. Owner ID is replaced; unrelated Bot/model/credential-reference/Profile metadata groups are omitted with complete-group hashes. No credentials or Profile bodies were queried.",
+  "originalToPublicFileMap": {
+    "recovered-read-response.json": "snapshot-013910.public.json",
+    "recovered-read-request.json": "recovered-request.public.json",
+    "recovered-read.sql": "recovered-read.public.sql",
+    "seven-report-baseline-013910.json": "seven-reports-013910.json",
+    "settings-013910.json": "settings-013910.public.json",
+    "current-data-audit.json": "current-audit.public.json",
+    "README.md": "recovery-audit-report.md"
+  },
+  "unavailableHistoricalInputs": [
+    "Original75-file unpublished staging bundle",
+    "Original00:55/01:03 before/settings/restoration responses",
+    "Originalpending/running/proof02 response files",
+    "Original01:14 terminal/settings responses and168 comparison"
+  ],
+  "historicalReferencesOnly": [
+    6673850974,
+    6673951257,
+    6674105740
+  ],
+  "historicalBoundary": "These comments were freshly read by id and retain original publication dates. Their old observation statements remain historical reports; no lost file bytes/hash or before/after comparison is reconstructed from memory.",
+  "sqlBoundary": "SQL is a redacted, non-executable evidence copy. Request projection records actual source hashes and controls; it is not an API request to replay.",
+  "imageBoundary": "No new production screenshot is available. The30 existing PNGs retain their original isolated-UI meaning.",
+  "laterFixesIncluded": false,
+  "ownerAcceptancePerformedOrClaimed": false,
+  "canonicalEncoding": "UTF-8 JSON ensure_ascii=False, sort_keys=True, separators=(comma,colon); array order retained."
+}

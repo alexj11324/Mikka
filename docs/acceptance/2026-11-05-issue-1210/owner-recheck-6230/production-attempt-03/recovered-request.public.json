@@ -1,0 +1,94 @@
+{
+  "publicationKind": "Non-executable query provenance projection, not a request to replay.",
+  "executionAllowed": false,
+  "originalRequest": {
+    "path": "recovered-read-request.json",
+    "bytes": 13653,
+    "sha256": "2c893eb71cce24eb57d62dad38ad12f1255cd7d576d32f80a01831a31d110453"
+  },
+  "originalStatementsFile": {
+    "path": "recovered-read-statements.json",
+    "bytes": 13445,
+    "sha256": "a7b4960938b5a7569c599f956f7c2282b044f8ea72dad0c4ff7bcb6eb7305505"
+  },
+  "statementCount": 18,
+  "selectCount": 16,
+  "readOnlyTransaction": true,
+  "statementTimeout": "5s",
+  "redactedSqlEvidence": "recovered-read.public.sql",
+  "statementSha256": [
+    {
+      "index": 0,
+      "sha256": "6c20e5345ee8028f61cc0541aeb60699e5cffa99c8f79ff7f8c62b0a8dad1837"
+    },
+    {
+      "index": 1,
+      "sha256": "2f0ad9318d8daad4452e9726e67089ca3909981bbd333d0f80972dd3f8470f2c"
+    },
+    {
+      "index": 2,
+      "sha256": "86c4bea6e5b4c8e0c28f3d02dcf8f5e03a54effdc2d1d88b1a4f2de93474cd67"
+    },
+    {
+      "index": 3,
+      "sha256": "bad61713199d602b8cc3c8ef4aaf3c74a63457374c5836e9049f87ff7bd9bcb8"
+    },
+    {
+      "index": 4,
+      "sha256": "78c77ba194540d0fefa04b16e6b7c240af790b5b3544ef05a40b4703cab10e8f"
+    },
+    {
+      "index": 5,
+      "sha256": "032cdb43ddf21c2e7c0a58dd8b7ca458bb45a8619610c03748f59a6fedf39309"
+    },
+    {
+      "index": 6,
+      "sha256": "6103a5fb51d96daeae51f7989a4b70a938a169ae5c6d56a428fbdd708732fbc1"
+    },
+    {
+      "index": 7,
+      "sha256": "3086c71fff879347f3873f380c0d5cf0577f45c9685fb443018eb67e7716d0c1"
+    },
+    {
+      "index": 8,
+      "sha256": "603205d5135c49732c2f0d04b0389cde17b0d81bbc34337ee62cb0002b414013"
+    },
+    {
+      "index": 9,
+      "sha256": "7abdaa97efba4ff16ffeaae1f239b593324e6ea85712ae7bf491a345ae66e9a2"
+    },
+    {
+      "index": 10,
+      "sha256": "7af8bb616bd8651f68849438fb039c26bed8fb8c64988077e6e952dd28fdf38f"
+    },
+    {
+      "index": 11,
+      "sha256": "9abb68864f42bb0868518f2d498b3d830c04f24e3e17e8ddc4025f8b1192363e"
+    },
+    {
+      "index": 12,
+      "sha256": "213fdfcc2a293fc40e7b042d0b42ed9d4f25cc00cec502e29c1714c5bebc0f99"
+    },
+    {
+      "index": 13,
+      "sha256": "b6962c3b6c7f397c1b56e037686bd4ee6c48be647302da8d202edc968fac57f1"
+    },
+    {
+      "index": 14,
+      "sha256": "a5ddaac692535c393de467ff4a47667c8bec43b42f72f89ae9d957c018606dac"
+    },
+    {
+      "index": 15,
+      "sha256": "229522c29a76c6dba35f219727e1391f647e968b62e79d11e24fe6d9c061895b"
+    },
+    {
+      "index": 16,
+      "sha256": "261e2a277a934a355cada1a0fcfb6e55dfa8fd03db849262683b1b3e500ba857"
+    },
+    {
+      "index": 17,
+      "sha256": "cf6659f9d991853a26c81bfbd23920335c2a99203e557fe4f0940891971fdd2e"
+    }
+  ],
+  "omissionBoundary": "Database routing identifiers and duplicated unredacted SQL array omitted. Original statement hashes bind the actual request; redacted copies must not be executed."
+}

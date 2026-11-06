@@ -1,0 +1,41 @@
+{
+  "preparedFromGithub": [
+    {
+      "name": "source-production-before-minimal.sql",
+      "path": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-01/production-before-minimal.sql",
+      "ref": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8"
+    },
+    {
+      "name": "source-attempt02-sample01.sql",
+      "path": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-02/attempt02-sample01.sql",
+      "ref": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8"
+    },
+    {
+      "name": "source-attempt02-proof01.sql",
+      "path": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-02/attempt02-proof01.sql",
+      "ref": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8"
+    },
+    {
+      "name": "source-model-order.ts",
+      "path": "lib/model-order.ts",
+      "ref": "4e588871ac2211d2b6ee825d2a6c3a981efcada2"
+    },
+    {
+      "name": "source-db-schema.ts",
+      "path": "lib/db/schema.ts",
+      "ref": "4e588871ac2211d2b6ee825d2a6c3a981efcada2"
+    },
+    {
+      "name": "source-agent-profile-schema.ts",
+      "path": "lib/db/agent-profile-schema.ts",
+      "ref": "4e588871ac2211d2b6ee825d2a6c3a981efcada2"
+    }
+  ],
+  "publishedEvidenceCommit": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8",
+  "schemaCommit": "4e588871ac2211d2b6ee825d2a6c3a981efcada2",
+  "readonlyStatements": 18,
+  "selectCount": 16,
+  "sourceNote": "Published SQL copies had redacted Owner ID and were not executed. Newly scoped readonly statements were constructed from confirmed projections, actual prior authorized identities, and source schema. No credentials/secret values selected.",
+  "originalBaselineAvailable": false,
+  "historical01_14AuditReproduced": false
+}

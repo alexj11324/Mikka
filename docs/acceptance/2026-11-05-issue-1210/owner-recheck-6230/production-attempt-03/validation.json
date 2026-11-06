@@ -1,0 +1,177 @@
+{
+  "validatedAt": "2026-11-06T02:08:26.906721+00:00",
+  "kind": "Offline validation of already observed01:39 inputs; no new production query or run.",
+  "rawResponse": {
+    "path": "recovered-read-response.json",
+    "bytes": 144546,
+    "sha256": "fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa"
+  },
+  "all15FrozenSourceFilesMatchManifest": true,
+  "snapshotTime": {
+    "from": "2026-11-06T01:39:10.493Z",
+    "through": "2026-11-06T01:39:10.524Z"
+  },
+  "currentTask": {
+    "actualQueriedAt": "2026-11-06T01:39:10.493Z",
+    "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+    "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+    "sourceEventId": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+    "botId": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+    "stage": "verify",
+    "status": "failed",
+    "revision": 22,
+    "attemptId": "8bd4fa88-5098-4e8d-818f-2de2afa84b5d",
+    "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+    "flowVersion": null,
+    "kind": "deliverable",
+    "candidateSha": null,
+    "producerRunId": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+    "deliverableHead": "d05417e7848871e511141e10a282ffb7998b0a79",
+    "producerSourceCommit": "054e64ce6167427aecf937e6dc2410af677df32d"
+  },
+  "currentCounts": {
+    "actualQueriedAt": "2026-11-06T01:39:10.515Z",
+    "ownerRecheckCount": 1,
+    "retryOrRecheckControlsSinceAttempt02": 1,
+    "acceptanceCount": 0,
+    "allAttemptCount": 7,
+    "attemptsAfterFailedReview5": 2,
+    "activeRuns": 0,
+    "activeLeases": 0
+  },
+  "sevenReportsPreservedWithoutFieldChanges": true,
+  "reportHashes": [
+    {
+      "position": 1,
+      "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "databaseReportFingerprint": "0cead4fbbb809e52fb255fb69195e5a2",
+      "canonicalReportSha256": "082bece2ce9654b9aaef5d85b8093937e614b8f0891368c850d614b4e18094dc"
+    },
+    {
+      "position": 2,
+      "runId": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+      "databaseReportFingerprint": "5062d38944649948b1340c430f289e03",
+      "canonicalReportSha256": "2a345ef99b870f8a4f688ada485318e7fdbe3a6f41d6be49ccf3bd5310030c72"
+    },
+    {
+      "position": 3,
+      "runId": "6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+      "databaseReportFingerprint": "b4929bfc76737566bc1deeabb5f75a34",
+      "canonicalReportSha256": "e09e020b3f80cf2908dedb455b875b1cdbde2facbd54a0cccf04d7b85c55d1d8"
+    },
+    {
+      "position": 4,
+      "runId": "f5269f72-0103-4d34-864a-0018c60195fc",
+      "databaseReportFingerprint": "cf7aeb42f3ad41ca0e9c64bcd76309b0",
+      "canonicalReportSha256": "1cb50bb5f5fbb3823cccf99cb7dffcfe9d352945b38082d8fc5a6f29002ccfbe"
+    },
+    {
+      "position": 5,
+      "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+      "databaseReportFingerprint": "f5592902b28ecb8fb0576e97aa024063",
+      "canonicalReportSha256": "85fe8da85f6d57798e1b069f039bdfc507113d7d48bacfed231e931dcfb3b335"
+    },
+    {
+      "position": 6,
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "databaseReportFingerprint": "cb5e98c828706a2d29e17f3412615514",
+      "canonicalReportSha256": "1071dc1f2f47f5ce5ca989dbfc434723ca23abfac7020a51ab80c0dc4016148e"
+    },
+    {
+      "position": 7,
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "databaseReportFingerprint": "4042668ddd9c45cb9b21f703b66eeb52",
+      "canonicalReportSha256": "99b3d8bab935fca4e2a727100773e4bb61bae01f67a5e1888710fb0bf9bb2361"
+    }
+  ],
+  "pairChecks": [
+    {
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "toolName": "mcp__mikka__inspect_artifact",
+      "inputChunkId": "91b51be7-1789-4feb-ae3d-d4e634ae1aff",
+      "outputChunkId": "2cda993a-6c02-494d-9630-133ae16986f4",
+      "inputToolCallId": "toolu_01Ed2kTmhxhEiNwv1oqkzpoj",
+      "inputSeq": 9,
+      "outputSeq": 10,
+      "inputOutputPairMatches": true,
+      "contractFieldsMatchActualOutput": true
+    },
+    {
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "toolName": "mcp__mikka__inspect_repository",
+      "inputChunkId": "48cc61f1-56a1-4b1f-974c-294586b8a311",
+      "outputChunkId": "a4ac1096-1ca9-4853-8c76-b67d6bf6eaf2",
+      "inputToolCallId": "toolu_01Rnu3Ju1LgZ7AZocSDUBosr",
+      "inputSeq": 11,
+      "outputSeq": 12,
+      "inputOutputPairMatches": true,
+      "contractFieldsMatchActualOutput": true
+    },
+    {
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "toolName": "mcp__mikka__inspect_artifact",
+      "inputChunkId": "2486f42f-4a0a-4519-ac5e-f67213596f58",
+      "outputChunkId": "1648f633-fdaf-4870-8476-92cd714618fb",
+      "inputToolCallId": "toolu_01EQWqZGHD4qpdQAFZDvewJX",
+      "inputSeq": 12,
+      "outputSeq": 13,
+      "inputOutputPairMatches": true,
+      "contractFieldsMatchActualOutput": true
+    },
+    {
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "toolName": "mcp__mikka__inspect_repository",
+      "inputChunkId": "917e6755-11ff-437b-97ff-899f70e60125",
+      "outputChunkId": "6a64a36d-fe2f-49cc-8f27-a605063fed81",
+      "inputToolCallId": "toolu_019354bGNV3N7ERQKLfA3kRL",
+      "inputSeq": 14,
+      "outputSeq": 15,
+      "inputOutputPairMatches": true,
+      "contractFieldsMatchActualOutput": true
+    }
+  ],
+  "originalNativeSummary": {
+    "characters": 560,
+    "utf8Bytes": 880,
+    "sha256": "1d79d246e88e8f60e29321101a2261b2624ff6b00c20c43978856cbde346c1a6",
+    "inputChunkId": "f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3",
+    "outputChunkId": "fddaaa05-97f6-4227-9f8f-65f18ca998f8"
+  },
+  "selectedHostFragmentChecks": [
+    {
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "rawPromptFingerprint": "f613ff132d3a835ffd4253b85972240a",
+      "selectedHostFragmentSha256": "ffd3e904796311d4158f0a5c1b8286d9bb2bc3f67cd5643e1cbf1e939056547a",
+      "nativeQuestionSummaryIncludedInSelectedFragment": false,
+      "exactOriginalSummaryIncludedInSelectedFragment": false,
+      "scope": "SQL-selected host-evidence substring, not the entire model prompt."
+    },
+    {
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "rawPromptFingerprint": "cbca322b1c27bc262ce8cb05a12eef6e",
+      "selectedHostFragmentSha256": "ffd3e904796311d4158f0a5c1b8286d9bb2bc3f67cd5643e1cbf1e939056547a",
+      "nativeQuestionSummaryIncludedInSelectedFragment": false,
+      "exactOriginalSummaryIncludedInSelectedFragment": false,
+      "scope": "SQL-selected host-evidence substring, not the entire model prompt."
+    }
+  ],
+  "newSidsDistinctFromEachOtherAndOldFive": true,
+  "newRunsHaveNoContinuationLineage": true,
+  "reviewFactoryStatus": "passed",
+  "verifyFactoryStatus": "failed",
+  "reportedFalseCriterionNumbers": {
+    "review": [],
+    "verify": [
+      5
+    ]
+  },
+  "semanticBoundary": "AC3 is marked passed by both reports despite their admitted lack of independent summary verification; verify AC5 remains false/unverified. Matching four external tool pairs does not rewrite these report limitations or establish Owner acceptance.",
+  "historicalBeforeAfterComparisonPerformed": false,
+  "canonicalEncoding": "UTF-8 JSON with ensure_ascii=False, sort_keys=True, separators=(comma,colon). These hashes supplement, and do not replace or normalize, original database fingerprint strings."
+}

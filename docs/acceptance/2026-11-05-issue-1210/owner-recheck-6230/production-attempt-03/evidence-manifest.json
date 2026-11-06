@@ -1,0 +1,409 @@
+{
+  "preparedAt": "2026-11-06T02:08:26.906721+00:00",
+  "status": "local proposal only; awaiting root review; no remote object or ref mutation",
+  "section": "production-attempt-03",
+  "outcome": "verify_failed_revision22_no_owner_acceptance",
+  "baseEvidenceCommit": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8",
+  "baseTree": "af97827d821c10bf2d7fc389e5d9a0dde85a2a57",
+  "actualQueryTime": {
+    "from": "2026-11-06T01:39:10.493Z",
+    "through": "2026-11-06T01:39:10.524Z"
+  },
+  "productionSource": "4e588871ac2211d2b6ee825d2a6c3a981efcada2",
+  "original75FilesRestored": false,
+  "old01_14RawReconstructed": false,
+  "old168ComparisonReproduced": false,
+  "sevenCompleteReportsPreserved": true,
+  "fourActualToolPairsPreserved": true,
+  "files": [
+    {
+      "path": "snapshot-013910.public.json",
+      "sources": [
+        {
+          "path": "recovered-read-response.json",
+          "bytes": 144546,
+          "sha256": "fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa"
+        }
+      ],
+      "transformation": "Decode named result groups; replace Owner ID; omit three unrelated settings groups and preserve their complete-value hashes.",
+      "ownerAccountIdRedactionCount": 2,
+      "bytes": 131806,
+      "sha256": "1e1c9006ca32838c2db5c9bf679360cf8006b6c04173aa10bb21527c04893782",
+      "gitBlobSha": "e5b16c4daf5bd4df00a84b4104302f87f79f9d1b",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/snapshot-013910.public.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/snapshot-013910.public.json"
+    },
+    {
+      "path": "seven-reports-013910.json",
+      "sources": [
+        {
+          "path": "recovered-read-response.json",
+          "bytes": 144546,
+          "sha256": "fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa"
+        },
+        {
+          "path": "seven-report-baseline-013910.json",
+          "bytes": 88935,
+          "sha256": "7b2e0abfa7578c5ef179f40ea7ea0b49a4cb9f80646597014bb04e9ec40a9b35"
+        }
+      ],
+      "transformation": "Extract all seven complete observed report rows without changing any report field or raw fingerprint.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 45116,
+      "sha256": "24b4d5e1d226eb3d7a650b5ccdd2e4e9999224a6660b280cd9a29a19e8fad71a",
+      "gitBlobSha": "148e223097c1b056fc870509ae4c2112c27deee0",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/seven-reports-013910.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/seven-reports-013910.json"
+    },
+    {
+      "path": "stage-tool-pairs-013910.json",
+      "sources": [
+        {
+          "path": "stage-tool-pairs-013910.json",
+          "bytes": 5360,
+          "sha256": "a0894858e7f9413a202f9d47dc7242e19f76ec8b96baeb801430cca9b14a0d21"
+        }
+      ],
+      "transformation": "Byte-for-byte selected new source file.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 5360,
+      "sha256": "a0894858e7f9413a202f9d47dc7242e19f76ec8b96baeb801430cca9b14a0d21",
+      "gitBlobSha": "414b6c5f0d2cd151179e1b7f1a122d9e74616204",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/stage-tool-pairs-013910.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/stage-tool-pairs-013910.json"
+    },
+    {
+      "path": "host-evidence-013910.json",
+      "sources": [
+        {
+          "path": "host-evidence-013910.json",
+          "bytes": 38651,
+          "sha256": "96e0ec888e138a41c012fd08fc4a7945a26f64ffcb39fe867ab70566bb11969e"
+        }
+      ],
+      "transformation": "Byte-for-byte selected new source file.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 38651,
+      "sha256": "96e0ec888e138a41c012fd08fc4a7945a26f64ffcb39fe867ab70566bb11969e",
+      "gitBlobSha": "290bb89a5ee2f82ee0ad98ef3daab196b8ea52fd",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/host-evidence-013910.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/host-evidence-013910.json"
+    },
+    {
+      "path": "original-native-ask-013910.json",
+      "sources": [
+        {
+          "path": "original-native-ask-013910.json",
+          "bytes": 2153,
+          "sha256": "7e48ef494f2a62601e4a08017173dae5b011dc6daa9afa880c5b530fcac9d050"
+        }
+      ],
+      "transformation": "Byte-for-byte selected new source file.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 2153,
+      "sha256": "7e48ef494f2a62601e4a08017173dae5b011dc6daa9afa880c5b530fcac9d050",
+      "gitBlobSha": "f2acfad1b9110aac09048a982c6f1335fd8ee50d",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/original-native-ask-013910.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/original-native-ask-013910.json"
+    },
+    {
+      "path": "recovered-read-timing.json",
+      "sources": [
+        {
+          "path": "recovered-read-timing.json",
+          "bytes": 565,
+          "sha256": "74362635e99b137056e311cbd89a3a16c7a47f05cc98838056012bbf753bbc7f"
+        }
+      ],
+      "transformation": "Byte-for-byte selected new source file.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 565,
+      "sha256": "74362635e99b137056e311cbd89a3a16c7a47f05cc98838056012bbf753bbc7f",
+      "gitBlobSha": "e1a6c965640a46eb056283efdfffa9014f94e324",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-read-timing.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-read-timing.json"
+    },
+    {
+      "path": "recovered-query-index.json",
+      "sources": [
+        {
+          "path": "recovered-query-index.json",
+          "bytes": 1576,
+          "sha256": "ea002cd242fc4bc35116a5a0ce549fa92dfd5ec4b6971dd0a24e72ed7ea1d27e"
+        }
+      ],
+      "transformation": "Byte-for-byte selected new source file.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 1576,
+      "sha256": "ea002cd242fc4bc35116a5a0ce549fa92dfd5ec4b6971dd0a24e72ed7ea1d27e",
+      "gitBlobSha": "3e239aca01e44db40e21eed3abb12a74886446c6",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-query-index.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-query-index.json"
+    },
+    {
+      "path": "query-provenance.json",
+      "sources": [
+        {
+          "path": "query-provenance.json",
+          "bytes": 1721,
+          "sha256": "dd7299b232b451172275d8234bd767a99f39d1f7d2ac9dc3b0fce3e30877f6bd"
+        }
+      ],
+      "transformation": "Byte-for-byte selected new source file.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 1721,
+      "sha256": "dd7299b232b451172275d8234bd767a99f39d1f7d2ac9dc3b0fce3e30877f6bd",
+      "gitBlobSha": "63bb09509f55b2f98df841e9a2d5c8bb926e5332",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/query-provenance.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/query-provenance.json"
+    },
+    {
+      "path": "settings-013910.public.json",
+      "sources": [
+        {
+          "path": "recovered-read-response.json",
+          "bytes": 144546,
+          "sha256": "fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa"
+        },
+        {
+          "path": "settings-013910.json",
+          "bytes": 7855,
+          "sha256": "93c3633b0f70937c813de906440db6754ec2637216e568245d17919138d0b3de"
+        }
+      ],
+      "transformation": "Retain exact target model-order settings; replace unrelated Bot/Profile rows with full-value hashes and necessary counts.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 1972,
+      "sha256": "87d827462c0dc46285f3579ebade5421e2ff5f44ee3aca8bbbed2c1511196480",
+      "gitBlobSha": "9e4f0b7a4862f394e32f93dd29e5addaed601bfb",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/settings-013910.public.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/settings-013910.public.json"
+    },
+    {
+      "path": "recovered-read.public.sql",
+      "sources": [
+        {
+          "path": "recovered-read.sql",
+          "bytes": 12714,
+          "sha256": "5993326316a50242435a1f1a083995d1f0a26cba010605e214125f6afc43b5b5"
+        }
+      ],
+      "transformation": "Add non-executable evidence header, replace Owner account ID, and normalize extra trailing newlines to one final LF; SQL statements otherwise preserved.",
+      "ownerAccountIdRedactionCount": 16,
+      "bytes": 12714,
+      "sha256": "da0433865d6625fa5dfa0a948148e2d3a57be1c18eb4a372b3a9134717bb0b1c",
+      "gitBlobSha": "b33c277e5354f95a97f6b80cf1ab73ee12708064",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-read.public.sql",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-read.public.sql",
+      "executionAllowed": false
+    },
+    {
+      "path": "recovered-request.public.json",
+      "sources": [
+        {
+          "path": "recovered-read-request.json",
+          "bytes": 13653,
+          "sha256": "2c893eb71cce24eb57d62dad38ad12f1255cd7d576d32f80a01831a31d110453"
+        },
+        {
+          "path": "recovered-read-statements.json",
+          "bytes": 13445,
+          "sha256": "a7b4960938b5a7569c599f956f7c2282b044f8ea72dad0c4ff7bcb6eb7305505"
+        }
+      ],
+      "transformation": "Retain request/statement hashes and read-only controls; omit routing identifiers and duplicate SQL text.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 2912,
+      "sha256": "78b5fc8527ea8e75f753d4f9364f7c776b500355f774d6262e5b21713670fdfa",
+      "gitBlobSha": "fe93f143b3e6cd9b2433de636c4c4ebbfe6d16ba",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-request.public.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovered-request.public.json"
+    },
+    {
+      "path": "current-audit.public.json",
+      "sources": [
+        {
+          "path": "current-data-audit.json",
+          "bytes": 19586,
+          "sha256": "e1b02a99f8781190a0487d7bd857d47b0caba5dc3d8539deff8fe8c2cf4caba8"
+        }
+      ],
+      "transformation": "Keep current audit conclusions and binding checks; replace duplicated four tool observations with hash and exact-IO file pointer.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 11207,
+      "sha256": "391c921e0b0130e3ffd3475f1c94e2c069efc6ceaffb9f301ccd323a8f3a2ae2",
+      "gitBlobSha": "8706a17525d9fc26229aad6491abb26bf45254aa",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/current-audit.public.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/current-audit.public.json"
+    },
+    {
+      "path": "recovery-audit-report.md",
+      "sources": [
+        {
+          "path": "README.md",
+          "bytes": 8690,
+          "sha256": "719457c68aa19263ada3b624ac76654568cca17adcfec1cdba36d4e3c8c1eb0c"
+        }
+      ],
+      "transformation": "Byte-for-byte recovery auditor report. Its source-file list describes the private recovery inputs; public projections are mapped separately.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 8690,
+      "sha256": "719457c68aa19263ada3b624ac76654568cca17adcfec1cdba36d4e3c8c1eb0c",
+      "gitBlobSha": "64137bd545a459b9356f3d46fb73b2b7f4b66ae9",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovery-audit-report.md",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/recovery-audit-report.md"
+    },
+    {
+      "path": "issuecomment-6673850974.json",
+      "sources": [
+        {
+          "path": "evidence-publication/issuecomment-6673850974.json",
+          "bytes": 2612,
+          "sha256": "411b648023d505cf1df468b959f8aa218002a3ea231c2e6d87e16c72b7a755a5"
+        },
+        {
+          "path": "root-memory/attempt03-release-and-pending-comment-body.json",
+          "bytes": 2409,
+          "sha256": "e809600351c16d5a789081be625eea80c739d7f43be9a4ccd55a60aa60803c25"
+        }
+      ],
+      "transformation": "Fresh GitHub comment id/URL/timestamps/body projection, exactly matching root recovered body; author/account metadata excluded.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 2612,
+      "sha256": "411b648023d505cf1df468b959f8aa218002a3ea231c2e6d87e16c72b7a755a5",
+      "gitBlobSha": "e83a74952fec08cd184ba8438f1f729bcb8ac45b",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/issuecomment-6673850974.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/issuecomment-6673850974.json",
+      "remoteSource": "https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6673850974"
+    },
+    {
+      "path": "issuecomment-6673951257.json",
+      "sources": [
+        {
+          "path": "evidence-publication/issuecomment-6673951257.json",
+          "bytes": 3053,
+          "sha256": "0f226100c641cc8a74254daf855447a8556b378d3e444df9b1081dab5a52906d"
+        },
+        {
+          "path": "root-memory/attempt03-failure-comment-body.json",
+          "bytes": 2850,
+          "sha256": "f5bf870fa598da5e10265a59f6574e00d539f4957a74868e7bece097e873cd17"
+        }
+      ],
+      "transformation": "Fresh GitHub comment id/URL/timestamps/body projection, exactly matching root recovered body; author/account metadata excluded.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 3053,
+      "sha256": "0f226100c641cc8a74254daf855447a8556b378d3e444df9b1081dab5a52906d",
+      "gitBlobSha": "2a28ab3fd1074ac2ea5accd5ca083af1c9acecf1",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/issuecomment-6673951257.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/issuecomment-6673951257.json",
+      "remoteSource": "https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6673951257"
+    },
+    {
+      "path": "issuecomment-6674105740.json",
+      "sources": [
+        {
+          "path": "evidence-publication/issuecomment-6674105740.json",
+          "bytes": 1853,
+          "sha256": "abb6efb55f2b615798ad2266b01777c00dd69f36be80aeb31a6bd79831426f45"
+        },
+        {
+          "path": "root-memory/attempt03-environment-blocker-body.json",
+          "bytes": 1650,
+          "sha256": "8ccc1881cee17581317a38fb75ed3fce5bd483bfc240e7be1776137cddd9ce48"
+        }
+      ],
+      "transformation": "Fresh GitHub comment id/URL/timestamps/body projection, exactly matching root recovered body; author/account metadata excluded.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 1853,
+      "sha256": "abb6efb55f2b615798ad2266b01777c00dd69f36be80aeb31a6bd79831426f45",
+      "gitBlobSha": "190fb7edf0656672338e09593dc7b5191b29d00a",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/issuecomment-6674105740.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/issuecomment-6674105740.json",
+      "remoteSource": "https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6674105740"
+    },
+    {
+      "path": "pr1464-release.public.json",
+      "sources": [
+        {
+          "path": "root-memory/pr1464-root-final-status-0.json",
+          "bytes": 1521,
+          "sha256": "0f3e0f390f5f9d540d6700f7fe9181f2b1d62decda28c07bbf8648267a54c089"
+        },
+        {
+          "path": "root-memory/pr1464-root-final-status-1.json",
+          "bytes": 12374,
+          "sha256": "401f683304c20ca4e133a3ab33a04770e3ddc5d92fdc696831ff27239a8ec8b9"
+        },
+        {
+          "path": "evidence-publication/issuecomment-6673850974.json",
+          "bytes": 2612,
+          "sha256": "411b648023d505cf1df468b959f8aa218002a3ea231c2e6d87e16c72b7a755a5"
+        }
+      ],
+      "transformation": "Keep source/deployment/five-job facts; exclude creator account and unnecessary fields; label comment-only historical assertions separately.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 2638,
+      "sha256": "75ec8fe738079fe42a8d97ff7f9434787135b41a557b77a4abea1dba7b5cb21b",
+      "gitBlobSha": "9a7b612ad2c82a5aeb555e219ea58ccc02eaac8b",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/pr1464-release.public.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/pr1464-release.public.json"
+    },
+    {
+      "path": "validation.json",
+      "sources": [
+        {
+          "path": "recovered-read-response.json",
+          "bytes": 144546,
+          "sha256": "fe082d3b2cefa20a70939517c779dc35563e1bd0773ce2306244b6fb2dbcd0aa"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 3152,
+          "sha256": "3659fef2dbd5364f4fae8fa638e7581cebb01de7aa0b1159d3c299f8e390eda7"
+        }
+      ],
+      "transformation": "Generate independent current-source integrity, exact-report, exact-pair and selected-host-fragment checks.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 7296,
+      "sha256": "fd761a42366f0a3a26fa924eb4bb391f187be22bac61e6b3ba263963643c6bde",
+      "gitBlobSha": "e4b3822076dc1efb1f0117d951169838be50f112",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/validation.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/validation.json"
+    },
+    {
+      "path": "publication-notes.json",
+      "sources": [
+        {
+          "path": "manifest.json",
+          "bytes": 3152,
+          "sha256": "3659fef2dbd5364f4fae8fa638e7581cebb01de7aa0b1159d3c299f8e390eda7"
+        }
+      ],
+      "transformation": "Generate explicit data-minimization, recovery-time, historical-loss and publication boundaries.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 2364,
+      "sha256": "df62beed8109e382697de3e248cc558954bf1744850aca30286dd48ac32beb6d",
+      "gitBlobSha": "1829b0dc6b6c28fd1de2d8f7e1e7ccf4ba8879d5",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/publication-notes.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/publication-notes.json"
+    },
+    {
+      "path": "sanitization-audit.json",
+      "sources": [],
+      "transformation": "Generate scan and explicit minimization/redaction record.",
+      "ownerAccountIdRedactionCount": 0,
+      "bytes": 4651,
+      "sha256": "601cd72e16673eecfa8788ba3486f26b1e455592eac3a89ee589a7ff1860b8eb",
+      "gitBlobSha": "b402f65766b93df850f194e45e37fbb0975334a2",
+      "repoPath": "docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/sanitization-audit.json",
+      "localPath": "/workspace/scratch/6b649311982a/ops/1210-a43-recovered/evidence-publication/proposal/docs/acceptance/2026-11-05-issue-1210/owner-recheck-6230/production-attempt-03/sanitization-audit.json"
+    }
+  ],
+  "manifestScope": "Every new section file except this manifest itself; complete tree manifest and diff are separately prepared.",
+  "oldArtifactFiles": 144,
+  "oldPngs": 30,
+  "newPngs": 0,
+  "remoteObjectsCreated": false,
+  "refMutations": 0
+}

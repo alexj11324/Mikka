@@ -1,0 +1,185 @@
+{
+  "phase": "current_snapshot_after_environment_recovery",
+  "actualQueriedFrom": "2026-11-06T01:39:10.493Z",
+  "actualQueriedThrough": "2026-11-06T01:39:10.524Z",
+  "rawSource": "recovered-read-response.json",
+  "old168FieldComparisonReproduced": false,
+  "historicalBaselineAvailable": false,
+  "exactSevenRunIdsObserved": true,
+  "allAttemptCount": 7,
+  "currentTask": {
+    "actualQueriedAt": "2026-11-06T01:39:10.493Z",
+    "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+    "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+    "sourceEventId": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+    "botId": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+    "stage": "verify",
+    "status": "failed",
+    "revision": 22,
+    "attemptId": "8bd4fa88-5098-4e8d-818f-2de2afa84b5d",
+    "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+    "flowVersion": null,
+    "kind": "deliverable",
+    "candidateSha": null,
+    "producerRunId": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+    "deliverableHead": "d05417e7848871e511141e10a282ffb7998b0a79",
+    "producerSourceCommit": "054e64ce6167427aecf937e6dc2410af677df32d"
+  },
+  "counts": {
+    "actualQueriedAt": "2026-11-06T01:39:10.515Z",
+    "ownerRecheckCount": 1,
+    "retryOrRecheckControlsSinceAttempt02": 1,
+    "acceptanceCount": 0,
+    "allAttemptCount": 7,
+    "attemptsAfterFailedReview5": 2,
+    "activeRuns": 0,
+    "activeLeases": 0
+  },
+  "questionEightNull": true,
+  "questionStatus": "expired",
+  "questionRevision": 3,
+  "toolPairsCount": 4,
+  "toolPairsUnique": true,
+  "allFourToolPairsMatchContract": true,
+  "hostChecks": [
+    {
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "promptFingerprint": "f613ff132d3a835ffd4253b85972240a",
+      "hostProducerMatchesCurrentReceipt": true,
+      "lifecycleComputedDigest": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+      "lifecycleFrozenDigest": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+      "digestMatches": true,
+      "watermark": {
+        "source": 29,
+        "producer": 20
+      },
+      "inheritedOutputChunkIds": [
+        "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+        "27c90934-986f-4574-9e46-df0706395559",
+        "202b7cf0-e388-4626-ae15-0dd08d8dfbc3"
+      ],
+      "nativeAskInputChunkMatches": true,
+      "nativeAskOutputChunkMatches": true,
+      "nativeAskCallMatches": true,
+      "nativeQuestionSummaryPresent": false,
+      "hostFragmentContainsExactOriginalSummary": false,
+      "currentRunNativeMatchesProducer": true,
+      "reportedCriterionCount": 6,
+      "falseCriterionNumbers": [],
+      "reportedAc3": {
+        "text": "完成上述实际检查后，必须通过既有 ask_human 工具发出一次真实 decision 问题：“是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？” summary 如实记录已创建文件与已执行检查。发出问题后结束这一段执行，等待 Owner 在正常问题入口回答；不能自己回答、提前 submit 或另建任务。",
+        "passed": true,
+        "status": "passed",
+        "command": "mcp__mikka__ask_human (native toolCallId toolu_01CXTLPrihL79jqRPzSgE4Eb, question fd3ce47c-785f-4e7a-92ee-d5763959d64b)",
+        "evidence": "Host lifecycle: nativeQuestion toolName=mcp__mikka__ask_human, kind=decision, question text exactly '是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？', inputChunkId f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3 (seq 22), outputChunkId fddaaa05-97f6-4227-9f8f-65f18ca998f8 (seq 23), output 'Recorded. End your turn now.'. waitingState stage=execute status=waiting revision=3. Answer 11708d4d-708f-5bc7-b41d-7db8386d8d15 source=human at 2026-11-04T20:10:34.260Z, after question at 2026-11-04T19:35:42.417Z; the source run stopped with stopReason=asked_human at 19:35:41.742Z. Limitation: the full ask_human summary text is not included in the host observations, so the summary's accuracy was not independently observed.",
+        "exitCode": null
+      },
+      "reportedAc5": {
+        "text": "独立 review 和独立 verify 分别在自己的固定候选中通过 inspect_artifact 实际读取新文件，并传入完整 expectedUtf8，核对 bytes、sha256、head、committedSha256、contentMatchesGit=true、matchesExpectedUtf8=true，保留各自真实新鲜的工具输入输出。它们是 reportOnly 的只读产物检查，不要求 Python、Bash 或未授予的 verify_command。",
+        "passed": true,
+        "status": "passed",
+        "command": "mcp__mikka__inspect_artifact (review check) with full expectedUtf8",
+        "evidence": "Review half only: inspect_artifact on fixed candidate d05417e7848871e511141e10a282ffb7998b0a79 returned bytes=52, sha256=05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6, head=d05417e7848871e511141e10a282ffb7998b0a79, committedSha256=05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6, contentMatchesGit=true, matchesExpectedUtf8=true. The independent verify stage was not run by this review and is still pending on its own candidate.",
+        "exitCode": null
+      }
+    },
+    {
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "promptFingerprint": "cbca322b1c27bc262ce8cb05a12eef6e",
+      "hostProducerMatchesCurrentReceipt": true,
+      "lifecycleComputedDigest": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+      "lifecycleFrozenDigest": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+      "digestMatches": true,
+      "watermark": {
+        "source": 29,
+        "producer": 20
+      },
+      "inheritedOutputChunkIds": [
+        "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+        "27c90934-986f-4574-9e46-df0706395559",
+        "202b7cf0-e388-4626-ae15-0dd08d8dfbc3"
+      ],
+      "nativeAskInputChunkMatches": true,
+      "nativeAskOutputChunkMatches": true,
+      "nativeAskCallMatches": true,
+      "nativeQuestionSummaryPresent": false,
+      "hostFragmentContainsExactOriginalSummary": false,
+      "currentRunNativeMatchesProducer": true,
+      "reportedCriterionCount": 6,
+      "falseCriterionNumbers": [
+        5
+      ],
+      "reportedAc3": {
+        "text": "完成上述实际检查后，必须通过既有 ask_human 工具发出一次真实 decision 问题：“是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？” summary 如实记录已创建文件与已执行检查。发出问题后结束这一段执行，等待 Owner 在正常问题入口回答；不能自己回答、提前 submit 或另建任务。",
+        "passed": true,
+        "status": "passed",
+        "evidence": "Host question lifecycle: nativeQuestion toolName mcp__mikka__ask_human, toolCallId toolu_01CXTLPrihL79jqRPzSgE4Eb, kind decision, question text '是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？', inputChunkId f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3 (seq 22, 19:35:31.321Z), outputChunkId fddaaa05-97f6-4227-9f8f-65f18ca998f8 (seq 23, 19:35:34.024Z), output 'Recorded. End your turn now.'. Source run stopped with stopReason asked_human at 19:35:41.742Z (terminal chunk d6283a08-aaf7-4ccd-8a27-9364d252faa0, seq 29). Question question id fd3ce47c-785f-4e7a-92ee-d5763959d64b; waitingState stage execute status waiting, sourceEventAt 2026-11-04T19:35:42.417Z. Answer id 11708d4d-708f-5bc7-b41d-7db8386d8d15, source human, answeredAt 2026-11-04T20:10:34.260Z. Source tool activity had no submit call before the question. Summary wording is the producer's own report, not verified separately."
+      },
+      "reportedAc5": {
+        "text": "独立 review 和独立 verify 分别在自己的固定候选中通过 inspect_artifact 实际读取新文件，并传入完整 expectedUtf8，核对 bytes、sha256、head、committedSha256、contentMatchesGit=true、matchesExpectedUtf8=true，保留各自真实新鲜的工具输入输出。它们是 reportOnly 的只读产物检查，不要求 Python、Bash 或未授予的 verify_command。",
+        "passed": false,
+        "reason": "This verify check's own observation passed (see evidence). The independent review check's inspect_artifact output is not in my inputs, so I cannot establish the review half of this criterion.",
+        "status": "unverified",
+        "evidence": "Verify half, my own fresh call: mcp__mikka__inspect_artifact path=mikka-question-recovery-cc-20261104-1237.txt with the full expectedUtf8 three-line text returned bytes=52, sha256=05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6, head=d05417e7848871e511141e10a282ffb7998b0a79, committedSha256 identical, contentMatchesGit=true, matchesExpectedUtf8=true. Read-only, no shell or verify_command used."
+      }
+    }
+  ],
+  "originalNativeAskSummaryAvailable": true,
+  "originalNativeAskSummaryLength": 560,
+  "newStageSidsDistinctFromAllHistory": true,
+  "newStagesNoContinuationLineage": true,
+  "currentMachineObservations": [
+    {
+      "stage": "review",
+      "runId": "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+      "sessionId": "bcb2058a-8cfa-472f-a284-50bd70335ee9",
+      "sandboxId": null,
+      "machineState": "ended",
+      "runningSince": null,
+      "startedAt": "2026-11-06T01:06:58.330Z",
+      "finishedAt": "2026-11-06T01:08:30.751Z"
+    },
+    {
+      "stage": "verify",
+      "runId": "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a",
+      "sessionId": "e04b9ce3-533a-4875-abbc-a7518893e82d",
+      "sandboxId": "i773iwx0ulev7nvbomyyk",
+      "machineState": "paused",
+      "runningSince": null,
+      "startedAt": "2026-11-06T01:08:51.260Z",
+      "finishedAt": "2026-11-06T01:10:26.311Z"
+    }
+  ],
+  "parent": {
+    "actualQueriedAt": "2026-11-06T01:39:10.513Z",
+    "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+    "parentState": "sleeping",
+    "parentSandboxId": "ipa60du803guuiqnyzqan",
+    "runtimeReady": true,
+    "deviceId": "93340db5-3234-467c-af26-a50d9f6425df",
+    "lastActiveAt": "2026-11-05T14:48:42.215Z",
+    "deviceEnabled": true
+  },
+  "onlyOriginalHaiku": true,
+  "preferredClaudeCode": true,
+  "activeProfileCount": 3,
+  "activeProfilesDisabled": true,
+  "limitations": [
+    "This is a new01:39 database snapshot, not recovery of the inaccessible01:14 raw or a replay of its168 comparisons.",
+    "Actual hostEvidencePrompt is a defined substring, not a complete prompt. Summary absence is scoped to this projection; reports also admit lack of independent summary observation.",
+    "Current terminal machine fields cannot establish a historical live-running observation. The verify live-running DB sample was not captured during attempt03.",
+    "Current counts and settings are a new baseline; no equality claim against the lost restored-before raw is made."
+  ],
+  "publicationProjection": {
+    "originalAudit": {
+      "path": "current-data-audit.json",
+      "bytes": 19586,
+      "sha256": "e1b02a99f8781190a0487d7bd857d47b0caba5dc3d8539deff8fe8c2cf4caba8"
+    },
+    "toolObservationRowsOmittedAsDuplicate": 4,
+    "completeToolObservationsCanonicalSha256": "4e1317e164050b937f410dfaae4d6179e732e703881d35f5862ada1b5987054c",
+    "actualToolIoFile": "stage-tool-pairs-013910.json"
+  }
+}

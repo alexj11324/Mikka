@@ -1,0 +1,42 @@
+{
+  "status": "executed_once_recovery_snapshot",
+  "authorization": "root recovery-only finite readonly reread; not retrying A43",
+  "historicalEvidenceCommit": "a0318e023f27d4773ce7e60512cf6aa9e7f648b8",
+  "schemaCommit": "4e588871ac2211d2b6ee825d2a6c3a981efcada2",
+  "resultIndices": {
+    "task": 2,
+    "attempts_and_runs": 3,
+    "history_seven": 4,
+    "actual_tool_pairs": 5,
+    "host_evidence": 6,
+    "old_verify_question": 7,
+    "original_native_ask": 8,
+    "producer_receipt": 9,
+    "parent": 10,
+    "counts": 11,
+    "control_receipts": 12,
+    "model_order_settings": 13,
+    "model_order_entries": 14,
+    "bot_chat_choices": 15,
+    "bot_models": 16,
+    "profile_settings": 17
+  },
+  "historyRunIds": [
+    "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+    "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+    "6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+    "f5269f72-0103-4d34-864a-0018c60195fc",
+    "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+    "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a"
+  ],
+  "proofRunIds": [
+    "4c609155-c3cb-4c1a-81cc-dfa85f26eadc",
+    "0fad0e8b-1ea8-40b2-8e78-40b8b09a515a"
+  ],
+  "note": "New SQL derived from published redacted evidence SELECTs and confirmed source columns, not execution of the redacted copies. actualQueriedAt means new sampling time; no reconstruction of lost 01:14 raw.",
+  "originalStatusAtPreparation": "prepared_not_executed",
+  "actualQueriedFrom": "2026-11-06T01:39:10.493Z",
+  "actualQueriedThrough": "2026-11-06T01:39:10.524Z",
+  "rawResponse": "recovered-read-response.json"
+}
