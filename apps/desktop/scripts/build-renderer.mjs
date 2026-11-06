@@ -117,7 +117,7 @@ function sharedStyles() {
 
 /** The installed fallback owns this presentation. Read its real CSS and SVG
  * paths instead of maintaining a second offline design in the React app. */
-function nativeOfflineView() {
+export function nativeOfflineView() {
   return {
     name: 'mikka-native-offline-view',
     setup(builder) {
