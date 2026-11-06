@@ -8,7 +8,7 @@
 Automatic model routing asks the Decision judge two independent `score`
 questions about the task: the model strength it needs (light, standard,
 strongest) and the reasoning effort it needs (low … max). The judge never sees
-the person's candidates. The host rounds the strength score (a score 0.3 or more past a level rounds up, since a too-weak model costs a failed run), takes the first
+the person's candidates. The host rounds the strength score to the nearest level, takes the first
 listed runnable model of that tier, else of the nearest higher tier, and only
 when nothing at or above it can run, the strongest tier that can. Effort is
 the level nearest its score that the model supports; a model with no effort
@@ -19,6 +19,11 @@ the person's list order. An uncertain effort sends no override and never
 discards the model. The threshold is set from labeled examples
 (`tests/fixtures/model-routing-labeled.json`,
 `scripts/model-routing-calibration.ts`), not a fixed guess.
+
+The judge reads the issue as markdown (not the editor's JSON document), with
+sections about process, acceptance, reporting and rules left out
+(`routingTaskContent`), and is told to judge by the scope and risk of the code
+that must change, not by how long the description is.
 
 The thread detail shows the judged strength, not a difficulty:
 「标准模型 → Claude Sonnet 5.5 · 高推理强度」. Runs frozen before this change keep

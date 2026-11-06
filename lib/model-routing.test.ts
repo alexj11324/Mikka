@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { validatedAnswers, type DecisionAnswer } from './coordinator/decision'
-import { candidateForTier, escalateModelRouting, levelForScore, MODEL_ROUTING_EFFORTS, modelRoutingDiagnostics, modelTier, nearestEffort, ROUTING_MIN_CONFIDENCE, routingDecisionQuestions, selectModelRouting, supportedModelEfforts, type ModelRoutingCandidate, type ModelRoutingSnapshot, type ModelRoutingSnapshotV1 } from './model-routing.ts'
+import { candidateForTier, escalateModelRouting, levelForScore, routingTaskContent, MODEL_ROUTING_EFFORTS, modelRoutingDiagnostics, modelTier, nearestEffort, ROUTING_MIN_CONFIDENCE, routingDecisionQuestions, selectModelRouting, supportedModelEfforts, type ModelRoutingCandidate, type ModelRoutingSnapshot, type ModelRoutingSnapshotV1 } from './model-routing.ts'
 
 const candidate = (id: string, model: string, harness: ModelRoutingCandidate['harness'], position: number): ModelRoutingCandidate => ({
   id, model, harness, tier: modelTier(model), position, efforts: supportedModelEfforts(model, harness),
@@ -67,17 +67,27 @@ test('the transport validates score answers against the question levels', () => 
 test('the rounded tier picks the first listed model of that tier, regardless of the list head', () => {
   const pick = (score: number) => selectModelRouting(catalog, answers(score, null))!
   assert.deepEqual(pick(0.2), { id: light.id, snapshot: { version: 2, required: 'light', model: light.model, harness: light.harness, tier: 'light', reason: 'difficulty_fit' } })
-  assert.equal(pick(0.29).id, light.id)
-  assert.equal(pick(0.3).id, standard.id, 'a score 0.3 past a level rounds up')
-  assert.equal(pick(1.29).id, standard.id)
+  assert.equal(pick(0.49).id, light.id)
+  assert.equal(pick(0.5).id, standard.id)
+  assert.equal(pick(1.49).id, standard.id)
   assert.equal(pick(1.1).id, standard.id)
   assert.equal(pick(1.6).id, strongest.id)
   assert.equal(selectModelRouting([sol, luna, strongest], answers(2, null))?.id, strongest.id)
 })
 
-test('levels round up from 0.3 past a level and never exceed the top', () => {
-  assert.deepEqual([0, .29, .3, .99, 1, 1.3, 2].map(score => levelForScore(score, 3)), [0, 0, 1, 1, 1, 2, 2])
-  assert.deepEqual([3.2, 3.3, 4].map(score => levelForScore(score, 5)), [3, 4, 4])
+test('scores round to the nearest level within bounds', () => {
+  assert.deepEqual([0, .49, .5, 1.49, 1.5, 2].map(score => levelForScore(score, 3)), [0, 0, 1, 1, 2, 2])
+  assert.deepEqual([3.4, 3.5, 4].map(score => levelForScore(score, 5)), [3, 4, 4])
+})
+
+test('the judge reads what must change, not process, acceptance or reporting sections', () => {
+  const content = ['Intro line.', '## 现象', 'The list is unsorted.', '## 要做', '1. Sort by time.', '### 细节', 'Use createdAt.',
+    '## 验收', 'Run pnpm test:local-loop.', '### 截图', 'Attach screenshots.', '## 汇报', 'Message the coordinator.', '## Rules', 'Never push to main.',
+    '## 不在范围', 'Mobile.'].join('\n')
+  assert.equal(routingTaskContent(content), ['Intro line.', '## 现象', 'The list is unsorted.', '## 要做', '1. Sort by time.', '### 细节', 'Use createdAt.',
+    '## 不在范围', 'Mobile.'].join('\n'))
+  assert.equal(routingTaskContent('No headings at all.'), 'No headings at all.')
+  assert.equal(routingTaskContent(''), '')
 })
 
 test('a missing tier goes up, never down, and only falls lower when nothing higher can run', () => {
@@ -95,10 +105,9 @@ test('effort maps to the nearest level the selected model supports', () => {
   assert.equal(nearestEffort(['low', 'medium', 'high', 'xhigh'], 4), 'xhigh')
   assert.equal(nearestEffort(['low', 'high'], 1), 'high')
   assert.equal(nearestEffort([], 2), undefined)
-  assert.equal(selectModelRouting(catalog, answers(2, 2.29))?.snapshot.effort, 'high')
-  assert.equal(selectModelRouting(catalog, answers(2, 2.4))?.snapshot.effort, 'xhigh')
-  assert.equal(selectModelRouting(catalog, answers(0, 0.1))?.snapshot.effort, 'low')
-  assert.equal(selectModelRouting(catalog, answers(0, 0.3))?.snapshot.effort, 'medium')
+  assert.equal(selectModelRouting(catalog, answers(2, 2.4))?.snapshot.effort, 'high')
+  assert.equal(selectModelRouting(catalog, answers(2, 2.5))?.snapshot.effort, 'xhigh')
+  assert.equal(selectModelRouting(catalog, answers(0, 0.3))?.snapshot.effort, 'low')
   const unknown = candidate('candidate:5', 'new-provider-model', 'codex', 5)
   const result = selectModelRouting([unknown], answers(1, 4))!
   assert.deepEqual([result.id, result.snapshot.reason], [unknown.id, 'difficulty_fit'])

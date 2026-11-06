@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { DECISION_MODEL, DECISIONS_URL, validatedAnswers, type DecisionAnswer } from '../lib/coordinator/decision'
-import { levelForScore, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_TIERS, routingDecisionQuestions, type ModelRoutingEffort, type ModelRoutingTier } from '../lib/model-routing'
+import { levelForScore, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_TIERS, routingDecisionQuestions, routingTaskContent, type ModelRoutingEffort, type ModelRoutingTier } from '../lib/model-routing'
 
 /** Replays the labeled routing set against the real Decision route, once per
  * example and never retried, and reports how each confidence threshold trades
@@ -30,12 +30,18 @@ export function summarize(observations: readonly Observation[], thresholds = [0,
   })
 }
 
+/** The same projection the server applies to an issue before routing. */
+const productionTask = (task: string) => {
+  const issue = JSON.parse(task) as { title: string; content: string }
+  return JSON.stringify({ title: issue.title, content: routingTaskContent(issue.content) }).slice(0, 12_000)
+}
+
 async function observe(example: LabeledExample, key: string): Promise<Observation> {
   const questions = routingDecisionQuestions()
   const base = { issue: example.issue, expected: example.tier, effortRange: example.effort }
   const response = await fetch(DECISIONS_URL, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000),
     headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: DECISION_MODEL, input: JSON.stringify({ task: example.task, stage: 'execute' }), questions }) })
+    body: JSON.stringify({ model: DECISION_MODEL, input: JSON.stringify({ task: productionTask(example.task), stage: 'execute' }), questions }) })
   if (!response.ok) { await response.body?.cancel(); return { ...base, unavailable: true } }
   const answers = validatedAnswers(await response.json(), questions)
   const score = (name: string) => {

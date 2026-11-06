@@ -5,7 +5,8 @@ import type { OrderScope } from './model-order'
 import { hostedBillingScope } from './abuse/context'
 import { invokeDecision } from './coordinator/decide'
 import { maskFactoryNote } from './factory/note-mask'
-import { modelTier, supportedModelEfforts, routingDecisionQuestions, selectModelRouting, escalateModelRouting, modelRoutingDiagnostics, type FrozenModelRoutingSnapshot, type ModelRoutingSnapshot } from './model-routing'
+import { issueContentToMarkdown } from './linear-sync/markdown'
+import { modelTier, supportedModelEfforts, routingDecisionQuestions, selectModelRouting, escalateModelRouting, modelRoutingDiagnostics, routingTaskContent, type FrozenModelRoutingSnapshot, type ModelRoutingSnapshot } from './model-routing'
 
 /** Supplied by the dispatch host, never accepted as a model/tool permission. */
 export interface ModelRoutingContext {
@@ -49,7 +50,9 @@ export async function routeModelCandidates(pool: Pool, scope: OrderScope, entrie
   if (!task && context.issueId) {
     const { issueForUser } = await import('./issue-access')
     const issue = await issueForUser(scope.ownerId, context.issueId)
-    if (issue) task = JSON.stringify({ title: issue.title, content: issue.content }).slice(0, 12_000)
+    // Markdown, not the editor's JSON document: the judge reads the words, with
+    // process-only sections left out (see routingTaskContent).
+    if (issue) task = JSON.stringify({ title: issue.title, content: routingTaskContent(issueContentToMarkdown(issue.content)) }).slice(0, 12_000)
   }
   if (!task) return withExplicitEffort(selectModelRouting(eligible, null, { fallbackReason: 'decision_unavailable' }))
   const input = maskFactoryNote(JSON.stringify({ task, stage: context.stage ?? 'execute', note: context.note?.slice(0, 4000) }))
