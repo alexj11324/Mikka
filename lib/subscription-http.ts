@@ -163,7 +163,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     if (expired.expired) await ownerSettingsChanged(service.repository.pool, session.userId)
     // A subscription belongs to the account (decision 2026-10-31-2130): every workspace lists the same
     // connections. The same provider account connected in two workspaces shows once; nothing is deleted.
-    const { rows: all } = await service.repository.pool.query('select id,"ownerId","workspaceId",provider,state,epoch,"accountLabel","providerSubject",paused,"lastErrorCode" from byos_connections where "ownerId"=$1 and "removedAt" is null and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId])
+    const { rows: all } = await service.repository.pool.query('select id,"ownerId","workspaceId",provider,state,epoch,"accountLabel","providerSubject",paused,"lastErrorCode","modelCatalog"->\'models\' as models from byos_connections where "ownerId"=$1 and "removedAt" is null and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId])
     const subjects = new Set<string>()
     const rows = all.filter(row => !row.providerSubject || (subjects.has(`${row.provider}:${row.providerSubject}`) ? false : (subjects.add(`${row.provider}:${row.providerSubject}`), true)))
     // Current saved chat selections here, not historical bindings or active runs.
@@ -185,10 +185,11 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
           if (resumed.revision === Number(row.epoch)) activeAttempt = { ...resumed, connectionId: row.id }
         } catch { /* starting, another session, or expired: keep the row available for explicit restart */ }
       }
-      return { id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), paused: row.paused === true, lastErrorCode: row.lastErrorCode ?? null, activeAttempt, bots: bots.filter(bot => bot.connectionId === row.id && bot.workspaceId === workspaceId).map(({ id, name, color, shape, workspaceId }) => ({ id, name, color, shape, workspaceId })) }
+      return { id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), paused: row.paused === true, lastErrorCode: row.lastErrorCode ?? null, models: Array.isArray(row.models) ? row.models.map(String) : [], activeAttempt, bots: bots.filter(bot => bot.connectionId === row.id && bot.workspaceId === workspaceId).map(({ id, name, color, shape, workspaceId }) => ({ id, name, color, shape, workspaceId })) }
     }))
     return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(signIn?.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections }, { headers })
   } catch (error) {
+    if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable' && process.env.MIKKA_DESIGN_FIXTURES === '1') return designFixtureList(session.userId)
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ enabled: false, providers: [], connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
   }
@@ -213,6 +214,7 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
       service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => failedUsage(row.id, 'unavailable')), force)))
     return Response.json({ connections }, { headers })
   } catch (error) {
+    if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable' && process.env.MIKKA_DESIGN_FIXTURES === '1') return designFixtureUsage(session.userId)
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
   }
@@ -222,4 +224,19 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
  * the authenticated application through device polling or explicit URL handoff. */
 export async function subscriptionCallback(_request: Request, _deps: SubscriptionHTTPDependencies) {
   return Response.json({ error: 'callback_handoff_required' }, { status: 410, headers })
+}
+
+/** Design prototype only (MIKKA_DESIGN_FIXTURES=1 on a local build): the stored connections without the custody service. */
+async function designFixtureList(userId: string) {
+  const { pool } = await import('./db')
+  const { rows } = await pool.query('select id,provider,state,epoch,"accountLabel",paused,"lastErrorCode","modelCatalog"->\'models\' as models from byos_connections where "ownerId"=$1 and "removedAt" is null and state<>\'disconnected\' order by "createdAt"', [userId])
+  return Response.json({ enabled: true, providers: [{ provider: 'codex', available: true }, { provider: 'claude', available: true }], connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: row.accountLabel, paused: row.paused === true, lastErrorCode: row.lastErrorCode ?? null, models: Array.isArray(row.models) ? row.models.map(String) : [], activeAttempt: null, bots: [] })) }, { headers })
+}
+
+/** Design prototype only: plausible quota windows for the stored connections. */
+async function designFixtureUsage(userId: string) {
+  const { pool } = await import('./db')
+  const { rows } = await pool.query('select id,provider,"accountLabel" from byos_connections where "ownerId"=$1 and "removedAt" is null and state=\'connected\'', [userId])
+  const at = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString()
+  return Response.json({ connections: rows.map(row => ({ id: row.id, status: 'ok', account: row.accountLabel, plan: row.provider === 'codex' ? 'plus' : 'max', windows: [{ kind: 'five_hour', remaining: 72, resetsAt: at(3) }, { kind: 'weekly', remaining: 41, resetsAt: at(70) }], observedAt: new Date().toISOString() })) }, { headers })
 }

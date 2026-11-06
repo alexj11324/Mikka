@@ -34,7 +34,18 @@ export async function getBotModelMenu(chatBot: string | null) {
   const settings = new ExecutionSettings(pool);
   // A subscription never asked for its models has none to list: ask it before reading the menu.
   await settings.ensureCatalogues(scope);
-  return botModelMenu(pool, settings, scope, botId);
+  const menu = await botModelMenu(pool, settings, scope, botId);
+  return process.env.MIKKA_DESIGN_FIXTURES === "1" ? designFixtureMenu(menu, scope.ownerId) : menu;
+}
+
+/** Design prototype only (MIKKA_DESIGN_FIXTURES=1 on a local build): subscription groups from the stored catalogues when nothing is bound. */
+async function designFixtureMenu(menu: BotModelMenu, ownerId: string): Promise<BotModelMenu> {
+  if (menu.groups.some((group) => group.kind === "subscription")) return menu;
+  const { rows } = await pool.query<{ id: string; provider: "claude" | "codex"; accountLabel: string | null; models: unknown }>(
+    `SELECT id::text AS id, provider, "accountLabel", "modelCatalog"->'models' AS models FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND NOT paused AND "removedAt" IS NULL ORDER BY provider`, [ownerId]);
+  const groups = rows.map((row) => ({ kind: "subscription" as const, provider: row.provider, plan: row.provider === "codex" ? "Plus" : "Max", credentialLabel: row.accountLabel ?? "", options: (Array.isArray(row.models) ? row.models.map(String) : []).map((model) => ({ id: `fixture:${row.id}:${model}`, modelId: model, provider: row.provider })) }));
+  const first = groups[0]?.options[0];
+  return { ...menu, groups: [...groups, ...menu.groups], ...(first ? { current: { ...menu.current, id: first.id, modelId: first.modelId, provider: first.provider, chosen: true, available: true, availability: "available", kind: "subscription" } } : {}) } as BotModelMenu;
 }
 /** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
 export async function refreshBotModelMenuAction(chatBot: string | null) {

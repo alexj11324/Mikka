@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useEnabledModels } from '@/lib/enabled-models'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
@@ -12,11 +13,11 @@ import { InputGroupButton } from '@/components/ui/input-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { HostedModelLabel, ModelLabel } from '@/components/labels/entity-labels'
-import { groupByModelFamily, modelDisplayName } from '@/lib/model-display-name'
-import { HOSTED_CHOICE, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { HostedModelLabel, ModelLabel, ProviderMark } from '@/components/labels/entity-labels'
+import { groupByModelFamily, modelDisplayName, modelVendor, type ModelVendor } from '@/lib/model-display-name'
+import { HOSTED_CHOICE, parseApiKeyOption, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
 import { cn } from '@/lib/utils'
 
 type T = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
@@ -151,18 +152,8 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
       {failed && <span className="shrink-0 text-xs text-destructive-foreground">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>
-    <DropdownMenuContent side="top" align="start" className="w-80">
-      <DropdownMenuRadioGroup value={value} onValueChange={id => { void choose(String(id)) }}>
-        {groups.map((group, index) => <DropdownMenuGroup key={`${group.kind}-${index}`} data-group={group.kind}>
-          {/* A rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
-          {index === 1 && <DropdownMenuSeparator />}
-          <DropdownMenuLabel className="truncate font-normal" title={heading(t, group)}>{heading(t, group)}</DropdownMenuLabel>
-          {groupByModelFamily(group.options, option => option.modelId).map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick onClick={() => { if (option.id === value && !current.chosen) void choose(option.id) }}>
-            <OptionLabel t={t} option={option} />
-            {tag(t, group) && <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{tag(t, group)}</span>}
-          </DropdownMenuRadioItem>)}
-        </DropdownMenuGroup>)}
-      </DropdownMenuRadioGroup>
+    <DropdownMenuContent side="top" align="start" className="w-[26rem] p-0">
+      <VendorMenu t={t} groups={groups} value={value} onChoose={id => { void choose(id) }} />
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         {refreshFailed && <DropdownMenuItem closeOnClick={false} className="text-xs text-destructive-foreground" onClick={() => { void refresh() }}>{t('refreshFailed')}</DropdownMenuItem>}
@@ -180,4 +171,85 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
       </DropdownMenuGroup>
     </DropdownMenuContent>
   </DropdownMenu>
+}
+
+type Entry = { option: BotModelMenuOption; vendor: ModelVendor | 'mikka'; sources: string[] }
+const VENDOR_ORDER: (ModelVendor | 'mikka')[] = ['anthropic', 'openai', 'google', 'deepseek', 'moonshot', 'alibaba', 'zhipu', 'mistral', 'meta', 'xai', 'other', 'mikka']
+const VENDOR_NAMES: Record<ModelVendor | 'mikka', string> = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google', deepseek: 'DeepSeek', moonshot: 'Moonshot', alibaba: 'Qwen', zhipu: 'Zhipu', mistral: 'Mistral', meta: 'Meta', xai: 'xAI', other: '…', mikka: 'Mikka' }
+const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh'] as const
+
+/** The source a menu option's model comes from, for 启用的模型 (design prototype: fixture and key ids carry it). */
+function sourceOf(option: BotModelMenuOption, group: BotModelMenuGroup): { id: string; kind: 'subscription' | 'api_key' } | null {
+  const key = parseApiKeyOption(option.id)
+  if (key) return { id: key.keyId, kind: 'api_key' }
+  const fixture = /^fixture:([0-9a-f-]{36}):/i.exec(option.id)
+  if (fixture) return { id: fixture[1], kind: 'subscription' }
+  return null
+}
+
+/**
+ * Vendor first (design 2026-11-06, docs/design/enabled-models/full): vendors on the left, that vendor's
+ * enabled models on the right, each saying which source a run takes; the chosen one opens 思考强度.
+ * One model from several sources is listed once; the first source in the list order runs it.
+ */
+function VendorMenu({ t, groups, value, onChoose }: { t: T; groups: BotModelMenuGroup[]; value: string; onChoose: (id: string) => void }) {
+  const store = useEnabledModels()
+  const [effort, setEffort] = useState<typeof EFFORTS[number]>('medium')
+  const catalogues = new Map<string, string[]>()
+  for (const group of groups) for (const option of group.options) { const source = sourceOf(option, group); if (source) catalogues.set(source.id, [...(catalogues.get(source.id) ?? []), option.modelId]) }
+  const entries = new Map<string, Entry>()
+  for (const group of groups) for (const option of group.options) {
+    const source = sourceOf(option, group)
+    if (source && !store.isEnabled(source.id, source.kind, catalogues.get(source.id) ?? [], option.modelId)) continue
+    const vendor = option.id === HOSTED_CHOICE ? 'mikka' : modelVendor(option.modelId)
+    const key = option.id === HOSTED_CHOICE ? HOSTED_CHOICE : `${vendor}:${modelDisplayName(option.modelId).name}`
+    const existing = entries.get(key)
+    if (existing) existing.sources.push(heading(t, group))
+    else entries.set(key, { option, vendor, sources: [heading(t, group)] })
+  }
+  const all = [...entries.values()]
+  const vendors = VENDOR_ORDER.filter(vendor => all.some(entry => entry.vendor === vendor))
+  const chosen = all.find(entry => entry.option.id === value)
+  const [vendor, setVendor] = useState<ModelVendor | 'mikka'>(chosen?.vendor ?? vendors[0] ?? 'anthropic')
+  const shown = groupByModelFamily(all.filter(entry => entry.vendor === vendor), entry => entry.option.modelId)
+  return <div className="flex min-h-56" data-slot="vendor-model-menu">
+    <div role="tablist" aria-label={t('vendors')} className="flex flex-col gap-1 border-r border-border p-1.5">
+      {vendors.map(item => <Tooltip key={item}>
+        <TooltipTrigger render={<Button type="button" role="tab" variant="ghost" size="icon-sm" aria-selected={item === vendor} aria-label={VENDOR_NAMES[item]}
+          className={cn(item === vendor && 'bg-muted')} onClick={() => setVendor(item)} />}>
+          {item === 'anthropic' ? <ProviderMark provider="claude" /> : item === 'openai' ? <ProviderMark provider="openai" /> : item === 'mikka' ? <HostedModelLabel name="" />
+            : <span aria-hidden="true" className="flex size-4 items-center justify-center rounded-sm bg-muted-foreground/20 text-xs font-semibold">{VENDOR_NAMES[item].charAt(0)}</span>}
+        </TooltipTrigger>
+        <TooltipContent side="left">{VENDOR_NAMES[item]}</TooltipContent>
+      </Tooltip>)}
+    </div>
+    <DropdownMenuGroup className="flex min-w-0 flex-1 flex-col p-1">
+    <DropdownMenuLabel className="font-normal">{VENDOR_NAMES[vendor]}</DropdownMenuLabel>
+    <DropdownMenuRadioGroup value={value} onValueChange={id => onChoose(String(id))} className="flex flex-col">
+      {shown.map(entry => {
+        const selected = entry.option.id === value
+        const route = entry.sources.length > 1 ? t('routeMore', { source: entry.sources[0], other: entry.sources.slice(1).join('、') }) : t('route', { source: entry.sources[0] })
+        return <div key={entry.option.id} className="flex items-center gap-1">
+          <DropdownMenuRadioItem value={entry.option.id} closeOnClick className="min-w-0 flex-1 items-start py-1.5">
+            <span className="flex min-w-0 flex-col">
+              {entry.option.id === HOSTED_CHOICE ? <span>{t('hosted')}</span> : <span className="truncate" title={entry.option.modelId}>{modelDisplayName(entry.option.modelId).name}</span>}
+              <span className="truncate text-xs text-muted-foreground">{route}</span>
+            </span>
+          </DropdownMenuRadioItem>
+          {selected && entry.option.id !== HOSTED_CHOICE && <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="shrink-0 gap-1 text-xs text-muted-foreground" aria-label={t('effort')}>{t(`efforts.${effort}`)}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="font-normal">{t('effort')}</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={effort} onValueChange={next => setEffort(next as typeof EFFORTS[number])}>
+                  {EFFORTS.map(level => <DropdownMenuRadioItem key={level} value={level}>{t(`efforts.${level}`)}</DropdownMenuRadioItem>)}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>}
+        </div>
+      })}
+    </DropdownMenuRadioGroup>
+    </DropdownMenuGroup>
+  </div>
 }

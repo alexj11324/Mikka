@@ -1703,6 +1703,26 @@
     }
   },
   "Settings": {
+    "enabledModels": {
+      "count": "{on}/{total} models",
+      "freshCount": "{count, plural, one {# new model} other {# new models}}",
+      "search": "Search models",
+      "all": "Select all",
+      "new": "New",
+      "noMatch": "No model matches “{query}”",
+      "autoEnableVersions": "Turn on new versions automatically",
+      "autoEnableNew": "Turn on new models automatically",
+      "invalid": "Key invalid or revoked",
+      "refreshFailed": "Refresh failed · list from {time}",
+      "retry": "Retry",
+      "refresh": "Refresh models",
+      "empty": "This key returned no models",
+      "modelId": "Model ID",
+      "add": "Add",
+      "replaceKey": "Replace key",
+      "done": "Done",
+      "other": "Other"
+    },
     "title": "Settings",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",
@@ -3295,6 +3315,11 @@
     "sendOffline": "No connection. Not sent",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
+      "vendors": "Vendors",
+      "route": "Runs on {source}",
+      "routeMore": "Runs on {source} · also {other}",
+      "effort": "Reasoning effort",
+      "efforts": {"auto": "Default", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high"},
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",

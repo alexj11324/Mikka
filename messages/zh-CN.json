@@ -1703,6 +1703,26 @@
     }
   },
   "Settings": {
+    "enabledModels": {
+      "count": "{on}/{total} 个模型",
+      "freshCount": "{count} 个新模型",
+      "search": "搜索模型",
+      "all": "全选",
+      "new": "新",
+      "noMatch": "没有匹配「{query}」的模型",
+      "autoEnableVersions": "新版本出来后自动启用",
+      "autoEnableNew": "新模型出来后自动启用",
+      "invalid": "Key 无效或已撤销",
+      "refreshFailed": "刷新失败 · {time} 的列表",
+      "retry": "重试",
+      "refresh": "刷新模型",
+      "empty": "这个 Key 没返回模型",
+      "modelId": "模型 ID",
+      "add": "添加",
+      "replaceKey": "更换 Key",
+      "done": "完成",
+      "other": "其他"
+    },
     "title": "设置",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
@@ -3295,6 +3315,11 @@
     "sendOffline": "没有网络，未发送",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
+      "vendors": "厂商",
+      "route": "走 {source}",
+      "routeMore": "走 {source} · 另有 {other}",
+      "effort": "思考强度",
+      "efforts": {"auto": "默认", "low": "低", "medium": "中", "high": "高", "xhigh": "更高"},
       "label": "模型：{name}",
       "labelUnavailable": "模型：{name}，不可用",
       "hosted": "Mikka 默认",

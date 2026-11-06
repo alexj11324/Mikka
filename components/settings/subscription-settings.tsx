@@ -23,6 +23,7 @@ import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { EnabledModelsButton, EnabledModelsDialog, type EnabledModelsSource } from '@/components/settings/enabled-models-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { withBasePath } from '@/lib/base-path'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
@@ -92,6 +93,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
   const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
   // 断开连接 asks first, like deleting an API key (A1).
+  const [modelsOpen, setModelsOpen] = useState<EnabledModelsSource | null>(null)
   const [disconnecting, setDisconnecting] = useState<{ id: string; provider: Provider; revision: number; label: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
@@ -364,7 +366,11 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
                       <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-sm font-medium">{account ?? product}</span>
-                        {account && <span className="text-xs text-muted-foreground">{product}</span>}
+                        <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                          {account && <span>{product}</span>}
+                          {live && connection.models && connection.models.length > 0 && <>{account && <span aria-hidden="true">·</span>}<EnabledModelsButton source={{ id: connection.id, kind: 'subscription', models: connection.models }}
+                            onOpen={() => setModelsOpen({ id: connection.id, kind: 'subscription', title: `${account ?? product} · ${product}`, models: connection.models ?? [] })} /></>}
+                        </span>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
@@ -407,6 +413,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
             </div>
             {mine && !catching && <SignInPanel attempt={mine} callback={callback} pending={pending} onCallback={setCallback} onFinish={() => { void finishCallback() }} onCancel={cancel} />}
           </div>
+          {modelsOpen && <EnabledModelsDialog source={modelsOpen} onClose={() => setModelsOpen(null)} />}
           {failure && <div role="alert" className="flex items-center gap-2 px-5 py-3 text-sm text-warning-foreground">
             <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-warning-foreground" />
             <span className="min-w-0 flex-1">{failure.message}</span>

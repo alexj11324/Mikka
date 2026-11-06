@@ -12,6 +12,9 @@ import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/com
 import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { groupByModelFamily, modelDisplayName } from '@/lib/model-display-name'
+import { useEnabledModels } from '@/lib/enabled-models'
+import { readSubscriptions, subscriptionsKey } from '@/components/settings/subscription-settings'
+import { apiKeysKey, readApiKeys } from '@/components/settings/api-key-settings'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -64,11 +67,21 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const keyDialog = usePresence(keyOpen)
   const data = order.data && !order.data.error ? order.data : null
   // One Agent's list at a time (decision 2026-11-05-0400): 优先使用的 Agent picks it; each keeps its own order.
-  const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness) : []
+  // 启用的模型 (design prototype): a model switched off on its subscription or key leaves this list.
+  const enabledModels = useEnabledModels()
+  const subscriptionList = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
+  const keyList = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
+  const catalogue = (entry: OrderRow): { kind: 'subscription' | 'api_key'; models: string[] } | null => {
+    if (entry.source.kind === 'subscription') { const id = entry.source.connectionId; const models = subscriptionList.data?.connections.find(item => item.id === id)?.models; return models?.length ? { kind: 'subscription', models } : null }
+    const id = entry.source.keyId; const keys = keyList.data && 'keys' in keyList.data ? keyList.data.keys : undefined; const models = keys?.find(item => item.id === id)?.models
+    return models?.length ? { kind: 'api_key', models } : null
+  }
+  const switchedOn = (entry: OrderRow) => { const list = catalogue(entry); const id = entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId; return !list || enabledModels.isEnabled(id, list.kind, list.models, entry.model) }
+  const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness && switchedOn(entry)) : []
   const offered = data ? data.candidates.filter(candidate => candidate.harness === data.preferredHarness) : []
   // The other Agent's list is the fallback dispatch takes after this one (decision 2026-11-05-0400).
   const other: OrderHarness = data?.preferredHarness === 'codex' ? 'claude_code' : 'codex'
-  const backup = data ? data.entries.filter(entry => entry.harness === other) : []
+  const backup = data ? data.entries.filter(entry => entry.harness === other && switchedOn(entry)) : []
   const offeredOther = data ? data.candidates.filter(candidate => candidate.harness === other) : []
   // A subscription connected, paused or read again elsewhere: this list re-reads (no polling).
   useLiveKey('model_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })

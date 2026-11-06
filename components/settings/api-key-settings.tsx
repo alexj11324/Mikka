@@ -8,6 +8,7 @@ import { KeyRound, TriangleAlert } from 'lucide-react'
 import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
 import { settingsRead } from '@/lib/settings-read'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { EnabledModelsButton, EnabledModelsDialog, type EnabledModelsSource } from '@/components/settings/enabled-models-dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -62,6 +63,8 @@ export function useApiKeyList(workspaceId: string) {
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)
+  const [modelsOpen, setModelsOpen] = useState<EnabledModelsSource | null>(null)
+  const modelsT = useTranslations('Settings.enabledModels')
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState<{ message: string; retry: () => void } | null>(null)
   const data = keys.data && !keys.data.error ? keys.data : null
@@ -94,12 +97,13 @@ export function useApiKeyList(workspaceId: string) {
     } catch { setFailed({ message: actionError(), retry: () => void remove(key) }) } finally { setPending(false); setRemoving(null) }
   }
 
+  const modelsSource = (key: Key): EnabledModelsSource => ({ id: key.id, kind: 'api_key', title: `${title(key)} · ••••${key.last4}`, models: key.models, invalid: key.modelsError === 'invalid', onRefresh: () => void refetch(key) })
   const modelsLine = (key: Key) => {
     const refetchButton = <Button type="button" variant="secondary" size="xs" disabled={pending} aria-label={t('refetchLabel', { name: title(key) })} onClick={() => void refetch(key)}>{t('refetch')}</Button>
     if (key.modelsError) return <span role="status" className="flex flex-wrap items-center gap-2 text-xs text-warning-foreground">
-      <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0 text-warning-foreground" />{t(key.modelsError === 'invalid' ? 'modelsInvalid' : 'modelsUnavailable')}{refetchButton}
+      <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0 text-warning-foreground" />{t(key.modelsError === 'invalid' ? 'modelsInvalid' : 'modelsUnavailable')}{key.modelsError === 'invalid' ? <Button type="button" variant="secondary" size="xs" onClick={() => setModelsOpen(modelsSource(key))}>{modelsT('replaceKey')}</Button> : refetchButton}
     </span>
-    return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
+    return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? <EnabledModelsButton source={modelsSource(key)} onOpen={() => setModelsOpen(modelsSource(key))} /> : t('noModels')}</span>
   }
   // An OpenAI-protocol provider without the Responses API serves bot chats only (Codex runs on it).
   const agentsLine = (key: Key) => key.protocol === 'openai' && !key.responsesApi && key.provider === 'custom'
@@ -143,6 +147,7 @@ export function useApiKeyList(workspaceId: string) {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    {modelsOpen && <EnabledModelsDialog source={modelsOpen} onClose={() => setModelsOpen(null)} />}
     <AlertDialog open={removing !== null} onOpenChange={open => { if (!open && !pending) setRemoving(null) }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('removeTitle', { name: removing ? title(removing) : '' })}</AlertDialogTitle></AlertDialogHeader>

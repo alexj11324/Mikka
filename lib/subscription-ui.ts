@@ -14,6 +14,8 @@ export const subscriptionListSchema = z.object({
     account: z.string().max(256).nullable().optional(),
     paused: z.boolean().optional(),
     lastErrorCode: z.string().max(128).nullable().optional(),
+    /** The account's model catalogue as it reported it, newest first; empty until it was asked. */
+    models: z.array(z.string().max(200)).max(300).optional(),
     activeAttempt: startSchema.nullable().optional(),
     /** The owner's saved chat selections in the requested workspace, never active-use claims. */
     bots: z.array(z.object({ id: z.uuid(), workspaceId: z.uuid(), name: z.string().max(200), color: z.string().max(40), shape: z.string().max(40) })).max(200).optional(),
