@@ -201,9 +201,9 @@ export async function runRoutingAcceptance({ mode = 'dispatch', receiptPath = nu
       }
       const discoverIssue = async (item, row) => {
         const all = await rpc('issues.listIssues')
-        const matches = (Array.isArray(all) ? all : []).filter(issue => issue.userId === identity.userId && issue.title === issueTitle(runKey, item.key))
+        const matches = (Array.isArray(all) ? all : []).filter(issue => issue.ownerId === identity.userId && issue.title === issueTitle(runKey, item.key))
         if (matches.length !== 1) fail(matches.length ? 'fixture_ambiguous' : 'fixture_not_found')
-        return verifyIssue(matches[0], item, row)
+        return verifyIssue((await rpc('issues.getIssue', [matches[0].id])).issue, item, row)
       }
       const collectRunsOnce = async row => {
         const data = await rpc('agents.pollIssueThreads', [row.issueId])
