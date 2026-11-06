@@ -488,6 +488,7 @@ test(
         });
         await t.test('shared subscription answer preserves its lender and session, and revoked or foreign grants fail closed',async()=>{
           const f=await cloudFixture('running'),lender='question-subscription-lender',custodyWorkspace=randomUUID();
+          await pool.query(`UPDATE thread_machines SET "templateKind"='codex' WHERE "runId"=$1`,[f.runId]);
           await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Lender','question-lender@example.invalid',true,now(),now())`,[lender]);
           // The connection's custody workspace may differ from the workspace
           // where the lender authorizes this run's frozen consumer binding.
@@ -530,7 +531,9 @@ test(
           assert.equal(child.agentDefinition.definitionDigest,f.definition.definitionDigest);
           assert.equal(child.questionContinuation.requireSessionResume,true);
           assert.equal((await pool.query('SELECT "ownerId","consumerId" FROM byos_bindings WHERE id=$1',[f.credentialId])).rows[0].ownerId,lender);
-          assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1',[result.continuationRunId])).rows[0].sandboxId,f.sandboxId);
+          const {rows:[machine]}=await pool.query('SELECT "sandboxId","templateKind" FROM thread_machines WHERE "runId"=$1',[result.continuationRunId]);
+          assert.equal(machine.sandboxId,f.sandboxId);
+          assert.equal(machine.templateKind,'codex');
           const claimed=await f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString());
           assert.equal(claimed.resumeSessionId,f.q.originSessionId);
           assert.equal(claimed.requireSessionResume,true);
