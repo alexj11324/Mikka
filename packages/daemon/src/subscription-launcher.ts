@@ -7,6 +7,7 @@ import type { AgentSandbox } from './agents/sandbox'
 import { startSubscriptionSession } from './subscription'
 import type { NativeLease, SubscriptionWorkerClient } from './subscription-worker-client'
 import { requireRunToolApproval } from './agents/tool-approval'
+import { daemonTracer, runIdHash } from './tracing'
 
 /** Called inside the trusted owner runtime, never from a task-supplied cwd/env. */
 export async function launchHostedSubscription(use: SubscriptionUse, options: StartOptions, host: {
@@ -19,12 +20,13 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
   revocationPollMs?: number
 }): Promise<AgentSession> {
   const gate = requireRunToolApproval(options.runId, options.toolApproval)
-  const check = async () => {
-    if (!await gate.checkLive()) { gate.revoke(); throw new Error('Run tool approval unavailable') }
-    const access = await host.access()
+  const traceAttributes = { 'mikka.run.id_hash': runIdHash(options.runId) }
+  const check = () => daemonTracer.span('daemon.adapter.auth', traceAttributes, async () => {
+    if (!await daemonTracer.span('daemon.adapter.auth.gate', traceAttributes, () => gate.checkLive())) { gate.revoke(); throw new Error('Run tool approval unavailable') }
+    const access = await daemonTracer.span('daemon.adapter.auth.access', traceAttributes, () => host.access())
     if (gate.revoked) throw new Error('Run tool approval unavailable')
     return authorizeSubscriptionUse({ ...use, execution: 'native' }, access)
-  }
+  })
   const authorized = await check()
   const revision = authorized.binding.connectionRevision
   let lastToken: string | undefined
@@ -33,11 +35,11 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
     credentialCalls++
     try {
     await check()
-    let lease = await host.worker.call<NativeLease>('nativeAuth', { revision })
+    let lease = await daemonTracer.span('daemon.adapter.auth.native_auth', traceAttributes, () => host.worker.call<NativeLease>('nativeAuth', { revision }))
     // The quota probe or another consumer may already have rotated the grant.
     if (forceRefresh && lease.accessToken === lastToken) {
-      await host.worker.call('refresh', { revision })
-      lease = await host.worker.call<NativeLease>('nativeAuth', { revision })
+      await daemonTracer.span('daemon.adapter.auth.refresh', traceAttributes, () => host.worker.call('refresh', { revision }))
+      lease = await daemonTracer.span('daemon.adapter.auth.native_auth', traceAttributes, () => host.worker.call<NativeLease>('nativeAuth', { revision }))
     }
     lastToken = lease.accessToken
     await check()

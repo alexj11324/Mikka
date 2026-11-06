@@ -7,6 +7,7 @@ import {
 
 import type { AgentAdapter, AgentSession, StartOptions } from "./adapters/types"
 import { buildChildEnv } from "./env"
+import { daemonTracer, runIdHash } from "./tracing"
 
 export interface HostedSubscriptionBackend {
   access(): Promise<SubscriptionAccess>
@@ -25,7 +26,9 @@ export async function startSubscriptionSession(
   const check = async () =>
     authorizeSubscriptionUse(
       { ...use, execution: "native" },
-      await backend.access(),
+      await daemonTracer.span("daemon.adapter.auth.access", {
+        "mikka.run.id_hash": runIdHash(options.runId),
+      }, () => backend.access()),
       clock(),
     )
   const { binding } = await check()
