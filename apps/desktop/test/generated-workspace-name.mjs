@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import { tsImport } from 'tsx/esm/api'
 import { TestAccountPool } from '../../../scripts/test-accounts/pool.mjs'
+
+const importOptions = { parentURL: import.meta.url, tsconfig: fileURLToPath(new URL('../../../tsconfig.json', import.meta.url)) }
 
 const fail = code => { throw Object.assign(new Error(code), { code }) }
 const requireTrue = (value, code = 'WORKSPACE_NAME_CLEANUP_UNPROVEN') => { if (!value) fail(code) }
@@ -26,8 +29,8 @@ export async function captureGeneratedWorkspaceName(scope) {
   const lease = { ...scope.lease }
   const owners = [scope.owner?.userId, scope.peer?.userId]
   requireTrue(owners.every(value => typeof value === 'string' && value) && owners[0] !== owners[1], 'WORKSPACE_NAME_SCOPE_REQUIRED')
-  const { defaultWorkspaceName } = await tsImport('../../../lib/workspace-name.ts', import.meta.url)
-  const { encode, decode } = await tsImport('../../../lib/desktop-rpc/wire.ts', import.meta.url)
+  const { defaultWorkspaceName } = await tsImport('../../../lib/workspace-name.ts', importOptions)
+  const { encode, decode } = await tsImport('../../../lib/desktop-rpc/wire.ts', importOptions)
   const evidence = { captured: false, phase: 'capture', restored: false }
   let original
 

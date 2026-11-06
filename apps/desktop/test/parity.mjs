@@ -16,6 +16,7 @@ import { launchElectron } from './electron-launch.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
 import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
@@ -37,7 +38,7 @@ const initialWorkspaceMenuNames = [messages.Nav.workspaceMenu, JSON.parse(await 
 const actionIds = await readActionIds(resolve(process.env.MIKKA_TEST_APP_DIR ?? process.cwd()))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./parity-clock.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).update(await readFile(new URL('../../../scripts/acceptance/read-action-transport.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./generated-workspace-name.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./parity-clock.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).update(await readFile(new URL('../../../scripts/acceptance/read-action-transport.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
   timeZone: 'UTC',
@@ -49,6 +50,7 @@ await mkdir(output, { recursive: true })
 let scope
 let fixtures
 let nativeResources
+let generatedWorkspaceName
 let systemBrowser
 let webBrowser
 const applications = new Set()
@@ -411,6 +413,10 @@ function publicScreens(fixture) {
 try {
   stage = 'acquire-lease'
   scope = await acquireTestAccounts({ runId: `parity-${started}`, workerId: 'desktop-parity', requestId: `parity-${started}`, ttlMs: 300_000 })
+  if (mode === 'desktop') {
+    stage = 'capture-generated-workspace-name'
+    generatedWorkspaceName = await captureGeneratedWorkspaceName(scope)
+  }
   stage = 'create-fixtures'
   fixtures = await createParityFixtures(scope)
   report.fixtureEpoch = fixtures.fixture.epoch
@@ -523,6 +529,11 @@ try {
       if (nativeResources) report.nativeCleanup = await nativeResources.cleanup({ drained: true })
       stage = 'cleanup-fixtures'
       if (fixtures) { await fixtures.cleanup(); cleaned = true }
+      if (cleaned && report.nativeCleanup?.cleaned === true && generatedWorkspaceName) {
+        stage = 'cleanup-generated-workspace-name'
+        try { await generatedWorkspaceName.restore({ drained: true }) }
+        finally { report.workspaceNameCleanup = generatedWorkspaceName.read() }
+      }
     } catch (error) { failedCleanup(error) }
   }
   // The pool re-fingerprints both users. A visual mismatch can release a clean

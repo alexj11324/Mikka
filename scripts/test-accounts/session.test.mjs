@@ -172,7 +172,7 @@ async function reauthenticationUnit(scenario, moduleURL) {
   for (const account of accounts) await writeFile(join(privateRoot, 'credentials', account.credentialRef),
     JSON.stringify({ binding, slotId: account.slotId, email: account.email, password: account.password }), { mode: 0o600 })
   const lease = { id: randomUUID(), pairId: randomUUID(), environmentId: environment.instanceId, generation: 1,
-    state: 'active', remainingMs: 60000, accounts: accounts.map(({ password, ...account }) => account) }
+    state: 'active', remainingMs: 60000, accounts: accounts.map(({ password: _password, ...account }) => account) }
   const resources = [], calls = [], releases = [], sessions = new Map()
   let active = true, mode = 'initial', databaseWrites = 0
   let lastToken, lastCookie, bodyStarted, finishBody

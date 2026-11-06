@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { tsImport } from 'tsx/esm/api'
 import { TestAccountPool } from '../../../scripts/test-accounts/pool.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { recordNativeCleanup } from './native-auth-diagnostics.mjs'
 
-const { defaultWorkspaceName, renameGeneratedWorkspace } = await tsImport('../../../lib/workspace-name.ts', import.meta.url)
-const { encode, decode } = await tsImport('../../../lib/desktop-rpc/wire.ts', import.meta.url)
+const importOptions = { parentURL: import.meta.url, tsconfig: fileURLToPath(new URL('../../../tsconfig.json', import.meta.url)) }
+
+const { defaultWorkspaceName, renameGeneratedWorkspace } = await tsImport('../../../lib/workspace-name.ts', importOptions)
+const { encode, decode } = await tsImport('../../../lib/desktop-rpc/wire.ts', importOptions)
 const OWNER = 'owner-test', PEER = 'peer-test', ID = '11111111-1111-4111-8111-111111111111'
 const fingerprint = owned => {
   const hash = createHash('sha256')
