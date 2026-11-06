@@ -65,6 +65,9 @@ each edge (对话, 线程, 任务, 建议, 搜索), an inset grouped list's card
 **No badges** (Alex 2026-11-06): the tab bar carries no count badges, and thread and task rows no coloured status
 dots; the list's sections name the state. The unread mark on a chat's avatar stays.
 
+**Short titles** ([decision](decisions/2026-11-06-1400-task-short-titles.md)): a task, and every thread that works on
+it, is listed by the short title the small model wrote when the task was created, while the task keeps that title.
+
 **线程** (designs 13, 15) has a 线程 | 任务 segment under its large title, then one list. Each row is one line: the
 status icon and the title, at 17 pt, cut with an ellipsis; a title's leading issue key (ALEX-12, #1408) and trailing
 date or time are not shown (Alex 2026-11-06, `lib/display-title.ts`). A floating glass switcher above the tab bar

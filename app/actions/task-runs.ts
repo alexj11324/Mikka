@@ -19,6 +19,7 @@ import { ownerListRead } from '@/lib/live/list-read-server'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
+import { issueShortTitle } from '@/lib/short-title-sql'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -54,7 +55,8 @@ async function readTaskRuns() {
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentName: runAgentName,
+    // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`, agentName: runAgentName,
     status: agentRuns.status, outcome: agentRuns.outcome,
     botId: runBotId,
     expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`,
