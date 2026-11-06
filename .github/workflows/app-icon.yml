@@ -51,26 +51,7 @@ jobs:
           xcrun assetutil --info "$out/Assets.car" > "$out/assets-info.json"
           grep -o '"Appearance" : "[^"]*"' "$out/assets-info.json" | sort | uniq -c
           ls "$out"/AppIcon*.png
-      - name: TEMP isolate the macOS crash
-        run: |
-          mk() { rm -rf "$RUNNER_TEMP/v/$1.icon"; mkdir -p "$RUNNER_TEMP/v"; cp -R apps/desktop/build/icon.icon "$RUNNER_TEMP/v/$1.icon"; python3 -c "import json,sys;p=sys.argv[1];d=json.load(open(p));exec(sys.argv[2]);json.dump(d,open(p,'w'),indent=2)" "$RUNNER_TEMP/v/$1.icon/icon.json" "$2"; }
-          mk base 'pass'
-          mk noopacity 'del d["groups"][1]["layers"][0]["opacity"]'
-          mk offnoglass 'd["groups"][1]["layers"][0]["glass"]=False'
-          mk notransl 'd["groups"][0]["translucency"]={"enabled":False,"value":0.5}'
-          mk nospec 'd["groups"][0]["specular"]=False; d["groups"][0].pop("name"); d["groups"][1].pop("name")'
-          mk noshadow 'd["groups"][0]["shadow"]={"kind":"none","opacity":0.5}'
-          mk onegroup 'd["groups"]=d["groups"][:1]'
-          for v in base noopacity offnoglass notransl nospec noshadow onegroup; do
-            o="$RUNNER_TEMP/v/out-$v"; mkdir -p "$o"
-            if actool "$RUNNER_TEMP/v/$v.icon" --compile "$o" --output-format human-readable-text --errors \
-              --output-partial-info-plist "$o/p.plist" --app-icon $v --include-all-app-icons \
-              --enable-on-demand-resources NO --development-region en \
-              --target-device mac --minimum-deployment-target 26.0 --platform macosx > "$o/log.txt" 2>&1 && test -s "$o/Assets.car"
-            then echo "RESULT $v ok"; else echo "RESULT $v CRASH"; fi
-          done
       - name: Compile for macOS as electron-builder does
-        continue-on-error: true
         run: |
           out="$RUNNER_TEMP/out/mac"
           mkdir -p "$out"
@@ -88,14 +69,12 @@ jobs:
           out="$RUNNER_TEMP/out/previews"
           mkdir -p "$out"
           "$ICTOOL" --version || true
-          for platform in iOS macOS; do
-            for rendition in Default Dark TintedLight TintedDark ClearLight ClearDark; do
-              "$ICTOOL" apps/mobile/assets/icon.icon --export-image \
-                --output-file "$out/$platform-$rendition.png" \
-                --platform "$platform" --rendition "$rendition" \
-                --width 1024 --height 1024 --scale 1
-              test -s "$out/$platform-$rendition.png"
-            done
+          for rendition in Default Dark TintedLight TintedDark ClearLight ClearDark; do
+            "$ICTOOL" apps/mobile/assets/icon.icon --export-image \
+              --output-file "$out/$rendition.png" \
+              --platform iOS --rendition "$rendition" \
+              --width 1024 --height 1024 --scale 1
+            test -s "$out/$rendition.png"
           done
           ls -la "$out"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
