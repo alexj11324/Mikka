@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { REQUIRED } from './web-deploy.mjs'
+import { REQUIRED, buildEnvironment } from './web-deploy.mjs'
+import { directDatabaseURL } from '../postgres-connection.mjs'
 import { productionBuildEnvironment } from './build-vercel.mjs'
 
 const sourceSha = 'a'.repeat(40)
@@ -25,4 +26,49 @@ test('production preflight rejects stale source, missing values and an unbound d
   assert.throws(() => prepare({ text: text.replace('"production"', '"preview"') }), /productionEnvironmentRequired/)
   assert.throws(() => prepare({ env: { ...env, MIKKA_DEPLOYMENT_ID: '' } }), /deploymentIdRequired/)
   assert.throws(() => prepare({ nodeVersion: 'v22.23.4' }), /node24Required/)
+})
+
+test('the filled build file preserves JSON-escaped connection and auth values byte for byte', () => {
+  const plain = 'postgresql://fixture:plain@ep-fixture-pooler.us-east-2.aws.neon.tech/app?sslmode=require'
+  const cases = [
+    ['plain', plain],
+    ['quoted password', plain.replace('plain', 'quoted"password')],
+    ['backslash password', plain.replace('plain', 'back\\slash')],
+    ['dollar password', plain.replace('plain', 'dollar$password')],
+    ['escaped dollar password', plain.replace('plain', 'back\\$password')],
+    ['leading CR', '\r' + plain],
+    ['trailing LF', plain + '\n'],
+    ['literal backslash n', plain.replace('plain', 'literal\\npassword')],
+  ]
+  const authSecret = 'fixture\r\n"quoted"\\literal\\$cash'
+  const withheld = text.replace('fixture-MIKKA_DATABASE_URL', '')
+    .replace('fixture-DATABASE_URL', '').replace('fixture-BETTER_AUTH_SECRET', '')
+  const observed = cases.map(([name, connection]) => {
+    const values = { ...env, MIKKA_DATABASE_URL: connection,
+      DATABASE_URL: connection.replace('/app?', '/workspace?'), BETTER_AUTH_SECRET: authSecret }
+    // The production workflow first fills the file, then the direct builder
+    // reads that already-filled file. Neither pass may reinterpret credentials.
+    const filled = buildEnvironment(withheld, values)
+    const result = productionBuildEnvironment({ text: filled, sourceSha, env: values, nodeVersion: 'v24.22.1' })
+    let directUsable = false
+    try {
+      directUsable = ['MIKKA_DATABASE_URL', 'DATABASE_URL'].every(key =>
+        new URL(directDatabaseURL(result[key])).password === new URL(values[key]).password)
+    } catch { /* Report only the closed observation, never the connection value. */ }
+    return { name, applicationUnchanged: result.MIKKA_DATABASE_URL === values.MIKKA_DATABASE_URL,
+      workspaceUnchanged: result.DATABASE_URL === values.DATABASE_URL,
+      authUnchanged: result.BETTER_AUTH_SECRET === authSecret, directUsable }
+  })
+  assert.deepEqual(observed, cases.map(([name]) => ({ name, applicationUnchanged: true,
+    workspaceUnchanged: true, authUnchanged: true, directUsable: true })))
+})
+
+test('the codec does not repair or dequote an originally invalid database value', () => {
+  const invalid = '"postgresql://fixture:password@database.invalid/app"'
+  const withheld = text.replace('fixture-MIKKA_DATABASE_URL', '')
+  const values = { ...env, MIKKA_DATABASE_URL: invalid }
+  const filled = buildEnvironment(withheld, values)
+  const result = productionBuildEnvironment({ text: filled, sourceSha, env: values, nodeVersion: 'v24.22.1' })
+  assert.equal(result.MIKKA_DATABASE_URL === invalid, true)
+  assert.throws(() => directDatabaseURL(result.MIKKA_DATABASE_URL), /DATABASE_CONNECTION_URL_INVALID/)
 })

@@ -41,8 +41,8 @@ function parse(text) {
   return entries
 }
 
-/** Returns the rewritten dotenv text; throws with variable names only, never values. */
-export function buildEnvironment(text, job) {
+/** Resolves production values; throws with variable names only, never values. */
+export function buildEnvironmentValues(text, job) {
   if (!SHA.test(job.GITHUB_SHA ?? '')) throw Error('webDeploy:commitShaRequired')
   const entries = parse(text)
   // Only keys the production environment defines, and only where Vercel withheld the value.
@@ -55,7 +55,14 @@ export function buildEnvironment(text, job) {
   if (entries.get('VERCEL_ENV') !== 'production') throw Error('webDeploy:productionEnvironmentRequired')
   const missing = REQUIRED.filter(key => !entries.get(key))
   if (missing.length) throw Error(`webDeploy:missing:${missing.join(',')}`)
-  return [...entries].map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n'
+  return Object.fromEntries(entries)
+}
+
+/** The build file uses JSON string values; the direct build reuses the object
+ * above rather than interpreting those escapes with a different dotenv parser. */
+export function buildEnvironment(text, job) {
+  return Object.entries(buildEnvironmentValues(text, job))
+    .map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n'
 }
 
 /** Current production deployment's commit, read through the public alias. */
