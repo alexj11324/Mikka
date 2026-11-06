@@ -13,16 +13,17 @@ const flag = (key) => {
   const at = args.indexOf(key)
   return at < 0 ? undefined : args[at + 1]
 }
-if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3") process.exit(2)
-const token = readFileSync(3, "utf8")
-closeSync(3)
+const apiKey = process.env.FIXTURE_MACHINE_AUTH && process.env.ANTHROPIC_API_KEY === 'fixture-direct-provider-key'
+if (!apiKey && (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3")) process.exit(2)
+const token = apiKey ? process.env.ANTHROPIC_API_KEY : readFileSync(3, "utf8")
+if (!apiKey) closeSync(3)
 const config = process.env.CLAUDE_CONFIG_DIR ?? join(process.env.HOME, '.claude')
 if (
   !token ||
   !config ||
   config !== join(process.env.HOME, ".claude") ||
   (!process.env.FIXTURE_MACHINE_AUTH && existsSync(join(config, ".credentials.json"))) ||
-  process.env.ANTHROPIC_API_KEY ||
+  (!apiKey && process.env.ANTHROPIC_API_KEY) ||
   process.env.ANTHROPIC_AUTH_TOKEN ||
   (!process.env.FIXTURE_MACHINE_AUTH && (process.env.E2B_API_KEY || Object.keys(process.env).some((key) => /REFRESH_TOKEN|INFISICAL/.test(key))))
 )
@@ -40,7 +41,8 @@ if (flag('--resume') !== undefined) {
 }
 const sessionId = history.resumeSessionId ?? requestedSession
 writeFileSync(historyFile, JSON.stringify(history))
-writeFileSync(join(config, 'fixture-auth.json'), JSON.stringify({ tokenSha: createHash('sha256').update(token).digest('hex') }))
+writeFileSync(join(config, 'fixture-auth.json'), JSON.stringify({ tokenSha: createHash('sha256').update(token).digest('hex'),
+  ...(apiKey ? { baseUrl: process.env.ANTHROPIC_BASE_URL } : {}) }))
 // Capture only the official effort flag and session identity, never auth argv/env.
 writeFileSync(join(config, 'fixture-effort.json'), JSON.stringify({ transport: 'cli', sessionId, effort: flag('--effort') ?? null, resumed: flag('--resume') !== undefined }))
 const processReceipt = join(config, 'fixture-process.json')
@@ -59,6 +61,11 @@ lines.on("line", async (line) => {
   }
   if (frame.type === "control_request") {
     if (token === 'fixture-timeout') return
+    if (token === 'fixture-early-init') {
+      out({ type: 'system', subtype: 'init', session_id: sessionId })
+      out({ type: 'user', uuid: 'historical-frame', session_id: sessionId, parent_tool_use_id: null,
+        isReplay: true, message: { role: 'user', content: [{ type: 'text', text: 'old task' }] } })
+    }
     if (token.startsWith('fixture-delayed')) await new Promise(resolve => setTimeout(resolve, 12_000))
     out({
       type: "control_response",
@@ -85,6 +92,10 @@ lines.on("line", async (line) => {
   prompts++
   history.messages.push(text); writeFileSync(historyFile, JSON.stringify(history))
   writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
+  if (args.includes('--replay-user-messages')) {
+    if (token === 'fixture-early-init') out({ ...frame, session_id: 'another-session', isReplay: true })
+    out({ ...frame, session_id: sessionId, isReplay: true })
+  }
   if (text === 'REFRESH') {
     if (process.env.CLAUDE_CODE_SDK_HAS_OAUTH_REFRESH !== '1') process.exit(2)
     const request_id = 'fixture-oauth-refresh'

@@ -138,7 +138,7 @@ export class HttpServerLink implements ServerLink {
     const url = new URL(transfer.downloadUrl)
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com') || url.username || url.password || url.port) throw Error('Invalid attachment storage origin')
     // The capability is sufficient: never forward the device session to storage.
-    const response = await this.fetchImpl(url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
+    const response = await this.taskFetch(assignment.runId, 'storage_transfer', url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
     if (!response.ok || !response.body) throw Error('Attachment storage unavailable')
     const reader = response.body.getReader(), chunks: Uint8Array[] = []
     let size = 0
@@ -207,7 +207,7 @@ export class HttpServerLink implements ServerLink {
     return gate
   }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
-    return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
+    return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: (url, init) => this.taskFetch(assignment.runId, 'mailbox_operation', url, init),
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
   }
   async claimCoordinator(deviceId: string, signal: AbortSignal) {
@@ -239,6 +239,18 @@ export class HttpServerLink implements ServerLink {
       const url = new URL(baseUrl)
       if (url.protocol !== 'https:' || !url.hostname.endsWith('.vercel.app') || url.username || url.password || url.search || url.hash || !/^[A-Za-z0-9_-]{20,256}$/.test(protectionBypass)) throw new Error('Invalid preview transport')
     }
+  }
+
+  /** Count raw task transports too; preserve their existing redirects, body,
+   * headers and response streaming without introducing a request. */
+  private async taskFetch(runId: string, endpoint: "mailbox_operation" | "storage_transfer" | "task_data", input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
+    const measured = runRuntimeTimings.taskRequest(runId, endpoint, init?.method ?? "GET")
+    let status: number | undefined
+    try {
+      const response = await this.fetchImpl(input, init)
+      status = response.status
+      return response
+    } finally { measured(status) }
   }
 
   private async send(
@@ -454,7 +466,7 @@ export class HttpServerLink implements ServerLink {
     const server = upload.target === "server"
     let response: Response
     try {
-      response = await this.fetchImpl(server ? serverUrl(this.baseUrl, capturePaths.upload(checkId(runId), checkId(captureId))) : upload.url, {
+      response = await this.taskFetch(runId, server ? "task_data" : "storage_transfer", server ? serverUrl(this.baseUrl, capturePaths.upload(checkId(runId), checkId(captureId))) : upload.url, {
         method: "PUT",
         headers: server
           ? { "content-type": contentType, [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.credential ? { authorization: `Bearer ${this.credential}` } : {}), ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) }

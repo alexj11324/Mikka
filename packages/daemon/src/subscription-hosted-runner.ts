@@ -2,9 +2,8 @@
 // credentials once; official CLIs connect directly to their providers and use
 // the machine's normal HOME, environment and working directory Git metadata.
 import { execFile, spawn } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, realpathSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { delimiter, dirname, join } from 'node:path'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk'
@@ -29,6 +28,8 @@ import { removeRunCredentials } from './run-scratch'
 import { daemonTracer, runIdHash } from './tracing'
 import { runRuntimeTimings } from './run-runtime-timing'
 import { startCliTimingCollector } from './official-cli-timing'
+import { hostedBinaries } from './hosted-binaries'
+export { hostedBinaries } from './hosted-binaries'
 
 const exec = promisify(execFile)
 const computerProxy = fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url))
@@ -51,43 +52,6 @@ async function stopGroup(child: ReturnType<typeof spawn>, graceMs = 3000) {
   signal('SIGKILL')
 }
 const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { throw unavailable('host_unsupported') } }
-
-/** The model probe and actual CLI execution use the same immutable binaries. */
-export function hostedBinaries(passed?: Partial<Record<"codex" | "claude_code", string>>): Partial<Record<"codex" | "claude_code", string>> {
-  const host = { binaries: passed };
-  const require = createRequire(import.meta.url);
-  let claude = host.binaries?.claude_code;
-  try {
-    const bundled = createRequire(
-      require.resolve("@anthropic-ai/claude-agent-sdk"),
-    );
-    claude ??= join(
-      dirname(
-        bundled.resolve(
-          "@anthropic-ai/claude-agent-sdk-linux-x64/package.json",
-        ),
-      ),
-      "claude",
-    );
-  } catch {}
-  const codex =
-    host.binaries?.codex ??
-    (process.env.PATH ?? "")
-      .split(delimiter)
-      .map((dir) => join(dir, "codex"))
-      .find((path) => existsSync(path));
-  const binaries: Partial<Record<"codex" | "claude_code", string>> = { codex, claude_code: claude };
-  for (const kind of ["codex", "claude_code"] as const)
-    if (binaries[kind]) {
-      try {
-        binaries[kind] = realpathSync(binaries[kind]!);
-        if (!lstatSync(binaries[kind]!).isFile()) delete binaries[kind];
-      } catch {
-        delete binaries[kind];
-      }
-    }
-  return binaries;
-}
 
 export async function createHostedBotRunner(host: {
   stateDir: string

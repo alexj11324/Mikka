@@ -15,6 +15,9 @@ import { createHash } from 'node:crypto'
 const finalizationBytes = readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))
 const finalizationPolicy = JSON.parse(finalizationBytes)
 const finalizationPolicySha = createHash('sha256').update(finalizationBytes).digest('hex')
+const certificateBytes = readFileSync(new URL('./e2b-certificate-relinks.json', import.meta.url))
+if (createHash('sha256').update(certificateBytes).digest('hex') !== finalizationPolicy.certificateRelinksSha256) throw Error('e2b_certificate_policy_invalid')
+const certificateRelinks = JSON.parse(certificateBytes)
 
 const API = 'https://api.vercel.com'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
@@ -46,6 +49,10 @@ const hasModels = (rows, harnesses) => Array.isArray(rows) && harnesses.every(ha
 export function assertConservation(proof, kind) {
   const valid = row => Number.isSafeInteger(row?.entries) && row.entries > 0 && /^[a-f0-9]{64}$/.test(row.sha256 ?? '')
   const final = proof?.finalization, rules = { ...finalizationPolicy.common, ...finalizationPolicy.templates[kind] }
+  for (const certificate of certificateRelinks.filter(row => row.templates.includes(kind))) rules[certificate.path] = {
+    kind: { before: 'file', after: 'link' }, sha256: { before: certificate.sha256, after: null },
+    target: { before: null, after: certificate.target }, ...(certificate.mode ? { mode: certificate.mode } : {}), _certificate: certificate,
+  }
   if (!valid(proof?.before) || !isDeepStrictEqual(proof.before, proof.after)
     || final?.kind !== kind || final?.policySha256 !== finalizationPolicySha
     || !isDeepStrictEqual(final?.originalBefore, proof.before) || !valid(final?.originalAfter)
@@ -58,6 +65,10 @@ export function assertConservation(proof, kind) {
     if (paths.has(change?.path) || !fields.length || !allowed
       || !isDeepStrictEqual(fields.sort(), Object.keys(change?.after ?? {}).sort())) fail(`runtime_release_conservation_invalid ${kind}`)
     paths.add(change.path)
+    const certificate = allowed._certificate
+    if (certificate && (change.kind !== 'file' || change.before.kind !== 'file' || change.after.kind !== 'link'
+      || !/^[a-f0-9]{64}$/.test(change.resolvedSha256 ?? '')
+      || (!certificate.providerRoot && change.resolvedSha256 !== certificate.sha256))) fail(`runtime_release_conservation_invalid ${kind}`)
     for (const field of fields) {
       const before = change.before[field], after = change.after[field], rule = allowed[field]
       if (rule === 'per-boot') {
@@ -100,10 +111,16 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
   }
   for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
     const row = releaseEvidence.subscriptionAcceptance?.[kind]
+    const ack = row?.agentAcceptance, authorization = row?.runtimeAuthorization
     if (row?.status !== 'passed' || row?.templateId !== templates[kind] || row?.sourceCommit !== sourceCommit || row?.workerSha !== sourceSha
       || row?.harness !== harness || row?.model !== model || row?.credentialRoute !== 'subscription' || row?.replyVerified !== true
       || !/^[a-f0-9]{64}$/.test(row?.officialBinarySha256 ?? '') || typeof row?.officialCliVersion !== 'string' || !row.officialCliVersion
-      || !row?.runId || !row?.deviceId) fail(`runtime_release_subscription_missing ${kind}`)
+      || !row?.runId || !row?.deviceId
+      || ack?.harness !== harness || ack?.runIdHash !== createHash('sha256').update(row.runId).digest('hex').slice(0, 16)
+      || ack?.kind !== (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
+      || !Number.isSafeInteger(ack?.at) || ack.at <= 0 || !Number.isFinite(ack?.ms) || ack.ms < 0
+      || authorization?.source !== 'http_server_link' || authorization.complete !== true || authorization.truncated !== false
+      || authorization.extraRemoteCalls !== 0) fail(`runtime_release_subscription_missing ${kind}`)
   }
 }
 

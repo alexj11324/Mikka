@@ -337,13 +337,16 @@ class PromptQueue implements AsyncIterable<SDKUserMessage> {
 
   push(text: string) {
     if (this.closed) throw new Error("The Claude session already ended")
+    const uuid = randomUUID()
     this.items.push({
       type: "user",
+      uuid,
       message: { role: "user", content: [{ type: "text", text }] },
       parent_tool_use_id: null,
       session_id: this.sessionId,
     })
     this.wake()
+    return uuid
   }
 
   close() {
@@ -557,6 +560,7 @@ export class ClaudeAdapter implements AgentAdapter {
 
     const queue = new EventQueue()
     const prompts = new PromptQueue(sessionId)
+    let firstPromptId: string | undefined
     let written = 0
     let results = 0
     let runtimeModel: string | null = null
@@ -609,6 +613,9 @@ export class ClaudeAdapter implements AgentAdapter {
       options: {
         ...refreshOptions,
         cwd: ctx.worktree,
+        // The official CLI echoes the exact stdin user frame after reading
+        // it. Its UUID distinguishes this task from init and resumed history.
+        extraArgs: { 'replay-user-messages': null },
         // Hosted options contain the full machine environment; personal
         // runs retain their existing child environment preparation.
         env: {
@@ -723,12 +730,9 @@ export class ClaudeAdapter implements AgentAdapter {
             message.session_id !== sessionId
           )
             throw new Error("Claude resumed a different question session")
-          if ('session_id' in message && message.session_id === sessionId) {
-            if (message.type === 'system' && message.subtype === 'init')
-              runRuntimeTimings.agentAccepted(options.runId, 'claude_system_init')
-            else if (message.type === 'assistant' || message.type === 'user')
-              runRuntimeTimings.agentAccepted(options.runId, 'claude_first_event')
-          }
+          if (!ending && firstPromptId && message.type === 'user' && message.session_id === sessionId &&
+            message.uuid === firstPromptId && message.parent_tool_use_id == null)
+            runRuntimeTimings.agentAccepted(options.runId, 'claude_user_ack')
           if (message.type === "system" && message.subtype === "init" && typeof message.model === "string")
             runtimeModel = message.model || null
           if (message.type === "assistant" && message.parent_tool_use_id == null && typeof message.message.model === "string")
@@ -854,7 +858,7 @@ export class ClaudeAdapter implements AgentAdapter {
         offRevoke?.()
       }
     }
-    prompts.push(firstMessage)
+    firstPromptId = prompts.push(firstMessage)
     written++
     if (mode === "continue" && !(await untilSpoken(spoken))) {
       if (providerFailure) {
@@ -866,7 +870,7 @@ export class ClaudeAdapter implements AgentAdapter {
         throw new Error(externalAuth ? SUBSCRIPTION_ERROR : 'Original Claude question session is unavailable; refusing a fresh session')
       }
       log.info(
-        { stderr: stderrTail() },
+        { stderr: redactDiagnostic(stderrTail(), secrets) },
         "could not continue the earlier claude session; starting a new one",
       )
       // Close the failed transport and its pending callbacks. The same live

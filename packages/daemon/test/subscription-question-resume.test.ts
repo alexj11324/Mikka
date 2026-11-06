@@ -330,8 +330,12 @@ it.each(['latest-history', 'stale-ledger-run', 'missing-latest-history'] as cons
         const recoveredLedger = JSON.parse(readFileSync(join(f.stateDir, 'native-ledgers', recoveryId + '.json'), 'utf8'))
         expect(recoveredLedger).toEqual({ ...sourceLedger, scope: { ...sourceLedger.scope, runId: recoveryId } })
         expect(JSON.parse(readFileSync(sourceLedgerPath, 'utf8'))).toEqual(sourceLedger)
-        expect(JSON.parse(readFileSync(f.history(f.next.runId), 'utf8'))).toEqual(sourceHistory)
+        // The task's one native session store advances in place. Its ledger
+        // keeps each continuation's binding without making a history copy.
+        expect(JSON.parse(readFileSync(f.history(f.next.runId), 'utf8')))
+          .toEqual({ ...sourceHistory, messages: [...sourceHistory.messages, message] })
       } finally { await resumed.cancel() }
     }
-    expect(readFileSync(f.history(f.assignment.runId), 'utf8')).toBe(originalBytes)
+    if (mode === 'stale-ledger-run') expect(readFileSync(f.history(f.assignment.runId), 'utf8')).toBe(originalBytes)
+    if (mode === 'missing-latest-history') expect(existsSync(f.history(f.assignment.runId))).toBe(false)
   }, 45000)

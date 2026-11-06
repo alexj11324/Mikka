@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { hostedBinaries } from './subscription-hosted-runner'
+import { hostedBinaries } from './hosted-binaries'
 import { probeHarnessModels } from './model-probe'
 import type { HarnessInfo } from '@mikka/protocol'
 

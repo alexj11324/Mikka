@@ -15,11 +15,13 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 from urllib.error import HTTPError
 from pathlib import Path
@@ -31,7 +33,7 @@ WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
                 'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
 # What else decides the template's contents: its bootstrap and the build steps below.
 COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
-BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'start-prebuilt.sh')
+BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'e2b-certificate-relinks.json', 'start-prebuilt.sh')
 INSTANCE_BOOTSTRAP = 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
 RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES),
                 'scripts/e2b/build-template.py', 'scripts/e2b/template-capabilities.json',
@@ -290,7 +292,7 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
         for runtime_file in (*BOOTSTRAP_FILES, 'instance-bootstrap.sh'):
             template = template.copy(runtime_file, f'/opt/mikka/{runtime_file}')
         template = (template
-                    .run_cmd('python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json', user='root')
+                    .run_cmd(f'python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind {kind} --cli-manifest /opt/mikka/original-cli.json', user='root')
                     .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='user')
                     .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
@@ -331,13 +333,67 @@ def assert_new_template(name, api_key):
         raise
     raise ValueError('template_name_already_exists')
 
+def release_metadata(environ=os.environ):
+    """Attach only public workflow identity so a cancelled job is recoverable."""
+    identity = {'application': 'mikka-template-release'}
+    if (environ.get('GITHUB_REPOSITORY') == 'alexj11324/Mikka'
+            and re.fullmatch(r'[a-f0-9]{40}', environ.get('GITHUB_SHA', ''))
+            and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ID', ''))
+            and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ATTEMPT', ''))):
+        identity.update(sourceCommit=environ['GITHUB_SHA'], runId=environ['GITHUB_RUN_ID'], runAttempt=environ['GITHUB_RUN_ATTEMPT'])
+    return identity
+
+
+def cleanup_templates(candidates, api_key, request=None):
+    """Remove exact private candidates, retaining public and previous images."""
+    request = request or _request
+    receipts = []
+    for candidate in candidates:
+        name = candidate['name']
+        row = {'name': name, 'kind': candidate['kind']}
+        try:
+            if not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
+                raise ValueError('cleanup_name_invalid')
+            try:
+                info = request('GET', '/templates/' + name, api_key)
+            except HTTPError as error:
+                if error.code == 404:
+                    receipts.append({**row, 'status': 'absent'})
+                    continue
+                raise
+            names = (info.get('names') or []) + (info.get('aliases') or [])
+            template_id = info.get('templateID')
+            if (name not in names or info.get('isDefault') is True or not isinstance(template_id, str)
+                    or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id)
+                    or (candidate.get('templateId') and template_id != candidate['templateId'])):
+                raise ValueError('cleanup_candidate_identity_mismatch')
+            row['templateId'] = template_id
+            if info.get('public') is True:
+                receipts.append({**row, 'status': 'retained_public'})
+                continue
+            if info.get('public') is not False:
+                raise ValueError('cleanup_candidate_visibility_unknown')
+            request('DELETE', '/templates/' + template_id, api_key)
+            try:
+                request('GET', '/templates/' + template_id, api_key)
+            except HTTPError as error:
+                if error.code != 404:
+                    raise
+            else:
+                raise RuntimeError('cleanup_candidate_still_exists')
+            receipts.append({**row, 'status': 'deleted'})
+        except Exception as error:
+            receipts.append({**row, 'status': 'failed', 'error': type(error).__name__})
+    return receipts
+
+
 def probe_models(template_id, kind, api_key, sandbox_factory=None):
     """Read the built image's actual CLI catalogues, never a handwritten model list."""
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
     required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
-    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60)
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
     try:
         result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
         if result.exit_code != 0:
@@ -364,18 +420,28 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
-    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=180)
+    began = time.perf_counter()
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=600, metadata=release_metadata())
+    def stage(name):
+        nonlocal began
+        now = time.perf_counter()
+        print('mikka-conservation-stage ' + json.dumps({'kind': kind, 'phase': name, 'elapsedMs': round((now - began) * 1000)}, separators=(',', ':')), file=sys.stderr, flush=True)
+        began = now
+    stage('create')
     try:
         conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
+        stage('preload_receipts')
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
-        result = sandbox.commands.run(f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}',
-                                      user='root', timeout=120, request_timeout=125)
+        result = sandbox.commands.run(f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+                                      user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
+        stage('fresh_scan')
         conservation['preloadFinalization'] = conservation['finalization']
-        conservation['finalization'] = json.loads(result.stdout)
+        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
+        stage('fresh_receipt')
         return guard.validate_receipt(conservation, kind)
     finally:
         sandbox.kill()
@@ -399,13 +465,20 @@ def verify_release_evidence(report):
     subscriptions = report.get('subscriptionAcceptance', {})
     for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]:
         row = subscriptions.get(kind, {})
+        ack, authorization = row.get('agentAcceptance', {}), row.get('runtimeAuthorization', {})
         if (row.get('status') != 'passed' or row.get('templateId') != report['templates'][kind]['templateId']
                 or row.get('sourceCommit') != report['sourceCommit'] or row.get('workerSha') != report['workerSha']
                 or row.get('harness') != harness or row.get('model') != model
                 or row.get('credentialRoute') != 'subscription' or row.get('replyVerified') is not True
                 or not re.fullmatch(r'[a-f0-9]{64}', row.get('officialBinarySha256', ''))
                 or not isinstance(row.get('officialCliVersion'), str) or not row['officialCliVersion']
-                or not row.get('runId') or not row.get('deviceId')):
+                or not row.get('runId') or not row.get('deviceId')
+                or ack.get('harness') != harness or ack.get('runIdHash') != hashlib.sha256(row['runId'].encode()).hexdigest()[:16]
+                or ack.get('kind') != ('claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack')
+                or type(ack.get('at')) is not int or ack['at'] <= 0
+                or type(ack.get('ms')) not in (int, float) or not math.isfinite(ack['ms']) or ack['ms'] < 0
+                or authorization.get('source') != 'http_server_link' or authorization.get('complete') is not True
+                or authorization.get('truncated') is not False or authorization.get('extraRemoteCalls') != 0):
             raise ValueError(f'release_subscription_acceptance_missing {kind}')
     return report
 
@@ -446,8 +519,13 @@ def main(argv=None):
         return
     if not args.name:
         parser.error('--name is required to build')
-    kinds = args.kind or list(KINDS)
+    kinds = list(dict.fromkeys(args.kind or KINDS))
     sha = commit(args.source_ref)
+    # Confirm absence before claiming cleanup ownership. A manual collision
+    # must never turn into deletion of a previous candidate.
+    candidates = [{'kind': kind, 'name': f'{args.name}-{kind}'} for kind in kinds]
+    for candidate in candidates:
+        assert_new_template(candidate['name'], api_key)
 
     def one(kind):
         name = f'{args.name}-{kind}'
@@ -461,8 +539,13 @@ def main(argv=None):
 
     # The templates share nothing at build time; build them side by side.
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=len(kinds)) as pool:
-        templates = dict(pool.map(one, kinds))
+    try:
+        with ThreadPoolExecutor(max_workers=len(kinds)) as pool:
+            templates = dict(pool.map(one, kinds))
+    except BaseException:
+        cleanup = cleanup_templates(candidates, api_key)
+        print('mikka-template-cleanup ' + json.dumps(cleanup, separators=(',', ':')), file=sys.stderr, flush=True)
+        raise
     out = {'sourceCommit': sha, 'workerSha': worker_hash(sha), 'templates': templates}
     if args.json:
         print(json.dumps(out))

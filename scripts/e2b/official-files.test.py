@@ -1,4 +1,8 @@
 import importlib.util
+import hashlib
+import json
+import os
+from copy import deepcopy
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +14,106 @@ spec.loader.exec_module(files)
 
 
 class OfficialFiles(unittest.TestCase):
+    def test_provider_certificate_relinks_require_exact_measured_target_and_same_certificate_bytes(self):
+        rules, _ = files.finalization_policy('claude')
+        certificate = next(value['_certificate'] for value in rules.values() if value.get('_certificate') and not value['_certificate'].get('providerRoot'))
+        original = {'path': certificate['path'], 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': certificate['sha256']}
+        updated = {'path': certificate['path'], 'kind': 'link', 'mode': 0o777, 'uid': 0, 'gid': 0, 'target': certificate['target']}
+        with patch.object(files.Path, 'resolve', return_value=Path('/usr/share/ca-certificates/mozilla/fixture.crt')), \
+             patch.object(files, 'entry', side_effect=[updated, {**original, 'path': '/usr/share/ca-certificates/mozilla/fixture.crt'}]):
+            final = files.verify({'version': 1, 'entries': [original]}, 'claude')
+        self.assertEqual(final['before'], final['after'])
+        change = final['providerChanges'][0]
+        self.assertEqual(change['resolvedSha256'], certificate['sha256'])
+        for mutate in [lambda row: row['after'].update(target='/opt/mikka/replaced.crt'),
+                       lambda row: row.update(resolvedSha256='a' * 64),
+                       lambda row: row.update(path='/etc/ssl/certs/unobserved.pem'),
+                       lambda row: row['before'].update(sha256='a' * 64),
+                       lambda row: row['after'].update(uid=1000)]:
+            bad = deepcopy(change)
+            mutate(bad)
+            if 'uid' in bad['after']: bad['before']['uid'] = 0
+            self.assertFalse(files.permitted_provider_change(bad, rules))
+        with patch.object(files, 'entry', return_value=updated):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]})
+
+    def test_cli_capture_uses_original_realpath_without_executing_or_accepting_private_fallback(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            private = root / 'mikka'
+            private.mkdir()
+            original = root / 'official-claude'
+            original.write_text('#!/bin/sh\nexit 49\n')
+            original.chmod(0o755)
+            (root / 'claude').symlink_to(original)
+            replacement = private / 'claude'
+            replacement.write_text('wrong fallback')
+            replacement.chmod(0o755)
+            baseline = files.capture([str(root)], private)
+            with patch.object(files, 'PRIVATE', private), patch.dict(os.environ, {'PATH': f'{private}:{root}'}):
+                captured = files.capture_cli('claude', baseline)
+                self.assertEqual(captured['original']['claude_code'], {
+                    'path': str(original), 'sha256': hashlib.sha256(original.read_bytes()).hexdigest()})
+                self.assertIsNone(captured['original']['codex'])
+                original.write_text('changed original')
+                with self.assertRaisesRegex(ValueError, 'official_cli_baseline_mismatch'):
+                    files.capture_cli('claude', baseline)
+                with patch.dict(os.environ, {'PATH': str(private)}):
+                    with self.assertRaisesRegex(ValueError, 'official_cli_missing'):
+                        files.capture_cli('claude')
+
+    def test_versioned_cli_inventory_survives_atomic_stage_move_and_preserves_previous(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            private = root / 'mikka'
+            old = private / 'releases' / 'old'
+            stage = private / 'releases' / '.stage-new'
+            destination = private / 'releases' / 'new'
+            old.mkdir(parents=True)
+            stage.mkdir()
+            original = root / 'codex'
+            original.write_text('official codex')
+            original.chmod(0o755)
+            inventory = {'version': 1, 'kind': 'codex', 'original': {
+                'claude_code': None, 'codex': {'path': str(original), 'sha256': hashlib.sha256(original.read_bytes()).hexdigest()}}, 'added': {}}
+            prior = old / '.mikka-original-cli.json'
+            prior.write_text(json.dumps(inventory))
+            previous_bytes = prior.read_bytes()
+            private_cli = stage / 'claude'
+            private_cli.write_text('private missing harness')
+            private_cli.chmod(0o755)
+            with patch.object(files, 'PRIVATE', private):
+                finalized = files.finalize_cli(inventory, 'codex', {'claude_code': str(private_cli)}, stage, destination)
+                manifest = stage / '.mikka-original-cli.json'
+                manifest.write_text(json.dumps(finalized))
+                stage.rename(destination)
+                self.assertEqual(finalized['added']['claude_code']['path'], str(destination / 'claude'))
+                self.assertEqual(hashlib.sha256((destination / 'claude').read_bytes()).hexdigest(), finalized['added']['claude_code']['sha256'])
+                self.assertEqual(prior.read_bytes(), previous_bytes)
+                self.assertEqual(finalized['original'], inventory['original'])
+                original.write_text('overwritten official CLI')
+                with self.assertRaisesRegex(ValueError, 'official_cli_changed'):
+                    files.finalize_cli(finalized, 'codex', {'claude_code': str(destination / 'claude')})
+
+    def test_cli_manifest_rejects_missing_desktop_harness_and_replacement_of_original(self):
+        original = {'path': '/usr/local/bin/claude', 'sha256': 'a' * 64}
+        private = {'path': '/opt/mikka/releases/current/claude', 'sha256': 'b' * 64}
+        manifest = {'version': 1, 'kind': 'desktop', 'original': {'claude_code': None, 'codex': None}, 'added': {'claude_code': private}}
+        with self.assertRaisesRegex(ValueError, 'runtime_cli_missing'):
+            files.validate_cli_manifest(manifest, 'desktop')
+        files.validate_cli_manifest(manifest, 'desktop', complete=False)
+        manifest['original']['claude_code'] = original
+        with self.assertRaisesRegex(ValueError, 'official_cli_manifest_invalid'):
+            files.validate_cli_manifest(manifest, 'desktop', complete=False)
+        manifest['added'] = {}
+        manifest['extra'] = True
+        with self.assertRaisesRegex(ValueError, 'official_cli_manifest_invalid'):
+            files.validate_cli_manifest(manifest, 'desktop', complete=False)
+        for malformed in [None, [], {'version': 1, 'kind': 'codex', 'original': [], 'added': {}}]:
+            with self.assertRaisesRegex(ValueError, 'official_cli_manifest_invalid'):
+                files.validate_cli_manifest(malformed, 'codex')
+
     def test_only_control_proven_fields_may_change_during_e2b_finalization(self):
         original = {'path': '/.e2b', 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
         baseline = {'version': 1, 'entries': [original]}
@@ -24,7 +128,7 @@ class OfficialFiles(unittest.TestCase):
         for path, update in [('/usr/local/bin/codex', {'sha256': 'b' * 64}),
                              ('/.e2b', {'uid': 1000}),
                              ('/usr/local/share/e2b/ssl-certs.tar', {'mode': 0o666}),
-                             ('/etc/ssl/certs/ca-certificates.crt', {'sha256': 'b' * 64})]:
+                             ('/etc/ssl/certs/unobserved.crt', {'sha256': 'b' * 64})]:
             before = {**original, 'path': path}
             with patch.object(files, 'entry', return_value={**before, **update}):
                 with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):

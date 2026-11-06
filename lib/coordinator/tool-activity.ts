@@ -87,6 +87,14 @@ export function toolFailure(tool: Pick<ChatTool, 'state' | 'output'>): { failed:
   return failed ? { failed: true, reason } : { failed: false, reason: null }
 }
 
+/**
+ * A call to a tool the bot does not have (the AI SDK's `AI_NoSuchToolError`, #1516): its name is whatever the model
+ * made up (「none」), so it is never shown as a tool's name.
+ */
+export function toolUnknown(tool: Pick<ChatTool, 'state' | 'output'>): boolean {
+  return tool.state === 'error' && /^\s*(?:\{\s*"[^"]+"\s*:\s*")?AI_NoSuchToolError\b/.test(tool.output ?? '')
+}
+
 export interface ToolSummaryPart { action: ToolAction; count: number }
 
 /**

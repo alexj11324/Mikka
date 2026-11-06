@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { candidateReceipt, validateTemplateSubscriptions } from './validate-template-subscriptions.mjs'
+import { createHash } from 'node:crypto'
 
 const COMMIT = 'a'.repeat(40), WORKER = 'b'.repeat(40)
 const DEVICE = '10000000-0000-4000-8000-000000000001', RUN = '10000000-0000-4000-8000-000000000002'
@@ -12,6 +13,11 @@ const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscriptio
   status: 'execution_proved_awaiting_server_timing', sourceCommit: COMMIT, harness, runId: RUN,
   execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription' },
   credentialRoute: 'subscription', replyVerified: true, cleanup: { status: 'passed' },
+  requireAgentAcceptance: true, runtimeTiming: { version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit',
+    runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness, complete: true, truncated: false,
+    startedAt: 1000, endedAt: 2000, ms: 1000, executionStartMs: 100, executionEndMs: 900,
+    requests: [], counts: [], providerOutputChunks: 1, toolCallsStarted: 1, toolCallsCompleted: 1, toolCallsFailed: 0,
+    agentAccepted: { kind: harness === 'codex' ? 'codex_turn_start_ack' : 'claude_user_ack', at: 1100, ms: 100 } },
 }] })
 
 test('a different application commit is refused before login, enrollment or candidate creation', async () => {
@@ -29,11 +35,17 @@ test('a release receipt names the actual candidate, revision, model and register
   const receipt = candidateReceipt(report, 'codex', proof, accepted('codex'))
   assert.deepEqual(receipt, { status: 'passed', templateId: 'candidate-codex', sourceCommit: COMMIT, workerSha: WORKER,
     harness: 'codex', model: 'gpt-6-luna', credentialRoute: 'subscription', replyVerified: true, runId: RUN,
-    deviceId: DEVICE, officialBinarySha256: proof.binarySha256, officialCliVersion: proof.version })
+    deviceId: DEVICE, officialBinarySha256: proof.binarySha256, officialCliVersion: proof.version,
+    agentAcceptance: { runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness: 'codex', kind: 'codex_turn_start_ack', at: 1100, ms: 100 },
+    runtimeAuthorization: { source: 'http_server_link', complete: true, truncated: false, extraRemoteCalls: 0 } })
   for (const mutate of [
     sample => { sample.replyVerified = false }, sample => { sample.execution.credentialType = 'api_key' },
     sample => { sample.execution.deviceId = RUN }, sample => { sample.execution.model = 'other' },
     sample => { sample.sourceCommit = 'd'.repeat(40) }, sample => { sample.cleanup.status = 'failed' },
+    sample => { sample.runtimeTiming.agentAccepted.kind = 'claude_system_init' },
+    sample => { sample.runtimeTiming.runIdHash = 'f'.repeat(16) },
+    sample => { delete sample.runtimeTiming.agentAccepted },
+    sample => { sample.runtimeTiming.truncated = true },
   ]) {
     const value = accepted('codex'); mutate(value.samples[0])
     assert.throws(() => candidateReceipt(report, 'codex', proof, value), /template_gate_/)
