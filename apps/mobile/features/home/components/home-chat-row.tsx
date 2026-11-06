@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
-import { Pin, PinOff } from 'lucide-react-native'
+import { EyeOff, Pin, PinOff } from 'lucide-react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
@@ -11,7 +11,7 @@ import { tap, warn } from '@/lib/haptics'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { SNAP_BACK } from '@/lib/springs'
 import { colors } from '@/lib/theme'
-import { armedAt, PIN_REVEAL, settleSwipe } from '../model/pin-swipe'
+import { armedAt, settleSwipe, SWIPE_REVEAL } from '../model/pin-swipe'
 import type { HomeChat, useHomeChats } from '../model/use-home-chats'
 import { ChatBadge } from './chat-badge'
 import { useChatDrag } from './chat-drag'
@@ -21,8 +21,8 @@ type Actions = ReturnType<typeof useHomeChats>
 
 /**
  * A chat on the home list (#1408 Phase 2b). A tap opens it with the system's link transition; a long press opens its
- * menu over a live preview of the chat (chat-menu.tsx). A swipe to the left shows 置顶 at 88 pt and pins on release
- * past 144 pt, with a tick as it crosses (pin-swipe.ts); on a closed row a swipe to the right is the drawer's, and on
+ * menu over a live preview of the chat (chat-menu.tsx). A swipe to the left shows two capsules, 置顶 and 隐藏 (Comma
+ * design 03), and pins on release past the full mark, with a tick as it crosses (pin-swipe.ts); on a closed row a swipe to the right is the drawer's, and on
  * an open row it closes the row. Holding 250 ms and moving drags it instead (chat-drag.tsx): the two race, and the
  * first to start wins.
  */
@@ -69,7 +69,7 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
       const outcome = settleSwipe(offset.get(), event.velocityX, armed.get())
       armed.set(false)
       if (outcome === 'pin') { settleTo(0); scheduleOnRN(opened, false); scheduleOnRN(pin) }
-      else if (outcome === 'open') { settleTo(-PIN_REVEAL); scheduleOnRN(opened, true) }
+      else if (outcome === 'open') { settleTo(-SWIPE_REVEAL); scheduleOnRN(opened, true) }
       else { settleTo(0); scheduleOnRN(opened, false) }
     }), [armed, blocked, chat.key, offset, onOpen, open, opened, pin, settleTo, start])
   const gesture = useMemo(() => Gesture.Race(drag.gesture, swipe), [drag.gesture, swipe])
@@ -77,10 +77,12 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
   const moved = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }))
   return (
     <View style={styles.clip}>
-      <PinAction chat={chat} offset={offset} blocked={blocked} onPress={() => { close(); if (blocked) warn(); else pin() }} />
+      <SwipeActions chat={chat} offset={offset} blocked={blocked}
+        onPin={() => { close(); if (blocked) warn(); else pin() }}
+        onHide={() => { close(); void actions.setHidden(chat, true) }} />
       <GestureDetector gesture={gesture}>
         <Reanimated.View ref={drag.ref} collapsable={false} style={[styles.surface, moved]}>
-          <ChatLink chat={chat} actions={actions} ignore={() => swiping.current || drag.active()} style={({ pressed }) => pressed && { backgroundColor: colors.pressed }}>
+          <ChatLink chat={chat} actions={actions} ignore={() => swiping.current || drag.active()} style={({ pressed }) => [styles.press, pressed && { backgroundColor: colors.pressed }]}>
             <ChatRowContent row={chat.row} badge={<ChatBadge chat={chat} />} />
           </ChatLink>
           {/* An open row: a tap on it closes it rather than opening the chat. */}
@@ -91,24 +93,37 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
   )
 }
 
-/** The action under a swiped row: 置顶 or 取消置顶, growing with the swipe; grey when the pins are full. */
-function PinAction({ chat, offset, blocked, onPress }: { chat: HomeChat; offset: SharedValue<number>; blocked: boolean; onPress: () => void }) {
-  const grow = useAnimatedStyle(() => ({ width: Math.max(PIN_REVEAL, -offset.get()), opacity: offset.get() < 0 ? 1 : 0 }))
+/** The capsules under a swiped row: 置顶 or 取消置顶 (orange; grey when the pins are full) and 隐藏 (grey). */
+function SwipeActions({ chat, offset, blocked, onPin, onHide }: { chat: HomeChat; offset: SharedValue<number>; blocked: boolean; onPin: () => void; onHide: () => void }) {
+  const shown = useAnimatedStyle(() => ({ width: Math.max(SWIPE_REVEAL, -offset.get()), opacity: Math.min(1, -offset.get() / (SWIPE_REVEAL / 2)) }))
+  const pinLabel = chat.pinned ? '取消置顶' : '置顶'
   return (
-    <Reanimated.View style={[styles.action, { backgroundColor: blocked ? colors.tertiary : colors.orange }, grow]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={chat.pinned ? '取消置顶' : '置顶'} onPress={onPress} style={styles.actionButton}>
-        <Symbol name={chat.pinned ? 'pin.slash.fill' : 'pin.fill'} size={20} color={colors.onAccent}
-          web={chat.pinned ? <PinOff size={20} color={colors.onAccent} strokeWidth={2} /> : <Pin size={20} color={colors.onAccent} strokeWidth={2} />} />
-        <Text style={styles.actionLabel}>{chat.pinned ? '取消置顶' : '置顶'}</Text>
-      </Pressable>
+    <Reanimated.View style={[styles.actions, shown]}>
+      <Capsule label={pinLabel} color={blocked ? colors.tertiary : colors.orange} onPress={onPin}
+        icon={<Symbol name={chat.pinned ? 'pin.slash.fill' : 'pin.fill'} size={19} color={colors.onAccent}
+          web={chat.pinned ? <PinOff size={19} color={colors.onAccent} strokeWidth={2} /> : <Pin size={19} color={colors.onAccent} strokeWidth={2} />} />} />
+      <Capsule label="隐藏" color={colors.tertiary} onPress={onHide}
+        icon={<Symbol name="eye.slash.fill" size={19} color={colors.onAccent} web={<EyeOff size={19} color={colors.onAccent} strokeWidth={2} />} />} />
     </Reanimated.View>
+  )
+}
+
+function Capsule({ label, color, icon, onPress }: { label: string; color: string; icon: ReactNode; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.capsuleButton, pressed && { opacity: 0.7 }]}>
+      <View style={[styles.capsule, { backgroundColor: color }]}>{icon}</View>
+      <Text style={styles.capsuleLabel} numberOfLines={1}>{label}</Text>
+    </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   surface: { backgroundColor: colors.page },
-  action: { position: 'absolute', right: 0, top: 0, bottom: 0, justifyContent: 'center' },
-  actionButton: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  actionLabel: { fontSize: 12.5, lineHeight: 16, fontWeight: '600', color: colors.onAccent },
+  /** The pressed surface sits 10 pt in from each side, rounded 10 (Comma's list rows). */
+  press: { marginHorizontal: 10, borderRadius: 10 },
+  actions: { position: 'absolute', right: 0, top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingRight: 14 },
+  capsuleButton: { alignItems: 'center', gap: 4 },
+  capsule: { width: 58, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  capsuleLabel: { fontSize: 12, lineHeight: 15, color: colors.secondary },
 })

@@ -39,7 +39,7 @@ export function HiddenChatsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   row: { flexDirection: 'row', alignItems: 'center' },
-  open: { flex: 1, minWidth: 0 },
+  open: { flex: 1, minWidth: 0, marginLeft: 10, borderRadius: 10 },
   show: { height: 32, paddingHorizontal: 12, marginRight: 16, borderRadius: 16, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   showText: { fontSize: 14, fontWeight: '600', color: colors.accent },
   none: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
