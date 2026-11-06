@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 spec = importlib.util.spec_from_file_location('build_template', Path(__file__).with_name('build-template.py'))
 bt = importlib.util.module_from_spec(spec)
@@ -23,6 +24,39 @@ def fake(template):
     return opener, calls
 
 class Publish(unittest.TestCase):
+    def test_conservation_reads_build_receipts_and_rechecks_a_fresh_disposable_image(self):
+        calls = []
+        digest = {'entries': 5, 'sha256': 'f' * 64}
+        final = {'kind': 'codex', 'policySha256': bt.official_files_guard().finalization_policy('codex')[1],
+                 'before': digest, 'after': digest, 'originalBefore': digest, 'originalAfter': digest, 'providerChanges': []}
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, path, **options):
+                calls.append(('read', path))
+                return json.dumps(final if path.endswith(('ready.json', 'fresh-conservation.json')) else {'before': digest, 'after': digest})
+            def run(self, command, **options):
+                calls.append(('run', command))
+                return SimpleNamespace(exit_code=0, stdout=json.dumps(final))
+            def kill(self): calls.append(('kill',))
+        result = bt.probe_conservation('candidate', 'fixture-key', 'codex', lambda *_, **__: Probe())
+        self.assertEqual(result['preloadFinalization'], final)
+        self.assertEqual(result['finalization'], final)
+        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'read', 'kill'])
+        self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
+
+    def test_build_name_must_be_absent_and_never_an_official_alias(self):
+        with patch.object(bt, '_request', return_value={'templateID': 'previous-version'}):
+            with self.assertRaisesRegex(ValueError, 'template_name_already_exists'):
+                bt.assert_new_template('mikka-old-claude', 'fixture-key')
+        for name in ('claude', 'codex', 'desktop', '../other'):
+            with self.assertRaisesRegex(ValueError, 'template_name_invalid'):
+                bt.assert_new_template(name, 'fixture-key')
+        with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/new', 404, 'Not found', {}, None)):
+            bt.assert_new_template('mikka-new-claude', 'fixture-key')
+        with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/new', 503, 'Unavailable', {}, None)):
+            with self.assertRaises(HTTPError):
+                bt.assert_new_template('mikka-new-claude', 'fixture-key')
+
     def test_model_probe_requires_each_declared_harness_and_kills_only_its_sandbox(self):
         calls = []
         class Probe:
@@ -79,7 +113,7 @@ class Publish(unittest.TestCase):
         class Template:
             def __new__(cls, **_): return Recipe()
             build = staticmethod(build_recipe)
-        with patch.dict('sys.modules', {'e2b': SimpleNamespace(Template=Template)}), patch.object(bt, 'source_context', side_effect=context):
+        with patch.dict('sys.modules', {'e2b': SimpleNamespace(Template=Template)}), patch.object(bt, 'source_context', side_effect=context), patch.object(bt, 'assert_new_template'):
             sha, result = bt.build(f'mikka-test-{kind}', api_key='fixture-key', kind=kind)
         self.assertEqual(sha, 'a' * 40)
         self.assertEqual(result.template_id, 'tpl1')
@@ -108,7 +142,7 @@ class Publish(unittest.TestCase):
     def test_template_start_preloads_only_anonymous_private_runtime(self):
         text = (bt.ROOT / 'scripts/e2b/start-prebuilt.sh').read_text()
         self.assertIn('--wait-bootstrap', text)
-        self.assertIn('env -i', text)
+        self.assertNotIn('env -i', text)
         self.assertIn('/opt/mikka/runtime/node/bin/node', text)
         self.assertNotIn('rm ', text)
         self.assertNotIn('sleep ', text)
@@ -116,9 +150,14 @@ class Publish(unittest.TestCase):
 
     def test_release_gate_rejects_missing_stale_and_non_subscription_receipts(self):
         proof = {'entries': 4, 'sha256': 'f' * 64}
+        def conservation(kind):
+            return {'before': proof.copy(), 'after': proof.copy(), 'finalization': {
+                'kind': kind, 'policySha256': bt.official_files_guard().finalization_policy(kind)[1],
+                'before': proof.copy(), 'after': proof.copy(), 'originalBefore': proof.copy(),
+                'originalAfter': proof.copy(), 'providerChanges': []}}
         report = {'sourceCommit': 'a' * 40, 'workerSha': 'b' * 40, 'templates': {
             kind: {'templateId': 'tpl-' + kind, 'buildId': 'build-' + kind, 'baseTemplate': kind, 'preinstalled': True,
-                   'conservation': {'before': proof.copy(), 'after': proof.copy()}} for kind in bt.KINDS}}
+                   'conservation': conservation(kind)} for kind in bt.KINDS}}
         with self.assertRaisesRegex(ValueError, 'release_subscription_acceptance_missing'):
             bt.verify_release_evidence(report)
         report['subscriptionAcceptance'] = {

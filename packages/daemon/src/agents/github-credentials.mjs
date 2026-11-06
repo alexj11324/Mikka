@@ -50,6 +50,10 @@ export function matchesGitRepository(input) {
 }
 
 export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.now, minValidityMs = 60_000 } = {}) {
+  // New claims already resolved the run owner's token. Ordinary git/gh
+  // operations reuse it; no age-based reauthorization is introduced.
+  if (typeof config.token === 'string' && config.token &&
+    (config.expiresAt == null || Date.parse(config.expiresAt) - now() > minValidityMs)) return config.token
   const cachePath = `${config.file}.cache`
   try {
     const stat = await lstat(cachePath)
@@ -59,6 +63,7 @@ export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.no
         cached.createdAt <= now() && now() - cached.createdAt < MAX_CACHE_AGE && Date.parse(cached.expiresAt) - now() > minValidityMs) return cached.token
     }
   } catch { /* No reusable run-local token. */ }
+  if (!config.runToken) throw new RunGitHubCredentialError('runGitHubUnavailable')
   const response = await fetcher(config.endpoint, {
     method: 'POST', redirect: 'error', cache: 'no-store',
     headers: { authorization: `Bearer ${config.runToken}` }, signal: AbortSignal.timeout(15_000),

@@ -98,19 +98,35 @@ def run():
         return {'cpuCount': info.cpu_count, 'memoryMB': info.memory_mb}
     try:
         def build_one(kind):
+            phase = 'base_resources'
+            began = time.perf_counter()
             # Use the exact official-base allocation for a like-for-like test.
             base = create(kind)
             try:
                 allocation = resources(base)
             finally:
                 kill(base)
+            phase = 'build'
             _, result = builder.build(prefix + '-' + kind, sha, api_key=key, kind=kind,
                                       cpu_count=allocation['cpuCount'], memory_mb=allocation['memoryMB'],
                                       on_build_logs=lambda entry: print(f'[{kind}] {entry}', file=sys.stderr, flush=True))
             templates[kind] = result.template_id
-            proof = builder.probe_conservation(result.template_id, key, kind)
+            try:
+                phase = 'conservation'
+                proof = builder.probe_conservation(result.template_id, key, kind)
+                phase = 'models'
+                models = builder.probe_models(result.template_id, kind, key)
+            except Exception as error:
+                detail = {'kind': kind, 'phase': phase, 'error': type(error).__name__, 'elapsedMs': round((time.perf_counter() - began) * 1000)}
+                # Only our checker's metadata/hash diagnostic is allowed here;
+                # SDK error representations can contain response credentials.
+                for line in getattr(error, 'stderr', '').splitlines():
+                    marker = 'RuntimeError: official_files_changed '
+                    if line.startswith(marker):
+                        detail['officialChanges'] = json.loads(line.removeprefix(marker))
+                print('mikka-component-validation-failed ' + json.dumps(detail, separators=(',', ':')), flush=True)
+                raise
             print('mikka-component-conservation ' + json.dumps({'kind': kind, 'conservation': proof}, separators=(',', ':')), flush=True)
-            models = builder.probe_models(result.template_id, kind, key)
             return kind, {'templateId': result.template_id, 'buildId': result.build_id,
                           'baseTemplate': kind, 'preinstalled': True, 'resources': allocation,
                           'conservation': proof, 'models': models}

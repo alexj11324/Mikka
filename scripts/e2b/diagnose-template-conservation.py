@@ -21,6 +21,11 @@ try:
     receipt={'status':'preserved','conservation':guard.verify(json.loads(Path('/opt/mikka/before.json').read_text()))}
 except RuntimeError as error:
     receipt={'status':'changed','detail':str(error)}
+    if str(error).startswith('official_files_changed '):
+        changes=json.loads(str(error).removeprefix('official_files_changed '))
+        receipt['certificateTargets']=[{'path':row['path'],'resolvedPath':str(Path(row['path']).resolve(strict=True)),
+                                       'sha256':guard.entry(Path(row['path']).resolve(strict=True)).get('sha256')}
+                                      for row in changes if row['path'].startswith('/etc/ssl/certs/') and row['after'].get('kind')=='link']
 Path('/opt/mikka/ready-diagnostic.json').write_text(json.dumps(receipt)+'\n')
 PY
 exec sleep infinity'''

@@ -2,7 +2,7 @@ import 'server-only'
 import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, pool } from '@/lib/db'
-import { notifyRunControl } from '@/lib/device-gateway-notify'
+import { runPolicyStopSQL, notifyStoppedPolicyRuns, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 import { agentRuns, bots } from '@/lib/db/schema'
 import { teamMembers, teams } from '@/lib/db/team-schema'
 import { workspaceInvitations, workspaceMembers } from '@/lib/db/workspace-schema'
@@ -79,7 +79,8 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
  * their subscription share, API key shares and credit share leave with them and their bots there pause until an
  * admin takes one over. Runs on that subscription are stopped at once, and
- * model calls check the share and the membership on every call.
+ * the machine receives a stop through its control channel. New admissions and
+ * background credential renewals check the current share and membership.
  */
 export async function releaseDepartingMember(workspaceId: string, userId: string) {
   // A card they designated keeps paying through its grace period; admins see when it stops (计费).
@@ -93,12 +94,12 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
     const archived = await main.update(bots).set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, userId), isNull(bots.archivedAt))).returning({ id: bots.id })
     for (const { id } of archived) await botListChanged(main, id)
+    const stopped = await main.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'workspace', workspaceId, ownerId: userId }))
+    notifyStoppedPolicyRuns(main, stopped.rows)
   })
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
   await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
-  // Their own runs lose the membership their policy needs: wake those daemons.
-  await notifyRunControl(pool, { userId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */

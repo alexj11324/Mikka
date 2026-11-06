@@ -8,6 +8,7 @@ import { z } from 'zod'
 import test from 'node:test'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { readCliRunPolicy, readCliAgentPolicy, lockCliTaskScope, providerContinuationPolicy } from './policy-store'
 import { readIssueMetadata } from '../issue-metadata'
 import { setCliPolicy, setCliAgentPolicy } from './policy-settings'
@@ -20,6 +21,8 @@ import { freezeWorkerDefinition } from '../agent-kit/worker'
 import { intersectRunPolicy } from '../run-assignment-policy'
 import { continuedRunPolicyCeiling } from '../computer/run-model'
 import { humanSessionHeaders } from '../desktop-rpc/handler'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import { runPolicyStopSQL, type RunPolicyStopScope } from '../run-policy-stop'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) {
@@ -33,6 +36,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   const priorSecret = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET = 'isolated-policy-distribution-test-fixture-only'
   const pool = new Pool({ connectionString: target })
+  observePoolCommits(pool)
   const { workspacePool } = await import('../workspace-db')
   const { pool: appPool } = await import('../db')
   const tokenId = randomUUID(), token = randomUUID()
@@ -485,4 +489,53 @@ test('task policy transfers metadata without document bodies and retains complet
   await client.query('UPDATE issues SET content=\'{"type":"doc"}\' WHERE id=$1',[id])
   await assert.rejects(lockCliTaskScope(measured,'another-owner',id),/agentPolicyUnavailable/)
   await assert.rejects(lockCliTaskScope(measured,owner,randomUUID()),/agentPolicyUnavailable/)
+})
+
+test('direct machine policy changes stop exactly their admitted scope in the same transaction', { skip: !target }, async t => {
+  const admin = new Pool({ connectionString: target })
+  const schema = `policy_stop_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  const database = new Pool({ connectionString: target, options: `-c search_path=${schema}` })
+  t.after(async () => { await database.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
+  await database.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"workspaceId" uuid);
+    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"botId" uuid,"issueId" uuid,"deviceId" uuid,
+      "machineAuthority" boolean,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz,cli_policy_hierarchy jsonb)`)
+  const [wa, wb, ba, bb, aa, ab, ia, ib, ic, ta, tb, pa, pb, device] = Array.from({ length: 14 }, () => randomUUID())
+  await database.query('INSERT INTO bots VALUES($1,$2),($3,$4)', [ba, wa, bb, wb])
+  const rows = [
+    { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: true, status: 'running' },
+    { owner: 'a', agent: aa, bot: bb, issue: ib, workspace: wb, team: tb, project: pb, direct: true, status: 'paused' },
+    { owner: 'a', agent: ab, bot: bb, issue: ic, workspace: wa, team: ta, project: pb, direct: true, status: 'running' },
+    { owner: 'b', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: true, status: 'running' },
+    { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: false, status: 'running' },
+    { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: true, status: 'completed' },
+  ].map(row => ({ ...row, id: randomUUID() }))
+  for (const row of rows) await database.query(`INSERT INTO agent_runs VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL,now()+interval '5 minutes',now(),$9)`,
+    [row.id, row.owner, row.agent, row.bot, row.issue, device, row.direct, row.status, { workspaceId: row.workspace, teamId: row.team, projectId: row.project }])
+  const cases: [RunPolicyStopScope, number[]][] = [
+    [{ kind: 'worker', ownerId: 'a', agentId: aa }, [0, 1]],
+    [{ kind: 'agent', ownerId: 'a', botId: ba }, [0]],
+    [{ kind: 'workspace', workspaceId: wa }, [0, 2, 3]],
+    [{ kind: 'workspace', workspaceId: wa, ownerId: 'a' }, [0, 2]],
+    [{ kind: 'team', scopeId: ta }, [0, 2, 3]],
+    [{ kind: 'team', scopeId: ta, ownerId: 'a' }, [0, 2]],
+    [{ kind: 'project', scopeId: pa }, [0, 3]],
+    [{ kind: 'task', issueId: ia }, [0, 3]],
+    [{ kind: 'tasks', issueIds: [ib, ic] }, [1, 2]],
+    [{ kind: 'tasks', issueIds: [] }, []],
+  ]
+  for (const [scope, expected] of cases) {
+    const client = await database.connect()
+    try {
+      await client.query('BEGIN')
+      const compiled = new PgDialect().sqlToQuery(runPolicyStopSQL(scope))
+      const stopped = await client.query(compiled.sql, compiled.params)
+      assert.deepEqual(stopped.rows.filter(row => row.stopped).map(row => row.id).sort(), expected.map(index => rows[index]!.id).sort(), scope.kind)
+      const state = await client.query('SELECT id,"stopRequestedAt" IS NOT NULL AS stopped,"leaseExpiresAt"<=clock_timestamp() AS expired FROM agent_runs ORDER BY id')
+      assert.deepEqual(state.rows.filter(row => row.stopped).map(row => row.id), expected.map(index => rows[index]!.id).sort())
+      assert.ok(state.rows.filter(row => row.stopped).every(row => row.expired))
+      assert.equal(state.rows.find(row => row.id === rows[4]!.id).stopped, false, 'legacy daemons keep their existing control contract')
+    } finally { await client.query('ROLLBACK'); client.release() }
+    assert.equal((await database.query('SELECT count(*)::int AS count FROM agent_runs WHERE "stopRequestedAt" IS NOT NULL')).rows[0].count, 0, 'a rolled-back policy mutation cannot stop a machine')
+  }
 })

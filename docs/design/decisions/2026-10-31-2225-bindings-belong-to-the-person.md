@@ -9,6 +9,7 @@
 - Rule: —
 - Superseded in part by: [2026-11-01-1152](2026-11-01-1152-payment-card-row-and-credit-shares.md) (the payer row names the card, with no 「正在支付」)
 - Superseded in part by: [2026-11-01-2240-own-credentials-always-usable](2026-11-01-2240-own-credentials-always-usable.md) (rule 3: no per-workspace opt-in and no admin switch for a person's own subscriptions and API keys; an admin can switch off only 分享给团队成员; app and computer policies never stop a person's own connections or bots)
+- Superseded in part by: [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md) (rule 4 revocation transport and rule 8 credential delivery/runtime lifecycle; ownership and billing remain).
 - Replaces: in [personal vs workspace](2026-10-31-2130-personal-vs-workspace.md),
   the three admin switches, 「a subscription runs in any workspace the owner
   belongs to」, and 「work with no workspace of its own bills the personal
@@ -43,10 +44,13 @@
      member shared here with 分享给团队成员, Claude first, then the oldest
      share; otherwise Mikka 默认. A Coordinator only ever uses its own
      person's subscription.
-   - Other members see only 「X 的 Claude 订阅」 as available, never the
-     credential; the owner sees, under 使用中, which bots used it.
-   - Un-sharing, turning the option off, leaving, or the admin switch stops
-     it for everyone at the next model call; a frozen run stops, no fallback.
+   - Settings shows other members 「X 的 Claude 订阅」 as available without
+     displaying the secret value; the owner sees, under 使用中, which bots
+     used it. An admitted task receives the real selected credential under 1800.
+   - Un-sharing, turning the option off, leaving, or the admin switch persists
+     and pushes a stop to the affected runner or reclaims its VM. A frozen run
+     stops without fallback; execution does not wait for another model-call
+     permission check ([1800](2026-11-06-1800-machine-is-the-execution-boundary.md)).
 5. **A member may pay for a team with their own card**
    (「由我的卡支付这个团队」). Follow-up: it changes who Stripe charges.
 6. **Leaving a team, or un-sharing,** removes the member's subscription share
@@ -59,14 +63,14 @@
    counts as verified when its owner verified any workspace they own, and
    starts like a new sign-up, with the free allowance. The payment method
    stays per workspace (rules 2 and 5).
-8. **Cloud snapshots hold software only, never credentials.** A workspace or
-   thread snapshot contains the repository, its dependencies and the
-   installed harnesses (Claude Code, Codex). The credential the resolver
-   picked is injected at run start through the run-scoped broker, scoped to
-   that run and gone when it ends or pauses, so un-sharing or leaving takes
-   effect on the next run without a snapshot rebuild. Subscription tokens
-   already never reach the sandbox (only a placeholder does); making
-   snapshots exclude every other run credential is a follow-up.
+8. **Reusable templates hold software only, never task credentials.** The
+   assigned private VM receives its real subscription login, GitHub token and
+   model key during preparation. Its normal private state may remain while
+   that same task is paused; it is never published as a reusable image or
+   assigned to another task. Official CLIs talk directly to providers, natural
+   renewal runs in the background, and task completion reclaims the VM. This
+   replaces the earlier per-run placeholder/broker and mandatory credential
+   removal on every pause ([1800](2026-11-06-1800-machine-is-the-execution-boundary.md)).
 9. **Migration.** A workspace with other members becomes `team` and keeps its
    history, bots, card, credits and billing. Every existing subscription
    stays shared where it was connected. Nothing silently stops.

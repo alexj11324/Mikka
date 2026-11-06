@@ -5,7 +5,7 @@
 // 2026-11-01-2335): nothing is asked per tool. The run's live gate stops it
 // when the run is revoked. Hosted runs spawn through the hosted runner.
 //
-// Isolation (ADR 0009; devices are runners, 2026-10-31): every run gets its
+// Personal runs retain their existing session storage: every run gets its
 // own `HOME` and `CLAUDE_CONFIG_DIR` in its run dir, so the person's
 // `~/.claude`, their login (Claude Code keys its macOS Keychain entry by the
 // config dir) and their settings are never read or written. The run's
@@ -14,12 +14,15 @@
 // MCP servers out too. The session store lives in that run home, so `resume`
 // works after a daemon restart; a follow-up run copies the earlier run's
 // `projects` store first.
+// Cloud tasks own the VM and use its normal HOME/settings with direct native
+// credentials (decision 2026-11-06-1800); no extra inner environment is made.
 import { claudeQuotaSignal, mergeQuota, type QuotaSignal } from "../runs/quota-exhausted"
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 import { daemonTracer, runIdHash } from "../tracing"
+import { runRuntimeTimings } from '../run-runtime-timing'
 import type { Readable, Writable } from "node:stream"
 
 import {
@@ -86,7 +89,7 @@ export interface ClaudeAdapterOptions {
   /** The daemon's pinned Claude Code, installed on first need. */
   ensureBinary?: () => Promise<string>
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
-  spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess & { stderr?: Readable }
+  spawnHosted?: (options: SpawnOptions, oauthToken?: string) => SpawnedProcess & { stderr?: Readable }
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
@@ -98,6 +101,8 @@ export interface ClaudeAdapterOptions {
     /** Only with the trusted hosted transport and the public socket marker. */
     brokered?: true
     accountId: string
+    /** A background lease cache supplies native SDK refresh requests locally. */
+    automaticRefresh?: true
     verify?(): Promise<void>
     token(): Promise<{
       accountId: string
@@ -462,7 +467,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let expiresAt = 0
     if (externalAuth) {
       if(externalAuth.brokered && !this.options.spawnHosted)throw new Error(SUBSCRIPTION_ERROR)
-      const clean = buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
@@ -495,11 +500,11 @@ export class ClaudeAdapter implements AgentAdapter {
     }
     // Never the host's login or config. This is config isolation only; a
     // hosted runner still requires an owner security boundary.
-    const nativeHome = join(runDir, "native-home")
-    const configDir = join(nativeHome, ".claude")
-    ownDir(nativeHome)
-    ownDir(configDir)
-    if (mode === "continue" && options.continueSession) {
+    const nativeHome = options.machineEnvironment ? options.env.HOME : join(runDir, "native-home")
+    if (!nativeHome) throw new Error('Cloud machine HOME unavailable')
+    const configDir = options.machineEnvironment ? options.env.CLAUDE_CONFIG_DIR ?? join(nativeHome, '.claude') : join(nativeHome, ".claude")
+    if (!options.machineEnvironment) { ownDir(nativeHome); ownDir(configDir) }
+    if (!options.machineEnvironment && mode === "continue" && options.continueSession) {
       carryHistory(join(runPaths(this.options.stateDir, options.continueSession.runId).runDir, "native-home", ".claude"), configDir, ["projects"])
     }
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_ERROR)
@@ -513,6 +518,7 @@ export class ClaudeAdapter implements AgentAdapter {
       mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
+      machineEnvironment: options.machineEnvironment,
       childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
@@ -584,21 +590,36 @@ export class ClaudeAdapter implements AgentAdapter {
       child.once("exit", off)
       return child
     }
+    const credentialSecrets = [nativeToken, options.credential?.key].filter((value): value is string => Boolean(value && value !== NATIVE_AUTH_PLACEHOLDER))
+    const refreshOptions = externalAuth?.automaticRefresh ? {
+      getOAuthToken: async ({ signal }: { signal: AbortSignal }): Promise<string | null> => {
+        if (signal.aborted || approval.revoked || ending) return null
+        const value = await externalAuth.token()
+        if (value.accountId !== externalAuth.accountId || !value.accessToken || /[\r\n\0]/.test(value.accessToken) ||
+          Date.parse(value.expiresAt) <= Date.now()) return null
+        nativeToken = value.accessToken
+        expiresAt = Date.parse(value.expiresAt)
+        if (!credentialSecrets.includes(nativeToken)) credentialSecrets.push(nativeToken)
+        options.onCredential?.('SUBSCRIPTION_ACCESS_TOKEN', nativeToken)
+        return nativeToken
+      },
+    } : {}
     const session = query({
       prompt: prompts,
       options: {
+        ...refreshOptions,
         cwd: ctx.worktree,
-        // Replaces the environment: the CLI sees the run's clean env only.
+        // Hosted options contain the full machine environment; personal
+        // runs retain their existing child environment preparation.
         env: {
           ...options.env,
           ...ctx.tempEnv(),
           ...CLAUDE_RUN_ENV,
           CLAUDE_CODE_TMPDIR: ctx.tmpDir,
           ...credentialEnv,
-          HOME: nativeHome,
-          CLAUDE_CONFIG_DIR: configDir,
+          ...(!options.machineEnvironment ? { HOME: nativeHome, CLAUDE_CONFIG_DIR: configDir } : {}),
         },
-        settingSources: [],
+        settingSources: options.machineEnvironment ? ["user", "project", "local"] : [],
         settings: {
           ...claudeSettings(options.policy),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
@@ -609,7 +630,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
           ...claudeAppServers(options.apps),
         },
-        strictMcpConfig: true,
+        strictMcpConfig: !options.machineEnvironment,
         systemPrompt: {
           type: "preset",
           preset: "claude_code",
@@ -621,10 +642,10 @@ export class ClaudeAdapter implements AgentAdapter {
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
-        // A hosted run spawns through the hosted runner; an API-key run there holds the placeholder too.
+        // The hosted runner passes the actual credential to the official CLI.
         spawnClaudeCodeProcess: (config: SpawnOptions) => {
           const child = this.options.spawnHosted
-            ? this.options.spawnHosted(config, nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
+            ? this.options.spawnHosted(config, nativeToken)
             : spawnLocal(config)
           // Capture the actual pipe. The SDK's stderr callback can remain
           // empty for a custom spawn, including when a result precedes exit.
@@ -663,7 +684,7 @@ export class ClaudeAdapter implements AgentAdapter {
     }
     // The native text can hold the lease: only redacted copies reach the log,
     // and the run's error names a fixed class.
-    const secrets = nativeToken && nativeToken !== NATIVE_AUTH_PLACEHOLDER ? [nativeToken] : []
+    const secrets = credentialSecrets
     const subscriptionFailure = (category: string, fields: Record<string, unknown>) => {
       try {
         log.warn({
@@ -702,6 +723,12 @@ export class ClaudeAdapter implements AgentAdapter {
             message.session_id !== sessionId
           )
             throw new Error("Claude resumed a different question session")
+          if ('session_id' in message && message.session_id === sessionId) {
+            if (message.type === 'system' && message.subtype === 'init')
+              runRuntimeTimings.agentAccepted(options.runId, 'claude_system_init')
+            else if (message.type === 'assistant' || message.type === 'user')
+              runRuntimeTimings.agentAccepted(options.runId, 'claude_first_event')
+          }
           if (message.type === "system" && message.subtype === "init" && typeof message.model === "string")
             runtimeModel = message.model || null
           if (message.type === "assistant" && message.parent_tool_use_id == null && typeof message.message.model === "string")
@@ -760,10 +787,10 @@ export class ClaudeAdapter implements AgentAdapter {
       }
     })()
 
-    // This SDK exposes no documented host token-refresh callback. End at the
-    // access lease boundary; the broker refreshes once before the next start.
-    // Never hand the rotating grant to a second refresh writer.
-    authTimer = externalAuth && !externalAuth.brokered
+    // New direct runners use the pinned SDK's oauth_token_refresh callback
+    // and a background lease cache. Legacy callers without that cache retain
+    // their old expiry behavior; no rotating refresh grant reaches a CLI.
+    authTimer = externalAuth && !externalAuth.brokered && !externalAuth.automaticRefresh
       ? setTimeout(
           () => {
             void end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
@@ -858,7 +885,7 @@ export class ClaudeAdapter implements AgentAdapter {
         if (externalAuth?.verify) {
           try { await externalAuth.verify() } catch (error) { await end({ outcome: 'failed', error: SUBSCRIPTION_ERROR }); throw new Error(SUBSCRIPTION_ERROR, { cause: error }) }
         }
-        if (externalAuth && !externalAuth.brokered && Date.now() >= expiresAt) {
+        if (externalAuth && !externalAuth.brokered && !externalAuth.automaticRefresh && Date.now() >= expiresAt) {
           await end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
           throw new Error(SUBSCRIPTION_ERROR)
         }

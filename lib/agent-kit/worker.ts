@@ -9,7 +9,7 @@ import type { RepositoryAdmission } from '../repository-admission'
 import { mcpAuthoritySchema, type McpAuthority } from '../plugins/contracts'
 import type { OrderEntry, RunLocation } from '../model-order-plan'
 import { runPolicySchema, type RunPolicy } from '@mikka/protocol/agent-policy'
-import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from '../model-routing'
+import { modelTier, supportedModelEfforts, type FrozenModelRoutingSnapshot } from '../model-routing'
 
 /** Host-recorded model choice, distinct from the CLI's explicit model argument. */
 export interface WorkerModelDispatch {
@@ -17,7 +17,7 @@ export interface WorkerModelDispatch {
   location?: RunLocation
   entry?: OrderEntry
   /** Host-validated difficulty choice, frozen with the actual model. */
-  routing?: ModelRoutingSnapshot
+  routing?: FrozenModelRoutingSnapshot
 }
 
 export interface WorkerDefinitionSnapshot {

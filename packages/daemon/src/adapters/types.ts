@@ -69,7 +69,11 @@ export interface SessionOptions {
   credential?: RunCredential
   /** Trusted server-issued delivery binding, never model-selected. */
   /** The run owner's own GitHub credential for git and gh; `branch` is the task branch a delivering run pushes. */
-  github?: { endpoint: string; repository: string; branch?: string; runToken: string; issueId: string }
+  github?: { endpoint: string; repository: string; branch?: string; runToken?: string; issueId: string; token?: string; expiresAt?: string | null }
+  /** Trusted cloud runner: use the task machine's ordinary HOME and environment. */
+  machineEnvironment?: true
+  /** Add a refreshed credential to the existing in-memory output masker before use. */
+  onCredential?(name: string, value: string): void
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */
   apps?: RunApps
   /** Trusted claimed run MCP; independent of optional app connections. */

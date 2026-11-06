@@ -1112,7 +1112,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     const Y = await import('yjs')
     for (const caller of ['document', 'preference', 'save', 'metadata', 'relation-target', 'duplicate-source', 'duplicate-descendant', 'history', 'members', 'options', 'get', 'legacy-get', 'republished-document'] as const) {
       const target = randomUUID(); await seed(target, target, false)
-      if (caller === 'legacy-get') await pool.query('update issues set content=content #- \'{attrs,mikka,number}\' where id=$1',[target])
+      // The database never lets a task lose its number; the read must leave it exactly as it was.
+      const numberBefore = Number((await pool.query('select number from issues where id=$1',[target])).rows[0].number)
       let source = target
       if (caller === 'relation-target' || caller === 'duplicate-descendant') { source = randomUUID(); await seed(source, source, false) }
       for (const id of new Set([source, target])) await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,owner,member])
@@ -1173,7 +1174,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
         assert.ok(row.title===privateText && JSON.stringify(row.content).includes(privateText))
         assert.equal(row.scope,caller==='republished-document'?'workspace':'personal')
         assert.equal(row.revision,caller==='republished-document'?4:3)
-        if (caller === 'legacy-get') assert.equal(readIssueMetadata(row.content).number, undefined, 'a retired teammate read must not backfill the private task number')
+        assert.equal(readIssueMetadata(row.content).number, numberBefore, 'a retired teammate read must not change the private task number')
         assert.equal(Number((await pool.query('select count(*) from issues where "userId"=$1',[member])).rows[0].count),beforeMemberIssues+(safePublicDuplicate?1:0))
         assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1 and content::text like $2',[member,`%${privateText}%`])).rows[0].n,0)
         assert.equal(JSON.stringify(provider.requests).includes(privateText),false)

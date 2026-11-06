@@ -20,6 +20,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 from urllib.error import HTTPError
 from pathlib import Path
@@ -31,7 +32,7 @@ WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
                 'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
 # What else decides the template's contents: its bootstrap and the build steps below.
 COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
-BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'start-prebuilt.sh')
+BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'e2b-certificate-relinks.json', 'start-prebuilt.sh')
 INSTANCE_BOOTSTRAP = 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
 RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES),
                 'scripts/e2b/build-template.py', 'scripts/e2b/template-capabilities.json',
@@ -290,7 +291,7 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
         for runtime_file in (*BOOTSTRAP_FILES, 'instance-bootstrap.sh'):
             template = template.copy(runtime_file, f'/opt/mikka/{runtime_file}')
         template = (template
-                    .run_cmd('python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json', user='root')
+                    .run_cmd(f'python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind {kind} --cli-manifest /opt/mikka/original-cli.json', user='root')
                     .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='user')
                     .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
@@ -364,18 +365,28 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
-    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=180)
+    began = time.perf_counter()
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=600)
+    def stage(name):
+        nonlocal began
+        now = time.perf_counter()
+        print('mikka-conservation-stage ' + json.dumps({'kind': kind, 'phase': name, 'elapsedMs': round((now - began) * 1000)}, separators=(',', ':')), file=sys.stderr, flush=True)
+        began = now
+    stage('create')
     try:
         conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
+        stage('preload_receipts')
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
-        result = sandbox.commands.run(f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}',
-                                      user='root', timeout=120, request_timeout=125)
+        result = sandbox.commands.run(f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+                                      user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
+        stage('fresh_scan')
         conservation['preloadFinalization'] = conservation['finalization']
-        conservation['finalization'] = json.loads(result.stdout)
+        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
+        stage('fresh_receipt')
         return guard.validate_receipt(conservation, kind)
     finally:
         sandbox.kill()

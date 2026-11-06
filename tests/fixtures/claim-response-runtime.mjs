@@ -56,6 +56,7 @@ const sources = new Map([
       return {query(sql,args){
         if(!sql.startsWith('UPDATE agent_runs SET "deviceTokenId"=$2')||args[0]!==p.run.id||args[1]!=="synthetic-device-token"||args[2]!=="member")throw new Error("unexpected SQL in claim fixture")
         p.run.deviceTokenId=args[1]
+        p.run.machineAuthority=args[3]
         return Promise.resolve({rows:[],rowCount:1})
       }}
     }
@@ -82,7 +83,8 @@ const sources = new Map([
   ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
   ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
   ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
-  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){throw new Error("unexpected subscription access")}'],
+  ['/lib/github/user-access.ts', 'export async function githubTokenForUser(owner){const p=globalThis.claimResponseProbe;p.credentialOwners.push(owner);await p.beforeCredential?.();if(p.credentialFailure)throw p.credentialFailure;return {token:"fixture-claim-github-token",githubAccountId:"123",expiresAt:new Date("2030-01-01T00:00:00.000Z")}}'],
+  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){const p=globalThis.claimResponseProbe;if(!p.nativeLease)throw new Error("unexpected subscription access");return {async nativeRun(owner,device,run){(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}},async nativeLease(use){(p.nativeLeaseCalls??=[]).push(use);return p.nativeLease}}}'],
 ])
 registerHooks({
   resolve(specifier,context,next){

@@ -844,8 +844,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(await questionHistory(f), before);
     }));
 
-    await t.test('a queued stage upgrades its adopted official VM before bootstrap and preserves its completed producer', () => withRefreshWorker(async () => {
-      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+    for (const derived of [false, true]) await t.test(`a queued stage upgrades its adopted ${derived ? 'retired additive' : 'official'} VM before bootstrap and preserves its completed producer`, () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId, { template: derived ? 'retired-derived-codex' : 'codex' }), next = await run(issueId);
+      if (derived) await pool.query('UPDATE thread_machines SET "templateKind"=$2 WHERE "runId"=$1', [prior.runId, 'codex']);
       await pool.query(`UPDATE agent_runs SET "sessionId"='retained-original-session',report='{"summary":"original immutable result"}' WHERE id=$1`, [prior.runId]);
       const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0];
       const fixture = refreshFake({ prior }, 'paused'), connect = fixture.provider.connect;
@@ -853,6 +854,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         const sandbox = await connect(...args), execute = sandbox.commands.run.bind(sandbox.commands);
         sandbox.commands.run = (async (...commandArgs: Parameters<typeof sandbox.commands.run>) => {
           if (String(commandArgs[0]).includes('MIKKA_OFFICIAL_WORKER_STAGE')) {
+            assert.match(String(commandArgs[0]), /bash -s -- [a-f0-9]{40} [a-f0-9]{40} codex stage /, 'worker maintenance uses the preserved official base, never the retired image ID');
             const tx = await pool.connect();
             try {
               await tx.query('BEGIN'); await tx.query(`SET LOCAL lock_timeout='250ms'`);
@@ -871,6 +873,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0], before);
       assert.equal((await machine(prior.runId)).sandboxId, null);
       assert.deepEqual(await machine(next), { state: 'running', sandboxId: prior.sandboxId, deviceId: prior.device, issueId });
+      assert.equal((await pool.query('SELECT "templateKind" FROM thread_machines WHERE "runId"=$1', [next])).rows[0].templateKind, 'codex');
       const current = (await pool.query('SELECT status,"deviceId","sessionId" FROM agent_runs WHERE id=$1', [next])).rows[0];
       assert.deepEqual(current, { status: 'queued', deviceId: prior.device, sessionId: null }, 'the independent checker has not borrowed the producer session');
     }));
@@ -1262,6 +1265,25 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       }
     });
 
+    await t.test('additive releases preserve the task VM and official harness provenance after catalogue rotation', async () => {
+      const issueId = await task(), before = await parked(issueId, { template: 'retired-derived-codex' });
+      await pool.query('UPDATE thread_machines SET "templateKind"=$2 WHERE "runId"=$1', [before.runId, 'codex']);
+      const next = await run(issueId), fixture = fake();
+      fixture.provider.connect = async id => { fixture.calls.push(`connect:${id}`); throw new Error('fixture retained derived runtime'); };
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), RetainedTaskMachineUnavailable);
+      assert.deepEqual(fixture.calls, [`connect:${before.sandboxId}`]);
+      const retained = (await pool.query('SELECT "snapshotId","templateKind","sandboxId" FROM thread_machines WHERE "runId"=$1', [next])).rows[0];
+      assert.deepEqual(retained, { snapshotId: 'retired-derived-codex', templateKind: 'codex', sandboxId: before.sandboxId });
+      assert.equal((await machine(before.runId)).sandboxId, null);
+    });
+    await t.test('a derived VM from another official harness cannot be adopted', async () => {
+      const issueId = await task(), before = await parked(issueId, { template: 'retired-derived-claude' });
+      await pool.query('UPDATE thread_machines SET "templateKind"=$2 WHERE "runId"=$1', [before.runId, 'claude']);
+      const next = await run(issueId), fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider));
+      assert.deepEqual(fixture.calls, ['create']);
+      assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+    });
     await t.test("the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device", async () => {
       const issueId = await task();
       const before = await parked(issueId);

@@ -94,12 +94,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       assertNoProfile(run.agentDefinition)
       const tx={query:async(statement:string,args:unknown[])=>{
         assert.ok(statement.startsWith('UPDATE agent_runs SET "deviceTokenId"=$2'))
-        assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner'])
+        assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner',false])
         run.deviceTokenId=String(args[1]);return {rows:[],rowCount:1}
       }}
       if(!await guard(tx))return 'unavailable';calls.push('claim');run.status='preparing';await after(tx);return 'claimed'
     }},
     '@/lib/subscription-runtime':{},
+    '@/lib/subscription-native-device':{},
     // The real switch, read against this fixture's environment rather than the test process's.
     '@/lib/deployment-switches':{deploymentSwitch:(name:DeploymentSwitch)=>deploymentSwitch(name,fixtureEnv)},
     '@/lib/computer/native-run-binding':{},

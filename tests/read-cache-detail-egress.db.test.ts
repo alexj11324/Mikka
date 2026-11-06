@@ -64,7 +64,9 @@ test('detail and activity revalidate current access while returning only changed
     const changedBody = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Changed body without a clock or revision' }] }] }
     await pool.query('update issues set content=$2 where id=$1', [id, JSON.stringify(changedBody)])
     const bodyChanged = successful(await read(() => pollIssue(id, changed.value.version)))
-    assert.deepEqual(bodyChanged.issue?.content, changedBody)
+    // The database keeps the task's number when a write leaves it out.
+    assert.deepEqual(bodyChanged.issue?.content?.content, changedBody.content)
+    assert.equal((bodyChanged.issue?.content as { attrs?: { mikka?: { number?: number } } } | undefined)?.attrs?.mikka?.number, 1)
     assert.notEqual(bodyChanged.version, changed.value.version)
 
     const newVersion = randomUUID()
