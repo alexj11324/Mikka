@@ -206,7 +206,8 @@ Before release, the source gate and overlay equality run again. The signed
 installers, SBOM, checksums and `mikka-ui-overlay.json` are sealed, verified and
 published in the **same macOS job**; no Actions artifact transports a paid
 bundle between jobs. The latter JSON is covered by the existing release
-manifest digest. Existing signing, notarization and skip-notarization draft
+manifest digest and is also embedded in the signed app’s `dist/` for inspection
+after installation. Existing signing, notarization and skip-notarization draft
 rules still apply. New desktop runs cancel obsolete ones.
 
 ### Public output boundary
