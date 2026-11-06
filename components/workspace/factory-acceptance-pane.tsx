@@ -398,7 +398,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     const ask = () => artifact.onRequestChanges(number ? tReview('changeRequestChip', { number }) : tReview('changeRequestLabel'))
     const failedChecks = results.filter(row => row.status === 'failed')
     const actions = <>
-      {(kind === 'review' || kind === 'refused' || kind === 'merging') && canRequest && <Button size="sm" variant="secondary" disabled={busy || kind === 'merging'} onClick={ask}>{t('reject')}</Button>}
+      {(kind === 'review' || kind === 'refused' || kind === 'merging') && canRequest && <Button size="sm" variant="secondary" disabled={busy || kind === 'merging'} onClick={ask}>{tReview('changeRequestLabel')}</Button>}
       {kind === 'fixing' && <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground"><Spinner />{tReview('state.fixing')}</span>}
       {(kind === 'review' || kind === 'refused' || kind === 'fixing') && <Button size="sm" disabled={busy || kind !== 'review' || !ledger} onClick={() => setConfirming(true)}>{tReview('approveAndMerge')}</Button>}
       {kind === 'merging' && <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground"><Spinner />{tReview('state.merging')}</span>}
