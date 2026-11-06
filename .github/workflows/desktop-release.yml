@@ -169,6 +169,12 @@ jobs:
       # The installed renderer uses the shared Vite and application dependency
       # graph, including apps/frontend and root UI/CSS build dependencies.
       - run: pnpm install --frozen-lockfile
+      - name: Install private UI runtime dependencies without license scripts
+        run: |
+          if ! pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/private-ui-install.log" 2>&1; then
+            echo "::error::Private UI dependency installation failed; private diagnostics withheld."
+            exit 1
+          fi
       - name: Cache electron-builder downloads
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:

@@ -161,6 +161,13 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Install private UI runtime dependencies without license scripts
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          if ! pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/private-ui-install.log" 2>&1; then
+            echo "::error::Private UI dependency installation failed; private diagnostics withheld."
+            exit 1
+          fi
       - name: Build (runs migrations last, as the Vercel build did)
         if: steps.skip.outputs.skip != 'true'
         run: node scripts/release/build-vercel.mjs

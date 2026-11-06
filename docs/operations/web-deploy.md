@@ -180,7 +180,10 @@ Checkout does not persist it in Git configuration.
 
 Web checks out private `main` into ignored `.hosted-ui/`, records the exact
 commit in `MIKKA_UI_OVERLAY_SHA`, then exports `MIKKA_UI_OVERLAY_DIR` before
-building. Nitro inlines that SHA into `/mikka/api/version` as `overlaySha`;
+building. Private runtime dependencies are installed with `--ignore-workspace
+--prod --ignore-scripts --frozen-lockfile`: the library remains standalone and
+its license-writing postinstall never runs. Install diagnostics stay on the
+ephemeral runner. Nitro inlines that SHA into `/mikka/api/version` as `overlaySha`;
 Vercel deployment metadata also records `mikkaUiOverlaySha`. An open-source
 server reports `overlaySha: null`. Runtime Vercel environment changes cannot
 mislabel a previously built overlay. After upload, the public route must match

@@ -71,7 +71,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     let result
     if (command === 'record') result = await recordOverlay(directory)
     else if (command === 'production') {
-      result = await productionOverlay({ expectedOverlay: process.env.MIKKA_UI_OVERLAY_SHA })
+      result = await productionOverlay({ expectedOverlay: process.env.MIKKA_UI_OVERLAY_SHA || process.env.EXPECTED_UI_OVERLAY_SHA })
       if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `overlay-sha=${result.overlaySha}\n`)
     } else if (command === 'audit') result = await assertNoSourceMaps(directory)
     else if (command === 'desktop-evidence') {
