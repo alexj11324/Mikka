@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { assertDeployedTarget, DeployedTargetError, publicTargetFailure } from './deployed-target.mjs'
-import { selectTeamWorkspace, isTeamWorkspaceSwitchRequest, TeamWorkspaceError,
+import { selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, TeamWorkspaceError,
   publicTeamWorkspaceFailure } from './team-workspace.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
@@ -28,11 +28,13 @@ const check = (ok, code) => { if (!ok) throw new DeployedBrowserError(code) }
 const BINDING_FIELDS = ['targetMode', 'applicationSha', 'driverRevision', 'driverRunId',
   'driverRunAttempt', 'webDeployRunId', 'webAttempt', 'deploymentId']
 const projectBinding = proof => Object.fromEntries(BINDING_FIELDS.map(key => [key, proof[key]]))
-const TEAM_FIELDS = ['teamWorkspaceConfirmed', 'teamWorkspaceHash', 'teamSelectionBasis', 'teamOwnerAttribution']
+const TEAM_FIELDS = ['teamWorkspaceConfirmed', 'teamWorkspaceHash', 'teamAdminMembershipVerified',
+  'teamSelectionBasis', 'teamOwnerAttribution']
 const isConfirmedTeam = value => value?.teamWorkspaceConfirmed === true &&
+  value.teamAdminMembershipVerified === true &&
   typeof value.teamWorkspaceHash === 'string' && /^[a-f0-9]{64}$/.test(value.teamWorkspaceHash) &&
-  value.teamSelectionBasis === 'unique-active-team-membership' &&
-  value.teamOwnerAttribution === 'AGENTS.md-shared-account-team'
+  value.teamSelectionBasis === 'unique-active-admin-identity-match' &&
+  value.teamOwnerAttribution === 'AGENTS.md-and-owner-comment-1504-6691409495'
 const projectTeam = proof => Object.fromEntries(TEAM_FIELDS.map(key => [key, proof[key]]))
 const publicFailure = error => error instanceof DeployedTargetError
   ? publicTargetFailure(error)
@@ -72,7 +74,7 @@ export async function selectBrowserTeamWorkspace({ page, baseURL, ownerId }) {
     const json = async (path, body) => {
       const post = body !== undefined
       check(post ? path === '/mikka/api/rpc' && isTeamWorkspaceSwitchRequest(body)
-        : path === '/mikka/api/workspace' || path === '/mikka/api/auth/get-session',
+        : isTeamWorkspaceReadPath(path) || path === '/mikka/api/auth/get-session',
       'browser_contract_rejected')
       const url = origin + path
       const options = { headers: { origin, 'cache-control': 'no-store' },
@@ -112,7 +114,7 @@ export async function runDeployedBrowserSmoke({
     targetBeforeVerified: false, targetAfterVerified: false,
     browserExecuted: false, assertionsPassed: false, pageErrorCount: 0,
     signInAttempted: false, normalSessionObserved: false,
-    teamWorkspaceConfirmed: false, teamWorkspaceHash: null,
+    teamWorkspaceConfirmed: false, teamWorkspaceHash: null, teamAdminMembershipVerified: false,
     teamSelectionBasis: null, teamOwnerAttribution: null, teamWorkspaceFailure: null,
     pageClosed: false, signOutAttempted: false, signOutSucceeded: false,
     anonymousAfterLogout: false, sessionClosed: false,

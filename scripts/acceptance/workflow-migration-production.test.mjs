@@ -13,6 +13,9 @@ const ORIGIN = 'https://app.aspectlylabs.com', REPOSITORY = 'alexj11324/Mikka'
 const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 const DEPLOYMENT = 'dpl_SyntheticProofOnly', COORDINATOR = 'wrun_SYNTHETIC_COORDINATOR_01', TIMER = 'wrun_SYNTHETIC_TIMER_01'
 const OWNER = 'synthetic-owner', EMAIL = 'owner+mikka-smoke@example.invalid', PASSWORD = 'SYNTHETIC_PASSWORD'
+// Public policy identity from owner comment #1504/6691409495, not a login credential.
+const POLICY_ADMIN_EMAIL = 'alex@acme.aspectlylabs.com'
+const POLICY_ADMIN = 'synthetic-policy-admin'
 const COOKIE = 'SYNTHETIC_COOKIE', TOKEN = 'SYNTHETIC_MANAGER_TOKEN'
 const id = n => '10000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const BOT = id(1), SCHEDULE = id(2), OCCURRENCE = id(3), OPERATION = id(4)
@@ -142,7 +145,7 @@ function fullFixture(options = {}) {
     inputs: { application_sha: SHA, web_run_id: '10', deployment_id: DEPLOYMENT } } : event
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), headers = new Headers(init.headers), method = init.method ?? 'GET'
-    requests.push({ origin: url.origin, path: url.pathname, method, body: init.body })
+    requests.push({ origin: url.origin, path: url.pathname, search: url.search, method, body: init.body })
     assert.equal(init.redirect, 'error')
     if (url.origin === 'https://api.github.com') {
       assert.equal(headers.get('authorization'), 'Bearer SYNTHETIC_GH_TOKEN')
@@ -185,10 +188,24 @@ function fullFixture(options = {}) {
     assert.equal(headers.get('cookie'), 'better-auth.session_token=' + COOKIE + (teamSelected ? '; mikka-workspace=' + id(12) : ''))
     if (url.pathname.endsWith('/sign-out')) return json({}, options.logoutStatus ?? 200)
     if (url.pathname.endsWith('/get-session')) return json({ user: { id: OWNER, email: EMAIL } })
-    if (url.pathname === '/mikka/api/workspace') return json({ currentUserId: OWNER, role: teamSelected ? 'member' : 'admin',
-      workspace: { id: teamSelected ? id(12) : id(10), kind: teamSelected ? 'team' : 'personal' },
-      choices: [{ id: id(10), kind: 'personal' }, ...(options.noTeams ? [] : [{ id: id(12), kind: 'team' }]),
-        ...(options.multipleTeams ? [{ id: id(13), kind: 'team' }] : [])] })
+    if (url.pathname === '/mikka/api/workspace') {
+      const candidate = url.searchParams.get('workspace')
+      const choices = [{ id: id(10), kind: 'personal' }, ...(options.noTeams ? [] : [
+        ...(options.oneTeam ? [] : [{ id: id(13), kind: 'team' }]), { id: id(12), kind: 'team' },
+      ])]
+      if (candidate) {
+        assert.equal(url.search, '?workspace=' + candidate)
+        assert.ok(choices.some(choice => choice.kind === 'team' && choice.id === candidate))
+        if (options.candidateError && candidate === id(13)) return json({ error: 'PRIVATE_CANDIDATE_ERROR' }, 500)
+      }
+      const workspaceId = candidate ?? (teamSelected ? id(12) : id(10))
+      return json({ currentUserId: OWNER, role: workspaceId === id(10) ? 'admin' : 'member',
+        workspace: { id: options.candidateWrongScope && candidate ? id(19) : workspaceId,
+          kind: workspaceId === id(10) ? 'personal' : 'team' }, choices,
+        members: workspaceId === id(10) ? [] : [{ userId: POLICY_ADMIN,
+          email: !options.noAdmin && (workspaceId === id(12) || options.multipleAdminMatches)
+            ? POLICY_ADMIN_EMAIL : 'other-admin@example.invalid', role: 'admin', status: 'active' }] })
+    }
     if (url.pathname === '/mikka/api/coordinator/messages') assert.equal(teamSelected, true, 'business must use the normal selected team cookie')
     if (url.pathname === '/mikka/api/coordinator/messages' && method === 'POST') {
       const body = JSON.parse(init.body); assert.match(body.submissionId, /^[0-9a-f-]{36}$/)
@@ -257,7 +274,7 @@ test('complete driver separates manager credentials, performs one normal post, r
   assert.ok(f.requests.some(row => row.path === '/mikka/api/rpc'), 'merged chat alone was insufficient')
   assert.ok(f.managerCalls.includes('events'))
   const publicText = JSON.stringify(report)
-  for (const privateValue of [EMAIL, PASSWORD, COOKIE, TOKEN, OWNER, BOT, SCHEDULE, COORDINATOR, TIMER])
+  for (const privateValue of [EMAIL, PASSWORD, COOKIE, TOKEN, OWNER, POLICY_ADMIN, POLICY_ADMIN_EMAIL, BOT, SCHEDULE, COORDINATOR, TIMER])
     assert.equal(publicText.includes(privateValue), false)
 })
 
@@ -768,33 +785,60 @@ test('invalid or additional inspection CLI arguments cannot enter owner business
 })
 
 
-test('automatic and explicit proof select the unique active team through the normal owner session', async () => {
+test('automatic and explicit proof select the unique policy admin team among multiple memberships', async () => {
   for (const deployed of [false, true]) {
     const f = fullFixture({ deployed }), report = await f.run()
     assert.equal(report.status, 'pass')
     assert.equal(report.teamWorkspaceConfirmed, true)
     assert.match(report.teamWorkspaceHash, /^[a-f0-9]{64}$/)
-    assert.equal(report.teamSelectionBasis, 'unique-active-team-membership')
-    assert.equal(report.teamOwnerAttribution, 'AGENTS.md-shared-account-team')
+    assert.equal(report.teamAdminMembershipVerified, true)
+    assert.equal(report.teamSelectionBasis, 'unique-active-admin-identity-match')
+    assert.equal(report.teamOwnerAttribution, 'AGENTS.md-and-owner-comment-1504-6691409495')
     assert.equal(report.personalWorkspaceConfirmed, undefined)
     assert.equal(report.submissionCount, 1)
     assert.equal(report.sessionClosed, true)
     const switches = f.requests.filter(row => row.path === '/mikka/api/rpc'
       && JSON.parse(row.body).action === 'workspace.switchWorkspace')
     assert.equal(switches.length, 1)
+    const candidates = f.requests.filter(row => row.path === '/mikka/api/workspace' && row.search)
+    assert.deepEqual(candidates.map(row => row.search), [id(13), id(12)].map(value => '?workspace=' + value))
+    assert.ok(candidates.every(row => row.method === 'GET' && row.body === undefined))
+    const beforeSwitch = f.requests.indexOf(switches[0])
+    assert.ok(candidates.every(row => f.requests.indexOf(row) < beforeSwitch))
     assert.equal(JSON.stringify(report).includes(id(12)), false)
+    assert.equal(JSON.stringify(report).includes(POLICY_ADMIN_EMAIL), false)
   }
 })
 
 
 test('ambiguous team selection closes the normal session without any Coordinator submission', async () => {
   for (const deployed of [false, true]) {
-    const f = fullFixture({ deployed, multipleTeams: true }), report = await f.run()
+    const f = fullFixture({ deployed, multipleAdminMatches: true }), report = await f.run()
     assert.equal(report.status, 'fail')
-    assert.equal(report.code, 'team_workspace_failed'); assert.equal(report.detail, 'team_ambiguous')
+    assert.equal(report.code, 'team_workspace_failed'); assert.equal(report.detail, 'team_admin_ambiguous')
     assert.equal(report.submissionCount, 0); assert.equal(report.sessionClosed, true)
     assert.equal(f.requests.some(row => row.path === '/mikka/api/coordinator/messages'), false)
     if (deployed) assert.equal(report.targetAfter.status, 'ready')
+  }
+})
+
+
+test('missing admin and unreadable or mismatched candidate keep cleanup and target fences without submitting', async () => {
+  for (const deployed of [false, true]) {
+    for (const [options, detail] of [
+      [{ noAdmin: true, oneTeam: true }, 'team_admin_missing'],
+      [{ candidateError: true }, 'candidate_read'],
+      [{ candidateWrongScope: true }, 'candidate_identity'],
+    ]) {
+      const f = fullFixture({ deployed, ...options }), report = await f.run()
+      assert.equal(report.status, 'fail')
+      assert.equal(report.code, 'team_workspace_failed'); assert.equal(report.detail, detail)
+      assert.equal(report.teamAdminMembershipVerified, false)
+      assert.equal(report.submissionCount, 0); assert.equal(report.sessionClosed, true)
+      assert.equal(f.requests.some(row => row.path === '/mikka/api/coordinator/messages'), false)
+      assert.equal(f.requests.some(row => row.path === '/mikka/api/rpc'), false)
+      if (deployed) assert.equal(report.targetAfter.status, 'ready')
+    }
   }
 })
 
