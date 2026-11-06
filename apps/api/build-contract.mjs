@@ -45,7 +45,9 @@ export async function routeFunctionRules(root) {
     if (route.sourceHash !== hash) throw new Error('API_ROUTE_SOURCE_CHANGED')
     if (route.maxDuration === undefined) continue
     if (!Number.isInteger(route.maxDuration) || route.maxDuration < 1 || route.maxDuration > 800) throw new Error('API_ROUTE_DURATION_INVALID')
-    const pattern = route.path.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, '**').replace(/\[[^\]]+\]/g, '*')
+    // rou3 treats `*` as a catch-all and rejects more than one per route.
+    // Named parameters retain each dynamic segment's original one-part bound.
+    const pattern = route.path.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, '**').replace(/\[([^\]]+)\]/g, ':$1')
     rules[pattern] = { maxDuration: route.maxDuration, ...(route.template === '/api/coordinator/stream' ? { supportsCancellation: true } : {}) }
   }
   return rules

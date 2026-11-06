@@ -14,7 +14,9 @@ export const redirect = ({ href, locale }: { href: Href; locale: string }) => na
 function syncLocaleCookie(locale: string, nextLocale: string | undefined) {
   if (nextLocale === locale || !routing.locales.some(value => value === nextLocale)) return
   if (window.location.protocol !== 'https:' && window.location.protocol !== 'http:') return
-  document.cookie = `NEXT_LOCALE=${nextLocale}; Max-Age=${routing.localeCookie.maxAge}; Path=${BASE_PATH || '/'}; SameSite=Lax`
+  const cookie = routing.localeCookie
+  if (!cookie || typeof cookie !== 'object') return
+  document.cookie = `NEXT_LOCALE=${nextLocale}; Max-Age=${cookie.maxAge}; Path=${BASE_PATH || '/'}; SameSite=Lax`
 }
 
 export function useRouter() {

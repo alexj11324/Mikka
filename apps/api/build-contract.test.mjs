@@ -3,11 +3,18 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { copyPublicAssets, createNitro, prepare } from 'nitro/builder'
 import { assertApiBuildConfiguration, nodeRuntimePackages, routeFunctionRules, workflowNodeExternals } from './build-contract.mjs'
 import { publicAssetConfiguration } from './public-assets.mjs'
 import { inspectRoute } from './scripts/generate-routes.mjs'
+
+// Use the exact router Nitro uses when it sorts and emits Vercel function
+// rules. Source-shape assertions alone missed its multiple-wildcard failure.
+const nitroRequire = createRequire(import.meta.resolve('nitro/package.json'))
+const { addRoute, createRouter, findRoute, routeToRegExp } = await import(pathToFileURL(nitroRequire.resolve('rou3')).href)
 
 test('declaration inventory includes named reexports/destructuring and preserves explicit duration', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-route-source-'))
@@ -32,6 +39,42 @@ test('function rules remain per route, source-bound, and accept actual catch-all
     await save({ ...route, sourceHash: '0'.repeat(64) }); await assert.rejects(routeFunctionRules(root), /API_ROUTE_SOURCE_CHANGED/)
     const nitro = { options: { externals: { external: ['existing'] } } }; workflowNodeExternals(nitro)
     assert.deepEqual(nitro.options.externals.external, ['existing', ...nodeRuntimePackages])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('actual Nitro router accepts multiple named parameters and preserves route duration boundaries', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-vercel-routing-'))
+  try {
+    const declarations = [
+      ['/api/bots/[botId]/subagents/[id]/credentials', 60],
+      ['/v1/devices/[deviceId]/runs/[runId]/subscription', 300],
+      ['/api/coordinator/stream', 300],
+    ]
+    const routes = []
+    for (const [template, maxDuration] of declarations) {
+      const source = `app${template}/route.ts`, text = `export const maxDuration=${maxDuration}; export const POST=handler`
+      await mkdir(join(root, `app${template}`), { recursive: true })
+      await writeFile(join(root, source), text)
+      routes.push({ template, path: `/mikka${template}`, source, methods: ['POST'], maxDuration,
+        sourceHash: createHash('sha256').update(text).digest('hex') })
+    }
+    await mkdir(join(root, 'apps/api/generated'), { recursive: true })
+    await writeFile(join(root, 'apps/api/generated/routes.json'), JSON.stringify({ version: 1, basePath: '/mikka', routes }))
+    const rules = await routeFunctionRules(root), router = createRouter()
+    for (const [path, data] of Object.entries(rules)) addRoute(router, '', path, data)
+    const credentials = '/mikka/api/bots/:botId/subagents/:id/credentials'
+    assert.deepEqual(rules[credentials], { maxDuration: 60 })
+    const matched = findRoute(router, '', '/mikka/api/bots/bot-1/subagents/agent-1/credentials')
+    assert.deepEqual(matched?.data, { maxDuration: 60 })
+    assert.deepEqual({ ...matched?.params }, { botId: 'bot-1', id: 'agent-1' })
+    assert.equal(findRoute(router, '', '/mikka/v1/devices/device-1/runs/run-1/subscription')?.data.maxDuration, 300)
+    assert.deepEqual(findRoute(router, '', '/mikka/api/coordinator/stream')?.data, { maxDuration: 300, supportsCancellation: true })
+    const pattern = routeToRegExp(credentials)
+    for (const path of ['/mikka/api/bots/subagents/agent-1/credentials', '/mikka/api/bots/bot-1/extra/subagents/agent-1/credentials',
+      '/mikka/api/bots/bot-1/subagents/agent-1/credentials/extra', '/mikka/api/bots/bot-1/subagents/agent-1/other']) {
+      assert.equal(pattern.test(path), false, path)
+      assert.equal(findRoute(router, '', path), undefined, path)
+    }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 

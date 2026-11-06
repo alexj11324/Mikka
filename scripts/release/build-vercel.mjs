@@ -10,7 +10,7 @@ import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
 import { buildEnvironment } from './web-deploy.mjs'
 
 export function productionBuildEnvironment({ text, env, sourceSha, nodeVersion = process.version }) {
-  if (!/^v24\./.test(nodeVersion)) throw new Error('webDeploy:node24Required')
+  if (!nodeVersion.startsWith('v24.')) throw new Error('webDeploy:node24Required')
   if (!/^[a-f0-9]{40}$/.test(sourceSha ?? '') || sourceSha !== env.GITHUB_SHA
     || (env.VERCEL_GIT_COMMIT_SHA && env.VERCEL_GIT_COMMIT_SHA !== sourceSha)) throw new Error('webDeploy:sourceMismatch')
   const values = parseEnv(buildEnvironment(text, env))
