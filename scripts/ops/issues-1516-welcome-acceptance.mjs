@@ -117,6 +117,9 @@ export async function runAcceptance() {
       bytes += chunk.byteLength; check(bytes < 8000000, 'turn_stream_too_large')
       buffer += decoder.decode(chunk, { stream: true })
       for (;;) { const at = buffer.indexOf('\n'); if (at < 0) break; accept(buffer.slice(0, at)); buffer = buffer.slice(at + 1) }
+      // The durable Workflow owns the stream beyond this reply. The app's
+      // committed event, not transport EOF, is this turn's completion boundary.
+      if (state.committed) break
     }
     buffer += decoder.decode(); accept(buffer)
     const chat = (await rpc('coordinator.syncCoordinatorChat', [botId])).chat
@@ -127,7 +130,7 @@ export async function runAcceptance() {
       textSha256: hash(state.text), workflowRunId: state.workflowRunId, messages: chat.items.length }
     return { evidence, text: state.text || chat.items.filter(item => item.from === 'coordinator').at(-1)?.text || '' }
   }
-  const passTurn = evidence => check(evidence.committed && !evidence.working && !evidence.chatErrorPresent && !evidence.streamError && !evidence.invalidToolSeen && evidence.textChars > 0, 'coordinator_turn_failed')
+  const passTurn = evidence => check(evidence.committed && !evidence.chatErrorPresent && !evidence.streamError && !evidence.invalidToolSeen && evidence.textChars > 0, 'coordinator_turn_failed')
   try {
     await pin()
     await json('/api/auth/sign-in/email', { email, password })
@@ -176,6 +179,9 @@ export async function runAcceptance() {
           jsonb_array_elements(CASE WHEN jsonb_typeof(message->'content')='array' THEN message->'content' ELSE '[]'::jsonb END) p
           WHERE m."userId"=$1 AND m."botId"=$2 AND ((p->>'type' IN ('tool-call','tool-result') AND coalesce(p->>'toolName','') IN ('none','')) OR p::text LIKE '%NoSuchToolError%')`, [ownerId, botId])
         result.invalidToolRecords = invalid.count; check(invalid.count === 0, 'invalid_tool_persisted')
+        const settled = (await rpc('coordinator.syncCoordinatorChat', [botId])).chat
+        result.finalWorking = settled?.working; result.finalChatErrorPresent = Boolean(settled?.error)
+        check(settled && !settled.working && !settled.error, 'coordinator_did_not_settle')
         await pin(); result.status = 'passed'
       } catch (error) { result.status = 'failed'; result.error = publicFailure(error) }
       finally {
