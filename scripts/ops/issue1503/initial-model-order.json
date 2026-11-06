@@ -1,0 +1,193 @@
+{
+  "issue": 1503,
+  "phase": "delivery",
+  "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
+  "repository": "alexj11324/Mikka-handoff",
+  "marker": "42278720813-1",
+  "startedAt": "2026-11-06T19:21:01.313Z",
+  "completedAt": "2026-11-06T19:21:37.827Z",
+  "originalOrder": {
+    "location": "cloud",
+    "preferredHarness": "claude_code",
+    "autoModelRouting": true,
+    "customized": false,
+    "entries": [
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-5-5",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6.1-sol",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-sonnet-5-5",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-fable-5-1",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-5",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-sonnet-5",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-fable-5",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-4-8",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-4-7",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-sonnet-4-6",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-4-6",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-4-5-20251101",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-haiku-4-5-20251001",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-sonnet-4-5-20250929",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-astra",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6.1-terra",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-sol",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-sol",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-terra",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-luna",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        }
+      }
+    ]
+  }
+}

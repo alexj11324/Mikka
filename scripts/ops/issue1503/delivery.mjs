@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { smokeSession, fail, SMOKE_ID } from './http.ts'
 import { encode, decode } from '../../../lib/desktop-rpc/wire.ts'
 import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
+import { explicitNewTaskArguments, explicitNewTaskComplete, explicitNewTaskEvidence, explicitNewTaskCleanupReceipts } from './explicit-submission.mjs'
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
@@ -65,6 +66,14 @@ export function fileSpecification(marker, harness) {
   return { path: `docs/issue-1503/${marker}-${harness}.txt`, initial, revised: initial.replace('State: initial', 'State: revised') }
 }
 
+export function deliveryTaskText(specification) {
+  return `Repository: ${REPOSITORY}. Create only ${specification.path} as UTF-8 text with a final newline.\nInitial contents:\n${specification.initial}\nAcceptance for this initial candidate: the header and Case line must stay exactly as given; State is initially initial. Do not edit any other file. Run a small command that reads the file and verifies these requirements.\nLater workflow instructions: If the human requests changes, update only State to revised and preserve the header, Case line, final newline, and all other files. This later revision is not required for the initial candidate; wait for the actual human change request.\nDelivery instructions: Commit your change and complete the normal Mikka submission so the host automatically pushes the assigned task branch and opens the PR. Leave the PR open for human review. Do not merge it yourself. Do not call any external messaging API.`
+}
+
+export function deliveryProfileInstructions(specification) {
+  return `Perform the assigned Factory stage faithfully. Use the existing repository instructions, make only the requested tiny file change, and report actual command results. During the independent review, use mikka.inspect_artifact on ${specification.path} with its exact expectedUtf8 contents to observe the fixed commit, complete bytes and final newline. For the criterion that no other file changed, use mikka.inspect_repository with path:"." and baseCommit equal to the producing run report's full sourceCommit. This is the implementation's original baseline, not the review run's sourceCommit or the fixed candidate HEAD. The tool is granted in this read-only review even without shell or git diff. Check comparison.baseCommit against that baseline, comparison.head against the fixed candidate, comparison.truncated===false, and comparison.changes containing exactly one added (status A) file at ${specification.path}. Current working-tree status and the producer's narrative alone do not prove committed change scope. Record these actual tool observations in their separate applicable criteria. Never pass a criterion with missing or truncated observations. The v2 review is read-only and report-only; implementation owns command verification.`
+}
+
 /** The host executes this exact command after the agent submits. Validate the
  * current file and every other smoke file present, including the final newline.
  * The other harness's file may not exist yet when the first case runs. */
@@ -117,26 +126,53 @@ function artifactToolValues(value, depth = 0) {
   return [value]
 }
 
-/** Read-only native tool observations, not the reviewer's narrative. Keep only
- * safe hashes and identifiers in the report; never dump a thread transcript. */
-export function reviewArtifactObservations(thread, runId, candidateSha, filePath, expectedText) {
+function reviewToolPairs(thread, runId, toolName) {
   check(thread.thread?.id === runId && thread.thread.latestRunId === runId && thread.thread.status === 'succeeded' && thread.chunkCursor?.chain === runId
     && Array.isArray(thread.chunks), 'review_thread_binding_mismatch')
   const chunks = thread.chunks.map(item => item.chunk)
-  const matches = []
+  const pairs = []
   for (const [index, input] of chunks.entries()) {
-    if (input.type !== 'tool-input-available' || input.toolName !== 'mcp__mikka__inspect_artifact' || input.input?.path !== filePath) continue
+    if (input.type !== 'tool-input-available' || input.toolName !== toolName) continue
     const inputs = chunks.filter(item => item.type === 'tool-input-available' && item.toolCallId === input.toolCallId)
     const outputs = chunks.map((item, i) => ({ item, i })).filter(({ item }) => ['tool-output-available', 'tool-output-error'].includes(item.type) && item.toolCallId === input.toolCallId)
     if (!nonempty(input.toolCallId) || inputs.length !== 1 || outputs.length !== 1 || outputs[0].i <= index || outputs[0].item.type !== 'tool-output-available') continue
-    const observed = artifactToolValues(outputs[0].item.output).find(item => item.path === filePath && item.head === candidateSha
+    pairs.push({ input, output: outputs[0].item.output })
+  }
+  return pairs
+}
+
+/** Read-only native tool observations, not the reviewer's narrative. Keep only
+ * safe hashes and identifiers in the report; never dump a thread transcript. */
+export function reviewArtifactObservations(thread, runId, candidateSha, filePath, expectedText) {
+  const matches = []
+  for (const { input, output } of reviewToolPairs(thread, runId, 'mcp__mikka__inspect_artifact')) {
+    if (input.input?.path !== filePath) continue
+    const observed = artifactToolValues(output).find(item => item.path === filePath && item.head === candidateSha
       && item.contentUtf8 === expectedText && item.bytes === Buffer.byteLength(expectedText) && item.sha256 === digest(expectedText)
       && item.committedSha256 === digest(expectedText) && item.contentMatchesGit === true && item.textUnavailable === null)
     if (observed) matches.push({ runId, candidateSha, path: filePath, bytes: observed.bytes, sha256: observed.sha256,
-      toolCallId: input.toolCallId, inputSha256: digest(JSON.stringify(input.input)), outputSha256: digest(JSON.stringify(outputs[0].item.output)),
+      toolCallId: input.toolCallId, inputSha256: digest(JSON.stringify(input.input)), outputSha256: digest(JSON.stringify(output)),
       contentMatchesGit: true, source: 'review_inspect_artifact' })
   }
   check(matches.length > 0, 'review_artifact_observations_missing')
+  return matches
+}
+
+export function reviewRepositoryObservations(thread, runId, candidateSha, sourceCommit, filePath) {
+  check(sha(sourceCommit) && sha(candidateSha), 'review_repository_observations_missing')
+  const matches = []
+  for (const { input, output } of reviewToolPairs(thread, runId, 'mcp__mikka__inspect_repository')) {
+    if ((input.input?.path ?? '.') !== '.' || input.input?.baseCommit !== sourceCommit) continue
+    const observed = artifactToolValues(output).find(item => item.path === '.' && item.repository === REPOSITORY.toLowerCase()
+      && item.head === candidateSha && item.comparison?.baseCommit === sourceCommit && item.comparison.head === candidateSha
+      && item.comparison.truncated === false && Array.isArray(item.comparison.changes) && item.comparison.changes.length === 1
+      && item.comparison.changes[0].path === filePath && item.comparison.changes[0].status === 'A')
+    if (observed) matches.push({ runId, candidateSha, sourceCommit, repository: observed.repository,
+      changes: observed.comparison.changes.map(({ status, path }) => ({ status, path })), truncated: false,
+      toolCallId: input.toolCallId, inputSha256: digest(JSON.stringify(input.input)), outputSha256: digest(JSON.stringify(output)),
+      source: 'review_inspect_repository' })
+  }
+  check(matches.length > 0, 'review_repository_observations_missing')
   return matches
 }
 
@@ -252,15 +288,17 @@ export class LiveChanges {
   }
 }
 
-export async function runDeliveryAcceptance(env = process.env) {
+export function deliveryConfiguration(env = process.env) {
   const expectedSha = env.MIKKA_EXPECTED_DEPLOYMENT_SHA
   const workspaceId = env.MIKKA_1503_WORKSPACE_ID ?? defaultWorkspace
   const teamId = env.MIKKA_1503_TEAM_ID ?? defaultTeam
   const marker = env.MIKKA_1503_RUN_MARKER ?? `${env.GITHUB_RUN_ID ?? 'manual'}-${env.GITHUB_RUN_ATTEMPT ?? '1'}`
   const harness = env.MIKKA_1503_HARNESS || undefined
+  const submissionMode = env.MIKKA_1503_SUBMISSION_MODE ?? 'existing_issue'
   const timeoutMs = Number(env.MIKKA_ACCEPTANCE_TIMEOUT_MS ?? 1200000)
   check(sha(expectedSha) && uuid(workspaceId) && uuid(teamId) && /^[a-zA-Z0-9_-]{3,43}$/.test(marker)
     && (harness === undefined || ['claude_code', 'codex'].includes(harness))
+    && ['existing_issue', 'explicit_new_task'].includes(submissionMode)
     && Number.isFinite(timeoutMs) && timeoutMs >= 60000 && timeoutMs <= 3600000, 'delivery_configuration_required')
   const cases = [
     { harness: 'claude_code', model: 'claude-haiku-5-5', source: { kind: 'subscription', connectionId: env.MIKKA_1503_CLAUDE_CONNECTION_ID ?? '93b6ab23-900b-4e18-9ea0-baccf2d104ce' } },
@@ -268,9 +306,29 @@ export async function runDeliveryAcceptance(env = process.env) {
   ].filter(item => harness === undefined || item.harness === harness)
   check(cases.every(item => uuid(item.source.connectionId)), 'subscription_reference_invalid')
   const specifications = cases.map(item => fileSpecification(marker, item.harness))
+  return { expectedSha, workspaceId, teamId, marker, submissionMode, timeoutMs, cases, specifications }
+}
+
+/** A single failure-path discovery, scoped to the issue actually created by
+ * this invocation's new bot. Never infer cleanup targets from titles or prose. */
+export async function discoverExplicitCleanupTask(json, workspaceId, item) {
+  if (!uuid(item.issueId) || !uuid(item.botId)) return null
+  const found = await json(`/api/factory/tasks?issueId=${item.issueId}`)
+  check(found.liveWorkspaceId === workspaceId && Array.isArray(found.tasks), 'cleanup_task_scope_mismatch')
+  if (found.tasks.length === 0) return null
+  check(found.tasks.length === 1 && uuid(found.tasks[0].id), 'cleanup_task_scope_mismatch')
+  const state = await json(`/api/factory/tasks/${found.tasks[0].id}`)
+  check(state.liveWorkspaceId === workspaceId && state.task?.id === found.tasks[0].id && state.task.issueId === item.issueId
+    && state.task.botId === item.botId && Array.isArray(state.attempts)
+    && (item.dispatchReceipts?.runIds ?? []).every(runId => state.attempts.some(attempt => attempt.runId === runId)), 'cleanup_task_scope_mismatch')
+  return state
+}
+
+export async function runDeliveryAcceptance(env = process.env) {
+  const { expectedSha, workspaceId, teamId, marker, submissionMode, timeoutMs, cases, specifications } = deliveryConfiguration(env)
   const report = { issue: 1503, phase: 'delivery', startedAt: new Date().toISOString(), expectedSha, workspaceId, teamId,
-    marker, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
-  let session, live, chatLive, originalOrder, currentOrder, profile, activeCase, project, originalVerification
+    marker, submissionMode, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
+  let session, live, chatLive, originalOrder, currentOrder, profile, activeCase, project, originalVerification, explicitSubmission
   const chatLiveCounts = { messages: 0, reconnects: 0 }
   const closeChatLive = () => {
     if (!chatLive) return
@@ -280,6 +338,17 @@ export async function runDeliveryAcceptance(env = process.env) {
   const installedVerificationCommands = new Set()
   const reportPath = resolve(env.MIKKA_1503_REPORT ?? 'issue1503-report/delivery.json')
   const checkpoint = async () => { await mkdir(resolve(reportPath, '..'), { recursive: true }); await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 }) }
+  const rememberExplicitReceipts = async chat => {
+    if (!explicitSubmission) return
+    check(chat?.botId === activeCase.botId && chat.live?.ownerId === SMOKE_ID, 'chat_live_scope_missing')
+    const receipts = explicitNewTaskCleanupReceipts(chat, explicitSubmission.text, explicitSubmission.after)
+    if (!receipts.issueIds.length && !receipts.runIds.length) return
+    activeCase.dispatchReceipts = receipts
+    if (receipts.issueIds.length === 1) activeCase.issueId ??= receipts.issueIds[0]
+    activeCase.threadRunId ??= receipts.runIds[0]
+    activeCase.runIdsSeen = [...new Set([...(activeCase.runIdsSeen ?? []), ...receipts.runIds])]
+    await checkpoint()
+  }
   let rpc, json, request
   const stage = async name => { report.stage = name; console.log(JSON.stringify({ phase: name, harness: activeCase?.harness, taskId: activeCase?.taskId })); await checkpoint() }
   try {
@@ -321,6 +390,7 @@ export async function runDeliveryAcceptance(env = process.env) {
     await pin(); await rpc('workspace.switchWorkspace', [workspaceId])
     const directory = await rpc('teams.loadTeamDirectory', [workspaceId])
     check(directory.teams.some(team => team.id === teamId && team.identifier === 'F1503'), 'fixture_team_mismatch')
+    if (submissionMode === 'explicit_new_task') check(directory.teams.length === 1, 'new_task_team_ambiguous')
     const github = await json('/api/integrations/github')
     check(github.connected && github.viewerId === SMOKE_ID && github.login === 'alexj11324'
       && github.repositories?.some(repo => repo.fullName === REPOSITORY), 'github_authorization_missing')
@@ -348,6 +418,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       const { initial: initialText, revised: revisedText } = specification
       const verifyCommand = repositoryVerifyCommand(specifications, specification.path)
       activeCase = { harness: definition.harness, model: definition.model, status: 'running', filePath: specification.path, runs: [] }
+      explicitSubmission = null
       report.cases.push(activeCase)
       await stage('configure_repository_verification'); await pin()
       const currentVerification = repositoryVerificationValue(await json(`${verificationPath}?repository=${encodeURIComponent(REPOSITORY)}`))
@@ -369,60 +440,112 @@ export async function runDeliveryAcceptance(env = process.env) {
       profile = (await json('/api/factory/agent-profiles', session.post({ workspaceId, requestId: randomUUID(), profile: {
         name: `1503 ${marker} ${definition.harness}`, description: 'Tiny code delivery and independent Factory review.', roles: ['execute', 'review', 'verify'],
         enabled: true, harness: definition.harness, model: { mode: 'fixed', ...definition }, effort: 'low', skills: [],
-        instructions: 'Perform the assigned Factory stage faithfully. Use the existing repository instructions, make only the requested tiny file change, and report actual command results. During the independent review, use mikka.inspect_artifact on the requested file with its exact expectedUtf8 contents to observe the fixed commit, complete bytes and final newline. Record those concrete observations in each applicable criterion. The v2 review is read-only and report-only; implementation owns command verification.' } }))).profile
+        instructions: deliveryProfileInstructions(specification) } }))).profile
       check(uuid(profile?.id), 'profile_missing'); activeCase.profileId = profile.id
       const bot = await rpc('bots.createBot', [{ name: `1503 ${marker} ${definition.harness}`, color: 'bleu', shape: 'cercle', repository: botRepository, model: null }])
       check(uuid(bot?.id), 'bot_missing'); activeCase.botId = bot.id
-      const taskText = `Repository: ${REPOSITORY}. Create only ${activeCase.filePath} as UTF-8 text with a final newline.\nInitial contents:\n${initialText}\nAcceptance: the header and Case line must stay exactly as given; State is initially initial. If the human requests changes, update only State to revised and preserve the header and Case line. Do not edit any other file. Run a small command that reads the file and verifies these requirements. Commit your change and complete the normal Mikka submission so the host automatically pushes the assigned task branch and opens the PR. Do not merge it yourself. Do not call any external messaging API.`
-      await stage('create_numbered_task')
-      let issue = (await rpc('issues.saveIssue', [{ title: `Factory #1503 ${marker} ${definition.harness}`, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: taskText }] }] }, status: 'todo', priority: 'low' }])).issue
-      check(uuid(issue?.id) && typeof issue.identifier === 'string' && /-\d+$/.test(issue.identifier), 'number_missing_at_creation')
-      activeCase.issueId = issue.id; activeCase.personalIdentifier = issue.identifier
-      issue = (await rpc('issues.promoteIssueToTeam', [{ requestId: randomUUID(), issueId: issue.id, revision: issue.revision, teamId, expectedTeamId: null }])).issue
-      check(issue?.scope === 'workspace' && /^F1503-\d+$/.test(issue.identifier), 'team_number_missing')
-      activeCase.identifier = issue.identifier; activeCase.expectedBranch = `mikka/${issue.identifier.toLowerCase()}`
-      const workspaceIssues = await rpc('issues.listWorkspaceIssues', [workspaceId])
-      check(Array.isArray(workspaceIssues) && workspaceIssues.some(item => item.id === issue.id && item.identifier === issue.identifier), 'workspace_issue_number_mismatch')
-      activeCase.workspaceList = { count: workspaceIssues.length, identifier: issue.identifier }
-      project = (await rpc('projects.setProjectIssues', [{ id: project.id, revision: project.revision, issueIds: report.cases.map(item => item.issueId) }])).project
-      const issueKeys = [`factory_issue:${issue.id}`]
-      const before = await json(`/api/factory/tasks?issueId=${issue.id}`)
-      check(before.liveWorkspaceId === workspaceId && before.tasks.length === 0, 'fixture_task_not_fresh')
-      await stage('dispatch'); await pin()
-      // The ordinary chat dispatches this existing issue. Keep the human source
-      // and Profile, with cloud-only placement in its normal dispatch_run call.
-      const submissionId = randomUUID()
-      const dispatchText = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read its existing description and use that exact task; do not create a duplicate. This is repository work, so use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, and the selected Profile ${profile.id}. It is a tiny file task and needs no specification approval: needsSpec false. Preserve the task's existing acceptance criteria, publish automatically, and leave its PR for my Factory review. I will request one change and then merge it.`
-      const readChat = async () => (await rpc('coordinator.syncCoordinatorChat', [bot.id])).chat
-      const beforeChat = await readChat()
-      check(beforeChat?.botId === bot.id && beforeChat.live?.ownerId === SMOKE_ID && uuid(beforeChat.live.workspaceId)
-        && Number.isSafeInteger(beforeChat.cursor) && beforeChat.cursor >= 0, 'chat_live_scope_missing')
-      const chatKey = `bot_chat:${bot.id}`
-      // Chat invalidations use the owner's home channel, which may differ from
-      // the task workspace. Forward only a wake-up, never message contents.
-      chatLive = new LiveChanges(json, beforeChat.live.workspaceId, { kinds: ['bot_chat'], onNotify: key => { if (!key || key === chatKey) live.notify(chatKey) } })
-      await chatLive.start()
-      const dispatched = await rpc('coordinator.sendCoordinatorMessage', existingIssueMessageArguments(dispatchText, bot.id, submissionId, profile.id))
-      check(dispatched.queued === true, 'dispatch_failed'); activeCase.submissionId = submissionId
-      const readDispatched = async () => {
-        if (chatLive.failure) throw chatLive.failure
-        const found = await json(`/api/factory/tasks?issueId=${issue.id}`)
-        if (found.tasks.length) return found
-        const chat = await readChat()
-        check(chat?.botId === bot.id && chat.live?.ownerId === SMOKE_ID
-          && chat.live.workspaceId === beforeChat.live.workspaceId, 'chat_live_scope_changed')
-        if (chatSubmissionComplete(chat, dispatchText, beforeChat.cursor)) {
-          // The queue commit precedes the completed reply. Read after observing
-          // that reply to avoid racing a dispatch that committed during chat read.
-          const completed = await json(`/api/factory/tasks?issueId=${issue.id}`)
-          if (completed.tasks.length) return completed
-          activeCase.dispatchFailure = { cursor: chat.cursor, working: false,
-            code: ['wake_exhausted', 'wake_failed', 'wake_start_unconfirmed', 'turn_failed', 'length'].includes(chat.error) ? chat.error : 'completed_without_dispatch' }
-          fail('coordinator_completed_without_dispatch')
+      const taskText = deliveryTaskText(specification)
+      let issue, found, issueKeys
+      if (submissionMode === 'explicit_new_task') {
+        const title = `Factory #1503 ${marker} ${definition.harness} explicit cloud`
+        const submissionId = randomUUID()
+        // Match NewTaskDialog's English prompt/context and transport. The
+        // Coordinator creates the issue and binds taskEventId itself; there is
+        // no saveIssue/promote call or operator-written provenance in this mode.
+        const dispatchText = `Create a task for me (run it on Mikka Cloud): Create one new task with this exact title: ${title}. Put the following complete requirements in its body.\n${taskText}\nCreate the task through normal create_issue in this workspace's sole F1503 team, then dispatch that created task with normal dispatch_run, repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, selected Profile ${profile.id}, needsSpec false. Do not create another task or use dispatch_bot_computer. Leave its PR for my Factory review.`
+        const readChat = async () => {
+          if (chatLive?.failure) throw chatLive.failure
+          const chat = (await rpc('coordinator.syncCoordinatorChat', [bot.id])).chat
+          check(chat?.botId === bot.id && chat.live?.ownerId === SMOKE_ID && uuid(chat.live.workspaceId), 'chat_live_scope_missing')
+          await rememberExplicitReceipts(chat)
+          return chat
         }
-        return found
+        const beforeChat = await readChat()
+        check(Number.isSafeInteger(beforeChat.cursor) && beforeChat.cursor >= 0, 'chat_live_scope_missing')
+        const chatKey = `bot_chat:${bot.id}`
+        chatLive = new LiveChanges(json, beforeChat.live.workspaceId, { kinds: ['bot_chat'] })
+        await chatLive.start()
+        await stage('create_and_dispatch_new_task'); await pin()
+        activeCase.submissionId = submissionId
+        explicitSubmission = { text: dispatchText, after: beforeChat.cursor }
+        const dispatched = await rpc('coordinator.sendCoordinatorMessage', explicitNewTaskArguments(dispatchText, bot.id, submissionId, profile.id))
+        check(dispatched.queued === true, 'dispatch_failed')
+        const completed = await chatLive.until([chatKey], async () => {
+          const chat = await readChat()
+          check(chat.live.workspaceId === beforeChat.live.workspaceId, 'chat_live_scope_changed')
+          return chat
+        }, chat => explicitNewTaskComplete(chat, dispatchText, beforeChat.cursor), timeoutMs)
+        // One list read after the completed turn. The sole team is selected by
+        // normal create_issue, so the issue must already have its F1503 number.
+        const workspaceIssues = await rpc('issues.listWorkspaceIssues', [workspaceId])
+        const created = Array.isArray(workspaceIssues) ? workspaceIssues.filter(item => item.title === title) : []
+        check(created.length === 1 && uuid(created[0].id) && created[0].scope === 'workspace'
+          && /^F1503-\d+$/.test(created[0].identifier) && Date.parse(created[0].createdAt) >= Date.parse(report.startedAt), 'new_task_numbered_issue_missing')
+        issue = created[0]
+        check(!activeCase.issueId || activeCase.issueId === issue.id, 'new_task_creation_receipt_mismatch')
+        activeCase.issueId = issue.id; activeCase.identifier = issue.identifier; activeCase.expectedBranch = `mikka/${issue.identifier.toLowerCase()}`
+        activeCase.workspaceList = { count: workspaceIssues.length, identifier: issue.identifier }
+        issueKeys = [`factory_issue:${issue.id}`]
+        found = await json(`/api/factory/tasks?issueId=${issue.id}`)
+        check(found.liveWorkspaceId === workspaceId && found.tasks.length === 1, 'new_task_factory_missing')
+        // Bind cleanup before checking the receipt, in case a proof mismatch
+        // follows a successfully admitted task owned by this invocation.
+        activeCase.taskId = found.tasks[0].id
+        activeCase.creation = explicitNewTaskEvidence(completed, dispatchText, beforeChat.cursor, issue.id)
+        activeCase.threadRunId = activeCase.creation.runId
+        project = (await rpc('projects.setProjectIssues', [{ id: project.id, revision: project.revision, issueIds: report.cases.map(item => item.issueId) }])).project
+        await checkpoint()
+      } else {
+        await stage('create_numbered_task')
+        issue = (await rpc('issues.saveIssue', [{ title: `Factory #1503 ${marker} ${definition.harness}`, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: taskText }] }] }, status: 'todo', priority: 'low' }])).issue
+        check(uuid(issue?.id) && typeof issue.identifier === 'string' && /-\d+$/.test(issue.identifier), 'number_missing_at_creation')
+        activeCase.issueId = issue.id; activeCase.personalIdentifier = issue.identifier
+        issue = (await rpc('issues.promoteIssueToTeam', [{ requestId: randomUUID(), issueId: issue.id, revision: issue.revision, teamId, expectedTeamId: null }])).issue
+        check(issue?.scope === 'workspace' && /^F1503-\d+$/.test(issue.identifier), 'team_number_missing')
+        activeCase.identifier = issue.identifier; activeCase.expectedBranch = `mikka/${issue.identifier.toLowerCase()}`
+        const workspaceIssues = await rpc('issues.listWorkspaceIssues', [workspaceId])
+        check(Array.isArray(workspaceIssues) && workspaceIssues.some(item => item.id === issue.id && item.identifier === issue.identifier), 'workspace_issue_number_mismatch')
+        activeCase.workspaceList = { count: workspaceIssues.length, identifier: issue.identifier }
+        project = (await rpc('projects.setProjectIssues', [{ id: project.id, revision: project.revision, issueIds: report.cases.map(item => item.issueId) }])).project
+        issueKeys = [`factory_issue:${issue.id}`]
+        const before = await json(`/api/factory/tasks?issueId=${issue.id}`)
+        check(before.liveWorkspaceId === workspaceId && before.tasks.length === 0, 'fixture_task_not_fresh')
+        await stage('dispatch'); await pin()
+        // The ordinary chat dispatches this existing issue. Keep the human source
+        // and Profile, with cloud-only placement in its normal dispatch_run call.
+        const submissionId = randomUUID()
+        const dispatchText = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read its existing description and use that exact task; do not create a duplicate. This is repository work, so use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, and the selected Profile ${profile.id}. It is a tiny file task and needs no specification approval: needsSpec false. Preserve the task's existing acceptance criteria, publish automatically, and leave its PR for my Factory review.`
+        const readChat = async () => (await rpc('coordinator.syncCoordinatorChat', [bot.id])).chat
+        const beforeChat = await readChat()
+        check(beforeChat?.botId === bot.id && beforeChat.live?.ownerId === SMOKE_ID && uuid(beforeChat.live.workspaceId)
+          && Number.isSafeInteger(beforeChat.cursor) && beforeChat.cursor >= 0, 'chat_live_scope_missing')
+        const chatKey = `bot_chat:${bot.id}`
+        // Chat invalidations use the owner's home channel, which may differ from
+        // the task workspace. Forward only a wake-up, never message contents.
+        chatLive = new LiveChanges(json, beforeChat.live.workspaceId, { kinds: ['bot_chat'], onNotify: key => { if (!key || key === chatKey) live.notify(chatKey) } })
+        await chatLive.start()
+        const dispatched = await rpc('coordinator.sendCoordinatorMessage', existingIssueMessageArguments(dispatchText, bot.id, submissionId, profile.id))
+        check(dispatched.queued === true, 'dispatch_failed'); activeCase.submissionId = submissionId
+        const readDispatched = async () => {
+          if (chatLive.failure) throw chatLive.failure
+          const found = await json(`/api/factory/tasks?issueId=${issue.id}`)
+          if (found.tasks.length) return found
+          const chat = await readChat()
+          check(chat?.botId === bot.id && chat.live?.ownerId === SMOKE_ID
+            && chat.live.workspaceId === beforeChat.live.workspaceId, 'chat_live_scope_changed')
+          if (chatSubmissionComplete(chat, dispatchText, beforeChat.cursor)) {
+            // The queue commit precedes the completed reply. Read after observing
+            // that reply to avoid racing a dispatch that committed during chat read.
+            const completed = await json(`/api/factory/tasks?issueId=${issue.id}`)
+            if (completed.tasks.length) return completed
+            activeCase.dispatchFailure = { cursor: chat.cursor, working: false,
+              code: ['wake_exhausted', 'wake_failed', 'wake_start_unconfirmed', 'turn_failed', 'length'].includes(chat.error) ? chat.error : 'completed_without_dispatch' }
+            fail('coordinator_completed_without_dispatch')
+          }
+          return found
+        }
+        found = await live.until([...issueKeys, chatKey], readDispatched, value => value.tasks.length > 0, timeoutMs)
       }
-      const found = await live.until([...issueKeys, chatKey], readDispatched, value => value.tasks.length > 0, timeoutMs)
       check(found.tasks.length === 1, 'multiple_factory_tasks'); activeCase.taskId = found.tasks[0].id
       closeChatLive()
       const keys = [`factory_task:${activeCase.taskId}`, ...issueKeys, `pull_request_status:${issue.id}`]
@@ -430,6 +553,12 @@ export async function runDeliveryAcceptance(env = process.env) {
       const read = async () => {
         const state = await json(`/api/factory/tasks/${activeCase.taskId}`)
         check(state.task.id === activeCase.taskId && state.task.issueId === issue.id && state.liveWorkspaceId === workspaceId, 'task_scope_mismatch')
+        if (submissionMode === 'explicit_new_task') {
+          check(state.task.botId === bot.id && uuid(state.task.sourceEventId)
+            && state.attempts.some(item => item.stage === 'execute' && item.runId === activeCase.creation.runId), 'new_task_source_binding_mismatch')
+          activeCase.creation.sourceEventId ??= state.task.sourceEventId
+          check(state.task.sourceEventId === activeCase.creation.sourceEventId, 'new_task_source_binding_changed')
+        }
         const now = `${state.task.stage}:${state.task.status}:${state.task.revision}`
         if (now !== lastState) { lastState = now; console.log(JSON.stringify({ phase: 'factory_progress', harness: definition.harness, taskId: state.task.id, stage: state.task.stage, status: state.task.status, revision: state.task.revision })) }
         activeCase.lastState = { stage: state.task.stage, status: state.task.status, revision: state.task.revision }
@@ -465,15 +594,22 @@ export async function runDeliveryAcceptance(env = process.env) {
           const evidence = await json(`/api/runs/${runId}/evidence`)
           check(evidence.run.harness === definition.harness && evidence.run.model === definition.model && evidence.run.credentialType === 'subscription'
             && evidence.run.subscriptionRoute === (definition.harness === 'codex' ? 'codex_cli' : 'claude_code_cli'), 'official_model_provenance_mismatch')
+          if (submissionMode === 'explicit_new_task') check(evidence.run.issueId === issue.id
+            && evidence.run.executionIdentity?.billingAccount?.runtime?.kind === 'e2b'
+            && evidence.run.agentProfile?.profileId === profile.id && evidence.run.agentProfile.version === profile.version
+            && evidence.run.agentProfile.source === (state.attempts.some(item => item.stage === 'execute' && item.runId === runId) ? 'explicit' : 'decision'),
+          'new_task_cloud_profile_provenance_mismatch')
           activeCase.runs.push({ runId, harness: evidence.run.harness, model: evidence.run.model, credentialType: evidence.run.credentialType, subscriptionRoute: evidence.run.subscriptionRoute,
-            profileId: evidence.run.agentProfile?.profileId, profileVersion: evidence.run.agentProfile?.version })
+            profileId: evidence.run.agentProfile?.profileId, profileVersion: evidence.run.agentProfile?.version,
+            ...(submissionMode === 'explicit_new_task' ? { profileSource: evidence.run.agentProfile.source, runtimeKind: evidence.run.executionIdentity.billingAccount.runtime.kind } : {}) })
         }
+        const artifact = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(`run-report:${candidate.runId}`)}`)
         const reviewArtifacts = []
         for (const verified of verification) {
           if (historicalReview) {
             const prior = activeCase.initial.reviewArtifacts.find(item => item.attemptId === verified.attemptId && item.runId === verified.runId
               && item.candidateId === verified.candidateId && item.candidateSha === verified.candidateSha)
-            check(prior && prior.observations.length > 0, 'historical_review_observations_missing')
+            check(prior && prior.observations.length > 0 && prior.repositoryObservations.length > 0, 'historical_review_observations_missing')
             reviewArtifacts.push({ ...prior, appliesToCurrentCandidate: false })
             continue
           }
@@ -482,18 +618,18 @@ export async function runDeliveryAcceptance(env = process.env) {
           const raw = checked.raw
           check(raw?.check?.sha === verified.candidateSha && raw.check.readOnly === true && Array.isArray(raw.filesChanged)
             && raw.filesChanged.length === 0 && criteriaPassed(raw.criteria), 'independent_report_evidence_missing')
-          let observations = []
+          let observations = [], repositoryObservations = []
           if (flowVersion === 2 && verified.stage === 'review') {
             check(raw.reviewVerdict === 'passed', 'independent_review_verdict_missing')
             const thread = await rpc('agents.getIssueThread', [issue.id, verified.runId])
             observations = reviewArtifactObservations(thread, verified.runId, verified.candidateSha, activeCase.filePath, expectedText)
+            repositoryObservations = reviewRepositoryObservations(thread, verified.runId, verified.candidateSha, artifact.raw?.sourceCommit, activeCase.filePath)
           } else verifiedFileBytes(raw, verifyCommand, activeCase.filePath, expectedText, label === 'initial' ? 'initial' : 'revised')
           reviewArtifacts.push({ attemptId: verified.attemptId, runId: verified.runId, stage: verified.stage, candidateId: verified.candidateId,
             candidateSha: verified.candidateSha, artifact: artifactRef, reportSha256: digest(JSON.stringify(raw)),
-            reviewVerdict: raw.reviewVerdict ?? null, verifyStatus: raw.verify?.status ?? null, appliesToCurrentCandidate: true, observations,
+            reviewVerdict: raw.reviewVerdict ?? null, verifyStatus: raw.verify?.status ?? null, appliesToCurrentCandidate: true, observations, repositoryObservations,
             criteria: raw.criteria.map(item => ({ criterionId: item.criterionId ?? null, passed: item.passed, status: item.status ?? 'passed', evidenceSha256: digest(item.evidence) })) })
         }
-        const artifact = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(`run-report:${candidate.runId}`)}`)
         const publish = artifact.raw?.publish
         check(publish?.pushed === true && publish.branch === activeCase.expectedBranch && publish.commit === candidate.sha && publish.remote === 'origin', 'publication_report_mismatch')
         const verifiedContent = verifiedFileBytes(artifact.raw, verifyCommand, activeCase.filePath, expectedText, label === 'initial' ? 'initial' : 'revised')
@@ -550,7 +686,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       activeCase.finalBinding = binding(final.task); activeCase.status = 'passed'
       await json(`/api/factory/agent-profiles/${profile.id}`, { ...session.post({ workspaceId, version: profile.version }), method: 'DELETE' })
       report.cleanup.push({ kind: 'profile_archived', id: profile.id }); profile = null
-      await checkpoint(); activeCase = null
+      await checkpoint(); activeCase = null; explicitSubmission = null
     }
     await pin()
     report.status = 'passed'
@@ -561,10 +697,30 @@ export async function runDeliveryAcceptance(env = process.env) {
   } finally {
     closeChatLive()
     live?.close()
+    let cleanupState
+    if (activeCase?.botId && explicitSubmission && !activeCase.taskId && rpc) {
+      // Admission may have succeeded before a chat/list/proof failure. Stop this
+      // new bot's Coordinator, retain its real tool receipts, then discover once.
+      try {
+        const stopped = await rpc('coordinator.stopCoordinatorTurn', [activeCase.botId])
+        report.cleanup.push({ kind: 'coordinator_turn_stopped', botId: activeCase.botId, stopped: stopped.stopped === true })
+      } catch { report.cleanup.push({ kind: 'coordinator_turn_stop_failed', botId: activeCase.botId }) }
+      try { await rememberExplicitReceipts((await rpc('coordinator.syncCoordinatorChat', [activeCase.botId])).chat) }
+      catch { report.cleanup.push({ kind: 'dispatch_receipt_read_failed', botId: activeCase.botId }) }
+      try {
+        cleanupState = await discoverExplicitCleanupTask(json, workspaceId, activeCase)
+        if (cleanupState) {
+          activeCase.taskId = cleanupState.task.id
+          activeCase.runIdsSeen = [...new Set([...(activeCase.runIdsSeen ?? []), ...cleanupState.attempts.map(item => item.runId).filter(uuid)])]
+          activeCase.threadRunId ??= cleanupState.attempts.find(item => item.stage === 'execute' && uuid(item.runId))?.runId
+          report.cleanup.push({ kind: 'admitted_task_discovered', id: activeCase.taskId })
+        }
+      } catch { report.cleanup.push({ kind: 'admitted_task_discovery_failed', botId: activeCase.botId }) }
+    }
     // Stop only this invocation's unfinished tasks. Leave evidence and receipts.
     if (activeCase?.taskId && json) {
       try {
-        const state = await json(`/api/factory/tasks/${activeCase.taskId}`)
+        const state = cleanupState ?? await json(`/api/factory/tasks/${activeCase.taskId}`)
         activeCase.runIdsSeen = [...new Set([...(activeCase.runIdsSeen ?? []), ...state.attempts.map(item => item.runId).filter(uuid)])]
         if (!['passed', 'cancelled', 'revoked'].includes(state.task.status)) {
           await json(`/api/factory/tasks/${activeCase.taskId}`, session.post({ binding: { taskId: activeCase.taskId, revision: state.task.revision }, eventId: randomUUID(), action: 'cancel', reason: 'Issue #1503 acceptance round ended; release its temporary run resources.' }))

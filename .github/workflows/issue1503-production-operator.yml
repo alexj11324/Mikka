@@ -1,4 +1,4 @@
-name: Issue 1503 credit sharing prerequisite
+name: Issue 1503 production acceptance operator
 on:
   push:
     branches: [ops/issue-1503-production-smoke]
@@ -9,13 +9,13 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: issue1503-credit-share
+  group: issue1503-production-operator
   cancel-in-progress: false
 jobs:
-  credit_share:
+  delivery:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
@@ -37,50 +37,16 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /neon
-          secret-name: DATABASE_URL
-          recursive: false
-          include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_DATABASE_URL
-          recursive: false
-          include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: BETTER_AUTH_SECRET
-          recursive: false
-          include-imports: false
-      - name: Share the existing verified Owner credits and retry the failed Coordinator reply
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/credit-share.ts
+      - name: Exercise full Codex delivery on the current fixed production release
+        run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
-          VERCEL_ENV: production
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 2960d783f0196fed5375593d910a43430a101747
-          BETTER_AUTH_URL: https://app.aspectlylabs.com
-          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: c0c98baa3020a085652ee5f773310b6dfa412c5d
+          MIKKA_1503_SUBMISSION_MODE: existing_issue
+          MIKKA_1503_HARNESS: codex
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-credit-share
+          name: issue1503-delivery
           path: issue1503-report
           retention-days: 3
