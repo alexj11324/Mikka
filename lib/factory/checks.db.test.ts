@@ -2398,7 +2398,7 @@ test(
         queueFactoryRun: async (...args: Parameters<FactoryQueue>) => {
           lastQueueSelection = (args as unknown[])[6] as Record<string, unknown> | undefined;
           const queued = await queue(...args);
-          await args[0].query('UPDATE agent_runs SET prompt=$2 WHERE id=$1', [queued.runId, queuedRepairPrompt]);
+          await args[0].query('UPDATE agent_runs SET prompt=$2,"promptTaskStart"=0,"promptTaskLength"=char_length($2) WHERE id=$1', [queued.runId, queuedRepairPrompt]);
           return queued;
         },
       } });
@@ -2434,9 +2434,11 @@ test(
           const current=await store.read('owner',planned.task.id);
           assert.equal(current.task.stage,'execute');assert.equal(current.task.status,'running');
           const runId=current.attempts.find(attempt=>attempt.id===current.task.attemptId)!.runId;
-          const run=(await db.query('SELECT "continuesRunId",prompt FROM agent_runs WHERE id=$1',[runId])).rows[0];
+          const run=(await db.query('SELECT "continuesRunId",prompt,"promptTaskStart" FROM agent_runs WHERE id=$1',[runId])).rows[0];
           assert.equal(run.continuesRunId,null);
           assert.match(run.prompt,/Factory implementation owns validation/);
+          // The thread’s task range moved past the prepended Factory guidance (lib/thread-prompt.ts).
+          assert.ok(Array.from(run.prompt as string).slice(run.promptTaskStart).join('').startsWith(queuedRepairPrompt));
         });
         await t.test('saved Owner answer survives automatic repair and the new candidate checks through canonical same-epoch ancestry', async () => {
           const pending = await pendingReview();

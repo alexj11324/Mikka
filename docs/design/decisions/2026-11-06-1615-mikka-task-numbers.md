@@ -13,6 +13,12 @@ Every task gets its number when it is created, from every entry point
   another team.
 - A personal task uses its owner's prefix and number (`ALEX-12`). An owner who
   has not chosen a prefix uses the email default, else `TASK`.
+- An existing workspace task without a local team link (including a legacy
+  Linear import or a task whose team was explicitly removed) keeps its own
+  owner-prefixed number until a team is assigned. Resolving its identifier
+  does not change its scope, workspace, membership, or Linear link. It never
+  invents a team or drops the number. An existing publication retains its
+  pinned identifier and branch even when the task's team or prefix changes.
 
 The Mikka number is the only primary number. Every place that names a task
 uses it: lists, detail, chat chips, Factory, the task branch

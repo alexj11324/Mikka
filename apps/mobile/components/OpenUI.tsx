@@ -168,9 +168,11 @@ function Questions({ value }: { value: Component }) {
                 if (page) { void openOnWeb(page); return }
                 setPicked({ [only.id]: [option.value] }); void send(option.label)
               }}
-              style={({ pressed }) => [styles.option, (pressed || choice === option.value) && { backgroundColor: colors.bubble }, !open && choice !== option.value && { opacity: 0.5 }]}>
+              // Once answered the picked row keeps its fill and a check; the others stay readable, in the secondary colour (Claude, ChatGPT).
+              style={({ pressed }) => [styles.option, (pressed || choice === option.value) && { backgroundColor: colors.bubble }]}>
               <View style={styles.letter}><Text style={styles.letterText}>{String.fromCharCode(65 + index)}</Text></View>
-              <Text style={[cardText.body, { flex: 1 }]}>{option.label}</Text>
+              <Text style={[cardText.body, { flex: 1 }, !open && choice !== option.value && { color: colors.secondary }, choice === option.value && { fontWeight: '600' }]}>{option.label}</Text>
+              {choice === option.value ? <Check size={16} color={colors.text} strokeWidth={2.5} /> : null}
             </Pressable>
           ))}
         </View>

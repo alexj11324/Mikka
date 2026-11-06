@@ -81,3 +81,20 @@ test('malformed explicit frozen selection never invokes the default model',async
   }
   assert.equal(generated,0)
 })
+
+test('after 停止 a tool call that has not started does not run; one already running finishes and is timed', async () => {
+  const { timedTools, STOPPED_TOOL_RESULT } = await import('./subscription-workflow-turn')
+  const ran: string[] = []
+  const stop = new AbortController()
+  const timings: { tool: string; ms: number; failed: boolean }[] = []
+  const tools = timedTools({
+    dispatch_run: { inputSchema: {} as never, execute: async () => { ran.push('dispatch_run'); stop.abort(); return { status: 'queued' } } },
+    create_issue: { inputSchema: {} as never, execute: async () => { ran.push('create_issue'); return { id: 'i' } } },
+  } as never, timings, () => 0, stop.signal) as unknown as Record<string, { execute: (...args: unknown[]) => Promise<unknown> }>
+  // Running when 停止 came: it finishes.
+  assert.deepEqual(await tools.dispatch_run.execute({}, {}), { status: 'queued' })
+  // Next in line after 停止: never runs.
+  assert.deepEqual(await tools.create_issue.execute({}, {}), STOPPED_TOOL_RESULT)
+  assert.deepEqual(ran, ['dispatch_run'])
+  assert.deepEqual(timings.map(timing => timing.tool), ['dispatch_run'])
+})

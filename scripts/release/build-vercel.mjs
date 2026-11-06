@@ -7,21 +7,32 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
 import { buildEnvironmentValues } from './web-deploy.mjs'
+import { directDatabaseURL } from '../postgres-connection.mjs'
 
 export function productionBuildEnvironment({ text, env, sourceSha, nodeVersion = process.version }) {
   if (!nodeVersion.startsWith('v24.')) throw new Error('webDeploy:node24Required')
   if (!/^[a-f0-9]{40}$/.test(sourceSha ?? '') || sourceSha !== env.GITHUB_SHA
     || (env.VERCEL_GIT_COMMIT_SHA && env.VERCEL_GIT_COMMIT_SHA !== sourceSha)) throw new Error('webDeploy:sourceMismatch')
   const values = buildEnvironmentValues(text, env)
+  // Vercel CLI 65.4's dotenv loader keeps a non-empty job value. Empty or
+  // absent job values fall back to the filled file; do not decode job values.
+  for (const key of Object.keys(values)) if (env[key]) values[key] = env[key]
   const deploymentId = configuredDeploymentId(env)
   if (!deploymentId) throw new Error('webDeploy:deploymentIdRequired')
   const build = { ...env, ...values, NODE_ENV: 'production', VERCEL: '1', VERCEL_ENV: 'production',
+    VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'alexj11324', VERCEL_GIT_REPO_SLUG: 'Mikka',
     VERCEL_GIT_COMMIT_REF: 'main', VERCEL_GIT_COMMIT_SHA: sourceSha,
     NEXT_PUBLIC_MIKKA_BUILD: sourceSha, NITRO_PRESET: 'vercel', MIKKA_DEPLOYMENT_ID: deploymentId }
   // A disposable acceptance identity must never be compiled into production.
   delete build.MIKKA_TEST_DEPLOYMENT_SHA
   delete build.MIKKA_LOCAL_TEST_ACCOUNTS
   delete build.MIKKA_TEST_ENVIRONMENT_FILE
+  // Reject the same invalid migration inputs before spending time on a build.
+  // The helper's direct-endpoint result is intentionally not assigned here.
+  for (const key of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
+    try { directDatabaseURL(build[key]) }
+    catch (cause) { throw new Error(`webDeploy:databaseConnectionUrlInvalid:${key}`, { cause }) }
+  }
   return build
 }
 

@@ -19,7 +19,7 @@ export default defineConfig({
     // Traces would carry the session cookie; screenshots of the smoke account are enough.
     trace: 'off',
     video: 'off',
-    screenshot: 'only-on-failure',
+    screenshot: process.env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target' ? 'off' : 'only-on-failure',
     actionTimeout: 15000,
     navigationTimeout: 45000,
   },

@@ -1,8 +1,8 @@
 // How a task is named in the UI (MIK-46). The single source of truth: every
 // place that shows a task id goes through `taskIdentifier`.
 // - Workspace tasks use their team key and their number in that team (AL-12),
-//   which the database assigns when the task joins the team. A linked Linear
-//   id is only an outside alias.
+//   which the database assigns when the task joins the team. A task without
+//   a local team keeps its owner number; a Linear id is only an outside alias.
 // - Personal tasks use a four-letter personal prefix (ALEX-12) and the
 //   owner's number. Every owner has a prefix: their own, else a default.
 
@@ -21,9 +21,9 @@ export type TaskIdentifierInput = {
   personalPrefix?: string | null
 }
 
-/** `AL-12` or `ALEX-12`; null only while the database has not yet given the task its team or number. */
+/** `AL-12` or `ALEX-12`; a missing team never removes the task's owner number. */
 export function taskIdentifier(task: TaskIdentifierInput): string | null {
-  if (task.scope === 'workspace') return task.team ? `${task.team.key}-${task.team.number}` : null
+  if (task.scope === 'workspace' && task.team) return `${task.team.key}-${task.team.number}`
   if (!task.number || !task.personalPrefix) return null
   return `${task.personalPrefix}-${task.number}`
 }

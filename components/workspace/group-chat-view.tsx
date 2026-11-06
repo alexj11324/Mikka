@@ -16,6 +16,7 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { UserMessageText } from '@/components/workspace/user-message-text'
+import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { AgentMarkdown } from '@/components/workspace/agent-markdown'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { cn } from '@/lib/utils'
@@ -145,7 +146,7 @@ export function GroupChatView({ group, userId, people }: {
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
                           {run.messages.map(message => <Fragment key={message.id}>
                             <Bubble variant={mine ? 'secondary' : 'muted'} align={mine ? 'end' : 'start'} className={cn('max-w-full', mine && '*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground')}>
-                              <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <UserMessageText text={message.body} /> : <AgentMarkdown text={message.body} />}</BubbleContent>
+                              <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
                             </Bubble>
                             <MessageReactions reactions={reactions[message.id]} align={mine ? 'end' : 'start'} />
                           </Fragment>)}
@@ -154,7 +155,7 @@ export function GroupChatView({ group, userId, people }: {
                     })}
                     {unsent.map(item => <li key={item.key} data-pending={item.failed ? 'failed' : 'sending'} className="flex flex-col items-end gap-1">
                       <Bubble variant="secondary" align="end" className={cn('max-w-[min(26rem,80%)] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', !item.failed && 'opacity-60')}>
-                        <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><UserMessageText text={item.body} /></BubbleContent>
+                        <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><CollapsibleMessage><UserMessageText text={item.body} /></CollapsibleMessage></BubbleContent>
                       </Bubble>
                       {item.failed && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{t('notSent')}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
                     </li>)}

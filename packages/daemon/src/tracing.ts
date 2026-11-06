@@ -6,6 +6,7 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto"
 import { resourceFromAttributes } from "@opentelemetry/resources"
 import { BasicTracerProvider, BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
 import type { DeviceRegistered } from "@mikka/protocol/device"
+import { HARNESSES, type Harness } from "@mikka/protocol/harness"
 import { safeErrorAttributes, scrubLocalString } from "@mikka/protocol/tracing"
 
 // Traces of the daemon's own operations (docs/operations/tracing.md, "Daemon"):
@@ -23,6 +24,44 @@ export const EXPORT_PAUSE_MS = 60_000
 export type TraceSettings = NonNullable<DeviceRegistered["tracing"]>
 type Env = Record<string, string | undefined>
 type Value = string | number | boolean | undefined
+
+/** Closed, content-free measurements carried by the existing agent_start chunk. */
+export const STARTUP_TIMING_PHASE_LIMIT = 64
+const STARTUP_PHASES = new Set([
+  "daemon.adapter.model_report", "daemon.adapter.auth", "daemon.adapter.auth.gate",
+  "daemon.adapter.auth.context", "daemon.adapter.auth.access", "daemon.adapter.auth.token",
+  "daemon.adapter.auth.native_auth", "daemon.adapter.auth.refresh",
+  "daemon.adapter.auth.broker", "daemon.adapter.workspace.shadow_clone", "daemon.adapter.workspace.read_tree",
+  "daemon.adapter.cli_init", "daemon.adapter.account_check", "daemon.adapter.account_check.account_info",
+  "daemon.adapter.account_check.login",
+] as const)
+type StartupPhaseName = typeof STARTUP_PHASES extends Set<infer Name> ? Name : never
+export type DaemonStartupPhase = {
+  name: StartupPhaseName
+  /** Monotonic offsets from adapter.start; parent and child intervals overlap. */
+  startMs: number
+  endMs: number
+  ms: number
+  outcome: "ok" | "error"
+}
+export type DaemonStartupTiming = {
+  version: 1
+  runIdHash: string
+  harness: Harness
+  startedAt: number
+  endedAt: number
+  ms: number
+  outcome: "ok" | "error"
+  phases: DaemonStartupPhase[]
+  /** Also true if a child was still pending when adapter.start ended. */
+  truncated: boolean
+}
+type StartupScope = {
+  runIdHash: string; harness: Harness; startedAt: number; started: number
+  phases: DaemonStartupPhase[]; phaseCount: number; truncated: boolean; closed: boolean
+}
+type SpanOptions = { root?: boolean; onStartupTiming?: (timing: DaemonStartupTiming) => void }
+const milliseconds = (value: number) => Math.max(0, Math.round(value * 1_000) / 1_000)
 
 /** The only attributes a daemon span may carry. Everything else is dropped before export. */
 const ALLOWED = new Set([
@@ -103,6 +142,7 @@ const setter = { set(carrier: Record<string, string>, key: string, value: string
 export class DaemonTracer {
   private provider: BasicTracerProvider | null = null
   private readonly scope = new AsyncLocalStorage<Context>()
+  private readonly startupScope = new AsyncLocalStorage<StartupScope>()
 
   get enabled(): boolean { return this.provider !== null }
 
@@ -134,9 +174,58 @@ export class DaemonTracer {
   /**
    * Runs `work` inside a span. The span records the outcome and, on a throw,
    * the error by name and code; tracing never changes the work's result or
-   * throws into it. Without a configured provider it only runs `work`.
+   * throws into it. Startup timings are independent of OTel configuration and
+   * sampling. Only the fixed phase names and numeric intervals are retained.
    */
-  span<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, { root = false }: { root?: boolean } = {}): Promise<T> {
+  span<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, options: SpanOptions = {}): Promise<T> {
+    const hash = attributes["mikka.run.id_hash"], harness = attributes["mikka.harness"]
+    if (name === "daemon.adapter.start" && typeof hash === "string" && /^[a-f0-9]{16}$/.test(hash)
+      && HARNESSES.includes(harness as Harness)) {
+      const scope: StartupScope = { runIdHash: hash, harness: harness as Harness, startedAt: Date.now(), started: performance.now(),
+        phases: [], phaseCount: 0, truncated: false, closed: false }
+      return this.startupScope.run(scope, () => this.measuredSpan(name, attributes, work, options, failed => {
+        scope.closed = true
+        const timing: DaemonStartupTiming = { version: 1, runIdHash: scope.runIdHash, harness: scope.harness,
+          startedAt: scope.startedAt, endedAt: Date.now(), ms: milliseconds(performance.now() - scope.started),
+          outcome: failed ? "error" : "ok", phases: scope.phases.sort((a, b) => a.startMs - b.startMs),
+          truncated: scope.truncated || scope.phases.length < scope.phaseCount }
+        // Long-lived CLI callbacks inherit this scope. Close it and release the
+        // records before returning; later provider activity is not startup.
+        scope.phases = []
+        try { options.onStartupTiming?.(timing) } catch { /* measurement never changes work */ }
+      }))
+    }
+    const scope = this.startupScope.getStore()
+    if (scope && !scope.closed && !options.root && (hash === undefined || hash === scope.runIdHash)
+      && (harness === undefined || harness === scope.harness) && STARTUP_PHASES.has(name as StartupPhaseName)) {
+      if (scope.phaseCount >= STARTUP_TIMING_PHASE_LIMIT) scope.truncated = true
+      else {
+        scope.phaseCount++
+        const started = performance.now()
+        return this.measuredSpan(name, attributes, work, options, failed => {
+          if (scope.closed) return
+          const ended = performance.now()
+          scope.phases.push({ name: name as StartupPhaseName, startMs: milliseconds(started - scope.started),
+            endMs: milliseconds(ended - scope.started), ms: milliseconds(ended - started), outcome: failed ? "error" : "ok" })
+        })
+      }
+    }
+    if (options.root || name === "daemon.adapter.start") return this.startupScope.exit(() => this.traceSpan(name, attributes, work, options))
+    return this.traceSpan(name, attributes, work, options)
+  }
+
+  private measuredSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, options: SpanOptions, end: (failed: boolean) => void): Promise<T> {
+    let failed = false, pending: Promise<T>
+    try {
+      pending = this.traceSpan(name, attributes, span => work({
+        set: (key, value) => span.set(key, value),
+        fail: (error, outcome) => { failed = true; span.fail(error, outcome) },
+      }), options)
+    } catch (error) { end(true); throw error }
+    return pending.then(value => { end(failed); return value }, (error: unknown) => { end(true); throw error })
+  }
+
+  private traceSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, { root = false }: SpanOptions): Promise<T> {
     const provider = this.provider
     if (!provider) return work(NOOP)
     let span: Span | undefined

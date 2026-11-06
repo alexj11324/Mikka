@@ -166,7 +166,11 @@ export interface ThreadDetail { /** Each run's live channel (lib/live/panels.ts 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }
 
-export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string }
+/** Why a task is 受阻 (lib/task-blocked.ts on the web): its newest thread, a task it waits on (`blocker`, its number), or the person's flag. */
+export type TaskBlockReason = 'question' | 'quota' | 'run' | 'failed' | 'dependency' | 'flagged'
+export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
+  /** Absent from a server older than 受阻. */
+  blocked?: { reason: TaskBlockReason; blocker: string | null } | null }
 
 export interface Preferences {
   proactive: boolean

@@ -35,13 +35,19 @@ export async function teamNumbers(issueIds: string[]) {
   return result
 }
 
-/** `taskIdentifier` for many tasks at once, keyed by task id. */
-export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db) {
+/** `taskIdentifier` for many tasks at once, keyed by task id. `knownTeams` may
+ * reuse a complete link read made by this same operation, never a held cache. */
+export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db, knownTeams?: ReadonlyMap<string, { key: string; number: number }>) {
   const result = new Map<string, string | null>()
   if (!tasks.length) return result
   const workspaceIds = tasks.filter(task => task.scope === 'workspace').map(task => task.id)
-  const personalOwners = tasks.filter(task => task.scope === 'personal').map(task => task.ownerId)
-  const [teams, prefixes] = await Promise.all([teamNumbers(workspaceIds), personalPrefixes(personalOwners, executor)])
+  const teams = knownTeams ?? await teamNumbers(workspaceIds)
+  // Legacy imports and an explicitly removed team can leave a workspace task
+  // unlinked. Naming it must not change its scope, membership or Linear alias.
+  // Fetch these owners with personal-task owners in the same bounded batch;
+  // a normal team-only dispatch still makes no personal-prefix query.
+  const ownerIds = tasks.filter(task => task.scope === 'personal' || !teams.has(task.id)).map(task => task.ownerId)
+  const prefixes = await personalPrefixes(ownerIds, executor)
   for (const task of tasks) {
     result.set(task.id, taskIdentifier({
       scope: task.scope,

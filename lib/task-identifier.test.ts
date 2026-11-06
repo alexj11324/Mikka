@@ -31,3 +31,9 @@ test('an owner with no usable prefix still gets one', () => {
   assert.equal(resolvePersonalPrefix({ email: 'ab12@example.com', linearTeamKeys: [] }), FALLBACK_PERSONAL_PREFIX)
   assert.equal(taskIdentifier({ scope: 'personal', number: 7, personalPrefix: resolvePersonalPrefix({ email: 'x@y.z', linearTeamKeys: [] }) }), 'TASK-7')
 })
+
+test('a workspace task without a local team keeps its owner number', () => {
+  assert.equal(taskIdentifier({ scope: 'workspace', number: 12, personalPrefix: 'MINE' }), 'MINE-12')
+  assert.equal(taskIdentifier({ scope: 'workspace', number: 12, personalPrefix: 'MINE', team: { key: 'AL', number: 4 } }), 'AL-4')
+  assert.equal(taskIdentifier({ scope: 'workspace', number: 12, personalPrefix: 'MINE', team: null }), 'MINE-12')
+})

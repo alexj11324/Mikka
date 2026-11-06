@@ -33,11 +33,14 @@ export const runBotId = sql<string | null>`coalesce(
 export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code' then 'Claude Code' when 'codex' then 'Codex' when 'cursor' then 'Cursor' else ${agents.harness} end`
 
 /**
- * The start of a run's prompt, enough for `threadName` (the first line, cut
+ * The start of a run's task (its prompt from `promptTaskStart`, so Factory guidance
+ * prepended at dispatch never names the thread), enough for `threadName` (the first line, cut
  * at 60 characters): leading blank space dropped, then 400 characters. A list
  * names a thread from this instead of reading whole prompts.
  */
-export const threadNamePrompt = sql<string>`left(ltrim(${agentRuns.prompt}, E' \\t\\r\\n'), 400)`
+/** A run's prompt from its task on (`promptTaskStart`): Factory guidance prepended at dispatch never names the thread. */
+export const runTaskPrompt = sql<string>`substr(${agentRuns.prompt}, coalesce(${agentRuns.promptTaskStart}, 0) + 1)`
+export const threadNamePrompt = sql<string>`left(ltrim(${runTaskPrompt}, E' \\t\\r\\n'), 400)`
 /**
  * A run's prompt up to the end of its first line with a letter, in a query
  * that joins other tables (explicit `agent_runs`). `threadName` names a thread
@@ -45,6 +48,6 @@ export const threadNamePrompt = sql<string>`left(ltrim(${agentRuns.prompt}, E' \
  * emphasis, so a line with a letter is never empty and no later line is read.
  * The lines before it are kept, so the name equals the whole prompt's name.
  */
-export const threadNameLines = sql<string | null>`substring(ltrim(agent_runs.prompt, E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
+export const threadNameLines = sql<string | null>`substring(ltrim(substr(agent_runs.prompt, coalesce(agent_runs."promptTaskStart", 0) + 1), E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
 /** `threadNameLines` within `threadNamePrompt`'s 400 characters: the same name as `threadNamePrompt` gives. */
 export const threadNameHead = sql<string | null>`left(${threadNameLines}, 400)`

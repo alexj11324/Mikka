@@ -47,6 +47,7 @@ import { withTaskEnv } from "./task-env";
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide } from "./permissions";
 import { removeRunCredentials } from "./run-scratch";
+import { daemonTracer, runIdHash } from "./tracing";
 
 const exec = promisify(execFile);
 const bootstrap = fileURLToPath(
@@ -323,10 +324,11 @@ export async function createHostedBotRunner(host: {
       }
       // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
       if (selected && host.reportedModels) {
-        const report = await host.reportedModels(kind).catch(() => null);
+        const report = await daemonTracer.span("daemon.adapter.model_report", { "mikka.harness": kind, "mikka.run.id_hash": runIdHash(assignment.runId) }, () => host.reportedModels!(kind)).catch(() => null);
         if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw new Error("subscription_model_not_reported");
       }
       const lifetime = new AbortController();
+      const traceAttributes = { "mikka.harness": kind, "mikka.run.id_hash": runIdHash(assignment.runId) };
       // Fixed diagnostic fields only. These callbacks can fail after the first
       // context succeeds; the adapters deliberately hide their raw errors.
       type StartupPhase = "context_initial" | "context_check" | "token" | "verify" | "adapter_start";
@@ -376,7 +378,7 @@ export async function createHostedBotRunner(host: {
       };
       const live = async () => {
         assertOpen();
-        if (!await gate.checkLive()) {
+        if (!await daemonTracer.span("daemon.adapter.auth.gate", traceAttributes, () => gate.checkLive())) {
           gate.revoke();
           throw unavailable("run_closed");
         }
@@ -427,7 +429,7 @@ export async function createHostedBotRunner(host: {
               if (checkAuthority) await live();
               else assertOpen();
               try {
-                return await host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
+                return await daemonTracer.span("daemon.adapter.auth.context", traceAttributes, () => host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal));
               } catch (error) {
                 if (!(error instanceof ServerUnreachableError) || attempt >= 2) throw error;
                 await delay(250, undefined, { signal: lifetime.signal });
@@ -442,7 +444,7 @@ export async function createHostedBotRunner(host: {
             throw unavailable("context_changed");
           startup.contextReady = true;
           const revision = first.revision;
-          const check = async (phase: StartupPhase = "context_check", checkAuthority = true) => {
+          const check = (phase: StartupPhase = "context_check", checkAuthority = true) => daemonTracer.span("daemon.adapter.auth", traceAttributes, async () => {
             startup.phase = phase;
             try {
               const current = await context(checkAuthority);
@@ -468,7 +470,7 @@ export async function createHostedBotRunner(host: {
               reportFailure(error);
               throw error;
             }
-          };
+          });
           // Only the shared background watcher has just checked authority.
           // Every actual provider/tool operation keeps the fresh checks above.
           // It runs on each run-control push and again when the subscription
@@ -497,7 +499,7 @@ export async function createHostedBotRunner(host: {
         const emptyHome = join(paths.runDir, "git-bootstrap-home");
         mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
         if (!existsSync(shadow)) {
-          await exec(
+          await daemonTracer.span("daemon.adapter.workspace.shadow_clone", traceAttributes, () => exec(
             "git",
             [
               "-c",
@@ -523,12 +525,12 @@ export async function createHostedBotRunner(host: {
               signal: lifetime.signal,
               maxBuffer: 1024 * 1024,
             },
-          );
+          ));
           // Initialize only a new shadow, preserving staged changes on resume.
-          await exec("git", ["--git-dir", join(shadow, ".git"), "read-tree", "HEAD"], {
+          await daemonTracer.span("daemon.adapter.workspace.read_tree", traceAttributes, () => exec("git", ["--git-dir", join(shadow, ".git"), "read-tree", "HEAD"], {
             env: { ...bareEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
             timeout: 30000, signal: lifetime.signal, maxBuffer: 1024 * 1024,
-          });
+          }));
         }
         await live();
         if (
@@ -601,7 +603,7 @@ export async function createHostedBotRunner(host: {
           broker = created;
           return created;
         });
-        const readyBroker = await brokerStarting;
+        const readyBroker = await daemonTracer.span("daemon.adapter.auth.broker", traceAttributes, () => brokerStarting!);
         startup.brokerReady = true;
         await live();
         const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
