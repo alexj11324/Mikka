@@ -131,11 +131,15 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
   // The bot whose run made it, so its window sits beside that bot's chat (as on the Artifact page); only the person's own run counts.
   const [run] = found.runId ? await db.select({ botId: agentRuns.botId }).from(agentRuns)
     .where(and(eq(agentRuns.id, found.runId), eq(agentRuns.userId, userId))).limit(1) : []
-  const report = await acceptanceReport(artifactId)
-  // A PR report's window is titled by its task and PR (「ALEX-84 · PR #6」): its task id, only for a task the person still sees.
-  const [keyed] = report.acceptanceTaskId && found.issueId ? await withIssueKeys(userId, [{ id: found.id, kind: found.kind, title: found.title, latestVersion: found.latestVersion,
-    runId: found.runId, issueId: found.issueId, botId: null, authorName: null, updatedAt: new Date() }]) : []
-  return { ...found, botId: run?.botId ?? null, shared: Boolean(live), ...report, issueKey: keyed?.issueKey ?? null }
+  return { ...found, botId: run?.botId ?? null, shared: Boolean(live), ...await acceptanceReport(artifactId) }
+}
+
+/** A PR report's task id (「ALEX-84」) for its window title; null for any other artifact or a task the person no longer sees. */
+export async function reportIssueKey(userId: string, found: ArtifactDetail): Promise<string | null> {
+  if (!found.acceptanceTaskId || !found.issueId) return null
+  const [keyed] = await withIssueKeys(userId, [{ id: found.id, kind: found.kind, title: found.title, latestVersion: found.latestVersion,
+    runId: found.runId, issueId: found.issueId, botId: null, authorName: null, updatedAt: new Date() }])
+  return keyed?.issueKey ?? null
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
