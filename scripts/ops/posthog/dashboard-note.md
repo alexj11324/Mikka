@@ -7,4 +7,4 @@
 - **字节：**来自返回行 JSON 大小的近似值，再按采样 ×10；**不是 Neon 网络传输或账单**。缺字节值不强行置零；有缺失时汇总只包含已知部分，缺失数量单列。未知 route 明确显示。
 - **来源：**查询 production 的 `mikka-web` / `mikka-daemon`。目前只有 `mikka-web` 服务；`client_kind=daemon` 只表示服务端归因，不能证明 daemon 本地 spans 已接入。
 - **错误：**统计 `status_code=2` 的 spans，同一次失败可能产生多个 spans。code 优先 `mikka.error.code`，回退 `error.type`；未埋点的 code/detail 明确标记。
-- **预算：**下方复用现有日预算（100 MB/UTC 日）和账期预算（5 GB）insights，保持原定义。值是最近一次已知供应商快照，可能陈旧；请结合[采集健康看板](https://us.posthog.com/project/670821/dashboard/2297143)判断。
+- **预算：**下方复用日额度（500 GB 的 1/30，约 16.7 GB/UTC 日）和账期额度（Launch 套餐每月 500 GB）insights，保持原定义。值是最近一次已知供应商快照，可能陈旧；请结合[采集健康看板](https://us.posthog.com/project/670821/dashboard/2297143)判断。

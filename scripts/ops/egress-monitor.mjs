@@ -5,9 +5,10 @@ import { api, activeAlias, TEAM, PROJECT, PRODUCTION_ALIAS } from './deployment-
 export const NEON_PROJECT = 'autumn-fire-21908520'
 export const NEON_ORG = 'org-sweet-lab-80289846'
 export const WINDOW_MS = 15 * 60_000
-// Initial operating budget, not the plan allowance. Keep an early warning after upgrading plans.
-export const DAILY_BUDGET_BYTES = 100_000_000
-export const MONTHLY_BUDGET_BYTES = 5_000_000_000
+// The Launch plan's allowance: 500 GB of public network transfer per project per month, then $0.10/GB (Alex, 2026-11-06).
+export const MONTHLY_BUDGET_BYTES = 500_000_000_000
+// A day's share of the month's allowance.
+export const DAILY_BUDGET_BYTES = Math.round(MONTHLY_BUDGET_BYTES / 30)
 const iso = n => new Date(n).toISOString()
 const fail = code => { throw Error(code) }
 const safeError = e => /^[a-z_]+$/.test(e?.message) ? e.message : 'collection_failed'
