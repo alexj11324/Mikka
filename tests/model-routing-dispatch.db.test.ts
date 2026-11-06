@@ -8,30 +8,32 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import type { DecisionAnswer, DecisionInput, DecisionQuestion } from '../lib/coordinator/decision'
 import type { ModelDispatch } from '../lib/model-dispatch'
-import type { ModelRoutingCandidate } from '../lib/model-routing'
+import { MODEL_ROUTING_EFFORTS, MODEL_ROUTING_TIERS, modelTier } from '../lib/model-routing'
 import type { OrderEntry, OrderHarness } from '../lib/model-order-plan'
 
 if (dbUrl && !disposableDatabase(process.env, dbUrl)) throw Error('Model routing DB tests require isolated loopback *_e2e targets')
 
 type Decision = typeof import('../lib/coordinator/decide').invokeDecision
-type DecisionCall = { purpose: string; input: DecisionInput; questions: DecisionQuestion[]; candidates: ModelRoutingCandidate[] }
-function decisionFixture(model: string, difficulty = 'easy', effort = 'low', options: { choice?: string; confidence?: number; unavailable?: boolean } = {}) {
+type DecisionCall = { purpose: string; input: DecisionInput; questions: DecisionQuestion[] }
+/** Answers the judged tier of `model` and the effort level; the judge never sees candidates. */
+function decisionFixture(model: string, _legacyDifficulty = 'easy', effort = 'low', options: { choice?: 'not-listed' | 'none'; confidence?: number; unavailable?: boolean } = {}) {
   const calls: DecisionCall[] = []
   const decision: Decision = async (purpose, input, questions) => {
-    const body = JSON.parse(typeof input === 'string' ? input : input.text) as { candidates: ModelRoutingCandidate[] }
-    calls.push({ purpose, input, questions, candidates: body.candidates })
+    calls.push({ purpose, input, questions })
     if (options.unavailable) return null
-    const choice = options.choice ?? body.candidates.find(candidate => candidate.model === model)?.id ?? 'not-a-candidate'
+    const confidence = options.confidence ?? .95
+    const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>()
+    if (options.choice !== 'none') answers.set('tier', { name: 'tier', type: 'score', score: options.choice === 'not-listed' ? 9 : MODEL_ROUTING_TIERS.indexOf(modelTier(model)), confidence })
+    if (effort !== 'default') answers.set('effort', { name: 'effort', type: 'score', score: MODEL_ROUTING_EFFORTS.indexOf(effort as never), confidence })
     return {
-      answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
-        Object.entries({ difficulty, model: choice, effort, reason: choice === 'none' ? 'no_selection' : 'difficulty_fit' })
-          .map(([name, value]) => [name, { name, type: 'choice', choice: value, confidence: options.confidence ?? .95 }])),
+      answers,
       execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-model-routing',
         startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' },
     }
   }
   return { calls, decision }
 }
+const judgeInput = (call: DecisionCall) => JSON.parse(typeof call.input === 'string' ? call.input : call.input.text) as Record<string, unknown>
 function localTarget(target: ModelDispatch) {
   assert.equal(target.kind, 'device')
   if (target.kind !== 'device') assert.fail('Expected a runnable fixture device')
@@ -134,16 +136,15 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
     assert.equal(easy.calls[0].purpose, 'task-model-routing')
     assert.equal(picked.deviceId, claude.id)
     assert.deepEqual(picked.entry.source, { kind: 'subscription', connectionId: lightSource })
-    assert.deepEqual(picked.routing, { version: 1, difficulty: 'easy', model: 'claude-haiku-5-5', harness: 'claude_code', tier: 'light', effort: 'low', reason: 'difficulty_fit' })
+    assert.deepEqual(picked.routing, { version: 2, required: 'light', model: 'claude-haiku-5-5', harness: 'claude_code', tier: 'light', effort: 'low', reason: 'difficulty_fit' })
     const publicData = JSON.stringify(easy.calls)
     for (const hidden of [scope.ownerId, foreign.ownerId, scope.workspaceId, scope.botId, claude.id, codex.id, claude.agentId, codex.agentId,
       strongSource, lightSource, standardSource, codexSource, foreignSource, 'synthetic-routing-', 'providerSubject', 'secretDigest', 'connectionId', 'sourceId']) assert.ok(!publicData.includes(hidden), hidden)
-    assert.deepEqual(easy.calls[0].candidates.map(candidate => candidate.model), rows.filter(entry => entry.harness === 'claude_code').map(entry => entry.model))
-    assert.ok(easy.calls[0].candidates.every(candidate => /^candidate:\d+$/.test(candidate.id)))
+    assert.deepEqual(Object.keys(judgeInput(easy.calls[0])).sort(), ['stage', 'task'], 'the judge sees the task, never candidates')
+    for (const entry of rows) assert.ok(!publicData.includes(entry.model), entry.model)
     const hard = decisionFixture('gpt-6.1-sol', 'hard', 'high')
     const strongest = localTarget(await route(hard.decision, { harness: 'codex' }))
     assert.equal(hard.calls.length, 1)
-    assert.ok(hard.calls[0].candidates.every(candidate => candidate.harness === 'codex'))
     assert.equal(strongest.deviceId, codex.id)
     assert.equal(strongest.routing?.tier, 'strongest')
     assert.equal(strongest.routing?.effort, 'high')
@@ -158,11 +159,10 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
       const codexTarget = localTarget(await route(preferred.decision))
       assert.equal(codexTarget.deviceId, codex.id)
       assert.equal(codexTarget.model, 'gpt-6-luna')
-      assert.deepEqual(preferred.calls[0].candidates.map(candidate => candidate.model), ['gpt-6.1-sol', 'gpt-6-luna'])
       await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour' WHERE id=$1`, [codex.id])
       const other = decisionFixture('claude-haiku-5-5')
-      assert.equal(localTarget(await route(other.decision)).deviceId, claude.id)
-      assert.ok(other.calls[0].candidates.every(candidate => candidate.harness === 'claude_code'))
+      const otherTarget = localTarget(await route(other.decision))
+      assert.deepEqual([otherTarget.deviceId, otherTarget.entry.harness, otherTarget.model], [claude.id, 'claude_code', 'claude-haiku-5-5'])
     } finally {
       await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [codex.id])
       await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'claude_code' })
@@ -179,7 +179,6 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
       assert.equal(target.model, 'gpt-6.1-sol')
       assert.deepEqual(target.entry.source, { kind: 'subscription', connectionId: codexSource })
       assert.equal(probe.calls.length, 1)
-      assert.deepEqual(probe.calls[0].candidates.map(candidate => [candidate.harness, candidate.model]), [['codex', 'gpt-6.1-sol']])
       assert.equal(target.routing?.reason, 'difficulty_fit')
     } finally {
       for (const [position, entry] of rows.entries()) if (entry.harness === 'codex') await pool.query(`INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId")
@@ -192,11 +191,12 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
     await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [standardSource])
     await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour' WHERE id=$1`, [codex.id])
     try {
-      const probe = decisionFixture('claude-opus-5-5', 'hard', 'high')
+      // A light judgement can only rise to the one model left runnable.
+      const probe = decisionFixture('claude-haiku-5-5', 'easy', 'high')
       const picked = localTarget(await route(probe.decision))
       assert.equal(probe.calls.length, 1)
-      assert.deepEqual(probe.calls[0].candidates.map(candidate => candidate.model), ['claude-opus-5-5'])
       assert.equal(picked.model, 'claude-opus-5-5')
+      assert.equal(picked.routing?.required, 'light')
       assert.equal(picked.routing?.reason, 'difficulty_fit')
     } finally {
       await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [lightSource, quota('claude')])
@@ -205,9 +205,9 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
     }
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [claude.id, JSON.stringify([{ ...claude.report[0], models: ['claude-opus-5-5', 'claude-sonnet-5-5'] }])])
     try {
-      const probe = decisionFixture('claude-sonnet-5-5', 'medium', 'medium')
+      // Haiku is no longer reported: light rises to the nearest higher tier, never past it.
+      const probe = decisionFixture('claude-haiku-5-5', 'easy', 'medium')
       assert.equal(localTarget(await route(probe.decision)).model, 'claude-sonnet-5-5')
-      assert.ok(probe.calls[0].candidates.every(candidate => candidate.model !== 'claude-haiku-5-5'))
     } finally { await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [claude.id, JSON.stringify(claude.report)]) }
   })
 
@@ -245,13 +245,13 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
   })
 
   await t.test('invalid, uncertain and unavailable Decisions use list order without invented difficulty or effort', async () => {
-    for (const [options, reason] of [[{ choice: 'not-listed' }, 'invalid_answer'], [{ choice: 'none' }, 'no_selection'], [{ confidence: .3 }, 'low_confidence'], [{ unavailable: true }, 'decision_unavailable']] as const) {
+    for (const [options, reason] of [[{ choice: 'not-listed' }, 'invalid_answer'], [{ choice: 'none' }, 'no_selection'], [{ confidence: .1 }, 'low_confidence'], [{ unavailable: true }, 'decision_unavailable']] as const) {
       const probe = decisionFixture('claude-haiku-5-5', 'easy', 'low', options)
       const result = localTarget(await route(probe.decision))
       assert.equal(probe.calls.length, 1)
       assert.equal(result.model, rows[0].model)
       assert.equal(result.routing?.reason, reason)
-      assert.equal(result.routing?.difficulty, 'unknown')
+      assert.equal(result.routing?.required, 'unknown')
       assert.equal(result.routing?.effort, undefined)
     }
   })
@@ -259,7 +259,7 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
   await t.test('an uncertain Decision preserves the existing server placement preference', async () => {
     await pool.query(`UPDATE devices SET "deviceType"='server' WHERE id=$1`, [codex.id])
     try {
-      const probe = decisionFixture('claude-haiku-5-5', 'easy', 'low', { confidence: .3 })
+      const probe = decisionFixture('claude-haiku-5-5', 'easy', 'low', { confidence: .1 })
       const ordered = localTarget(await resolveModelDispatch(pool, scope, undefined, 'local', undefined, { decision: probe.decision }))
       assert.equal(ordered.deviceId, codex.id)
       assert.equal(ordered.model, 'gpt-6.1-sol')
@@ -267,7 +267,7 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
       assert.equal(probe.calls.length, 1)
       assert.equal(fallback.deviceId, ordered.deviceId)
       assert.deepEqual(fallback.entry, ordered.entry)
-      assert.deepEqual(fallback.routing, { version: 1, difficulty: 'unknown', model: 'gpt-6.1-sol', harness: 'codex', tier: 'strongest', reason: 'low_confidence' })
+      assert.deepEqual(fallback.routing, { version: 2, required: 'unknown', model: 'gpt-6.1-sol', harness: 'codex', tier: 'strongest', reason: 'low_confidence' })
       const confident = localTarget(await route(decisionFixture('claude-haiku-5-5').decision))
       assert.equal(confident.deviceId, claude.id)
       assert.equal(confident.model, 'claude-haiku-5-5')
@@ -350,7 +350,6 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
     const inheritedTarget = localTarget(inheritedResult.target)
     assert.equal(easy.calls.length, 1); assert.equal(inheritedTarget.model, 'claude-haiku-5-5')
     assert.equal(inheritedResult.selectionMode, 'preference')
-    assert.ok(easy.calls[0].candidates.every(candidate => candidate.harness === 'claude_code'))
     assert.ok(!JSON.stringify(easy.calls).includes('PRIVATE_PROFILE_CONTENT'))
     assert.deepEqual(inheritedResult.agentProfile?.targetEntry, inheritedTarget.entry)
     const fixed = await store.create(scope, { name: 'Fixed routing fixture', harness: 'claude_code', effort: 'high',
@@ -385,11 +384,10 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
       const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: profile.id, location: 'local' }, { modelDecision: probe.decision })
       const target = localTarget(selected.target)
       assert.equal(probe.calls.length, 1)
-      assert.ok(probe.calls[0].candidates.every(candidate => candidate.efforts.length === 1 && candidate.efforts[0] === 'high'))
       assert.equal(selected.agentProfile?.effort, 'high')
       assert.equal(target.routing?.effort, 'high')
       assert.equal(target.routing?.reason, unavailable ? 'decision_unavailable' : 'difficulty_fit')
-      assert.equal(target.routing?.difficulty, unavailable ? 'unknown' : 'easy')
+      assert.equal(target.routing?.required, unavailable ? 'unknown' : 'light')
       await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload)
         VALUES ($1,$2,$3,$4,'user_message',$5,$6)`, [sourceEventId, scope.ownerId, scope.botId, issueId, `routing-effort:${sourceEventId}`, JSON.stringify({ text: taskText })])
       const repository = normalizeRepository(`https://github.com/synthetic/effort-${randomUUID()}.git`), repoId = randomUUID()

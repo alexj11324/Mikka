@@ -123,7 +123,9 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
     </dl>
     {routing && <section className="flex flex-col gap-1" data-model-routing={routing.reason}>
       <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-muted-foreground">
-        <span>{t('modelRouting')}</span><span>{t(`routingDifficulty.${routing.difficulty}`)}</span><span aria-hidden="true">→</span>
+        <span>{t('modelRouting')}</span>
+        {routing.version === 2 && routing.required !== 'unknown' && <><span>{t(`routingTier.${routing.required}`)}</span><span aria-hidden="true">→</span></>}
+        {routing.version === 1 && routing.difficulty !== 'unknown' && <><span>{t(`routingDifficulty.${routing.difficulty}`)}</span><span aria-hidden="true">→</span></>}
         <span className="min-w-0 wrap-break-word text-foreground" title={routing.model}><ModelLabel model={routing.model} /></span>
         {routing.effort && <><span aria-hidden="true">·</span><span>{t(`routingEffort.${routing.effort}`)}</span></>}
       </p>

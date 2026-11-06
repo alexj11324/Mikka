@@ -14,6 +14,7 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 import { recordPushGrant } from './support/github-app-stub'
 import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
 import type { DecisionAnswer } from '../lib/coordinator/decision'
+import { MODEL_ROUTING_TIERS, modelTier } from '../lib/model-routing'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
@@ -134,12 +135,10 @@ test('provider failure continues the same task through its authorized preferred 
   }
   const routedSelection = async (p: Person, model: string, issueId: string, profileId?: string, harness: Harness = 'claude_code') => {
     const decision: typeof import('../lib/coordinator/decide').invokeDecision = async (_purpose, input) => {
-      const body = JSON.parse(typeof input === 'string' ? input : input.text) as { candidates: { id: string; model: string }[] }
-      const candidate = body.candidates.find(item => item.model === model)
-      assert.ok(candidate, 'the light model must be a real runnable candidate')
-      const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
-        Object.entries({ difficulty: 'easy', model: candidate.id, effort: 'low', reason: 'difficulty_fit' })
-          .map(([name, choice]) => [name, { name, type: 'choice', choice, confidence: .99 }]))
+      assert.ok(!('candidates' in JSON.parse(typeof input === 'string' ? input : input.text)), 'the judge never sees candidates')
+      const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['tier', { name: 'tier', type: 'score', score: MODEL_ROUTING_TIERS.indexOf(modelTier(model)), confidence: .99 }],
+        ['effort', { name: 'effort', type: 'score', score: 0, confidence: .99 }]])
       return { answers, execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-routing',
         startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
     }
@@ -265,7 +264,7 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(continuations.length, 1)
     const continuation = continuations[0]
     assert.equal(continuation.agentDefinition.model, 'claude-sonnet-5-5')
-    assert.deepEqual(continuation.agentDefinition.modelDispatch.routing, { version: 1, difficulty: 'easy',
+    assert.deepEqual(continuation.agentDefinition.modelDispatch.routing, { version: 2, required: 'light',
       model: 'claude-sonnet-5-5', harness: 'claude_code', tier: 'standard', effort: 'low', reason: 'escalated', previousModel: 'claude-haiku-5-5' })
     assert.deepEqual(continuation.agentDefinition.agentProfile,
       { ...admitted.agentDefinition.agentProfile, targetEntry: continuation.agentDefinition.modelDispatch.entry })
@@ -356,7 +355,7 @@ test('provider failure continues the same task through its authorized preferred 
     const repaired = await row(attempt.runId)
     assert.notEqual(repaired.id, first.runId)
     assert.equal(repaired.agentDefinition.model, 'claude-sonnet-5-5')
-    assert.deepEqual(repaired.agentDefinition.modelDispatch.routing, { version: 1, difficulty: 'easy', model: 'claude-sonnet-5-5',
+    assert.deepEqual(repaired.agentDefinition.modelDispatch.routing, { version: 2, required: 'light', model: 'claude-sonnet-5-5',
       harness: 'claude_code', tier: 'standard', effort: 'low', reason: 'escalated', previousModel: 'claude-haiku-5-5' })
     assert.deepEqual(repaired.agentDefinition.agentProfile, { ...original.agentDefinition.agentProfile, targetEntry: repaired.agentDefinition.modelDispatch.entry })
     assert.equal(repaired.agentDefinition.readOnly, true)
