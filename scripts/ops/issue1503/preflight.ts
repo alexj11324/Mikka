@@ -9,6 +9,7 @@ import { requireWorkspace } from '../../../lib/workspace-access'
 import { getSubscriptionShare, setOwnSubscriptionShare } from '../../../lib/personal-policy-server'
 import { enqueueWorkspaceAudit } from '../../../lib/audit/delivery'
 import { ownerWorkspaceListsChanged, workspaceListChanged } from '../../../lib/live/lists'
+import { setupIssue1503SmokeGitHub } from '../issue1503-smoke-github.mjs'
 
 const report: Record<string, any> = { issue: 1503, phase: 'preflight', startedAt: new Date().toISOString(), status: 'running' }
 let session: Awaited<ReturnType<typeof smokeSession>> | undefined
@@ -59,24 +60,34 @@ try {
   report.e2bConfigured = Boolean(e2b)
   report.e2bChanged = false
   if (!e2b || e2b.lastErrorCode) fail('smoke_e2b_unavailable')
+  report.stage = 'official_subscription_quota'
+  for (const connectionId of ['93b6ab23-900b-4e18-9ea0-baccf2d104ce', 'ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5']) {
+    await session.rpc('model-order.checkModelOrderQuota', [connectionId, workspaceId])
+  }
   report.stage = 'factory_catalog'
   const profiles = await session.json(`/api/factory/agent-profiles?workspaceId=${workspaceId}&location=cloud`)
   report.catalog = { keys: Object.keys(profiles.catalog ?? {}), models: (profiles.catalog?.models ?? []).filter((model: any) =>
     JSON.stringify(model).includes('claude-haiku-5-5') || JSON.stringify(model).includes('gpt-6-luna')) }
   report.existingProfiles = profiles.profiles?.map((profile: any) => ({ id: profile.id, version: profile.version, name: profile.definition?.name ?? profile.name }))
   report.stage = 'github_read'
-  const github = await session.json('/api/integrations/github')
+  let github = await session.json('/api/integrations/github')
+  report.githubSetupCreated = !github.connected
+  if (!github.connected) {
+    report.stage = 'github_scoped_setup'
+    report.githubSetup = (await setupIssue1503SmokeGitHub({ ownerUserId: OWNER_ID })).state
+    github = await session.json('/api/integrations/github')
+  }
   report.github = { connected: github.connected, viewerId: github.viewerId, login: github.login, githubAccountId: github.githubAccountId,
     handoffAccessible: github.repositories?.some((repo: any) => repo.fullName === 'alexj11324/Mikka-handoff') ?? false }
-  // GitHub operator initialization is a separate, provider-verified module.
-  // This first receipt establishes normal login, membership and subscription visibility.
-  report.status = 'ready_for_github_and_delivery'
+  if (!report.github.connected || report.github.viewerId !== SMOKE_ID || report.github.login !== 'alexj11324' || !report.github.handoffAccessible) fail('github_readback_mismatch')
+  report.status = 'ready_for_delivery'
 } catch (error) {
   report.status = 'failed'
   report.code = error instanceof Error && /^issue1503_[a-z0-9_]+$/.test(error.message) ? error.message : 'issue1503_preflight_failed'
   report.errorType = error instanceof Error ? error.name : 'UnknownError'
   const causeCode = (error as any)?.code ?? (error as any)?.cause?.code
   if (typeof causeCode === 'string' && /^[a-zA-Z0-9_]{1,80}$/.test(causeCode)) report.causeCode = causeCode
+  if ((error as any)?.name === 'SmokeGitHubSetupError') report.githubFailure = (error as any).toJSON()
   process.exitCode = 1
 } finally {
   if (session) await session.close().catch(() => undefined)
