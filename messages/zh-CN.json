@@ -3761,6 +3761,34 @@
     "needsModelCloudUnavailable": "云端暂时无法启动",
     "needsModelChecking": "订阅额度暂未确认，请重试"
   },
+  "ThreadRunPlace": {
+    "cloudName": "云电脑 {id}",
+    "label": "运行在 {name} · {state}",
+    "kinds": {
+      "cloud": "云电脑",
+      "laptop": "电脑",
+      "server": "服务器"
+    },
+    "states": {
+      "online": "在线",
+      "offline": "离线",
+      "starting": "启动中",
+      "running": "运行中",
+      "paused": "休眠",
+      "ended": "已停止",
+      "error": "出错"
+    },
+    "id": "ID",
+    "template": "模板",
+    "created": "创建",
+    "stopped": "停止",
+    "system": "系统",
+    "host": "主机",
+    "lastSeen": "上次在线",
+    "copyId": "复制 ID",
+    "copied": "ID 已复制",
+    "copyFailed": "复制失败"
+  },
   "IssueThreads": {
     "title": "线程",
     "modelSwitched": "已改用",
