@@ -56,6 +56,7 @@ import {
   appendFactoryCheckContinuationContext,
   configureFactoryCheck,
   producerCommandObservations,
+  priorReviewArtifactObservations,
   factoryCheckAssignment,
   factoryCheckGates,
   factoryRepairBrief,
@@ -535,6 +536,287 @@ test(
           );
       }
       const state = (id: string) => store.read("owner", id);
+      // Native events are synthetic fixtures in the already migrated isolated PG.
+      // The production dispatch, assignment and observation readers remain real.
+      const handoffText = 'mikka-group-policy-v3\npath=claude-code\nstatus=ready\n';
+      const handoffHash = createHash('sha256').update(handoffText).digest('hex');
+      const handoffBase = 'b'.repeat(40);
+      async function artifactInspectionChunks(runId: string, format: 'claude' | 'codex' = 'claude') {
+        const encode = (value: unknown) => format === 'claude'
+          ? JSON.stringify(value) : [{ type: 'text', text: JSON.stringify(value) }];
+        const records = [
+          {
+            toolName: 'mcp__mikka__inspect_artifact',
+            input: { path: 'delivery.txt', expectedUtf8: handoffText },
+            output: encode({ path: 'delivery.txt', bytes: 52, sha256: handoffHash, head: sha,
+              committedSha256: handoffHash, contentMatchesGit: true, matchesExpectedUtf8: true,
+              contentUtf8: handoffText, textUnavailable: null }),
+          },
+          {
+            toolName: 'mcp__mikka__inspect_repository',
+            input: { path: '.', baseCommit: handoffBase },
+            output: encode({ path: '.', head: sha, repository: null,
+              comparison: { baseCommit: handoffBase, head: sha,
+                changes: [{ status: 'A', path: 'delivery.txt' }], truncated: false } }),
+          },
+        ].map((record, index) => ({ ...record, toolCallId: randomUUID(), inputChunkId: randomUUID(),
+          outputChunkId: randomUUID(), inputSeq: 1 + index * 2, outputSeq: 2 + index * 2 }));
+        for (const record of records) for (const [id, seq, chunk] of [
+          [record.inputChunkId, record.inputSeq, { type: 'tool-input-available', toolName: record.toolName,
+            toolCallId: record.toolCallId, input: record.input }],
+          [record.outputChunkId, record.outputSeq, { type: 'tool-output-available',
+            toolCallId: record.toolCallId, output: record.output }],
+        ] as const) await db.query(`INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt")
+          SELECT $1,id,$3,$4,"finishedAt"-interval '500 milliseconds'+($3::int*interval '1 millisecond')
+          FROM agent_runs WHERE id=$2`, [id, runId, seq, JSON.stringify(chunk)]);
+        return records;
+      }
+      async function priorReviewFixture(format: 'claude' | 'codex' = 'claude') {
+        let producerRunId = '';
+        const pending = await pendingReview('deliverable', true, async runId => {
+          producerRunId = runId;
+          await db.query(`UPDATE agent_runs SET report=jsonb_set(report,'{sourceCommit}',to_jsonb($2::text)) WHERE id=$1`,
+            [runId, handoffBase]);
+        });
+        const review = await start(pending.task);
+        const reviewBefore = await state(pending.task.id);
+        const reviewCheck = reviewBefore.attempts.find(a => a.runId === review.runId)!.output.check;
+        assert.ok(reviewCheck);
+        assert.equal(Object.hasOwn(reviewCheck as object, 'priorReviewArtifactObservation'), false,
+          'review must not depend on a future verify observation');
+        const reviewPrompt = (await db.query('SELECT prompt FROM agent_runs WHERE id=$1', [review.runId])).rows[0].prompt;
+        assert.doesNotMatch(reviewPrompt, /Host-recorded prior review artifact observations/);
+        const reviewSession = `review-artifact-${pending.task.id}`;
+        await terminal(review.runId, reviewSession, false, report => {
+          report.verify = { status: 'not_run' };
+          report.summary = 'FORGED_REVIEW_REPORT_ONLY_SUCCESS';
+          report.criteria = [{ text: 'Independent artifact inspection', passed: true,
+            evidence: 'FORGED_REVIEW_REPORT_ONLY_SUCCESS' }];
+        });
+        const records = await artifactInspectionChunks(review.runId, format);
+        await reconcile.run('owner', review.runId);
+        const beforeVerify = await state(pending.task.id);
+        assert.equal(beforeVerify.task.stage, 'verify');
+        assert.equal(beforeVerify.task.status, 'pending');
+        const verify = await start(beforeVerify.task);
+        const current = await state(pending.task.id);
+        const candidate = { id: pending.task.candidateId!, executionSha: sha,
+          producerExecution: { runId: producerRunId, sessionId: `execute-${pending.task.issueId}` } };
+        return { task: current.task, candidate, review, verify, reviewSession, records,
+          reviewAttemptId: beforeVerify.attempts.find(a => a.runId === review.runId)!.id };
+      }
+      await t.test('prior review handoff carries real paired artifact observations into verify, which still inspects independently', async () => {
+        for (const format of ['claude', 'codex'] as const) {
+          const fixture = await priorReviewFixture(format);
+          const observed = await priorReviewArtifactObservations(db, fixture.task, fixture.verify.runId, fixture.candidate);
+          assert.equal(observed.data.complete, true);
+          assert.deepEqual(observed.data.incompleteReasons, []);
+          assert.deepEqual([observed.data.taskId, observed.data.requestEpoch, observed.data.candidateId, observed.data.candidateSha],
+            [fixture.task.id, fixture.task.sourceEventId, fixture.candidate.id, sha]);
+          assert.deepEqual([observed.data.review?.attemptId, observed.data.review?.runId, observed.data.review?.sessionId],
+            [fixture.reviewAttemptId, fixture.review.runId, fixture.reviewSession]);
+          assert.equal(observed.data.review?.continuesRunId, null);
+          assert.equal(observed.data.review?.questionContinuationPresent, false);
+          assert.equal(observed.data.records.length, 2);
+          for (const [i, original] of fixture.records.entries()) {
+            const actual = observed.data.records[i];
+            for (const key of ['toolName', 'toolCallId', 'inputChunkId', 'outputChunkId', 'inputSeq', 'outputSeq', 'input', 'output'] as const)
+              assert.deepEqual(actual[key], original[key], `${format}: preserve actual ${key}`);
+          }
+          const run = (await db.query('SELECT prompt FROM agent_runs WHERE id=$1', [fixture.verify.runId])).rows[0];
+          assert.ok(run.prompt.includes(JSON.stringify(observed.data)), 'the actual verify prompt must contain this admitted collection');
+          assert.match(run.prompt, /does not replace your own new independent artifact and repository inspections/);
+          assert.doesNotMatch(run.prompt, /FORGED_REVIEW_REPORT_ONLY_SUCCESS/);
+          const saved = (await state(fixture.task.id)).attempts.find(a => a.runId === fixture.verify.runId)!.output.check as {
+            priorReviewArtifactObservation: { digest: string };
+          };
+          assert.equal(saved.priorReviewArtifactObservation.digest, observed.digest);
+          assert.equal((await db.query('SELECT count(*)::int AS n FROM run_chunks WHERE "runId"=$1', [fixture.verify.runId])).rows[0].n, 0,
+            'the host must not turn historical review chunks into verifier-owned observations');
+          await terminal(fixture.verify.runId, `verify-artifact-${fixture.task.id}`, false, report => {
+            report.verify = { status: 'not_run' };
+            report.criteria = [{ text: 'Independent artifact inspection', passed: true,
+              evidence: 'Synthetic verifier has its own paired native artifact observations.' }];
+          });
+          const fresh = await artifactInspectionChunks(fixture.verify.runId, format);
+          assert.ok(fresh.every(pair => fixture.records.every(old => old.inputChunkId !== pair.inputChunkId && old.outputChunkId !== pair.outputChunkId)));
+          await reconcile.run('owner', fixture.verify.runId);
+          const complete = await state(fixture.task.id);
+          assert.equal(complete.task.stage, 'approval');
+          assert.equal(complete.task.status, 'pending');
+          assert.equal(complete.task.candidateId, fixture.candidate.id);
+          assert.deepEqual(complete.attempts.filter(a => ['review', 'verify'].includes(a.stage)).map(a => a.status), ['passed', 'passed']);
+        }
+      });
+      await t.test('prior review observations retain owner, candidate, epoch, independent SID and latest-review fences', async () => {
+        const fixture = await priorReviewFixture();
+        const tx = await db.connect();
+        const incomplete = (result: Awaited<ReturnType<typeof priorReviewArtifactObservations>>) => {
+          assert.equal(result.data.complete, false);
+          assert.ok(result.data.incompleteReasons.length > 0);
+          assert.deepEqual(result.data.records, []);
+        };
+        try {
+          await tx.query('BEGIN');
+          const original = await priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate);
+          await tx.query('SAVEPOINT prior_review_continuation_projection');
+          try {
+            // Test only the reader's projection of continuation metadata on an
+            // already passed review. This does not establish a question/answer
+            // chain, bypass an independence gate, or reconcile this variant.
+            const predecessorId = randomUUID();
+            await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,
+              "baseBranch","agentDefinition",status,"stopReason","sessionId",prompt,"startedAt","finishedAt")
+              SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,
+                "baseBranch","agentDefinition",'stopped','asked_human',"sessionId",'Earlier projection-only segment fixture',
+                "startedAt"-interval '2 seconds',"startedAt"-interval '1 second' FROM agent_runs WHERE id=$1`,
+              [fixture.review.runId, predecessorId]);
+            await tx.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt")
+              SELECT gen_random_uuid(),$2,seq,chunk,"createdAt"-interval '2 seconds' FROM run_chunks WHERE "runId"=$1`,
+              [fixture.review.runId, predecessorId]);
+            await tx.query('UPDATE agent_runs SET "continuesRunId"=$2,"questionContinuation"=$3 WHERE id=$1',
+              [fixture.review.runId, predecessorId, JSON.stringify({ originRunId: predecessorId,
+                originSessionId: fixture.reviewSession, requireSessionResume: true })]);
+            const projected = await priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate);
+            assert.equal(projected.data.complete, true, 'continuation metadata alone must not globally suppress the reader');
+            assert.equal(projected.data.review?.runId, fixture.review.runId);
+            assert.equal(projected.data.review?.continuesRunId, predecessorId);
+            assert.equal(projected.data.review?.questionContinuationPresent, true);
+            assert.deepEqual(projected.data.records, original.data.records, 'exclude native records in earlier segments');
+          } finally { await tx.query('ROLLBACK TO SAVEPOINT prior_review_continuation_projection'); }
+          for (const [task, candidate] of [
+            [{ ...fixture.task, userId: 'other' }, fixture.candidate],
+            [{ ...fixture.task, issueId: randomUUID() }, fixture.candidate],
+            [{ ...fixture.task, sourceEventId: randomUUID() }, fixture.candidate],
+            [fixture.task, { ...fixture.candidate, id: randomUUID() }],
+            [fixture.task, { ...fixture.candidate, executionSha: 'c'.repeat(40) }],
+          ] as const) incomplete(await priorReviewArtifactObservations(tx, task, fixture.verify.runId, candidate));
+          const mutations: [string, (tx: import('pg').PoolClient) => Promise<unknown>][] = [
+            ['review no longer binds this candidate', client => client.query('UPDATE factory_attempts SET "candidateId"=NULL WHERE id=$1', [fixture.reviewAttemptId])],
+            ['native review did not succeed', client => client.query("UPDATE agent_runs SET status='failed',\"stopReason\"='error' WHERE id=$1", [fixture.review.runId])],
+            ['verifier reuses review SID', client => client.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [fixture.verify.runId, fixture.reviewSession])],
+            ['attempt SID differs from native SID', client => client.query('UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [fixture.reviewAttemptId, 'wrong-review-session'])],
+            ['review reuses producer SID', async client => {
+              await client.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [fixture.review.runId, fixture.candidate.producerExecution.sessionId]);
+              await client.query('UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [fixture.reviewAttemptId, fixture.candidate.producerExecution.sessionId]);
+            }],
+            ['latest review belongs to another request epoch', client => client.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`,
+              [fixture.reviewAttemptId, randomUUID()])],
+            ['newer failed review must hide the earlier passed review', async client => {
+              await client.query('UPDATE factory_attempts SET position=position+1 WHERE id=$1', [fixture.task.attemptId]);
+              await client.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"candidateId",reason,output)
+                SELECT $2,"taskId",'review',ordinal+1,position+1,'failed',"candidateId",'Newer failed review fixture',output
+                FROM factory_attempts WHERE id=$1`, [fixture.reviewAttemptId, randomUUID()]);
+            }],
+          ];
+          for (const [label, mutate] of mutations) {
+            await tx.query('SAVEPOINT prior_review_fence');
+            try { await mutate(tx); incomplete(await priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate)); }
+            finally { await tx.query('ROLLBACK TO SAVEPOINT prior_review_fence'); }
+            assert.equal((await priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate)).data.complete, true, label);
+          }
+          for (const [path, value] of [
+            ['{check,sha}', 'd'.repeat(40)], ['{check,candidateId}', randomUUID()],
+            ['{check,requestEpoch}', randomUUID()], ['{check,policy,readOnly}', false],
+          ] as const) {
+            await tx.query('SAVEPOINT historical_assignment');
+            try {
+              await tx.query('UPDATE factory_attempts SET output=jsonb_set(output,$2::text[],$3::jsonb) WHERE id=$1',
+                [fixture.reviewAttemptId, path, JSON.stringify(value)]);
+              await assert.rejects(priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate),
+                { code: 'factoryCheckBindingMismatch' }, path);
+            } finally { await tx.query('ROLLBACK TO SAVEPOINT historical_assignment'); }
+          }
+        } finally { await tx.query('ROLLBACK'); tx.release(); }
+      });
+      await t.test('prior review native IO is all-or-incomplete for missing, ambiguous, failed, over-budget or redacted records', async () => {
+        const fixture = await priorReviewFixture();
+        const exhausted = await priorReviewArtifactObservations(db, fixture.task, fixture.verify.runId, fixture.candidate, 0);
+        assert.equal(exhausted.data.complete, false);
+        assert.deepEqual(exhausted.data.records, []);
+        assert.deepEqual(exhausted.data.incompleteReasons, ['prior_review_records_omitted'], 'prior review cannot displace authenticated instructions when the shared evidence budget is exhausted');
+        const pair = fixture.records[0];
+        const tx = await db.connect();
+        const mutateOutput = (client: import('pg').PoolClient, output: unknown) => client.query(
+          `UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}',$2::jsonb) WHERE id=$1`, [pair.outputChunkId, JSON.stringify(output)]);
+        const mutations: [string, string, (tx: import('pg').PoolClient) => Promise<unknown>][] = [
+          ['missing output', 'prior_review_pair_incomplete', client => client.query('DELETE FROM run_chunks WHERE id=$1', [pair.outputChunkId])],
+          ['duplicate output outside the run window', 'prior_review_pair_incomplete', client => client.query(`INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt")
+            SELECT $2,"runId",90,chunk,"createdAt"+interval '1 hour' FROM run_chunks WHERE id=$1`, [pair.outputChunkId, randomUUID()])],
+          ['duplicate native input', 'prior_review_pair_incomplete', client => client.query(`INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt")
+            SELECT $2,"runId",91,chunk,"createdAt" FROM run_chunks WHERE id=$1`, [pair.inputChunkId, randomUUID()])],
+          ['tool error', 'prior_review_content_incomplete', client => client.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{type}','"tool-output-error"'::jsonb) WHERE id=$1`, [pair.outputChunkId])],
+          ['oversized input', 'prior_review_content_incomplete', client => client.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input}',$2::jsonb) WHERE id=$1`,
+            [pair.inputChunkId, JSON.stringify({ path: 'delivery.txt', expectedUtf8: 'x'.repeat(4100) })])],
+          ['oversized output', 'prior_review_content_incomplete', client => mutateOutput(client, 'x'.repeat(12100))],
+          ['redacted output', 'prior_review_content_redacted', client => mutateOutput(client, 'password=fixture-private-prior-review')],
+          ['persisted redaction marker', 'prior_review_content_redacted', client => mutateOutput(client, '[REDACTED]')],
+          ['persisted secret reference', 'prior_review_content_redacted', client => mutateOutput(client, '[secret:fixture-private-prior-review]')],
+          ['collection budget', 'prior_review_records_omitted', async client => {
+            for (const item of fixture.records) await client.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}',$2::jsonb) WHERE id=$1`,
+              [item.outputChunkId, JSON.stringify('x'.repeat(8500))]);
+          }],
+          ['pair count bound', 'prior_review_records_omitted', async client => {
+            for (let i = 0; i < 15; i++) {
+              const toolCallId = randomUUID();
+              for (const [id, seq, chunk] of [
+                [randomUUID(), 10 + 2 * i, { type: 'tool-input-available', toolName: pair.toolName, toolCallId, input: pair.input }],
+                [randomUUID(), 11 + 2 * i, { type: 'tool-output-available', toolCallId, output: pair.output }],
+              ] as const) await client.query(`INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt")
+                SELECT $1,id,$3,$4,"finishedAt"-interval '100 milliseconds' FROM agent_runs WHERE id=$2`,
+                [id, fixture.review.runId, seq, JSON.stringify(chunk)]);
+            }
+          }],
+        ];
+        try {
+          await tx.query('BEGIN');
+          for (const [label, reason, mutate] of mutations) {
+            await tx.query('SAVEPOINT prior_review_content');
+            try {
+              await mutate(tx);
+              const result = await priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate);
+              assert.equal(result.data.complete, false, label);
+              assert.ok(result.data.incompleteReasons.includes(reason), label);
+              assert.deepEqual(result.data.records, [], 'do not present the surviving valid repository pair as a complete collection');
+              assert.doesNotMatch(JSON.stringify(result.data), /fixture-private-prior-review/);
+            } finally { await tx.query('ROLLBACK TO SAVEPOINT prior_review_content'); }
+          }
+        } finally { await tx.query('ROLLBACK'); tx.release(); }
+      });
+      await t.test('verify continuation retains frozen prior-review identity and rejects native content or digest drift', async () => {
+        const fixture = await priorReviewFixture();
+        const observed = await priorReviewArtifactObservations(db, fixture.task, fixture.verify.runId, fixture.candidate);
+        const tx = await db.connect();
+        try {
+          await tx.query('BEGIN');
+          const followUp = await appendFactoryCheckContinuationContext(tx, fixture.task, fixture.verify.runId, 'Original saved answer');
+          assert.ok(followUp.includes(JSON.stringify(observed.data)), 'continuation gets the exact admitted historical observations');
+          assert.match(followUp, /^Original saved answer/);
+          for (const value of ['0'.repeat(64), 'not-a-digest']) {
+            await tx.query('SAVEPOINT prior_review_digest');
+            try {
+              await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check,priorReviewArtifactObservation,digest}',to_jsonb($2::text)) WHERE id=$1`,
+                [fixture.task.attemptId, value]);
+              await assert.rejects(appendFactoryCheckContinuationContext(tx, fixture.task, fixture.verify.runId, 'Original saved answer'),
+                { code: 'factoryCheckBindingMismatch' });
+            } finally { await tx.query('ROLLBACK TO SAVEPOINT prior_review_digest'); }
+          }
+          await tx.query('SAVEPOINT prior_review_raw_drift');
+          try {
+            await tx.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}',$2::jsonb) WHERE id=$1`,
+              [fixture.records[0].outputChunkId, JSON.stringify('Changed actual native observation')]);
+            const changed = await priorReviewArtifactObservations(tx, fixture.task, fixture.verify.runId, fixture.candidate);
+            assert.equal(changed.data.complete, true, 'complete collection is not a synthesized semantic pass');
+            assert.notEqual(changed.digest, observed.digest);
+            await assert.rejects(appendFactoryCheckContinuationContext(tx, fixture.task, fixture.verify.runId, 'Original saved answer'),
+              { code: 'factoryCheckBindingMismatch' });
+          } finally { await tx.query('ROLLBACK TO SAVEPOINT prior_review_raw_drift'); }
+          await tx.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [fixture.review.runId, 'replacement-review-session']);
+          await tx.query('UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [fixture.reviewAttemptId, 'replacement-review-session']);
+          await assert.rejects(appendFactoryCheckContinuationContext(tx, fixture.task, fixture.verify.runId, 'Original saved answer'),
+            { code: 'factoryCheckBindingMismatch' });
+        } finally { await tx.query('ROLLBACK'); tx.release(); }
+      });
       await t.test('a stale local heartbeat rejects direct dispatch until the same pending check receives a real fresh heartbeat', async () => {
         const pending = await pendingReview();
         const before = await state(pending.task.id);
@@ -583,6 +865,10 @@ test(
         const pending = await pendingReview('repository', false);
         assert.equal(pending.task.route.flowVersion, 2);
         const review = await start(pending.task);
+        const single = await state(pending.task.id);
+        assert.equal(Object.hasOwn(single.attempts.find(a => a.runId === review.runId)!.output.check as object, 'priorReviewArtifactObservation'), false);
+        assert.doesNotMatch((await db.query('SELECT prompt FROM agent_runs WHERE id=$1', [review.runId])).rows[0].prompt,
+          /Host-recorded prior review artifact observations/);
         const extras = await factoryCheckAssignment(db, 'owner', review.runId);
         assert.equal(extras.factoryCheck.reportOnly, true);
         assert.equal(extras.verifyCommand, undefined);
@@ -3068,3 +3354,4 @@ test('isolated PG: producer command records bind owner/session/candidate and ret
     await admin.end()
   }
 })
+

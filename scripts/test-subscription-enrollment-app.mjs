@@ -44,6 +44,18 @@ export function enrollmentContainerArgs({ source, snapshot, viteCache, certifica
   return args
 }
 
+/** Retain the owned container and its logs, but never leave its dev server
+ * running after acceptance. Docker's stop result alone is not exit evidence. */
+export async function stopEnrollmentContainer(name, run) {
+  assert.match(name, /^mikka-enrollment-test-[0-9a-f-]{36}$/)
+  await run('docker', ['stop', '--time', '35', name], 45_000)
+  const state = JSON.parse(await run('docker', ['inspect', '--format', '{{json .State}}', name], 10_000))
+  assert.equal(state.Running, false, 'Owned enrollment server must actually exit')
+  assert.equal(state.Status, 'exited', 'Owned enrollment container must be stopped')
+  assert.equal(state.OOMKilled, false, 'A killed process is failed cleanup evidence')
+  assert.ok([0, 143].includes(state.ExitCode), 'Forced or failed enrollment shutdown cannot pass')
+}
+
 export async function checkSubscriptionEnrollment() {
   assert.equal(process.platform, 'linux')
   const source = resolve(import.meta.dirname, '..')
@@ -53,7 +65,7 @@ export async function checkSubscriptionEnrollment() {
   const snapshot = join(directory, 'app')
   const name = `mikka-enrollment-test-${randomUUID()}`
   const operator = `fixture-only-${randomUUID()}`
-  let started = false, vault
+  let started = false, vault, failure
   const run = (command, args, timeout = 60000) => new Promise((resolve, reject) => {
     const child = spawn(command, args, { env: { PATH: process.env.PATH, LANG: 'C.UTF-8' }, stdio: ['ignore', 'pipe', 'pipe'] })
     let result = ''; child.stdout.on('data', part => { if (result.length < 100000) result += part }); child.stderr.resume()
@@ -142,12 +154,22 @@ export async function checkSubscriptionEnrollment() {
     const completion={id:result.id,provider:'claude',handoffKey:result.handoffKey,callbackUrl:'http://localhost:54545/callback?code=fixture-code&state='+state}
     assert.equal((await scoped({...completion,handoffKey:'x'.repeat(43)})).status,409);assert.equal(claimAttempts,0)
     assert.equal((await scoped(completion)).status,409);assert.equal(claimAttempts,1)
-    console.log('PASS: actual Vite/Nitro operator and scoped handoff routes -> production custody worker -> TLS fixture; valid proof reaches refused replay latch; no SQL/reader/native/E2B/external OAuth request')
+  } catch (error) {
+    failure = error
   } finally {
-    if (started) console.error(`Retained enrollment test container: ${name}`)
-    if (vault) { vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)) }
+    if (started) {
+      try { await stopEnrollmentContainer(name, run) }
+      catch (error) { failure = failure ? new AggregateError([failure, error], 'Enrollment acceptance and shutdown failed') : error }
+      console.error(`Retained enrollment test container: ${name}`)
+    }
+    if (vault) {
+      try { vault.closeAllConnections(); await new Promise((resolve, reject) => vault.close(error => error ? reject(error) : resolve())) }
+      catch (error) { failure = failure ? new AggregateError([failure, error], 'Enrollment acceptance and TLS shutdown failed') : error }
+    }
     console.error(`Retained enrollment test directory: ${directory}`)
   }
+  if (failure) throw failure
+  console.log('PASS: actual Vite/Nitro operator and scoped handoff routes -> production custody worker -> TLS fixture; valid proof reaches refused replay latch; owned server stopped; no SQL/reader/native/E2B/external OAuth request')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await checkSubscriptionEnrollment()

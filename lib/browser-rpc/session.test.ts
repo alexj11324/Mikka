@@ -94,7 +94,8 @@ test('browser RPC rejects origin, cookie/bearer confusion, unknown actions and i
     method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://example.test', 'x-mikka-rpc': '1', cookie: 'session=one', ...extra }, body: JSON.stringify(body),
   })
   const valid = { version: 1, action: 'test.read', args: ['8fd4a011-25c0-4e0e-ad1e-ef0203ee15c3'] }
-  for (const extra of [{ origin: 'https://foreign.test' }, { authorization: 'Bearer anything' }, { 'x-mikka-session-cache': 'cache' }, { 'sec-fetch-site': 'cross-site' }]) assert.equal((await rpc(request(valid, extra))).status, 403)
+  const deniedHeaders: Record<string, string>[] = [{ origin: 'https://foreign.test' }, { authorization: 'Bearer anything' }, { 'x-mikka-session-cache': 'cache' }, { 'sec-fetch-site': 'cross-site' }]
+  for (const extra of deniedHeaders) assert.equal((await rpc(request(valid, extra))).status, 403)
   assert.equal(reads, 0)
   assert.equal((await rpc(request({ ...valid, action: 'auth.getSession' }))).status, 404)
   assert.equal((await rpc(request({ ...valid, args: ['not-a-uuid'] }))).status, 400)

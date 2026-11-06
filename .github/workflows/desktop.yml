@@ -216,6 +216,8 @@ jobs:
           cache: pnpm
       - run: test "$(uname -m)" = arm64
       - run: pnpm install --frozen-lockfile
+      - name: Keep setup-node 24 in the native installer login shell
+        run: node apps/desktop/test/native-node.mjs
       - run: pnpm exec playwright install chromium
       - name: Start an independent local PostgreSQL
         run: |

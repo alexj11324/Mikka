@@ -48,6 +48,12 @@ test('local routing preserves workspace history state, locale, query and fragmen
   assert.equal(navigation.localeOf('/mikka/en/settings'), 'en')
   assert.equal(navigation.localeHref('/mikka/en/?bot=one', 'zh-CN'), '/?bot=one')
   assert.equal(navigation.isOwnURL(new URL('mikka://other/mikka')), false)
+  for (const path of ['/mikka/api/desktop/return?state=fixture', '/mikka/api/rpc', '/mikka/v1/devices', '/mikka/.well-known/oauth-authorization-server']) {
+    assert.equal(navigation.isClientRoute(new URL(path, window.location.href)), false)
+  }
+  for (const path of ['/mikka/en/settings?section=models', '/mikka/en/a/shared-fixture', '/mikka/en/w/fixture-workspace']) {
+    assert.equal(navigation.isClientRoute(new URL(path, window.location.href)), true)
+  }
   const before = window.location.href
   navigation.navigate('https://example.test/help')
   assert.equal(window.location.href, before)

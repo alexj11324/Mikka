@@ -2,16 +2,14 @@
 // harness operation; startup cannot create, adopt or rebind its database.
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { realpathSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { build } from 'esbuild'
 import { EnvironmentError } from '../../../scripts/test-accounts/database-target.mjs'
 import { dockerRequestUrl } from '../../../scripts/test-accounts/docker-ingress.mjs'
 import { dockerGatewayRequest, proxyDockerGateway, proxyDockerGatewayUpgrade } from '../../../scripts/test-accounts/docker-gateway.mjs'
 import { readCompiledDockerBuild } from '../../../scripts/start-app.mjs'
+import { startLiveWorker } from './live-worker.mjs'
 
 export function assertDockerBuild(environment, revision, built) {
   if (environment.kind !== 'isolated-docker') throw new EnvironmentError('DOCKER_RUNTIME_DESCRIPTOR_REQUIRED')
@@ -19,6 +17,24 @@ export function assertDockerBuild(environment, revision, built) {
   if (built.version !== 1 || built.preset !== 'node-server' || built.basePath !== environment.basePath
     || built.docker?.trustProxy !== false || built.docker.entry !== 'server/mikka-docker.mjs'
     || built.docker.application !== 'server/docker-entry.mjs') throw new EnvironmentError('DOCKER_RUNTIME_CONFIG_MISMATCH')
+}
+
+export async function closeDockerResources({ server, sockets, app, worker }, { originalFailure, closeMs = 35_000 } = {}) {
+  const failures = []
+  try {
+    server?.closeAllConnections()
+    for (const socket of sockets) socket.destroy()
+    if (server?.listening) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  } catch (error) { failures.push(error) }
+  let timer
+  try {
+    await Promise.race([Promise.resolve().then(() => app?.close()), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('DOCKER_RUNTIME_APP_CLOSE_TIMEOUT')), closeMs)
+    })])
+  } catch (error) { failures.push(error) }
+  finally { clearTimeout(timer) }
+  try { await worker?.close() } catch (error) { failures.push(error) }
+  if (failures.length) throw new AggregateError(originalFailure ? [originalFailure, ...failures] : failures, 'DOCKER_RUNTIME_CLOSE_FAILED')
 }
 
 async function main() {
@@ -44,23 +60,18 @@ async function main() {
   try { await assertDatabaseIdentity(pool, environment) } finally { await pool.end() }
   await recordRunnerEvidenceSecrets(environment)
 
-  const require = createRequire(import.meta.url)
-  const workerRequire = createRequire(realpathSync(require.resolve('wrangler/package.json')))
-  const { Miniflare, Log, LogLevel, convertV4MiniflareOptions } = workerRequire('miniflare')
   const secret = randomBytes(32).toString('hex')
   await recordAuthenticationSecrets([secret], { environment })
-  const compiled = await build({ entryPoints: [resolve(root, 'cloudflare/device-gateway/src/index.ts')], bundle: true, format: 'esm', platform: 'neutral', external: ['cloudflare:workers', 'node:crypto'], write: false })
-  const options = {
-    workers: [{ name: 'desktop-docker-gateway', modules: true, script: compiled.outputFiles[0].text,
-      compatibilityDate: '2026-10-22', compatibilityFlags: ['nodejs_compat'],
-      durableObjects: { DEVICE_SESSION: { className: 'DeviceSession', useSQLite: true } },
-      bindings: { GATEWAY_PUSH_SECRET: secret } }], host: '127.0.0.1', port: 0, cf: false, log: new Log(LogLevel.WARN),
-  }
-  const worker = new Miniflare(convertV4MiniflareOptions ? convertV4MiniflareOptions(options) : options)
-  let app, server
+  const stopped = Promise.withResolvers()
+  const startupAbort = new AbortController()
+  const requestStop = () => { startupAbort.abort(); stopped.resolve() }
+  process.once('SIGINT', requestStop)
+  process.once('SIGTERM', requestStop)
+  let app, server, worker, originalFailure
   const sockets = new Set()
   try {
-    const gateway = (await worker.ready).origin
+    worker = await startLiveWorker({ root, secret, name: 'desktop-docker-gateway', signal: startupAbort.signal })
+    const gateway = worker.origin
     process.env.DEVICE_GATEWAY_PUSH_SECRET = secret
     // Clients use the same real Worker through this one published HTTPS port.
     process.env.DEVICE_GATEWAY_URL = environment.origin
@@ -85,12 +96,13 @@ async function main() {
     server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)) })
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(environment.docker.port, '0.0.0.0', resolve) })
     console.log(JSON.stringify({ status: 'ready', revision, origin: environment.origin, environmentId: environment.id, gateway: environment.origin }))
-    await new Promise(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve) })
+    await Promise.race([stopped.promise, worker.failure])
+  } catch (error) {
+    originalFailure = error
+    throw error
   } finally {
-    server?.closeAllConnections()
-    for (const socket of sockets) socket.destroy()
-    if (server?.listening) await new Promise(resolve => server.close(resolve))
-    try { await app?.close() } finally { await worker.dispose() }
+    try { await closeDockerResources({ server, sockets, app, worker }, { originalFailure }) }
+    finally { process.removeListener('SIGINT', requestStop); process.removeListener('SIGTERM', requestStop) }
   }
 }
 
@@ -98,5 +110,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   main().catch(error => {
     console.error(`Docker test runtime blocked (${error instanceof EnvironmentError ? error.code : 'UNEXPECTED_ERROR'}).`)
     process.exitCode = 1
+    // If a failed SDK close retained handles, fail this owned process instead
+    // of leaving a server behind. The database and failed-run evidence remain.
+    setTimeout(() => process.exit(1), 5_000).unref()
   })
 }

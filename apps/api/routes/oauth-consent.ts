@@ -12,7 +12,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401, headers })
   const query = new URL(request.url).searchParams
   const clientId = query.get('client_id')
-  if (!clientId || clientId.length > 512 || query.getAll('client_id').length !== 1) return Response.json({ error: 'Invalid client' }, { status: 400, headers })
-  const [client] = await db.select({ name: oauthClients.name, uri: oauthClients.uri }).from(oauthClients).where(eq(oauthClients.clientId, clientId)).limit(1)
+  if ((clientId?.length ?? 0) > 512 || query.getAll('client_id').length > 1) return Response.json({ error: 'Invalid client' }, { status: 400, headers })
+  const [client] = clientId ? await db.select({ name: oauthClients.name, uri: oauthClients.uri }).from(oauthClients).where(eq(oauthClients.clientId, clientId)).limit(1) : []
   return Response.json({ clientName: client?.name ?? null, clientUri: client?.uri ?? null, account: session.user.email }, { headers })
 }

@@ -18,8 +18,14 @@ export function callAction<T = unknown>(action: string, args: unknown[]): Promis
   return callRemoteAction(action, args, { endpoint: '/api/desktop/rpc', credentials: 'omit', header: 'x-mikka-desktop-protocol' })
 }
 
-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc' }): Promise<T> {
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: () => boolean }): Promise<T> {
+  // Web supplies its existing SDK owner generation. Native identity fencing
+  // remains in main; it does not supply or depend on this optional callback.
+  const assertCurrent = (cause?: unknown) => {
+    if (transport.isCurrent?.() === false) throw new DesktopTransportError('desktop_session_changed', { status: 409, cause })
+  }
   const encoded = await encodeArgs(args)
+  assertCurrent()
   let response: Response
   try {
     response = await fetch(withBasePath(transport.endpoint), {
@@ -30,9 +36,11 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
     })
   } catch (cause) {
+    assertCurrent(cause)
     setTransportState('offline')
     throw new DesktopTransportError('desktop_backend_unreachable', { cause })
   }
+  assertCurrent()
   if (response.status === 401) {
     setTransportState('unauthenticated')
     throw new DesktopTransportError('desktop_session_expired', { status: response.status })
@@ -46,6 +54,7 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
     throw new DesktopTransportError('desktop_backend_unreachable', { status: response.status })
   }
   const value = await response.json().catch(() => null) as { version: number; ok: boolean; result?: unknown; error?: { code: string } } | null
+  assertCurrent()
   if (!value || value.version !== DESKTOP_RPC_VERSION || typeof value.ok !== 'boolean') throw new DesktopTransportError('desktop_rpc_response_invalid', { status: response.status })
   if (!value.ok) throw new DesktopTransportError(value.error?.code ?? 'desktop_rpc_response_invalid', { status: response.status })
   if (!response.ok) throw new DesktopTransportError('desktop_rpc_request_rejected', { status: response.status })

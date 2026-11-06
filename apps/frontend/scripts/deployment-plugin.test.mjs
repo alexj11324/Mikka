@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
+import { build } from 'vite'
+import { frontendConfig } from '../vite.config.mjs'
 import { deploymentPlugin, pinChunkReferences, pinnedUrl } from './deployment-plugin.mjs'
 
 test('deployment pinning preserves relative resource paths, existing queries and hashes without pinning external URLs', () => {
@@ -11,7 +16,7 @@ test('deployment pinning preserves relative resource paths, existing queries and
 
 test('actual emitted static imports, lazy chunks, preload entries and CSS fonts receive the same deployment pin', () => {
   const files = new Set(['assets/main.js', 'assets/shared.js', 'assets/lazy.js', 'assets/font.woff2'])
-  const code = 'import value from "./shared.js"; export const read = () => import("./lazy.js"); const preload = ["assets/shared.js"]; const other = "business-value";'
+  const code = 'import value from "./shared.js"; export const read = () => import(`./lazy.js`); const preload = [`assets/shared.js`]; const other = "business-value";'
   const pinned = pinChunkReferences(code, 'assets/main.js', files, 'release-1')
   assert.match(pinned, /\.\/shared\.js\?dpl=release-1/)
   assert.match(pinned, /\.\/lazy\.js\?dpl=release-1/)
@@ -23,4 +28,35 @@ test('actual emitted static imports, lazy chunks, preload entries and CSS fonts 
   const html = deploymentPlugin({ deploymentId: 'release-1' }).transformIndexHtml.handler('<script type="module" src="/mikka/assets/main.js"></script><link href="/mikka/icon.svg">')
   assert.match(html, /main\.js\?dpl=release-1/)
   assert.match(html, /icon\.svg\?dpl=release-1/)
+})
+
+test('the real Vite HTML, lazy module and font outputs keep one deployment identity', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-deployment-build-'))
+  const previous = process.env.MIKKA_DEPLOYMENT_ID
+  try {
+    process.env.MIKKA_DEPLOYMENT_ID = 'release-contract'
+    await Promise.all([
+      writeFile(join(directory, 'index.html'), '<html><head><link rel="icon" href="/mikka/icon.svg"></head><body><script type="module" src="./entry.ts"></script></body></html>'),
+      writeFile(join(directory, 'entry.ts'), 'import "./style.css"; window.loadFixture = () => import("./lazy.ts");'),
+      writeFile(join(directory, 'lazy.ts'), 'export const loaded = true'),
+      writeFile(join(directory, 'style.css'), '@font-face{font-family:Fixture;src:url(./fixture.woff2)}body{font-family:Fixture}'),
+      writeFile(join(directory, 'fixture.woff2'), 'local-font-contract'),
+    ])
+    const config = await frontendConfig({ target: 'web' })
+    const result = await build({ ...config, root: directory, publicDir: false, logLevel: 'silent', build: { ...config.build, write: false, assetsInlineLimit: 0 } })
+    const html = result.output.find(file => file.fileName === 'index.html').source
+    const css = result.output.find(file => file.type === 'asset' && file.fileName.endsWith('.css')).source
+    const lazy = result.output.find(file => file.type === 'chunk' && file.isDynamicEntry)
+    const entry = result.output.find(file => file.type === 'chunk' && file.isEntry)
+    assert.ok(lazy)
+    const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(match => new URL(match[1].replaceAll('&amp;', '&'), 'https://app.example'))
+    assert.ok(urls.length >= 3)
+    assert.ok(urls.every(url => url.pathname.startsWith('/mikka/') && url.searchParams.get('dpl') === 'release-contract'))
+    assert.ok(entry.code.includes(`${lazy.fileName.split('/').at(-1)}?dpl=release-contract`))
+    assert.match(String(css), /fixture[^"()]*\.woff2\?dpl=release-contract/)
+  } finally {
+    if (previous === undefined) delete process.env.MIKKA_DEPLOYMENT_ID
+    else process.env.MIKKA_DEPLOYMENT_ID = previous
+    await rm(directory, { recursive: true, force: true })
+  }
 })

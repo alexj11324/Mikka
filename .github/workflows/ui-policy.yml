@@ -275,6 +275,8 @@ jobs:
         if: always()
       - run: node apps/api/scripts/generate-routes.mjs --check
         if: always()
+      - run: pnpm lint:runtime
+        if: always()
       - run: pnpm test:api
         if: always()
       - run: pnpm --filter @mikka/frontend test

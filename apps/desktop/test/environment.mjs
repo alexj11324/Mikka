@@ -3,26 +3,21 @@
 // store; no .env file, production connection or external service key is needed.
 import { spawn, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { realpathSync } from 'node:fs'
 import { lstat, mkdir, open, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { build } from 'esbuild'
 import { Pool } from 'pg'
 import { assertDatabaseIdentity, loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { recordRunnerEvidenceSecrets } from '../../../scripts/test-accounts/bootstrap.mjs'
 import { localDatabaseTarget } from '../../../scripts/test-accounts/database-target.mjs'
-import { productionApplication } from './production-application.mjs'
+import { productionApplication, stopOwnedApplication } from './production-application.mjs'
+import { startLiveWorker } from './live-worker.mjs'
 
 const harnessRoot = fileURLToPath(new URL('../../..', import.meta.url))
 const root = process.env.MIKKA_TEST_APP_DIR ? resolve(process.env.MIKKA_TEST_APP_DIR) : harnessRoot
 process.chdir(root)
-const require = createRequire(import.meta.url)
-const workerRequire = createRequire(realpathSync(require.resolve('wrangler/package.json')))
-const { Miniflare, Log, LogLevel, convertV4MiniflareOptions } = workerRequire('miniflare')
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const database = process.env.E2E_DATABASE_URL
 localDatabaseTarget(database)
@@ -48,9 +43,13 @@ await mkdir('.cache/desktop-runtime', { recursive: true, mode: 0o700 })
 const children = []
 let worker
 let stopping = false
-// Miniflare's signal hook calls process.exit synchronously. Its own Worker is
-// cleaned there, but an async finally cannot run: kill only our detached Next
-// groups on that path. Ordinary command completion still drains them below.
+const stopped = Promise.withResolvers()
+const startupAbort = new AbortController()
+const requestStop = () => { stopping = true; startupAbort.abort(); stopped.resolve() }
+process.once('SIGINT', requestStop)
+process.once('SIGTERM', requestStop)
+// Miniflare lives in its own child. These emergency handlers cover only an
+// unexpected owner exit; an ordinary signal reaches the awaited finally below.
 process.once('exit', () => {
   stopping = true
   for (const child of children) signalServer(child, 'SIGKILL')
@@ -109,19 +108,22 @@ async function start(directory, serverPort, label, metrics) {
   throw new Error(`DESKTOP_TEST_${label}_SERVER_TIMEOUT`)
 }
 
+async function stopEnvironment(originalFailure) {
+  stopping = true
+  const results = await Promise.allSettled(children.map(child => stopOwnedApplication(child, { signal: signalServer })))
+  const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
+  try { await worker?.close() } catch (error) { failures.push(error) }
+  if (failures.length) throw new AggregateError(originalFailure ? [originalFailure, ...failures] : failures, 'DESKTOP_TEST_ENVIRONMENT_STOP_FAILED')
+}
+
+let originalFailure
 try {
   await productionApplication(root, { expectedRevision: sha, hostname, port })
   await requireFreePort(port, '0.0.0.0')
   await requireFreePort(port + 1, '127.0.0.1')
-  const compiled = await build({ entryPoints: [resolve('cloudflare/device-gateway/src/index.ts')], bundle: true, format: 'esm', platform: 'neutral', external: ['cloudflare:workers', 'node:crypto'], write: false })
-  const options = {
-    workers: [{ name: 'desktop-acceptance-gateway', modules: true, script: compiled.outputFiles[0].text,
-      compatibilityDate: '2026-10-22', compatibilityFlags: ['nodejs_compat'],
-      durableObjects: { DEVICE_SESSION: { className: 'DeviceSession', useSQLite: true } },
-      bindings: { GATEWAY_PUSH_SECRET: secret } }], host: '127.0.0.1', port: 0, cf: false, log: new Log(LogLevel.WARN),
-  }
-  worker = new Miniflare(convertV4MiniflareOptions ? convertV4MiniflareOptions(options) : options)
-  process.env.DEVICE_GATEWAY_URL = (await worker.ready).origin
+  worker = await startLiveWorker({ root, secret, name: 'desktop-acceptance-gateway', signal: startupAbort.signal })
+  void worker.failure.catch(rejectServerExit)
+  process.env.DEVICE_GATEWAY_URL = worker.origin
   const existing = await lstat(process.env.MIKKA_TEST_ENVIRONMENT_FILE).then(() => true, error => {
     if (error.code === 'ENOENT') return false
     throw error
@@ -139,7 +141,7 @@ try {
   }
   const bundled = await start(root, port, 'bundled', true)
   const hosted = await start(root, port + 1, 'hosted', true)
-  const descriptor = { revision: sha, origin, bundled, hosted, gateway: process.env.DEVICE_GATEWAY_URL, startedAt: new Date().toISOString() }
+  const descriptor = { revision: sha, origin, bundled, hosted, gateway: process.env.DEVICE_GATEWAY_URL, gatewayPid: worker.pid, startedAt: new Date().toISOString() }
   await writeFile('.cache/desktop-runtime/processes.json', `${JSON.stringify(descriptor, null, 2)}\n`, { mode: 0o600 })
   console.log(JSON.stringify({ status: 'ready', revision: sha, origin, gateway: descriptor.gateway }))
   const separator = process.argv.indexOf('--')
@@ -148,12 +150,12 @@ try {
     if (!command) throw new Error('DESKTOP_TEST_COMMAND_REQUIRED')
     await Promise.race([run(command, args), serverExit])
   } else {
-    await Promise.race([new Promise(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve) }), serverExit])
+    await Promise.race([stopped.promise, serverExit])
   }
+} catch (error) {
+  originalFailure = error
+  throw error
 } finally {
-  stopping = true
-  for (const child of children) signalServer(child, 'SIGTERM')
-  if (children.length) await delay(1_000)
-  for (const child of children) signalServer(child, 'SIGKILL')
-  await worker?.dispose()
+  try { await stopEnvironment(originalFailure) }
+  finally { process.removeListener('SIGINT', requestStop); process.removeListener('SIGTERM', requestStop) }
 }

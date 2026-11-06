@@ -7,6 +7,8 @@ import { Pool, type PoolClient } from 'pg'
 import { z } from 'zod'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { createDesktopRpc } from '../lib/desktop-rpc/handler'
+import { createBrowserRpc } from '../lib/browser-rpc/handler'
+import { browserAuthentication } from '../lib/browser-rpc/session'
 import { desktopAuthentication } from '../lib/desktop-rpc/authentication'
 import { safeDesktopSession, withDesktopSession } from '../lib/desktop-rpc/session'
 import { DESKTOP_SESSION_CACHE_HEADER as cacheHeader, desktopSessionCacheAfter, desktopSessionCacheFromHeaders, validDesktopSessionCache, withDesktopSessionCache } from '../lib/desktop-rpc/session-cache'
@@ -87,7 +89,7 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
     // auth/user response or business query is mocked, and the action is reused.
     await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${alice.token}` }), query: { disableCookieCache: true } })
     const web = () => withDatabaseClient(business!, () => requestHeaders.run(new Headers({ cookie: alice.cookie }), getPreferences))
-    const route = (instance = auth, oldFreshTransport = false) => {
+    const route = (instance = auth, oldFreshTransport = false, browser = false) => {
       const sessions = desktopAuthentication(input => instance.api.getSession(input), async () => (await instance.$context).authCookies.sessionData.name)
       const actions = {
         'preferences.getPreferences': { args: z.tuple([]), invoke: getPreferences },
@@ -108,6 +110,12 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
         } },
       }
       const error = () => ({ status: 401, code: 'authRequired' })
+      if (browser) {
+        const browserSessions = browserAuthentication(input => instance.api.getSession(input), async () => (await instance.$context).authCookies.sessionData.name)
+        return createBrowserRpc({ actions, error, trustedBaseURL: origin, authenticate: browserSessions.authenticate,
+          scope: (session, work, request) => withDatabaseClient(business!, () => requestHeaders.run(request.headers, () => browserSessions.scope(session, work))),
+        })
+      }
       if (oldFreshTransport) return createDesktopRpc({ actions, error,
         authenticate: headers => instance.api.getSession({ headers, query: { disableCookieCache: true } }),
         scope: (session, work, request) => withDatabaseClient(business!, () => requestHeaders.run(request.headers, () => withDesktopSession(session, work))),
@@ -117,29 +125,68 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
       })
     }
     const rpc = route()
+    const browserRpc = route(auth, false, true)
     const request = (person = alice, action = 'preferences.getPreferences', extra: Record<string, string> = {}) => new Request(`${origin}/mikka/api/desktop/rpc`, {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${person.token}`, [cacheHeader]: person.cache, 'x-mikka-client': 'desktop', ...extra },
       body: JSON.stringify({ version: 1, action, args: encode([]) }),
     })
     const result = async (response: Response) => { assert.equal(response.status, 200); return decode((await response.json()).result) }
+    const browserRequest = (person = alice, action = 'preferences.getPreferences', extra: Record<string, string> = {}) => new Request(`${origin}/mikka/api/rpc`, {
+      method: 'POST', headers: { 'content-type': 'application/json', origin, 'x-mikka-rpc': '1', cookie: person.cookie, ...extra },
+      body: JSON.stringify({ version: 1, action, args: encode([]) }),
+    })
 
     await t.test('full original web read and cached native RPC have identical queries, PostgreSQL bytes and data', async () => {
       const baseline = await measure(web)
       const previous = await measure(async () => result(await route(auth, true)(request())))
       const native = await measure(async () => result(await rpc(request())))
+      const browser = await measure(async () => result(await browserRpc(browserRequest())))
       assert.deepEqual(native.value, baseline.value)
       assert.deepEqual(previous.value, baseline.value)
       assert.equal(baseline.statements, 2, 'the actual preferences action reads preferences and attention only')
       assert.equal(previous.statements, 4, 'the old transport added session and user lookups')
       assert.equal(native.statements, baseline.statements)
       assert.equal(native.bytes, baseline.bytes, 'the complete native read must not add PG response bytes')
+      assert.deepEqual(browser.value, baseline.value)
+      assert.equal(browser.statements, baseline.statements, 'browser RPC reuses only its verified request cookie session')
+      assert.equal(browser.bytes, baseline.bytes, 'the complete independent web read must not add PG response bytes')
       assert.ok(previous.bytes > baseline.bytes)
-      t.diagnostic(JSON.stringify({ action: 'preferences.getPreferences', web: { statements: baseline.statements, bytes: baseline.bytes }, oldNative: { statements: previous.statements, bytes: previous.bytes }, native: { statements: native.statements, bytes: native.bytes } }))
+      t.diagnostic(JSON.stringify({ action: 'preferences.getPreferences', web: { statements: baseline.statements, bytes: baseline.bytes }, oldNative: { statements: previous.statements, bytes: previous.bytes }, native: { statements: native.statements, bytes: native.bytes }, browser: { statements: browser.statements, bytes: browser.bytes } }))
       const response = await rpc(request(alice, 'desktop.session'))
       const body = await response.text()
       assert.equal(body.includes(alice.token), false)
       assert.equal(body.includes(alice.cache), false)
       assert.equal(response.headers.has(cacheHeader), false, 'a cache hit is not renewed or extended')
+    })
+
+    await t.test('browser CSRF/private credentials stop before SQL; foreign proof cannot select a different owner', async () => {
+      const deniedHeaders: Record<string, string>[] = [{ origin: 'https://foreign.invalid' }, { authorization: `Bearer ${bob.token}` }, { [cacheHeader]: bob.cache }, { 'x-mikka-session-token': bob.token }, { 'sec-fetch-site': 'cross-site' }]
+      for (const extra of deniedHeaders) {
+        const denied = await measure(() => browserRpc(browserRequest(alice, 'desktop.session', extra)))
+        assert.equal(denied.value.status, 403); assert.equal(denied.statements, 0); assert.equal(denied.bytes, 0)
+      }
+      const name = (await auth.$context).authCookies.sessionData.name
+      const tokenOnly = alice.cookie.split('; ').filter(value => !value.startsWith(`${name}=`) && !value.startsWith(`${name}.`)).join('; ')
+      const foreign = await measure(() => browserRpc(browserRequest(alice, 'desktop.session', { cookie: `${tokenOnly}; ${name}=${bob.cache}` })))
+      assert.equal(foreign.statements, 2)
+      assert.equal((await result(foreign.value) as { user: { id: string } }).user.id, alice.id)
+      assert.equal(foreign.value.headers.has(cacheHeader), false)
+    })
+
+    await t.test('browser fresh checks always reach PostgreSQL, and a cold authenticated read does not duplicate them', async () => {
+      const name = (await auth.$context).authCookies.sessionData.name
+      const tokenOnly = alice.cookie.split('; ').filter(value => !value.startsWith(`${name}=`) && !value.startsWith(`${name}.`)).join('; ')
+      for (const action of ['fixture.sensitive', 'fixture.explicitFresh']) {
+        const baseline = await measure(() => fresh.withFreshSession(() => auth.api.getSession({ headers: new Headers({ cookie: alice.cookie }) })))
+        const cached = await measure(() => browserRpc(browserRequest(alice, action)))
+        assert.equal(cached.statements, baseline.statements); assert.equal(cached.bytes, baseline.bytes)
+        assert.deepEqual(await result(cached.value), { userId: alice.id })
+        const cold = await measure(() => browserRpc(browserRequest(alice, action, { cookie: tokenOnly })))
+        assert.equal(cold.statements, 2, 'the initial real DB authentication already proves freshness for this request')
+        assert.deepEqual(await result(cold.value), { userId: alice.id })
+        assert.ok(cold.value.headers.getSetCookie().length)
+        assert.equal(cold.value.headers.has(cacheHeader), false)
+      }
     })
 
     await t.test('native HTTP get-session shares the SDK proof and never lets a foreign cookie rescue an invalid bearer', async () => {
@@ -240,13 +287,20 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
     await t.test('revocation preserves ordinary web cache semantics but denies sensitive native work immediately', async () => {
       await database.query('DELETE FROM session WHERE "userId"=$1', [alice.id])
       const cachedWeb = await measure(web), cachedNative = await measure(async () => result(await rpc(request())))
+      const cachedBrowser = await measure(async () => result(await browserRpc(browserRequest())))
       assert.deepEqual(cachedNative.value, cachedWeb.value)
       assert.equal(cachedNative.statements, cachedWeb.statements)
       assert.equal(cachedNative.bytes, cachedWeb.bytes)
+      assert.deepEqual(cachedBrowser.value, cachedWeb.value)
+      assert.equal(cachedBrowser.statements, cachedWeb.statements)
+      assert.equal(cachedBrowser.bytes, cachedWeb.bytes)
       for (const action of ['fixture.sensitive', 'fixture.explicitFresh']) {
         const denied = await rpc(request(alice, action, { cookie: bob.cookie }))
         assert.equal(denied.status, 401)
         assert.equal(denied.headers.get(cacheHeader), '', 'main clears the revoked proof')
+        const browserDenied = await browserRpc(browserRequest(alice, action))
+        assert.equal(browserDenied.status, 401)
+        assert.equal(browserDenied.headers.has(cacheHeader), false)
       }
     })
 
@@ -260,6 +314,9 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
       const expired = await measure(async () => shortRpc(request(signed, 'desktop.session')))
       assert.equal(expired.value.status, 401)
       assert.ok(expired.statements > 0)
+      const browserExpired = await measure(() => route(short, false, true)(browserRequest(signed, 'desktop.session')))
+      assert.equal(browserExpired.value.status, 401)
+      assert.ok(browserExpired.statements > 0)
     })
   } finally {
     business?.release()

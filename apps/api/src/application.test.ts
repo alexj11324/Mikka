@@ -4,6 +4,7 @@ import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
 import test from 'node:test'
 import { NodeRequest } from 'srvx/node'
+import { NextRequest as OriginalNextRequest } from 'next/server.js'
 import { createApiHandler } from './application'
 import { createRequestScope, currentRequestScope, requestCache, runRequestScope } from './context'
 import { cookies, headers } from '../compat/headers'
@@ -14,6 +15,24 @@ import type { ApiRoute } from './routes'
 
 const fixture = (path: string, module: Record<string, unknown>, methods = Object.keys(module)): ApiRoute => ({ path: `/mikka/api/${path}`, template: `/api/${path}`, source: 'fixture', methods, load: async () => module })
 const request = (path = 'one', init?: RequestInit) => new Request(`https://example.test/mikka/api/${path}`, init)
+
+test('request cookies match the installed SDK for duplicates and malformed encoding without rewriting auth headers', async () => {
+  for (const cookie of [
+    'NEXT_LOCALE=en; NEXT_LOCALE=zh-CN; mikka-workspace=old; mikka-workspace=new',
+    'NEXT_LOCALE=en; NEXT_LOCALE=%E0%A4%A; bad=%; invalid=%FF; valid=%E4%B8%AD',
+    'bad=%; bad=okay; empty=; flag; quoted="value"; plus=a+b; equals=a=b; encoded=%3D',
+    'spaced =value;\tuntouched=name; %6Eame=literal; ; final=one; final=two',
+  ]) {
+    const input = request('one', { headers: { cookie } })
+    const original = new OriginalNextRequest(input), adapted = new NextRequest(input)
+    assert.deepEqual(adapted.cookies.getAll(), original.cookies.getAll())
+    assert.equal(adapted.headers.get('cookie'), input.headers.get('cookie'))
+    await runRequestScope(createRequestScope(input), async () => {
+      assert.deepEqual((await cookies()).getAll(), original.cookies.getAll())
+      assert.equal((await headers()).get('cookie'), input.headers.get('cookie'))
+    })
+  }
+})
 
 test('exact routes, decoded parameters, HEAD and OPTIONS preserve method contracts', async () => {
   let writes = 0
@@ -31,6 +50,29 @@ test('exact routes, decoded parameters, HEAD and OPTIONS preserve method contrac
   assert.equal((await app.fetch(request('items/x/nested'))).status, 404)
   assert.equal((await app.fetch(request('items/%E0%A4%A'))).status, 400)
   assert.equal(writes, 0)
+})
+
+test('API slash redirects preserve POST replay and never execute a handler or decode an encoded route', async () => {
+  let called = 0
+  const app = createApiHandler([fixture('write', { POST: async (input: Request) => {
+    called++
+    return Response.json({ method: input.method, body: await input.text(), query: new URL(input.url).search })
+  } })])
+  const input = request('write/?x=a%2Fb&x=c+d', { method: 'POST', body: 'original payload', headers: { authorization: 'Bearer fixture' } })
+  const response = await app.fetch(input)
+  assert.equal(response.status, 308); assert.equal(called, 0); assert.equal(input.bodyUsed, false)
+  const replay = new Request(response.headers.get('location')!, input)
+  assert.deepEqual(await (await app.fetch(replay)).json(), { method: 'POST', body: 'original payload', query: '?x=a%2Fb&x=c+d' })
+  assert.equal(called, 1)
+  for (const path of ['missing/', '../%61pi/write/', '../api%2Fwrite/']) {
+    const redirected = await app.fetch(request(path))
+    assert.equal(redirected.status, 308)
+    const missing = await app.fetch(new Request(redirected.headers.get('location')!))
+    assert.equal(missing.status, 404)
+    assert.equal(missing.headers.get('content-type')?.includes('text/html'), false)
+  }
+  assert.equal((await app.fetch(request('write%2F', { method: 'POST', body: 'opaque' }))).status, 404)
+  assert.equal(called, 1)
 })
 
 test('parallel requests retain their own cookie, locale, React cache and all after ALS', async () => {

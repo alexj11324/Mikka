@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { enrollmentContainerArgs, initializeSnapshotIndex, snapshotIndexRecords } from './test-subscription-enrollment-app.mjs'
+import { enrollmentContainerArgs, initializeSnapshotIndex, snapshotIndexRecords, stopEnrollmentContainer } from './test-subscription-enrollment-app.mjs'
 
 const revision = '1'.repeat(40)
 
@@ -68,4 +68,32 @@ test('the runner preserves its container boundary and mounts only its Vite cache
   ])
   assert.throws(() => enrollmentContainerArgs({ ...settings, env: {} }))
   assert.throws(() => enrollmentContainerArgs({ ...settings, env: { VERCEL_GIT_COMMIT_SHA: 'main' } }))
+})
+
+test('cleanup stops only the newly owned container, waits for real exit, and preserves its evidence', async () => {
+  const name = 'mikka-enrollment-test-00000000-0000-4000-8000-000000000001'
+  const stopped = Promise.withResolvers(), calls = []
+  let completed = false
+  const clean = stopEnrollmentContainer(name, async (command, args, timeout) => {
+    calls.push({ command, args, timeout })
+    if (args[0] === 'stop') { await stopped.promise; return name }
+    return JSON.stringify({ Running: false, Status: 'exited', OOMKilled: false, ExitCode: 0 })
+  }).then(() => { completed = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(completed, false); assert.equal(calls.length, 1)
+  stopped.resolve(); await clean
+  assert.deepEqual(calls, [
+    { command: 'docker', args: ['stop', '--time', '35', name], timeout: 45_000 },
+    { command: 'docker', args: ['inspect', '--format', '{{json .State}}', name], timeout: 10_000 },
+  ])
+  await assert.rejects(stopEnrollmentContainer('some-other-container', () => assert.fail('must not touch foreign containers')))
+})
+
+test('a still-running, forced or OOM-killed enrollment process cannot count as clean', async () => {
+  for (const patch of [{ Running: true }, { Status: 'running' }, { OOMKilled: true }, { ExitCode: 137 }, { ExitCode: 1 }]) {
+    await assert.rejects(stopEnrollmentContainer('mikka-enrollment-test-00000000-0000-4000-8000-000000000001', async (_, args) => {
+      if (args[0] === 'stop') return ''
+      return JSON.stringify({ Running: false, Status: 'exited', OOMKilled: false, ExitCode: 0, ...patch })
+    }))
+  }
 })

@@ -26,7 +26,9 @@ export function pinChunkReferences(code, filename, files, deploymentId) {
   const source = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
   const changes = []
   const visit = node => {
-    if (ts.isStringLiteral(node) && emittedReference(node.text, filename, files)) {
+    // Rolldown can minify static strings into no-substitution templates,
+    // including dynamic import(`./chunk.js`) and preload dependency tables.
+    if (ts.isStringLiteralLike(node) && emittedReference(node.text, filename, files)) {
       const value = pinnedUrl(node.text, deploymentId)
       if (value !== node.text) changes.push({ start: node.getStart(source), end: node.end, value: JSON.stringify(value) })
     }

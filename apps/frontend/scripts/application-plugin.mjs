@@ -31,7 +31,7 @@ export function serverSpecifier(source) {
 
 function serverFile(filename) {
   const path = slash(relative(repository, filename.split('?')[0]))
-  return /^app\/api\//.test(path) || /^lib\/(?:auth|db|session)\.ts$/.test(path) || /^lib\/db\//.test(path)
+  return path.startsWith('app/api/') || /^lib\/(?:auth|db|session)\.ts$/.test(path) || path.startsWith('lib/db/')
     || /^lib\/desktop-rpc\/(?:registry|schemas|handler|bootstrap|authentication|session(?:-cache(?:-context)?)?)\.ts$/.test(path)
     || /\/next\/dist\/(?:server|compiled\/webpack)/.test(slash(filename))
 }

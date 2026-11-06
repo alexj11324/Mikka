@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { apiProxyOptions, developmentPages } from './dev-http.mjs'
+import { assertApiBuildConfiguration } from '../build-contract.mjs'
 
 const execute = promisify(execFile)
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -35,6 +36,14 @@ export async function tracingEntry({ directory, originalEntry, tracing }) {
   // dynamic application graph. A plugin runs too late for pg instrumentation.
   await writeFile(entry, `import "./tracing.mjs"\nconst application = await import(${JSON.stringify(originalEntry)})\nexport default application.default\n`)
   return entry
+}
+
+export async function closeDevelopment(development, log = console.error) {
+  try { await development?.close(); return 0 }
+  catch (error) {
+    log('[dev] Shutdown failed', { name: error?.name ?? 'Error', code: 'API_DEV_SHUTDOWN_FAILED' })
+    return 1
+  }
 }
 
 export async function startDevelopment({ args = [], root = repository, log = console.info } = {}) {
@@ -73,6 +82,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
       serveStatic: false,
       replace: { 'process.env.NEXT_PUBLIC_MIKKA_BUILD': '""' },
     }, { dotenv: false })
+    assertApiBuildConfiguration(nitro, root, { development: true })
     // Config merging appends arrays; explicitly remove production public assets
     // so a clean development checkout needs no previous frontend build.
     nitro.options.publicAssets = []
@@ -132,7 +142,9 @@ export async function startDevelopment({ args = [], root = repository, log = con
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let development, stopping
-  const stop = () => stopping ??= Promise.resolve().then(() => development?.close()).finally(() => { process.exitCode = 0 })
+  const stop = () => stopping ??= Promise.resolve().then(() => closeDevelopment(development)).then(code => {
+    process.exitCode = Math.max(Number(process.exitCode) || 0, code)
+  })
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void stop() })
   try {
     development = await startDevelopment({ args: process.argv.slice(2) })

@@ -4,6 +4,7 @@ import { NextRequest } from '../compat/server'
 import { NavigationResponse } from '../compat/navigation'
 import { allowedMethods, routeMatcher, routerPath, type ApiRoute } from './routes'
 import { createRequestScope, requireRequestScope, runRequestScope } from './context'
+import { trailingSlashRedirect } from '../runtime/http-policy.mjs'
 
 type Trace = { run<T>(work: () => T): T; finish(status: number, error?: unknown): void }
 type TraceFactory = (request: Request, route: string) => Trace
@@ -44,6 +45,8 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
   const app = new H3()
   app.all('/**', async event => {
     const original = event.req
+    const canonical = trailingSlashRedirect(original)
+    if (canonical) return canonical
     const scope = createRequestScope(original)
     let template = '/unmatched', result: Response | undefined, caught: unknown
     try {
@@ -57,8 +60,8 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
     // Register before work/output: Node and Vercel retain the entire lifetime,
     // including tasks registered during handler execution and nested after().
     event.waitUntil(scope.after.lifetime)
-    onDispose(event, () => {
-      trace.finish(result?.status ?? 500, caught)
+    onDispose(event, reason => {
+      trace.finish(result?.status ?? 500, caught ?? reason)
       return scope.after.finish()
     })
     return runRequestScope(scope, () => trace.run(async () => {

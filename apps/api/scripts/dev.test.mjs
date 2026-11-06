@@ -7,10 +7,21 @@ import { promisify } from 'node:util'
 import test from 'node:test'
 import { build } from 'esbuild'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { developmentOptions, tracingEntry } from './dev.mjs'
+import { closeDevelopment, developmentOptions, tracingEntry } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
+
+test('development shutdown waits for the real close and preserves failure as a nonzero status', async () => {
+  const closing = Promise.withResolvers(), entries = []
+  let complete = false
+  const pending = closeDevelopment({ close: () => closing.promise }, (...args) => entries.push(args)).then(status => { complete = true; return status })
+  await Promise.resolve(); assert.equal(complete, false)
+  closing.resolve(); assert.equal(await pending, 0); assert.deepEqual(entries, [])
+  const status = await closeDevelopment({ close: async () => { throw new Error('private shutdown detail') } }, (...args) => entries.push(args))
+  assert.equal(status, 1)
+  assert.deepEqual(entries, [['[dev] Shutdown failed', { name: 'Error', code: 'API_DEV_SHUTDOWN_FAILED' }]])
+})
 
 test('development keeps one explicit browser origin and accepts existing port/host switches', () => {
   assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, origin: 'http://localhost:3000' })

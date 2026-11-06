@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createServer, request } from 'node:http'
 import test from 'node:test'
-import { assertDockerBuild } from '../../apps/desktop/test/docker-environment.mjs'
+import { assertDockerBuild, closeDockerResources } from '../../apps/desktop/test/docker-environment.mjs'
 import { dockerGatewayRequest, proxyDockerGateway, proxyDockerGatewayUpgrade } from './docker-gateway.mjs'
 
 const channel = 'a'.repeat(64)
@@ -109,11 +109,44 @@ test('WebSocket upgrades retain the capability protocol, rejection and duplex by
 test('the public runtime refuses another environment, SHA, base path or broad proxy trust', () => {
   const revision = 'a'.repeat(40)
   const environment = { kind: 'isolated-docker', deploymentSha: revision, basePath: '/mikka' }
-  const built = { config: { basePath: '/mikka', env: { MIKKA_TEST_BUILD_SHA: revision } } }
+  const built = { version: 1, preset: 'node-server', basePath: '/mikka', revision, testDeploymentSha: revision,
+    docker: { entry: 'server/mikka-docker.mjs', application: 'server/docker-entry.mjs', trustProxy: false } }
   assert.doesNotThrow(() => assertDockerBuild(environment, revision, built))
   assert.throws(() => assertDockerBuild({ ...environment, kind: 'isolated-ci' }, revision, built), { code: 'DOCKER_RUNTIME_DESCRIPTOR_REQUIRED' })
   assert.throws(() => assertDockerBuild(environment, 'b'.repeat(40), built), { code: 'DOCKER_RUNTIME_COMPILED_REVISION_MISMATCH' })
-  assert.throws(() => assertDockerBuild(environment, revision, { config: { ...built.config, env: { MIKKA_TEST_BUILD_SHA: 'b'.repeat(40) } } }), { code: 'DOCKER_RUNTIME_COMPILED_REVISION_MISMATCH' })
-  assert.throws(() => assertDockerBuild(environment, revision, { config: { ...built.config, basePath: '/' } }), { code: 'DOCKER_RUNTIME_CONFIG_MISMATCH' })
-  assert.throws(() => assertDockerBuild(environment, revision, { config: { ...built.config, experimental: { trustHostHeader: true } } }), { code: 'DOCKER_RUNTIME_CONFIG_MISMATCH' })
+  assert.throws(() => assertDockerBuild(environment, revision, { ...built, testDeploymentSha: 'b'.repeat(40) }), { code: 'DOCKER_RUNTIME_COMPILED_REVISION_MISMATCH' })
+  for (const change of [{ version: 2 }, { preset: 'vercel' }, { basePath: '/' }, { docker: { ...built.docker, trustProxy: true } },
+    { docker: { ...built.docker, entry: 'server/index.mjs' } }, { docker: { ...built.docker, application: 'server/unknown.mjs' } }]) {
+    assert.throws(() => assertDockerBuild(environment, revision, { ...built, ...change }), { code: 'DOCKER_RUNTIME_CONFIG_MISMATCH' })
+  }
+})
+
+test('public cleanup waits for real HTTP, Workflow and Worker completion in ownership order', async () => {
+  const order = [], appClosed = Promise.withResolvers(), workerClosed = Promise.withResolvers()
+  let done = false
+  const cleaning = closeDockerResources({
+    server: { listening: true, closeAllConnections: () => order.push('connections'), close: callback => { order.push('server'); callback() } },
+    sockets: new Set([{ destroy: () => order.push('socket') }]),
+    app: { close: () => { order.push('app'); return appClosed.promise } },
+    worker: { close: () => { order.push('worker'); return workerClosed.promise } },
+  }).then(() => { done = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(order, ['connections', 'socket', 'server', 'app']); assert.equal(done, false)
+  appClosed.resolve(); await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(order, ['connections', 'socket', 'server', 'app', 'worker']); assert.equal(done, false)
+  workerClosed.resolve(); await cleaning
+  assert.equal(done, true)
+})
+
+test('a timed-out Workflow close still disposes the Worker and preserves the original failure', async () => {
+  const original = new Error('original failure retained in memory')
+  let workerClosed = false
+  await assert.rejects(closeDockerResources({ sockets: new Set(), app: { close: () => new Promise(() => {}) },
+    worker: { close: () => { workerClosed = true } } }, { closeMs: 5, originalFailure: original }), error => {
+    assert.equal(error.message, 'DOCKER_RUNTIME_CLOSE_FAILED')
+    assert.equal(error.errors[0], original)
+    assert.equal(error.errors[1].message, 'DOCKER_RUNTIME_APP_CLOSE_TIMEOUT')
+    return true
+  })
+  assert.equal(workerClosed, true)
 })

@@ -3,7 +3,8 @@ import test from 'node:test'
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { productionApplication } from './production-application.mjs'
+import { EventEmitter } from 'node:events'
+import { productionApplication, stopOwnedApplication } from './production-application.mjs'
 
 const sha = 'a'.repeat(40)
 const options = { expectedRevision: sha, hostname: 'localhost', port: 3004 }
@@ -50,4 +51,31 @@ test('missing compiled proof, symlinked manifests and malformed launch arguments
   for (const patch of [{ expectedRevision: '' }, { expectedRevision: 'main' }, { port: 0 }, { port: 3.5 }, { hostname: 'localhost; echo unsafe' }]) {
     await assert.rejects(productionApplication(root, { ...options, ...patch }), /DESKTOP_TEST_/)
   }
+})
+
+test('shutdown waits for the actual owned child exit after its graceful signal', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null })
+  const signals = []
+  let completed = false
+  const result = stopOwnedApplication(child, { signal: (_, name) => signals.push(name), graceMs: 1000 })
+    .then(() => { completed = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(signals, ['SIGTERM']); assert.equal(completed, false)
+  child.exitCode = 0; child.emit('exit', 0)
+  await result
+  assert.equal(completed, true); assert.equal(child.listenerCount('exit'), 0)
+})
+
+test('a forced owned exit is proven but remains a failed shutdown, and an unproven exit fails separately', async () => {
+  for (const exits of [true, false]) {
+    const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null })
+    const signals = []
+    await assert.rejects(stopOwnedApplication(child, { graceMs: 5, killMs: 5, signal: (_, name) => {
+      signals.push(name)
+      if (name === 'SIGKILL' && exits) { child.signalCode = name; child.emit('exit', null, name) }
+    } }), exits ? /STOP_FORCED/ : /STOP_UNPROVEN/)
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL'])
+    assert.equal(child.listenerCount('exit'), 0)
+  }
+  await stopOwnedApplication({ pid: 123, exitCode: 0, signalCode: null }, { signal: () => assert.fail('must not signal an exited PID') })
 })

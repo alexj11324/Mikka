@@ -20,6 +20,82 @@ test('web RPC keeps the shared codec but uses only normal same-origin cookie tra
   } finally { globalThis.window = beforeWindow; globalThis.fetch = beforeFetch }
 })
 
+async function ownerTransport(callback) {
+  const beforeWindow = globalThis.window
+  const beforeFetch = globalThis.fetch
+  globalThis.window = { location: new URL('https://app.example/mikka/en'), dispatchEvent() {} }
+  const api = await browserModule(`
+    export { callAction } from "./apps/frontend/src/web/rpc.ts"
+    export { watchSessionOwner } from "./apps/frontend/src/web/session-owner.ts"
+    export { getTransportState } from "./apps/desktop/src/renderer/transport-state.ts"
+  `)
+  let listener
+  const value = id => ({ data: { user: { id }, session: { id: `${id}-session` } }, isPending: false })
+  const stop = api.watchSessionOwner({ subscribe(fn) { listener = fn; fn(value('A')); return () => {} } }, () => {})
+  try { await callback(api, id => listener(value(id))) }
+  finally { stop(); globalThis.window = beforeWindow; globalThis.fetch = beforeFetch }
+}
+
+test('an old web owner delayed 401 cannot clear the newly authenticated owner', () => ownerTransport(async (api, owner) => {
+  const started = Promise.withResolvers()
+  const delayed = Promise.withResolvers()
+  let requests = 0
+  globalThis.fetch = () => {
+    if (++requests === 1) { started.resolve(); return delayed.promise }
+    return Promise.resolve(Response.json({ version: 1, ok: true, result: { user: { id: 'B' }, session: { id: 'B-session' } } }))
+  }
+  const old = api.callAction('preferences.getPreferences', [])
+  await started.promise
+  owner('B')
+  const current = await api.callAction('desktop.bootstrap', [])
+  assert.equal(current.user.id, 'B')
+  assert.equal(api.getTransportState(), 'ready')
+  delayed.resolve(new Response('', { status: 401 }))
+  await assert.rejects(old, error => error.code === 'desktop_session_changed' && error.status === 409)
+  assert.equal(api.getTransportState(), 'ready')
+  // The current owner's real expiry still fails closed through the same path.
+  globalThis.fetch = async () => new Response('', { status: 401 })
+  await assert.rejects(api.callAction('desktop.bootstrap', []), error => error.code === 'desktop_session_expired' && error.status === 401)
+  assert.equal(api.getTransportState(), 'unauthenticated')
+}))
+
+test('an old web owner network rejection does not overwrite the new owner transport', () => ownerTransport(async (api, owner) => {
+  const started = Promise.withResolvers()
+  const delayed = Promise.withResolvers()
+  const cause = new TypeError('fixture transport interruption')
+  globalThis.fetch = () => { started.resolve(); return delayed.promise }
+  const old = api.callAction('preferences.getPreferences', [])
+  await started.promise
+  owner('B')
+  delayed.reject(cause)
+  await assert.rejects(old, error => error.code === 'desktop_session_changed' && error.status === 409 && error.cause === cause)
+  assert.equal(api.getTransportState(), 'ready')
+}))
+
+test('web owner changes fence both asynchronous response bodies and pre-request encoding', () => ownerTransport(async (api, owner) => {
+  const reading = Promise.withResolvers()
+  let body
+  globalThis.fetch = async () => {
+    const response = new Response(new ReadableStream({ start(controller) { body = controller } }), { status: 200 })
+    const json = response.json.bind(response)
+    response.json = () => { reading.resolve(); return json() }
+    return response
+  }
+  const old = api.callAction('desktop.bootstrap', [])
+  await reading.promise
+  owner('B')
+  body.enqueue(new TextEncoder().encode(JSON.stringify({ version: 1, ok: true, result: { user: { id: 'A' } } })))
+  body.close()
+  await assert.rejects(old, error => error.code === 'desktop_session_changed' && error.status === 409)
+  assert.equal(api.getTransportState(), 'ready')
+  let requests = 0
+  globalThis.fetch = async () => { requests++; return Response.json({ version: 1, ok: true, result: null }) }
+  const notSent = api.callAction('workspace.switchWorkspace', [{ accountId: 'B' }])
+  owner('C')
+  await assert.rejects(notSent, error => error.code === 'desktop_session_changed' && error.status === 409)
+  assert.equal(requests, 0)
+}))
+
 test('web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior', async () => {
   const { webAuthentication, authenticatedReturn } = await browserModule('export { webAuthentication, authenticatedReturn } from "./apps/frontend/src/web/auth-routing.ts"')
   const location = new URL('https://app.example/mikka/en/sign-in')

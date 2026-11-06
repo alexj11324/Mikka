@@ -1,7 +1,8 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { auth } from '@/lib/api-auth'
-import { agentImageQuery, findAgentImage } from '@/lib/agent-images'
+import { agentImageQuery } from '@/lib/agent-images'
+import { findCachedAgentImage } from '@/lib/agent-images-server'
 
 async function handleGET(request: Request) {
   const headers = { 'Cache-Control': 'private, no-store' }
@@ -12,7 +13,7 @@ async function handleGET(request: Request) {
   const query = agentImageQuery.safeParse(new URL(request.url).searchParams.get('q'))
   if (!query.success) return Response.json({ error: agentCopy.imageKeywordsMustBe2160CharactersAnd }, { status: 400, headers })
   try {
-    return Response.json({ image: await findAgentImage(query.data, request.signal) }, { headers })
+    return Response.json({ image: await findCachedAgentImage(query.data, request.signal) }, { headers })
   } catch {
     return Response.json({ error: agentCopy.imageSourcesAreTemporarilyUnavailableTheResponse }, { status: 502, headers })
   }

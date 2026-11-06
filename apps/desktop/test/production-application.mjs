@@ -31,3 +31,27 @@ export async function productionApplication(directory, { expectedRevision, hostn
   return { kind: 'next', revision: expectedRevision,
     args: [...prefix, resolve(root, 'node_modules/next/dist/bin/next'), 'start', '--hostname', hostname, '--port', String(port)] }
 }
+
+/** Stop only a child created by the calling harness. Completion means its exit
+ * event, not the signal being accepted; a forced kill remains failed evidence. */
+export async function stopOwnedApplication(child, { graceMs = 35_000, killMs = 5_000, signal = (owned, name) => {
+  try { process.kill(process.platform === 'win32' ? owned.pid : -owned.pid, name) }
+  catch (error) { if (error.code !== 'ESRCH') throw error }
+} } = {}) {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
+  const completion = Promise.withResolvers()
+  const onExit = () => completion.resolve()
+  child.once('exit', onExit)
+  const wait = async milliseconds => {
+    let timer
+    try { return await Promise.race([completion.promise.then(() => true), new Promise(resolve => { timer = setTimeout(() => resolve(false), milliseconds) })]) }
+    finally { clearTimeout(timer) }
+  }
+  try {
+    signal(child, 'SIGTERM')
+    if (await wait(graceMs)) return
+    signal(child, 'SIGKILL')
+    if (!await wait(killMs)) fail('DESKTOP_TEST_SERVER_STOP_UNPROVEN')
+    fail('DESKTOP_TEST_SERVER_STOP_FORCED')
+  } finally { child.removeListener('exit', onExit) }
+}

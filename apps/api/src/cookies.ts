@@ -1,4 +1,5 @@
-import { parse, serialize, type SerializeOptions } from 'cookie'
+import { serialize, type SerializeOptions } from 'cookie'
+import { parseRequestCookies } from './request-cookies.mjs'
 
 export type CookieOptions = SerializeOptions
 export type CookieValue = { name: string; value: string } & CookieOptions
@@ -11,9 +12,7 @@ export class CookieJar {
   private committed = false
   constructor(header: string | null = null, private readonly onChange?: (value: string) => void,
     private readonly onSetCookie?: (name: string, value: string) => void) {
-    for (const [name, value] of Object.entries(parse(header ?? ''))) {
-      if (value !== undefined) this.values.set(name, { name, value })
-    }
+    for (const [name, value] of parseRequestCookies(header)) this.values.set(name, { name, value })
   }
   get(name: string | { name: string }): CookieValue | undefined { return this.values.get(typeof name === 'string' ? name : name.name) }
   getAll(name?: string | { name: string }): CookieValue[] {

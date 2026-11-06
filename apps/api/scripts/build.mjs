@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, copyPublicAssets, createNitro, prepare } from 'nitro/builder'
 import { finalizeBuild } from './finalize-build.mjs'
+import { assertApiBuildConfiguration } from '../build-contract.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const preset = process.env.NITRO_PRESET || (process.env.VERCEL ? 'vercel' : 'node-server')
@@ -17,6 +18,7 @@ await mkdir(join(root, 'apps/api/generated'), { recursive: true })
 await writeFile(join(root, 'apps/api/generated/spa.ts'), `// Generated from the same Vite build that supplies public assets.\nexport const spaHtml = ${JSON.stringify(html)}\n`)
 const nitro = await createNitro({ rootDir: root, preset })
 try {
+  assertApiBuildConfiguration(nitro, root)
   if (preset === 'node-server') {
     // One compilation graph supplies both the standard listener and the
     // explicitly non-listening Docker adapter; do not build another app copy.

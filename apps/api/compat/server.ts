@@ -44,7 +44,7 @@ export class NextRequest extends Request {
   }
 }
 
-export class NextResponse<Body = unknown> extends Response {
+export class NextResponse<_Body = unknown> extends Response {
   private jar?: CookieJar
   get cookies(): CookieJar {
     if (!this.jar) {
