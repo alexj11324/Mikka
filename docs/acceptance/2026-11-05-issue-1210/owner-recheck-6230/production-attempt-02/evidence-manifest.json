@@ -1,0 +1,403 @@
+{
+  "preparedAt": "2026-11-06T00:30:44.540216+00:00",
+  "section": "production-attempt-02",
+  "state": "review_failed_verify_not_created_no_owner_acceptance",
+  "priorEvidenceCommit": "6df6027861f457e7dd3fa7d89a06135540476a9f",
+  "productionClickCommit": "1846002bec14c649e4bead67f136014141f4d133",
+  "lastDirectOutcomeObservation": "2026-11-06T00:05:21.017Z–2026-11-06T00:05:21.029Z",
+  "files": [
+    {
+      "source": "ops/1210-release-gate/diagnostic-0677-deployed.json",
+      "sourceBytes": 5197,
+      "sourceSha256": "e0d217b1af9718e9e520e55bedba7e2b67e1b90932aec2e3f3b84d535f39fdde",
+      "path": "diagnostic-0677-deployed.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 5197,
+      "publishedSha256": "e0d217b1af9718e9e520e55bedba7e2b67e1b90932aec2e3f3b84d535f39fdde",
+      "gitBlobSha": "4671f37c6986389872b789b679798edcca8fc681"
+    },
+    {
+      "source": "ops/1210-release-gate/public-root-diagnostic-0677-ready.json",
+      "sourceBytes": 338,
+      "sourceSha256": "7d7d005644b9c0e5724bac783f8bcda036bd628d7a0137d8fb3dc639bdad45a7",
+      "path": "public-root-diagnostic-0677-ready.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 338,
+      "publishedSha256": "7d7d005644b9c0e5724bac783f8bcda036bd628d7a0137d8fb3dc639bdad45a7",
+      "gitBlobSha": "a0b3d5330a26557ef23723d43d1b05a32088ec08"
+    },
+    {
+      "source": "ops/1210-release-gate/public-root-before-click02.json",
+      "sourceBytes": 338,
+      "sourceSha256": "ca08387950cae2414600b61cee553fb76aaacb0b669d343509042b6568beaffe",
+      "path": "public-root-before-click02.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 338,
+      "publishedSha256": "ca08387950cae2414600b61cee553fb76aaacb0b669d343509042b6568beaffe",
+      "gitBlobSha": "4726d476d8553565cc2d6373648bec24d5879ba6"
+    },
+    {
+      "source": "ops/1210-a43-final/root-recheck-ui-action-02.json",
+      "sourceBytes": 675,
+      "sourceSha256": "5bbed3ef6f16d0344143cddf0faf2c9258a5b5674b659ebc7c8d24dfa3b6049f",
+      "path": "root-recheck-ui-action-02.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 675,
+      "publishedSha256": "5bbed3ef6f16d0344143cddf0faf2c9258a5b5674b659ebc7c8d24dfa3b6049f",
+      "gitBlobSha": "9cb4fbae351f1e6fad807936c5d88353e993b50c"
+    },
+    {
+      "source": "ops/1210-a43-final/root-recheck-ui-observation-02-start.json",
+      "sourceBytes": 551,
+      "sourceSha256": "eba1e7b4f4d0c92453d808ede9670c2e6d37172bf48afce84354ff2d34cf2739",
+      "path": "root-recheck-ui-observation-02-start.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 551,
+      "publishedSha256": "eba1e7b4f4d0c92453d808ede9670c2e6d37172bf48afce84354ff2d34cf2739",
+      "gitBlobSha": "7314773907d7d2635c3c2dfca4f832f877caa8ab"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-before-response.json",
+      "sourceBytes": 2713,
+      "sourceSha256": "d4cf8c784112ea547d4661ab42580e6e260376efd284a72d4ea31bb1ec771a85",
+      "path": "attempt02-before-response.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 2713,
+      "publishedSha256": "d4cf8c784112ea547d4661ab42580e6e260376efd284a72d4ea31bb1ec771a85",
+      "gitBlobSha": "d1b8fe2bb9bdb788c718f2aa6d902bd86a82356d"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-before-timing.json",
+      "sourceBytes": 240,
+      "sourceSha256": "6e2037c404b15bfe5e9a65c12757dfff0aeaa6fe71fcec745953252521d1a5a3",
+      "path": "attempt02-before-timing.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 240,
+      "publishedSha256": "6e2037c404b15bfe5e9a65c12757dfff0aeaa6fe71fcec745953252521d1a5a3",
+      "gitBlobSha": "9c5de75efce0ac1d2fb1ee53113919f29ecfdfff"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-before-comparison.json",
+      "sourceBytes": 7400,
+      "sourceSha256": "e0aa8e7b0c8f1dcc3303492ba2837172459fa66f28a4c83a1c7cc95f600c3ee6",
+      "path": "attempt02-before-comparison.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 7400,
+      "publishedSha256": "e0aa8e7b0c8f1dcc3303492ba2837172459fa66f28a4c83a1c7cc95f600c3ee6",
+      "gitBlobSha": "57420079555e9372b86aae9e3c7992e38f0efa47"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-blocker.md",
+      "sourceBytes": 8812,
+      "sourceSha256": "1815ad2834de6e49622eff621b61d275ab0a6a047e656ad33b326eab924922c8",
+      "path": "attempt02-blocker.md",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 8812,
+      "publishedSha256": "1815ad2834de6e49622eff621b61d275ab0a6a047e656ad33b326eab924922c8",
+      "gitBlobSha": "b136bb7ac45e286fa6dee4241b8e27f6342841d5"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-status.json",
+      "sourceBytes": 2929,
+      "sourceSha256": "12da7947ce48167f404d8e434ad3ea1d107b10b9426e3c9033216ff000c29fbf",
+      "path": "attempt02-status.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 2929,
+      "publishedSha256": "12da7947ce48167f404d8e434ad3ea1d107b10b9426e3c9033216ff000c29fbf",
+      "gitBlobSha": "9d853cf0ea8d10d2fce8651a16bbdcf11f75df78"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-history-baseline.json",
+      "sourceBytes": 9742,
+      "sourceSha256": "17bcd84e694a88614bd2d14babeb654603ce782d8b6e84a24b7b1a3602c73154",
+      "path": "attempt02-history-baseline.json",
+      "ownerIdRedactionCount": 1,
+      "transformation": "Owner account ID replaced with explicit placeholder",
+      "publishedBytes": 9737,
+      "publishedSha256": "bd0eea52b87b8dbe910f0550eda9673bad721f0b462f02ab5d67e270ae7b468c",
+      "gitBlobSha": "def63af128573631ca679d131d041abe95e529f4"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-review-semantic-audit.md",
+      "sourceBytes": 8363,
+      "sourceSha256": "a33ef6d59c09b735ffe5f95078576b4de1d25596b5153592432537269bce46af",
+      "path": "attempt02-review-semantic-audit.md",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 8363,
+      "publishedSha256": "a33ef6d59c09b735ffe5f95078576b4de1d25596b5153592432537269bce46af",
+      "gitBlobSha": "2c291aafbe17d432ca5254ef3c1e0b5dafd6dd3a"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-startup-classification.md",
+      "sourceBytes": 4922,
+      "sourceSha256": "a91cff0374986b8e3abaf65d650abd773279091a9f7b1b1355c63a4b7d966126",
+      "path": "attempt02-startup-classification.md",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 4922,
+      "publishedSha256": "a91cff0374986b8e3abaf65d650abd773279091a9f7b1b1355c63a4b7d966126",
+      "gitBlobSha": "ede73d6bb64e62597cc68a94ff66e8914698bd04"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-host-artifact-comparison.json",
+      "sourceBytes": 39339,
+      "sourceSha256": "50370f7685400d0430d04265baf1bcfd819e8eee54da0be1a7889ffa1f75acd6",
+      "path": "attempt02-host-artifact-comparison.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 39339,
+      "publishedSha256": "50370f7685400d0430d04265baf1bcfd819e8eee54da0be1a7889ffa1f75acd6",
+      "gitBlobSha": "368216ad513864ddc5609cc44834e87c9fa237f5"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-review-report.json",
+      "sourceBytes": 5859,
+      "sourceSha256": "c4566c28b7a0fd464aa04d63465b137e7e0b05b82d6880e52828e2a0d124d664",
+      "path": "attempt02-review-report.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 5859,
+      "publishedSha256": "c4566c28b7a0fd464aa04d63465b137e7e0b05b82d6880e52828e2a0d124d664",
+      "gitBlobSha": "623db8d3403f7344ef8fae4a2eac049995481d17"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-artifact-pairs.json",
+      "sourceBytes": 1063,
+      "sourceSha256": "d93e04225c42114f7c79f17772b2b890db2c78c031ecc1faa2f53739e7b34f41",
+      "path": "attempt02-artifact-pairs.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 1063,
+      "publishedSha256": "d93e04225c42114f7c79f17772b2b890db2c78c031ecc1faa2f53739e7b34f41",
+      "gitBlobSha": "89b21f070c88baa3f9f25983a9ec8f2cf5301991"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-host-evidence.json",
+      "sourceBytes": 16053,
+      "sourceSha256": "c8932b990103d9f2757cc851259b5f48f6f9c9aea77611da3403e9a4b699721c",
+      "path": "attempt02-host-evidence.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 16053,
+      "publishedSha256": "c8932b990103d9f2757cc851259b5f48f6f9c9aea77611da3403e9a4b699721c",
+      "gitBlobSha": "3da030f25ed219dd3c8c7d5624eaa6b9099f96ba"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-lifecycle-observation.json",
+      "sourceBytes": 7850,
+      "sourceSha256": "f8b675b3ae3f0b997c3778d3f90f7b1221ced5d1290c18c2e82b491a49304660",
+      "path": "attempt02-lifecycle-observation.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 7850,
+      "publishedSha256": "f8b675b3ae3f0b997c3778d3f90f7b1221ced5d1290c18c2e82b491a49304660",
+      "gitBlobSha": "26be9c46fc2e69639014104a4e2dbe890e0414a4"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-command-observations.json",
+      "sourceBytes": 4748,
+      "sourceSha256": "a17a56da58d180b1a56083e43dbbfca5d8dca1652e2b09b9caac29100ff9f5fb",
+      "path": "attempt02-command-observations.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 4748,
+      "publishedSha256": "a17a56da58d180b1a56083e43dbbfca5d8dca1652e2b09b9caac29100ff9f5fb",
+      "gitBlobSha": "ccde312c8d2e50252dfe21b83240577d36538f2b"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-tool-index.json",
+      "sourceBytes": 2021,
+      "sourceSha256": "633bde8768cf67f96d5fc338abe01f81a220aca81f8df219a6c8e639fb0f3268",
+      "path": "attempt02-tool-index.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 2021,
+      "publishedSha256": "633bde8768cf67f96d5fc338abe01f81a220aca81f8df219a6c8e639fb0f3268",
+      "gitBlobSha": "34b5a9796bc883e3353bf17e93f12c38d99a13b9"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-pre-correction-preparation-README.md",
+      "sourceBytes": 12369,
+      "sourceSha256": "132a709d8f525d3d42a65161f4ba3c4cf892888a0ffa52b0a8b2d8914222fba6",
+      "path": "attempt02-pre-correction-preparation-README.md",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "interpretation": "Historical preparation snapshot: its fresh-VM assumption is explicitly retracted in the new section; other pending states retain their historical date.",
+      "publishedBytes": 12369,
+      "publishedSha256": "132a709d8f525d3d42a65161f4ba3c4cf892888a0ffa52b0a8b2d8914222fba6",
+      "gitBlobSha": "bc4b880577a8927c02a17afbb0e6fba79bd2f9b3"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-sample01-response.json",
+      "sourceBytes": 14054,
+      "sourceSha256": "710e7d45287881a57b2fc4821ded059c2f823d0407cd00ee2081a4f58aea7a53",
+      "path": "attempt02-sample01-response.json",
+      "ownerIdRedactionCount": 1,
+      "transformation": "Owner account ID replaced with explicit placeholder",
+      "publishedBytes": 14049,
+      "publishedSha256": "813a965dad36a77a1a5db7e4ad8b1d744a6cc0138123ee69a3be6b3e82ec4013",
+      "gitBlobSha": "80f95f5527334357d37984967644cc75c332b079"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-sample01-timing.json",
+      "sourceBytes": 240,
+      "sourceSha256": "d8f9d5a518b4ec790273c437f970e5c5993797f447a40122ed98c62592c36d75",
+      "path": "attempt02-sample01-timing.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 240,
+      "publishedSha256": "d8f9d5a518b4ec790273c437f970e5c5993797f447a40122ed98c62592c36d75",
+      "gitBlobSha": "ab71b4647fdba963a997d4e28043356830a7f799"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-sample02-response.json",
+      "sourceBytes": 7799,
+      "sourceSha256": "45496cfcf478c26d8d5ceae07af3a46da88c2ee1a67d89c422c5d4933db04bf0",
+      "path": "attempt02-sample02-response.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 7799,
+      "publishedSha256": "45496cfcf478c26d8d5ceae07af3a46da88c2ee1a67d89c422c5d4933db04bf0",
+      "gitBlobSha": "30fbe39954bf551ce7d214c92adb7ccc8dabf569"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-sample02-timing.json",
+      "sourceBytes": 240,
+      "sourceSha256": "2313569e5cc07f78587569f90c6d032ec65fa99d969029c2cf03c25b85c7a1f2",
+      "path": "attempt02-sample02-timing.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 240,
+      "publishedSha256": "2313569e5cc07f78587569f90c6d032ec65fa99d969029c2cf03c25b85c7a1f2",
+      "gitBlobSha": "e997da201560057680808873871a78c148b1caf5"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-proof01-response.json",
+      "sourceBytes": 38366,
+      "sourceSha256": "bbb0f870bd532de46a6d4c206ffb0a623c84aa6d5b5170e542cfe156236c9415",
+      "path": "attempt02-proof01-response.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 38366,
+      "publishedSha256": "bbb0f870bd532de46a6d4c206ffb0a623c84aa6d5b5170e542cfe156236c9415",
+      "gitBlobSha": "8da5eae944d6c0734ab5b0ace82b32424069d7e3"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-proof01-timing.json",
+      "sourceBytes": 240,
+      "sourceSha256": "e38a64cdaf347e1181756b3536357f54a231a5919f65c2d6a287b58f8212bc6c",
+      "path": "attempt02-proof01-timing.json",
+      "ownerIdRedactionCount": 0,
+      "transformation": "byte-for-byte selected original",
+      "publishedBytes": 240,
+      "publishedSha256": "e38a64cdaf347e1181756b3536357f54a231a5919f65c2d6a287b58f8212bc6c",
+      "gitBlobSha": "9eadcfae1605d0b075c0314d8a5a271cccbadde1"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-before.sql",
+      "sourceBytes": 3497,
+      "sourceSha256": "ded0a41d9830f8012e75c138aa5a717bcd9bece8a236ab1204fd667e711d741d",
+      "path": "attempt02-before.sql",
+      "ownerIdRedactionCount": 6,
+      "transformation": "Owner account ID replaced with explicit placeholder; non-executable evidence-copy header added",
+      "publishedBytes": 3548,
+      "publishedSha256": "c5c6470d83f719fd9c5dafc7c5cb942331790ca5348997405b357759d5612199",
+      "gitBlobSha": "f364471f718b2be7a5e5e12d9ea1091933151787"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-sample01.sql",
+      "sourceBytes": 7389,
+      "sourceSha256": "1692e0f62c5f99a44f5812ec9e12c2d8a7939cbc7db1dc6b1b0e0f6076d98ba6",
+      "path": "attempt02-sample01.sql",
+      "ownerIdRedactionCount": 6,
+      "transformation": "Owner account ID replaced with explicit placeholder; non-executable evidence-copy header added",
+      "publishedBytes": 7440,
+      "publishedSha256": "1a45a62b4ce2aa665f526cd4a9a354c7b30848cc3317e036c65891118ca194e0",
+      "gitBlobSha": "ececca9141313cf2d9a6b0a6d96cd3f4812002e3"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-sample02.sql",
+      "sourceBytes": 3687,
+      "sourceSha256": "6efb15cc1708fe0fb586cdeb056abadf4fb80658977d76e7f9d1ba8bfaa54ee6",
+      "path": "attempt02-sample02.sql",
+      "ownerIdRedactionCount": 4,
+      "transformation": "Owner account ID replaced with explicit placeholder; non-executable evidence-copy header added",
+      "publishedBytes": 3748,
+      "publishedSha256": "1ea7ef335f7530c8088a807fdaabf1e7328642b788da9e14e10cacd4f04bb1e8",
+      "gitBlobSha": "036fd364e95e04964d78a15be770e5fd47240ee9"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-proof01.sql",
+      "sourceBytes": 6102,
+      "sourceSha256": "1cf4bbaf9472bfd8ef0781592621a0ed5bf05cdf328c891c7045e6d55117b8ad",
+      "path": "attempt02-proof01.sql",
+      "ownerIdRedactionCount": 8,
+      "transformation": "Owner account ID replaced with explicit placeholder; non-executable evidence-copy header added",
+      "publishedBytes": 6143,
+      "publishedSha256": "b36ce1e2502ef2920249c549f1f519905a13931348c88a3194e4d2e651fe1da8",
+      "gitBlobSha": "8310811f85b636bad8f52cafc95d206c0ad0db5a"
+    },
+    {
+      "source": "ops/1210-release-gate/production-1846002-before-click02-gate.json",
+      "sourceBytes": 37179,
+      "sourceSha256": "3c924aaecb4256a3cdb3bb07c705474b2aa5c8604cce13dbf0a18074d5f85e17",
+      "path": "production-1846002-readiness-projection.json",
+      "transformation": "necessary source/deployment/check fields; full patches and job details omitted",
+      "ownerIdRedactionCount": 0,
+      "publishedBytes": 5517,
+      "publishedSha256": "72cbe900f0c0f8802c6a345975f1c74706ff11cdfb6132bdd7ae438fa88a0c5e",
+      "gitBlobSha": "c097e3ec590e09d78d0d52eaf1dc744bbbe72a1b"
+    },
+    {
+      "path": "attempt02-startup-events-projection.json",
+      "transformation": "bounded event/field projection from two saved runtime responses",
+      "sourceFiles": [
+        {
+          "source": "ops/1210-a43-final/attempt02-runtime-initial-response.json",
+          "sourceBytes": 46988,
+          "sourceSha256": "213c5f6880361182510468cf6d965fab0f218be6df661418ee8c5f307f3a328c"
+        },
+        {
+          "source": "ops/1210-a43-final/attempt02-runtime-second-response.json",
+          "sourceBytes": 17581,
+          "sourceSha256": "c7f80677887bc861b04f873860ff7ba035512b42165bb068d696b5341aad8bef"
+        }
+      ],
+      "ownerIdRedactionCount": 0,
+      "publishedBytes": 2795,
+      "publishedSha256": "92cf072a41bc48049ecac56b429b156c631e6d9c999ff6c644bbc0bb26be5506",
+      "gitBlobSha": "378901c224b5dab231fc9aca0bef3a227f258c6b"
+    },
+    {
+      "path": "sanitization-audit.json",
+      "transformation": "generated pattern scan and explicit redaction record",
+      "publishedBytes": 7470,
+      "publishedSha256": "1151584b7724646002b1e1e89e11d0b2c9ee53c96c34ac7dc461d55226cfbe3f",
+      "gitBlobSha": "cec08a72e33f09f849f5aef4d29f9d5b1d91a026"
+    }
+  ],
+  "oldPngCount": 30,
+  "newPngCount": 0,
+  "historyPolicy": "First-attempt 47 files and all preexisting artifacts retain exact bytes. README keeps all prior bytes and adds only a dated notice plus this section.",
+  "notIncluded": [
+    "full unrelated runtime responses",
+    "full provider logs, credentials, cookies or session files",
+    "Owner account ID",
+    "duplicate full workflow logs",
+    "new-fix source/tests or undeployed success claims",
+    "unavailable production screenshots",
+    "superseded initial comparison whose command count included ask_human"
+  ],
+  "manifestScope": "every selected/generated section file except this manifest itself; entire artifact tree manifest is kept separately"
+}

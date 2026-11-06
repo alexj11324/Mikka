@@ -1,0 +1,1091 @@
+{
+  "phase": "attempt02-review-host-and-artifact-independent-comparison",
+  "baseline": "../1210-a43-audit/before.json",
+  "source": "attempt02-proof01-response.json",
+  "digestMethod": "Exact deployed evidence.ts canonical localeCompare sorting + SHA256(JSON.stringify)",
+  "computedDigest": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+  "frozenDigest": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+  "comparisonCount": 131,
+  "differenceCount": 0,
+  "differences": [],
+  "checks": [
+    {
+      "name": "frozen lifecycle digest matches actual host prompt",
+      "equal": true,
+      "actual": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea",
+      "expected": "5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea"
+    },
+    {
+      "name": "watermark",
+      "equal": true,
+      "actual": {
+        "source": 29,
+        "producer": 20
+      },
+      "expected": {
+        "source": 29,
+        "producer": 20
+      }
+    },
+    {
+      "name": "lifecycle taskId",
+      "equal": true,
+      "actual": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+      "expected": "e42571e5-58f7-40e3-9418-c02ee8843fe6"
+    },
+    {
+      "name": "lifecycle candidateId",
+      "equal": true,
+      "actual": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "expected": "2f338962-c690-4ba7-bc63-6c73a9de3acb"
+    },
+    {
+      "name": "lifecycle candidateSha",
+      "equal": true,
+      "actual": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "expected": "d05417e7848871e511141e10a282ffb7998b0a79"
+    },
+    {
+      "name": "lifecycle requestEpoch",
+      "equal": true,
+      "actual": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "expected": "4ad02e70-8015-5eac-87f4-a96fbd775d14"
+    },
+    {
+      "name": "lifecycleComplete",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "lifecycleIncompleteReasons",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "question id",
+      "equal": true,
+      "actual": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "expected": "fd3ce47c-785f-4e7a-92ee-d5763959d64b"
+    },
+    {
+      "name": "question kind",
+      "equal": true,
+      "actual": "decision",
+      "expected": "decision"
+    },
+    {
+      "name": "question text",
+      "equal": true,
+      "actual": "是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？",
+      "expected": "是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？"
+    },
+    {
+      "name": "question createdAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:42.417Z",
+      "expected": "2026-11-04T19:35:42.417Z"
+    },
+    {
+      "name": "question sourceEventId",
+      "equal": true,
+      "actual": "2ad4318d-7ef7-5cf5-9833-458cd2a35ff2",
+      "expected": "2ad4318d-7ef7-5cf5-9833-458cd2a35ff2"
+    },
+    {
+      "name": "question sourceEventAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:42.417Z",
+      "expected": "2026-11-04T19:35:42.417Z"
+    },
+    {
+      "name": "question waitEventId",
+      "equal": true,
+      "actual": "8d5c9fe9-277e-578a-9ecf-e35fc85145e7",
+      "expected": "8d5c9fe9-277e-578a-9ecf-e35fc85145e7"
+    },
+    {
+      "name": "question waitEventAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:42.417Z",
+      "expected": "2026-11-04T19:35:42.417Z"
+    },
+    {
+      "name": "question waitingState",
+      "equal": true,
+      "actual": {
+        "stage": "execute",
+        "status": "waiting",
+        "revision": 3,
+        "attemptId": "662d23b3-6ac4-4860-9616-a0f69d888725"
+      },
+      "expected": {
+        "stage": "execute",
+        "status": "waiting",
+        "revision": 3,
+        "attemptId": "662d23b3-6ac4-4860-9616-a0f69d888725"
+      }
+    },
+    {
+      "name": "answer id",
+      "equal": true,
+      "actual": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "expected": "11708d4d-708f-5bc7-b41d-7db8386d8d15"
+    },
+    {
+      "name": "answer source",
+      "equal": true,
+      "actual": "human",
+      "expected": "human"
+    },
+    {
+      "name": "answer fingerprint",
+      "equal": true,
+      "actual": "05f35551b6d38f39d78b286744c12b583471f3ac7226266f41d243e98b5dec46",
+      "expected": "05f35551b6d38f39d78b286744c12b583471f3ac7226266f41d243e98b5dec46"
+    },
+    {
+      "name": "answer answeredAt",
+      "equal": true,
+      "actual": "2026-11-04T20:10:34.260Z",
+      "expected": "2026-11-04T20:10:34.260Z"
+    },
+    {
+      "name": "answer exact text from saved continuation",
+      "equal": true,
+      "actual": "再次确认：是。把当前已检查的 52 字节文件作为本次交付，提交独立审阅。请在原任务、原会话中按冻结契约继续，保留同一文件和提问前的真实检查记录，不重跑文件创建、读取、字节或哈希命令。仍使用原官方 Claude Code 订阅 claude-haiku-5-5。独立 review 和 verify 完成后等待我的 Owner 验收。",
+      "expected": "再次确认：是。把当前已检查的 52 字节文件作为本次交付，提交独立审阅。请在原任务、原会话中按冻结契约继续，保留同一文件和提问前的真实检查记录，不重跑文件创建、读取、字节或哈希命令。仍使用原官方 Claude Code 订阅 claude-haiku-5-5。独立 review 和 verify 完成后等待我的 Owner 验收。"
+    },
+    {
+      "name": "resume kind",
+      "equal": true,
+      "actual": "question_resume",
+      "expected": "question_resume"
+    },
+    {
+      "name": "resume eventId",
+      "equal": true,
+      "actual": "22b008a6-9793-564a-a858-9855df7b2444",
+      "expected": "22b008a6-9793-564a-a858-9855df7b2444"
+    },
+    {
+      "name": "resume recordedAt",
+      "equal": true,
+      "actual": "2026-11-04T20:10:34.260Z",
+      "expected": "2026-11-04T20:10:34.260Z"
+    },
+    {
+      "name": "resume originRunId",
+      "equal": true,
+      "actual": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "expected": "6658f0ef-d446-4d8f-813d-7b7734bb02f3"
+    },
+    {
+      "name": "resume sourceRunId",
+      "equal": true,
+      "actual": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "expected": "6658f0ef-d446-4d8f-813d-7b7734bb02f3"
+    },
+    {
+      "name": "resume continuationRunId",
+      "equal": true,
+      "actual": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+      "expected": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11"
+    },
+    {
+      "name": "resume originSessionId",
+      "equal": true,
+      "actual": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "expected": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae"
+    },
+    {
+      "name": "resume originAttemptId",
+      "equal": true,
+      "actual": "662d23b3-6ac4-4860-9616-a0f69d888725",
+      "expected": "662d23b3-6ac4-4860-9616-a0f69d888725"
+    },
+    {
+      "name": "resume continuationAttemptId",
+      "equal": true,
+      "actual": "0324128f-51f9-4bf5-905b-dfe1b306b583",
+      "expected": "0324128f-51f9-4bf5-905b-dfe1b306b583"
+    },
+    {
+      "name": "sourceToolActivity startedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:34:33.562Z",
+      "expected": "2026-11-04T19:34:33.562Z"
+    },
+    {
+      "name": "sourceToolActivity finishedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:42.560Z",
+      "expected": "2026-11-04T19:35:42.560Z"
+    },
+    {
+      "name": "sourceToolActivity status",
+      "equal": true,
+      "actual": "stopped",
+      "expected": "stopped"
+    },
+    {
+      "name": "sourceToolActivity stopReason",
+      "equal": true,
+      "actual": "asked_human",
+      "expected": "asked_human"
+    },
+    {
+      "name": "sourceToolActivity watermark",
+      "equal": true,
+      "actual": 29,
+      "expected": 29
+    },
+    {
+      "name": "sourceToolActivity count",
+      "equal": true,
+      "actual": 29,
+      "expected": 29
+    },
+    {
+      "name": "sourceToolActivity enumerationComplete",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "sourceToolActivity incompleteReasons",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "sourceToolActivity unknownChunkTypes",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "sourceToolActivity unclassifiedTools",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "sourceToolActivity all actual tool pairs",
+      "equal": true,
+      "actual": [
+        {
+          "toolName": "Bash",
+          "toolCallId": "toolu_01BozNDu5BYA13dQJ5hXxNfb",
+          "inputChunkId": "0bdd3f8d-223e-4d04-8ee4-2320efc70c26",
+          "inputSeq": 11,
+          "inputObservedAt": "2026-11-04T19:35:08.587Z",
+          "outputChunkId": "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+          "outputSeq": 12,
+          "outputObservedAt": "2026-11-04T19:35:08.587Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "Bash",
+          "toolCallId": "toolu_01TZNXZpSuL83jcfyo9hqPy1",
+          "inputChunkId": "314bf1ce-4473-467f-9305-21163ae54d45",
+          "inputSeq": 13,
+          "inputObservedAt": "2026-11-04T19:35:09.535Z",
+          "outputChunkId": "27c90934-986f-4574-9e46-df0706395559",
+          "outputSeq": 14,
+          "outputObservedAt": "2026-11-04T19:35:09.535Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "Bash",
+          "toolCallId": "toolu_01J8bvBFd3Yn9TbvdgFuRDzy",
+          "inputChunkId": "6b43bcd3-13d1-4cf6-bc87-d21f610183ed",
+          "inputSeq": 15,
+          "inputObservedAt": "2026-11-04T19:35:09.872Z",
+          "outputChunkId": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+          "outputSeq": 16,
+          "outputObservedAt": "2026-11-04T19:35:09.872Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "ToolSearch",
+          "toolCallId": "toolu_016tPwdYYVV1y8Spmc7X13u1",
+          "inputChunkId": "964e884a-e434-4e6f-9629-e33a39470397",
+          "inputSeq": 20,
+          "inputObservedAt": "2026-11-04T19:35:20.646Z",
+          "outputChunkId": "609373c5-1c36-4246-9344-919e18891c8c",
+          "outputSeq": 21,
+          "outputObservedAt": "2026-11-04T19:35:20.646Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "mcp__mikka__ask_human",
+          "toolCallId": "toolu_01CXTLPrihL79jqRPzSgE4Eb",
+          "inputChunkId": "f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3",
+          "inputSeq": 22,
+          "inputObservedAt": "2026-11-04T19:35:31.321Z",
+          "outputChunkId": "fddaaa05-97f6-4227-9f8f-65f18ca998f8",
+          "outputSeq": 23,
+          "outputObservedAt": "2026-11-04T19:35:34.024Z",
+          "outputType": "tool-output-available"
+        }
+      ],
+      "expected": [
+        {
+          "toolName": "Bash",
+          "toolCallId": "toolu_01BozNDu5BYA13dQJ5hXxNfb",
+          "inputChunkId": "0bdd3f8d-223e-4d04-8ee4-2320efc70c26",
+          "inputSeq": 11,
+          "inputObservedAt": "2026-11-04T19:35:08.587Z",
+          "outputChunkId": "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+          "outputSeq": 12,
+          "outputObservedAt": "2026-11-04T19:35:08.587Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "Bash",
+          "toolCallId": "toolu_01TZNXZpSuL83jcfyo9hqPy1",
+          "inputChunkId": "314bf1ce-4473-467f-9305-21163ae54d45",
+          "inputSeq": 13,
+          "inputObservedAt": "2026-11-04T19:35:09.535Z",
+          "outputChunkId": "27c90934-986f-4574-9e46-df0706395559",
+          "outputSeq": 14,
+          "outputObservedAt": "2026-11-04T19:35:09.535Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "Bash",
+          "toolCallId": "toolu_01J8bvBFd3Yn9TbvdgFuRDzy",
+          "inputChunkId": "6b43bcd3-13d1-4cf6-bc87-d21f610183ed",
+          "inputSeq": 15,
+          "inputObservedAt": "2026-11-04T19:35:09.872Z",
+          "outputChunkId": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+          "outputSeq": 16,
+          "outputObservedAt": "2026-11-04T19:35:09.872Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "ToolSearch",
+          "toolCallId": "toolu_016tPwdYYVV1y8Spmc7X13u1",
+          "inputChunkId": "964e884a-e434-4e6f-9629-e33a39470397",
+          "inputSeq": 20,
+          "inputObservedAt": "2026-11-04T19:35:20.646Z",
+          "outputChunkId": "609373c5-1c36-4246-9344-919e18891c8c",
+          "outputSeq": 21,
+          "outputObservedAt": "2026-11-04T19:35:20.646Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "mcp__mikka__ask_human",
+          "toolCallId": "toolu_01CXTLPrihL79jqRPzSgE4Eb",
+          "inputChunkId": "f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3",
+          "inputSeq": 22,
+          "inputObservedAt": "2026-11-04T19:35:31.321Z",
+          "outputChunkId": "fddaaa05-97f6-4227-9f8f-65f18ca998f8",
+          "outputSeq": 23,
+          "outputObservedAt": "2026-11-04T19:35:34.024Z",
+          "outputType": "tool-output-available"
+        }
+      ]
+    },
+    {
+      "name": "producerToolActivity startedAt",
+      "equal": true,
+      "actual": "2026-11-04T20:10:47.449Z",
+      "expected": "2026-11-04T20:10:47.449Z"
+    },
+    {
+      "name": "producerToolActivity finishedAt",
+      "equal": true,
+      "actual": "2026-11-04T20:11:52.412Z",
+      "expected": "2026-11-04T20:11:52.412Z"
+    },
+    {
+      "name": "producerToolActivity status",
+      "equal": true,
+      "actual": "succeeded",
+      "expected": "succeeded"
+    },
+    {
+      "name": "producerToolActivity stopReason",
+      "equal": true,
+      "actual": "submitted",
+      "expected": "submitted"
+    },
+    {
+      "name": "producerToolActivity watermark",
+      "equal": true,
+      "actual": 20,
+      "expected": 20
+    },
+    {
+      "name": "producerToolActivity count",
+      "equal": true,
+      "actual": 20,
+      "expected": 20
+    },
+    {
+      "name": "producerToolActivity enumerationComplete",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "producerToolActivity incompleteReasons",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "producerToolActivity unknownChunkTypes",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "producerToolActivity unclassifiedTools",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "producerToolActivity all actual tool pairs",
+      "equal": true,
+      "actual": [
+        {
+          "toolName": "ToolSearch",
+          "toolCallId": "toolu_0167y7gBVZc9av1chY5gWKsK",
+          "inputChunkId": "083ccff6-2877-4f66-bc2d-74c77ed2a621",
+          "inputSeq": 10,
+          "inputObservedAt": "2026-11-04T20:11:24.008Z",
+          "outputChunkId": "156e5016-4703-4118-8c84-1f864a908a43",
+          "outputSeq": 11,
+          "outputObservedAt": "2026-11-04T20:11:24.008Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "mcp__mikka__submit",
+          "toolCallId": "toolu_01TiYB8LHkCz8ZNfS8fhJbo5",
+          "inputChunkId": "59313298-3c7a-407c-8bdb-b071fe0245b4",
+          "inputSeq": 12,
+          "inputObservedAt": "2026-11-04T20:11:38.997Z",
+          "outputChunkId": "22018f31-dd91-4a42-96b8-11e26b382b87",
+          "outputSeq": 13,
+          "outputObservedAt": "2026-11-04T20:11:39.716Z",
+          "outputType": "tool-output-available"
+        }
+      ],
+      "expected": [
+        {
+          "toolName": "ToolSearch",
+          "toolCallId": "toolu_0167y7gBVZc9av1chY5gWKsK",
+          "inputChunkId": "083ccff6-2877-4f66-bc2d-74c77ed2a621",
+          "inputSeq": 10,
+          "inputObservedAt": "2026-11-04T20:11:24.008Z",
+          "outputChunkId": "156e5016-4703-4118-8c84-1f864a908a43",
+          "outputSeq": 11,
+          "outputObservedAt": "2026-11-04T20:11:24.008Z",
+          "outputType": "tool-output-available"
+        },
+        {
+          "toolName": "mcp__mikka__submit",
+          "toolCallId": "toolu_01TiYB8LHkCz8ZNfS8fhJbo5",
+          "inputChunkId": "59313298-3c7a-407c-8bdb-b071fe0245b4",
+          "inputSeq": 12,
+          "inputObservedAt": "2026-11-04T20:11:38.997Z",
+          "outputChunkId": "22018f31-dd91-4a42-96b8-11e26b382b87",
+          "outputSeq": 13,
+          "outputObservedAt": "2026-11-04T20:11:39.716Z",
+          "outputType": "tool-output-available"
+        }
+      ]
+    },
+    {
+      "name": "native question tool metadata",
+      "equal": true,
+      "actual": {
+        "toolName": "mcp__mikka__ask_human",
+        "toolCallId": "toolu_01CXTLPrihL79jqRPzSgE4Eb",
+        "inputChunkId": "f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3",
+        "inputSeq": 22,
+        "inputObservedAt": "2026-11-04T19:35:31.321Z",
+        "outputChunkId": "fddaaa05-97f6-4227-9f8f-65f18ca998f8",
+        "outputSeq": 23,
+        "outputObservedAt": "2026-11-04T19:35:34.024Z",
+        "outputType": "tool-output-available"
+      },
+      "expected": {
+        "toolName": "mcp__mikka__ask_human",
+        "toolCallId": "toolu_01CXTLPrihL79jqRPzSgE4Eb",
+        "inputChunkId": "f1ae824b-71cf-4dfc-89f9-6c4ca134b5d3",
+        "inputSeq": 22,
+        "inputObservedAt": "2026-11-04T19:35:31.321Z",
+        "outputChunkId": "fddaaa05-97f6-4227-9f8f-65f18ca998f8",
+        "outputSeq": 23,
+        "outputObservedAt": "2026-11-04T19:35:34.024Z",
+        "outputType": "tool-output-available"
+      }
+    },
+    {
+      "name": "native question kind",
+      "equal": true,
+      "actual": "decision",
+      "expected": "decision"
+    },
+    {
+      "name": "native question text",
+      "equal": true,
+      "actual": "是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？",
+      "expected": "是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？"
+    },
+    {
+      "name": "native question output",
+      "equal": true,
+      "actual": "Recorded. End your turn now.",
+      "expected": "Recorded. End your turn now."
+    },
+    {
+      "name": "producer command current segment records",
+      "equal": true,
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "producer inherited omitted",
+      "equal": true,
+      "actual": false,
+      "expected": false
+    },
+    {
+      "name": "producer earlier omitted",
+      "equal": true,
+      "actual": false,
+      "expected": false
+    },
+    {
+      "name": "inherited command count",
+      "equal": true,
+      "actual": 3,
+      "expected": 3
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c inputChunkId",
+      "equal": true,
+      "actual": "0bdd3f8d-223e-4d04-8ee4-2320efc70c26",
+      "expected": "0bdd3f8d-223e-4d04-8ee4-2320efc70c26"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c outputChunkId",
+      "equal": true,
+      "actual": "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+      "expected": "bb4083b9-b87b-4d56-be4c-68349ea5d49c"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c seq",
+      "equal": true,
+      "actual": 11,
+      "expected": 11
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c toolName",
+      "equal": true,
+      "actual": "Bash",
+      "expected": "Bash"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c inputObservedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:08.587Z",
+      "expected": "2026-11-04T19:35:08.587Z"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c observedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:08.587Z",
+      "expected": "2026-11-04T19:35:08.587Z"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c input",
+      "equal": true,
+      "actual": {
+        "command": "printf 'mikka-group-policy-v3\\npath=claude-code\\nstatus=ready\\n' > mikka-question-recovery-cc-20261104-1237.txt; echo \"exit=$?\"",
+        "description": "Create the target file with exact three LF-terminated lines"
+      },
+      "expected": {
+        "command": "printf 'mikka-group-policy-v3\\npath=claude-code\\nstatus=ready\\n' > mikka-question-recovery-cc-20261104-1237.txt; echo \"exit=$?\"",
+        "description": "Create the target file with exact three LF-terminated lines"
+      }
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c output",
+      "equal": true,
+      "actual": "exit=0",
+      "expected": "exit=0"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c outputType",
+      "equal": true,
+      "actual": "tool-output-available",
+      "expected": "tool-output-available"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c inherited",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c sourceRunId",
+      "equal": true,
+      "actual": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "expected": "6658f0ef-d446-4d8f-813d-7b7734bb02f3"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c sourceSessionId",
+      "equal": true,
+      "actual": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "expected": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c sourceStatus",
+      "equal": true,
+      "actual": "stopped",
+      "expected": "stopped"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c sourceStopReason",
+      "equal": true,
+      "actual": "asked_human",
+      "expected": "asked_human"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c recoveryEventId",
+      "equal": true,
+      "actual": "22b008a6-9793-564a-a858-9855df7b2444",
+      "expected": "22b008a6-9793-564a-a858-9855df7b2444"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c questionId",
+      "equal": true,
+      "actual": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "expected": "fd3ce47c-785f-4e7a-92ee-d5763959d64b"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c answerId",
+      "equal": true,
+      "actual": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "expected": "11708d4d-708f-5bc7-b41d-7db8386d8d15"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c requestEpoch",
+      "equal": true,
+      "actual": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "expected": "4ad02e70-8015-5eac-87f4-a96fbd775d14"
+    },
+    {
+      "name": "inherited bb4083b9-b87b-4d56-be4c-68349ea5d49c candidateSha",
+      "equal": true,
+      "actual": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "expected": "d05417e7848871e511141e10a282ffb7998b0a79"
+    },
+    {
+      "name": "frozen questionCommandSource bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+      "equal": true,
+      "actual": {
+        "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+        "status": "stopped",
+        "sessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+        "observedAt": "2026-11-04T19:35:08.587Z",
+        "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "outputChunkId": "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+        "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444"
+      },
+      "expected": {
+        "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+        "status": "stopped",
+        "sessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+        "observedAt": "2026-11-04T19:35:08.587Z",
+        "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "outputChunkId": "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+        "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444"
+      }
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 inputChunkId",
+      "equal": true,
+      "actual": "314bf1ce-4473-467f-9305-21163ae54d45",
+      "expected": "314bf1ce-4473-467f-9305-21163ae54d45"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 outputChunkId",
+      "equal": true,
+      "actual": "27c90934-986f-4574-9e46-df0706395559",
+      "expected": "27c90934-986f-4574-9e46-df0706395559"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 seq",
+      "equal": true,
+      "actual": 13,
+      "expected": 13
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 toolName",
+      "equal": true,
+      "actual": "Bash",
+      "expected": "Bash"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 inputObservedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:09.535Z",
+      "expected": "2026-11-04T19:35:09.535Z"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 observedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:09.535Z",
+      "expected": "2026-11-04T19:35:09.535Z"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 input",
+      "equal": true,
+      "actual": {
+        "command": "cat -A mikka-question-recovery-cc-20261104-1237.txt; echo \"exit=$?\"; wc -c < mikka-question-recovery-cc-20261104-1237.txt; echo \"wc_exit=$?\"; sha256sum mikka-question-recovery-cc-20261104-1237.txt; echo \"sha_exit=$?\"; head -c 3 mikka-question-recovery-cc-20261104-1237.txt | od -An -tx1; echo \"bom_check_exit=$?\"",
+        "description": "Read file, count bytes, compute SHA-256, check for BOM"
+      },
+      "expected": {
+        "command": "cat -A mikka-question-recovery-cc-20261104-1237.txt; echo \"exit=$?\"; wc -c < mikka-question-recovery-cc-20261104-1237.txt; echo \"wc_exit=$?\"; sha256sum mikka-question-recovery-cc-20261104-1237.txt; echo \"sha_exit=$?\"; head -c 3 mikka-question-recovery-cc-20261104-1237.txt | od -An -tx1; echo \"bom_check_exit=$?\"",
+        "description": "Read file, count bytes, compute SHA-256, check for BOM"
+      }
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 output",
+      "equal": true,
+      "actual": "mikka-group-policy-v3$\npath=claude-code$\nstatus=ready$\nexit=0\n52\nwc_exit=0\n05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6  mikka-question-recovery-cc-20261104-1237.txt\nsha_exit=0\n 6d 69 6b\nbom_check_exit=0",
+      "expected": "mikka-group-policy-v3$\npath=claude-code$\nstatus=ready$\nexit=0\n52\nwc_exit=0\n05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6  mikka-question-recovery-cc-20261104-1237.txt\nsha_exit=0\n 6d 69 6b\nbom_check_exit=0"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 outputType",
+      "equal": true,
+      "actual": "tool-output-available",
+      "expected": "tool-output-available"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 inherited",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 sourceRunId",
+      "equal": true,
+      "actual": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "expected": "6658f0ef-d446-4d8f-813d-7b7734bb02f3"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 sourceSessionId",
+      "equal": true,
+      "actual": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "expected": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 sourceStatus",
+      "equal": true,
+      "actual": "stopped",
+      "expected": "stopped"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 sourceStopReason",
+      "equal": true,
+      "actual": "asked_human",
+      "expected": "asked_human"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 recoveryEventId",
+      "equal": true,
+      "actual": "22b008a6-9793-564a-a858-9855df7b2444",
+      "expected": "22b008a6-9793-564a-a858-9855df7b2444"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 questionId",
+      "equal": true,
+      "actual": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "expected": "fd3ce47c-785f-4e7a-92ee-d5763959d64b"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 answerId",
+      "equal": true,
+      "actual": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "expected": "11708d4d-708f-5bc7-b41d-7db8386d8d15"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 requestEpoch",
+      "equal": true,
+      "actual": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "expected": "4ad02e70-8015-5eac-87f4-a96fbd775d14"
+    },
+    {
+      "name": "inherited 27c90934-986f-4574-9e46-df0706395559 candidateSha",
+      "equal": true,
+      "actual": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "expected": "d05417e7848871e511141e10a282ffb7998b0a79"
+    },
+    {
+      "name": "frozen questionCommandSource 27c90934-986f-4574-9e46-df0706395559",
+      "equal": true,
+      "actual": {
+        "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+        "status": "stopped",
+        "sessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+        "observedAt": "2026-11-04T19:35:09.535Z",
+        "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "outputChunkId": "27c90934-986f-4574-9e46-df0706395559",
+        "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444"
+      },
+      "expected": {
+        "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+        "status": "stopped",
+        "sessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+        "observedAt": "2026-11-04T19:35:09.535Z",
+        "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "outputChunkId": "27c90934-986f-4574-9e46-df0706395559",
+        "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444"
+      }
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 inputChunkId",
+      "equal": true,
+      "actual": "6b43bcd3-13d1-4cf6-bc87-d21f610183ed",
+      "expected": "6b43bcd3-13d1-4cf6-bc87-d21f610183ed"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 outputChunkId",
+      "equal": true,
+      "actual": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+      "expected": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 seq",
+      "equal": true,
+      "actual": 15,
+      "expected": 15
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 toolName",
+      "equal": true,
+      "actual": "Bash",
+      "expected": "Bash"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 inputObservedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:09.872Z",
+      "expected": "2026-11-04T19:35:09.872Z"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 observedAt",
+      "equal": true,
+      "actual": "2026-11-04T19:35:09.872Z",
+      "expected": "2026-11-04T19:35:09.872Z"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 input",
+      "equal": true,
+      "actual": {
+        "command": "git status --porcelain=v1; echo \"status_exit=$?\"; echo \"--- changed paths vs HEAD (tracked + untracked):\"; git status --porcelain=v1 --untracked-files=all | awk '{print $2}'; echo \"--- diff stat:\"; git diff --stat HEAD; echo \"diff_exit=$?\"; echo \"--- HEAD:\"; git rev-parse HEAD; echo \"rev_exit=$?\"",
+        "description": "Check git status and scope of changes"
+      },
+      "expected": {
+        "command": "git status --porcelain=v1; echo \"status_exit=$?\"; echo \"--- changed paths vs HEAD (tracked + untracked):\"; git status --porcelain=v1 --untracked-files=all | awk '{print $2}'; echo \"--- diff stat:\"; git diff --stat HEAD; echo \"diff_exit=$?\"; echo \"--- HEAD:\"; git rev-parse HEAD; echo \"rev_exit=$?\"",
+        "description": "Check git status and scope of changes"
+      }
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 output",
+      "equal": true,
+      "actual": "?? mikka-question-recovery-cc-20261104-1237.txt\nstatus_exit=0\n--- changed paths vs HEAD (tracked + untracked):\nmikka-question-recovery-cc-20261104-1237.txt\n--- diff stat:\ndiff_exit=0\n--- HEAD:\n054e64ce6167427aecf937e6dc2410af677df32d\nrev_exit=0",
+      "expected": "?? mikka-question-recovery-cc-20261104-1237.txt\nstatus_exit=0\n--- changed paths vs HEAD (tracked + untracked):\nmikka-question-recovery-cc-20261104-1237.txt\n--- diff stat:\ndiff_exit=0\n--- HEAD:\n054e64ce6167427aecf937e6dc2410af677df32d\nrev_exit=0"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 outputType",
+      "equal": true,
+      "actual": "tool-output-available",
+      "expected": "tool-output-available"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 inherited",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 sourceRunId",
+      "equal": true,
+      "actual": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "expected": "6658f0ef-d446-4d8f-813d-7b7734bb02f3"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 sourceSessionId",
+      "equal": true,
+      "actual": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "expected": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 sourceStatus",
+      "equal": true,
+      "actual": "stopped",
+      "expected": "stopped"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 sourceStopReason",
+      "equal": true,
+      "actual": "asked_human",
+      "expected": "asked_human"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 recoveryEventId",
+      "equal": true,
+      "actual": "22b008a6-9793-564a-a858-9855df7b2444",
+      "expected": "22b008a6-9793-564a-a858-9855df7b2444"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 questionId",
+      "equal": true,
+      "actual": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "expected": "fd3ce47c-785f-4e7a-92ee-d5763959d64b"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 answerId",
+      "equal": true,
+      "actual": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "expected": "11708d4d-708f-5bc7-b41d-7db8386d8d15"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 requestEpoch",
+      "equal": true,
+      "actual": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "expected": "4ad02e70-8015-5eac-87f4-a96fbd775d14"
+    },
+    {
+      "name": "inherited 202b7cf0-e388-4626-ae15-0dd08d8dfbc3 candidateSha",
+      "equal": true,
+      "actual": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "expected": "d05417e7848871e511141e10a282ffb7998b0a79"
+    },
+    {
+      "name": "frozen questionCommandSource 202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+      "equal": true,
+      "actual": {
+        "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+        "status": "stopped",
+        "sessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+        "observedAt": "2026-11-04T19:35:09.872Z",
+        "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "outputChunkId": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+        "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444"
+      },
+      "expected": {
+        "runId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+        "status": "stopped",
+        "sessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+        "observedAt": "2026-11-04T19:35:09.872Z",
+        "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "outputChunkId": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+        "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444"
+      }
+    },
+    {
+      "name": "one actual artifact pair",
+      "equal": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "artifact input",
+      "equal": true,
+      "actual": {
+        "path": "mikka-question-recovery-cc-20261104-1237.txt",
+        "expectedUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n"
+      },
+      "expected": {
+        "path": "mikka-question-recovery-cc-20261104-1237.txt",
+        "expectedUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n"
+      }
+    },
+    {
+      "name": "artifact successful output type",
+      "equal": true,
+      "actual": "tool-output-available",
+      "expected": "tool-output-available"
+    },
+    {
+      "name": "artifact exact output",
+      "equal": true,
+      "actual": {
+        "path": "mikka-question-recovery-cc-20261104-1237.txt",
+        "bytes": 52,
+        "sha256": "05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6",
+        "head": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "committedSha256": "05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6",
+        "contentMatchesGit": true,
+        "contentUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n",
+        "textUnavailable": null,
+        "matchesExpectedUtf8": true
+      },
+      "expected": {
+        "path": "mikka-question-recovery-cc-20261104-1237.txt",
+        "bytes": 52,
+        "sha256": "05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6",
+        "head": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "committedSha256": "05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6",
+        "contentMatchesGit": true,
+        "contentUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n",
+        "textUnavailable": null,
+        "matchesExpectedUtf8": true
+      }
+    },
+    {
+      "name": "artifact pair same callId",
+      "equal": true,
+      "actual": "toolu_01T3NDsmzMieqBZJuMAjpgXL",
+      "expected": "toolu_01T3NDsmzMieqBZJuMAjpgXL"
+    },
+    {
+      "name": "artifact pair order",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "all three inherited output UUIDs cited",
+      "equal": true,
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "native question actual original output",
+      "equal": true,
+      "actual": "Recorded. End your turn now.",
+      "expected": "Recorded. End your turn now."
+    },
+    {
+      "name": "native question exact original input kind",
+      "equal": true,
+      "actual": "decision",
+      "expected": "decision"
+    },
+    {
+      "name": "native question exact original input text",
+      "equal": true,
+      "actual": "是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？",
+      "expected": "是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？"
+    }
+  ],
+  "limitations": [
+    "The complete native tool index is not an OS audit.",
+    "The stray report text run-chunk:bb... is not a valid citation and was not counted as evidence. The same report separately cites all three exact admitted output UUIDs.",
+    "This comparison cannot change the persisted failed review or create the missing verify."
+  ],
+  "methodCorrection": "The baseline sourceTools array has three Bash pairs and one ask_human pair. Command-count comparison now explicitly counts only Bash, while the fourth pair is compared independently as the native question. Raw before/proof files were unchanged."
+}

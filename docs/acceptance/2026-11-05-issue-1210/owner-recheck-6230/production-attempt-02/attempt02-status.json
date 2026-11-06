@@ -1,0 +1,61 @@
+{
+  "phase": "attempt02-review-failed-awaiting-product-fix-and-root-trigger",
+  "clickAt": "2026-11-06T00:00:55.806Z",
+  "lastDirectObservedAt": "2026-11-06T00:05:21.017Z",
+  "ownerRecheckEventId": "6c485476-b3b5-4d1e-a7e7-47865d34affa",
+  "newReviewRunId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+  "newReviewAttemptId": "f23b075b-992a-4e17-b891-1c462d4d3738",
+  "newReviewSessionId": "0c6512df-0df0-460a-92d0-6aea0a963033",
+  "newVerifyRunId": null,
+  "runStatus": "succeeded",
+  "runStopReason": "submitted",
+  "attemptStatus": "failed",
+  "taskStage": "review",
+  "taskStatus": "failed",
+  "taskRevision": 16,
+  "reportFingerprint": "f5592902b28ecb8fb0576e97aa024063",
+  "reportedUnverifiedCriteria": [
+    {
+      "text": "Model assignment: continuation and producer ran on the frozen original subscription model claude-haiku-5-5.",
+      "passed": false,
+      "reason": "Host execution assignment records model claude-haiku-5-5 and harness claude_code, but observedModel is null; I cannot verify the provider alias or subscription from this read-only check.",
+      "status": "unverified",
+      "evidence": "Host-recorded assignment only."
+    },
+    {
+      "text": "Git scope: only the target file was added or modified in the candidate commit relative to its parent.",
+      "passed": false,
+      "reason": "The read-only tools here cannot run git diff between 054e64c and d05417e. The only observed change set is the pre-delivery git status (run-chunk:202b7cf0-e388-4626-ae15-0dd08d8dfbc3), taken at HEAD 054e64c before the host retained commit d05417e.",
+      "status": "unverified",
+      "evidence": "inspect_artifact confirms the file at HEAD d05417e only; the commit change list is not observed here."
+    }
+  ],
+  "actualArtifactPairCount": 1,
+  "hostComparisonCount": 131,
+  "hostComparisonDifferences": 0,
+  "sandboxId": "i773iwx0ulev7nvbomyyk",
+  "vmObservation": "Same task artifact VM retained; new independent native SID. Not a fresh VM claim.",
+  "parentAtProof": {
+    "observedAt": "2026-11-06T00:05:21.029Z",
+    "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+    "parentState": "sleeping",
+    "parentSandboxId": "ipa60du803guuiqnyzqan",
+    "runtimeReady": true,
+    "deviceId": "93340db5-3234-467c-af26-a50d9f6425df",
+    "lastActiveAt": "2026-11-05T14:48:42.215Z",
+    "deviceEnabled": true
+  },
+  "activeAtProof": {
+    "activeRuns": 0,
+    "activeLeases": 0
+  },
+  "finalAcceptance": false,
+  "previousEvidencePreserved": true,
+  "readOnlyTransactionsThisAttempt": 4,
+  "productionWrites": 0,
+  "credentialRefreshes": 0,
+  "modelInvocations": 0,
+  "browserActions": 0,
+  "queryControl": "Stopped after root instruction; waiting for a new deployed version and actual root click notice.",
+  "actionCounterScope": "Counters describe this independent read-only audit agent only. The root Owner UI click and Mikka native model execution are separately observed in the recorded evidence."
+}

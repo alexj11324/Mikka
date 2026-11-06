@@ -1,0 +1,11 @@
+{
+  "startedAt": "2026-11-06T00:03:50.519Z",
+  "finishedAt": "2026-11-06T00:03:54.452Z",
+  "readOnly": true,
+  "statementTimeout": "5s",
+  "productionWrites": 0,
+  "credentialRefreshes": 0,
+  "modelInvocations": 0,
+  "browserActions": 0
+}
+

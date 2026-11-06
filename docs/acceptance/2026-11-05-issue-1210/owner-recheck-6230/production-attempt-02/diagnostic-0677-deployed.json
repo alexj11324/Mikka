@@ -1,0 +1,131 @@
+{
+  "head": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+  "merge": {
+    "sha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "tree": "4d234a44ec32bb1b28e8552b6dd0e44c2c7733b1",
+    "parents": [
+      "b9e1b5b892132c758db601c681de1e559bb17956",
+      "b1bee585e7f1c78b09fb8f80b8752227591b13f1"
+    ],
+    "url": "https://github.com/alexj11324/Mikka/commit/0677fbff4c949c53b839706011af5ec77cdd1d24"
+  },
+  "web": {
+    "id": 42131188496,
+    "head_sha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "job": 127607917077,
+    "updated_at": "2026-11-05T23:47:45Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42131188496"
+  },
+  "deployment": {
+    "id": "dpl_C5mqNpPppuxu1F36mXpQZdHy1ntG",
+    "url": "https://mikka-cu1uooste-mikka-dev.vercel.app",
+    "readyState": "READY",
+    "readyAt": "2026-11-05T23:47:39.309Z",
+    "createdAt": "2026-11-05T23:46:45.364Z",
+    "meta": {
+      "githubCommitRef": "main",
+      "githubCommitSha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+      "githubCommitMessage": "Merge pull request #1462 from alexj11324/fix/1210-recheck-diagnostics-20261105",
+      "githubRepo": "Mikka",
+      "githubOrg": "alexj11324"
+    }
+  },
+  "mainCI": {
+    "id": 42131188519,
+    "head_sha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "status": "completed",
+    "conclusion": "success",
+    "updated_at": "2026-11-05T23:47:05Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42131188519",
+    "actualCheckout": [
+      "2026-11-05T23:40:48.3376822Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0677fbff4c949c53b839706011af5ec77cdd1d24:refs/remotes/origin/main",
+      "2026-11-05T23:40:50.3586051Z  * [new ref]         0677fbff4c949c53b839706011af5ec77cdd1d24 -> origin/main",
+      "2026-11-05T23:40:50.5834933Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-11-05T23:40:50.5850805Z 0677fbff4c949c53b839706011af5ec77cdd1d24"
+    ]
+  },
+  "runtime": {
+    "id": 42131188627,
+    "head_sha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "status": "completed",
+    "conclusion": "success",
+    "updated_at": "2026-11-05T23:41:00Z",
+    "jobs": [
+      {
+        "id": 127607917055,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127607994664,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127608112614,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 127608112671,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 127608113490,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped"
+      }
+    ]
+  },
+  "latestMain": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+  "webEvidence": [
+    "2026-11-05T23:41:36.5635543Z Detected Next.js version: ***6.4.***",
+    "2026-11-05T23:42:24.5705197Z ▲ Next.js ***6.4.*** (Turbopack)",
+    "2026-11-05T23:45:03.3176165Z ✓ Compiled successfully in 2.5min",
+    "2026-11-05T23:45:36.7941096Z Traced Next.js server files in: ***95.49ms",
+    "2026-11-05T23:46:10.5776132Z Build Completed in .vercel/output [5m]",
+    "2026-11-05T23:46:10.9117161Z \u001b[36;***mecho \"Deployed $url\"\u001b[0m",
+    "2026-11-05T23:47:39.7364314Z ✓ Ready in ***m",
+    "2026-11-05T23:47:39.8553082Z Deployed https://mikka-cu***uooste-mikka-dev.vercel.app",
+    "2026-11-05T23:47:41.5596606Z {\"event\":\"***uction_version_verified\",\"url\":\"***/mikka/api/version\",\"build\":\"0677fbff4c949c53b8397060***af5ec77cdd***d24\",\"status\":200,\"verifiedAt\":\"2026-***-05T23:47:4***.558Z\",\"attempts\":***}"
+  ],
+  "publicMethod": {
+    "script": "/workspace/scratch/6b649311982a/ops/1210-release-gate/read-public-version.py",
+    "request": "single unauthenticated normal urllib GET; no retry, no cache bypass, no custom auth",
+    "url": "https://app.aspectlylabs.com/mikka/api/version",
+    "path": "/workspace/scratch/6b649311982a/ops/1210-release-gate/public-version-diagnostic-0677-ready.json"
+  },
+  "sourceQualification": "PR CI checked e8ad91f4/tree6a288 at old base82789. This new main CI actually checked merge0677/tree4d234 after root normal merge onto b9e1b5. These two facts are distinct.",
+  "publicVersion": {
+    "observedAt": "2026-11-05T23:48:22.966623+00:00",
+    "url": "https://app.aspectlylabs.com/mikka/api/version",
+    "status": 200,
+    "body": {
+      "build": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+      "minMobileBuild": 0,
+      "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+      "minDesktopVersion": null
+    }
+  },
+  "logFiles": [
+    {
+      "file": "diagnostic-0677-web-full.log",
+      "bytes": 273179,
+      "sha256": "a75a197e3cee69512151d6986a3cca4aa9ca1ade822648edee88748b1b3fdcb2"
+    },
+    {
+      "file": "diagnostic-0677-main-ci-source.log",
+      "bytes": 48888,
+      "sha256": "bcaaa66db0e56185ae5766a647d4d17c5be0104fd68fba86e7868f779f73b89c"
+    }
+  ]
+}

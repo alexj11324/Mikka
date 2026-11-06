@@ -1,0 +1,14 @@
+{
+  "observedAt": "2026-11-06T00:01:12.107Z",
+  "surface": "Normal signed-in Owner UI",
+  "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+  "observedTaskStatus": "Reviewing",
+  "threadsCount": 4,
+  "newThreadState": "Running",
+  "reviewDisplay": "In progress",
+  "verifyDisplay": "In progress",
+  "verifyDisplayNotProofNewVerifyStarted": true,
+  "retryButtonPresent": false,
+  "acceptancePerformed": false,
+  "pageUrl": "https://app.aspectlylabs.com/mikka/en?issue=0b9e6f79-790b-4931-aa54-2f45f5d142de&thread=d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11"
+}

@@ -1,0 +1,18 @@
+{
+  "action": "owner_candidate_recheck",
+  "clickAt": "2026-11-06T00:00:55.806Z",
+  "method": "Normal signed-in Owner UI",
+  "tabId": "64",
+  "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+  "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+  "button": "Retry review",
+  "clickCountThisAttempt": 1,
+  "totalOwnerRecheckClicks": 2,
+  "afterClickObserved": "Loading Retry review; disabled",
+  "publicVersionProof": "../1210-release-gate/public-root-before-click02.json",
+  "publicVersion": "1846002bec14c649e4bead67f136014141f4d133",
+  "oldVerifyQuestionAnswered": false,
+  "acceptancePerformed": false,
+  "quotaResetElapsed": true,
+  "quotaAvailabilityNotAssumed": true
+}

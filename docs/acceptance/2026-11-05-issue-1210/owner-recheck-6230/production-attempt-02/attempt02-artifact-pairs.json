@@ -1,0 +1,19 @@
+[
+  {
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "inputChunkId": "d40371c8-e3c4-48d4-b081-cf30d849923f",
+    "outputChunkId": "7b058789-b30c-4cee-b427-b1a4b4c720cf",
+    "inputSeq": 9,
+    "outputSeq": 10,
+    "inputAt": "2026-11-06T00:03:20.643Z",
+    "outputAt": "2026-11-06T00:03:21.354Z",
+    "toolName": "mcp__mikka__inspect_artifact",
+    "input": {
+      "path": "mikka-question-recovery-cc-20261104-1237.txt",
+      "expectedUtf8": "mikka-group-policy-v3\npath=claude-code\nstatus=ready\n"
+    },
+    "outputType": "tool-output-available",
+    "output": "{\"path\":\"mikka-question-recovery-cc-20261104-1237.txt\",\"bytes\":52,\"sha256\":\"05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6\",\"head\":\"d05417e7848871e511141e10a282ffb7998b0a79\",\"committedSha256\":\"05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6\",\"contentMatchesGit\":true,\"contentUtf8\":\"mikka-group-policy-v3\\npath=claude-code\\nstatus=ready\\n\",\"textUnavailable\":null,\"matchesExpectedUtf8\":true}"
+  }
+]

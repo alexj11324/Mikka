@@ -1,5 +1,7 @@
 # #1210 / #1449 — Owner 重新审阅当前交付物
 
+> **追加记录（2026-11-06）：** 第二次正常重审已实际执行，但Factory review失败，新的verify尚未创建、Owner未接受；两项unverified和VM假设纠正见文末[production-attempt-02](#production-attempt-02)。以下旧摘要与历史章节保持首轮冻结原文。
+
 > 截至本次生产尝试记录：#1449 已以82789正常合并并部署；23:14的唯一一次 Owner Retry review 未完成，23:22无新回执/attempt，原六项与最终接受仍未完成。官方快照和原源码纯回放复现额度准入阻断，原失败POST具体错误正文未捕获。下方原30张隔离UI截图保留实际6230 / 925 / 3f0版本；诊断#1462及其后续合并单列，未冒充生产验收通过。
 
 这次修改让仍在 flow v1 验证阶段、或当前交付物尚未接受的 Owner，从已有 Factory 验收入口发起同一候选的重新审阅，再进行独立验证。此前结果保留。既有的接受、退回修改与检查恢复操作继续使用原有组件和权限。
@@ -311,3 +313,91 @@ reviewer 未编写产品 UI，按 `ux-heuristics` 和 `cognitive-walkthrough` �
 本页隔离UI部分证明指定版本的入口与布局，以及另行列明的源码/数据库检查；新增production-attempt-01记录真实发布、单次正常Owner点击及其阻断。合成夹具内的“通过”结果不证明ALEX43的生产六项验收，也不证明真实独立review/verify已运行、已回答历史问题或已完成新检查。本轮实际读回没有新的检查回执，六项与最终Owner接受仍未完成。
 
 三轮30张截图继续保留实际源码身份；3f0的源/Happy DOM检查、类型检查、构建、UI6审计、自审和独立逐图复核已有成功原件。79c随后通过CI、82789部署成功的原件已在新增章节补齐；23:14的真实重审未完成，额度准入阻断的来源与推导边界均保留。诊断补丁的测试与合并不能替代原六项及最终Owner接受。
+
+## production-attempt-02
+
+**第二次正常重审实际执行了新的 review，但 Factory 判定未通过。** 最后直接数据库观察为 **2026-11-06 00:05:21.017–00:05:21.029 UTC**：task=`review / failed`、revision=16；新 review attempt=`failed`，原生 run=`succeeded / submitted`。后者只表示运行成功提交了报告，不能写成 Factory 通过。**新 verify 尚未创建，最终 Owner 接受没有发生。** [最终状态](production-attempt-02/attempt02-status.json)、[实际 proof 响应](production-attempt-02/attempt02-proof01-response.json)及[失败调查](production-attempt-02/attempt02-blocker.md)保留这些不同层级的事实。
+
+第一轮 `production-attempt-01` 的 47 个文件、全部历史 UI 原件和当时的 pending 叙述均原样保留。以下是后续事件；不会把后来 READY、额度刷新或新运行回写成第一轮点击已经成功。
+
+### 后续部署与第二次点击的实际版本
+
+| 发布或版本 | 已保存的实际证明 |
+| --- | --- |
+| 诊断 #1462 的最终合并 | `0677fbff4c949c53b839706011af5ec77cdd1d24` / tree `4d234a44ec32bb1b28e8552b6dd0e44c2c7733b1`。自身 main CI `42131188519` 实际 checkout 为0677并 success；它与旧 base82789 的 PR synthetic CI 分别记录。 |
+| 0677 实际部署 | Web `42131188496` attempt1 success；deployment `dpl_C5mqNpPppuxu1F36mXpQZdHy1ntG` 于 **2026-11-05 23:47:39.309 READY**。[部署原件](production-attempt-02/diagnostic-0677-deployed.json)与[root 23:48:59.317058 的公开完整 SHA](production-attempt-02/public-root-diagnostic-0677-ready.json)。第一轮章节的“待 READY”属于23:45:32快照，仍然保留。 |
+| 第二次点击前的生产版本 | 随后 #1461 合并为 **`1846002bec14c649e4bead67f136014141f4d133`** / tree `4cc40c5a1bd5c203a6dd0bbb6176ac883ce8101c`，第一 parent 就是0677。Web `42132342122` attempt1 success，deployment `dpl_4XFwJH7YCuoCsfSZ5XFGYuG1Bppn` **23:56:40.144 READY**。[部署与源码相关性必要字段投影](production-attempt-02/production-1846002-readiness-projection.json)。 |
+| 点击前的公开版本读回 | root **23:58:58.218359** 的普通公开 GET 为 HTTP200、完整 build=`1846002bec14c649e4bead67f136014141f4d133`。[原始公开响应](production-attempt-02/public-root-before-click02.json)。本次实际点击版本记为1846002，不改标成0677。 |
+
+源码 watcher 的既有审阅区分了 #1461 的 spec continuation 路径与本案 fresh acceptance check 路径；Owner recheck、quota 和相关准入文件的未变化范围保存在该投影中。部署完成只是本次操作的版本前置条件，不代表六项验收已经完成。
+
+### 从点击前到失败判定的时间线
+
+| 时间（UTC） | 实际观察与边界 |
+| --- | --- |
+| 2026-11-05 **23:59:30.230–23:59:30.234** | 点击前仍为原 `verify / waiting`、revision13；与23:04原始 before共有 **48字段、0差异**。旧问题八个消费字段NULL，recheck回执/新attempt/活动run/lease/接受记录均0，父机sleeping。该前置读取没有刷新额度。[before响应](production-attempt-02/attempt02-before-response.json)、[比较](production-attempt-02/attempt02-before-comparison.json)。 |
+| 2026-11-06 **00:00:55.806** | root 刷新正常登录的 Owner UI 后，本轮只点一次 **Retry review**；累计两次正常Owner重审。最初为 Loading / disabled；没有回答旧verify问题，没有执行接受。[动作记录](production-attempt-02/root-recheck-ui-action-02.json)。 |
+| **00:00:58.058** | 正常产品流程确实取得新官方 quota 快照：全局 weekly used=0，reset=`2026-11-13T00:00:00.000Z`；five_hour used=0.04。这个记录来自真实刷新，不能用时钟越过00:00替代。[sample01中两个冻结来源的quota原件](production-attempt-02/attempt02-sample01-response.json)。它只证明该时点的快照，不是未来额度保证。 |
+| **00:00:58.332** | `owner_candidate_recheck` 回执 **`6c485476-b3b5-4d1e-a7e7-47865d34affa`** 已提交，绑定原revision13、原candidate/epoch和两个旧检查来源。旧verify问题正常变为expired / revision3，原expiry与八NULL保留；没有回答或续接该过期问题。 |
+| **00:01:12.107** | UI显示Reviewing、新第4条线程Running、Review/Verify均In progress。**Verify文案不证明新verify已开始**；实际运行身份以后续数据库记录为准。[UI起始观察](production-attempt-02/root-recheck-ui-observation-02-start.json)。 |
+| **00:01:18.681 → 00:01:20.406** | 第一次 `install_computer` 记录TimeoutError；同一durable工作流随后正常再次handoff，`providerContinuation=false`。这是内部重试，没有第二次本轮Owner点击。[必要runtime事件投影](production-attempt-02/attempt02-startup-events-projection.json)。 |
+| **00:01:55.481–00:01:55.487** | sample01中task虽为review/running，原生run仍queued、SID/start/native claim/lease均NULL，thread machine=error；不能把这一帧计为已执行的独立审阅。[sample01响应](production-attempt-02/attempt02-sample01-response.json)。 |
+| **00:02:11.746 → 00:02:17.934** | 先出现可选`preloaded.pid`缺失输出；随后00:02:17.019记录handoff finished / started=true，真实run startedAt=00:02:17.934，machine runningSince=00:02:17.011。源码有正常worker fallback，PID这一行不是独立的fatal证据；实际native claim证明本次启动后来恢复。[启动分类](production-attempt-02/attempt02-startup-classification.md)。 |
+| **00:03:54.387** | sample02真实看到review运行中、新独立SID、原native binding、API claim=false、providerObservedModel=NULL；同任务artifact VM被复用，父机仍sleeping。[sample02响应](production-attempt-02/attempt02-sample02-response.json)。 |
+| **00:04:03.483 / 00:05:21** | 原生run结束为succeeded/submitted；最后proof显示Factory review attempt failed、task review/failed revision16，**无新verify、active run=0、有效lease=0**。[实际proof](production-attempt-02/attempt02-proof01-response.json)。 |
+
+原始采集时间与只读/5秒timeout记录分别保存为 `attempt02-before`、`sample01`、`sample02`、`proof01` 的 timing 文件；对应SQL发布副本只遮去Owner账户ID并标记不可执行。没有把内部启动重试、queued帧、UI状态或成功submit替代最终Factory判定。
+
+### 新独立检查的固定身份及 VM 假设纠正
+
+| 对象 | 本次实际值 |
+| --- | --- |
+| task / issue | `e42571e5-58f7-40e3-9418-c02ee8843fe6` / `0b9e6f79-790b-4931-aa54-2f45f5d142de` |
+| 原candidate / epoch / 交付HEAD | `2f338962-c690-4ba7-bc63-6c73a9de3acb` / `4ad02e70-8015-5eac-87f4-a96fbd775d14` / `d05417e7848871e511141e10a282ffb7998b0a79`，与原交付绑定相同 |
+| 新review attempt / run | position5，`f23b075b-992a-4e17-b891-1c462d4d3738` / `af4309f0-c48f-463a-8552-1b04c6e33595` |
+| 新native SID | `0c6512df-0df0-460a-92d0-6aea0a963033`，不同于旧execute、producer、review和verify的SID；retryOf / continuesRunId / questionContinuation均NULL |
+| 宿主记录的实际模型来源 | harness=`claude_code`，model=`claude-haiku-5-5`；native binding=`0e5edf2d-2653-475e-8693-b53ceafa7c11`，connection=`93b6ab23-900b-4e18-9ea0-baccf2d104ce` / revision2 / route=`claude_code_cli`；API claim=false；**providerObservedModel仍NULL** |
+| 实际artifact VM | **`i773iwx0ulev7nvbomyyk`**，保留并转移同任务VM；**没有新建VM** |
+| 父Bot runtime | `ipa60du803guuiqnyzqan`；00:05:21.029仍sleeping，lastActiveAt=`2026-11-05T14:48:42.215Z` |
+
+**更正此前额外加入的VM假设：**原Takeover要求全新官方模板VM的对象是此前已完成的四个NEW tasks；A43要求的是新的独立SID、无retry/continuation绑定，并如实记录实际VM与父机状态。此前准备文档把它加强写成了“每个review/verify也必须新VM”，这不是A43原合同。源码的同任务sandbox保留/转移路径允许本次复用；既不能把它写成fresh VM，也不能以此新增验收阻断。[原错误准备文档完整历史副本](production-attempt-02/attempt02-pre-correction-preparation-README.md)保持原字节，仅作被更正的历史；[启动分类的纠正说明](production-attempt-02/attempt02-startup-classification.md)和[语义审阅](production-attempt-02/attempt02-review-semantic-audit.md)记录当前解释。
+
+### 失败报告的两项 unverified 均保留
+
+[新review报告原件](production-attempt-02/attempt02-review-report.json)有六条报告项目：四条passed、两条`passed:false / status:unverified`。**这些报告项目与原合同六项并非逐行同一组，不能概括成“原六项已通过四项”。** Factory最终failed没有被人工覆盖。两项缺口分别是：
+
+1. **checker可见的模型来源证据不足。** 报告承认宿主记录Haiku/Claude Code，却因observedModel=NULL表示无法核实provider alias或订阅。数据库native claim确有原binding、connection、route/model与非API来源，但当时checker prompt的producerExecution只有runId/sessionId/status/model/harness/observedModel，没有把完整native claim投影给checker。因此不能指责模型已经拿到全部来源字段却忽略了它们；也不能填造非NULL alias。原合同要求原官方订阅和冻结模型，并未额外要求供应商回传alias必须非NULL。后续应补真实、绑定到producer的最小宿主来源事实，同时保留alias的观察限制。
+2. **最终commit的完整changed-path范围尚未观察。** “只新增并交付目标文件”是原标准1的真实要求。新inspect_artifact实测了目标文件及其committed内容，却没有最终`054e64… → d05417…`的全部路径变化；提问前Git status只证明那个更早时刻的工作树。报告把最终commit仅目标文件列为unverified。原合同没有要求checker执行Bash或未授予的verify_command；现有inspect_repository也只提供HEAD、origin、当前工作树状态和目录，不提供commit比较。因此需要允许的只读scope证据，不能以working-tree clean或单文件hash冒充完整commit范围。
+
+本轮实际工具索引只有 **ToolSearch → inspect_artifact → submit**；没有inspect_repository或git diff调用。[完整六条输入/输出索引](production-attempt-02/attempt02-tool-index.json)保持原样。模型报告中的不完整`run-chunk:bb...` placeholder没有被修补成真实ID，也没有计入有效证据；报告另有真实完整的BOM和三条Bash输出引用。这些引用瑕疵、两项unverified和已保存的failed结论均保留。[独立语义审阅](production-attempt-02/attempt02-review-semantic-audit.md)解释上述边界，不替代后续真实检查。
+
+### 实际 artifact IO 与原六项的逐项边界
+
+本轮只有新review的一对真实inspect_artifact IO：[完整输入/输出](production-attempt-02/attempt02-artifact-pairs.json)。input chunk=`d40371c8-e3c4-48d4-b081-cf30d849923f`、output chunk=`7b058789-b30c-4cee-b427-b1a4b4c720cf`，同一toolCallId=`toolu_01T3NDsmzMieqBZJuMAjpgXL`，seq9→10，时间 **00:03:20.643→00:03:21.354**。
+
+| artifact字段 | 实际返回 |
+| --- | --- |
+| path | `mikka-question-recovery-cc-20261104-1237.txt` |
+| expectedUtf8 / contentUtf8 | 均为完整`mikka-group-policy-v3\npath=claude-code\nstatus=ready\n`，包含最后LF |
+| bytes / sha256 | 52 / `05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6` |
+| head / committedSha256 | `d05417e7848871e511141e10a282ffb7998b0a79` / 与上述sha256相同 |
+| Git及内容匹配 | contentMatchesGit=true，matchesExpectedUtf8=true，textUnavailable=null |
+
+| 原合同项目 | 本次实际取得的证据和剩余边界 |
+| --- | --- |
+| 1. 仅目标文件，精确52B/UTF-8/LF/hash | 单文件完整内容与其Git绑定已实测；最终commit完整changed-path范围仍缺，保留unverified。 |
+| 2. 提问前真实Bash创建/读取/bytes/hash/Git范围及退出 | 三对原始Bash输入/输出及exit0真实进入新host prompt，逐字段等于旧原件；它们属于原stopped/asked_human源run，不被说成本轮新执行。 |
+| 3. 精确decision问题、结束执行并等待Owner | 真实ask_human输入/输出、宿主question/wait事件和原等待状态对应，lifecycleComplete=true；保留原事件身份。 |
+| 4. 正常回答后同任务/SID继续，不重跑文件命令 | human answer、question_resume不可变回执及源/producer同SID对应；完整producer原生工具索引只有ToolSearch/submit。原生索引不是OS审计，不扩写成未观测副作用的绝对保证。 |
+| 5. 两个新独立检查分别inspect_artifact | 新review这一对IO已实测；**新verify不存在，整体条款未完成**，不能复用旧verify替代。 |
+| 6. 严格回执绑定的直接前驱及真实chunk/event引用 | 新review实际prompt中的三条questionCommandSources、问答/命令观察、source29/producer20 watermark对应原件；有效完整引用保留，placeholder不计入。未来新verify的同等证据仍不存在。 |
+
+[宿主实际提示及冻结元数据](production-attempt-02/attempt02-host-evidence.json)、[生命周期观察](production-attempt-02/attempt02-lifecycle-observation.json)、[命令观察](production-attempt-02/attempt02-command-observations.json)与[独立逐项比较](production-attempt-02/attempt02-host-artifact-comparison.json)共同保留来源。审计比较 **131项、0差异**；按部署evidence.ts的canonical顺序复算digest与冻结值同为`5a197441091fb463a44997c7d73c10a307b5f1f89e42b8a239ab2967d1c637ea`。原sourceTools有三对Bash和一对ask_human：最新比较明确只计前三对为命令，第四对独立核对问题；不使用已被更正的旧计数结果。这些观察证明旧记录传入了新review，不能消除其failed或补造未发生的verify。
+
+### 历史、采样边界与发布材料
+
+[历史基线](production-attempt-02/attempt02-history-baseline.json)直接复制新失败review的状态、stopReason、SID、起止时间和原始reportFingerprint，字符串不按预期长度补齐或改写。四个原run的报告基线仍来自最后一次直接读取的 **2026-11-05 23:04:14.920**；本次没有再次查询旧报告，不能把保存的旧行称为本轮之后“全部未变”的新实测。旧verify问题最新直接观测为00:01:55.484：expired/r3，原expiry与八NULL保留；该时间也不冒充00:05重新查询。
+
+发布选择及每个原/新SHA、字节数、变换说明见[本轮清单](production-attempt-02/evidence-manifest.json)。sample01响应与history-baseline各有一处Owner账户ID被替换为显式占位符；四份SQL中的同一账户ID也只作显式脱敏，原件哈希保留，发布副本标明不可执行。所有运行、回执、候选、native binding与来源字段保持原值。runtime只摘录这个run的初始超时、内部handoff、PID提示和最终handoff成功；不收录全量无关runtime/provider日志。完整部署日志只保留其既有证明中的原件哈希及必要摘录，不附凭据、cookie或会话文件。[扫描记录](production-attempt-02/sanitization-audit.json)列出实际模式检查及限制。
+
+本轮没有新增可发布的生产截图；既有30PNG仍只证明各自隔离UI版本。独立审计自身的四次只读事务与root实际Owner点击、Mikka原生模型运行分别计数，不能把审计的`modelInvocations=0`说成本轮没有真实模型执行。此次记录固定第二轮失败事实；后续修复、下一次检查和最终接受均不包含在本轮完成声明中。

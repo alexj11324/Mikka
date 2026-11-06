@@ -1,0 +1,82 @@
+{
+  "kind": "selected necessary runtime events; not a full request log",
+  "sourceFiles": [
+    {
+      "source": "ops/1210-a43-final/attempt02-runtime-initial-response.json",
+      "sourceBytes": 46988,
+      "sourceSha256": "213c5f6880361182510468cf6d965fab0f218be6df661418ee8c5f307f3a328c"
+    },
+    {
+      "source": "ops/1210-a43-final/attempt02-runtime-second-response.json",
+      "sourceBytes": 17581,
+      "sourceSha256": "c7f80677887bc861b04f873860ff7ba035512b42165bb068d696b5341aad8bef"
+    }
+  ],
+  "sourceRunId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+  "deployment": "dpl_4XFwJH7YCuoCsfSZ5XFGYuG1Bppn",
+  "selection": "same run only: timeout, handoff, optional preload PID notice and handoff finished; bounded existing fields only",
+  "events": [
+    {
+      "at": "2026-11-06T00:01:02.067Z",
+      "eventFields": {
+        "event": "factory_cloud_handoff",
+        "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+        "previousRunId": "6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+        "providerContinuation": false
+      },
+      "sources": [
+        "attempt02-runtime-initial-response.json"
+      ]
+    },
+    {
+      "at": "2026-11-06T00:01:18.681Z",
+      "eventFields": {
+        "event": "thread_runtime_start_failed",
+        "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+        "phase": "install_computer",
+        "errorClass": "TimeoutError",
+        "errorCode": "unknown"
+      },
+      "sources": [
+        "attempt02-runtime-initial-response.json"
+      ]
+    },
+    {
+      "at": "2026-11-06T00:01:20.406Z",
+      "eventFields": {
+        "event": "factory_cloud_handoff",
+        "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+        "previousRunId": "6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+        "providerContinuation": false
+      },
+      "sources": [
+        "attempt02-runtime-initial-response.json"
+      ]
+    },
+    {
+      "at": "2026-11-06T00:02:11.746Z",
+      "eventFields": {
+        "event": "thread_worker_output",
+        "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+        "stream": "stdout",
+        "line": "/bin/bash: line 1: /home/user/.mikka/preloaded.pid: No such file or directory"
+      },
+      "sources": [
+        "attempt02-runtime-initial-response.json",
+        "attempt02-runtime-second-response.json"
+      ]
+    },
+    {
+      "at": "2026-11-06T00:02:17.019Z",
+      "eventFields": {
+        "event": "factory_cloud_handoff_finished",
+        "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+        "started": true
+      },
+      "sources": [
+        "attempt02-runtime-second-response.json"
+      ]
+    }
+  ],
+  "limits": "Event selection is not a proof of all process activity. The independent native claim is recorded in sample02/proof01. No extra Owner click is inferred from internal workflow retries."
+}

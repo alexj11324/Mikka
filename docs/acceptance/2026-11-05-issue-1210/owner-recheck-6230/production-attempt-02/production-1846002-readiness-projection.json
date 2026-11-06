@@ -1,0 +1,152 @@
+{
+  "productionSha": "1846002bec14c649e4bead67f136014141f4d133",
+  "merge": {
+    "sha": "1846002bec14c649e4bead67f136014141f4d133",
+    "tree": "4cc40c5a1bd5c203a6dd0bbb6176ac883ce8101c",
+    "parents": [
+      "0677fbff4c949c53b839706011af5ec77cdd1d24",
+      "69c98a968f88cbfc814fac2e4c505292411854d3"
+    ],
+    "message": "Merge pull request #1461: recover receipt-bound spec continuations (#1276)\n\nfix(factory): recover receipt-bound spec continuations (#1276)"
+  },
+  "unchangedRelevantFiles": [
+    "app/api/factory/tasks/[taskId]/route.ts",
+    "lib/factory/http.ts",
+    "lib/factory/store.ts",
+    "lib/factory/candidate-recheck.ts",
+    "lib/factory/automatic-dispatch.ts",
+    "lib/factory/checks.ts",
+    "lib/factory/check-start-recovery.ts",
+    "lib/factory/agent-profile.ts",
+    "lib/model-order.ts",
+    "packages/protocol/src/subscription.ts"
+  ],
+  "relevanceConclusion": {
+    "profileAdmission": "Only questionContinuation && (kind implement || plan) branch changed. Owner fresh recheck uses acceptance with required NULL questionContinuation, so this branch is not entered.",
+    "questions": "Changes govern host-receipted question_resume/question_recover and spec/plan never-claimed history recovery. Owner recheck does not call those recovery entry points; its waiting verify question archival remains in unchanged owner store.",
+    "quota": "Quota/admission implementation unchanged; reaching reset alone is insufficient without normal product refresh returning a fresh usable provider snapshot.",
+    "gate": "Source/version/deployment gate passed. No new UI action, model call, deploy, tests or production mutation by this watcher."
+  },
+  "deployment": {
+    "id": "dpl_4XFwJH7YCuoCsfSZ5XFGYuG1Bppn",
+    "url": "https://mikka-q9xz8xmfh-mikka-dev.vercel.app",
+    "readyState": "READY",
+    "readyAt": "2026-11-05T23:56:40.144Z",
+    "createdAt": "2026-11-05T23:55:48.748Z",
+    "meta": {
+      "githubCommitRef": "main",
+      "githubCommitSha": "1846002bec14c649e4bead67f136014141f4d133",
+      "githubCommitMessage": "Merge pull request #1461: recover receipt-bound spec continuations (#1276)",
+      "githubRepo": "Mikka",
+      "githubOrg": "alexj11324"
+    }
+  },
+  "runs": [
+    {
+      "id": 42132342353,
+      "name": "E2B official instance runtime",
+      "head_sha": "1846002bec14c649e4bead67f136014141f4d133",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-11-05T23:49:45Z",
+      "updated_at": "2026-11-05T23:50:21Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42132342353"
+    },
+    {
+      "id": 42132342122,
+      "name": "Web deploy",
+      "head_sha": "1846002bec14c649e4bead67f136014141f4d133",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-11-05T23:49:45Z",
+      "updated_at": "2026-11-05T23:56:46Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42132342122"
+    },
+    {
+      "id": 42132342141,
+      "name": "CI",
+      "head_sha": "1846002bec14c649e4bead67f136014141f4d133",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-11-05T23:49:45Z",
+      "updated_at": "2026-11-05T23:56:16Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42132342141"
+    }
+  ],
+  "recordedAt": "2026-11-06T00:01:24.371983+00:00",
+  "rootPublicObservation": {
+    "observedAt": "2026-11-05T23:58:58.218359+00:00",
+    "url": "https://app.aspectlylabs.com/mikka/api/version",
+    "status": 200,
+    "body": {
+      "build": "1846002bec14c649e4bead67f136014141f4d133",
+      "minMobileBuild": 0,
+      "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+      "minDesktopVersion": null
+    }
+  },
+  "kind": "necessary-field projection from the saved production gate",
+  "source": {
+    "source": "ops/1210-release-gate/production-1846002-before-click02-gate.json",
+    "sourceSha256": "3c924aaecb4256a3cdb3bb07c705474b2aa5c8604cce13dbf0a18074d5f85e17",
+    "sourceBytes": 37179,
+    "path": "production-1846002-readiness-projection.json",
+    "transformation": "omit full code patches and workflow job details"
+  },
+  "comparison": {
+    "base": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "status": "ahead",
+    "ahead_by": 2,
+    "behind_by": 0,
+    "merge_base": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "files": [
+      {
+        "filename": "lib/factory/profile-admission.ts",
+        "status": "modified",
+        "changes": 10
+      },
+      {
+        "filename": "lib/factory/profile-continuation.test.ts",
+        "status": "added",
+        "changes": 92
+      },
+      {
+        "filename": "lib/factory/profile-dispatch.db.test.ts",
+        "status": "modified",
+        "changes": 258
+      },
+      {
+        "filename": "lib/factory/questions/execution-continuation.ts",
+        "status": "modified",
+        "changes": 94
+      },
+      {
+        "filename": "lib/factory/questions/queue-continuation.ts",
+        "status": "modified",
+        "changes": 21
+      },
+      {
+        "filename": "lib/factory/questions/store.ts",
+        "status": "modified",
+        "changes": 35
+      },
+      {
+        "filename": "package.json",
+        "status": "modified",
+        "changes": 2
+      }
+    ]
+  },
+  "webJobs": [
+    {
+      "id": 127611794476,
+      "name": "deploy",
+      "run_id": 42132342122,
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

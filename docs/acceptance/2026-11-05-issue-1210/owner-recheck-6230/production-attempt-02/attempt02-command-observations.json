@@ -1,0 +1,86 @@
+{
+  "producerRunId": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+  "producerSessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+  "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+  "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+  "earlierRecordsOmitted": false,
+  "records": [],
+  "inheritedRecords": [
+    {
+      "inherited": true,
+      "sourceRunId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "sourceSessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "sourceStatus": "stopped",
+      "sourceStopReason": "asked_human",
+      "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444",
+      "snapshotRecoveryEventId": null,
+      "questionId": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "answerId": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "requestEpoch": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "inputChunkId": "0bdd3f8d-223e-4d04-8ee4-2320efc70c26",
+      "outputChunkId": "bb4083b9-b87b-4d56-be4c-68349ea5d49c",
+      "seq": 11,
+      "toolName": "Bash",
+      "inputObservedAt": "2026-11-04T19:35:08.587Z",
+      "observedAt": "2026-11-04T19:35:08.587Z",
+      "outputType": "tool-output-available",
+      "input": {
+        "command": "printf 'mikka-group-policy-v3\\npath=claude-code\\nstatus=ready\\n' > mikka-question-recovery-cc-20261104-1237.txt; echo \"exit=$?\"",
+        "description": "Create the target file with exact three LF-terminated lines"
+      },
+      "output": "exit=0"
+    },
+    {
+      "inherited": true,
+      "sourceRunId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "sourceSessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "sourceStatus": "stopped",
+      "sourceStopReason": "asked_human",
+      "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444",
+      "snapshotRecoveryEventId": null,
+      "questionId": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "answerId": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "requestEpoch": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "inputChunkId": "314bf1ce-4473-467f-9305-21163ae54d45",
+      "outputChunkId": "27c90934-986f-4574-9e46-df0706395559",
+      "seq": 13,
+      "toolName": "Bash",
+      "inputObservedAt": "2026-11-04T19:35:09.535Z",
+      "observedAt": "2026-11-04T19:35:09.535Z",
+      "outputType": "tool-output-available",
+      "input": {
+        "command": "cat -A mikka-question-recovery-cc-20261104-1237.txt; echo \"exit=$?\"; wc -c < mikka-question-recovery-cc-20261104-1237.txt; echo \"wc_exit=$?\"; sha256sum mikka-question-recovery-cc-20261104-1237.txt; echo \"sha_exit=$?\"; head -c 3 mikka-question-recovery-cc-20261104-1237.txt | od -An -tx1; echo \"bom_check_exit=$?\"",
+        "description": "Read file, count bytes, compute SHA-256, check for BOM"
+      },
+      "output": "mikka-group-policy-v3$\npath=claude-code$\nstatus=ready$\nexit=0\n52\nwc_exit=0\n05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6  mikka-question-recovery-cc-20261104-1237.txt\nsha_exit=0\n 6d 69 6b\nbom_check_exit=0"
+    },
+    {
+      "inherited": true,
+      "sourceRunId": "6658f0ef-d446-4d8f-813d-7b7734bb02f3",
+      "sourceSessionId": "2f6f0def-43d5-4206-bd00-bfc0eabbaeae",
+      "sourceStatus": "stopped",
+      "sourceStopReason": "asked_human",
+      "recoveryEventId": "22b008a6-9793-564a-a858-9855df7b2444",
+      "snapshotRecoveryEventId": null,
+      "questionId": "fd3ce47c-785f-4e7a-92ee-d5763959d64b",
+      "answerId": "11708d4d-708f-5bc7-b41d-7db8386d8d15",
+      "requestEpoch": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "candidateSha": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "inputChunkId": "6b43bcd3-13d1-4cf6-bc87-d21f610183ed",
+      "outputChunkId": "202b7cf0-e388-4626-ae15-0dd08d8dfbc3",
+      "seq": 15,
+      "toolName": "Bash",
+      "inputObservedAt": "2026-11-04T19:35:09.872Z",
+      "observedAt": "2026-11-04T19:35:09.872Z",
+      "outputType": "tool-output-available",
+      "input": {
+        "command": "git status --porcelain=v1; echo \"status_exit=$?\"; echo \"--- changed paths vs HEAD (tracked + untracked):\"; git status --porcelain=v1 --untracked-files=all | awk '{print $2}'; echo \"--- diff stat:\"; git diff --stat HEAD; echo \"diff_exit=$?\"; echo \"--- HEAD:\"; git rev-parse HEAD; echo \"rev_exit=$?\"",
+        "description": "Check git status and scope of changes"
+      },
+      "output": "?? mikka-question-recovery-cc-20261104-1237.txt\nstatus_exit=0\n--- changed paths vs HEAD (tracked + untracked):\nmikka-question-recovery-cc-20261104-1237.txt\n--- diff stat:\ndiff_exit=0\n--- HEAD:\n054e64ce6167427aecf937e6dc2410af677df32d\nrev_exit=0"
+    }
+  ],
+  "inheritedRecordsOmitted": false
+}

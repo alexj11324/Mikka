@@ -1,0 +1,68 @@
+[
+  {
+    "position": 5,
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "chunkId": "cd7c2ecc-e778-46a0-9e53-497db021ec39",
+    "seq": 7,
+    "createdAt": "2026-11-06T00:03:11.572Z",
+    "type": "tool-input-available",
+    "toolName": "ToolSearch",
+    "toolCallId": "toolu_011621VgAqYPtHyzW4H1Jbez"
+  },
+  {
+    "position": 5,
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "chunkId": "03acf558-863d-4ad1-ad64-67f11f69c1d5",
+    "seq": 8,
+    "createdAt": "2026-11-06T00:03:12.079Z",
+    "type": "tool-output-available",
+    "toolName": null,
+    "toolCallId": "toolu_011621VgAqYPtHyzW4H1Jbez"
+  },
+  {
+    "position": 5,
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "chunkId": "d40371c8-e3c4-48d4-b081-cf30d849923f",
+    "seq": 9,
+    "createdAt": "2026-11-06T00:03:20.643Z",
+    "type": "tool-input-available",
+    "toolName": "mcp__mikka__inspect_artifact",
+    "toolCallId": "toolu_01T3NDsmzMieqBZJuMAjpgXL"
+  },
+  {
+    "position": 5,
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "chunkId": "7b058789-b30c-4cee-b427-b1a4b4c720cf",
+    "seq": 10,
+    "createdAt": "2026-11-06T00:03:21.354Z",
+    "type": "tool-output-available",
+    "toolName": null,
+    "toolCallId": "toolu_01T3NDsmzMieqBZJuMAjpgXL"
+  },
+  {
+    "position": 5,
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "chunkId": "bc44a8d4-1894-4fc7-b778-94992bbcd441",
+    "seq": 11,
+    "createdAt": "2026-11-06T00:03:49.475Z",
+    "type": "tool-input-available",
+    "toolName": "mcp__mikka__submit",
+    "toolCallId": "toolu_013tzZkqUF7oQJRfypu6VLUk"
+  },
+  {
+    "position": 5,
+    "stage": "review",
+    "runId": "af4309f0-c48f-463a-8552-1b04c6e33595",
+    "chunkId": "2d5b52a7-6179-4d64-803d-f72f18145256",
+    "seq": 12,
+    "createdAt": "2026-11-06T00:03:49.898Z",
+    "type": "tool-output-available",
+    "toolName": null,
+    "toolCallId": "toolu_013tzZkqUF7oQJRfypu6VLUk"
+  }
+]
