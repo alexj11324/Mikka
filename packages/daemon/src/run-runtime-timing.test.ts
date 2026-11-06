@@ -14,14 +14,14 @@ it("attributes GitHub credential renewal by its actual query-bound run and recor
   timings.request("POST", `/v1/devices/${deviceId}/github-token?runId=${runId}`, undefined)(200)
   now = 10; run.executing()
   timings.agentAccepted(runId, "codex_turn_start_ack")
-  now = 12; timings.agentAccepted(runId, "claude_system_init")
+  now = 12; timings.agentAccepted(runId, "claude_user_ack")
   now = 20; timings.agentAccepted(runId, "claude_first_event")
   await timings.backgroundCredentialRefresh(runId, async () => {
     timings.request("POST", `/v1/devices/${deviceId}/github-token?runId=${runId}`, undefined)(200)
   })
   timings.request("POST", `/v1/devices/other/github-token?runId=${runId}`, undefined)(200)
   const receipt = run.finish()!
-  expect(receipt.agentAccepted).toEqual({ kind: "claude_system_init", at: 1012, ms: 12 })
+  expect(receipt.agentAccepted).toEqual({ kind: "claude_user_ack", at: 1012, ms: 12 })
   expect(receipt.requests.map(item => item.endpoint)).toEqual(["github_credential_lease", "github_credential_refresh"])
   expect(JSON.stringify(receipt)).not.toMatch(/private-|github-token|runId=/)
 })
@@ -130,5 +130,31 @@ it("observes the real HttpServerLink fetch edge even when daemon tracing is unco
       ["provider_proxy", "ok"], ["run_telemetry", "ok"], ["run_telemetry", "error"],
     ])
     expect(JSON.stringify(receipt)).not.toMatch(/private-|83e6a183|3f317b20|mikka.test/)
+  } finally { observation.close() }
+})
+
+it("counts mailbox SSE and direct capture transports, and classifies skill revalidation as authorization", async () => {
+  const actualRun = "83e6a183-c568-4d27-a560-1ff592f08d9c", actualDevice = "3f317b20-284f-408a-a11f-a9d074c061b4"
+  const observation = runRuntimeTimings.begin(actualRun, actualDevice, "claude_code")
+  const link = new HttpServerLink("https://mikka.invalid", async (_url, init) => {
+    if (init?.method === "PUT") return new Response(null, { status: 204 })
+    const packet = JSON.parse(String(init?.body))
+    if (packet.method === "notifications/initialized") return new Response(null, { status: 202 })
+    const result = packet.method === "initialize" ? { protocolVersion: "2025-03-26" } : { tools: [{ name: "mailbox_inbox" }] }
+    return new Response(`data: ${JSON.stringify({ jsonrpc: "2.0", id: packet.id, result })}\n\n`, { headers: { "content-type": "text/event-stream" } })
+  })
+  try {
+    observation.executing()
+    const mailbox = await link.prepareRunMailbox({ runId: actualRun, deviceId: actualDevice,
+      mcp: { url: "https://mikka.invalid/api/mcp", token: "mkw_" + "a".repeat(43), mailbox: true } } as import("@mikka/protocol").RunAssignment,
+      new AbortController().signal, () => {})
+    await mailbox?.close()
+    await link.sendCapture(actualRun, "capture", { target: "server" } as import("@mikka/protocol/capture").CaptureUploadResponse["upload"], Buffer.from("private-capture"), "image/png")
+    await link.sendCapture(actualRun, "capture", { target: "storage", url: "https://storage.invalid/private", headers: {} } as import("@mikka/protocol/capture").CaptureUploadResponse["upload"], Buffer.from("private-capture"), "image/png")
+    runRuntimeTimings.request("GET", `/v1/runs/${actualRun}/skill-receipt?receiptId=private`, undefined)(200)
+    const receipt = observation.finish()!
+    expect(receipt.requests.map(item => item.endpoint)).toEqual(["mailbox_operation", "mailbox_operation", "mailbox_operation", "task_data", "storage_transfer", "permission_check"])
+    expect(receipt.requests.every(item => item.outcome === "ok")).toBe(true)
+    expect(JSON.stringify(receipt)).not.toMatch(/private|mkw_|mikka.invalid|storage.invalid/)
   } finally { observation.close() }
 })

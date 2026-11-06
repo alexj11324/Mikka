@@ -3,11 +3,14 @@ import { createHash, randomBytes } from 'node:crypto'
 
 // Only normal Mikka OAuth HTTP endpoints are used. The caller supplies its
 // already attested/leased owner request function and secret-audit recorder.
-export async function authorizeMcpSession(owner, environment, recordSecrets) {
+export async function authorizeMcpSession(owner, environment, recordSecrets, {
+  fetchImpl = fetch, registrationPath = '/api/auth/oauth2/register',
+} = {}) {
+  assert.ok(['/api/auth/oauth2/register', '/api/auth/oauth2/create-client'].includes(registrationPath))
   const callback = 'http://127.0.0.1:45123/callback'
   const verifier = randomBytes(32).toString('base64url')
   const state = randomBytes(32).toString('base64url')
-  const registered = await owner.request('/api/auth/oauth2/register', {
+  const registered = await owner.request(registrationPath, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_name: 'Older runtime acceptance', application_type: 'native', redirect_uris: [callback], token_endpoint_auth_method: 'none', grant_types: ['authorization_code'], response_types: ['code'], scope: 'mikka' }),
   })
@@ -32,7 +35,7 @@ export async function authorizeMcpSession(owner, environment, recordSecrets) {
   const code = returned.searchParams.get('code')
   assert.ok(code)
   await recordSecrets([verifier, code])
-  const exchanged = await fetch(`${environment.origin}/mikka/api/auth/oauth2/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', client_id: registration.client_id, redirect_uri: callback, code_verifier: verifier, code, resource: `${environment.origin}/mikka/api/mcp` }), redirect: 'error', signal: AbortSignal.timeout(30_000) })
+  const exchanged = await fetchImpl(`${environment.origin}/mikka/api/auth/oauth2/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', client_id: registration.client_id, redirect_uri: callback, code_verifier: verifier, code, resource: `${environment.origin}/mikka/api/mcp` }), redirect: 'error', signal: AbortSignal.timeout(30_000) })
   assert.equal(exchanged.status, 200, 'Normal PKCE token exchange must succeed')
   const token = await exchanged.json()
   assert.ok(typeof token.access_token === 'string' && token.access_token.startsWith('mka_'))
@@ -40,7 +43,7 @@ export async function authorizeMcpSession(owner, environment, recordSecrets) {
   let session, protocol = '2025-06-18', sequence = 0
   async function rpc(method, params, notification = false) {
     const id = notification ? undefined : ++sequence
-    const response = await fetch(`${environment.origin}/mikka/api/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': protocol, ...(session ? { 'mcp-session-id': session } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', ...(notification ? {} : { id }), method, ...(params ? { params } : {}) }), redirect: 'error', signal: AbortSignal.timeout(30_000) })
+    const response = await fetchImpl(`${environment.origin}/mikka/api/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': protocol, ...(session ? { 'mcp-session-id': session } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', ...(notification ? {} : { id }), method, ...(params ? { params } : {}) }), redirect: 'error', signal: AbortSignal.timeout(30_000) })
     assert.ok(response.ok, 'Authenticated MCP HTTP request must succeed')
     session = response.headers.get('mcp-session-id') ?? session
     if (notification || response.status === 202) { await response.body?.cancel(); return }

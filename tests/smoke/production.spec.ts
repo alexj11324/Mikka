@@ -1,4 +1,6 @@
 import { appendFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { runDeployedBrowserSmoke } from '../../scripts/acceptance/deployed-browser-session.mjs'
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { isSmokeAccountEmail } from '../../lib/smoke-account'
 
@@ -32,30 +34,44 @@ test.beforeAll(() => {
 })
 
 test('the smoke account signs in, reaches its chat and reports feature state', async ({ page, baseURL }) => {
-  const signIn = await page.request.post(app('/api/auth/sign-in/email'), { data: { email, password }, headers: { origin: new URL(baseURL!).origin } })
-  expect(signIn.status(), 'sign-in').toBe(200)
-  const session = await (await page.request.get(app('/api/auth/get-session'))).json()
-  expect(session?.user?.email?.toLowerCase()).toBe(email.toLowerCase())
+  const smoke = async (scope?: { signInAttempted(): void; identityConfirmed(): void }) => {
+    scope?.signInAttempted()
+    const signIn = await page.request.post(app('/api/auth/sign-in/email'), { data: { email, password }, headers: { origin: new URL(baseURL!).origin } })
+    expect(signIn.status(), 'sign-in').toBe(200)
+    const session = await (await page.request.get(app('/api/auth/get-session'))).json()
+    expect(session?.user?.email?.toLowerCase()).toBe(email.toLowerCase())
+    scope?.identityConfirmed()
 
-  await page.goto(app('/en'))
-  await expect(page).not.toHaveURL(/\/sign-in/)
-  await expect(page.locator('main textarea').first(), 'chat composer').toBeVisible()
+    await page.goto(app('/en'))
+    await expect(page).not.toHaveURL(/\/sign-in/)
+    await expect(page.locator('main textarea').first(), 'chat composer').toBeVisible()
 
-  const results = [] as { feature: string; status: number | null; on: boolean }[]
-  for (const item of probes) results.push(await probe(page.request, item))
-  const bot = page.getByRole('button', { name: smokeBot, exact: true })
-  await expect(bot, `the "${smokeBot}" bot (docs/production-smoke.md)`).toBeVisible()
-  await bot.click()
-  // The tab waits on the rollout flag, so give it time before calling it off.
-  const computer = await page.getByRole('tab', { name: 'Computer', exact: true }).waitFor({ timeout: 15000 }).then(() => true, () => false)
-  results.push({ feature: 'cloudComputer', status: null, on: computer })
+    const results = [] as { feature: string; status: number | null; on: boolean }[]
+    for (const item of probes) results.push(await probe(page.request, item))
+    const bot = page.getByRole('button', { name: smokeBot, exact: true })
+    await expect(bot, `the "${smokeBot}" bot (docs/production-smoke.md)`).toBeVisible()
+    await bot.click()
+    // The tab waits on the rollout flag, so give it time before calling it off.
+    const computer = await page.getByRole('tab', { name: 'Computer', exact: true }).waitFor({ timeout: 15000 }).then(() => true, () => false)
+    results.push({ feature: 'cloudComputer', status: null, on: computer })
 
-  const table = ['| Feature | On | HTTP |', '| --- | --- | --- |', ...results.map(r => `| ${r.feature} | ${r.on ? 'yes' : 'no'} | ${r.status ?? '—'} |`)].join('\n')
-  await test.info().attach('features.json', { body: JSON.stringify(results, null, 2), contentType: 'application/json' })
-  console.log(table)
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Production smoke\n\n${table}\n`)
+    const table = ['| Feature | On | HTTP |', '| --- | --- | --- |', ...results.map(r => `| ${r.feature} | ${r.on ? 'yes' : 'no'} | ${r.status ?? '—'} |`)].join('\n')
+    await test.info().attach('features.json', { body: JSON.stringify(results, null, 2), contentType: 'application/json' })
+    console.log(table)
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Production smoke\n\n${table}\n`)
 
-  expect(results.find(r => r.feature === 'coordinator')?.on, 'coordinator runtime').toBe(true)
-  const regressed = results.filter(r => expected.has(r.feature) && !r.on).map(r => r.feature)
-  expect(regressed, 'features expected on').toEqual([])
+    expect(results.find(r => r.feature === 'coordinator')?.on, 'coordinator runtime').toBe(true)
+    const regressed = results.filter(r => expected.has(r.feature) && !r.on).map(r => r.feature)
+    expect(regressed, 'features expected on').toEqual([])
+
+  }
+  const mode = process.env.MIKKA_ACCEPTANCE_TARGET_MODE
+  if (mode === undefined) return smoke()
+  if (mode !== 'deployed-target') throw new Error('browser_mode_rejected')
+  let event: unknown, attestation: unknown
+  try {
+    event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH!, 'utf8'))
+    attestation = JSON.parse(await readFile('production-read-cache-report/attestation.json', 'utf8'))
+  } catch { throw new Error('deployed_browser_input_invalid') }
+  await runDeployedBrowserSmoke({ page, baseURL, smoke, event, attestation })
 })

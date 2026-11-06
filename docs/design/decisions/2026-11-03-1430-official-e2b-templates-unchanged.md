@@ -38,6 +38,22 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 中接受已证明的字段变化，并记录完整原始摘要、受保护字段摘要和实际差异。
 未知路径、未知字段、其他权限变化，以及任何原有 CLI 或软件内容变化均拒绝。
 
+[后续 fresh-create 控制](https://github.com/alexj11324/Mikka/actions/runs/42281127309)
+还证明 provider 会重新生成证书索引：Claude/desktop 各 240 个、Codex 298 个
+原证书副本成为系统证书的符号链接，并重新生成 CA bundle、证书归档及 desktop
+的 Java trust store。[该阶段的收据](../research/2026-11-06-e2b-fresh-create-certificates.json)
+与 `scripts/e2b/e2b-certificate-relinks.json` 固定每一条原路径、原 SHA-256、精确
+链接目标、权限变化和适用模板；普通证书解析链接后的内容也必须保持原摘要。
+仅 Codex 已观测到的两条 E2B root 引用可指向本次 provider 注入的 root。
+未列出的证书路径或目标也拒绝，不豁免整个证书目录。
+
+构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
+某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
+自己的 `.mikka-original-cli.json`，与 worker symlink 一起切换和回退。生产 worker、
+模型探测和订阅门槛共用同一个选择函数；门槛不设置额外二进制 override，官方 CLI
+缺失不得静默换成 SDK 自带副本。保留实例的正常 staging 继承原记录，不改其 repo、
+HOME 或 session；新 manifest 完整后才标记 worker ready。
+
 CI 还必须在候选模板上用真实订阅分别完成 Claude Code (`claude-haiku-5-5`) 和
 Codex (`gpt-6-luna`) 的一次执行，使用正常的设备注册、任务绑定与订阅授权。
 只探测 CLI 版本、模型列表或启动进程不足以通过验收。两个结果和文件保全收据
@@ -49,6 +65,10 @@ worker 升级重新构建带唯一版本名的三个模板，不覆盖旧模板�
 worker SHA、source commit 与模型目录必须整组匹配；单次 upsert 后逐项回读，
 部分写入或错配必须重新验证，且不能覆盖有效的 previous。模板发布和应用配置
 更新沿用 GitHub Actions 与 Web deploy 的发布队列，保持来源版本校验。
+构建部分失败、source 过期、等待应用失败或订阅失败时，最终清理步骤按本次
+source/run/attempt 标记关闭全部探测实例，再按唯一名称和 ID 删除仍为私有的候选。
+删除后回读确认不存在，清理失败使工作流失败并保留收据。已公开模板及 previous
+不删除；失败后的重试需要重跑整条流水线以重新构建候选。
 
 ## 性能与成本
 

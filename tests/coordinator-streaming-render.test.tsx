@@ -297,6 +297,17 @@ test('an opened dispatch reads 「Handed to」 its coding agent and its thread c
     assert.equal(view.container.querySelector('[data-activity-detail]'), null)
     assert.doesNotMatch(view.container.querySelector('[data-activity-tool="error"]')?.textContent ?? '', /a@example\.com|Hello there|error: forbidden/)
 
+    // A raw SDK failure is never the row's words: one line in the reader's language, the text only under 原始数据 (#1516).
+    const raw = "AI_NoSuchToolError: Model tried to call unavailable tool 'none'. Available tools: get_issue."
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity key="unknown" tools={[{ call: 'u1', name: 'none', state: 'error' as const, input: '{}', output: raw }]} /></AgentCitationsContext>)
+    const unknownTitle = () => view.container.querySelector('[data-activity-tool="error"] [data-slot="trace-title"]')?.textContent
+    assert.equal(unknownTitle(), 'Unknown step· failed, skipped')
+    await act(async () => { (view.container.querySelector('[data-activity-tool="error"] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-raw]')))
+    await act(async () => { (view.container.querySelector('[data-activity-raw] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-raw] [data-slot="code-block"]')))
+    assert.match(view.container.querySelector('[data-activity-raw]')?.textContent ?? '', /AI_NoSuchToolError/)
+
     // Inside a group, an opened row reads the same.
     await view.render(<AgentCitationsContext value={citations}><ReplyActivity key="group" tools={[{ call: 'g1', name: 'get_issue', state: 'done' as const, input: '{"identifier": "MIK-1"}' }, dispatch]} /></AgentCitationsContext>)
     await act(async () => { (view.container.querySelector('[data-activity-group] button') as HTMLButtonElement).click() })

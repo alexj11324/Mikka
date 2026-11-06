@@ -1,6 +1,7 @@
 """Publish step of build-template.py, against a fake E2B API (no network, no SDK)."""
 import importlib.util
 import io
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -33,7 +34,7 @@ class Publish(unittest.TestCase):
             def __init__(self): self.files = self.commands = self
             def read(self, path, **options):
                 calls.append(('read', path))
-                return json.dumps(final if path.endswith('ready.json') else {'before': digest, 'after': digest})
+                return json.dumps(final if path.endswith(('ready.json', 'fresh-conservation.json')) else {'before': digest, 'after': digest})
             def run(self, command, **options):
                 calls.append(('run', command))
                 return SimpleNamespace(exit_code=0, stdout=json.dumps(final))
@@ -41,7 +42,7 @@ class Publish(unittest.TestCase):
         result = bt.probe_conservation('candidate', 'fixture-key', 'codex', lambda *_, **__: Probe())
         self.assertEqual(result['preloadFinalization'], final)
         self.assertEqual(result['finalization'], final)
-        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'kill'])
+        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'read', 'kill'])
         self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
 
     def test_build_name_must_be_absent_and_never_an_official_alias(self):
@@ -164,6 +165,9 @@ class Publish(unittest.TestCase):
             kind: {'status': 'passed', 'templateId': 'tpl-' + kind, 'sourceCommit': report['sourceCommit'],
                    'workerSha': report['workerSha'], 'harness': harness, 'model': model, 'credentialRoute': 'subscription',
                    'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
+                   'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
+                                       'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
+                   'runtimeAuthorization': {'source': 'http_server_link', 'complete': True, 'truncated': False, 'extraRemoteCalls': 0},
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
         self.assertIs(bt.verify_release_evidence(report), report)

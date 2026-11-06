@@ -61,6 +61,11 @@ lines.on("line", async (line) => {
   }
   if (frame.type === "control_request") {
     if (token === 'fixture-timeout') return
+    if (token === 'fixture-early-init') {
+      out({ type: 'system', subtype: 'init', session_id: sessionId })
+      out({ type: 'user', uuid: 'historical-frame', session_id: sessionId, parent_tool_use_id: null,
+        isReplay: true, message: { role: 'user', content: [{ type: 'text', text: 'old task' }] } })
+    }
     if (token.startsWith('fixture-delayed')) await new Promise(resolve => setTimeout(resolve, 12_000))
     out({
       type: "control_response",
@@ -87,6 +92,10 @@ lines.on("line", async (line) => {
   prompts++
   history.messages.push(text); writeFileSync(historyFile, JSON.stringify(history))
   writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
+  if (args.includes('--replay-user-messages')) {
+    if (token === 'fixture-early-init') out({ ...frame, session_id: 'another-session', isReplay: true })
+    out({ ...frame, session_id: sessionId, isReplay: true })
+  }
   if (text === 'REFRESH') {
     if (process.env.CLAUDE_CODE_SDK_HAS_OAUTH_REFRESH !== '1') process.exit(2)
     const request_id = 'fixture-oauth-refresh'

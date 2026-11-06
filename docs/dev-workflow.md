@@ -201,6 +201,10 @@ The final E2B boot has a separate, recorded check for only the provider-owned
 runtime fields established by the official-only control experiment; see the
 decision's exact-path policy. A fresh verification VM is destroyed before
 creating any timed sample, so the file scan cannot warm the measured VM.
+Production, model probes and subscription acceptance share the release's CLI
+manifest and resolver. A retained VM receives that manifest with its staged
+worker release; activating or rolling back the worker selects the matching
+manifest without rebuilding its repository or session.
 
 The publication uses Web deploy's production queue and exact-source checks.
 Each build gets a unique name; retain old templates and save the previous
@@ -213,6 +217,10 @@ gate leaves production on its existing templates. The single configuration
 upsert is checked by per-variable readback; a partial write requires repair
 and revalidation and never replaces a valid previous configuration. See the
 [release workflow](../.github/workflows/README.md#cloud-worker-template-release).
+An always-run finalizer kills this attempt's labelled test instances and deletes
+its exact private candidates after any failure, with readback and cleanup
+receipts. Public and previous images remain. Rerun the full workflow after a
+failed release so the removed candidates are rebuilt.
 
 ## 8. Reaching a local service from outside
 

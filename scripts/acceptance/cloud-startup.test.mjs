@@ -20,7 +20,7 @@ const startedStage = sample => { const item = stage('agent_start', 3500); item.c
 const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit',
   runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16), harness: sample.harness,
   startedAt: epoch + 1000, endedAt: epoch + 6000, ms: 5000, executionStartMs: 2500, executionEndMs: 4000,
-  agentAccepted: { kind: sample.harness === 'codex' ? 'codex_turn_start_ack' : 'claude_system_init', at: epoch + 3500, ms: 2500 },
+  agentAccepted: { kind: sample.harness === 'codex' ? 'codex_turn_start_ack' : 'claude_user_ack', at: epoch + 3500, ms: 2500 },
   complete: true, truncated: false, requests: [{ sequence: 1, endpoint: 'run_telemetry', phase: 'executing', method: 'POST', shared: false,
     startMs: 3000, endMs: 3010, ms: 10, outcome: 'ok' }],
   counts: [{ endpoint: 'run_telemetry', phase: 'executing', shared: false, started: 1, completed: 1, errors: 0, ms: 10 }],
@@ -96,6 +96,8 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, true)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
           assert.equal(input.model, undefined)
+          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
+          assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
@@ -109,7 +111,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           if (stopRace) return Response.json({ version: 1, ok: false, error: { code: 'runChainEnded' } }, { status: 409 })
           return rpc({ stoppedRunIds: [args[0]] })
         }
-        if (action === 'issues.getIssue') return rpc({ id: current.issueId, title: current.title, revision: 2 })
+        if (action === 'issues.getIssue') return rpc({ issue: { id: current.issueId, title: current.title, revision: 2 } })
         if (action === 'issue-operations.setIssueDeleted') {
           assert.equal(args[0].id, current.issueId)
           if (failDelete) return Response.json({ error: 'PRIVATE_FAILURE' }, { status: 500 })
@@ -125,7 +127,9 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       if (path.startsWith('/api/factory/agent-profiles/')) { assert.equal(init.method, 'DELETE'); return json({ archived: true }) }
       if (path === '/api/coordinator/stream') {
         const output = JSON.stringify({ runId: current.runId, arbitraryLongField: 'truncated '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }).slice(0, 200)
-        const events = [{ type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'running', at: 0 },
+        const events = [{ type: 'tool', name: 'dispatch_run', call: 'stale', state: 'running', input: JSON.stringify({issueId: id(999)}) },
+          { type: 'tool', name: 'dispatch_run', call: 'stale', state: 'error', errorCode: 'staleDispatch' },
+          { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'running', quote: `Read README then STARTUP_OK_${current.marker}`, at: 0 },
           { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'done', output }]
         return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n',
           { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': current.workflowRunId } })
@@ -247,7 +251,7 @@ test('direct diagnostics use and delete only this test repository variable, and 
 })
 
 test('candidate gate checks frozen device and marker without representing itself as cloud latency acceptance', async () => {
-  const io = fixture({ candidate: true })
+  const io = fixture({ candidate: true, runtime: true })
   const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), { env, ...io })
   assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
   assert.equal(report.target, 'candidate_device'); assert.equal(report.samples[0].execution.deviceId, deviceId)
@@ -303,4 +307,31 @@ test('alignment rejects missing, ambiguous and reversed clocks; baseline does no
   assert.equal(alignServerTimings(make(), []).samples[0].timing.reason, 'dispatch_log_missing')
   assert.equal(alignServerTimings(make(), [...logs, logs[0]]).samples[0].timing.reason, 'ambiguous_dispatch')
   assert.equal(alignServerTimings(make(), logs.map(log => ({ ...log, startedAt: epoch + 7000, endedAt: epoch + 8000 }))).samples[0].timing.reason, 'clock_or_receipt_invalid')
+})
+
+
+test('reused Coordinator workflow aligns only through the owned run server interval', () => {
+  const hashes = ['a'.repeat(16), 'b'.repeat(16)]
+  const report = { mode:'baseline', maxStartupMs:5000, cleanup:{errors:[]}, samples: hashes.map((runIdHash,index)=>({
+    workflowRunId:'wrun_SHARED', runIdHash, status:'execution_proved_awaiting_server_timing', execution:{credentialType:'subscription'},
+    cleanup:{status:'passed'}, agentStart:{storedAt:new Date(epoch+index*10000+3500).toISOString()},
+    firstProviderChunk:{storedAt:new Date(epoch+index*10000+5000).toISOString()}})) }
+  const logs = hashes.flatMap((runIdHash,index)=>[
+    {msg:'dispatch_timing',workflowRunId:'wrun_SHARED',stepId:`step_${index}`,startedAt:epoch+index*10000,endedAt:epoch+index*10000+3000,totalMs:3000,failed:false},
+    {msg:'cloud_startup_timing',runIdHash,stage:'cloud.thread.ensure',startedAt:epoch+index*10000+200,endedAt:epoch+index*10000+2900,ms:2700}])
+  const aligned = alignServerTimings(report,logs)
+  assert.equal(aligned.status,'baseline_recorded')
+  assert.deepEqual(aligned.samples.map(sample=>sample.timing.dispatchToAgentStartMs),[3500,3500])
+  assert.deepEqual(aligned.samples.map(sample=>sample.timing.stepId),['step_0','step_1'])
+})
+
+
+test('Claude initialization is retained as history but never proves current task acceptance', () => {
+  const value = runtimeTiming({runId:id(200),harness:'claude_code'})
+  value.agentAccepted.kind = 'claude_system_init'
+  const parsed = readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})
+  assert.equal(parsed.agentAccepted.kind,'claude_system_init')
+  assert.deepEqual(runtimeEvidence(parsed),{status:'unavailable',reason:'official_agent_acceptance_missing'})
+  value.agentAccepted.kind = 'claude_user_ack'
+  assert.equal(runtimeEvidence(readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})).status,'passed')
 })

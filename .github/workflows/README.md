@@ -56,13 +56,21 @@ SHA-256, type, mode, owner and link target; and both official Claude Code
 (`claude-haiku-5-5`) and Codex (`gpt-6-luna`) execute a real subscription task on
 the exact candidates. A model catalogue probe is additional capability data,
 not subscription acceptance. Candidate tests use normal device enrollment,
-owner-bound runs and subscription leases. Only the disposable test instances,
-devices and tasks are cleaned up.
+owner-bound runs and subscription leases. Each release records original CLI
+paths and hashes in its own manifest; production, probing and acceptance use
+the same resolver, without an acceptance-only binary override.
 Installation preserves every original persistent entry exactly. E2B's final
 boot and a disposable fresh instance are checked separately against the
 recorded exact-path provider-runtime policy; original CLI/software bytes and
 all other fields remain protected. File-scan verification instances are never
 reused as cold-start performance samples.
+The finalizer always closes instances labelled with this exact source, run and
+attempt. A failed build, obsolete source, failed Web wait or subscription gate
+also removes this run's exact named private candidates and verifies their
+absence. Public images and previous releases remain available. Cleanup receipts
+are artifacts; a cleanup error fails the workflow. After a failed release, rerun
+all jobs to rebuild candidates, since a failed-jobs-only rerun would refer to
+candidates that the finalizer has already removed.
 
 After both gates pass, the workflow makes the candidates public and publishes
 all three IDs, their official base kinds, worker digest, source commit and

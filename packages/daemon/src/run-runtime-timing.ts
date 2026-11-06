@@ -7,10 +7,10 @@ type Phase = "preparing" | "executing" | "finishing"
 type Endpoint = "policy_snapshot" | "permission_check" | "permission_request" | "server_decision" | "computer_authority"
   | "subscription_context" | "provider_proxy" | "credential_lease" | "credential_refresh"
   | "github_credential_lease" | "github_credential_refresh"
-  | "run_telemetry" | "device_control" | "run_control" | "task_data" | "other_run_request"
+  | "run_telemetry" | "device_control" | "run_control" | "task_data" | "mailbox_operation" | "storage_transfer" | "other_run_request"
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "HEAD" | "OPTIONS" | "other"
 type Outcome = "ok" | "error" | "pending"
-type AgentAcceptedKind = "claude_system_init" | "claude_first_event" | "codex_turn_start_ack"
+type AgentAcceptedKind = "claude_user_ack" | "claude_system_init" | "claude_first_event" | "codex_turn_start_ack"
 type RequestRecord = { sequence: number; endpoint: Endpoint; phase: Phase; method: Method; shared: boolean
   startMs: number; endMs: number | null; ms: number | null; outcome: Outcome }
 type Count = { endpoint: Endpoint; phase: Phase; shared: boolean; started: number; completed: number; errors: number; ms: number }
@@ -53,12 +53,13 @@ function classify(tail: string, body: unknown): Endpoint {
   if (tail === "tool-approval") return operation?.operation === "check" ? "permission_check" : "permission_request"
   if (tail === "decision") return "server_decision"
   if (tail === "computer-authority") return "computer_authority"
+  if (tail === "skill-receipt") return "permission_check"
   if (tail === "subscription") return operation?.action === "context" ? "subscription_context"
     : operation?.action === "request" ? "provider_proxy" : "other_run_request"
   if (tail === "subscription-lease") return "credential_lease"
   if (["", "events", "checkpoint", "complete"].includes(tail)) return "run_telemetry"
   if (["claim", "commands"].includes(tail)) return "run_control"
-  if (/^(attachments|captures|skill-receipt)(\/|$)/.test(tail)) return "task_data"
+  if (/^(attachments|captures)(\/|$)/.test(tail)) return "task_data"
   return "other_run_request"
 }
 
@@ -100,7 +101,7 @@ export class RunRuntimeObservation {
   }
 
   accepted(kind: AgentAcceptedKind) {
-    if (this.closed || this.agentAccepted || !(this.harness === "claude_code" ? ["claude_system_init", "claude_first_event"].includes(kind)
+    if (this.closed || this.agentAccepted || !(this.harness === "claude_code" ? ["claude_user_ack", "claude_system_init", "claude_first_event"].includes(kind)
       : this.harness === "codex" && kind === "codex_turn_start_ack")) return
     this.agentAccepted = { kind, at: this.wallClock(), ms: ms(this.clock() - this.started) }
   }
@@ -193,6 +194,16 @@ export class RunRuntimeTimings {
 
   agentAccepted(runId: string, kind: AgentAcceptedKind) {
     this.runs.get(runIdHash(runId))?.accepted(kind)
+  }
+
+  /** Already-authorized task transports whose URL does not contain the run.
+   * Only the caller's held assignment supplies identity; never infer it from
+   * payloads, signed storage URLs, or MCP arguments. */
+  taskRequest(runId: string, endpoint: "mailbox_operation" | "storage_transfer" | "task_data", method: string): (status?: number) => void {
+    try {
+      const verb: Method = METHODS.has(method) ? method as Method : "other"
+      return this.runs.get(runIdHash(runId))?.request(endpoint, verb, false) ?? NOOP
+    } catch { return NOOP }
   }
 
   request(method: string, path: string, body: unknown): (status?: number) => void {

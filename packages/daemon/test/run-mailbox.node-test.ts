@@ -39,7 +39,7 @@ const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { isLiv
 
 function fixture() {
   const token = 'mkw_' + randomBytes(32).toString('base64url')
-  const assignment = { runId: randomUUID(), mcp: { url: endpoint.href, token, mailbox: true } } as RunAssignment
+  const assignment: RunAssignment = { runId: randomUUID(), issueId: 'issue', deviceId: 'device', repoId: 'repo', baseBranch: 'main', harness: 'mock', prompt: 'Synthetic', mcp: { url: endpoint.href, token, mailbox: true } }
   const abort = new AbortController()
   const state = { revoked: false, cancelled: false, dropped: false, oversized: false, malformed: false, disabled: false, revokeOnSent: false, requests: 0, writes: 0, headersValid: true, allowed: Object.keys(mailboxInputs) }
   const keys = new Map<string, string>()
@@ -86,7 +86,7 @@ test('claim parser preserves only an explicit transport capability and uses the 
   assert.equal(f.state.requests, before)
 })
 
-function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, controls: { pause?: { entered(): void; wait: Promise<void> }; noLease?: boolean } = {}) {
+async function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, controls: { pause?: { entered(): void; wait: Promise<void> }; noLease?: boolean } = {}) {
   const entries = new Map<string, JournalEntry>(), records: { kind: string }[] = []
   const state = { starts: 0, closes: 0 }
   let opened!: (value: StartOptions) => void, entered!: () => void, finish!: () => void
@@ -116,13 +116,13 @@ function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, 
   } as unknown as SupervisorDeps)
   const assignment = { ...f.assignment, repoId: 'repo', harness: 'mock', prompt: 'Synthetic', ...(controls.noLease ? {} : { leaseExpiresAt: new Date(Date.now() + 60000).toISOString() }) } as RunAssignment
   journal.put({ assignment, state: 'queued', sessionId: null, worktree: supervisorWorktree, baseCommit: 'synthetic', lastSeq: 0, error: null, updatedAt: new Date().toISOString() })
-  supervisor.resumeAll()
+  await supervisor.resumeAll()
   return { supervisor, records, get options() { return Promise.race([options, supervisor.idle().then(() => { throw Error('Supervisor ended before starting the fixture adapter: ' + supervisor.list().map(run => run.error).join('; ')) })]) }, running, finish, state }
 }
 
 for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) test(`actual Supervisor wires the callback and clears custody after ${mode}`, { timeout: 10_000 }, async () => {
   const f = fixture(); if (mode === 'default-off') delete f.assignment.mcp!.mailbox
-  const h = supervisorFixture(f, mode === 'close-failure', { noLease: mode === 'default-off' })
+  const h = await supervisorFixture(f, mode === 'close-failure', { noLease: mode === 'default-off' })
   const options = await h.options; await h.running
   if (mode === 'default-off') { assert.equal(options.mailbox, undefined); assert.equal(f.state.requests, 0) }
   else assert.ok(options.mailbox)
@@ -142,7 +142,7 @@ for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) tes
 for (const mode of ['stop', 'lease-expiry', 'shutdown']) test(`Supervisor handshake handoff ${mode} closes once without starting a CLI`, { timeout: 10_000 }, async () => {
   const f = fixture(); let entered!: () => void, release!: () => void
   const ready = new Promise<void>(resolve => { entered = resolve }), wait = new Promise<void>(resolve => { release = resolve })
-  const h = supervisorFixture(f, false, { pause: { entered, wait } })
+  const h = await supervisorFixture(f, false, { pause: { entered, wait } })
   await ready
   const ending = mode === 'stop' ? h.supervisor.cancel(f.assignment.runId) : mode === 'shutdown' ? h.supervisor.stop() : undefined
   if (mode === 'lease-expiry') h.supervisor.check(Date.now() + 120000)

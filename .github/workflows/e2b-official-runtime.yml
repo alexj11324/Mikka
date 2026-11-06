@@ -21,6 +21,7 @@ on:
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/e2b-template.yml'
       - 'scripts/e2b/validate-template-subscriptions.mjs'
+      - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/acceptance/cloud-startup.mjs'
       - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
@@ -60,6 +61,7 @@ jobs:
       - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 scripts/e2b/official-files.test.py
+      - run: python3 scripts/e2b/cleanup-template-candidates.test.py
       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
       - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh
   # Unchanged runtime content skips validation unless its release-control path
@@ -236,3 +238,47 @@ jobs:
       runtime-template-models: ${{ needs.validate.outputs.template-models }}
       runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
       runtime-release-evidence: ${{ needs.subscriptions.outputs.release-evidence }}
+  cleanup:
+    needs: [check, validate, await-web, subscriptions, publish]
+    if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install the pinned cleanup SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/e2b-cleanup"
+          "$RUNNER_TEMP/e2b-cleanup/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Read this release's E2B key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Close this attempt's instances and remove only its private candidates
+        run: |
+          python3 - <<'PY'
+          import os,pathlib
+          pathlib.Path(os.environ['RUNNER_TEMP'],'cleanup-candidates.json').write_text(os.environ.get('CANDIDATE_REPORT') or '{}')
+          PY
+          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py --report "$RUNNER_TEMP/cleanup-candidates.json" --output "$RUNNER_TEMP/release-cleanup.json"
+        env:
+          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+      - name: Preserve release cleanup receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-runtime-release-cleanup
+          path: ${{ runner.temp }}/release-cleanup.json
+          if-no-files-found: warn
+          retention-days: 7
