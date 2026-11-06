@@ -4,7 +4,7 @@ import { access, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { nativeKeychainLog, probeCryptoInMain } from './native-crypto.mjs'
+import { nativeCloseReason, nativeKeychainLog, probeCryptoInMain } from './native-crypto.mjs'
 
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-native-crypto-'))
@@ -107,4 +107,17 @@ test('native Keychain diagnostics retain only closed status codes across split c
   log.push('x'.repeat(20_000))
   assert.equal(log.snapshot().truncated, true)
   assert.equal(JSON.stringify(log.snapshot()).includes('PRIVATE'), false)
+})
+
+test('close diagnostics classify only known lifecycle errors and never return original renderer text', () => {
+  for (const [message, reason] of [
+    ['page.evaluate: Execution context was destroyed, most likely because of a navigation. PRIVATE_VALUE', 'navigation'],
+    ['Target page, context or browser has been closed PRIVATE_VALUE', 'target-closed'],
+    ['NATIVE_INSTALLER_STILL_RUNNING', 'installer-active'],
+    ['NATIVE_INSTALLER_CANCEL_TIMEOUT', 'cancel-timeout'],
+    ['NATIVE_CRYPTO_PROCESS_EXIT_TIMEOUT', 'process-exit-timeout'],
+    ['NATIVE_CRYPTO_PROCESS_EXIT_FAILED', 'process-exit-failed'],
+    ['PRIVATE_VALUE /profile/arbitrary-path https://private.invalid/callback?code=secret', 'other'],
+  ]) assert.equal(nativeCloseReason(new Error(message)), reason)
+  assert.equal(nativeCloseReason(null), 'other')
 })

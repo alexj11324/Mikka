@@ -65,7 +65,8 @@ const cryptoReport = z.strictObject({
     code: z.enum(['NATIVE_CRYPTO_PACKAGE_INVALID', 'NATIVE_CRYPTO_REUSED_PROCESS', 'NATIVE_CRYPTO_TIMEOUT',
       'NATIVE_CRYPTO_FAILED', 'NATIVE_CRYPTO_PRIOR_CANARY_MISSING', 'NATIVE_CRYPTO_PROCESS_EXIT_TIMEOUT',
       'NATIVE_CRYPTO_PROCESS_EXIT_FAILED', 'NATIVE_CRYPTO_CLOSE_FAILED', 'NATIVE_CRYPTO_PACKAGE_CHANGED', 'NATIVE_CRYPTO_HARNESS_FAILED']),
-  }).optional(),
+    closeReason: z.enum(['navigation', 'target-closed', 'installer-active', 'cancel-timeout', 'process-exit-timeout', 'process-exit-failed', 'other']).optional(),
+  }).refine(value => !value.closeReason || value.stage === 'close').optional(),
   cleanup: z.enum(['passed', 'failed']),
 }).refine(value => !value.passed || (value.package?.passed && value.sameImmutablePackage && value.distinctProcesses === 3
   && value.cleanup === 'passed' && !value.failure && value.launches.length === 3

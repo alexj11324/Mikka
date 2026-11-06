@@ -31,7 +31,7 @@ import { sendThreadMessage } from '@/lib/thread-continue'
 import { factoryEventId } from '@/lib/factory/event-id'
 import { FactoryError } from '@/lib/factory/contract'
 import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
-import { executionBotName, runBotId, runBotName } from '@/lib/run-bot-name'
+import { executionBotName, runBotId, runBotName, threadNameLines } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
@@ -211,10 +211,14 @@ async function issueThreadAccess(issueId: string) {
 
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
-  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+  // Only the report's summary: runSummaryText reads nothing else of it.
+  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
   agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome,
   botColor: sql<string | null>`(select b.color from bots b where b.id = ${runBotId})`, botShape: sql<string | null>`(select b.shape from bots b where b.id = ${runBotId})`,
 }
+
+// A read after a cursor: the client holds the run's prompt (immutable), so only what names the thread is read.
+const threadCursorColumns = { ...threadColumns, prompt: sql<string>`coalesce(${threadNameLines}, '')` }
 
 // Read-only location and changes need authority, not conversation content.
 const threadIdentityColumns = { id: agentRuns.id, userId: agentRuns.userId }
@@ -257,15 +261,16 @@ async function readIssueThreads(issueId: string) {
  * workspace of the bot that dispatched it, or its owner alone when no bot did
  * (taskFreeThreadMembers); either way only its owner reads it.
  */
-type ThreadColumns = typeof threadColumns | typeof threadIdentityColumns
+type ThreadColumns = typeof threadColumns | typeof threadCursorColumns | typeof threadIdentityColumns
 type ReadableThreadResult<T extends ThreadColumns> = {
   row: SelectResult<T, 'partial', { agent_runs: 'not-null'; agents: 'not-null'; user: 'nullable' }>
   user: { id: string }
 }
 
 function readableThread(issueId: string | null, runId: string, columns: typeof threadColumns): Promise<ReadableThreadResult<typeof threadColumns>>
+function readableThread(issueId: string | null, runId: string, columns: typeof threadCursorColumns): Promise<ReadableThreadResult<typeof threadCursorColumns>>
 function readableThread(issueId: string | null, runId: string, columns: typeof threadIdentityColumns): Promise<ReadableThreadResult<typeof threadIdentityColumns>>
-async function readableThread(issueId: string | null, runId: string, columns: ThreadColumns): Promise<ReadableThreadResult<typeof threadColumns> | ReadableThreadResult<typeof threadIdentityColumns>> {
+async function readableThread(issueId: string | null, runId: string, columns: ThreadColumns): Promise<ReadableThreadResult<typeof threadColumns> | ReadableThreadResult<typeof threadCursorColumns> | ReadableThreadResult<typeof threadIdentityColumns>> {
   if (issueId !== null) {
     const access = await issueThreadAccess(issueId)
     if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
@@ -318,6 +323,8 @@ export interface IssueThreadDetail {
   chunkCursor: ThreadChunkCursor | null
   /** `chunks` holds only the chunks after the cursor that was passed: append them to the ones held. */
   chunksAppend: boolean
+  /** A cursor read: `thread.prompt` is left out; the held read's prompt stands (mergeThreadChunks). */
+  promptOmitted?: true
 }
 
 /**
@@ -379,7 +386,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   // Before any of the thread: this run's keys' revisions (other attempts carry none, so they always read).
   const { readRevisions } = await import('@/lib/live/revision-read')
   const revisions = await readRevisions([{ kind: 'thread', id: runId }, { kind: 'run', id: runId }])
-  const { row, user } = await readableThread(issueId, runId, threadColumns)
+  const { row, user } = cursor ? await readableThread(issueId, runId, threadCursorColumns) : await readableThread(issueId, runId, threadColumns)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
   const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
@@ -389,6 +396,9 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   // Invalidation reads retain the cursor: only later chunks, not the whole chain again.
   const read = await readThreadChunks(runIds, cursor)
   const chunks = read.chunks
+  // The client keeps its held prompt only when it keeps its held chunks; any other read sends the whole prompt.
+  const promptOmitted = Boolean(cursor && read.append)
+  const prompt = cursor && !read.append ? (await db.select({ prompt: agentRuns.prompt }).from(agentRuns).where(eq(agentRuns.id, row.id)).limit(1))[0]?.prompt ?? '' : row.prompt
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
@@ -443,11 +453,12 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
-    thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, questionWake, prompt: promptOmitted ? '' : prompt, stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
     chunksAppend: read.append,
+    ...(promptOmitted ? { promptOmitted: true as const } : {}),
   }
 }
 

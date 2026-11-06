@@ -78,6 +78,20 @@ test('a passing report requires the actual package gates and all three prior-can
   }
 })
 
+test('close failure reasons are optional closed enums, never arbitrary diagnostics or a passing result', () => {
+  const report = { version: 1, passed: false, platform: 'darwin', architecture: 'arm64', revision: 'a'.repeat(40), launches: [],
+    failure: { stage: 'close', code: 'NATIVE_CRYPTO_HARNESS_FAILED' }, cleanup: 'failed' }
+  validateNativeReport(report, 'crypto')
+  for (const closeReason of ['navigation', 'target-closed', 'installer-active', 'cancel-timeout', 'process-exit-timeout', 'process-exit-failed', 'other']) {
+    validateNativeReport({ ...report, failure: { ...report.failure, closeReason } }, 'crypto')
+  }
+  for (const failure of [{ ...report.failure, closeReason: 'PRIVATE_VALUE /profile' }, { ...report.failure, closeReason: 'navigation', details: 'PRIVATE_VALUE' },
+    { ...report.failure, stage: 'crypto', closeReason: 'navigation' }]) {
+    assert.throws(() => validateNativeReport({ ...report, failure }, 'crypto'), /NATIVE_EVIDENCE_SCHEMA_INVALID/)
+  }
+  assert.throws(() => validateNativeReport({ ...report, passed: true, failure: { ...report.failure, closeReason: 'navigation' } }, 'crypto'), /NATIVE_EVIDENCE_SCHEMA_INVALID/)
+})
+
 test('the shared writer refuses invalid evidence before creating an output file', async t => {
   const path = join(await directory(t), 'invalid.json')
   await assert.rejects(savePackageVerification(path, { ...observedFailure, rawError: 'NATIVE_SCHEMA_PRIVATE_TEST_VALUE' }), /NATIVE_EVIDENCE_SCHEMA_INVALID/)

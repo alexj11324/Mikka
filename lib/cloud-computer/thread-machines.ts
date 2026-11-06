@@ -22,6 +22,8 @@ import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
 import { factoryEventId } from '../factory/event-id'
 import { questionFingerprint } from '../factory/questions/contract'
+import { unclaimedPlanQuestionContinuation } from '../factory/questions/execution-continuation'
+import type { FactoryTask } from '../factory/store'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
 async function options(ownerId: string) {
   return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
@@ -336,6 +338,54 @@ async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: s
   return current
 }
 
+type UnclaimedQuestionRuntimeRecovery = {
+  taskId: string; taskRevision: number; requestEpoch: string; questionRevision: number
+  answerFingerprint: string; receiptDigest: string
+  continuation: NonNullable<Awaited<ReturnType<typeof unclaimedPlanQuestionContinuation>>>
+}
+
+/** A failed claim owns the retained VM, but never acquired a native SID. The
+ * same immutable spec receipt used by recovery is the only authority to
+ * maintain that VM. Lock task/question before run/machine, as settle does. */
+async function lockUnclaimedQuestionRuntimeRecovery(client: PoolClient, actor: Actor, runId: string,
+  expected?: UnclaimedQuestionRuntimeRecovery): Promise<UnclaimedQuestionRuntimeRecovery | null> {
+  const unavailable = (): null => {
+    if (expected) throw new ComputerError(409, 'Original question runtime is no longer current')
+    return null
+  }
+  const { rows: [task] } = await client.query<FactoryTask>(`SELECT t.* FROM factory_tasks t
+    JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id AND a.stage='spec' AND a.status='blocked' AND a."candidateId" IS NULL
+    JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+    JOIN factory_questions q ON q."taskId"=t.id AND q."userId"=t."userId" AND q."issueId"=t."issueId"
+      AND q.id::text=r."questionContinuation"->>'questionId' AND q."continuationRunId"=r.id
+    JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=t."userId"
+    WHERE r.id=$1 AND t."userId"=$2 AND b."workspaceId"=$3
+      AND t.stage='spec' AND t.status='blocked' AND t."candidateId" IS NULL
+      AND q.stage='spec' AND q.status='blocked' AND q."candidateId" IS NULL
+      AND r.status='failed' AND r."sessionId" IS NULL AND r."startedAt" IS NULL
+    FOR UPDATE OF t`, [runId, actor.userId, actor.workspaceId])
+  if (!task) return unavailable()
+  const { rows: [question] } = await client.query(`SELECT revision,"answerFingerprint",id FROM factory_questions
+    WHERE "taskId"=$1 AND "userId"=$2 AND "continuationRunId"=$3 AND stage='spec' AND status='blocked'
+      AND "candidateId" IS NULL FOR SHARE`, [task.id, actor.userId, runId])
+  if (!question) return unavailable()
+  const continuation = await unclaimedPlanQuestionContinuation(client, task, runId)
+  if (!continuation || continuation.continuationAttemptId !== task.attemptId || continuation.questionId !== question.id) return unavailable()
+  // A historical definition can predate executionIdentity. Keep this device
+  // fence explicit, including the transaction that publishes new credentials.
+  const device = await client.query(`SELECT 1 FROM devices d JOIN agent_runs r ON r."deviceId"=d.id AND r."userId"=d."ownerId"
+    WHERE r.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND d.enabled=true FOR SHARE OF d`, [runId, actor.userId])
+  if (!device.rowCount) return unavailable()
+  const { rows: [receipt] } = await client.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2 FOR SHARE',
+    [task.id, continuation.recoveryEventId])
+  if (!receipt) return unavailable()
+  const current = { taskId: task.id, taskRevision: task.revision, requestEpoch: task.sourceEventId,
+    questionRevision: question.revision, answerFingerprint: question.answerFingerprint,
+    receiptDigest: questionFingerprint(receipt), continuation }
+  if (expected && !isDeepStrictEqual(current, expected)) throw new ComputerError(409, 'Original question runtime is no longer current')
+  return current
+}
+
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
 export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider: typeof threadMachineProvider & { state?: (sandboxId: string, ownerId: string, budget?: RuntimeBudget) => Promise<string> } = threadMachineProvider, desktop = threadDesktop, refreshRuntime = false) {
@@ -355,6 +405,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   let retainedSandboxId: string | undefined
   let upgradeRetainedRuntime = false
   let questionRuntimeUpgrade: QuestionRuntimeUpgrade | undefined
+  let unclaimedQuestionRecovery: UnclaimedQuestionRuntimeRecovery | null = null
+  let unclaimedRuntimeSwitchStarted = false
   let reservedStartLease = false
   let runtimeRollback: (() => Promise<void>) | undefined
   let verifyRefreshedRuntime: (() => Promise<unknown>) | undefined
@@ -364,7 +416,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
     // Recovery takes policy before question/run locks. Acquire its order while
     // reserving maintenance so a blocked continuation cannot transfer custody.
-    if (refreshRuntime) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+    if (refreshRuntime) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+      unclaimedQuestionRecovery = await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId)
+    }
     const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       LEFT JOIN agents agent ON agent.id=r."agentId"
@@ -403,7 +458,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
         machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId || machine.issueId !== run.issueId ||
         machine.botId !== run.runtimeBotId) throw new ComputerError(409, 'Original question machine unavailable')
-      if (refreshRuntime && (run.status !== 'failed' || run.sessionId !== continuation.originSessionId)) throw new ComputerError(409, 'Original question machine unavailable')
+      if (refreshRuntime && (run.status !== 'failed' || (run.sessionId !== continuation.originSessionId &&
+        !(run.sessionId === null && unclaimedQuestionRecovery)))) throw new ComputerError(409, 'Original question machine unavailable')
       refreshPhase = 'question_source'
       const source = await client.query(`SELECT 1 FROM factory_questions q
         JOIN agent_runs origin ON origin.id=q."originRunId" AND origin."userId"=q."userId" AND origin."issueId"=q."issueId"
@@ -540,6 +596,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // sandbox was being created. Re-take the run lock and check again before the worker starts.
     await client.query('BEGIN')
     if (refreshBudget) await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [`${refreshBudget(5_000)}ms`])
+    if (unclaimedQuestionRecovery) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+      await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId, unclaimedQuestionRecovery)
+    }
     const again = (await client.query('SELECT status,"stopRequestedAt" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     if (exactQuestionMachine && again?.stopRequestedAt) throw new ComputerError(409, 'Thread stopped')
     if (retainedSandboxId && !refreshRuntime && (again?.status !== 'queued' || again.stopRequestedAt)) throw new ComputerError(409, 'Retained task runtime is no longer queued')
@@ -605,6 +665,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
           // The cloud claim path uses this same lock: staging happens before it;
           // only the bounded stop/switch window blocks new claims.
           await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+          if (unclaimedQuestionRecovery && action === 'switch') await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId, unclaimedQuestionRecovery)
           if (questionRuntimeUpgrade) await lockQuestionRuntimeUpgrade(client, actor, runId, run.questionContinuation.questionId, questionRuntimeUpgrade)
           const { rows: [maintenanceRun] } = await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])
           if (upgradeRetainedRuntime) {
@@ -612,19 +673,28 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
               (maintenanceRun.leaseExpiresAt && new Date(maintenanceRun.leaseExpiresAt).getTime() > Date.now())) throw new ComputerError(409, 'Retained task runtime is no longer queued')
             if (action === 'switch') await revalidateExecutionIdentity(client, maintenanceRun)
           }
-          const held = await client.query(`SELECT 1 FROM thread_machines m JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=m."ownerId" AND d.kind='cloud' AND d.enabled=true
+          const held = await client.query(`SELECT 1 FROM thread_machines m JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=m."ownerId" AND d.kind='cloud' AND (d.enabled=true OR $8::boolean)
             WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3 AND m."sandboxId"=$4 AND m."deviceId"=$5
               AND m."workerLeaseId"=$6 AND m."workerLeaseUntil">now() AND m.state<>'ended'
               AND NOT EXISTS(SELECT 1 FROM agent_runs active WHERE active."deviceId"=m."deviceId" AND active."userId"=m."ownerId"
                 AND (NOT $7::boolean OR active.id<>$1) AND active.status NOT IN ('succeeded','failed','stopped','cancelled')) FOR UPDATE OF m`,
-            [runId,actor.userId,actor.workspaceId,sandbox.sandboxId,machine.deviceId,leaseId,upgradeRetainedRuntime])
+            [runId,actor.userId,actor.workspaceId,sandbox.sandboxId,machine.deviceId,leaseId,upgradeRetainedRuntime,
+              Boolean(unclaimedQuestionRecovery && unclaimedRuntimeSwitchStarted && action === 'rollback')])
           if (!held.rowCount) throw new ComputerError(409, 'Task runtime is busy or its ownership changed')
+          if (unclaimedQuestionRecovery && action === 'switch') unclaimedRuntimeSwitchStarted = true
           await switchOfficialWorkerRelease(sandbox, release, {deviceId:machine.deviceId,workspaceId:actor.workspaceId,operationId:leaseId}, action, undefined, budget)
           await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1 AND "userId"=$2', [machine.deviceId,actor.userId])
           await client.query('COMMIT')
         } catch(error) { await client.query('ROLLBACK'); throw error }
       }
       refreshPhase = 'stage_admission'
+      if (unclaimedQuestionRecovery) {
+        await client.query('BEGIN')
+        await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [`${refreshBudget!(5_000)}ms`])
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+        await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId, unclaimedQuestionRecovery)
+        await client.query('COMMIT')
+      }
       // Refuse busy/foreign machines before fetching or building any release.
       const idle = await pool.query(`SELECT 1 FROM thread_machines m JOIN agent_runs current ON current.id=m."runId" AND current."userId"=m."ownerId"
         WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3 AND m."sandboxId"=$4 AND m."workerLeaseId"=$5 AND m."workerLeaseUntil">now() AND m.state<>'ended'
@@ -634,7 +704,12 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (!idle.rowCount) throw new ComputerError(409, 'Task runtime is busy')
       refreshPhase = 'stage_release'
       const release = await stageOfficialWorkerRelease(sandbox,machine.snapshotId,sourceSha,process.env,undefined,refreshBudget)
-      runtimeRollback = () => maintenance('rollback',release,budgetUntil(Date.now()+30_000))
+      runtimeRollback = async () => {
+        // Staging alone did not switch the worker. Once a switch may have
+        // started, restore under this lease even if its answer/permission was
+        // revoked; forward work still revalidates the full question receipt.
+        if (!unclaimedQuestionRecovery || unclaimedRuntimeSwitchStarted) await maintenance('rollback',release,budgetUntil(Date.now()+30_000))
+      }
       refreshPhase = 'switch_release'
       await maintenance('switch',release)
       verifyRefreshedRuntime = () => switchOfficialWorkerRelease(sandbox,release,{deviceId:machine.deviceId,workspaceId:actor.workspaceId,operationId:leaseId},'verify',undefined,refreshBudget)
@@ -650,6 +725,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     refreshPhase = 'credential_bootstrap'
     await client.query('BEGIN')
     if (refreshBudget) await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [`${refreshBudget(5_000)}ms`])
+    if (unclaimedQuestionRecovery) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+      await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId, unclaimedQuestionRecovery)
+    }
     if (questionRuntimeUpgrade) {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
       await lockQuestionRuntimeUpgrade(client, actor, runId, run.questionContinuation.questionId, questionRuntimeUpgrade)

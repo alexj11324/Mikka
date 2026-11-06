@@ -104,6 +104,18 @@ export function nativeKeychainLog() {
   }
 }
 
+/** Close diagnostics must never contain renderer text, URLs or native paths. */
+export function nativeCloseReason(error) {
+  const message = String(error?.message ?? '')
+  if (/Execution context was destroyed|Cannot find context with specified id/.test(message)) return 'navigation'
+  if (/Target page, context or browser has been closed|Target closed|Session closed/.test(message)) return 'target-closed'
+  if (message === 'NATIVE_INSTALLER_STILL_RUNNING') return 'installer-active'
+  if (message === 'NATIVE_INSTALLER_CANCEL_TIMEOUT') return 'cancel-timeout'
+  if (message === 'NATIVE_CRYPTO_PROCESS_EXIT_TIMEOUT') return 'process-exit-timeout'
+  if (message === 'NATIVE_CRYPTO_PROCESS_EXIT_FAILED') return 'process-exit-failed'
+  return 'other'
+}
+
 async function bounded(promise, timeout, code) {
   let timer
   try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(code)), timeout) })]) } finally { clearTimeout(timer) }
@@ -120,7 +132,7 @@ export async function runNativeCrypto() {
   let directory, application, failure
   const profiles = []
   const pids = new Set()
-  let stage = 'package-verification'
+  let stage = 'package-verification', closeReason
   try {
     report.package = await inspectMacPackage(appPath, 'acceptance')
     assert.equal(report.package.passed, true, 'NATIVE_CRYPTO_PACKAGE_INVALID')
@@ -155,6 +167,7 @@ export async function runNativeCrypto() {
         assert.ok(exitCode === 0 && signal === null, 'NATIVE_CRYPTO_PROCESS_EXIT_FAILED')
       } catch (error) {
         stage = 'close'
+        closeReason = nativeCloseReason(error)
         attemptFailure = attemptFailure ? new AggregateError([attemptFailure, error], 'NATIVE_CRYPTO_CLOSE_FAILED') : error
       } finally {
         // Early native startup precedes Playwright returning the child handle;
@@ -174,7 +187,7 @@ export async function runNativeCrypto() {
   } catch (error) {
     failure = error
     const codes = ['NATIVE_CRYPTO_PACKAGE_INVALID', 'NATIVE_CRYPTO_REUSED_PROCESS', 'NATIVE_CRYPTO_TIMEOUT', 'NATIVE_CRYPTO_FAILED', 'NATIVE_CRYPTO_PRIOR_CANARY_MISSING', 'NATIVE_CRYPTO_PROCESS_EXIT_TIMEOUT', 'NATIVE_CRYPTO_PROCESS_EXIT_FAILED', 'NATIVE_CRYPTO_CLOSE_FAILED', 'NATIVE_CRYPTO_PACKAGE_CHANGED']
-    report.failure = { stage, code: codes.includes(error?.message) ? error.message : 'NATIVE_CRYPTO_HARNESS_FAILED' }
+    report.failure = { stage, code: codes.includes(error?.message) ? error.message : 'NATIVE_CRYPTO_HARNESS_FAILED', ...(stage === 'close' ? { closeReason: closeReason ?? 'other' } : {}) }
   } finally {
     try {
       if (application) await bounded(closeElectron(application), 20_000, 'NATIVE_CRYPTO_PROCESS_EXIT_TIMEOUT')

@@ -3,6 +3,12 @@ import { lstat, readFile, realpath } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { tsImport } from 'tsx/esm/api'
 
+const closingApplications = new WeakMap()
+
+function navigationContextLost(error) {
+  return /Execution context was destroyed|Cannot find context with specified id/.test(String(error?.message))
+}
+
 async function bounded(promise, milliseconds, message) {
   let timer
   try {
@@ -18,7 +24,7 @@ export async function cancelLocalSetup(application) {
   if (!application || application.process().exitCode !== null) return
   for (const page of application.windows()) {
     if (page.isClosed()) continue
-    await bounded(page.evaluate(async () => {
+    const cancel = () => page.evaluate(async () => {
       const ssh = window.mikka?.ssh
       if (!ssh) return
       const state = await ssh.state()
@@ -30,13 +36,41 @@ export async function cancelLocalSetup(application) {
       }
       const remaining = await ssh.state()
       if (remaining && ['running', 'fingerprint'].includes(remaining.status)) throw new Error('NATIVE_INSTALLER_STILL_RUNNING')
-    }), 20_000, 'NATIVE_INSTALLER_CANCEL_TIMEOUT')
+    })
+    const deadline = Date.now() + 20_000
+    while (true) {
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) throw new Error('NATIVE_INSTALLER_CANCEL_TIMEOUT')
+      try {
+        await bounded(cancel(), remaining, 'NATIVE_INSTALLER_CANCEL_TIMEOUT')
+        break
+      } catch (error) {
+        // A hosted page can finish an ordinary redirect or switch to its local
+        // offline page during this read. Retry only that destroyed context;
+        // never treat navigation, a missing process or a closed page as proof
+        // that an active installer was cancelled.
+        if (!navigationContextLost(error) || page.isClosed()
+          || application.process().exitCode !== null || application.process().signalCode !== null) throw error
+        const wait = deadline - Date.now()
+        if (wait <= 0) throw new Error('NATIVE_INSTALLER_CANCEL_TIMEOUT')
+        await bounded(page.waitForLoadState('domcontentloaded', { timeout: wait }), wait, 'NATIVE_INSTALLER_CANCEL_TIMEOUT')
+      }
+    }
   }
 }
 
-export async function closeElectron(application) {
-  if (!application) return
-  try { await cancelLocalSetup(application) } finally { await application.close() }
+export function closeElectron(application) {
+  if (!application) return Promise.resolve()
+  const existing = closingApplications.get(application)
+  if (existing) return existing
+  // Retain both success and rejection for this exact application object.
+  // Cleanup must not issue a second SDK close after the first already exited,
+  // or forget an earlier failure to cancel its installer.
+  const closing = (async () => {
+    try { await cancelLocalSetup(application) } finally { await application.close() }
+  })()
+  closingApplications.set(application, closing)
+  return closing
 }
 
 async function processStopped(pid) {
