@@ -3,10 +3,11 @@
 - **Status:** accepted scope from issue #1329; implementation review 2026-11-05
 - **GitHub:** [#1329](https://github.com/alexj11324/Mikka/issues/1329)
 - **Owner thread:** issue #1329 implementation
+- **Changed:** 2026-11-06, [judge model strength and effort only](decisions/2026-11-06-1640-model-routing-judges-tier-and-effort.md)
 
 ## What the user does
 
-用户在「模型与订阅」决定派发给 Agent 的任务是否按难度自动选择模型，并在执行详情查看这一次实际冻结的难度判断、模型、推理强度和选择原因。
+用户在「模型与订阅」决定派发给 Agent 的任务是否按难度自动选择模型，并在执行详情查看这一次实际冻结的所需模型强度、模型、推理强度和选择原因。
 
 ## Where it lives
 
@@ -39,17 +40,18 @@
 | 模型选择 | Model selection |
 | 选择原因 | Selection reason |
 | 升级前的模型 | Model before escalation |
-| 简单 / 中等 / 困难 / 难度未判断 | Easy / Medium / Hard / Difficulty not assessed |
+| 轻量模型 / 标准模型 / 最强模型 | Light model / Standard model / Strongest model |
+| 简单 / 中等 / 困难（2026-11-06 之前冻结的记录） | Easy / Medium / Hard (records frozen before 2026-11-06) |
 | 低推理强度 / 中等推理强度 / 高推理强度 / 极高推理强度 / 最高推理强度 | Low / Medium / High / Extra-high / Maximum reasoning effort |
-| 按任务难度选择 | Selected by task difficulty |
+| 按任务所需的模型强度选择 | Selected by the model strength the task needs |
 | 按模型列表顺序选择 | Selected in model list order |
-| 难度判断不确定，沿用模型列表顺序 | Difficulty was uncertain; used model list order |
-| 难度判断暂不可用，沿用模型列表顺序 | Difficulty assessment was unavailable; used model list order |
-| 难度判断无效，沿用模型列表顺序 | Difficulty assessment was invalid; used model list order |
+| 模型强度判断不确定，沿用模型列表顺序 | Model strength was uncertain; used model list order |
+| 模型强度判断暂不可用，沿用模型列表顺序 | Model strength assessment was unavailable; used model list order |
+| 模型强度判断无效，沿用模型列表顺序 | Model strength assessment was invalid; used model list order |
 | 没有选出合适模型，沿用模型列表顺序 | No suitable model was selected; used model list order |
 | 原模型未能完成任务，已升级重试 | The previous model could not finish the task; retried with a stronger model |
 
-判断结果行格式：`简单 → GPT-6 Luna · 低推理强度` / `Easy → GPT-6 Luna · Low reasoning effort`。模型沿用现有显示名称；没有冻结的推理强度时省略分隔点和强度。
+判断结果行格式：`轻量模型 → GPT-6 Luna · 低推理强度` / `Light model → GPT-6 Luna · Low reasoning effort`。模型沿用现有显示名称；没有冻结的推理强度时省略分隔点和强度；没有判断出模型强度（沿用列表顺序）时省略强度和箭头，只显示模型，原因行说明为什么。
 
 ## Out of scope
 

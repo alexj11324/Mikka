@@ -45,11 +45,13 @@ test('routing evidence keeps only the frozen decision and never exposes dispatch
   assert.deepEqual(value.modelRouting, routing)
   assert.doesNotMatch(JSON.stringify(value.modelRouting), /PRIVATE|apiKey|candidate|credential/)
   assert.equal(threadExecutionEvidence(host(), runId).modelRouting, undefined, 'old runs do not infer routing from their model')
+  const current = { version: 2, required: 'standard', model: 'claude-sonnet-5-5', harness: 'claude_code', tier: 'standard', effort: 'medium', reason: 'difficulty_fit' }
+  assert.deepEqual(threadExecutionEvidence({ run: { ...host().run, modelRouting: { ...current, apiKey: 'PRIVATE_KEY' } } }, runId).modelRouting, current)
 })
 
 test('an invalid or future routing snapshot stays absent without breaking the rest of the evidence', () => {
   const routing = { version: 1, difficulty: 'easy', model: 'gpt-6-luna', harness: 'codex', tier: 'light', reason: 'difficulty_fit' }
-  for (const invalid of [{ ...routing, version: 2 }, { ...routing, difficulty: 'invented' }, { ...routing, effort: 'invented' }, { ...routing, reason: 'PRIVATE_REASON' }, { ...routing, harness: 'invented' }]) {
+  for (const invalid of [{ ...routing, version: 2 }, { ...routing, version: 3 }, { ...routing, version: 2, difficulty: undefined, required: 'invented' }, { ...routing, difficulty: 'invented' }, { ...routing, effort: 'invented' }, { ...routing, reason: 'PRIVATE_REASON' }, { ...routing, harness: 'invented' }]) {
     const value = threadExecutionEvidence({ run: { ...host().run, modelRouting: invalid } }, runId)
     assert.equal(value.modelRouting, null)
     assert.equal(value.id, runId)

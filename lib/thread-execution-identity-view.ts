@@ -3,16 +3,18 @@ import { withBasePath } from './base-path'
 import { MODEL_ROUTING_DIFFICULTIES, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_REASONS, MODEL_ROUTING_TIERS } from './model-routing'
 
 /** Shared allowlist for the server evidence projection and its client reader. */
-export const modelRoutingEvidenceSchema = z.object({
-  version: z.literal(1),
-  difficulty: z.enum([...MODEL_ROUTING_DIFFICULTIES, 'unknown']),
+const frozenRouting = {
   model: z.string().min(1).max(200),
   harness: z.enum(['claude_code', 'codex']),
   tier: z.enum(MODEL_ROUTING_TIERS),
   effort: z.enum(MODEL_ROUTING_EFFORTS).optional(),
   reason: z.enum(MODEL_ROUTING_REASONS),
   previousModel: z.string().min(1).max(200).optional(),
-})
+}
+export const modelRoutingEvidenceSchema = z.discriminatedUnion('version', [
+  z.object({ version: z.literal(1), difficulty: z.enum([...MODEL_ROUTING_DIFFICULTIES, 'unknown']), ...frozenRouting }).strip(),
+  z.object({ version: z.literal(2), required: z.enum([...MODEL_ROUTING_TIERS, 'unknown']), ...frozenRouting }).strip(),
+])
 
 const reference = z.string().min(1).max(200)
 const resource = z.object({

@@ -1,0 +1,21 @@
+{
+  "note": "Real Mikka issue titles (public repository tasks, no personal data), labeled with the model tier and effort range a coding agent needs. Replayed live by scripts/model-routing-calibration.ts to set ROUTING_MIN_CONFIDENCE and as a regression set.",
+  "examples": [
+    { "issue": 632, "task": "Backend: rename a bot (server action for Bot 详情页 inline name edit)", "tier": "light", "effort": ["low", "medium"] },
+    { "issue": 1235, "task": "AI 思考中的状态改用 affectUI 的 Thinking Loader", "tier": "light", "effort": ["low", "medium"] },
+    { "issue": 1264, "task": "任务页「活动」时间线没有按时间排序：任务事件和\"派出线程\"分成两段显示", "tier": "light", "effort": ["low", "medium"] },
+    { "issue": 1226, "task": "网页端代码对比改用 Pierre 的 @pierre/diffs", "tier": "standard", "effort": ["low", "high"] },
+    { "issue": 1225, "task": "模型调用失败（402 / 429 / 5xx）时按「优先使用的模型」顺序自动换到下一个，不要停在原地", "tier": "standard", "effort": ["medium", "high"] },
+    { "issue": 1108, "task": "订阅 run 失败原因被吞；.verify/ 验证产物混进提交和 filesChanged", "tier": "standard", "effort": ["medium", "high"] },
+    { "issue": 1106, "task": "点名另一个仓库要求新线程时，没开新线程，旧线程被换了仓库", "tier": "standard", "effort": ["medium", "high"] },
+    { "issue": 1277, "task": "Chat 工具调用：后端补失败标记、调用对象、显示名（配合前端重做）", "tier": "standard", "effort": ["low", "high"] },
+    { "issue": 593, "task": "Subscriptions: 连接 fails in production with an unobservable 409 (worker refusal codes dropped, nothing logged)", "tier": "standard", "effort": ["medium", "high"] },
+    { "issue": 1244, "task": "项目地图 1/5：技术方案（RFC）和数据模型", "tier": "strongest", "effort": ["high", "max"] },
+    { "issue": 1156, "task": "设备连接改为 Cloudflare Durable Objects 推送网关；合并到 main 不再重复生产构建", "tier": "strongest", "effort": ["high", "max"] },
+    { "issue": 1414, "task": "Neon transfer: every bot-list push re-reads the whole Coordinator chat (200 messages + citations)", "tier": "strongest", "effort": ["medium", "xhigh"] },
+    { "issue": 1284, "task": "Factory Agent Profiles：用户配置多种 Coding Agent，Decision API 按能力选型并接入真实派单", "tier": "strongest", "effort": ["high", "max"] },
+    { "issue": 1131, "task": "Use untouched official E2B templates with additive per-instance Mikka runtime", "tier": "strongest", "effort": ["high", "max"] },
+    { "issue": 959, "task": "Under a deny 电脑 policy, a person can still view and take over the Bot's desktop", "tier": "strongest", "effort": ["high", "max"] },
+    { "issue": 1410, "task": "Due timers stay on old code after a deploy (handover pins to the same deployment)", "tier": "strongest", "effort": ["high", "xhigh"] }
+  ]
+}
