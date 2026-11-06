@@ -24,6 +24,7 @@ import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { readNativeStartup } from './native-startup.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
+import { continueInSystemBrowser } from './browser-handoff.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledRootDocument } from './native-document.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
@@ -165,7 +166,7 @@ async function nativeSignIn(app, page, account = scope.owner) {
     mark('auth-return-navigation')
     const returned = page.waitForEvent('domcontentloaded', { timeout: 60_000 })
     returned.catch(() => {})
-    await browserPage.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await continueInSystemBrowser(browserPage, external)
     await handoff
     await returned
     mark('auth-public-session')
