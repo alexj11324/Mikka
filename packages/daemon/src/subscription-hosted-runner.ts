@@ -48,6 +48,7 @@ import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide } from "./permissions";
 import { removeRunCredentials } from "./run-scratch";
 import { daemonTracer, runIdHash } from "./tracing";
+import { cloneHostedGit, finishHostedGit } from "./agents/hosted-git";
 
 const exec = promisify(execFile);
 const bootstrap = fileURLToPath(
@@ -365,6 +366,8 @@ export async function createHostedBotRunner(host: {
       };
       let closed = false;
       let closing: Promise<void> | undefined;
+      let finishGit: (() => Promise<void>) | undefined;
+      let gitPreparing: Promise<void> | undefined;
       let computerGrant: ReturnType<ComputerBroker["spec"]>;
       type Broker = Awaited<ReturnType<typeof createNativeSubscriptionBroker>>;
       let broker: Broker | undefined;
@@ -406,7 +409,14 @@ export async function createHostedBotRunner(host: {
             finally {
               offRevoke();
               // The session's runtime-home and GitHub config hold no credential once it closes.
-              removeRunCredentials(host.stateDir, assignment.runId);
+              try { removeRunCredentials(host.stateDir, assignment.runId); }
+              finally {
+                await gitPreparing?.catch(() => undefined);
+                await finishGit?.().catch(() => {
+                  try { options.log.warn({ event: "hosted_git_retention_deferred" }, "Hosted Git history remains pinned for recovery"); }
+                  catch { /* Retention failure does not change a completed run. */ }
+                });
+              }
             }
           }
         });
@@ -436,7 +446,9 @@ export async function createHostedBotRunner(host: {
               }
             }
           };
-          const first = nativeBrokerContextSchema.parse(await context());
+          // live() just succeeded above; the context reply is followed by a
+          // fresh policy check before it becomes startup metadata.
+          const first = nativeBrokerContextSchema.parse(await context(false));
           await live();
           startup.sameRoute = first.route === selected.route;
           startup.sameModel = first.modelId === options.model;
@@ -444,28 +456,46 @@ export async function createHostedBotRunner(host: {
             throw unavailable("context_changed");
           startup.contextReady = true;
           const revision = first.revision;
+          let preparedContext = first;
+          const validate = (current: typeof first) => {
+            startup.sameRevision = current.revision === revision;
+            startup.sameAccount = current.accountId === first.accountId;
+            startup.sameRoute = current.route === first.route;
+            startup.sameModel = current.modelId === first.modelId;
+            const expiry = Date.parse(current.expiresAt);
+            startup.expiryValid = Number.isFinite(expiry);
+            startup.expiryFuture = startup.expiryValid && expiry > Date.now();
+            if (
+              current.revision !== revision ||
+              current.accountId !== first.accountId ||
+              current.route !== first.route ||
+              current.modelId !== first.modelId ||
+              !startup.expiryFuture
+            ) throw unavailable("context_changed");
+            return current;
+          };
+          // Local preparation grants no model work. The socket and CLI get a
+          // placeholder, never a credential; verify() and every broker request
+          // still call check() below before any prompt/provider work passes.
+          const prepared = async (phase: StartupPhase = "context_check") => {
+            startup.phase = phase;
+            try {
+              assertOpen();
+              // A lease that expired during local preparation still gets the
+              // normal refresh/check path; only valid metadata is reused.
+              if (Date.parse(preparedContext.expiresAt) <= Date.now()) return await check(phase);
+              return validate(preparedContext);
+            }
+            catch (error) { reportFailure(error); throw error; }
+          };
           const check = (phase: StartupPhase = "context_check", checkAuthority = true) => daemonTracer.span("daemon.adapter.auth", traceAttributes, async () => {
             startup.phase = phase;
             try {
               const current = await context(checkAuthority);
               if (checkAuthority) await live();
               else assertOpen();
-              startup.sameRevision = current.revision === revision;
-              startup.sameAccount = current.accountId === first.accountId;
-              startup.sameRoute = current.route === first.route;
-              startup.sameModel = current.modelId === first.modelId;
-              const expiry = Date.parse(current.expiresAt);
-              startup.expiryValid = Number.isFinite(expiry);
-              startup.expiryFuture = startup.expiryValid && expiry > Date.now();
-              if (
-                current.revision !== revision ||
-                current.accountId !== first.accountId ||
-                current.route !== first.route ||
-                current.modelId !== first.modelId ||
-                !startup.expiryFuture
-              )
-                throw unavailable("context_changed");
-              return current;
+              preparedContext = validate(current);
+              return preparedContext;
             } catch (error) {
               reportFailure(error);
               throw error;
@@ -489,7 +519,7 @@ export async function createHostedBotRunner(host: {
             lastExpiry = expiry;
             return due;
           };
-          return { first, revision, check, background, firstDue };
+          return { first, revision, prepared, check, background, firstDue };
         })() : undefined;
         // An API-key run is live while its gate is; withdrawing the key stops the run from the server.
         const check: () => Promise<unknown> = subscription?.check ?? live;
@@ -498,41 +528,27 @@ export async function createHostedBotRunner(host: {
         const shadow = join(paths.runDir, "runtime-git");
         const emptyHome = join(paths.runDir, "git-bootstrap-home");
         mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
-        if (!existsSync(shadow)) {
-          await daemonTracer.span("daemon.adapter.workspace.shadow_clone", traceAttributes, () => exec(
-            "git",
-            [
-              "-c",
-              "core.hooksPath=/dev/null",
-              "-c",
-              "core.fsmonitor=false",
-              "clone",
-              "--no-hardlinks",
-              "--no-checkout",
-              "--",
-              realpathSync(options.cwd),
-              shadow,
-            ],
-            {
-              env: {
-                ...bareEnv,
-                HOME: emptyHome,
-                GIT_CONFIG_GLOBAL: "/dev/null",
-                GIT_CONFIG_SYSTEM: "/dev/null",
-                GIT_TERMINAL_PROMPT: "0",
-              },
-              timeout: 30000,
-              signal: lifetime.signal,
-              maxBuffer: 1024 * 1024,
-            },
-          ));
+        const shadowOptions = {
+          source: options.cwd,
+          destination: shadow,
+          runId: assignment.runId,
+          repository: options.gitWritePaths?.length === 1 ? options.gitWritePaths[0] : undefined,
+          env: { ...bareEnv, HOME: emptyHome, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_TERMINAL_PROMPT: "0" },
+        };
+        finishGit = () => finishHostedGit(shadowOptions);
+        if (!existsSync(shadow)) gitPreparing = (async () => {
+          await daemonTracer.span("daemon.adapter.workspace.shadow_clone", traceAttributes, () => cloneHostedGit({
+            ...shadowOptions,
+            signal: lifetime.signal,
+          }));
           // Initialize only a new shadow, preserving staged changes on resume.
           await daemonTracer.span("daemon.adapter.workspace.read_tree", traceAttributes, () => exec("git", ["--git-dir", join(shadow, ".git"), "read-tree", "HEAD"], {
             env: { ...bareEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
             timeout: 30000, signal: lifetime.signal, maxBuffer: 1024 * 1024,
           }));
-        }
-        await live();
+        })();
+        await gitPreparing;
+        if (subscription) assertOpen(); else await live();
         if (
           !lstatSync(shadow).isDirectory() ||
           !lstatSync(join(shadow, ".git")).isDirectory() ||
@@ -581,6 +597,7 @@ export async function createHostedBotRunner(host: {
           root: join(host.stateDir, "native-brokers"),
           log: options.log,
           revision: subscription!.revision,
+          prepare: () => subscription!.prepared(),
           check,
           worker: {
             nativeRequest: async (_revision, payload, signal) => {
@@ -605,7 +622,7 @@ export async function createHostedBotRunner(host: {
         });
         const readyBroker = await daemonTracer.span("daemon.adapter.auth.broker", traceAttributes, () => brokerStarting!);
         startup.brokerReady = true;
-        await live();
+        if (subscription) assertOpen(); else await live();
         const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
         if (options.github && !githubCli) throw new Error('Install GitHub CLI (gh) in the cloud worker image');
         const cwd = realpathSync(options.cwd);
@@ -627,7 +644,7 @@ export async function createHostedBotRunner(host: {
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, "--captures"], env: {},
         } : undefined;
-        await live();
+        if (subscription) assertOpen(); else await live();
         const spawnHosted = (config: SpawnOptions): SpawnedProcess => {
           assertOpen();
           const home = join(runDir, "runtime-home");
@@ -683,7 +700,7 @@ export async function createHostedBotRunner(host: {
           return child;
         };
         const codexSpawn: typeof spawnCli = async (_sandbox, argv, input) => {
-          await check();
+          if (subscription) await subscription.prepared(); else await check();
           const child = spawnHosted({
             command: argv[0],
             args: argv.slice(1),
@@ -764,7 +781,7 @@ export async function createHostedBotRunner(host: {
                     token: async () => {
                       startup.tokenRequested = true;
                       startup.tokenCheckPassed = false;
-                      const current = await subscription!.check("token");
+                      const current = await subscription!.prepared("token");
                       startup.tokenCheckPassed = true;
                       startup.phase = "adapter_start";
                       return {

@@ -7,6 +7,7 @@ import { request } from "node:http";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultRunPolicy, type RunAssignment } from "@mikka/protocol";
 import { createHostedBotRunner } from "../src/subscription-hosted-runner";
+import * as nativeBroker from "../src/subscription-native-broker";
 import { DaemonError, ServerUnreachableError } from "../src/errors";
 import { MemoryServer } from "../src/server-link";
 import { createLogger } from "../src/log";
@@ -266,12 +267,19 @@ it.each(['context', 'broker'] as const)('fences hosted startup revoked during %s
     expect(fixture.link.nativeContext).not.toHaveBeenCalled()
   }
   fixture.link.nativeContext.mockImplementation(async () => {
-    if (fixture.link.nativeContext.mock.calls.length === (phase === 'context' ? 1 : 2)) {
+    if (phase === 'context' && fixture.link.nativeContext.mock.calls.length === 1) {
       entered.resolve()
       await resume.promise // Trusted server reply can arrive after cancellation.
     }
     return fixture.contextValue
   })
+  const createBroker = nativeBroker.createNativeSubscriptionBroker
+  const brokerPause = phase === 'broker' ? vi.spyOn(nativeBroker, 'createNativeSubscriptionBroker').mockImplementation(async host => {
+    const broker = await createBroker(host)
+    entered.resolve()
+    await resume.promise
+    return broker
+  }) : undefined
   const starting = fixture.runner.start(fixture.assignment, fixture.options)
   // Attach rejection handling before revoking or releasing any paused boundary.
   const rejected = expect(starting).rejects.toThrow('subscription_hosted_runtime_unavailable')
@@ -290,6 +298,7 @@ it.each(['context', 'broker'] as const)('fences hosted startup revoked during %s
   } finally {
     fixture.gate.revoke(); resume.resolve()
     await starting.catch(() => undefined)
+    brokerPause?.mockRestore()
   }
 }, 60000)
 
@@ -568,13 +577,13 @@ it.each(['expired', 'invalid'] as const)('rejects a successful but %s post-start
   } finally { fixture.gate.revoke(); await session?.cancel() }
 }, 45000)
 
-it.each(['token', 'verify'] as const)('logs finite startup diagnostics for a refusal during %s without private values', async phase => {
+it.each(['server_refused', 'context_changed'] as const)('logs finite startup diagnostics for fresh verification %s without private values', async reason => {
   const fixture = await revocationFixture()
   const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
   const consoleLog = vi.spyOn(console, 'warn').mockImplementation(() => {})
   fixture.link.nativeContext.mockImplementation(async () => {
-    if (fixture.link.nativeContext.mock.calls.length === (phase === 'token' ? 3 : 4)) {
-      if (phase === 'token') throw new DaemonError(-32603, 'private-upstream-token-must-not-log', { status: 409, credential: 'private-credential-must-not-log' })
+    if (fixture.link.nativeContext.mock.calls.length === 2) {
+      if (reason === 'server_refused') throw new DaemonError(-32603, 'private-upstream-token-must-not-log', { status: 409, credential: 'private-credential-must-not-log' })
       return { ...fixture.contextValue, accountId: 'private-account-must-not-log' }
     }
     return fixture.contextValue
@@ -583,8 +592,9 @@ it.each(['token', 'verify'] as const)('logs finite startup diagnostics for a ref
     await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_hosted_runtime_unavailable')
     const records = log.mock.calls.map(call => call[0] as unknown as { event?: string })
     expect(records.filter(record => record.event === 'subscription_startup_failed')).toHaveLength(1)
-    expect(records.find(record => record.event === 'subscription_startup_failed')).toMatchObject({ event: 'subscription_startup_failed', phase, contextReady: true, brokerReady: true, tokenRequested: true,
-      ...(phase === 'token' ? { reason: 'server_refused', httpStatus: 409, tokenCheckPassed: false } : { reason: 'context_changed', tokenCheckPassed: true, verifyRequested: true, verifyCheckPassed: false, sameAccount: false }) })
+    expect(records.find(record => record.event === 'subscription_startup_failed')).toMatchObject({ event: 'subscription_startup_failed', phase: 'verify', contextReady: true, brokerReady: true, tokenRequested: true,
+      tokenCheckPassed: true, verifyRequested: true, verifyCheckPassed: false, reason,
+      ...(reason === 'server_refused' ? { httpStatus: 409 } : { sameAccount: false }) })
     const encoded = JSON.stringify(log.mock.calls)
     for (const privateValue of ['private-upstream-token', 'private-credential', 'private-account', 'fixture-account']) expect(encoded).not.toContain(privateValue)
     expect(fixture.processes()).toEqual([])
@@ -613,11 +623,39 @@ it('reports a hung hosted Claude initializer as startup timeout and closes its e
   } finally { fixture.gate.revoke(); warn.mockRestore() }
 })
 
+it.each(['claude_code', 'codex'] as const)('starts %s with one metadata read and one fresh account verification', async harness => {
+  const fixture = await revocationFixture(harness === 'codex' ? 'fakes/fake-codex-subscription.mjs' : 'fakes/fake-claude-subscription.mjs', harness)
+  fixture.contextValue.expiresAt = new Date(Date.now() + 600_000).toISOString()
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    expect(fixture.link.nativeContext).toHaveBeenCalledTimes(2)
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    fixture.revokePolicy()
+    await expect(session.send('must not reach the CLI')).rejects.toThrow()
+    expect(fixture.gate.revoked).toBe(true)
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+  } finally { fixture.gate.revoke(); await session?.cancel() }
+})
+
+it('refreshes startup metadata that expired in transit before initializing the CLI', async () => {
+  const fixture = await revocationFixture()
+  fixture.contextValue.expiresAt = new Date(Date.now() + 600_000).toISOString()
+  fixture.link.nativeContext.mockImplementation(async () => fixture.link.nativeContext.mock.calls.length === 1
+    ? { ...fixture.contextValue, expiresAt: new Date(Date.now() - 1).toISOString() } : fixture.contextValue)
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    expect(fixture.link.nativeContext).toHaveBeenCalledTimes(3)
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+  } finally { fixture.gate.revoke(); await session?.cancel() }
+})
+
 it('rechecks the owned Codex broker account before the first custom-provider turn', async () => {
   const fixture = await revocationFixture('fakes/fake-codex-subscription.mjs', 'codex')
   const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
   const consoleLog = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  fixture.link.nativeContext.mockImplementation(async () => fixture.link.nativeContext.mock.calls.length === 4
+  fixture.link.nativeContext.mockImplementation(async () => fixture.link.nativeContext.mock.calls.length === 2
     ? { ...fixture.contextValue, accountId: 'another-account' } : fixture.contextValue)
   try {
     await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_hosted_runtime_unavailable')

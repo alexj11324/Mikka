@@ -13,11 +13,13 @@ export const NATIVE_AUTH_PLACEHOLDER = "mikka-native-broker-placeholder";
 export async function createNativeSubscriptionBroker(host: {
   root: string;
   revision: number;
+  /** Optional already-validated startup metadata; only used to open the private socket. */
+  prepare?(): Promise<unknown>;
   check(): Promise<unknown>;
   log?: Pick<Logger, 'warn'>;
   worker: Pick<SubscriptionWorkerClient, "nativeRequest">;
 }) {
-  await host.check();
+  await (host.prepare ? host.prepare() : host.check());
   mkdirSync(host.root, { recursive: true, mode: 0o700 });
   const dir = mkdtempSync(join(host.root, "native-broker-"));
   chmodSync(dir, 0o700);
