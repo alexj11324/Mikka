@@ -66,7 +66,8 @@
       "review": "评审中",
       "done": "已完成",
       "canceled": "已取消",
-      "duplicate": "重复"
+      "duplicate": "重复",
+      "blocked": "受阻"
     },
     "priority": {
       "urgent": "紧急",
@@ -4281,7 +4282,18 @@
           "running": "进行中",
           "waiting": "等待你",
           "blocked": "受阻"
-        }
+        },
+        "block": {
+          "question": "等你回答",
+          "quota": "额度用完",
+          "run": "运行受阻",
+          "failed": "运行失败",
+          "dependency": "等其他任务",
+          "dependencyOn": "等 {id}",
+          "flagged": "已标记"
+        },
+        "markBlocked": "标记为受阻",
+        "unblock": "移出受阻"
       },
       "title": "看板",
       "synced": "已与 Linear 同步",

@@ -11,7 +11,7 @@ import { issuePropertyChoices } from '@/lib/issue-property-choices'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
-import { assigneeSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { assigneeSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
@@ -24,6 +24,8 @@ const patchSchema = z.object({
   pullRequests: z.array(pullRequestSchema).max(10).optional(),
   dueDate: z.iso.date().nullable().optional(),
   estimate: z.number().int().min(0).max(100).nullable().optional(),
+  /** 受阻 by hand: moved into the column, or out of it (lib/task-blocked.ts). */
+  block: blockFlagSchema.nullable().optional(),
 }).strict()
 export type IssueMetadataPatch = z.infer<typeof patchSchema>
 
