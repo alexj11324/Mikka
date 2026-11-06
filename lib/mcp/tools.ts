@@ -13,6 +13,7 @@ import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
 import { subscribeToCoordinatorReplies } from './reply-live'
 import { waitForReply } from './reply-wait'
+import { logReplyCompletion } from './reply-completion'
 import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -118,7 +119,9 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
     const messages = await messagesAfter(userId, botId, after, limit)
     const replied = messages.some(message => message.role === 'assistant')
     return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() } }
-  }, { deadline, signal, subscribe: (changed, abort) => subscribeToCoordinatorReplies(scope, botId, changed, abort) })
+  }, { deadline, signal, subscribe: (changed, abort) => subscribeToCoordinatorReplies(scope, botId, changed, abort),
+    onComplete: completion => logReplyCompletion(botId, completion),
+  })
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {

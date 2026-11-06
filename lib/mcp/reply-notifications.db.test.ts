@@ -23,6 +23,20 @@ async function bounded<T>(promise: Promise<T>) {
   } finally { clearTimeout(timer) }
 }
 
+/** A writer COMMIT need not have reached the shared LISTEN socket yet. Consume
+ * a later marker on that same session before attaching the measured waiter. */
+async function fixtureCommitBarrier(database: Pool) {
+  const key = 'fixture-barrier:' + randomUUID(), controller = new AbortController()
+  const subscription = await subscribeShared(database, MCP_REPLY_CHANNEL, [key], controller.signal)
+  assert.ok(subscription, 'the fixture barrier needs the actual shared LISTEN session')
+  try {
+    const delivered = subscription.next(2_147_483_647, controller.signal)
+    await notifyChannel(database, MCP_REPLY_CHANNEL, [key])
+    await bounded(delivered)
+    assert.equal(subscription.lost, false, 'connection loss is not a committed fixture barrier')
+  } finally { controller.abort(); subscription.close() }
+}
+
 // Only the four notification tables are needed here. The normal migration and
 // existing reply-live DB suite exercise the complete schema and actual writers.
 const tables = `
@@ -122,6 +136,7 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
         const owner = randomUUID(), botId = randomUUID(), home = randomUUID(), nextHome = randomUUID()
         await app.query('INSERT INTO bots VALUES($1,$2,$3)', [botId, owner, home])
         await workspace.query('INSERT INTO mikka_workspace_members VALUES($1,$2,\'active\'),($3,$2,\'active\')', [home, owner, nextHome])
+        await Promise.all([fixtureCommitBarrier(app), fixtureCommitBarrier(workspace)])
         const controller = new AbortController()
         let ready!: () => void, reads = 0
         const first = new Promise<void>(resolve => { ready = resolve })
