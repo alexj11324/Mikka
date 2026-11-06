@@ -41,8 +41,9 @@ export function Spinner({ size = 18, color = colors.secondary }: { size?: number
  * A thread's status icon: a speech bubble with its state as a dot on the corner (R-52). A circle is always a task, so a
  * thread borrows none: 进行中 a pulsing grey dot, 等待你 orange, 受阻 red, 已解决 green, 空闲 a hollow ring. The icon's
  * label names the state, so the colour is never the only sign (R-87). A thread is never drawn with its bot's avatar.
+ * `plain` drops the dot where a list's section already names the state (the 线程 list, Alex 2026-11-06).
  */
-export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?: number }) {
+export function StatusIcon({ status, size = 18, plain = false }: { status: ThreadStatus; size?: number; plain?: boolean }) {
   const { dot, label } = threadDot(status)
   const pulse = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotionPreference()
@@ -61,11 +62,11 @@ export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?:
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={label} style={{ width: size, height: size }}>
       <MessageCircle size={size} color={colors.secondary} strokeWidth={2} />
-      <Animated.View testID={`thread-dot-${dot}`} style={{
+      {plain ? null : <Animated.View testID={`thread-dot-${dot}`} style={{
         position: 'absolute', top: -1, right: -1, width: spot, height: spot, borderRadius: spot / 2, backgroundColor: fill,
         borderWidth: dot === 'idle' ? 1.5 : 2, borderColor: dot === 'idle' ? colors.secondary : colors.page,
         opacity: dot === 'running' ? pulse : 1,
-      }} />
+      }} />}
     </View>
   )
 }

@@ -1,12 +1,18 @@
 import type { ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { GlassView } from 'expo-glass-effect'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Check } from 'lucide-react-native'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { useLiquidGlass } from '@/lib/glass'
 import { tap } from '@/lib/haptics'
 import { colors, lift } from '@/lib/theme'
+
+/** Space between the capsule and the tab bar. */
+const GAP = 12
+/** The room a list leaves under its last row so the capsule never covers it: the capsule, its gap and a margin. */
+export const SWITCHER_SPACE = 52 + GAP + 40
 
 export type ThreadFilter = 'all' | 'waiting' | 'running' | 'resolved'
 
@@ -22,8 +28,10 @@ const OPTIONS: { id: ThreadFilter; label: string; mark: ReactNode }[] = [
 /**
  * The floating status switcher over the 线程 list (Comma design 13; Alex 2026-11-06): 全部, 等待你, 进行中 and 已解决
  * in one Liquid Glass capsule above the tab bar, in place of the filter menu. Each mark has its word for VoiceOver.
+ * It sits in a native safe-area view: inside a tab, the system counts the tab bar in that view's bottom inset, so the
+ * capsule rests above the tab bar rather than on it, whatever its height.
  */
-export function StatusSwitcher({ value, onChange, bottom }: { value: ThreadFilter; onChange: (value: ThreadFilter) => void; bottom: number }) {
+export function StatusSwitcher({ value, onChange }: { value: ThreadFilter; onChange: (value: ThreadFilter) => void }) {
   const glass = useLiquidGlass()
   const segments = (
     <View style={styles.row} accessibilityRole="tablist">
@@ -41,14 +49,14 @@ export function StatusSwitcher({ value, onChange, bottom }: { value: ThreadFilte
     </View>
   )
   return (
-    <View pointerEvents="box-none" style={[styles.place, { bottom }]}>
+    <SafeAreaView edges={['bottom']} mode="padding" pointerEvents="box-none" style={styles.place}>
       {glass ? <GlassView isInteractive style={styles.capsule}>{segments}</GlassView> : <View style={[styles.capsule, styles.lifted]}>{segments}</View>}
-    </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  place: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  place: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingTop: 0, marginBottom: GAP },
   capsule: { borderRadius: 26, padding: 4 },
   lifted: { backgroundColor: colors.surface, ...lift, shadowOpacity: 0.14, shadowRadius: 18 },
   row: { flexDirection: 'row', gap: 2 },

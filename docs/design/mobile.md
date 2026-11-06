@@ -59,9 +59,16 @@ their counts as the system's tab badges.
 workspaces with a check on the open one; a tap switches and goes back. 编辑 shows
 handles that arrange them on this device.
 
-**线程** (designs 13, 15) has a 线程 | 任务 segment under its large title. 线程 lists the device chips and the
-threads by group; a floating glass switcher above the tab bar filters 全部 / 等待你 / 进行中 / 已解决 (it replaced the
-filter menu). 任务 lists the tasks by status, each opening on the web.
+**Side margins** (Alex 2026-11-06, HIG layout margins; `lib/theme.ts`): a plain list's content starts 16 pt in from
+each edge (对话, 线程, 任务, 建议, 搜索), an inset grouped list's cards 20 pt (插件, 工作区, the 新建 sheets).
+
+**No badges** (Alex 2026-11-06): the tab bar carries no count badges, and thread and task rows no coloured status
+dots; the list's sections name the state. The unread mark on a chat's avatar stays.
+
+**线程** (designs 13, 15) has a 线程 | 任务 segment under its large title, then one list. Each row is one line: the
+status icon and the title, at 17 pt, cut with an ellipsis; a title's leading issue key (ALEX-12, #1408) and trailing
+date or time are not shown (Alex 2026-11-06, `lib/display-title.ts`). A floating glass switcher above the tab bar
+filters 全部 / 等待你 / 进行中 / 已解决; it is the only filter. 任务 lists the tasks the same way, each opening on the web.
 
 **建议** (design 16) has a card per app with today's count, then 今天; 插件 is its bar button. **插件** (design 17) is
 pushed inside the 建议 and 设置 tabs: system search, 应用 | 技能, inset groups, a green dot for a connected app.

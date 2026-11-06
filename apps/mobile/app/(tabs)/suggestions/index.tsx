@@ -10,7 +10,7 @@ import { shortWhen } from '@/lib/clock'
 import type { Suggestion, Suggestions } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
-import { colors } from '@/lib/theme'
+import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 import { ListSectionHeader } from '@/shared/components/list-section'
 
 const VERB: Record<string, string> = { reply: '回复', review: '审阅', handle: '处理', read: '查看' }
@@ -77,13 +77,13 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   center: { paddingTop: 40, alignItems: 'center' },
   note: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
-  cards: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, gap: 10 },
+  cards: { paddingHorizontal: LIST_INSET, paddingTop: 4, paddingBottom: 4, gap: 10 },
   card: { width: 168, gap: 10, padding: 12, borderRadius: 16, borderCurve: 'continuous', backgroundColor: colors.bubble },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardName: { flexShrink: 1, fontSize: 15, fontWeight: '600' },
   cardCount: { fontSize: 13, color: colors.secondary },
   badge: { width: 26, height: 26, borderRadius: 7, borderCurve: 'continuous', backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, paddingVertical: 9, borderRadius: 10 },
   body: { flex: 1, minWidth: 0, gap: 2 },
   title: { fontSize: 17, lineHeight: 22 },
   verb: { fontWeight: '600' },

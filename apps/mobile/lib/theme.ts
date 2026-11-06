@@ -19,6 +19,14 @@ function resolve(name: Name, token: Token): string {
   return token.light
 }
 
+/**
+ * Side margins (Alex 2026-11-06; HIG layout margins): a plain list's content starts 16 pt in from each edge, an inset
+ * grouped list's cards 20 pt. A row's pressed surface sits 6 pt in and its content 10 pt further, so text lands on 16.
+ */
+export const LIST_INSET = 16
+export const GROUP_INSET = 20
+export const ROW_SURFACE_INSET = 6
+
 export const colors = Object.fromEntries(Object.entries(TOKENS).map(([name, token]) => [name, resolve(name as Name, token)])) as Record<Name, string>
 
 // The web build's palette, switched by the browser's colour scheme.
