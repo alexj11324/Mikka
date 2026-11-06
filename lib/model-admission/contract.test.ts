@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { admitGatewayRoute, admitModelRoute, GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, parseModelAdmissionPolicy, subscriptionModelRoute } from './contract'
+import { admitGatewayRoute, admitModelRoute, GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, parseModelAdmissionPolicy, subscriptionModelRoute, ZEROCAT_MODEL_ENDPOINT } from './contract'
 
 const request = { ownerId: 'alice', model: 'deepseek/deepseek-v4.1-flash', endpoint: GATEWAY_MODEL_ENDPOINT }
 const rule = { provider: 'vercel-gateway', endpoint: GATEWAY_MODEL_ENDPOINT, model: request.model,
@@ -42,4 +42,15 @@ test('existing subscription routes pin the worker endpoint, physical provider an
     assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, endpoint: `${transport.endpoint}?proxy=true` }] }), denied('modelPolicyInvalid'))
   }
   assert.throws(() => subscriptionModelRoute('openai_siwc'), denied('modelRouteDenied'))
+})
+test('the default model\'s ZeroCat route pins its endpoint and is not a Gateway route', () => {
+  const route = { provider: 'zerocat', endpoint: ZEROCAT_MODEL_ENDPOINT, model: request.model, servingProviders: ['zerocat'], principalIds: ['alice'], dataRegions: ['unknown'] }
+  const rule = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
+  const zeroCat = { provider: 'zerocat', endpoint: ZEROCAT_MODEL_ENDPOINT, ownerId: 'alice', model: request.model }
+  assert.equal(admitModelRoute(rule, zeroCat).provider, 'zerocat')
+  for (const changed of [{ endpoint: 'https://proxy.invalid/v1' }, { provider: 'vercel-gateway' }, { ownerId: 'bob' }])
+    assert.throws(() => admitModelRoute(rule, { ...zeroCat, ...changed }), denied('modelRouteDenied'))
+  assert.throws(() => admitGatewayRoute(rule, request), denied('modelRouteDenied'))
+  for (const changed of [{ endpoint: 'https://proxy.invalid/v1' }, { servingProviders: ['deepseek'] }])
+    assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, ...changed }] }), denied('modelPolicyInvalid'))
 })

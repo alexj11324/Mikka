@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { createGateway, generateText, streamText } from 'ai'
+import { createGateway, generateText, jsonSchema, stepCountIs, streamText, tool } from 'ai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { MVP_DECISION_KEY } from '../../tests/mvp/transport.mjs'
 import { startLocalCron } from './cron.mjs'
 import { refreshQueue } from './refresh-queue.mjs'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { stopOwnedServices } from './shutdown.mjs'
-import { grantLocalCredits, localDecision, localModelAnswer, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY } from './services.mjs'
+import { grantLocalCredits, localDecision, localModelAnswer, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './services.mjs'
 
 test('the scripted model echoes, calls a registered tool on /tool and reports tool results', () => {
   const user = text => ({ prompt: [{ role: 'user', content: [{ type: 'text', text }] }], tools: [{ type: 'function', name: 'create_issue' }] })
@@ -162,4 +163,30 @@ test('a stuck child or failing closer cannot leave the local stack running', asy
   await stopOwnedServices([child], [() => { throw new Error('closer failed') }], 100)
   await exited
   assert.equal(child.signalCode, 'SIGKILL')
+})
+
+test('the real OpenAI-compatible provider reaches the ZeroCat substitute, tool calls included', async t => {
+  const { routes } = localServiceRoutes({ log: () => {} })
+  const server = createServer(async (request, response) => {
+    if (!await routes(request, response, new URL(request.url, 'http://127.0.0.1'))) { response.writeHead(404); response.end() }
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  const origin = `http://127.0.0.1:${server.address().port}`
+  const local = (input, init) => {
+    const request = new Request(input, init)
+    assert.equal(request.url, 'https://zero.cat/v1/chat/completions')
+    return fetch(new Request(`${origin}/zerocat/v1/chat/completions`, request))
+  }
+  // As lib/abuse/zerocat.ts builds it.
+  const model = createOpenAICompatible({ name: 'zerocat', baseURL: 'https://zero.cat/v1', apiKey: LOCAL_ZEROCAT_KEY, includeUsage: true, fetch: local }).chatModel('deepseek-v4.1-flash')
+  assert.equal((await generateText({ model, prompt: 'ping' })).text, 'Local model: ping')
+  const streamed = streamText({ model, prompt: 'a longer message than one chunk of the stream' })
+  assert.equal(await streamed.text, 'Local model: a longer message than one chunk of the stream')
+  assert.equal((await streamed.totalUsage).outputTokens, 1)
+  const echo = tool({ inputSchema: jsonSchema({ type: 'object', properties: { word: { type: 'string' } } }), execute: async ({ word }) => ({ echoed: word }) })
+  const called = streamText({ model, tools: { echo }, stopWhen: stepCountIs(2), prompt: '/tool echo {"word":"hi"}' })
+  assert.equal(await called.text, 'echo: "{\\"echoed\\":\\"hi\\"}"')
+  const wrongKey = createOpenAICompatible({ name: 'zerocat', baseURL: 'https://zero.cat/v1', apiKey: 'real-looking-key', fetch: local }).chatModel('deepseek-v4.1-flash')
+  await assert.rejects(generateText({ model: wrongKey, prompt: 'ping', maxRetries: 0 }))
 })

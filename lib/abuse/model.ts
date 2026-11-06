@@ -7,6 +7,8 @@ import { hostedBillingScope } from './context'
 import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
 import { withSharedCredits } from '@/lib/credit-shares'
+import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { createZeroCatModel, zeroCatConfig, zeroCatCost } from './zerocat'
 import {
   gatewayCost,
   gatewayGenerationId,
@@ -25,6 +27,21 @@ export async function createTrustedGatewayModel(modelId: string, apiKey?: string
   trustedGatewayModels.add(model)
   return model
 }
+/**
+ * The default model (COORDINATOR_MODEL) goes straight to ZeroCat; every other
+ * hosted model id keeps its Vercel AI Gateway route.
+ */
+export function isZeroCatModel(modelId: string) { return modelId === COORDINATOR_MODEL }
+
+/** Admission for a hosted model on its own transport, before any paid work. */
+export async function admitHostedModel(scope: { workspaceId: string; ownerId?: string }, modelId: string,
+  options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<GatewayAdmission | null> {
+  if (!isZeroCatModel(modelId)) return modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, options)
+  // Admitted against the endpoint actually configured; Gateway options never apply.
+  await modelAdmission.zeroCat(scope, modelId, zeroCatConfig()?.baseURL, options)
+  return null
+}
+
 /** Every SDK tool step reaches this model boundary, including compaction. */
 export async function hostedModel(
   workspaceId: string,
@@ -33,7 +50,11 @@ export async function hostedModel(
   ownerId?: string,
 ): Promise<Model> {
   await withSharedCredits(workspaceId, canUseMikkaPaid)
-  const model = provider ?? gateway(modelId)
+  // A caller-supplied provider can never stand in for ZeroCat's server-owned transport.
+  const zeroCat = isZeroCatModel(modelId)
+  if (zeroCat && provider) throw new ModelAdmissionError('modelRouteDenied')
+  // Missing ZeroCat variables refuse here, before any reservation; never Gateway.
+  const model = zeroCat ? createZeroCatModel() : provider ?? gateway(modelId)
   const billing = hostedBillingScope.getStore()
   const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
   let managed: Model | undefined
@@ -46,7 +67,7 @@ export async function hostedModel(
     id: string,
     args: Parameters<Model['doGenerate']>[0],
   ) => {
-    const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal, auditAllowed: false })
+    const admission = await admitHostedModel(scope, modelId, { signal: args.abortSignal, auditAllowed: false })
     await executionModel(admission)
     // An input-size boundary, not a prepaid or estimated-cost balance check.
     const promptBytes = Buffer.byteLength(
@@ -58,7 +79,8 @@ export async function hostedModel(
   }
   const options = (value: Parameters<Model['doGenerate']>[0], admission: GatewayAdmission | null) => ({
     ...value,
-    providerOptions: {
+    // Gateway routing options mean nothing to ZeroCat, and a caller's must not reach it.
+    providerOptions: zeroCat ? withoutGatewayOptions(value.providerOptions) : {
       ...value.providerOptions,
       gateway: admission ? { ...managedGatewayOptions(admission), user: workspaceId } : { ...value.providerOptions?.gateway, user: workspaceId },
     },
@@ -77,13 +99,13 @@ export async function hostedModel(
           let requestStarted = false
           try {
             await checkAbuseAlerts()
-            const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
+            const admission = await admitHostedModel(scope, modelId, { signal: args.abortSignal })
             const selected = await executionModel(admission)
             const prepared = options(args, admission)
             if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
             requestStarted = true
             const result = await selected.doGenerate(prepared)
-            const cost = gatewayCost(result.providerMetadata)
+            const cost = zeroCat ? zeroCatCost(result.usage) : gatewayCost(result.providerMetadata)
             await hostedUsage.settle(
               id,
               cost,
@@ -107,7 +129,7 @@ export async function hostedModel(
           let requestStarted = false
           try {
             await checkAbuseAlerts()
-            const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
+            const admission = await admitHostedModel(scope, modelId, { signal: args.abortSignal })
             const selected = await executionModel(admission)
             const prepared = options(args, admission)
             if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
@@ -148,7 +170,7 @@ export async function hostedModel(
                       }
                     }
                     if (chunk.type === 'finish') {
-                      const cost = gatewayCost(chunk.providerMetadata)
+                      const cost = zeroCat ? zeroCatCost(chunk.usage) : gatewayCost(chunk.providerMetadata)
                       await hostedUsage.settle(
                         id,
                         cost,
@@ -183,4 +205,10 @@ export async function hostedModel(
       return typeof value === 'function' ? value.bind(target) : value
     },
   })
+}
+
+function withoutGatewayOptions(options: Parameters<Model['doGenerate']>[0]['providerOptions']) {
+  if (!options) return undefined
+  const { gateway: _gateway, ...rest } = options
+  return rest
 }

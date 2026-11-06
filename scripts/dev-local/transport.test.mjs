@@ -25,6 +25,8 @@ test('only GitHub, and the gateway and Resend without a real key, go to the loca
   assert.equal(devLocalTarget('https://ai-gateway.vercel.sh/v4/ai/language-model', local), null)
   assert.equal(devLocalTarget('https://api.resend.com/emails', { ...local, RESEND_API_KEY: 'mikka-local-outbox' }), 'http://127.0.0.1:3191/resend/emails')
   assert.equal(devLocalTarget('https://api.resend.com/emails', { ...local, RESEND_API_KEY: 're_real' }), null)
+  assert.equal(devLocalTarget('https://zero.cat/v1/chat/completions', { ...local, ZEROCAT_API_KEY: 'mikka-local-zerocat' }), 'http://127.0.0.1:3191/zerocat/v1/chat/completions')
+  assert.equal(devLocalTarget('https://zero.cat/v1/chat/completions', { ...local, ZEROCAT_API_KEY: 'real-key' }), null)
   assert.equal(devLocalTarget('https://api.resend.com/domains', { ...local, RESEND_API_KEY: 'mikka-local-outbox' }), null)
   assert.equal(devLocalTarget('https://api.deepseek.com/v1/chat/completions', local), null)
   assert.equal(devLocalTarget('https://github.com/login/oauth/authorize', local), null)

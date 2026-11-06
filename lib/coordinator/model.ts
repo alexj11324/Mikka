@@ -1,12 +1,16 @@
 import { roundStep } from '@/lib/agent-rounds'
 
 /**
- * The Coordinator's model, through Vercel AI Gateway. On Vercel the gateway
- * signs in with the deployment's OIDC token; elsewhere set AI_GATEWAY_API_KEY.
+ * The default model (Mikka 默认): the Coordinator's, and the one behind action
+ * titles, profile facts and group replies. It is called directly on ZeroCat's
+ * OpenAI-compatible API (`deepseek-v4.1-flash`, lib/abuse/zerocat.ts), with
+ * ZEROCAT_BASE_URL and ZEROCAT_API_KEY from Infisical `prod:/vercel`; without
+ * them a call refuses as temporarily unavailable and never falls back to AI
+ * Gateway. Other hosted model ids keep their Gateway route.
  */
 // User-selected project default. Existing immutable run snapshots still resolve
 // their own saved selection; changing this constant cannot rewrite their model.
-// DeepSeek BYOK delivery belongs to the team's Gateway configuration, not code.
+// This id names the model inside Mikka (snapshots, ledger, admission rules).
 export const COORDINATOR_MODEL = 'deepseek/deepseek-v4.1-flash'
 
 /**

@@ -102,7 +102,20 @@ and transaction preservation without Stripe calls.
 
 ## Scope and accounting
 
-All new Gateway text calls are admitted before provider I/O. Default Workflow
+The default model (`COORDINATOR_MODEL`, `deepseek/deepseek-v4.1-flash`) is
+served directly by ZeroCat's OpenAI-compatible API (`https://zero.cat/v1`,
+model `deepseek-v4.1-flash`, `lib/abuse/zerocat.ts`), not by Vercel AI
+Gateway. `ZEROCAT_BASE_URL` and `ZEROCAT_API_KEY` come from Infisical
+`prod:/vercel`, synced to Vercel Production. Without either, or with another
+base URL, `hostedModel` refuses before any reservation with
+`usage_cost_unavailable` (the chat's "temporarily unavailable"); it never falls
+back to Gateway, and a caller cannot supply its own provider for this model.
+Its admission rule is a `zerocat` route (`ModelAdmissionStore.zeroCat`); a
+workspace rule that only lists the `vercel-gateway` route refuses it. Gateway
+routing options (`providerOptions.gateway`) are dropped, not sent. Other hosted
+model ids keep their Gateway route below.
+
+All new hosted text calls are admitted before provider I/O. Default Workflow
 turns (Coordinator/bot and Slack), frozen hosted snapshots, live evaluations,
 compaction, group replies, action-title generation and profile extraction use
 the metered model seam. Triage, group routing/correction, and notification
@@ -169,7 +182,10 @@ compaction keeps its existing 30-second timeout. Inputs over 16 MB are refused;
 these transport bounds do not reserve money. Subscription calls keep their
 existing capabilities.
 Actual Gateway `providerMetadata.gateway.cost` is rounded upwards to integer
-microdollars. Missing cost or an interrupted provider call retains its
+microdollars. ZeroCat returns token counts and no cost, so a default-model call
+settles from its usage at `ZEROCAT_PRICE_USD_PER_MILLION` (input 0.12, cached
+input 0.012, output 1.00, reasoning included), the rates Gateway billed for this
+model, rounded up; missing token counts leave the cost unknown, as below. Missing cost or an interrupted provider call retains its
 receipt record and keeps its hold until reconciled, rather than treating unknown
 usage as free. Operators can reconcile the same call ID with
 `HostedUsageStore.settle(id, actualMicroUsd, ...)` after checking the Gateway
