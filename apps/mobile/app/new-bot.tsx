@@ -83,7 +83,7 @@ export default function NewBot() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  body: { padding: 16, gap: 12 },
+  body: { paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
   hero: { alignItems: 'center', marginTop: 24, marginBottom: 16 },
   label: { marginTop: 4, marginLeft: 16, fontSize: 15, fontWeight: '600', color: colors.secondary },
   panel: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6, padding: 10, borderRadius: 22, borderCurve: 'continuous', backgroundColor: colors.bubble },

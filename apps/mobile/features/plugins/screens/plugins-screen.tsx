@@ -12,7 +12,7 @@ import { api } from '@/lib/api'
 import type { ComposioAccounts, SkillsPage, StoreCatalog } from '@/lib/types'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
-import { colors } from '@/lib/theme'
+import { colors, GROUP_INSET } from '@/lib/theme'
 import { ListSectionHeader } from '@/shared/components/list-section'
 
 type Tab = 'apps' | 'skills'
@@ -101,7 +101,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       contentContainerStyle={styles.list}
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
-      renderItem={({ item: row }) => 'title' in row ? <ListSectionHeader title={row.title} /> : (
+      renderItem={({ item: row }) => 'title' in row ? <ListSectionHeader title={row.title} grouped /> : (
         <GroupRow place={row.place} label={`${row.item.name}${connected.has(row.item.id) ? '，已连接' : ''}`} onPress={() => void open(row.item.id)}>
           <AppIcon entry={row.item} />
           <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
@@ -193,9 +193,9 @@ function Skills({ query, header }: { query: string; header: ReactElement }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.grouped },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  header: { paddingHorizontal: GROUP_INSET, paddingTop: 8, paddingBottom: 4 },
   list: { paddingBottom: 32 },
-  groupRow: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, marginHorizontal: 16, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface },
+  groupRow: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, marginHorizontal: GROUP_INSET, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface },
   groupFirst: { borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   groupLast: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   hairline: { position: 'absolute', left: 60, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },

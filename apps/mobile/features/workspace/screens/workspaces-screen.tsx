@@ -12,7 +12,7 @@ import { Text } from '@/components/Text'
 import { tap } from '@/lib/haptics'
 import { SNAP_BACK } from '@/lib/springs'
 import type { Workspace } from '@/lib/types'
-import { colors } from '@/lib/theme'
+import { colors, GROUP_INSET } from '@/lib/theme'
 import { useWorkspaces } from '../model/use-workspaces'
 import { dragSlot, moveTo } from '../model/workspace-order'
 
@@ -88,7 +88,7 @@ function WorkspaceRow({ workspace, index, count, selected, busy, disabled, sorti
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.grouped },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { paddingHorizontal: GROUP_INSET, paddingTop: 16, paddingBottom: 32 },
   group: { borderRadius: 16, borderCurve: 'continuous', backgroundColor: colors.surface, paddingVertical: 4 },
   row: { height: ROW, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 16 },
   pick: { flex: 1, minWidth: 0, height: ROW, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16 },

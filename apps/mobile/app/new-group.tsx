@@ -80,7 +80,7 @@ export default function NewGroup() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  body: { padding: 16, gap: 20 },
+  body: { paddingHorizontal: 20, paddingVertical: 16, gap: 20 },
   field: { minHeight: 52, borderRadius: 26, paddingVertical: 12, paddingHorizontal: 18, justifyContent: 'center', backgroundColor: colors.bubble },
   input: { fontSize: 17, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   problem: { color: colors.danger, fontSize: 14, marginTop: -8, marginLeft: 4 },

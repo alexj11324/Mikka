@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import { ChatRowContent } from '@/components/ChatList'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
-import { colors } from '@/lib/theme'
+import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 import { chatHref } from '../components/chat-href'
 import { useHomeChats } from '../model/use-home-chats'
 
@@ -39,8 +39,8 @@ export function HiddenChatsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   row: { flexDirection: 'row', alignItems: 'center' },
-  open: { flex: 1, minWidth: 0, marginLeft: 10, borderRadius: 10 },
-  show: { height: 32, paddingHorizontal: 12, marginRight: 16, borderRadius: 16, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
+  open: { flex: 1, minWidth: 0, marginLeft: ROW_SURFACE_INSET, borderRadius: 10 },
+  show: { height: 32, paddingHorizontal: 12, marginRight: LIST_INSET, borderRadius: 16, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   showText: { fontSize: 14, fontWeight: '600', color: colors.accent },
   none: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
 })
