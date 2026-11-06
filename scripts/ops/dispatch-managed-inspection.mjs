@@ -16,7 +16,7 @@ const SOURCE_JOB_ID = 128123815664
 const SOURCE_SHA = 'c0c98baa3020a085652ee5f773310b6dfa412c5d'
 
 // Bound only after the inspected workflow is reviewed and merged on main.
-export const BINDING = Object.freeze({ driverSha: '1a70bb79d7dc4ab31418e9fa674dd39c0a1cae01' })
+export const BINDING = Object.freeze({ driverSha: 'e6afbd3cde052a66c9451ac81a0b59fc5674f7ae' })
 class ClosedError extends Error {
   constructor(code, { status = null, cause } = {}) {
     super(code, { cause }); this.code = code
