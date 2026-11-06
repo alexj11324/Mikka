@@ -1,4 +1,4 @@
-name: Issue 1504 cleanup and Coordinator setup
+name: Issue 1506 production Coordinator baseline
 
 # Branch-only acceptance using ordinary smoke login; only owned synthetic fixtures.
 on:
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  cleanup:
+  baseline:
     if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -32,7 +32,7 @@ jobs:
       - name: Check the acceptance clients
         run: |
           node --check scripts/acceptance/issue-1504-1506/production-session.mjs
-          node --check scripts/acceptance/issue-1504-1506/routing-production.mjs
+          node --check scripts/acceptance/issue-1504-1506/coordinator-baseline.mjs
       - name: Read the existing smoke email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -57,13 +57,11 @@ jobs:
           secret-name: SMOKE_OWNER_PASSWORD
           recursive: false
           include-imports: false
-      - name: Finish cleanup of the recorded routing fixtures
-        run: node scripts/acceptance/issue-1504-1506/routing-production.mjs cleanup scripts/acceptance/issue-1504-1506/routing-cleanup-receipt.json
-      - name: Verify the dedicated Coordinator uses shared Haiku
+      - name: Measure first text and stop the model stream
         env:
           MIKKA_ACCEPTANCE_SHA: 2cba2a841ab770692559f1e5e18a0a57cff99952
-        run: node scripts/acceptance/issue-1504-1506/coordinator-setup.mjs setup
-      - name: Retain the sanitized routing result
+        run: node scripts/acceptance/issue-1504-1506/coordinator-baseline.mjs first-text-stop
+      - name: Retain the sanitized Coordinator baseline
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
