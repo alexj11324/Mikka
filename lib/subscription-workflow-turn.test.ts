@@ -186,7 +186,7 @@ test('completed legitimate tool receipts survive exhausted SDK recovery without 
   },{prompt:'Synthetic request',stopWhen:isStepCount(120),onStepEnd:step=>{completed.push(...step.response.messages)}}),{code:'model_tool_unavailable'})
   assert.equal(modelCalls,3);assert.equal(executed,1)
   const calls=completed.filter(message=>message.role==='assistant').flatMap(message=>Array.isArray(message.content)?message.content:[]).filter(part=>part.type==='tool-call')
-  const receipts=completed.filter(message=>message.role==='tool').flatMap(message=>message.content)
+  const receipts=completed.filter(message=>message.role==='tool').flatMap(message=>message.content).filter(part=>part.type==='tool-result')
   assert.equal(calls.length,3);assert.equal(receipts.length,3)
   assert.equal(calls.filter(call=>call.toolName==='registered').length,1)
   assert.deepEqual(receipts.find(receipt=>receipt.toolName==='registered')?.output,{type:'json',value:{receipt:'completed-once'}})
