@@ -9,7 +9,7 @@ import { responseCookieJar } from './read-cache-production.mjs'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
 import { authorizeMcpSession } from '../../tests/support/mcp-closeout-session.mjs'
 import { DeployedTargetError, deployedTargetGuard, assertDeployedTarget, publicTargetFailure } from './deployed-target.mjs'
-import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from './team-workspace.mjs'
+import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from './team-workspace.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
 export const OPS_REF = 'refs/heads/ops/issue1415-production-functional'
@@ -79,7 +79,7 @@ export async function runProductionMcpProof({
       normalSessionClosed: false, sessionAbsent: false, unresolvedResources: false,
     }, registrationAttempts: 0, toolsInvoked: 0, modelCalls: 0, sqlUsed: false,
     registrationMode: 'owner-managed', requestedScopes: ['mikka'], refreshRequested: false, browserConsentUI: false,
-    loopbackCallbackObserved: false }
+    loopbackCallbackObserved: false, teamAdminMembershipVerified: false }
   const secretValues = new Set(), remember = values => {
     for (const value of values) if (typeof value === 'string' && value.length > 0) secretValues.add(value)
   }
@@ -193,7 +193,7 @@ export async function runProductionMcpProof({
     record('normal-owner-session')
     Object.assign(report, await selectTeamWorkspace({ ownerId, json: async (path, body) => {
       need(body === undefined
-        ? path === BASE + '/api/workspace' || path === AUTH + '/get-session'
+        ? isTeamWorkspaceReadPath(path) || path === AUTH + '/get-session'
         : path === BASE + '/api/rpc' && isTeamWorkspaceSwitchRequest(body), 'request_denied')
       const response = await raw(path, body === undefined ? {} : {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' },
