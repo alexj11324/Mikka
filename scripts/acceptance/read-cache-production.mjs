@@ -10,6 +10,7 @@ import { chatKeys, issueKeys, settingsKeys, threadKeys } from '../../lib/swr/key
 import { ORIGIN, REPOSITORY, successfulRelease } from './project-decisions.mjs'
 import { attestReadiness, ReadinessError, triggerGuard } from './production-readiness.mjs'
 import { createReadClient, discoverReadActions, requestAllowed as readRequestAllowed } from './read-cache.mjs'
+import { DeployedTargetError, deployedTargetGuard, attestDeployedTarget, publicTargetFailure } from './deployed-target.mjs'
 
 const environment = Object.freeze({ origin: ORIGIN, basePath: '/mikka' })
 const plan = Object.freeze({ purpose: 'production-readiness', mode: 'readonly' })
@@ -41,6 +42,7 @@ export class ProductionReadCacheError extends Error {
 }
 const check = (condition, code) => { if (!condition) throw new ProductionReadCacheError(code) }
 export function publicFailure(error) {
+  if (error instanceof DeployedTargetError) return publicTargetFailure(error)
   if (error instanceof ProductionReadCacheError) return { status: blocked.has(error.code) ? 'blocked' : 'fail', code: error.code }
   // ReadinessError constructs its message from an existing closed code set.
   if (error instanceof ReadinessError) return { status: 'blocked', code: error.message }
@@ -56,6 +58,7 @@ function automaticRelease(run, applicationSha, runId) {
 /** The two real GitHub event types have independent guards. Never adapt a
  * workflow_run payload into a synthetic manual event for the readiness guard. */
 export function productionGuard(env, event) {
+  if (env.MIKKA_ACCEPTANCE_TARGET_MODE) return deployedTargetGuard(env, event)
   if (env.GITHUB_EVENT_NAME === 'workflow_run') {
     const run = event?.workflow_run
     check(env.GITHUB_REPOSITORY === REPOSITORY && event?.repository?.full_name === REPOSITORY
@@ -71,6 +74,10 @@ export function productionGuard(env, event) {
 
 export async function attestProductionReadCache({ env = process.env, event, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
   const guard = productionGuard(env, event)
+  if (guard.targetMode === 'deployed-target') {
+    check(issueNumber === 1415, 'trigger_rejected')
+    return attestDeployedTarget({ env, event, fetchImpl, now })
+  }
   const { issueUrl, purpose } = acceptanceIssue(issueNumber, guard)
   if (guard.trigger === 'workflow_run') {
     check(typeof env.GH_TOKEN === 'string' && env.GH_TOKEN.length > 0, 'deployment_proof')
@@ -112,6 +119,7 @@ export async function attestProductionReadCache({ env = process.env, event, fetc
 }
 
 function requireAttestation(guard, attestation, now, issueNumber) {
+  check(attestation?.targetMode === undefined, 'attestation_required')
   const { purpose } = acceptanceIssue(issueNumber, guard)
   const age = now() - Date.parse(attestation?.checkedAt)
   check(attestation?.repository === REPOSITORY && attestation.mode === 'readonly'
@@ -237,6 +245,8 @@ export function responseCookieJar(now) {
 
 export async function runProductionReadCache({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
   const guard = productionGuard(env, event)
+  // This explicit migration mode authorizes attestation, not the historical read measurements.
+  check(guard.targetMode !== 'deployed-target', 'trigger_rejected')
   const { purpose } = acceptanceIssue(issueNumber, guard)
   if (!requireAttestation(guard, attestation, now, issueNumber)) return { purpose, ...guard,
     status: 'skipped', code: 'issue_closed', metadataReadAuthorized: false, readable: false }
