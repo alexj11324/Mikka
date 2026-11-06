@@ -1,0 +1,54 @@
+name: Issues 1515-1517 superseded CI cleanup
+on:
+  push:
+    branches: [ops/1515-1517-ci-queue]
+    paths: [.github/workflows/issues-1515-1517-ci-queue.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  cancel-superseded:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-ci-queue'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Preserve the complete latest batch and stop redundant issue runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          const repo = 'alexj11324/Mikka';
+          if (process.env.GITHUB_REPOSITORY !== repo || process.env.GITHUB_REF !== 'refs/heads/ops/1515-1517-ci-queue') throw Error('scope_mismatch');
+          const heads = new Map([
+            ['fix/1517-device-backend', 'd9bfd6615fb47d8b773dcf7827aef17d6101aad5'],
+            ['fix/1515-1516-models-tools', 'a3230decbff86996675edadde5384c4706117d2b'],
+            ['batch/2026-11-06-1515-1517', '580365f2d2b821f4c611ed877405ab2496d30128'],
+          ]);
+          const request = (path, method = 'GET') => fetch('https://api.github.com/repos/' + repo + path, {
+            method, redirect: 'error', signal: AbortSignal.timeout(15000),
+            headers: {authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2026-03-10'},
+          });
+          for (const [branch, sha] of heads) {
+            const response = await request('/git/ref/heads/' + branch);
+            if (!response.ok || (await response.json()).object.sha !== sha) throw Error('head_changed');
+          }
+          const final = await request('/actions/runs?branch=' + encodeURIComponent('batch/2026-11-06-1515-1517') + '&per_page=100');
+          if (!final.ok) throw Error('batch_read_failed');
+          const finalRuns = (await final.json()).workflow_runs;
+          if (!finalRuns.some(run => run.head_sha === heads.get('batch/2026-11-06-1515-1517') && run.name === 'CI')) throw Error('final_batch_ci_missing');
+          let cancelled = 0;
+          for (const [branch, sha] of heads) {
+            const response = await request('/actions/runs?branch=' + encodeURIComponent(branch) + '&per_page=100');
+            if (!response.ok) throw Error('runs_read_failed');
+            for (const run of (await response.json()).workflow_runs) {
+              if (run.status === 'completed' || run.head_branch !== branch || run.repository.full_name !== repo) continue;
+              if (branch.startsWith('batch/') && run.head_sha === sha) continue;
+              if (run.event !== 'pull_request') continue;
+              const result = await request('/actions/runs/' + run.id + '/cancel', 'POST');
+              if (![202, 409].includes(result.status)) throw Error('cancel_refused_' + result.status);
+              if (result.status === 202) cancelled++;
+              console.log(JSON.stringify({run:run.id, workflow:run.name, supersededBy:'580365f2', cancellationHttp:result.status}));
+            }
+          }
+          console.log(JSON.stringify({cancelled, finalBatchPreserved:true}));
+          JS
