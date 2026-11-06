@@ -48,6 +48,8 @@ export interface PoolDevice {
   activeRuns: number
   /** When it joined (ms): the earlier goes first on a tie. */
   joinedAt: number
+  /** Its last heartbeat (ms), for 「离线 · 5 天前」; null when it never reported. */
+  lastSeenAt?: number | null
   harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionPreflight'>[]
 }
 
@@ -88,7 +90,7 @@ export function deviceModel(device: PoolDevice, entry: OrderEntry): string | nul
 
 /** modelNotReported: the daemon reported its models and this one is not among them. */
 export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready'
-const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'subscriptionRuntimeUnavailable', 'ready']
+export const DEVICE_STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'subscriptionRuntimeUnavailable', 'ready']
 
 /** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
 export const reportsModel = harnessReportsModel
@@ -104,6 +106,19 @@ export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: Orde
   if (!info.subscriptionBroker) return 'needsUpdate'
   const reported = reportsModel(info, entry.model)
   return reported === null ? 'needsUpdate' : reported ? 'ready' : 'modelNotReported'
+}
+
+/**
+ * How far a device is from taking a run of this list, for the 运行位置 chain: its best
+ * step over the runnable entries. With no entry it is judged on the preferred Agent alone.
+ */
+export function placeStage(device: PoolDevice, entries: readonly OrderEntry[], harness: OrderHarness): DeviceStage {
+  if (!entries.length) {
+    if (!device.enabled) return 'off'
+    if (!device.online) return 'offline'
+    return device.harnesses.some(info => info.harness === harness && info.installed) ? 'ready' : 'notInstalled'
+  }
+  return entries.map(entry => deviceStage(device, entry)).reduce((best, stage) => DEVICE_STAGES.indexOf(stage) > DEVICE_STAGES.indexOf(best) ? stage : best)
 }
 
 export function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage {
@@ -123,7 +138,7 @@ export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>
 export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): NoDeviceWhy {
   if (!devices.length) return { why: 'none' }
   const staged = devices.map(device => ({ device, stage: deviceStage(device, entry) }))
-  const best = staged.reduce((top, item) => STAGES.indexOf(item.stage) > STAGES.indexOf(top.stage) ? item : top)
+  const best = staged.reduce((top, item) => DEVICE_STAGES.indexOf(item.stage) > DEVICE_STAGES.indexOf(top.stage) ? item : top)
   const why = best.stage === 'ready' ? 'needsUpdate' : best.stage
   const detail = why === 'subscriptionRuntimeUnavailable' ? best.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
   return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length, ...(detail ? { detail } : {}) }

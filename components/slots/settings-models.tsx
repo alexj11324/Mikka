@@ -20,7 +20,7 @@ export function ApiAndSubscriptions({ workspaceId, workspaceName, team }: Settin
   return <>
     <section aria-labelledby="account-models-scope" className="flex flex-col gap-6">
       <h2 id="account-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('account')}</h2>
-      <SubscriptionSettings workspaceId={workspaceId} workspaceName={workspaceName} />
+      <SubscriptionSettings workspaceId={workspaceId} />
       {apiKeys.section}
       <ApiKeyFallbackSetting workspaceId={workspaceId} />
     </section>
