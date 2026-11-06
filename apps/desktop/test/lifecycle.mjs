@@ -198,11 +198,23 @@ async function seedHosted(app, page) {
 }
 
 async function offline(app, value) {
-  await app.evaluate(async ({ session }, enabled) => {
+  let closedPort = null
+  if (value) {
+    const probe = createServer()
+    await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve))
+    closedPort = probe.address().port
+    await new Promise(resolve => probe.close(resolve))
+  }
+  await app.evaluate(async ({ session }, { enabled, port }) => {
     const backend = session.fromPartition('persist:mikka-dev-bundled-backend')
-    if (enabled) backend.enableNetworkEmulation({ offline: true })
-    else { backend.disableNetworkEmulation(); await backend.setProxy({ mode: 'direct' }); await backend.closeAllConnections() }
-  }, value)
+    // Use the same real failed connection as the native offline screenshot
+    // check. Network emulation did not interrupt session.fetch on macOS 45.
+    await backend.setProxy(enabled
+      ? { proxyRules: `http=127.0.0.1:${port};https=127.0.0.1:${port}`, proxyBypassRules: '<-loopback>' }
+      : { mode: 'direct' })
+    await backend.closeAllConnections()
+    if (enabled) await backend.clearCache()
+  }, { enabled: value, port: closedPort })
 }
 
 async function opaqueFrameBoundary(app, page) {

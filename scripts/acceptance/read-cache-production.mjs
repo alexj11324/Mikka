@@ -14,7 +14,10 @@ import { createReadClient, discoverReadActions, requestAllowed as readRequestAll
 const environment = Object.freeze({ origin: ORIGIN, basePath: '/mikka' })
 const plan = Object.freeze({ purpose: 'production-readiness', mode: 'readonly' })
 const repositoryApi = `https://api.github.com/repos/${REPOSITORY}`
-const issueUrl = `${repositoryApi}/issues/1372`
+const acceptanceIssue = (issueNumber, guard) => {
+  check(issueNumber === 1372 || issueNumber === 1415 && guard.trigger === 'workflow_run', 'trigger_rejected')
+  return { issueUrl: `${repositoryApi}/issues/${issueNumber}`, purpose: issueNumber === 1415 ? 'production-read-cache-migration' : 'production-read-cache' }
+}
 export const SCENARIOS = Object.freeze(['cold', 'warm', 'reload-restored', 'scoped-focus-catchup'])
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)
 const version = value => typeof value === 'string' && /^[0-9a-f]{32}$/.test(value)
@@ -66,8 +69,9 @@ export function productionGuard(env, event) {
   return guard
 }
 
-export async function attestProductionReadCache({ env = process.env, event, fetchImpl = fetch, now = Date.now } = {}) {
+export async function attestProductionReadCache({ env = process.env, event, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
   const guard = productionGuard(env, event)
+  const { issueUrl, purpose } = acceptanceIssue(issueNumber, guard)
   if (guard.trigger === 'workflow_run') {
     check(typeof env.GH_TOKEN === 'string' && env.GH_TOKEN.length > 0, 'deployment_proof')
     const read = async (url, github = false) => {
@@ -82,17 +86,24 @@ export async function attestProductionReadCache({ env = process.env, event, fetc
       return value
     }
     const issue = await read(issueUrl, true)
-    check(issue?.number === 1372 && issue.url === issueUrl && issue.repository_url === repositoryApi
+    check(issue?.number === issueNumber && issue.url === issueUrl && issue.repository_url === repositoryApi
       && !issue.pull_request && ['open', 'closed'].includes(issue.state), 'issue_proof')
-    const base = { purpose: 'production-read-cache', repository: REPOSITORY, ...guard,
-      issueNumber: 1372, issueState: issue.state, executionReady: false }
+    const base = { purpose, repository: REPOSITORY, ...guard,
+      issueNumber, issueState: issue.state, executionReady: false }
     if (issue.state === 'closed') return { ...base, status: 'skipped', code: 'issue_closed',
       metadataReadAuthorized: false, readable: false, checkedAt: new Date(now()).toISOString() }
+    const currentMain = async () => {
+      if (issueNumber !== 1415) return
+      const ref = await read(`${repositoryApi}/git/ref/heads/main`, true)
+      check(ref.ref === 'refs/heads/main' && ref.object?.type === 'commit' && ref.object.sha === guard.applicationSha, 'build_mismatch')
+    }
+    await currentMain()
     const pin = async () => check((await read(`${ORIGIN}/mikka/api/version`)).build === guard.applicationSha, 'build_mismatch')
     await pin()
     const run = await read(`${repositoryApi}/actions/runs/${guard.webDeployRunId}`, true)
     check(automaticRelease(run, guard.applicationSha, guard.webDeployRunId), 'web_deploy')
     await pin()
+    await currentMain()
     return { ...base, status: 'ready', metadataReadAuthorized: true, readable: true, checkedAt: new Date(now()).toISOString() }
   }
   // The existing proof checks the public build on both sides of a successful
@@ -100,7 +111,8 @@ export async function attestProductionReadCache({ env = process.env, event, fetc
   return attestReadiness({ env, event, plan, fetchImpl, now })
 }
 
-function requireAttestation(guard, attestation, now) {
+function requireAttestation(guard, attestation, now, issueNumber) {
+  const { purpose } = acceptanceIssue(issueNumber, guard)
   const age = now() - Date.parse(attestation?.checkedAt)
   check(attestation?.repository === REPOSITORY && attestation.mode === 'readonly'
     && attestation.applicationSha === guard.applicationSha && attestation.driverRevision === guard.driverRevision
@@ -108,8 +120,8 @@ function requireAttestation(guard, attestation, now) {
     && Number.isSafeInteger(attestation.webDeployRunId) && attestation.webDeployRunId > 0
     && Number.isFinite(age) && age >= 0 && age <= 300_000, 'attestation_required')
   if (guard.trigger === 'workflow_run') {
-    check(attestation.purpose === 'production-read-cache' && attestation.trigger === 'workflow_run'
-      && attestation.webDeployRunId === guard.webDeployRunId && attestation.issueNumber === 1372, 'attestation_required')
+    check(attestation.purpose === purpose && attestation.trigger === 'workflow_run'
+      && attestation.webDeployRunId === guard.webDeployRunId && attestation.issueNumber === issueNumber, 'attestation_required')
     if (attestation.status === 'skipped') {
       check(attestation.code === 'issue_closed' && attestation.issueState === 'closed'
         && attestation.metadataReadAuthorized === false && attestation.readable === false, 'attestation_required')
@@ -187,7 +199,7 @@ const mode = value => value?.unchanged === true ? 'unchanged' : value?.delta ===
 
 /** A fresh, memory-only jar for this run's fixed origin. Page discovery can
  * establish cookies too; dropping them can make later read actions render the page. */
-function responseCookieJar(now) {
+export function responseCookieJar(now) {
   const cookies = new Map()
   const domainMatches = (host, domain) => host === domain || host.endsWith(`.${domain}`)
   return {
@@ -223,15 +235,16 @@ function responseCookieJar(now) {
   }
 }
 
-export async function runProductionReadCache({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now } = {}) {
+export async function runProductionReadCache({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
   const guard = productionGuard(env, event)
-  if (!requireAttestation(guard, attestation, now)) return { purpose: 'production-read-cache', ...guard,
+  const { purpose } = acceptanceIssue(issueNumber, guard)
+  if (!requireAttestation(guard, attestation, now, issueNumber)) return { purpose, ...guard,
     status: 'skipped', code: 'issue_closed', metadataReadAuthorized: false, readable: false }
   // Credentials are not even read until the immutable deployment proof passed.
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
   const measurements = [], refs = {}, deadline = now() + 300_000
-  const report = { version: 1, issue: 1372, purpose: 'production-read-cache', ...guard, webDeployRunId: attestation.webDeployRunId,
+  const report = { version: 1, issue: issueNumber, purpose, ...guard, webDeployRunId: attestation.webDeployRunId,
     status: 'running', startedAt: now(), normalSessionObserved: false, sessionClosed: false,
     browserCacheVerified: false, businessMutationRequests: 0, modelCalls: 0, fixturesCreated: 0, backendMaintenanceWritesMeasured: false,
     cacheMissProbe: 'discard-one-held-item-with-server-issued-proofs', reads: [] }
@@ -413,10 +426,11 @@ export function productionOutcome(report, attesting = false) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const attesting = process.argv.includes('--attest')
+  const issueNumber = process.argv.includes('--migration-1415') ? 1415 : 1372
   let report
   try {
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
-    report = attesting ? await attestProductionReadCache({ event }) : await runProductionReadCache({ event,
+    report = attesting ? await attestProductionReadCache({ event, issueNumber }) : await runProductionReadCache({ event, issueNumber,
       attestation: JSON.parse(await readFile('production-read-cache-report/attestation.json', 'utf8')) })
   } catch (error) { report = publicFailure(error) }
   await output(attesting ? 'attestation' : 'report', report)

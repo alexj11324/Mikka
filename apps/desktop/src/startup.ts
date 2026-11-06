@@ -2,6 +2,8 @@
  * recorded once per process/document; account changes and retries add no log. */
 export type StartupMark =
   | 'main.ready' | 'main.restore.start' | 'main.restore.end' | 'main.window.start' | 'main.window.created'
+  | 'main.backend.preconnect' | 'main.bootstrap.network.start' | 'main.bootstrap.headers'
+  | 'main.bootstrap.cache.end' | 'main.bootstrap.response.end'
   | 'renderer.entry' | 'renderer.bootstrap.start' | 'renderer.bootstrap.end'
   | 'renderer.workspace.import.start' | 'renderer.workspace.import.end' | 'renderer.workspace.mounted'
 

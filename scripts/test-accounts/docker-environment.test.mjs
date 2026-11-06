@@ -112,6 +112,46 @@ test('live ownership requires two exact authenticated GETs and returns an opaque
   assert.throws(() => consumeDockerOwnership(ownership, request), { code: 'DOCKER_OWNERSHIP_PROOF_REQUIRED' })
 })
 
+
+test('authenticated management response cookies are never retained or forwarded', async t => {
+  const canary = 'synthetic-edge-cookie-canary'
+  for (const cookie of [
+    '__cf_bm=' + canary + '; Path=/; Secure; HttpOnly',
+    ['__cf_bm=' + canary + '; Path=/; Secure; HttpOnly', 'edge_partition=' + canary + '; Path=/'],
+  ]) {
+    const calls = management(t, [...fixture(), ...fixture()], { headers: { 'set-cookie': cookie } })
+    const first = await verifyDockerOwnership(request)
+    const second = await verifyDockerOwnership(request)
+    assert.equal(calls.length, 4, 'both resource reads and a later proof remain bearer-only')
+    for (const call of calls) assert.deepEqual(call.headers, {
+      authorization: `Bearer ${request.accessToken}`, accept: 'application/json',
+    })
+    for (const proof of [first, second]) {
+      assert.equal(JSON.stringify(proof).includes(canary), false)
+      assert.deepEqual(consumeDockerOwnership(proof, request), { sandboxUid, port: 3000, publicationUid })
+      assert.throws(() => consumeDockerOwnership(proof, request), { code: 'DOCKER_OWNERSHIP_PROOF_REQUIRED' })
+    }
+    t.mock.restoreAll()
+  }
+})
+
+test('response cookies do not relax the 65 KiB ownership response bound', async t => {
+  const values = fixture()
+  values[0].padding = ''
+  values[0].padding = 'x'.repeat(65_536 - Buffer.byteLength(JSON.stringify(values[0])))
+  assert.equal(Buffer.byteLength(JSON.stringify(values[0])), 65_536)
+  const headers = { 'set-cookie': '__cf_bm=synthetic-edge-cookie-canary; Secure; HttpOnly' }
+  const exactCalls = management(t, values, { headers })
+  const ownership = await verifyDockerOwnership(request)
+  assert.equal(exactCalls.length, 2)
+  assert.deepEqual(consumeDockerOwnership(ownership, request), { sandboxUid, port: 3000, publicationUid })
+  t.mock.restoreAll()
+  values[0].padding += 'x'
+  const excessCalls = management(t, values, { headers })
+  await assert.rejects(verifyDockerOwnership(request), { code: 'DOCKER_OWNERSHIP_RESPONSE_INVALID' })
+  assert.equal(excessCalls.length, 1, 'an oversized sandbox result cannot authorize the ports lookup')
+})
+
 test('wrong origin, sandbox, port, SHA or database fails before contacting Docker', async t => {
   const calls = management(t)
   for (const change of [
@@ -144,7 +184,7 @@ test('only live matching ownership and an unambiguous current publication author
     await assert.rejects(verifyDockerOwnership(request))
     t.mock.restoreAll()
   }
-  for (const options of [{ statusCode: 401 }, { statusCode: 403 }, { statusCode: 302, headers: { location: origin } }, { headers: { 'set-cookie': 'synthetic=x' } }]) {
+  for (const options of [{ statusCode: 401 }, { statusCode: 403, headers: { 'set-cookie': 'synthetic=x' } }, { statusCode: 302 }, { statusCode: 302, headers: { location: origin } }, { headers: { location: origin, 'set-cookie': 'synthetic=x' } }]) {
     management(t, fixture(), options)
     await assert.rejects(verifyDockerOwnership(request), { code: 'DOCKER_OWNERSHIP_REJECTED' })
     t.mock.restoreAll()

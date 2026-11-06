@@ -520,6 +520,11 @@ async function start(): Promise<void> {
         void mainWindow.loadURL(`${RENDERER_ORIGIN}${path}`)
       },
     })
+    // Open the first backend socket while the OS keychain and local renderer
+    // initialize. BundledAuth has validated this compiled origin; preconnect
+    // sends no application HTTP request or session credential.
+    backend.preconnect({ url: APP_ORIGIN, numSockets: 1 })
+    markStartup('main.backend.preconnect')
     markStartup('main.restore.start')
     restoring = bundledAuth.restore().then(() => { markStartup('main.restore.end') })
     bundledLive = new BundledLive(bundledAuth, (owner, event) => {

@@ -6,6 +6,7 @@ import type { LoopbackAuthServer } from './loopback'
 import { publicSession, responseSessionCache, SESSION_CACHE_HEADER, storedSession, type SessionVault, type StoredSession } from './session-vault'
 import { accountChoice, responseWorkspace, rpcEnvelope } from './bundled-accounts'
 import { openBundledWebPage } from './bundled-web'
+import { markStartup } from '../startup'
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 
@@ -110,8 +111,12 @@ export class BundledAuth {
     if (token) headers.set('authorization', `Bearer ${token}`)
     if (account?.sessionCache) headers.set(SESSION_CACHE_HEADER, account.sessionCache)
     if (account?.workspace && !path.startsWith('/api/auth/')) headers.set('cookie', `mikka-workspace=${account.workspace}`)
+    const startupBootstrap = account !== null && path === '/api/desktop/rpc' && rpcEnvelope(init.body)?.action === 'desktop.bootstrap'
+    if (startupBootstrap) markStartup('main.bootstrap.network.start')
     const response = await this.options.fetch(target.href, { ...init, headers, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+    if (startupBootstrap) markStartup('main.bootstrap.headers')
     if (account) await this.rememberCache(account, response.status === 401 ? '' : responseSessionCache(response.headers))
+    if (startupBootstrap) markStartup('main.bootstrap.cache.end')
     return response
   }
 
@@ -181,6 +186,7 @@ export class BundledAuth {
       }
       if (token !== this.current?.token || profileScope !== this.scope()) return Response.json({ version: rpc.version, ok: false, error: { code: 'desktop_session_changed' } }, { status: 409 })
     }
+    if (token && rpc?.action === 'desktop.bootstrap') markStartup('main.bootstrap.response.end')
     return response
   }
 

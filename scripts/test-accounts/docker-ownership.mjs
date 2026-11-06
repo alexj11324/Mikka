@@ -18,7 +18,9 @@ async function readOwnedResource(path, accessToken) {
     const request = https.request(new URL(path, API), {
       method: 'GET', headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' },
     }, response => {
-      if (response.statusCode !== 200 || response.headers.location || response.headers['set-cookie']) {
+      // Edge responses may set cookies. This bearer-only transport has no jar
+      // and never carries response cookies into the next management request.
+      if (response.statusCode !== 200 || response.headers.location) {
         response.resume()
         reject(new EnvironmentError('DOCKER_OWNERSHIP_REJECTED'))
         return

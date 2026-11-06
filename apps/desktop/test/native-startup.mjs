@@ -1,6 +1,7 @@
 // Diagnostic timing only, sampled after the unchanged usable-chat stopwatch.
 // Fixed mark names and numeric aggregates: no URL, identity, header or payload.
-const mainNames = ['ready', 'restore.start', 'restore.end', 'window.start', 'window.created']
+const mainNames = ['ready', 'restore.start', 'restore.end', 'window.start', 'window.created',
+  'backend.preconnect', 'bootstrap.network.start', 'bootstrap.headers', 'bootstrap.cache.end', 'bootstrap.response.end']
 const rendererNames = ['entry', 'bootstrap.start', 'bootstrap.end', 'workspace.import.start', 'workspace.import.end', 'workspace.mounted']
 
 export async function readNativeStartup(app, page) {
@@ -51,6 +52,10 @@ export async function readNativeStartup(app, page) {
     renderer,
     phasesMs: {
       restore: duration(main, 'restore.start', 'restore.end'),
+      backendResponseHeaders: duration(main, 'bootstrap.network.start', 'bootstrap.headers'),
+      backendCredentialPersistence: duration(main, 'bootstrap.headers', 'bootstrap.cache.end'),
+      backendResponseProcessing: duration(main, 'bootstrap.cache.end', 'bootstrap.response.end'),
+      backendBootstrap: duration(main, 'bootstrap.network.start', 'bootstrap.response.end'),
       windowCreation: duration(main, 'window.start', 'window.created'),
       bootstrap: duration(renderer.marks, 'bootstrap.start', 'bootstrap.end'),
       workspaceImport: duration(renderer.marks, 'workspace.import.start', 'workspace.import.end'),
