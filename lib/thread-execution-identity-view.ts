@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { withBasePath } from './base-path'
+import { executionIdentityLabelsSchema } from './execution-identity-label-view'
 import { MODEL_ROUTING_DIFFICULTIES, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_REASONS, MODEL_ROUTING_TIERS } from './model-routing'
 
 /** Shared allowlist for the server evidence projection and its client reader. */
@@ -36,6 +37,7 @@ const evidence = z.object({ run: z.object({
   credentialType: z.enum(['subscription', 'api_key', 'unknown']),
   subscriptionRoute: z.enum(['claude_code_cli', 'codex_cli']).nullable().catch(null),
   executionIdentity: identity.nullable(),
+  labels: executionIdentityLabelsSchema.nullable().optional().catch(null),
   modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
   agentProfile: z.object({
     profileId: z.string().min(1).max(200), name: z.string().max(80), version: z.number().int().positive(), digest: z.string().max(200),
