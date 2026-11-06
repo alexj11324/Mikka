@@ -334,6 +334,11 @@ belong in attributes.
 | `posthogDistinctId` | `posthogDistinctId` |
 | `sessionId` | `sessionId` |
 
+The durable JSON carrier also preserves the effective `sampleRate` decision
+when known. It is not accepted from or emitted into arbitrary HTTP headers.
+Spans and native stage logs use the same final sampling weight after local
+error/slow promotion.
+
 A selected run must show its API/Coordinator entry, Workflow turn and dispatch,
 `ensureThreadMachine`, E2B create/boot, daemon registration, repository/worktree
 preparation, adapter start, first generation, completion and delivery/Factory
@@ -550,14 +555,78 @@ Recheck the observed bytes, AI events and recordings after production acceptance
 with `billing-usage-get` and `billing-overview-get`. Do not apply the tracing
 multiplier to AI-event or Replay pricing.
 
+### Repeatable production acceptance
+
+The manual `Run trace production acceptance` workflow runs only on `main`
+and requires its exact 40-character deployment SHA. Before executing it, verify
+the immutable Vercel deployment is READY, the production domain serves that SHA,
+and the entire matching `E2B official instance runtime` workflow has finished,
+including any runtime-refresh web deployment. The driver checks the public
+version during its run; that check alone does not prove the worker release.
+
+Start with `mode=preflight`. For an actual task, `mode=execute` uses the existing
+Infisical production acceptance account and its own official Claude Haiku 5.5
+or Codex GPT-6 Luna subscription. It verifies the account's unique personal
+workspace through the normal workspace API and, when necessary, switches only
+its own newly authenticated session before selecting the Coordinator. Each model
+case is independent and submits once per revision. The driver verifies native execution identity, the current
+Factory flow's independent checks, exact Artifact bytes and the formal
+deliverable acceptance receipt. Factory v2 uses execute/review; historical
+flows still require verify. It never accepts a repository publication.
+
+`prepare=true` requires all visible owner-wide runs to be terminal, using the
+existing readers' 200-row, 30-day windows, and also checks the current workspace's
+complete Factory inventory. It temporarily prepares the account through existing
+settings APIs and restores unchanged settings afterward. For actual Replay
+evidence, run a single model case with `browser-submit=true`, refresh the
+already-signed-in production browser after deployment, and follow the generated
+ready comment in #1512 to submit the exact fixture once through New task.
+The API-only case does not prove browser Replay. The driver also does not prove
+PostHog ingestion; correlate its recorded IDs with the actual APM, AI, Logs and
+Replay records afterward. See the full
+[driver contract](../../scripts/acceptance/run-observability.md).
+
+For the native PostHog export job, optional `session-id` and `trace-id`
+inputs must be supplied together. They request a bounded, read-only check of the
+real recording metadata and one actual snapshot source using the existing
+runner-held PostHog key. The resulting receipt contains only safe correlation
+IDs, status/proof fields, timestamps, event-type counts, byte count and SHA-256;
+raw recording events and page contents are never saved. Reading one recording
+segment does not verify full playback; the receipt keeps `playback_verified=false`.
+An operator-supplied trace ID is not proof of correlation: verify
+the same session in APM and confirm that the recorded event window overlaps the
+selected run. A missing recording, insufficient existing read scope or malformed
+snapshot fails this evidence check instead of being reported as a pass.
+
 ### Local overhead evidence
 
-The #1518 AI wrapper microbenchmark on Node 24.22.1, after warm-up over 3,000
-generations, measured mean **0.0359 ms**, p95 **0.0604 ms** and p99 **0.1571 ms**
-per generation. It included JSON capture and OTel batching, and excluded the
-network, database and actual model request. It does not measure full production
-request overhead or tail-buffer memory under sustained concurrency; production
-acceptance records those limits separately.
+The HTTP/PostgreSQL benchmark at `7be76630cadcf0ce32ddf5f56710c11df62ba78e`
+used Node 24.22.2 on cloud Linux, a real loopback PostgreSQL server and
+600 requests per condition, with three identical queries per successful
+request. After 100 warm-up requests per condition, alternating blocks of 20
+reversed their order to limit warm-up and scheduling bias.
+
+| Handler duration | Tracing off | Tracing on | Added duration |
+| --- | ---: | ---: | ---: |
+| Mean | 0.394 ms | 0.971 ms | **0.577 ms** |
+| p95 | 0.545 ms | 1.451 ms | **0.906 ms** |
+| p99 | 3.130 ms | 6.063 ms | **2.933 ms** |
+
+All **600/600 critical requests** and **20/20 controlled ordinary failures**
+were retained. Each failed trace had a native ERROR log with a safe cause
+chain; the raw SQL error message was absent. This measures the real HTTP/pg
+instrumentation and async batching into in-memory exporters. It excludes the
+external collector network, model calls and cloud provisioning, and does not
+claim a production latency distribution or a sustained-concurrency memory
+bound. The [raw benchmark receipt](evidence/1512-http-benchmark.json) records
+both handler and round-trip distributions and the exact source revision.
+Reproduce with `scripts/ops/run-trace-benchmark.ts` against an owned isolated
+loopback database.
+
+Separately, the AI wrapper microbenchmark on Node 24.22.1, after warm-up over
+3,000 generations, measured mean **0.0359 ms**, p95 **0.0604 ms** and p99
+**0.1571 ms** per generation. It included JSON capture and OTel batching and
+excluded network, database and actual model latency.
 
 ## Configuration
 
