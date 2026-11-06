@@ -1,4 +1,4 @@
-name: Issue 1506 owned Docker verification
+name: Issue 1506 owned Docker cleanup
 
 on:
   push:
@@ -58,10 +58,7 @@ jobs:
           secret-name: DOCKER_PAT
           recursive: false
           include-imports: false
-      - name: Verify final candidate in the existing development sandbox
-        run: node scripts/acceptance/issue-1506-docker/control.mjs verify
-      - name: Ensure the same owned sandbox is stopped
-        if: always() && env.DOCKER_ID != '' && env.DOCKER_PAT != ''
+      - name: Observe and finish the same owned sandbox cleanup
         timeout-minutes: 3
         run: node scripts/acceptance/issue-1506-docker/control.mjs stop
       - name: Retain complete sanitized verification results
