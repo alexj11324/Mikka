@@ -51,15 +51,6 @@ export const lift = {
   elevation: 3,
 } as const
 
-/** The open drawer's shadow on the drawer. Lighter than a modal, and only while the surface is open. */
-export const drawerLift = {
-  shadowColor: '#000',
-  shadowOpacity: 0.1,
-  shadowRadius: 16,
-  shadowOffset: { width: -4, height: 0 },
-  elevation: 4,
-  boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.10)',
-} as const
 
 /**
  * Stack options: on iOS the system navigation bar, transparent over the

@@ -22,8 +22,7 @@ type Actions = ReturnType<typeof useHomeChats>
 /**
  * A chat on the home list (#1408 Phase 2b). A tap opens it with the system's link transition; a long press opens its
  * menu over a live preview of the chat (chat-menu.tsx). A swipe to the left shows two capsules, 置顶 and 隐藏 (Comma
- * design 03), and pins on release past the full mark, with a tick as it crosses (pin-swipe.ts); on a closed row a swipe to the right is the drawer's, and on
- * an open row it closes the row. Holding 250 ms and moving drags it instead (chat-drag.tsx): the two race, and the
+ * design 03), and pins on release past the full mark, with a tick as it crosses (pin-swipe.ts); a swipe to the right only closes an open row. Holding 250 ms and moving drags it instead (chat-drag.tsx): the two race, and the
  * first to start wins.
  */
 export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat; actions: Actions; openKey: string | null; onOpen: (key: string | null) => void }) {
@@ -50,7 +49,7 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
   const endSwipe = useCallback(() => { setTimeout(() => { swiping.current = false }, 0) }, [])
 
   const swipe = useMemo(() => Gesture.Pan()
-    // Left at once; right only to close an open row, so a closed row leaves a drag to the right to the drawer.
+    // Left at once; right only to close an open row.
     .activeOffsetX(open ? [-10, 10] : -10)
     .failOffsetX(open ? 10_000 : 10)
     .failOffsetY([-10, 10])
