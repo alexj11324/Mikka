@@ -7,6 +7,11 @@ test('native startup evidence keeps exact numeric phases and drops URLs, arbitra
   t.after(() => Object.defineProperty(globalThis, 'performance', descriptor))
   const marks = {
     'mikka.startup.main.ready': 8,
+    'mikka.startup.main.backend.preconnect': 9,
+    'mikka.startup.main.bootstrap.network.start': 125,
+    'mikka.startup.main.bootstrap.headers': 165,
+    'mikka.startup.main.bootstrap.cache.end': 185,
+    'mikka.startup.main.bootstrap.response.end': 190,
     'mikka.startup.main.restore.start': 10, 'mikka.startup.main.restore.end': 120,
     'mikka.startup.main.window.start': 12, 'mikka.startup.main.window.created': 30,
     'mikka.startup.renderer.entry': 40,
@@ -26,7 +31,17 @@ test('native startup evidence keeps exact numeric phases and drops URLs, arbitra
       ],
   } })
   const result = await readNativeStartup({ evaluate: (fn, names) => fn({}, names) }, { evaluate: (fn, names) => fn(names) })
-  assert.deepEqual(result.phasesMs, { restore: 110, windowCreation: 18, bootstrap: 105, workspaceImport: 50 })
+  assert.deepEqual(result.phasesMs, {
+    restore: 110,
+    backendResponseHeaders: 40,
+    backendCredentialPersistence: 20,
+    backendResponseProcessing: 5,
+    backendBootstrap: 65,
+    windowCreation: 18,
+    bootstrap: 105,
+    workspaceImport: 50,
+  })
+  assert.equal(result.main['backend.preconnect'], 9)
   assert.deepEqual(result.renderer.completedResources.script, { count: 2, totalDurationMs: 50, firstStartMs: 50, lastEndMs: 100 })
   assert.equal(result.main['window.created'] < result.main['restore.end'], true, 'evidence shows the actual overlap without changing the measured elapsed time')
   assert.equal(JSON.stringify(result).includes('private-'), false)
@@ -39,6 +54,15 @@ test('absent marks in the unchanged hosted renderer are explicit null, never a f
     getEntriesByName: () => [], getEntriesByType: () => [],
   } })
   const result = await readNativeStartup({ evaluate: (fn, names) => fn({}, names) }, { evaluate: (fn, names) => fn(names) })
-  assert.deepEqual(result.phasesMs, { restore: null, windowCreation: null, bootstrap: null, workspaceImport: null })
+  assert.deepEqual(result.phasesMs, {
+    restore: null,
+    backendResponseHeaders: null,
+    backendCredentialPersistence: null,
+    backendResponseProcessing: null,
+    backendBootstrap: null,
+    windowCreation: null,
+    bootstrap: null,
+    workspaceImport: null,
+  })
   assert.deepEqual(result.renderer.completedResources, {})
 })
