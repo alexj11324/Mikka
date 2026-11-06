@@ -54,6 +54,7 @@ jobs:
       DATABASE_URL: postgresql://workspace_e2e:workspace-local-only@127.0.0.1:5433/mikka_workspace_e2e
       SITE_SEARCH_WORKSPACE_DATABASE_URL: postgresql://workspace_e2e:workspace-local-only@127.0.0.1:5433/mikka_workspace_e2e
       SITE_SEARCH_REQUIRE_DUAL_PG: '1'
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
       BETTER_AUTH_URL: http://localhost:3100
       BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
       NEXT_TELEMETRY_DISABLED: '1'

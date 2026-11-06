@@ -15,19 +15,10 @@ export type Token = {
 export const TOKENS = {
   /** Dims the screen behind a modal while keeping its content readable. */
   scrim: { ios: { light: 'rgba(0, 0, 0, 0.35)', dark: 'rgba(0, 0, 0, 0.6)' }, light: 'rgba(0, 0, 0, 0.35)', dark: 'rgba(0, 0, 0, 0.6)' },
-  /**
-   * The veil on the open app surface (the push drawer). Far lighter than `scrim`: the page keeps its own
-   * colour. iOS has no system colour for this, so it is a dynamic colour in both schemes.
-   */
-  drawerDim: { ios: { light: 'rgba(0, 0, 0, 0.06)', dark: 'rgba(0, 0, 0, 0.18)', highContrastLight: 'rgba(0, 0, 0, 0.12)', highContrastDark: 'rgba(0, 0, 0, 0.28)' }, light: 'rgba(0, 0, 0, 0.06)', dark: 'rgba(0, 0, 0, 0.18)', contrast: { light: 'rgba(0, 0, 0, 0.12)', dark: 'rgba(0, 0, 0, 0.28)' } },
   /** A screen's background. */
   page: { ios: 'systemBackground', light: '#FFFFFF', dark: '#000000' },
   /** A grouped list's background (settings, a bot's page, sheets). */
   grouped: { ios: 'systemGroupedBackground', light: '#F2F2F7', dark: '#000000' },
-  /** The push drawer under the app. secondarySystemBackground: grouped grey in light, one step above the black page in dark. */
-  drawer: { ios: 'secondarySystemBackground', light: '#F2F2F7', dark: '#1C1C1E' },
-  /** An inset group on the drawer. tertiarySystemBackground: the white card in light, one step above the drawer in dark. */
-  drawerRow: { ios: 'tertiarySystemBackground', light: '#FFFFFF', dark: '#2C2C2E' },
   /** A card, a row of a grouped list, the composer's field, the title capsule. */
   surface: { ios: 'secondarySystemGroupedBackground', light: '#FFFFFF', dark: '#1C1C1E' },
   /** The bot's message bubble. */

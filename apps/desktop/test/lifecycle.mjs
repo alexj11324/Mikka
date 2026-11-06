@@ -20,6 +20,8 @@ import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { readNativeStartup } from './native-startup.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
+import { waitForNativeDevice } from './native-device-ready.mjs'
+import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledRootDocument } from './native-document.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -30,7 +32,11 @@ const pairs = Number(process.env.MIKKA_DESKTOP_COLD_PAIRS ?? 5)
 if (!Number.isInteger(pairs) || pairs < 5 || pairs > 20) throw new Error('LIFECYCLE_REQUIRES_5_TO_20_COLD_PAIRS')
 await mkdir(output, { recursive: true })
 const directory = await mkdtemp(join(tmpdir(), 'mikka-lifecycle-'))
-const profiles = { bundled: join(directory, 'bundled'), hosted: join(directory, 'hosted') }
+// The actual installed daemon service is per OS user. Compare the two loading
+// modes of one installed app, not two profiles that replace its service file.
+// The existing hosted/bundled partitions, remote-origin cookies and main vault
+// keep their boundaries; the multi-account PKCE/menu assertions below are intact.
+const profiles = { bundled: join(directory, 'profile'), hosted: join(directory, 'profile') }
 const viewport = { width: 1440, height: 900 }
 const message = 'Review the desktop workspace, including conversations, tasks, artifacts and settings.'
 const menuNames = Object.fromEntries(await Promise.all(['zh-CN', 'en'].map(async locale => [locale, JSON.parse(await readFile(join(root, 'messages', `${locale}.json`), 'utf8')).Nav.workspaceMenu])))
@@ -41,13 +47,14 @@ const evidence = {
     bundled: { revision, mode: 'bundled', url: 'mikka://app/mikka', backend: environment.origin },
     hosted: { revision, mode: 'hosted', url: `${environment.origin}/mikka`, backend: environment.origin },
   },
-  startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [], nativeViewports: [],
+  startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [], nativeViewports: [], nativeSetup: [], navigation: [], phases: [],
   measurement: {
     clock: 'Node performance.now, immediately before Electron launch to visible seeded message and enabled composer accepting a draft',
     process: 'same compiled shell/backend, bundled vs preserved hosted loading path; fresh Electron process for every sample, existing authenticated profile, same account/workspace',
     cache: 'normal profile/OS caches; no OS cache purge, artificial network delay or renderer response substitution',
     pairing: 'alternating bundled-first and hosted-first order',
     daemon: 'after every sample, cancel installers, close Electron and prove that exact profile daemon exited before launching the next process; drain time is outside readiness timing',
+    preparation: 'one owned installed-app profile; both loading modes must reach a real registered online local device before the unchanged cold samples',
   },
 }
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
@@ -56,6 +63,12 @@ let passed = false
 let cleanupFailure
 const active = new Set()
 const appProfiles = new WeakMap()
+let phase = 'setup'
+const phaseStart = performance.now()
+const mark = value => {
+  phase = value
+  if (evidence.phases.length < 128) evidence.phases.push({ phase, elapsedMs: Math.round(performance.now() - phaseStart) })
+}
 
 async function launch(mode, extraArgs = []) {
   await scope.assertActive()
@@ -71,6 +84,9 @@ async function launch(mode, extraArgs = []) {
   const page = await app.firstWindow({ timeout: 90_000 })
   const firstWindowMs = performance.now() - started
   page.setDefaultTimeout(60_000)
+  const navigation = { mode, launch: evidence.nativeViewports.length + 1, events: [], overflow: false }
+  evidence.navigation.push(navigation)
+  observeNativeNavigation(page, navigation)
   const errors = []
   page.on('pageerror', error => errors.push(error.name))
   evidence.nativeViewports.push({ mode, launch: evidence.nativeViewports.length + 1, ...await setNativeViewport(app, page, viewport) })
@@ -121,8 +137,9 @@ async function selectFixture(page) {
 }
 
 async function nativeSignIn(app, page, account = scope.owner) {
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForFunction(() => Boolean(window.mikka?.bundled))
+  mark('auth-initial-document')
+  await waitForBundledRootDocument(page)
+  mark('auth-open-browser')
   await app.evaluate(({ shell }) => {
     globalThis.__mikkaLifecycleExternal = null
     shell.openExternal = async url => { globalThis.__mikkaLifecycleExternal = url }
@@ -142,16 +159,26 @@ async function nativeSignIn(app, page, account = scope.owner) {
   const context = await browser.newContext({ storageState: account.storageStatePath })
   try {
     const browserPage = await context.newPage()
+    mark('auth-return-navigation')
     const returned = page.waitForEvent('domcontentloaded', { timeout: 60_000 })
     returned.catch(() => {})
     await browserPage.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await handoff
     await returned
+    mark('auth-public-session')
     const session = await waitForBundledSession(page, account.userId)
     assert.equal(session.user.id, account.userId)
+    mark('auth-record-session')
     await scope.recordResource({ type: 'session', id: session.session.id, ownerId: account.userId })
     return session
   } finally { await context.close() }
+}
+
+async function prepareNativeDevice(run, mode) {
+  mark(`prepare-${mode}-device`)
+  await waitForNativeDevice({ application: run.app, page: run.page, mode }, {
+    scope, profile: profiles[mode], record: value => evidence.nativeSetup.push(value),
+  })
 }
 
 async function seedHosted(app, page) {
@@ -242,14 +269,18 @@ try {
   let run = await launch('bundled')
   application = run.app
   ownerEmail = (await nativeSignIn(run.app, run.page)).user.email
+  mark('prepare-bundled-workspace')
   await selectFixture(run.page)
+  await prepareNativeDevice(run, 'bundled')
   await recordNativeState(run.page, 'authenticated-profile', 'bundled')
   await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
   await close(run.app); application = null
   run = await launch('hosted')
   application = run.app
+  mark('prepare-hosted-authentication')
   await seedHosted(run.app, run.page)
   await selectFixture(run.page)
+  await prepareNativeDevice(run, 'hosted')
   await recordNativeState(run.page, 'authenticated-profile', 'hosted')
   await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
   await run.app.evaluate(async ({ session }) => { await session.fromPartition('persist:mikka-dev').cookies.flushStore() })
@@ -260,6 +291,7 @@ try {
   for (let pair = 1; pair <= pairs; pair++) {
     const order = pair % 2 ? ['bundled', 'hosted'] : ['hosted', 'bundled']
     for (const mode of order) {
+      mark(`cold-${mode}`)
       run = await launch(mode)
       application = run.app
       await usable(run.page, 'Lifecycle readiness draft')
@@ -279,20 +311,25 @@ try {
   evidence.coldStart = { pairs, bundledMedianMs: bundled, hostedMedianMs: hosted, differenceMs: bundled - hosted, bundledFaster: bundled < hosted, improvementPercent: Math.round((hosted - bundled) / hosted * 10000) / 100 }
   check('at least five paired fresh-process launches reach the same usable seeded chat')
 
+  mark('multiowner-launch')
   run = await launch('bundled'); application = run.app
   // Both identities were already leased through ordinary server auth. Reuse
   // their real browser sessions through PKCE; do not fake a provider challenge.
   await nativeSignIn(run.app, run.page, scope.peer)
+  mark('multiowner-menu-locale')
   const menuLocale = await run.page.evaluate(() => document.documentElement.lang)
   await run.page.getByRole('button', { name: menuNames[menuLocale], exact: true }).first().click()
   const ownerGroup = run.page.getByRole('group').filter({ has: run.page.getByText(ownerEmail, { exact: true }) })
   await ownerGroup.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
+  mark('multiowner-retained-session')
   await waitForBundledSession(run.page, scope.owner.userId)
   await usable(run.page)
   await recordNativeState(run.page, 'retained-owner-after-account-switch', 'bundled')
   assert.equal(await run.page.evaluate(() => document.cookie), '')
   check('two leased browser identities remain private in main and the real account/workspace menu switches back to the retained owner')
+  mark('opaque-frame')
   await opaqueFrameBoundary(run.app, run.page)
+  mark('offline-loaded')
   await usable(run.page, 'Keep this unsent draft during the outage')
   await offline(run.app, true)
   const failedStatus = await run.page.evaluate(async () => (await fetch('/mikka/api/desktop/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, action: 'desktop.bootstrap', args: [] }) })).status)
@@ -310,6 +347,7 @@ try {
 
   // Exercise the real renderer → preload → main → native callback path; only
   // the OS presentation/click is injected because CI has no notification center.
+  mark('native-notification')
   await run.app.evaluate(({ Notification }) => {
     Notification.isSupported = () => true
     Notification.prototype.show = function () { globalThis.__mikkaLifecycleNotification = this }
@@ -320,6 +358,7 @@ try {
   await run.page.getByText(fixtures.fixture.issueTitle, { exact: false }).first().waitFor({ state: 'visible' })
   check('native notification click event follows the real preload bridge to the requested task/thread')
 
+  mark('native-repository-picker')
   const repo = join(directory, 'picked-repository')
   await mkdir(repo)
   execFileSync('git', ['init', '--quiet', repo])
@@ -334,6 +373,7 @@ try {
 
   // A deliberately closed proxy blocks remote HTTP from process startup. The
   // native protocol itself still serves the installed HTML/CSS/JS from disk.
+  mark('offline-cold')
   const portProbe = createServer()
   await new Promise(resolve => portProbe.listen(0, '127.0.0.1', resolve))
   const blockedPort = portProbe.address().port
@@ -357,6 +397,9 @@ try {
   await close(run.app); application = null
   assert.ok(evidence.coldStart.bundledFaster, 'DESKTOP_BUNDLED_COLD_START_NOT_FASTER')
   passed = true
+} catch (error) {
+  evidence.failure = { phase, ...nativeLifecycleFailure(error) }
+  throw error
 } finally {
   const cleanupErrors = []
   if (application) await close(application).catch(error => cleanupErrors.push(error))

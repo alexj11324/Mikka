@@ -275,7 +275,7 @@ jobs:
         env:
           # Issue #1415 expressly requests this disposable sandbox endpoint.
           # Other branches default to loopback; no artifact contacts production.
-          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || ((github.head_ref == 'desktop/bundled-renderer' || github.head_ref == 'desktop/runtime-phase2') && 'https://3000-001m6p8qt9pcng01mwgkmshdz6m.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
+          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || ((github.head_ref == 'desktop/bundled-renderer' || github.head_ref == 'desktop/runtime-phase2' || github.head_ref == 'batch/2026-11-06-1415') && 'https://3000-001m6p8qt9pcng01mwgkmshdz6m.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
       - name: Keep final package integrity evidence
         if: always()
         run: |

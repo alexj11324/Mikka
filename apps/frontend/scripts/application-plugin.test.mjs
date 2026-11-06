@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { build } from 'vite'
@@ -68,6 +69,20 @@ test('actual Vite resolution rejects server runtime and unregistered action cons
     'import "@/lib/auth"',
   ]) await assert.rejects(compile(source), /FRONTEND_SERVER_(?:IMPORT|MODULE)/)
   await assert.rejects(compile('export { shareCapture } from "@/app/actions/captures"'), /FRONTEND_ACTION_NOT_ALLOWED: captures.shareCapture/)
+})
+
+test('actual emitted CommonJS and ESM syntax themes retain their conditional export semantics', async () => {
+  const require = createRequire(import.meta.url)
+  const commonjs = require.resolve('react-syntax-highlighter/dist/cjs/styles/prism')
+  const esm = require.resolve('react-syntax-highlighter/dist/esm/styles/prism/coldark-dark')
+  const expected = require('react-syntax-highlighter/dist/cjs/styles/prism').coldarkDark
+  const source = `export { coldarkDark as commonjs } from ${JSON.stringify(commonjs)}; export { default as esm } from ${JSON.stringify(esm)};`
+  for (const target of ['web', 'desktop']) {
+    const { code } = await compile(source, target)
+    const themes = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}#syntax-exports-${++sequence}`)
+    assert.deepEqual(themes.commonjs, expected)
+    assert.deepEqual(themes.esm, expected)
+  }
 })
 
 test('Vite uses the same existing Lightning CSS color space and neutral mixing as hosted CSS', async () => {

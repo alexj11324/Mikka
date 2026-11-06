@@ -1,19 +1,19 @@
 import { ReadNotice } from '@/components/ReadNotice'
-import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Image, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native'
+import { type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { FlatList, Image, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
-import { Puzzle, Search } from 'lucide-react-native'
+import { Puzzle } from 'lucide-react-native'
 import { SourceIcon, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Segmented } from '@/components/Segmented'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { Field } from '@/components/ui'
 import { api } from '@/lib/api'
 import type { ComposioAccounts, SkillsPage, StoreCatalog } from '@/lib/types'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
-import { colors, font } from '@/lib/theme'
+import { colors } from '@/lib/theme'
+import { ListSectionHeader } from '@/shared/components/list-section'
 
 type Tab = 'apps' | 'skills'
 type Entry = { id: string; name: string; description: string; iconUrl: string | null; own?: boolean }
@@ -25,34 +25,33 @@ const OWN: Entry[] = [
   { id: 'telegram', name: 'Telegram', description: '', iconUrl: null, own: true },
 ]
 
+/** A row's place in its inset group, for the group's rounded ends and hairlines. */
+type Place = { first: boolean; last: boolean }
+const place = (index: number, count: number): Place => ({ first: index === 0, last: index === count - 1 })
+
 /**
- * 插件, the web's plugins page on the phone (components/plugins/plugins-view.tsx):
+ * 插件 (Comma design 17), the web's plugins page on the phone (components/plugins/plugins-view.tsx):
  * 应用, the store of every app a person can connect, with what they connected
  * first; 技能, skills.sh's leaderboard and search. Connecting and managing an
  * app happen on that app's web page, opened signed in: the provider's sign-in
  * runs in the browser, which holds the flow, and the list reloads on return.
  */
-export default function PluginsScreen() {
+export function PluginsScreen() {
   const [tab, setTab] = useState<Tab>('apps')
   const [query, setQuery] = useState('')
   return (
     <View style={styles.screen}>
-      <NavBar title="插件" large />
-      {tab === 'apps' ? <Apps query={query} header={<Header tab={tab} setTab={setTab} query={query} setQuery={setQuery} />} />
-        : <Skills query={query} header={<Header tab={tab} setTab={setTab} query={query} setQuery={setQuery} />} />}
+      <NavBar title="插件" large search={{ placeholder: tab === 'apps' ? '搜索应用' : '搜索技能', onChange: setQuery }} />
+      {tab === 'apps' ? <Apps query={query} header={<Header tab={tab} setTab={setTab} />} />
+        : <Skills query={query} header={<Header tab={tab} setTab={setTab} />} />}
     </View>
   )
 }
 
-function Header({ tab, setTab, query, setQuery }: { tab: Tab; setTab: (tab: Tab) => void; query: string; setQuery: (query: string) => void }) {
+function Header({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
   return (
     <View style={styles.header}>
-      <Segmented options={[{ value: 'apps', label: '应用' }, { value: 'skills', label: '技能' }]} value={tab} onChange={next => { setTab(next); setQuery('') }} />
-      <Field style={styles.search}>
-        <Symbol name="magnifyingglass" size={16} color={colors.secondary} web={<Search size={16} color={colors.secondary} strokeWidth={2} />} />
-        <TextInput value={query} onChangeText={setQuery} placeholder={tab === 'apps' ? '搜索应用' : '搜索技能'} placeholderTextColor={colors.secondary}
-          returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} autoCapitalize="none" style={styles.searchInput} accessibilityLabel="搜索" />
-      </Field>
+      <Segmented options={[{ value: 'apps', label: '应用' }, { value: 'skills', label: '技能' }]} value={tab} onChange={setTab} />
     </View>
   )
 }
@@ -87,7 +86,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
   }
   const rows = sections.flatMap(section => [
     ...(section.title ? [{ key: `h:${section.title}`, title: section.title }] : []),
-    ...section.items.map(item => ({ key: `${section.title}:${item.id}`, item })),
+    ...section.items.map((item, index) => ({ key: `${section.title}:${item.id}`, item, place: place(index, section.items.length) })),
   ])
 
   return (
@@ -102,24 +101,32 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       contentContainerStyle={styles.list}
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
-      renderItem={({ item: row }) => 'title' in row ? <Text style={styles.section}>{row.title}</Text> : (
-        <Pressable accessibilityRole="button" onPress={() => void open(row.item.id)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+      renderItem={({ item: row }) => 'title' in row ? <ListSectionHeader title={row.title} /> : (
+        <GroupRow place={row.place} label={`${row.item.name}${connected.has(row.item.id) ? '，已连接' : ''}`} onPress={() => void open(row.item.id)}>
           <AppIcon entry={row.item} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
-            {row.item.description ? <Text style={styles.detail} numberOfLines={1}>{row.item.description}</Text> : null}
-          </View>
-          {connected.has(row.item.id) ? <Text style={styles.state}>已连接</Text> : row.item.own ? null : accounts.error ? <Text style={styles.state}>连接状态未知</Text> : <Text style={styles.connect}>连接</Text>}
+          <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
+          {connected.has(row.item.id) ? <View style={styles.connected} /> : !row.item.own && accounts.error ? <Text style={styles.state}>连接状态未知</Text> : null}
           <Symbol name="chevron.right" size={13} color={colors.tertiary} />
-        </Pressable>
+        </GroupRow>
       )}
     />
   )
 }
 
+/** A row of an inset group (Comma design 17): white on the grouped page, rounded at the group's ends, a hairline between rows. */
+function GroupRow({ place: { first, last }, label, onPress, children }: { place: Place; label: string; onPress: () => void; children: ReactNode }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
+      style={({ pressed }) => [styles.groupRow, first && styles.groupFirst, last && styles.groupLast, pressed && { backgroundColor: colors.pressed }]}>
+      {children}
+      {last ? null : <View style={styles.hairline} />}
+    </Pressable>
+  )
+}
+
 function AppIcon({ entry }: { entry: Entry }) {
   if (entry.iconUrl) return <Image source={{ uri: entry.iconUrl }} style={styles.icon} />
-  if (entry.id === 'github' || entry.id === 'linear') return <View style={styles.icon}><SourceIcon source={entry.id} size={28} /></View>
+  if (entry.id === 'github' || entry.id === 'linear') return <View style={styles.icon}><SourceIcon source={entry.id} size={24} /></View>
   return <View style={[styles.icon, styles.iconBlank]}><Symbol name="puzzlepiece.extension" size={16} color={colors.secondary} web={<Puzzle size={16} color={colors.secondary} />} /></View>
 }
 
@@ -170,34 +177,34 @@ function Skills({ query, header }: { query: string; header: ReactElement }) {
       ListFooterComponent={loading && skills.length ? <View style={styles.center}><Spinner /></View> : undefined}
       ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View>
         : failed ? undefined : <Text style={styles.note}>{debounced.length === 1 ? '再多输入一个字' : debounced ? `没有找到「${debounced}」` : '没有技能'}</Text>}
-      renderItem={({ item }) => (
-        <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync(item.url)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+      renderItem={({ item, index }) => (
+        <GroupRow place={place(index, skills.length)} label={item.name} onPress={() => void WebBrowser.openBrowserAsync(item.url)}>
           <View style={[styles.icon, styles.iconBlank]}><Symbol name="sparkles" size={16} color={colors.secondary} web={<Puzzle size={16} color={colors.secondary} />} /></View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
             <Text style={styles.detail} numberOfLines={1}>{item.source} · {item.installs.toLocaleString()} 次安装</Text>
           </View>
           <Symbol name="arrow.up.right" size={12} color={colors.tertiary} />
-        </Pressable>
+        </GroupRow>
       )}
     />
   )
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.page },
-  header: { gap: 12, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 22, paddingHorizontal: 14, backgroundColor: colors.bubble },
-  searchInput: { flex: 1, minWidth: 0, width: 0, minHeight: 44, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
+  screen: { flex: 1, backgroundColor: colors.grouped },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   list: { paddingBottom: 32 },
-  section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 18, marginBottom: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 20, paddingVertical: 8 },
-  icon: { width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  groupRow: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, marginHorizontal: 16, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface },
+  groupFirst: { borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  groupLast: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  hairline: { position: 'absolute', left: 60, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
+  icon: { width: 30, height: 30, borderRadius: 7, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   iconBlank: { backgroundColor: colors.bubble },
-  name: { fontSize: 16 },
+  name: { flex: 1, minWidth: 0, fontSize: 17 },
   detail: { fontSize: 13, color: colors.secondary, marginTop: 2 },
   state: { fontSize: 14, color: colors.secondary },
-  connect: { fontSize: 15, color: colors.accent, fontWeight: '600' },
+  connected: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
   center: { paddingVertical: 32, alignItems: 'center' },
   note: { textAlign: 'center', color: colors.secondary, marginTop: 32, fontSize: 15 },
 })

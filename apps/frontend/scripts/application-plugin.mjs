@@ -77,7 +77,7 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
     name: 'mikka-shared-application', enforce: 'pre',
     api: { inventory: () => inventory },
     configResolved(config) { development = config.command === 'serve' },
-    async resolveId(source, importer) {
+    async resolveId(source, importer, options) {
       if (source.startsWith('\0mikka:')) return source
       if (source === 'mikka:platform') return resolve(target === 'desktop' ? renderer : resolve(frontend, 'src/web'), 'platform.tsx')
       if (source === 'mikka:frontend-runtime' || source === 'mikka:native-offline' || source === 'mikka:native-offline.css') return `\0${source}`
@@ -95,7 +95,9 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
         return resolve(frontend, 'src/web/next-script.tsx')
       }
       const candidate = source.startsWith('@/') ? resolve(repository, source.slice(2)) : source
-      const resolved = await this.resolve(candidate, importer, { skipSelf: true })
+      // Keep require-call/import semantics when resolving conditional package
+      // exports; a CommonJS helper must not become an ESM namespace object.
+      const resolved = await this.resolve(candidate, importer, { ...options, skipSelf: true })
       if (!resolved) return null
       const id = resolved.id.split('?')[0]
       if (serverFile(id)) throw new Error(`FRONTEND_SERVER_MODULE: ${slash(relative(repository, id))}`)

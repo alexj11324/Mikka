@@ -3,7 +3,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { ActionSheetIOS, Linking, Platform, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
+import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -19,11 +19,17 @@ import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 
-const icon = (name: SymbolName, Icon: typeof Bell, color: string = colors.ink) => <Symbol name={name} size={19} color={color} web={<Icon size={21} color={color} strokeWidth={1.8} />} />
+/** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
+const icon = (name: SymbolName, Icon: typeof Bell, background: string) => (
+  <View style={[tileStyle, { backgroundColor: background }]}>
+    <Symbol name={name} size={16} color="#fff" web={<Icon size={17} color="#fff" strokeWidth={2} />} />
+  </View>
+)
+const tileStyle = { width: 30, height: 30, borderRadius: 7, borderCurve: 'continuous' as const, alignItems: 'center' as const, justifyContent: 'center' as const }
 
 /**
- * Settings, a hierarchy (R-70): categories here, each opens its own page.
- * Every row has a precedent (mobile.md, "Settings").
+ * 设置 (Comma design 18), a hierarchy (R-70): the person, 工作区, then the Coordinator's settings and the app's, each
+ * opening its own page, and 退出登录 last. Every row has a precedent (mobile.md, "Settings").
  */
 export default function SettingsScreen() {
   const router = useRouter()
@@ -62,21 +68,23 @@ export default function SettingsScreen() {
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />
           <Group>
-            <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={40} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
-            <Row icon={icon('briefcase', BriefcaseBusiness)} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspace')} />
-          </Group>
-          <Group label="Coordinator">
-            <Row icon={icon('bell', Bell)} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
-            <Row icon={icon('book', BookOpen)} label="记忆" onPress={() => router.push('/settings/memory')} />
-            <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => router.push('/plugins')} />
-          </Group>
-          <Group label="App">
-            <Row icon={icon('globe', Globe)} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
-              onPress={Platform.OS === 'web' ? undefined : () => { void Linking.openSettings() }} />
-            <Row icon={icon('info.circle', Info)} label="版本" value={versionLabel()} trailing={null} />
+            <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={56} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
           </Group>
           <Group>
-            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label={signingOut ? "正在退出登录" : "退出登录"} disabled={signingOut} destructive onPress={confirmSignOut} />
+            <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />
+          </Group>
+          <Group>
+            <Row icon={icon('bell.fill', Bell, '#FF3B30')} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
+            <Row icon={icon('book.fill', BookOpen, '#AF52DE')} label="记忆" onPress={() => router.push('/settings/memory')} />
+            <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={String(data.apps.filter(app => app.connected).length || '')} onPress={() => router.push('/settings/plugins')} />
+          </Group>
+          <Group>
+            <Row icon={icon('globe', Globe, '#5856D6')} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
+              onPress={Platform.OS === 'web' ? undefined : () => { void Linking.openSettings() }} />
+            <Row icon={icon('info.circle.fill', Info, '#8E8E93')} label="版本" value={versionLabel()} trailing={null} />
+          </Group>
+          <Group>
+            <Row label={signingOut ? "正在退出登录" : "退出登录"} disabled={signingOut} destructive onPress={confirmSignOut} />
           </Group>
           {signOutFailed ? <View accessibilityRole="alert" style={{ gap: 10 }}><Text style={{ color: colors.danger }}>退出登录未完成，请重试。</Text><CardButton label="重试退出登录" busy={signingOut} onPress={() => void signOut()} /></View> : null}
         </ScrollView>

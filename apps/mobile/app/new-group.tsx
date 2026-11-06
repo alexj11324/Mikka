@@ -15,7 +15,7 @@ import { openChat } from '@/lib/navigate'
 import { colors, font } from '@/lib/theme'
 
 /**
- * 新建群聊, from 对话's 「+」: a name and the bots in it. In the group each
+ * 新建群聊 (Comma design 07), a form sheet from 对话's 新建: a name and the bots in it, ticked. In the group each
  * message goes to the bot it @mentions, else to the ones Mikka judges should
  * answer (lib/coordinator/group-judgment.ts).
  */
@@ -50,25 +50,24 @@ export default function NewGroup() {
     <View style={styles.screen}>
       <NavBar title="新建群聊"
         left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
-        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !ready || busy, busy, web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
+        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !ready || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Field style={styles.field}>
-          <TextInput editable={!busy} value={title} onChangeText={setTitle} placeholder="群名" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
-            style={styles.input} accessibilityLabel="群名" />
+          <TextInput editable={!busy} value={title} onChangeText={setTitle} placeholder="群聊名称" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
+            style={styles.input} accessibilityLabel="群聊名称" />
         </Field>
         {failed ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>没能创建</Text> : null}
         <ReadNotice error={home.error} hasData={Boolean(home.data)} label="Bot 列表" onRetry={home.reload} />
         {home.loading && !home.data ? <View style={{ alignItems: 'center', paddingVertical: 16 }}><Spinner /></View> : null}
-        <Group label="Bot">
+        <Group label="Bot" backgroundColor={colors.bubble}>
           {bots.map(bot => {
             const on = picked.includes(bot.id)
             return (
               <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled: busy }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} disabled={busy} onPress={() => toggle(bot.id)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-                <BotAvatar color={bot.color} shape={bot.shape} size={32} />
+                <BotAvatar color={bot.color} shape={bot.shape} size={30} />
                 <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
-                {on ? <Symbol name="checkmark.circle.fill" size={22} color={colors.accent} web={<Check size={20} color={colors.accent} />} />
-                  : <Symbol name="circle" size={22} color={colors.tertiary} web={<View style={styles.empty} />} />}
+                {on ? <Symbol name="checkmark" size={19} color={colors.accent} web={<Check size={22} color={colors.accent} strokeWidth={2.2} />} /> : null}
               </Pressable>
             )
           })}
@@ -80,13 +79,12 @@ export default function NewGroup() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.grouped },
+  screen: { flex: 1, backgroundColor: colors.page },
   body: { padding: 16, gap: 20 },
-  field: { minHeight: 50, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: colors.surface },
+  field: { minHeight: 52, borderRadius: 26, paddingVertical: 12, paddingHorizontal: 18, justifyContent: 'center', backgroundColor: colors.bubble },
   input: { fontSize: 17, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   problem: { color: colors.danger, fontSize: 14, marginTop: -8, marginLeft: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   name: { flex: 1, fontSize: 17 },
-  empty: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: colors.tertiary },
   note: { textAlign: 'center', color: colors.secondary, fontSize: 15 },
 })

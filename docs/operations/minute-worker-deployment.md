@@ -4,19 +4,23 @@
 existing Free-plan trigger limit rejected the earlier four-trigger configuration;
 the Worker now dispatches the same cadences from that one scheduled event:
 
-- Every minute: wakes, schedules and run recovery.
-- UTC minutes 0, 15, 30 and 45: operational observations and briefings.
-- UTC minute 0: account deletion, audit maintenance and suggestions reconciliation.
+- UTC minutes 0, 15, 30 and 45: the reconcile safety net, operational observations
+  and briefings.
+- UTC minute 0: abandoned subscription sign-in maintenance and suggestions
+  reconciliation.
 - UTC minute 30: user facts.
 
 Dispatch uses Cloudflare's `scheduledTime`, so a delayed invocation retains its
 original cadence. Each endpoint still gets its tick if another endpoint fails.
 The older individual cron strings remain accepted during deployment transition.
-Endpoint idempotency and authorization are unchanged. Account deletion includes
-chat-file cleanup; audit maintenance includes workspace audit delivery. Their
-scheduled retries now wait for the next UTC hour. Operational observations run
-at each UTC quarter-hour. Successful supplier collection uses that same fixed
-quarter; its claim lease and failure retry deadlines remain unchanged (see
+The current cadence comes from `cloudflare/suggestions-cron/src/index.mjs`:
+`SWEEP_MINUTES` contains only `/api/cron/reconcile: 15`. A minute with no work
+due sends no application request. Coordinator wakes, schedules, run recovery,
+account deletion and audit retention use durable timers started by the write
+that makes work due. Reconcile recovers work those timers missed; do not
+restore the former every-minute endpoint fan-out. Endpoint idempotency and
+authorization are unchanged. Successful supplier collection retains its
+quarter-hour cadence and existing claim and failure retry deadlines (see
 [suggestions schedules](../suggestions-cron.md)).
 
 Deploy the existing Worker only after the matching Mikka application is READY
@@ -65,10 +69,13 @@ version read-only before deciding whether another release is needed.
 A successful release receipt proves deployment identity and configuration,
 not that each scheduled endpoint has run. Record normal scheduled Worker
 history and the matching production route logs separately. Check a UTC
-quarter-hour for ops-monitor and a UTC hour boundary for account-deletions and
-audit-retention, including the three every-minute endpoints and their existing
-authentication/failure behavior. Do not invoke production cron routes manually
-to manufacture observation traffic or include secret values in evidence.
+quarter-hour for reconcile, ops-monitor and briefings, an hour boundary for
+subscriptions and suggestions reconciliation, and minute 30 for user facts.
+Observe normal due-time Workflow executions separately for coordinator wakes,
+schedules, run recovery, account deletion and audit retention. Preserve their
+existing authentication and failure behavior. Do not invoke production cron
+routes manually to manufacture observation traffic or include secret values
+in evidence.
 
 Provider references: [Wrangler deploy and secret preservation](https://developers.cloudflare.com/workers/wrangler/commands/workers/),
 [Worker subdomain flags](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/subdomain/methods/get/),

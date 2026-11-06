@@ -42,7 +42,9 @@ const PARTITION = `${FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'}${
 const PAGE_URL = BUNDLED ? RENDERER_URL : APP_URL
 const PAGE_ORIGIN = BUNDLED ? RENDERER_ORIGIN : APP_ORIGIN
 
-protocol.registerSchemesAsPrivileged([{ scheme: 'mikka', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }])
+// Custom schemes need this explicit opt-in to retain V8's normal compiled-code
+// cache across launches, as the hosted http(s) renderer already does.
+protocol.registerSchemesAsPrivileged([{ scheme: 'mikka', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, codeCache: true } }])
 
 app.setName(FLAVOR === 'dev' ? 'Mikka Dev' : 'Mikka')
 // Dev and production never share keychain ciphertext or Chromium state.

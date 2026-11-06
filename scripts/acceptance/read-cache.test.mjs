@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { tsImport } from 'tsx/esm/api'
 import { EnvironmentError } from '../test-accounts/environment.mjs'
 import { TestAccountError } from '../test-accounts/pool.mjs'
-import { desktopActionSchemas } from '../../lib/desktop-rpc/schemas.ts'
 import { decode } from '../../lib/desktop-rpc/wire.ts'
 import { READ_ACTIONS, ReadCacheAcceptanceError, ReadCacheDiagnosticError, actionResult, createReadClient, discoverReadActions, exerciseReadCases, publicFailure, requestAllowed } from './read-cache.mjs'
 import { observedAction, publishedReadActions, readRpcActions, rpcReadRequest } from './read-action-transport.mjs'
+
+// The CI entry is plain node --test; scope TypeScript alias resolution to this
+// real production schema instead of depending on a process-wide test loader.
+const { desktopActionSchemas } = await tsImport('../../lib/desktop-rpc/schemas.ts', import.meta.url)
 
 const environment = { origin: 'http://127.0.0.1:3110', basePath: '/mikka' }
 const id = number => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`

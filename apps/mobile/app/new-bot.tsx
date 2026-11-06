@@ -20,7 +20,7 @@ const colorLabels: Record<string, string> = {
 }
 
 /**
- * 新建 Bot, from 对话's 「+」: a name, a shape and a colour, as on the web
+ * 新建 Bot (Comma design 06), a form sheet from 对话's 新建: a name, a shape and a colour, as on the web
  * (components/nav/new-bot-dialog.tsx); the bot's chat opens once it exists.
  */
 export default function NewBot() {
@@ -50,7 +50,7 @@ export default function NewBot() {
     <View style={styles.screen}>
       <NavBar title="新建 Bot"
         left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
-        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !name.trim() || busy, busy, web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
+        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !name.trim() || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <View style={styles.hero}><BotAvatar color={color} shape={shape} size={96} /></View>
         <Field style={styles.field}>
@@ -58,18 +58,20 @@ export default function NewBot() {
             returnKeyType="done" onSubmitEditing={() => void create()} style={styles.input} accessibilityLabel="名字" />
         </Field>
         {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{problem}</Text> : null}
-        <View accessibilityRole="radiogroup" accessibilityLabel="形状" style={[styles.grid, styles.shapeGrid]}>
+        <Text style={styles.label}>形状</Text>
+        <View accessibilityRole="radiogroup" accessibilityLabel="形状" style={styles.panel}>
           {BOT_PICKER_SHAPES.map(item => (
             <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: shape === item, disabled: busy }} aria-checked={Platform.OS === 'web' ? shape === item : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} accessibilityLabel={shapeLabels[item]} disabled={busy} onPress={() => { tap(); setShape(item) }}
               style={[styles.choice, shape === item && styles.chosen]}>
-              <BotAvatar color={color} shape={item} size={40} />
+              <BotAvatar color="gris" shape={item} size={30} />
             </Pressable>
           ))}
         </View>
-        <View accessibilityRole="radiogroup" accessibilityLabel="颜色" style={styles.grid}>
+        <Text style={styles.label}>颜色</Text>
+        <View accessibilityRole="radiogroup" accessibilityLabel="颜色" style={styles.panel}>
           {Object.entries(BOT_COLORS).map(([id, hex]) => (
             <Pressable key={id} accessibilityRole="radio" accessibilityState={{ checked: color === id, disabled: busy }} aria-checked={Platform.OS === 'web' ? color === id : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} accessibilityLabel={colorLabels[id]} disabled={busy} onPress={() => { tap(); setColor(id) }}
-              style={[styles.swatchRing, color === id && { borderColor: colors.ink }]}>
+              style={[styles.swatchRing, color === id && { borderColor: colors.accent }]}>
               <View style={[styles.swatch, { backgroundColor: hex }]} />
             </Pressable>
           ))}
@@ -80,16 +82,16 @@ export default function NewBot() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.grouped },
-  body: { padding: 16, gap: 20 },
-  hero: { alignItems: 'center', marginTop: 8 },
-  field: { minHeight: 50, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: colors.surface },
+  screen: { flex: 1, backgroundColor: colors.page },
+  body: { padding: 16, gap: 12 },
+  hero: { alignItems: 'center', marginTop: 24, marginBottom: 16 },
+  label: { marginTop: 4, marginLeft: 16, fontSize: 15, fontWeight: '600', color: colors.secondary },
+  panel: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6, padding: 10, borderRadius: 22, borderCurve: 'continuous', backgroundColor: colors.bubble },
+  field: { minHeight: 52, borderRadius: 26, paddingVertical: 12, paddingHorizontal: 18, justifyContent: 'center', backgroundColor: colors.bubble },
   input: { fontSize: 17, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   problem: { color: colors.danger, fontSize: 14, marginTop: -8, marginLeft: 4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
-  shapeGrid: { width: 3 * 60 + 2 * 12, alignSelf: 'center' },
-  choice: { width: 60, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  chosen: { borderWidth: 2, borderColor: colors.ink },
-  swatchRing: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  swatch: { width: 30, height: 30, borderRadius: 15 },
+  choice: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  chosen: { borderColor: colors.accent },
+  swatchRing: { width: 48, height: 48, borderRadius: 24, borderWidth: 2.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  swatch: { width: 36, height: 36, borderRadius: 18 },
 })

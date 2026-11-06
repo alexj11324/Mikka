@@ -1,5 +1,5 @@
 /**
- * The order of the workspaces in the drawer, as the person arranged it on this phone. The server has no order for
+ * The order of the workspaces (the 对话 workspace menu and 工作区), as the person arranged it on this phone. The server has no order for
  * them, so the arrangement is a list of ids kept on the device; workspaces it does not name follow in the server's
  * order, and ids of workspaces that are gone are dropped.
  */
