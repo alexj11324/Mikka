@@ -95,14 +95,15 @@ export function ChangesTabLabel({ changes }: { changes: ThreadChanges | null }) 
   return <>{t('changesTab')}{changes && <Counts additions={changes.additions} deletions={changes.deletions} />}</>
 }
 
-function Counts({ additions, deletions }: { additions: number; deletions: number }) {
+export function Counts({ additions, deletions }: { additions: number; deletions: number }) {
   return <span className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
     {additions > 0 && <span className="text-success-foreground">+{additions}</span>}
     {deletions > 0 && <span className="text-destructive-foreground">−{deletions}</span>}
   </span>
 }
 
-function FileSection({ file, open, wrap, onOpenChange, ref }: { file: ChangedFile; open: boolean; wrap: DiffWrap; onOpenChange: (open: boolean) => void; ref: (node: HTMLElement | null) => void }) {
+/** One changed file as its diff, folded or open; the 改动 tab and the acceptance report draw each file with it. */
+export function FileSection({ file, open, wrap, onOpenChange, ref }: { file: ChangedFile; open: boolean; wrap: DiffWrap; onOpenChange: (open: boolean) => void; ref: (node: HTMLElement | null) => void }) {
   const t = useTranslations('IssueThreads')
   const { name } = splitPath(file.path)
   const fileDiff = useMemo(() => getSingularPatch(filePatch(file)), [file])
