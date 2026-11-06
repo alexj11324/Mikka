@@ -28,14 +28,14 @@ const env = { GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY, 
 const json = (value, status = 200, headers = {}) => Response.json(value, { status, headers })
 const stamp = ms => new Date(ms).toISOString()
 const coordinator = () => ({ runId: COORDINATOR, deploymentId: DEPLOYMENT, status: 'completed', createdAt: stamp(NOW + 1000),
-  workflowName: 'workflow//workflows/coordinator/workflow.ts//coordinatorTurn' })
+  workflowName: 'workflow//./workflows/coordinator/workflow//coordinatorTurn' })
 const timer = () => ({ runId: TIMER, deploymentId: DEPLOYMENT, status: 'running', createdAt: stamp(NOW),
-  workflowName: 'workflow//workflows/due-timer/workflow.ts//dueTimer' })
+  workflowName: 'workflow//./workflows/due-timer/workflow//dueTimer' })
 const events = () => [
   { runId: TIMER, eventType: 'wait_created', correlationId: 'wait_1', createdAt: stamp(NOW + 2000), eventData: { resumeAt: DUE } },
   { runId: TIMER, eventType: 'wait_completed', correlationId: 'wait_1', createdAt: stamp(NOW + 180_010) },
   { runId: TIMER, eventType: 'step_created', correlationId: 'step_1', createdAt: stamp(NOW + 180_020),
-    eventData: { stepName: 'step//workflows/due-timer/steps.ts//runDue' } },
+    eventData: { stepName: 'step//./workflows/due-timer/steps//runDue' } },
   { runId: TIMER, eventType: 'step_started', correlationId: 'step_1', createdAt: stamp(NOW + 180_030) },
   { runId: TIMER, eventType: 'step_completed', correlationId: 'step_1', createdAt: stamp(NOW + 180_100) },
 ]
@@ -98,7 +98,7 @@ test('managed proof requires exact deployment, completed owner turn, matching du
 
 test('descending SDK pages retain an eligible completed correlation behind a newer incomplete runDue', () => {
   const descending = [...events(), { runId: TIMER, eventType: 'step_created', correlationId: 'later',
-    createdAt: stamp(NOW + 180_200), eventData: { stepName: 'step//workflows/due-timer/steps.ts//runDue' } }].reverse()
+    createdAt: stamp(NOW + 180_200), eventData: { stepName: 'step//./workflows/due-timer/steps//runDue' } }].reverse()
   const observed = managedEvidence({ ...params(), events: descending })
   assert.ok(observed)
   assert.equal(observed.runDueCreatedAt, stamp(NOW + 180_020))
@@ -130,7 +130,7 @@ test('the real locked SDK absent-hook error is pending, while auth/transport err
 })
 
 function fullFixture(options = {}) {
-  let clock = NOW, definition, submitted = false, cancelled = false, timerReads = 0, deploymentReads = 0
+  let clock = NOW, definition, submitted = false, cancelled = false, timerReads = 0, deploymentReads = 0, teamSelected = false
   const requests = [], managerCalls = []
   const repository = { full_name: REPOSITORY, owner: { login: 'alexj11324' } }
   const selectedEnv = options.deployed ? { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: OTHER,
@@ -182,11 +182,14 @@ function fullFixture(options = {}) {
       assert.deepEqual(JSON.parse(init.body), { email: EMAIL, password: PASSWORD })
       return json({}, 200, { 'set-cookie': 'better-auth.session_token=' + COOKIE + '; Path=/; Secure; HttpOnly' })
     }
-    assert.equal(headers.get('cookie'), 'better-auth.session_token=' + COOKIE)
+    assert.equal(headers.get('cookie'), 'better-auth.session_token=' + COOKIE + (teamSelected ? '; mikka-workspace=' + id(12) : ''))
     if (url.pathname.endsWith('/sign-out')) return json({}, options.logoutStatus ?? 200)
     if (url.pathname.endsWith('/get-session')) return json({ user: { id: OWNER, email: EMAIL } })
-    if (url.pathname === '/mikka/api/workspace') return json({ currentUserId: OWNER, role: 'admin',
-      workspace: { id: id(10), kind: options.shared ? 'shared' : 'personal' } })
+    if (url.pathname === '/mikka/api/workspace') return json({ currentUserId: OWNER, role: teamSelected ? 'member' : 'admin',
+      workspace: { id: teamSelected ? id(12) : id(10), kind: teamSelected ? 'team' : 'personal' },
+      choices: [{ id: id(10), kind: 'personal' }, ...(options.noTeams ? [] : [{ id: id(12), kind: 'team' }]),
+        ...(options.multipleTeams ? [{ id: id(13), kind: 'team' }] : [])] })
+    if (url.pathname === '/mikka/api/coordinator/messages') assert.equal(teamSelected, true, 'business must use the normal selected team cookie')
     if (url.pathname === '/mikka/api/coordinator/messages' && method === 'POST') {
       const body = JSON.parse(init.body); assert.match(body.submissionId, /^[0-9a-f-]{36}$/)
       if (submitted) {
@@ -202,6 +205,12 @@ function fullFixture(options = {}) {
     if (url.pathname === '/mikka/api/rpc') {
       assert.equal(headers.get('x-mikka-rpc'), '1')
       const body = JSON.parse(init.body)
+      if (body.action === 'workspace.switchWorkspace') {
+        assert.deepEqual(body.args, [id(12)])
+        teamSelected = true
+        return json({ version: 1, ok: true, result: encode({ ok: true, data: { workspaceId: id(12) } }) }, 200,
+          { 'set-cookie': 'mikka-workspace=' + id(12) + '; Path=/; Secure; HttpOnly; SameSite=Lax' })
+      }
       assert.equal(body.action, 'coordinator.coordinatorHistory'); assert.equal(body.args[0], BOT); assert.equal(body.args[2], 1)
       return json({ ok: true, result: encode({ items: [outcome(definition.title)], cursor: 3 }) })
     }
@@ -244,7 +253,7 @@ test('complete driver separates manager credentials, performs one normal post, r
   const f = fullFixture(), report = await f.run()
   assert.equal(report.status, 'pass'); assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 0)
   assert.equal(report.normalSessionObserved, true); assert.equal(report.sessionClosed, true)
-  assert.equal(report.personalWorkspaceConfirmed, true); assert.equal(report.futureScheduleConfirmedAbsent, true)
+  assert.equal(report.teamWorkspaceConfirmed, true); assert.equal(report.futureScheduleConfirmedAbsent, true)
   assert.ok(f.requests.some(row => row.path === '/mikka/api/rpc'), 'merged chat alone was insufficient')
   assert.ok(f.managerCalls.includes('events'))
   const publicText = JSON.stringify(report)
@@ -274,8 +283,8 @@ test('failed due result cancels only the exact tool-proven schedule through the 
   assert.equal(f.requests.filter(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST').length, 2)
 })
 
-test('closed issue, stale main, denied manager or shared workspace never submits a task', async () => {
-  for (const options of [{ closed: true }, { wrongMain: true }, { managerDenied: true }, { shared: true }]) {
+test('closed issue, stale main, denied manager or missing team never submits a task', async () => {
+  for (const options of [{ closed: true }, { wrongMain: true }, { managerDenied: true }, { noTeams: true }]) {
     const f = fullFixture(options), report = await f.run()
     assert.notEqual(report.status, 'pass')
     assert.equal(f.requests.some(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST'), false)
@@ -527,16 +536,16 @@ async function historyMetadataFixture() {
   const oldDeployment = 'dpl_SyntheticPreviousDeployment'
   const runRows = [
     { runId: COORDINATOR, deploymentId: HISTORY_DEPLOYMENT, status: 'completed',
-      workflowName: 'workflow//workflows/coordinator/workflow.ts//coordinatorTurn', createdAt: stamp(begin + 1000), completedAt: stamp(begin + 20_000) },
+      workflowName: 'workflow//./workflows/coordinator/workflow//coordinatorTurn', createdAt: stamp(begin + 1000), completedAt: stamp(begin + 20_000) },
     { runId: TIMER, deploymentId: oldDeployment, status: 'completed',
-      workflowName: 'workflow//./workflows/due-timer/workflow.ts//dueTimer', createdAt: stamp(begin - 120_000), completedAt: stamp(finish - 1000) },
+      workflowName: 'workflow//./workflows/due-timer/workflow//dueTimer', createdAt: stamp(begin - 120_000), completedAt: stamp(finish - 1000) },
   ]
   const expectedEvents = [
     { runId: TIMER, eventType: 'run_completed', createdAt: stamp(finish - 1000) },
     { runId: TIMER, eventType: 'step_completed', correlationId: 'synthetic-step-correlation', createdAt: stamp(begin + 181_000) },
     { runId: TIMER, eventType: 'step_started', correlationId: 'synthetic-step-correlation', createdAt: stamp(begin + 180_100) },
     { runId: TIMER, eventType: 'step_created', correlationId: 'synthetic-step-correlation', createdAt: stamp(begin + 180_050),
-      eventData: { stepName: 'step//./workflows/due-timer/steps.ts//runDue' } },
+      eventData: { stepName: 'step//./workflows/due-timer/steps//runDue' } },
     { runId: TIMER, eventType: 'wait_completed', correlationId: 'synthetic-wait-correlation', createdAt: stamp(begin + 180_000) },
     { runId: TIMER, eventType: 'wait_created', correlationId: 'synthetic-wait-correlation', createdAt: stamp(begin - 2000),
       eventData: { resumeAt: new Date(begin + 180_000) } },
@@ -549,7 +558,8 @@ async function historyMetadataFixture() {
     runs: {
       async list(options) {
         calls.push({ operation: 'list', options }); assert.equal(options.resolveData, 'none')
-        assert.match(options.workflowName, /^workflow\/\/(?:\.\/)?workflows\/(?:coordinator|due-timer)\/workflow\.ts\/\/(?:coordinatorTurn|dueTimer)$/)
+        assert.ok(['workflow//./workflows/coordinator/workflow//coordinatorTurn',
+          'workflow//./workflows/due-timer/workflow//dueTimer'].includes(options.workflowName))
         return { data: runRows.filter(row => row.workflowName === options.workflowName), hasMore: false, cursor: null }
       },
       async get(runId, options) {
@@ -597,7 +607,11 @@ test('historical metadata inspection includes completed and previous-deployment 
   assert.ok(previous.events.some(row => row.eventType === 'wait_created' && row.inSourceWindow === false))
   assert.ok(previous.events.some(row => row.stepNameClass === 'runDue'))
   assert.ok(previous.events.some(row => row.eventType === 'run_completed'))
-  assert.equal(f.calls.filter(row => row.operation === 'list').length, 4, 'both exact canonical forms are read for each workflow')
+  assert.equal(report.listing.canonicalFilters, 2)
+  assert.deepEqual(f.calls.filter(row => row.operation === 'list').map(row => row.options.workflowName), [
+    'workflow//./workflows/coordinator/workflow//coordinatorTurn',
+    'workflow//./workflows/due-timer/workflow//dueTimer',
+  ])
   const output = JSON.stringify(report)
   for (const privateValue of [TOKEN, COORDINATOR, TIMER, 'synthetic-step-correlation', 'synthetic-wait-correlation'])
     assert.equal(output.includes(privateValue), false)
@@ -713,7 +727,7 @@ test('timer candidate listing stops at the explicit six-hour creation window and
   const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
   const f = await historyMetadataFixture()
   const ancient = { runId: 'wrun_SYNTHETIC_OLDER_TIMER', deploymentId: HISTORY_DEPLOYMENT, status: 'running',
-    workflowName: 'workflow//workflows/due-timer/workflow.ts//dueTimer',
+    workflowName: 'workflow//./workflows/due-timer/workflow//dueTimer',
     createdAt: stamp(Date.parse(HISTORY_SOURCE_REPORT.startedAt) - 6 * 60 * 60_000 - 2000) }
   f.runRows.push(ancient)
   const list = f.storage.runs.list
@@ -726,7 +740,7 @@ test('timer candidate listing stops at the explicit six-hour creation window and
   assert.equal(report.status, 'inspected'); assert.equal(report.candidates.length, 2)
   assert.equal(report.listing.olderTimersInspected, false)
   assert.equal(report.listing.timerCreatedNotBefore, '2026-11-06T14:06:03.595Z')
-  assert.equal(f.calls.filter(row => row.operation === 'list').length, 4)
+  assert.equal(f.calls.filter(row => row.operation === 'list').length, 2)
 })
 
 test('invalid or additional inspection CLI arguments cannot enter owner business code', async () => {
@@ -750,5 +764,76 @@ test('invalid or additional inspection CLI arguments cannot enter owner business
       assert.equal(report.status, 'blocked'); assert.equal(report.code, 'inspection_configuration')
       assert.equal(report.detail, 'inputs'); assert.equal(report.ownerRequests, 0)
     } finally { await rm(dir, { recursive: true, force: true }) }
+  }
+})
+
+
+test('automatic and explicit proof select the unique active team through the normal owner session', async () => {
+  for (const deployed of [false, true]) {
+    const f = fullFixture({ deployed }), report = await f.run()
+    assert.equal(report.status, 'pass')
+    assert.equal(report.teamWorkspaceConfirmed, true)
+    assert.match(report.teamWorkspaceHash, /^[a-f0-9]{64}$/)
+    assert.equal(report.teamSelectionBasis, 'unique-active-team-membership')
+    assert.equal(report.teamOwnerAttribution, 'AGENTS.md-shared-account-team')
+    assert.equal(report.personalWorkspaceConfirmed, undefined)
+    assert.equal(report.submissionCount, 1)
+    assert.equal(report.sessionClosed, true)
+    const switches = f.requests.filter(row => row.path === '/mikka/api/rpc'
+      && JSON.parse(row.body).action === 'workspace.switchWorkspace')
+    assert.equal(switches.length, 1)
+    assert.equal(JSON.stringify(report).includes(id(12)), false)
+  }
+})
+
+
+test('ambiguous team selection closes the normal session without any Coordinator submission', async () => {
+  for (const deployed of [false, true]) {
+    const f = fullFixture({ deployed, multipleTeams: true }), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.equal(report.code, 'team_workspace_failed'); assert.equal(report.detail, 'team_ambiguous')
+    assert.equal(report.submissionCount, 0); assert.equal(report.sessionClosed, true)
+    assert.equal(f.requests.some(row => row.path === '/mikka/api/coordinator/messages'), false)
+    if (deployed) assert.equal(report.targetAfter.status, 'ready')
+  }
+})
+
+test('managed evidence accepts actual locked compiler identifiers and rejects source-file aliases', async () => {
+  const workflowRequire = createRequire(import.meta.resolve('workflow/nitro'))
+  const nitroRequire = createRequire(workflowRequire.resolve('@workflow/nitro'))
+  const builders = pathToFileURL(nitroRequire.resolve('@workflow/builders'))
+  const { applySwcTransform } = await import(new URL('./apply-swc-transform.js', builders).href)
+  const { fileURLToPath } = await import('node:url')
+  const root = fileURLToPath(new URL('../../', import.meta.url))
+  const ids = []
+  for (const [file, mode, name] of [
+    ['workflows/coordinator/workflow.ts', 'workflow', 'coordinatorTurn'],
+    ['workflows/due-timer/workflow.ts', 'workflow', 'dueTimer'],
+    ['workflows/due-timer/steps.ts', 'step', 'runDue'],
+  ]) {
+    const filename = fileURLToPath(new URL('../../' + file, import.meta.url))
+    const transformed = await applySwcTransform(file, await readFile(filename, 'utf8'), mode, filename, root, root)
+    const entry = transformed.workflowManifest[mode === 'workflow' ? 'workflows' : 'steps'][file][name]
+    ids.push(entry[mode === 'workflow' ? 'workflowId' : 'stepId'])
+  }
+  assert.deepEqual(ids, [
+    'workflow//./workflows/coordinator/workflow//coordinatorTurn',
+    'workflow//./workflows/due-timer/workflow//dueTimer',
+    'step//./workflows/due-timer/steps//runDue',
+  ])
+  const p = params()
+  p.coordinator.workflowName = ids[0]
+  p.timer.workflowName = ids[1]
+  p.events.find(event => event.eventType === 'step_created').eventData.stepName = ids[2]
+  assert.ok(managedEvidence(p), 'actual generated IDs must satisfy the otherwise valid managed evidence')
+  for (const rewrite of [
+    value => value.replace('//coordinatorTurn', '.ts//coordinatorTurn').replace('//dueTimer', '.ts//dueTimer').replace('//runDue', '.ts//runDue'),
+    value => value.replace('//./', '//'),
+    value => value + 'Other',
+  ]) {
+    assert.equal(managedEvidence({ ...p, coordinator: { ...p.coordinator, workflowName: rewrite(ids[0]) } }), null)
+    assert.equal(managedEvidence({ ...p, timer: { ...p.timer, workflowName: rewrite(ids[1]) } }), null)
+    assert.equal(managedEvidence({ ...p, events: p.events.map(event => event.eventType === 'step_created'
+      ? { ...event, eventData: { stepName: rewrite(ids[2]) } } : event) }), null)
   }
 })

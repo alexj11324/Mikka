@@ -11,6 +11,7 @@ import { responseCookieJar } from '../acceptance/read-cache-production.mjs'
 import { publishedActions } from '../acceptance/read-action-transport.mjs'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
 import { DeployedTargetError, deployedTargetGuard, assertDeployedTarget, publicTargetFailure } from '../acceptance/deployed-target.mjs'
+import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const BASE = '/mikka'
@@ -29,7 +30,7 @@ class ProofError extends Error {
   constructor(code) { super(CODES.has(code) ? code : 'proof_failed'); this.code = this.message }
 }
 const check = (value, code) => { if (!value) throw new ProofError(code) }
-const failureCode = error => error instanceof ProofError ? error.code : 'proof_failed'
+const failureCode = error => error instanceof ProofError || error instanceof TeamWorkspaceError ? error.code : 'proof_failed'
 const isUuid = value => typeof value === 'string' && UUID.test(value)
 const sameIds = (left, right) => left.length === right.length && left.every(id => right.includes(id))
 const tokenIdentity = token => JSON.stringify([token.id, token.name, token.createdAt, token.expiresAt,
@@ -101,11 +102,12 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   const jar = responseCookieJar(now)
   const marker = 'm1415-wire-' + randomUUID()
   const unusedDeviceId = randomUUID()
-  let phase = 'configuration', ownerId, tokenId, credential, deviceId, client, contract
+  let phase = 'configuration', ownerId, teamWorkspaceId, tokenId, credential, deviceId, client, contract
   let beforeTokens, beforeDevices, registrationAttempted = false, signInStarted = false, signedIn = false, primaryPassed = false
   let targetProof = attestation
   const error = cause => {
     if (cause instanceof DeployedTargetError) report.targetFailure = publicTargetFailure(cause)
+    if (cause instanceof TeamWorkspaceError) report.teamFailure = publicTeamWorkspaceFailure(cause)
     report.errors.push({ phase, code: cause instanceof DeployedTargetError ? cause.code : failureCode(cause) })
   }
   const verifyDeployment = async () => {
@@ -127,7 +129,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   }
   async function owner(path, method = 'GET', body, cookieOverride) {
     const known = new Set(['/api/auth/sign-in/email', '/api/auth/sign-out',
-      '/api/auth/get-session?disableCookieCache=true', '/api/mobile/home',
+      '/api/auth/get-session?disableCookieCache=true', '/api/auth/get-session', '/api/workspace', '/api/mobile/home',
       '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json'])
     check(known.has(path) || (tokenId && path === '/api/device-tokens/' + tokenId + '/revoke'),
       'request_rejected')
@@ -222,11 +224,22 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       && session.body.user.email?.toLowerCase() === env.SMOKE_OWNER_EMAIL.toLowerCase(), 'session_identity')
     ownerId = session.body.user.id
     report.checks.sessionOwner = true
+    phase = 'team-workspace'
+    Object.assign(report, await selectTeamWorkspace({ ownerId, json: async (path, body) => {
+      check(body === undefined
+        ? path === BASE + '/api/workspace' || path === BASE + '/api/auth/get-session'
+        : path === BASE + '/api/rpc' && isTeamWorkspaceSwitchRequest(body), 'request_rejected')
+      const response = await owner(path.slice(BASE.length), body === undefined ? 'GET' : 'POST', body)
+      check(response.status === 200, 'response_invalid')
+      if (path === BASE + '/api/workspace') teamWorkspaceId = response.body?.workspace?.id
+      return response.body
+    } }))
     phase = 'mobile-home'
     const home = await owner('/api/mobile/home')
     check(home.status === 200 && home.body?.user?.id === ownerId
       && home.body.user.email?.toLowerCase() === env.SMOKE_OWNER_EMAIL.toLowerCase()
-      && isUuid(home.body.workspace?.id) && Array.isArray(home.body.workspaces) && Array.isArray(home.body.bots)
+      && home.body.workspace?.id === teamWorkspaceId && home.body.workspace.kind === 'team'
+      && Array.isArray(home.body.workspaces) && Array.isArray(home.body.bots)
       && Number.isSafeInteger(home.body.threads?.running) && Number.isSafeInteger(home.body.threads?.waiting)
       && home.body.live?.ownerId === ownerId
       && (home.body.live.workspaceId === null || isUuid(home.body.live.workspaceId)), 'mobile_home_failed')
