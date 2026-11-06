@@ -52,5 +52,5 @@ test('version answers: server too old, app too old, and an older Mikka without d
   assert.deepEqual(await probeServer(base, options({ [`${base}/api/desktop/discovery`]: () => json({ ...discovery, desktopProtocol: { min: 2, max: 2 }, minDesktopVersion: '2026.10000.90' }) })), { status: 'app_update_required', minimum: '2026.10000.90' })
   assert.deepEqual(await probeServer(base, options({ [`${base}/api/desktop/discovery`]: () => json({ ...discovery, minDesktopVersion: '2026.10000.90' }) })), { status: 'app_update_required', minimum: '2026.10000.90' })
   assert.deepEqual(await probeServer(base, options({ [`${base}/api/desktop/discovery`]: () => json({ version: 1, ok: false, error: { code: 'desktop_client_update_required' } }, 426) })), { status: 'app_update_required', minimum: null })
-  assert.deepEqual(await probeServer(base, options({ [`${base}/api/version`]: () => json({ build: 'abc1234', minDesktopVersion: null }) })), { status: 'server_update_required', version: 'abc1234' })
+  assert.deepEqual(await probeServer(base, options({ [`${base}/api/version`]: () => json({ build: 'abc1234', minDesktopVersion: null }) })), { status: 'server_update_required', version: null })
 })

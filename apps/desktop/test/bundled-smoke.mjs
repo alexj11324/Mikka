@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { createServer } from 'node:http'
 import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
@@ -39,6 +40,39 @@ let releaseObserver
 let generatedWorkspaceName
 let passed = false
 let failure
+let selfHosted
+
+/** A port nothing listens on, for the unreachable probe. */
+async function unusedPort() {
+  const server = createServer()
+  await new Promise(done => server.listen(0, '127.0.0.1', done))
+  const { port } = server.address()
+  await new Promise(done => server.close(done))
+  return port
+}
+
+/** A loopback stand-in for #1556's discovery read on a second origin. It
+ * answers the signed-out page's config read and nothing that signs anyone in. */
+async function startDiscoveryStub() {
+  let configReads = 0
+  const server = createServer((request, response) => {
+    const path = new URL(request.url, 'http://stub').pathname
+    if (path === '/mikka/api/desktop/discovery') {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ name: 'Acceptance self-hosted', version: 'acceptance', edition: 'community', basePath: '/mikka', desktopProtocol: { min: 0, max: 1 }, signIn: { google: false, github: false, email: true } }))
+    } else if (path === '/mikka/api/desktop/config') {
+      configReads++
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ googleEnabled: false, githubEnabled: false, emailEnabled: true }))
+    } else if (path === '/mikka/api/desktop/rpc') {
+      response.writeHead(401, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ version: 1, ok: false, error: { code: 'desktop_session_expired' } }))
+    } else { response.writeHead(404); response.end() }
+  })
+  await new Promise(done => server.listen(0, '127.0.0.1', done))
+  const address = `http://127.0.0.1:${server.address().port}`
+  return { address, url: `${address}/mikka`, configReads: () => configReads, close: () => new Promise(done => server.close(done)) }
+}
 
 try {
   scope = await acquireTestAccounts({ runId: `desktop-${started}`, workerId: 'bundled-smoke', requestId: `desktop-${started}`, ttlMs: 300_000 })
@@ -79,6 +113,35 @@ try {
 
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   await page.screenshot({ path: join(output, 'bundled-sign-in.png'), animations: 'disabled' })
+
+  // #1557: the sign-in page's server. A self-hosted one is accepted only after
+  // a probe; choosing it reloads the page, and the page's server and its
+  // signed-out reads follow; choosing the built-in server comes back.
+  const builtIn = `${environment.origin}/mikka`
+  assert.equal(await page.evaluate(() => window.mikka.app.serverUrl), builtIn)
+  assert.equal((await page.evaluate(() => window.mikka.bundled.server.state())).current.cloud, true)
+  selfHosted = await startDiscoveryStub()
+  const closedPort = await unusedPort()
+  assert.equal((await page.evaluate(address => window.mikka.bundled.server.probe(address), `http://127.0.0.1:${closedPort}`)).status, 'unreachable')
+  assert.equal((await page.evaluate(() => window.mikka.bundled.server.probe('http://example.com'))).status, 'https_required')
+  const ownProbe = await page.evaluate(address => window.mikka.bundled.server.probe(address), builtIn)
+  // Before #1556 the local server has no discovery read and is an older Mikka.
+  assert.ok(['ok', 'server_update_required'].includes(ownProbe.status), ownProbe.status)
+  evidence.builtInDiscovery = ownProbe.status
+  assert.equal(await page.evaluate(url => window.mikka.bundled.server.select(url).then(() => 'selected', () => 'refused'), selfHosted.url), 'refused')
+  const probed = await page.evaluate(address => window.mikka.bundled.server.probe(address), selfHosted.address)
+  assert.equal(probed.status, 'ok')
+  assert.equal(probed.server.url, selfHosted.url)
+  assert.equal(probed.server.name, 'Acceptance self-hosted')
+  await Promise.all([page.waitForEvent('framenavigated'), page.evaluate(url => window.mikka.bundled.server.select(url), selfHosted.url)])
+  await page.waitForFunction(url => window.mikka?.app.serverUrl === url, selfHosted.url)
+  await page.waitForFunction(() => document.body.innerText.trim().length > 30)
+  assert.ok(selfHosted.configReads() > 0, 'the signed-out page must read the chosen server')
+  await page.screenshot({ path: join(output, 'bundled-sign-in-self-hosted.png'), animations: 'disabled' })
+  await Promise.all([page.waitForEvent('framenavigated'), page.evaluate(() => window.mikka.bundled.server.select(null))])
+  await page.waitForFunction(url => window.mikka?.app.serverUrl === url, builtIn)
+  await page.waitForFunction(() => document.body.innerText.trim().length > 30)
+  check('server choice: probe states, probed-only selection, the page follows the chosen server and returns')
   browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ storageState: scope.owner.storageStatePath })
   const systemBrowser = await context.newPage()
@@ -156,6 +219,7 @@ try {
   const cleanup = (stage, action) => recordNativeCleanup(stage, action, evidence.cleanupStages)
   const failedCleanup = error => { passed = false; cleanupErrors.push(error) }
   if (browser) await cleanup('browser-close', () => browser.close()).catch(failedCleanup)
+  if (selfHosted) await selfHosted.close().catch(failedCleanup)
   let closed = true
   await cleanup('electron-close', () => closeElectron(application)).catch(error => { closed = false; failedCleanup(error) })
   let drained = false

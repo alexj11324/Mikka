@@ -108,7 +108,8 @@ export async function probeServer(input: unknown, options: { fetch: Fetcher; app
     if (olderMikka === undefined) {
       try {
         const legacy = await readJson(await get(`${base}/api/version`)) as Record<string, unknown> | null
-        if (legacy && typeof legacy === 'object' && typeof legacy.build === 'string' && 'minDesktopVersion' in legacy) olderMikka = text(legacy.build, 100)
+        // Its `build` is a commit, not a version a person upgrades from: say only that it is too old.
+        if (legacy && typeof legacy === 'object' && typeof legacy.build === 'string' && 'minDesktopVersion' in legacy) olderMikka = null
       } catch { /* not this path */ }
     }
   }
