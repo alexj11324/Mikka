@@ -9,13 +9,13 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: issue1503-production-operator
+  group: issue1503-codex-context-reply
   cancel-in-progress: false
 jobs:
-  delivery:
+  resume_codex:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
@@ -37,16 +37,14 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Exercise full Codex delivery on the current fixed production release
-        run: node --import tsx scripts/ops/issue1503/delivery.mjs
+      - name: Answer the exact Codex question through the normal Factory API
+        run: node --import tsx scripts/ops/issue1503/resume-codex.mjs
         env:
           NODE_ENV: production
           MIKKA_EXPECTED_DEPLOYMENT_SHA: c0c98baa3020a085652ee5f773310b6dfa412c5d
-          MIKKA_1503_SUBMISSION_MODE: existing_issue
-          MIKKA_1503_HARNESS: codex
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-delivery
+          name: issue1503-codex-reply
           path: issue1503-report
           retention-days: 3
