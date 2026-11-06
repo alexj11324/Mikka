@@ -3225,6 +3225,7 @@
     },
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "replyToolUnavailable": "This reply could not be completed. Please try again.",
     "apiBalance": "Insufficient API balance",
     "subscriptionRefusal": {
       "unavailable": "Chosen subscription unavailable",
@@ -4980,6 +4981,7 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "model_tool_unavailable": { "default": "This reply could not be completed. Please try again." },
     "desktop_client_update_required": { "default": "Update Mikka to continue" },
     "desktop_session_expired": { "default": "Sign in to Mikka again" },
     "desktop_session_changed": { "default": "The account or workspace changed. Try again" },

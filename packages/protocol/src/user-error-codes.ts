@@ -8,6 +8,7 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  model_tool_unavailable: [],
   desktop_client_update_required: [],
   desktop_session_expired: [],
   desktop_session_changed: [],

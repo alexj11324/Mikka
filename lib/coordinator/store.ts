@@ -361,8 +361,10 @@ export async function retryFailedTurn(userId: string, botId: string): Promise<bo
  * turn was answering keeps the reason too (`mikkaFailure`), so the chat shows it
  * under that message after the next turn and after a reload.
  */
-export async function failTurn(userId: string, holder: string, error: string, botId: string): Promise<void> {
+export async function failTurn(userId: string, holder: string, error: string, botId: string, completed?: { messages: ModelMessage[]; streamId: string }): Promise<void> {
   const reason = error.slice(0, 1000)
+  const messages = completed ? maskDeep(completed.messages, credentialMasker) : []
+  if (messages.length) await assertCredentialSafeChat(userId, messages)
   await db.transaction(async tx => {
     const released = await tx.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: reason, lastErrorAt: new Date(), updatedAt: new Date() })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
@@ -373,6 +375,18 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
+    // A bounded tool-recovery failure can follow real completed tool effects.
+    // Keep their receipts and the invalid-call evidence in the same transaction
+    // as the failure/lease release. A replay no longer owns the lease and
+    // returns above, so it cannot duplicate these messages or their effects.
+    if (messages.length) {
+      const first = await nextPosition(tx, userId, botId)
+      await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        return { id: crypto.randomUUID(), userId, botId, position: first + index,
+          message: { ...plain, ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
+      }))
+    }
   })
 }
 

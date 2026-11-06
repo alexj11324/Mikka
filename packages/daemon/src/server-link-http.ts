@@ -464,8 +464,8 @@ export class HttpServerLink implements ServerLink {
       schema: runAssignmentSchema.shape.localComputer.unwrap(),
     })
   }
-  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
-    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal,requireModelCatalogue?:boolean) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context',...(requireModelCatalogue ? {requireModelCatalogue:true} : {})},schema:nativeBrokerContextSchema,signal})
   }
   async nativeLease(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription-lease`, {schema:nativeLeaseSchema,signal})

@@ -153,8 +153,9 @@ export async function createHostedBotRunner(host: {
   computerBroker?: ComputerBroker;
   /**
    * The models this machine's CLI reported for a harness (the daemon's model probe, model-probe.ts),
-   * or null when it reported none. Given, a subscription run starts only on a model it lists; otherwise
-   * it fails with subscription_model_not_reported and no other model is put in its place (Alex, 2026-11-03).
+   * or null when it reported none. Claude full IDs absent from its shortcut menu require the broker
+   * to verify the run's exact account catalogue. Codex still requires its CLI report. Neither path
+   * substitutes a different model when evidence is missing.
    */
   reportedModels?: (harness: "codex" | "claude_code") => Promise<Pick<HarnessInfo, "models" | "modelSlots"> | null>;
 }) {
@@ -322,10 +323,16 @@ export async function createHostedBotRunner(host: {
           binding.workspaceId !== selected.workspaceId || binding.consumerId !== selected.consumerId || binding.route !== selected.route)
           throw unavailable("resume_mismatch");
       }
-      // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
+      // Claude's shortcut menu is not exhaustive. A full ID can instead be
+      // confirmed by this run's server-authorized account catalogue below.
+      let requireModelCatalogue = false;
       if (selected && host.reportedModels) {
         const report = await daemonTracer.span("daemon.adapter.model_report", { "mikka.harness": kind, "mikka.run.id_hash": runIdHash(assignment.runId) }, () => host.reportedModels!(kind)).catch(() => null);
-        if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw new Error("subscription_model_not_reported");
+        if (!options.model) throw new Error("subscription_model_not_reported");
+        if (!report || harnessReportsModel(report, options.model) !== true) {
+          if (kind !== 'claude_code') throw new Error("subscription_model_not_reported");
+          requireModelCatalogue = true;
+        }
       }
       const lifetime = new AbortController();
       const traceAttributes = { "mikka.harness": kind, "mikka.run.id_hash": runIdHash(assignment.runId) };
@@ -429,7 +436,7 @@ export async function createHostedBotRunner(host: {
               if (checkAuthority) await live();
               else assertOpen();
               try {
-                return await daemonTracer.span("daemon.adapter.auth.context", traceAttributes, () => host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal));
+                return await daemonTracer.span("daemon.adapter.auth.context", traceAttributes, () => host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal, requireModelCatalogue));
               } catch (error) {
                 if (!(error instanceof ServerUnreachableError) || attempt >= 2) throw error;
                 await delay(250, undefined, { signal: lifetime.signal });

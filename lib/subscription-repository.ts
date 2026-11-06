@@ -6,7 +6,7 @@ import type { CredentialScope } from '../packages/daemon/src/subscription-worker
 import { runMayUseCredentialSql } from './personal-policy'
 import { quotaDisplayKey } from './subscription-quota'
 
-export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean }
+export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean; modelCatalog?: { revision: number | string; models: string[] } | null }
 export class SubscriptionRepository {
   constructor(readonly pool: Pick<Pool, 'query'> & Partial<Pick<Pool, 'connect'>>) {}
   /** Serialize allocation only: provider calls happen after this short transaction.
@@ -37,7 +37,7 @@ export class SubscriptionRepository {
     return id
   }
   async connection(ownerId: string, id: string): Promise<ConnectionRow> {
-    const { rows } = await this.pool.query<ConnectionRow>('select id,"ownerId","workspaceId",provider,state,epoch,quota,"accountLabel",paused from byos_connections where id=$1 and "ownerId"=$2', [id, ownerId])
+    const { rows } = await this.pool.query<ConnectionRow>('select id,"ownerId","workspaceId",provider,state,epoch,quota,"accountLabel",paused,"modelCatalog" from byos_connections where id=$1 and "ownerId"=$2', [id, ownerId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     return rows[0]
   }
