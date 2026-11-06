@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { decode, encode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 
 const require = createRequire(resolve(process.env.MIKKA_OPS_DEPENDENCIES, 'package.json'))
 const { Pool } = require('pg')
@@ -8,7 +9,7 @@ const ORIGIN = 'https://app.aspectlylabs.com'
 const BRANCH = 'refs/heads/ops/1515-1517-acceptance'
 if (process.env.GITHUB_REPOSITORY !== 'alexj11324/Mikka' || process.env.GITHUB_REF !== BRANCH) throw Error('issue_diagnostic_scope_mismatch')
 if (!process.env.MIKKA_DATABASE_URL) throw Error('issue_diagnostic_database_unavailable')
-const report = { issues: [1515,1516,1517], mode: 'read_only', revision: process.env.GITHUB_SHA, startedAt: new Date().toISOString(), queries: {} }
+const report = { issues: [1515,1516,1517], mode: 'readonly_sql_and_normal_account_reads', normalReadMaintenanceWritesMeasured: false, revision: process.env.GITHUB_SHA, startedAt: new Date().toISOString(), queries: {} }
 const pool = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 15000, application_name: 'mikka-1515-1517-readonly' })
 let cookie = ''
 async function request(path, init = {}) {
@@ -55,16 +56,45 @@ try {
       const response=await request('/api/auth/get-session');const session=await response.json()
       report.account={status:response.status===200 && session?.user?.email?.toLowerCase()===email.toLowerCase()?'verified':'identity_mismatch'}
       if(report.account.status==='verified') {
-        const devices=await request('/api/devices');const body=await devices.json()
-        const rows=Array.isArray(body)?body:Array.isArray(body?.devices)?body.devices:[]
-        report.account.devices={http:devices.status,count:rows.length,demoCount:rows.filter(v=>/^de30000/.test(v.id??'')&&v.daemonVersion==='0.9.4').length}
+        const manifestResponse=await request('/renderer-manifest.json'),manifest=await manifestResponse.json()
+        if(!manifestResponse.ok || manifest.version!==1 || manifest.target!=='web' || !Array.isArray(manifest.usedActions)) throw Error('published_rpc_manifest_invalid')
+        const rpc=async(action,args=[])=>{
+          if(!['agents.listDevices','execution-settings.getBotModelMenu'].includes(action)||!manifest.usedActions.includes(action)) throw Error('published_read_action_unavailable')
+          const response=await request('/api/rpc',{method:'POST',headers:{'content-type':'application/json',accept:'application/json','x-mikka-rpc':'1'},body:JSON.stringify({version:DESKTOP_RPC_VERSION,action,args:encode(args)})})
+          const body=await response.json()
+          if(!response.ok || body.version!==DESKTOP_RPC_VERSION || body.ok!==true || !Object.hasOwn(body,'result')) throw Error('published_read_action_failed')
+          return decode(body.result)
+        }
+        const rows=await rpc('agents.listDevices')
+        if(!Array.isArray(rows)) throw Error('devices_response_invalid')
+        report.account.devices={transport:'web_rpc',count:rows.length,demoPrefixCount:rows.filter(v=>/^de30000/.test(v.id??'')).length,
+          futureCount:rows.filter(v=>new Date(v.lastSeenAt).getTime()>Date.now()).length,
+          futureOnlineCount:rows.filter(v=>new Date(v.lastSeenAt).getTime()>Date.now()&&v.online===true).length,
+          onlineCount:rows.filter(v=>v.online===true).length}
+        const botsResponse=await request('/api/bots'),bots=await botsResponse.json()
+        if(!botsResponse.ok || !Array.isArray(bots) || !bots.length || bots.some(bot=>bot.ownerId!==session.user.id||bot.workspaceId!==bots[0].workspaceId)) throw Error('account_workspace_unavailable')
+        const workspace=bots[0].workspaceId
+        const modelResponse=await request('/api/settings/model-order?workspace='+encodeURIComponent(workspace)),order=await modelResponse.json()
+        if(!modelResponse.ok || !Array.isArray(order.entries)||!Array.isArray(order.candidates)) throw Error('model_order_response_invalid')
+        const summarizeModel=entry=>({harness:entry.harness,model:entry.model,source:entry.source?.kind,block:entry.block?.reason??null})
+        report.account.modelOrder={customized:order.customized,autoModelRouting:order.autoModelRouting,preferredHarness:order.preferredHarness,location:order.location,
+          cloudReady:order.cloudReady,credentials:order.credentials,entries:order.entries.map(summarizeModel),candidateModels:[...new Set(order.candidates.map(entry=>entry.model))],
+          firstKind:order.first?.kind??null,readyDevices:order.readyDeviceIds?.length??null,
+          schedulerContractFields:Object.keys(order).filter(key=>/node|schedul|dispatch/i.test(key))}
+        const subscriptionsResponse=await request('/api/subscriptions?workspace='+encodeURIComponent(workspace)),subscriptions=await subscriptionsResponse.json()
+        if(!subscriptionsResponse.ok||!Array.isArray(subscriptions.connections)) throw Error('subscriptions_response_invalid')
+        report.account.subscriptions={enabled:subscriptions.enabled,connections:subscriptions.connections.map(item=>({provider:item.provider,state:item.state,paused:item.paused,
+          accountPresent:Boolean(item.account),lastErrorCode:item.lastErrorCode,activeAttemptPresent:Boolean(item.activeAttempt),botCount:item.bots?.length??null}))}
+        const menu=await rpc('execution-settings.getBotModelMenu',[null])
+        report.account.modelMenu={keys:Object.keys(menu??{}),selected:typeof menu?.selected==='string'?menu.selected.replace(/[a-f0-9]{8}-[a-f0-9-]{27,}/g,'[id]'):null,
+          options:Array.isArray(menu?.options)?menu.options.map(item=>({model:item.model,provider:item.provider,kind:item.kind,available:item.available})):null}
       }
     }
   }
   report.status='complete'
 } catch(error) {
   report.status='failed'
-  report.error={name:error?.name??'Error',code:typeof error?.code==='string'?error.code:'diagnostic_step_failed'}
+  report.error={name:error?.name??'Error',code:typeof error?.code==='string'?error.code:/^[a-z_]{1,80}$/.test(error?.message??'')?error.message:'diagnostic_step_failed'}
   process.exitCode=1
 } finally {
   await pool.end()
