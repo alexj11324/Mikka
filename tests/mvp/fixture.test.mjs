@@ -13,6 +13,8 @@ import { assertMvpEnvironment, REPOSITORY } from './isolated-env.mjs'
 import { answerModel } from './model.mjs'
 import { fixtureFailure, fixtureModelError, recordPeerFailure, readPeerFailures, observeTraceMcpFetch, observeTraceHttpParser } from './diagnostics.mjs'
 import { decisionRequestInput } from '../../lib/coordinator/decision.ts'
+import { triageInput, triageQuestions } from '../../lib/coordinator/triage.ts'
+import { artifactSubmittedEvent } from '../../lib/coordinator-events.ts'
 import { startMvpServices } from './services.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
 import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
@@ -354,6 +356,30 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
     assert.equal(evidence.observations.filter(item => item.kind === 'decision-request').length, 1)
     assert.equal(evidence.observations[0].eventId, eventId)
     assert.equal(evidence.errors.length, 4)
+  } finally { await services.close() }
+})
+
+test('scripted Decisions accepts the real artifact notice contract without requiring an ended run', async () => {
+  const services = await startMvpServices(0)
+  try {
+    const artifact = { artifactId: randomUUID(), version: 1, title: 'Synthetic acceptance report', kind: 'markdown' }
+    const submitter = { userId: randomUUID(), botId: randomUUID(), issueId: randomUUID(), runId: randomUUID(), authorName: 'Synthetic Agent' }
+    const event = (source = submitter, value = artifact) => ({ ...artifactSubmittedEvent(source, value), id: randomUUID(), observedRun: null })
+    const request = value => ({ model: 'openai/gpt-6-luna-decisions', input: decisionRequestInput(triageInput(value)), questions: triageQuestions(value) })
+    const post = body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    // Both a run artifact and a Factory/agent report without a run use this
+    // producer. Neither receipt supplies the independent PR publication gate.
+    for (const value of [event(), event({ ...submitter, runId: null }), event({ ...submitter, runId: null, issueId: null }, { ...artifact, kind: 'html' })]) {
+      const response = await post(request(value))
+      assert.equal(response.status, 200)
+      assert.deepEqual((await response.json()).answers, [{ type: 'choice', name: 'tier', choice: 'result' }])
+    }
+    for (const invalid of [event(submitter, { ...artifact, version: 0 }), event(submitter, { ...artifact, kind: 'private-invalid-kind' }),
+      event(submitter, { ...artifact, artifactId: 'invalid' }), { ...event(), kind: 'private-invalid-event' },
+      { ...event(), observedRun: { id: randomUUID(), status: 'running' } }]) assert.equal((await post(request(invalid))).status, 500)
+    const evidence = await (await fetch(`${services.origin}/observations`)).json()
+    assert.deepEqual(evidence.observations.filter(item => item.kind === 'decision-request').map(item => item.eventKind), ['artifact_submitted', 'artifact_submitted', 'artifact_submitted'])
+    assert.equal(evidence.errors.length, 5)
   } finally { await services.close() }
 })
 
