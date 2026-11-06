@@ -18,6 +18,14 @@ on:
         type: choice
         options: [all, claude, codex]
         default: all
+      prepare:
+        description: Temporarily prepare and restore idle account settings through normal APIs
+        type: boolean
+        default: false
+      browser-submit:
+        description: Prepare one model case and wait for a real browser New task submission
+        type: boolean
+        default: false
       export-target:
         description: Native saved PostHog object to export after verifying production evidence
         type: choice
@@ -41,10 +49,13 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      issues: write
     env:
       MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}
       MIKKA_OBSERVABILITY_MODEL_CASE: ${{ inputs.model-case }}
       ACCEPTANCE_MODE: ${{ inputs.mode }}
+      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}
+      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -59,9 +70,11 @@ jobs:
           assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? '', /^[a-f0-9]{40}$/)
           assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)
           assert.ok(['preflight', 'execute'].includes(process.env.ACCEPTANCE_MODE))
+          assert.ok(process.env.ACCEPTANCE_MODE === 'execute' || (process.env.ACCEPTANCE_PREPARE !== 'true' && process.env.ACCEPTANCE_BROWSER_SUBMIT !== 'true'))
+          assert.ok(process.env.ACCEPTANCE_BROWSER_SUBMIT !== 'true' || process.env.MIKKA_OBSERVABILITY_MODEL_CASE !== 'all')
           JS
       - name: Verify the acceptance guards before loading credentials
-        run: node --test scripts/acceptance/run-observability.test.mjs
+        run: node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs
       - name: Read the existing production acceptance account
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -84,13 +97,17 @@ jobs:
           secret-path: /
           secret-name: ACME_DEMO_PASSWORD
           include-imports: false
-      - name: Run the normal authenticated API acceptance
+      - name: Run bounded production acceptance
+        env:
+          MIKKA_ACCEPTANCE_PROGRESS_TOKEN: ${{ github.token }}
         run: |
+          args=()
           if [ "$ACCEPTANCE_MODE" = execute ]; then
-            node scripts/acceptance/run-observability.mjs --execute
-          else
-            node scripts/acceptance/run-observability.mjs
+            args+=(--execute)
           fi
+          if [ "$ACCEPTANCE_PREPARE" = true ]; then args+=(--prepare); fi
+          if [ "$ACCEPTANCE_BROWSER_SUBMIT" = true ]; then args+=(--browser-submit); fi
+          node scripts/acceptance/run-observability-workflow.mjs "${args[@]}"
       - name: Preserve only the safe acceptance report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
