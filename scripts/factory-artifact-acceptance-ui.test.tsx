@@ -47,7 +47,12 @@ mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { name
 mock.module(new URL('../hooks/use-mobile.ts', import.meta.url).href, { namedExports: { useIsMobile: () => false } })
 mock.module(new URL('../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: () => {} } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: ({ runId }: { runId: string }) => <div data-producer={runId} /> } })
-mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { getIssueThread: async () => undefined } })
+mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { getIssueThread: async () => undefined, getThreadChanges: async () => ({ state: 'none' }) } })
+// The report's diff rows use @pierre/diffs, which registers a web component on import; they draw only in a browser.
+mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.url).href, { namedExports: {
+  ThreadChangesPane: () => null, ThreadChangesView: () => null, ChangesTabLabel: () => null, Counts: () => null, FileSection: () => null,
+  useDiffWrap: () => ['nowrap', () => {}],
+} })
 mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { namedExports: { getArtifact: async () => undefined, getArtifactText: async () => undefined } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { listBots: async () => [] } })
 mock.module(new URL('../components/artifacts/artifact-share.tsx', import.meta.url).href, { namedExports: { ArtifactShare: () => null } })
@@ -244,11 +249,12 @@ test('reject stays unavailable when the server does not offer that capability', 
   assert.ok(button('Accept'))
 })
 
+// P1 (decision 2026-11-06-1615): in the window the decision is the header's 要求修改 and 批准并合并.
 test('the actual Artifact window puts the decision above its report and original producer thread', async () => {
   await act(async () => root.render(<ArtifactWindow artifactId={ARTIFACT} />))
-  assert.ok(button('Accept'))
-  assert.ok(button('Request changes'))
-  const decision = button('Accept')!, report = document.querySelector('main')!, producer = document.querySelector('[data-producer]')!
+  assert.ok(button(messages.ArtifactReview.approveAndMerge))
+  assert.ok(button(messages.ArtifactReview.changeRequestLabel))
+  const decision = button(messages.ArtifactReview.approveAndMerge)!, report = document.querySelector('main')!, producer = document.querySelector('[data-producer]')!
   assert.equal(producer.getAttribute('data-producer'), RUN)
   assert.ok(decision.compareDocumentPosition(report) & browser.Node.DOCUMENT_POSITION_FOLLOWING)
   assert.ok(decision.compareDocumentPosition(producer) & browser.Node.DOCUMENT_POSITION_FOLLOWING)
@@ -256,8 +262,8 @@ test('the actual Artifact window puts the decision above its report and original
   const older = [...document.querySelectorAll('[role="menuitemradio"]')].find(item => item.textContent?.startsWith('v1'))
   assert.ok(older, 'the real version picker exposes the older report')
   await act(async () => { (older as unknown as HTMLButtonElement).click() })
-  assert.equal(button('Accept'), undefined)
-  assert.equal(button('Request changes'), undefined)
+  assert.equal(button(messages.ArtifactReview.approveAndMerge), undefined)
+  assert.equal(button(messages.ArtifactReview.changeRequestLabel), undefined)
   assert.match(document.body.textContent ?? '', /Viewing v1/)
 })
 
