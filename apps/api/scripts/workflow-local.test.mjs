@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -11,9 +11,12 @@ import { build, createNitro, prepare } from 'nitro/builder'
 import { nodeRuntimePackages, workflowNodeExternals } from '../build-contract.mjs'
 
 const execute = promisify(execFile)
-const workflowRequire = createRequire(import.meta.resolve('workflow/runtime'))
-const coreRequire = createRequire(workflowRequire.resolve('@workflow/core/runtime'))
-const localPackage = dirname(dirname(coreRequire.resolve('@workflow/world-local')))
+const repository = fileURLToPath(new URL('../../../', import.meta.url))
+const applicationPackage = JSON.parse(await readFile(join(repository, 'package.json'), 'utf8'))
+// Resolve from the actual application root. pnpm does not expose a dependency
+// merely because it exists below @workflow/core in the installed graph.
+const applicationRequire = createRequire(join(repository, 'package.json'))
+const localPackage = dirname(dirname(applicationRequire.resolve('@workflow/world-local')))
 const manifest = JSON.parse(await readFile(join(localPackage, 'package.json'), 'utf8'))
 
 // A fresh Node process matters: the SDK caches package metadata on globalThis.
@@ -48,10 +51,10 @@ for (const development of [true, false]) {
     try {
       assert.equal(manifest.name, '@workflow/world-local')
       assert.match(manifest.version, /^\d+\.\d+\.\d+(?:-.+)?$/)
-      await mkdir(join(root, 'node_modules/@workflow'), { recursive: true })
-      await symlink(localPackage, join(root, 'node_modules/@workflow/world-local'), 'dir')
-      await symlink(dirname(dirname(workflowRequire.resolve('@workflow/core/runtime'))), join(root, 'node_modules/@workflow/core'), 'dir')
-      await symlink(dirname(dirname(fileURLToPath(import.meta.resolve('workflow/runtime')))), join(root, 'node_modules/workflow'), 'dir')
+      assert.equal(applicationPackage.dependencies['@workflow/world-local'], manifest.version)
+      // Inherit the installed application's real visibility. Do not invent a
+      // direct link to a transitive package: that hid the pnpm startup failure.
+      await symlink(join(repository, 'node_modules'), join(root, 'node_modules'), 'dir')
       await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'mikka-local-world-test', type: 'module', private: true }))
       const entry = join(root, 'entry.mjs')
       await writeFile(entry, "export { createWorld } from '@workflow/world-local'\n")

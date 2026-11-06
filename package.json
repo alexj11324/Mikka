@@ -276,6 +276,7 @@
     "@vercel/functions": "3.10.2",
     "@vercel/oidc": "^4.0.2",
     "@workflow/serde": "5.0.0",
+    "@workflow/world-local": "5.1.2",
     "ai": "7.0.148",
     "aws4fetch": "1.0.20",
     "beautiful-mermaid": "^1.1.3",
