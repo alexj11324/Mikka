@@ -17,6 +17,8 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   emailEnabled?: boolean
   next?: string
   oauthFailed?: boolean
+  /** The web's desktop-handoff account choice; the app's own window never shows it. */
+  signedInAs?: { name?: string | null; email: string; image?: string | null } | null
 }) {
   const t = useTranslations('Auth')
   const locale = useLocale() === 'en' ? 'en' : 'zh-CN'

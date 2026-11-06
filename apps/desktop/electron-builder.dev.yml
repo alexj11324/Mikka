@@ -9,6 +9,11 @@ directories:
   output: release-dev
 publish: null
 afterSign: null
+# A list replaces the release build's protocol object instead of merging with
+# it, so Mikka Dev never claims the installed app's mikka-auth links.
+protocols:
+  - name: Mikka Dev sign-in
+    schemes: [mikka-dev-auth]
 mac:
   identity: '-'
   hardenedRuntime: true

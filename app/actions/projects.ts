@@ -15,6 +15,8 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { teamIssues, teamProjects } from '@/lib/db/team-schema'
 import { inArray } from 'drizzle-orm'
 import { lockTeamRelations } from '@/lib/team-access'
+import { pool } from '@/lib/db'
+import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 
 async function userId() {
   const user = await currentUser()
@@ -81,6 +83,12 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
       if (destination && !destination.issueIds.includes(input.issueId) && destination.issueIds.length >= 100) return { error: i18nText("Errors.projectTaskLimit") }
       const result = await updateIssueMetadata({ id: input.issueId, revision: input.revision, patch: { project: destination?.name ?? null } })
       if (!('issue' in result) || !result.issue) return result
+      const previousProject = owned.find(project => project.issueIds.includes(input.issueId))
+      if ((previousProject?.id ?? null) !== input.projectId) {
+        // Workspace relations and runs use separate databases. Persist the stop
+        // while the relation lock is held, before exposing the new task scope.
+        await stopRunsForPolicyChange(pool, { kind: 'task', issueId: input.issueId })
+      }
       for (const project of owned.filter(project => project.issueIds.includes(input.issueId) || project.id === input.projectId)) {
         const issueIds = project.id === input.projectId ? [...new Set([...project.issueIds, input.issueId])] : project.issueIds.filter(id => id !== input.issueId)
         await tx.update(projects).set({ issueIds, revision: project.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, project.id), eq(projects.userId, owner)))
@@ -122,6 +130,8 @@ export async function setProjectIssues(input: { id: string; revision: number; is
       }
       const [project] = await tx.update(projects).set({ issueIds: ids, revision: input.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, input.id), eq(projects.userId, current.userId), eq(projects.revision, input.revision))).returning()
       if (!project) return { error: i18nText("Errors.projectSaveConflict") }
+      const changedIssues = [...new Set([...current.issueIds, ...ids])].filter(id => current.issueIds.includes(id) !== ids.includes(id))
+      if (changedIssues.length) await stopRunsForPolicyChange(pool, { kind: 'tasks', issueIds: changedIssues })
       await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: current.userId, projectId: project.id, message: i18nText("FeatureCopy.c_310e5541", { value0: (ids.length) }) })
       await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
       return { project }

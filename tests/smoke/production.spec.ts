@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { runDeployedBrowserSmoke } from '../../scripts/acceptance/deployed-browser-session.mjs'
+import { runDeployedBrowserSmoke, selectBrowserTeamWorkspace } from '../../scripts/acceptance/deployed-browser-session.mjs'
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { isSmokeAccountEmail } from '../../lib/smoke-account'
 
@@ -34,13 +34,18 @@ test.beforeAll(() => {
 })
 
 test('the smoke account signs in, reaches its chat and reports feature state', async ({ page, baseURL }) => {
-  const smoke = async (scope?: { signInAttempted(): void; identityConfirmed(): void }) => {
+  const smoke = async (scope?: { signInAttempted(): void; identityConfirmed(): void; teamWorkspaceConfirmed(proof: unknown): void }) => {
     scope?.signInAttempted()
     const signIn = await page.request.post(app('/api/auth/sign-in/email'), { data: { email, password }, headers: { origin: new URL(baseURL!).origin } })
     expect(signIn.status(), 'sign-in').toBe(200)
     const session = await (await page.request.get(app('/api/auth/get-session'))).json()
     expect(session?.user?.email?.toLowerCase()).toBe(email.toLowerCase())
     scope?.identityConfirmed()
+    // Both entry modes use the same authenticated context. A normal member is
+    // eligible; never infer the team from its name or pick the first choice.
+    const team = await selectBrowserTeamWorkspace({ page, baseURL, ownerId: session?.user?.id })
+    scope?.teamWorkspaceConfirmed(team)
+    await test.info().attach('team-workspace.json', { body: JSON.stringify(team), contentType: 'application/json' })
 
     await page.goto(app('/en'))
     await expect(page).not.toHaveURL(/\/sign-in/)

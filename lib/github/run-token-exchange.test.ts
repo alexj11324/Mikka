@@ -26,6 +26,16 @@ test('a token GitHub expires sooner keeps its own expiry', async () => {
   assert.equal((await (await handle(request())).json()).expiresAt, expiresAt.toISOString())
 })
 
+test('a direct task machine refreshes only at the provider expiry, including non-expiring tokens', async () => {
+  for (const expiresAt of [null, new Date(now + 8 * 60 * 60_000)]) {
+    const handle = createRunGitHubTokenExchange({ authorize: async () => scope, naturalExpiry: true, now: () => now,
+      issue: async () => ({ token: 'synthetic-user-token', expiresAt }) })
+    const result = await handle(request())
+    assert.equal(result.status, 200)
+    assert.deepEqual(await result.json(), { token: 'synthetic-user-token', expiresAt: expiresAt?.toISOString() ?? null })
+  }
+})
+
 test('bookkeeping after issuance sees the scope and the token, and its failure never withholds the token', async () => {
   const seen: unknown[] = []
   for (const fail of [false, true]) {

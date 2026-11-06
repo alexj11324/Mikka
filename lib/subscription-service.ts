@@ -165,13 +165,26 @@ export class SubscriptionService {
       return nativeBrokerContextSchema.parse({...info,route:binding.route,modelId:binding.modelId,revision:authorized.binding.connectionRevision})
     })
   }
-  /** A device run's access lease: the same checks as nativeContext, then the access token only. */
+  /** Prepare a device's direct-provider credential once. nativeAuth performs
+   * the custody refresh itself and returns the expiry with the access token;
+   * separate prepare/context child processes would repeat that same work. */
   async nativeLease(use: SubscriptionUse, signal?: AbortSignal) {
-    const context=await this.nativeContext(use,signal)
-    const binding=await this.repository.binding(use.ownerId,use.bindingId)
-    const row=await this.repository.connection(use.ownerId,binding.connectionId)
-    const lease=await this.worker(this.repository.scope(row)).forUse(use).call<{accessToken?:unknown;expiresAt?:unknown}>('nativeAuth',{revision:context.revision},signal)
-    return nativeLeaseSchema.parse({...context,accessToken:lease.accessToken,...(typeof lease.expiresAt==='string'?{expiresAt:new Date(lease.expiresAt).toISOString()}:{})})
+    return measureSubscriptionNative('lease', use.runId, async timing => {
+      const binding = await timing.measure('binding', () => this.repository.binding(use.ownerId, use.bindingId))
+      const selected = await timing.measure('selection', () => this.nativeRunSelection(use, binding.modelId))
+      const model = selected.modelId ?? binding.modelId
+      const scope = { ownerId: selected.executionOwnerId, workspaceId: binding.workspaceId, runId: use.runId }
+      await timing.measure('admit_before', () => this.admitModel(scope, model, binding.route, signal, false))
+      const authorized = await timing.measure('access', () => this.check(use, signal, model ?? null))
+      await timing.measure('admit_after', () => this.admitModel(scope, model, binding.route, signal, false))
+      const row = await timing.measure('connection', () => this.repository.connection(use.ownerId, binding.connectionId))
+      const lease = await timing.measure('native_auth', () => this.worker(this.repository.scope(row)).forUse(use)
+        .call<{ accessToken?: unknown; expiresAt?: unknown; accountId?: unknown; chatgptAccountId?: unknown; chatgptPlanType?: unknown }>('nativeAuth', { revision: authorized.binding.connectionRevision }, signal))
+      return nativeLeaseSchema.parse({ route: binding.route, modelId: model, revision: authorized.binding.connectionRevision,
+        accountId: binding.route === 'codex_cli' ? lease.chatgptAccountId : lease.accountId,
+        ...(typeof lease.chatgptPlanType === 'string' ? { plan: lease.chatgptPlanType } : {}),
+        accessToken: lease.accessToken, expiresAt: typeof lease.expiresAt === 'string' ? new Date(lease.expiresAt).toISOString() : lease.expiresAt })
+    })
   }
   async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
     return measureSubscriptionNative('request', use.runId, async timing => {

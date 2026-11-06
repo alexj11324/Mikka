@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  */
 export const GET = withRequestLog('/api/version', () => {
   return NextResponse.json(
-    { build: APP_BUILD, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION) },
+    { build: APP_BUILD, overlaySha: process.env.MIKKA_UI_OVERLAY_SHA || null, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION) },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
 })
