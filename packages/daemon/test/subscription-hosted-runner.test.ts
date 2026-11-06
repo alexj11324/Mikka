@@ -679,17 +679,17 @@ it.each([
   expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
 }, 60000)
 
-it('starts a subscription run only on a model the machine\'s own CLI reported, and fails with the reason otherwise', async () => {
-  const fixture = await revocationFixture()
+it('Codex still starts only on a model its own CLI reported', async () => {
+  const fixture = await revocationFixture('fakes/fake-codex-subscription.mjs', 'codex')
   let report: { models?: string[]; modelSlots?: { slot: string; model: string; name: string }[] } | null = { models: ['another-model'] }
   const reportedModels = vi.fn(async () => report)
-  const runner = await createHostedBotRunner({ stateDir: fixture.stateDir, link: fixture.link, binaries: { claude_code: fixture.binary }, reportedModels })
+  const runner = await createHostedBotRunner({ stateDir: fixture.stateDir, link: fixture.link, binaries: { codex: fixture.binary }, reportedModels })
   // Reported other models only, or none at all (a probe that got no answer): refused before any context, broker or CLI.
   for (const value of [{ models: ['another-model'] }, null, {}]) {
     report = value
     await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_model_not_reported')
   }
-  expect(reportedModels).toHaveBeenCalledWith('claude_code')
+  expect(reportedModels).toHaveBeenCalledWith('codex')
   expect(fixture.link.nativeContext).not.toHaveBeenCalled()
   expect(fixture.processes()).toEqual([])
   // Reported as a slot's resolved model: the model check passes and startup goes on (here to a refused context).
@@ -698,3 +698,18 @@ it('starts a subscription run only on a model the machine\'s own CLI reported, a
   await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('fixture context refused')
   expect(fixture.link.nativeContext).toHaveBeenCalled()
 })
+
+it('Claude requests exact-account catalogue evidence when the shortcut menu omits its full model ID', async () => {
+  const fixture = await revocationFixture()
+  const reportedModels = vi.fn(async () => ({ models: ['opus', 'sonnet', 'haiku', 'fable'] }))
+  const runner = await createHostedBotRunner({ stateDir: fixture.stateDir, link: fixture.link, binaries: { claude_code: fixture.binary }, reportedModels })
+  fixture.link.nativeContext.mockImplementation(async () => { throw new Error('catalogue not confirmed') })
+  await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('catalogue not confirmed')
+  expect(fixture.link.nativeContext).toHaveBeenCalledWith(fixture.assignment.deviceId, fixture.assignment.runId, expect.any(AbortSignal), true)
+  expect(fixture.processes()).toEqual([])
+  fixture.link.nativeContext.mockImplementation(async () => fixture.contextValue)
+  const session = await runner.start(fixture.assignment, { ...fixture.options, prompt: 'DONE' })
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+}, 60000)

@@ -54,6 +54,19 @@ test('fresh legacy heartbeats do not call the gateway; page duplicates only read
   })
 })
 
+test('a future database heartbeat is offline even if the gateway claims online', async () => {
+  let reads = 0
+  const now = Date.now()
+  await gateway((_request, response) => {
+    reads++
+    response.end(JSON.stringify({ online: true, lastSeenAt: new Date(now).toISOString() }))
+  }, async () => {
+    assert.equal(await deviceIsOnline({ id, lastSeenAt: new Date(now + 1) }, now), false)
+    assert.equal(await deviceIsOnline({ id, lastSeenAt: new Date('2036-11-06') }, now), false)
+    assert.equal(reads, 0)
+  })
+})
+
 test('offline, expired, malformed and unavailable gateway responses never invent online state', async () => {
   let reply: unknown = { online: false, lastSeenAt: new Date().toISOString() }
   let status = 200

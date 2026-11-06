@@ -3228,6 +3228,7 @@
     },
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "回复失败",
+    "replyToolUnavailable": "这次回复没能完成，请重试",
     "apiBalance": "API 余额不足",
     "subscriptionRefusal": {
       "unavailable": "所选订阅不可用",
@@ -5031,6 +5032,19 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "installer_failed": {
+      "default": "Mikka 未能安装，请查看本机安装日志。",
+      "node_required": "请安装 Node.js 22 或更新版本，然后重试。",
+      "unsupported_os": "请使用 Linux 或 macOS 电脑。",
+      "npm_permission": "Mikka 无法写入安装目录，请检查用户目录权限后重试。",
+      "npm_cache_permission": "Mikka 无法写入 npm 缓存，请检查用户目录权限后重试。",
+      "cancelled": "已取消安装，可以重试。",
+      "timeout": "安装超时，请检查连接后重试。",
+      "service_failed": "Mikka 服务未能启动，请查看安装日志后重试。",
+      "connection_failed": "设备未能连接到当前登录账号，请检查连接后重试。",
+      "command_failed": "安装命令失败，请查看安装日志中的完整错误。"
+    },
+    "model_tool_unavailable": { "default": "这次回复没能完成，请重试" },
     "desktop_client_update_required": { "default": "请更新 Mikka 后继续" },
     "desktop_session_expired": { "default": "请重新登录 Mikka" },
     "desktop_session_changed": { "default": "账号或工作区已切换，请重试" },

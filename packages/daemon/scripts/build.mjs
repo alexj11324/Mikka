@@ -21,7 +21,7 @@ const entryPoints = {
 }
 await build({
   absWorkingDir: root, entryPoints, outdir: out, bundle: true,
-  platform: 'node', format: 'esm', target: 'node24',
+  platform: 'node', format: 'esm', target: 'node22',
   // No shared chunks: import.meta.url is relative to the emitted entry,
   // keeping the existing hosted helper paths stable.
   splitting: false, sourcemap: false,

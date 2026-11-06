@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { ModelMessage } from 'ai'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -39,11 +40,17 @@ function conversation(): Record<string, unknown>[] {
     // newline falls through to the prompt.
     { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'call-4', toolName: 'dispatch_run', input: { note: `\n${'y'.repeat(1500)}` } }] },
     { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'call-5', toolName: 'dispatch_run', input: { note: '\n', prompt: 'Use the prompt' } }] },
+    { role: 'user', content: '[Welcome] Synthetic welcome' },
+    // Production SDK response.messages omit invalid:true; the paired error is
+    // the legacy evidence. Keep it in storage, never in the public preview.
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'invalid-legacy', toolName: 'none', input: { x: 1 } }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'invalid-legacy', toolName: 'none', output: { type: 'error-text', value: 'AI_NoSuchToolError: private synthetic SDK error' } }] },
+    { role: 'assistant', content: 'A corrected welcome' },
   ]
 }
 
 dbTest('the chat reads compact parts and shows exactly what the full messages show', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { chatItems, QUOTE_PREVIEW_CHARS }, { compactChatMessage, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db }, schema, store, { chatItems, QUOTE_PREVIEW_CHARS }, { compactChatMessage, compactChatToolMetadata, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -67,6 +74,7 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
       .from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))
     const view = await store.chatView(owner, 200, botId)
     assert.deepEqual(view.items, chatItems(full as never), 'the chat items are the same as from the full messages')
+    assert.doesNotMatch(JSON.stringify(view.items),/NoSuchToolError|private synthetic SDK error|"none"/)
     assert.deepEqual(view.persistedStreamIds, ['stream-1'])
     assert.ok(view.items.some(item => item.threads.includes(runId)), 'the dispatched thread still shows')
     assert.ok(view.items.some(item => item.activity?.tools.some(tool => tool.quote === `${note.slice(0, QUOTE_PREVIEW_CHARS).trimEnd()}…`)), 'the chat shows the note to its limit, then an ellipsis')
@@ -75,6 +83,10 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.equal(quotes['call-5'], 'Use the prompt', 'a note of only whitespace gives way to the prompt')
 
     const compact = (await db.select({ message: compactChatMessage }).from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))).map(row => row.message)
+    assert.doesNotMatch(JSON.stringify(compact),/NoSuchToolError|private synthetic SDK error/,'SDK error text never crosses the SQL projection')
+    assert.ok(JSON.stringify(full).includes('NoSuchToolError'),'original evidence remains stored')
+    const metadata = await db.select({ parts: compactChatToolMetadata }).from(schema.coordinatorMessages).where(mine)
+    assert.equal(metadata.flatMap(row=>row.parts).filter(part=>part.mikkaInvalidToolCall).length,1,'legacy result also invalidates a pre-fix cached activity')
     const calls = compact[1].content as { inputPreview: string }[]
     assert.equal(calls[1].inputPreview.length, TOOL_PREVIEW_CHARS)
     assert.match(calls[1].inputPreview, /^\{"query": "login login/, 'the input preview is the start of the input as JSON text')
@@ -108,6 +120,57 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
   })
 })
 
+
+dbTest('exhausted recovery saves completed receipts once, keeps evidence and releases the failed lease atomically', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { asc, eq, and, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-tool-recovery-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_tool-recovery-fixture'
+  t.after(async () => {
+    await scope.run(async () => {
+      await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId, owner))
+      await db.delete(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId, owner))
+      await db.delete(schema.bots).where(eq(schema.bots.id, botId))
+      await db.execute(sql`delete from "user" where id = ${owner}`)
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Recovery fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Recovery bot' })
+    await db.insert(schema.coordinatorMessages).values({ id: randomUUID(), userId: owner, botId, position: 1, message: { role: 'user', content: 'Synthetic request' } })
+    await db.insert(schema.coordinatorSessions).values({ userId: owner, botId, leaseHolder: holder, leaseUntil: new Date(Date.now() + 60_000) })
+    const messages: ModelMessage[] = [
+      { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'done', toolName: 'list_issues', input: {} }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'done', toolName: 'list_issues', output: { type: 'json', value: { receipt: 'completed-once' } } }] },
+      ...[1, 2].flatMap(index => [
+        { role: 'assistant', content: [{ type: 'tool-call', toolCallId: `invalid-${index}`, toolName: 'none', input: { x: index } }] },
+        { role: 'tool', content: [{ type: 'tool-result', toolCallId: `invalid-${index}`, toolName: 'none', output: { type: 'error-text', value: 'AI_NoSuchToolError: synthetic raw evidence' } }] },
+      ] as ModelMessage[]),
+    ]
+    const completed = { messages, streamId: `${holder}:0` }
+    await store.failTurn(owner, holder, 'model_tool_unavailable', botId, completed)
+    await store.failTurn(owner, holder, 'model_tool_unavailable', botId, completed)
+    const mine = and(eq(schema.coordinatorMessages.userId, owner), eq(schema.coordinatorMessages.botId, botId))
+    const rows = await db.select({ message: schema.coordinatorMessages.message }).from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))
+    assert.equal(rows.length, 7, 'replaying the failure step cannot append receipts twice')
+    assert.equal((rows[0].message as Record<string, unknown>).mikkaFailure, 'model_tool_unavailable')
+    assert.deepEqual(rows.slice(1).map(row => {
+      const { mikkaStreamId: _stream, ...message } = row.message as Record<string, unknown>
+      return message
+    }), messages, 'valid receipts and the original invalid call/result evidence are saved exactly once')
+    const [session] = await db.select({ holder: schema.coordinatorSessions.leaseHolder, until: schema.coordinatorSessions.leaseUntil, error: schema.coordinatorSessions.lastError }).from(schema.coordinatorSessions)
+      .where(and(eq(schema.coordinatorSessions.userId, owner), eq(schema.coordinatorSessions.botId, botId)))
+    assert.deepEqual(session, { holder: null, until: null, error: 'model_tool_unavailable' })
+    const view = await store.chatView(owner, 200, botId)
+    assert.equal(view.working, false)
+    assert.equal(view.error, 'model_tool_unavailable')
+    const tools = view.items.flatMap(item => item.activity?.tools ?? [])
+    assert.deepEqual(tools.map(tool => ({ name: tool.name, state: tool.state })), [{ name: 'list_issues', state: 'done' }])
+    assert.doesNotMatch(JSON.stringify(view.items), /NoSuchToolError|synthetic raw evidence|"none"/)
+  })
+})
 
 dbTest('real tool failures and bounded full-input metadata survive the database projection', async t => {
   const [{ createRequestDatabaseScope, db }, schema, { createCoordinatorRegistry }, { chatItems }, { compactChatMessage }, { asc, eq, and, sql }] = await Promise.all([

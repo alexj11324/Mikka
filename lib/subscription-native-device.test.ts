@@ -51,6 +51,21 @@ const service = (fail = false) => () => ({
 })
 const post = () => new Request('http://local/lease', { method: 'POST' })
 
+test('full-model catalogue checks are opt-in and keep the native context wire format compatible', async () => {
+  const checks: unknown[] = []
+  const context = { route: 'claude_code_cli', modelId: 'm', revision: 1, accountId: 'a', expiresAt: '2026-11-01T01:00:00.000Z' }
+  const handler = subscriptionNativeHTTP({ authorize: async () => 'o', service: () => ({
+    nativeRun: async () => ({ ownerId: 'o' }),
+    nativeContext: async (_use: unknown, _signal: unknown, requireCatalogue: unknown) => { checks.push(requireCatalogue); return context },
+  }) as never })
+  for (const body of [{ action: 'context' }, { action: 'context', requireModelCatalogue: true }]) {
+    const result = await handler(new Request('http://local/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), { params: Promise.resolve(ids) })
+    assert.equal(result.status, 200)
+    assert.deepEqual(await result.json(), context)
+  }
+  assert.deepEqual(checks, [undefined, true])
+})
+
 test('hosted context refusals retain a bounded server diagnosis without returning private details', async () => {
   const lines: string[] = []
   const failure = new SubscriptionRefusal('account_unavailable')

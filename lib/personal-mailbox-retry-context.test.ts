@@ -6,6 +6,7 @@ import { remoteKey } from '@mikka/protocol/repository'
 // Exercise the actual infrastructure-retry writer with controlled persistence.
 // No PostgreSQL, credentials, models or network calls are used.
 const botId = '28700000-0000-4000-8000-000000000011'
+const now = new Date('2026-11-06T00:00:00.000Z')
 const lost = { id: '28700000-0000-4000-8000-000000000041', userId: 'synthetic-owner', botId,
   agentId: 'agent', deviceId: 'device', deviceRepoId: 'repository', issueId: 'issue',
   status: 'running', kind: 'implement', prompt: 'Already authorized task', baseBranch: 'main',
@@ -24,7 +25,7 @@ const database = {
       from() { return selection }, where() { return selection }, innerJoin() { return selection },
       limit: async () => !fields ? [lost] : 'remoteUrl' in fields ? [{ remoteUrl: 'https://github.com/synthetic/fixture.git', repoPath: remoteKey('https://github.com/synthetic/fixture.git') }] : 'harness' in fields ? [{ harness: 'codex' }] : [],
       // A run only retries where a machine can take it: one online server with Codex (允许自动调度 on by default).
-      orderBy: async () => [{ deviceId: 'other-device', lastSeenAt: new Date(), harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }],
+      orderBy: async () => [{ deviceId: 'other-device', lastSeenAt: now, harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }],
     }
     return selection
   },
@@ -49,7 +50,9 @@ mock.module(new URL('./factory/handoff.ts', import.meta.url).href, { namedExport
 
 test('actual reclaim writer carries the trusted private Bot into a new attempt instead of falling back to default namespace', async () => {
   const { reclaimLostRuns } = await import('./run-leases')
-  await reclaimLostRuns(lost.userId)
+  // The heartbeat and the reclaim snapshot share a clock; a newly allocated
+  // Date inside the async query can be in the future relative to that snapshot.
+  await reclaimLostRuns(lost.userId, now)
   assert.ok(inserted)
   assert.equal(recoveryHandoff.mock.callCount(), 1)
   assert.equal(readmit.mock.callCount(), 0)

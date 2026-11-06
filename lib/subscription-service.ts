@@ -149,7 +149,7 @@ export class SubscriptionService {
     // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
     return {ownerId:String(row.ownerId),workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }
-  async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {
+  async nativeContext(use: SubscriptionUse, signal?: AbortSignal, requireModelCatalogue = false) {
     return measureSubscriptionNative('context', use.runId, async timing => {
       const binding=await timing.measure('binding', () => this.repository.binding(use.ownerId,use.bindingId))
       const selected = await timing.measure('selection', () => this.nativeRunSelection(use, binding.modelId))
@@ -159,6 +159,15 @@ export class SubscriptionService {
       const authorized=await timing.measure('access', () => this.check(use,signal,selected.modelId ?? null))
       await timing.measure('admit_after', () => this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal, false))
       const row=await timing.measure('connection', () => this.repository.connection(use.ownerId,binding.connectionId))
+      // Requested only by a daemon that could not resolve a full ID through its
+      // shortcut menu. The evidence belongs to this exact authorized binding and
+      // credential epoch; a different account's catalogue grants nothing.
+      if (requireModelCatalogue && (binding.route !== 'claude_code_cli' || row.state !== 'connected'
+        || row.paused || Number(row.epoch) !== authorized.binding.connectionRevision
+        || !row.modelCatalog || Number(row.modelCatalog.revision) !== Number(row.epoch)
+        || !Array.isArray(row.modelCatalog.models) || !row.modelCatalog.models.includes(binding.modelId))) {
+        throw new SubscriptionRefusal('binding_mismatch')
+      }
       const client=this.worker(this.repository.scope(row)).forUse(use)
       await timing.measure('prepare', () => client.call('prepare',{revision:authorized.binding.connectionRevision},signal))
       const info=await timing.measure('context', () => client.call<{accountId:string;plan?:string;expiresAt:string}>('nativeContext',{revision:authorized.binding.connectionRevision},signal))

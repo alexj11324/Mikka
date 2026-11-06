@@ -595,7 +595,7 @@ export class Daemon {
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = hosted
-      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
+      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(harness === 'claude_code' ? { subscriptionModelCatalogue: true as const } : {}), ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? detectHarnesses(this.harnessStore()))
     if (this.stopped) throw new Error("daemon stopped during startup")
     // A callback alone is insufficient: the host must own the enforcement
@@ -1031,11 +1031,12 @@ export class Daemon {
     const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
       toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
     delete report.subscriptionBroker
+    delete report.subscriptionModelCatalogue
     delete report.subscriptionPreflight
     if (!this.localSubscriptionCapable(info) || (info.harness !== "codex" && info.harness !== "claude_code")) return report
     const result = await preflightLocalSubscription(info.harness, { store: this.harnessStore(), scratchDir: this.paths.dataDir,
       binary: this.options.harnessBinaries?.[info.harness] })
-    if (result.ready) return { ...report, version: result.version, subscriptionBroker: true }
+    if (result.ready) return { ...report, version: result.version, subscriptionBroker: true, ...(report.harness === 'claude_code' ? { subscriptionModelCatalogue: true as const } : {}) }
     logCodedError(result.error, { harness: info.harness }, this.log)
     return { ...report, subscriptionPreflight: result.error.detail }
   }

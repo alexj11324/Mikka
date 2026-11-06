@@ -100,3 +100,30 @@ for (const route of ['codex_cli', 'claude_code_cli'] as const) {
     }
   })
 }
+
+test('a full Claude model ID is admitted only by the authorized connection catalogue at its current epoch', async () => {
+  const { use, access } = subscriptionFixture('claude_code_cli')
+  access.connection!.quota.observedAt = new Date().toISOString()
+  const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId,
+    provider: 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota,
+    modelCatalog: { revision: 1, models: ['claude-sonnet-5'] } as { revision: number; models: string[] } | null }
+  const repository = { binding: async () => ({ ...access.binding!, modelId: 'claude-sonnet-5' }), connection: async () => row, scope: () => ({}) } as unknown as SubscriptionService['repository']
+  const calls: string[] = []
+  const worker = { forUse() { return this }, async call(method: string) {
+    calls.push(method)
+    return { accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60_000).toISOString() }
+  } }
+  const service = new SubscriptionService(repository, () => worker as never,
+    { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined, async () => undefined)
+  const context = await service.nativeContext(use, undefined, true)
+  assert.equal(context.modelId, 'claude-sonnet-5')
+  assert.deepEqual(Object.keys(context).sort(), ['accountId', 'expiresAt', 'modelId', 'revision', 'route'], 'existing daemons keep the same strict response shape')
+  for (const catalogue of [null, { revision: 0, models: ['claude-sonnet-5'] }, { revision: 1, models: ['another-model'] }]) {
+    row.modelCatalog = catalogue
+    calls.length = 0
+    await assert.rejects(service.nativeContext(use, undefined, true), { code: 'binding_mismatch' })
+    assert.deepEqual(calls, [], 'unknown or stale evidence cannot prepare a provider session')
+  }
+  await service.nativeContext(use)
+  assert.deepEqual(calls, ['prepare', 'nativeContext'], 'legacy model-probe contexts keep their original behavior')
+})
