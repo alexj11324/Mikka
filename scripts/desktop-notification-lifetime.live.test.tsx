@@ -154,7 +154,7 @@ test('a prior account decision cannot notify after the Vite account subtree is r
   cache = new Map(); snapshot = runs('running', 'next-owner')
   await render('next-owner'); await settled()
   await approve(choice)
-  assert.deepEqual(shown, [])
+  assert.equal(shown.length, 0)
   assert.equal(choices.length, 1, 'the new account gets its own quiet baseline')
   await transition('failed'); await approve(choices[1])
   assert.deepEqual(shown.map(notification => notification.title), ['next-owner task'])
