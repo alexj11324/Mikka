@@ -1,9 +1,9 @@
 import { ReadNotice } from '@/components/ReadNotice'
-import { type ComponentType, useEffect, useMemo, useState } from 'react'
-import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, List, Plus, SlidersHorizontal } from 'lucide-react-native'
+import { Plus } from 'lucide-react-native'
 import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
@@ -14,21 +14,16 @@ import { openChat } from '@/lib/navigate'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { botPageLive, threadsLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
-import { colors, lift } from '@/lib/theme'
+import { colors } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 import { CLOSED_SHOWN, ListSectionHeader, ShowAllRow } from '@/shared/components/list-section'
 import { ThreadLink } from '@/shared/components/thread-link'
+import { Segmented } from '@/components/Segmented'
+import { TaskList } from '@/features/tasks/components/task-list'
+import { StatusSwitcher, type ThreadFilter as Filter } from '@/features/threads/components/status-switcher'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
-type Filter = 'all' | 'waiting' | 'running' | 'resolved'
-/** A thread group's menu icon: the same bubble and dot its rows show (R-52), never a task's circle. */
-const groupIcon = (group: ThreadGroup) => function GroupIcon({ size = 18 }: { size?: number }) { return <StatusIcon status={GROUP_ICON[group]} size={size} /> }
-const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'bubble.left' }[] = [
-  { id: 'all', label: '全部', icon: List, symbol: 'list.bullet' },
-  { id: 'waiting', label: '等待你', icon: groupIcon('waiting'), symbol: 'bubble.left' },
-  { id: 'running', label: '进行中', icon: groupIcon('running'), symbol: 'bubble.left' },
-  { id: 'resolved', label: '已解决', icon: groupIcon('resolved'), symbol: 'bubble.left' },
-]
+const FILTER_TITLE: Record<Filter, string> = { all: '全部', waiting: '等待你', running: '进行中', resolved: '已解决' }
 
 /** The server's group (R-52); an older server sends none, so its status stands in, never as resolved. */
 export const groupOf = (thread: Thread): ThreadGroup => thread.group ?? (thread.status === 'running' ? 'running' : thread.status === 'failed' || thread.status === 'paused' ? 'blocked' : 'waiting')
@@ -48,10 +43,14 @@ const rank = (thread: Thread) => GROUPS.findIndex(group => group.id === groupOf(
 
 /** The row's icon says its group, not the run's raw status: a run that finished blocked shows the alert, never the check. */
 
-/** 线程, like the Claude app's Code screen: 设备 chips, filter menu, 新线程 pill (mobile.md). */
+/**
+ * 线程 (Comma designs 13 and 15): on the tab, a 线程 | 任务 segment under the large title; 线程 has the device chips,
+ * the threads by group and the floating status switcher above the tab bar, which replaced the filter menu (Alex
+ * 2026-11-06). A bot's threads, pushed over its chat, are the same list without the segment.
+ */
 export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const router = useRouter()
-  // `bot`: one bot's threads, pushed over its chat; otherwise 线程 from the drawer, a large-title page.
+  // `bot`: one bot's threads, pushed over its chat; otherwise the 线程 tab.
   const pushed = bot !== undefined
   const insets = useSafeAreaInsets()
   const home = useHome().data
@@ -64,7 +63,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const refresh = useRefresh(reload)
   const [machine, setMachine] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
-  const [menu, setMenu] = useState(false)
+  const [segment, setSegment] = useState<'threads' | 'tasks'>('threads')
 
   // A workspace change or removed device must not leave an invisible filter.
   useEffect(() => {
@@ -78,13 +77,20 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
     .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
   // 全部: grouped as on the web (R-52), each with its count; 已解决 shows its first rows until 显示全部.
   const [allResolved, setAllResolved] = useState(false)
-  type Row = Thread | { title: string; count: number } | { more: number }
+  type Row = Thread | { title: string } | { more: number }
   const rows: Row[] = filter !== 'all' ? list : GROUPS.flatMap((group): Row[] => {
     const items = list.filter(thread => groupOf(thread) === group.id)
     if (!items.length) return []
     const cut = group.id === 'resolved' && !allResolved && items.length > CLOSED_SHOWN
-    return [{ title: group.title, count: items.length }, ...(cut ? items.slice(0, CLOSED_SHOWN) : items), ...(cut ? [{ more: items.length }] : [])]
+    return [{ title: group.title }, ...(cut ? items.slice(0, CLOSED_SHOWN) : items), ...(cut ? [{ more: items.length }] : [])]
   })
+
+  // The tab's 线程 | 任务 switch; a bot's own threads have no tasks segment.
+  const switcher = pushed ? undefined : (
+    <View style={styles.segment}>
+      <Segmented options={[{ value: 'threads', label: '线程' }, { value: 'tasks', label: '任务' }]} value={segment} onChange={setSegment} />
+    </View>
+  )
 
   return (
     <View style={styles.screen}>
@@ -92,9 +98,9 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
         back={pushed ? () => router.back() : undefined}
         title={bot ? `${bot.name} 的线程` : '线程'}
         large={!pushed}
-        right={[{ icon: 'square.and.pencil', label: '新线程', web: <Plus size={20} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1' } }) }, { icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),
-          items: filters.map(f => ({ label: f.label, icon: f.symbol, on: filter === f.id, onPress: () => setFilter(f.id) })) }]}
+        right={{ icon: 'square.and.pencil', label: '新线程', web: <Plus size={20} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1' } }) }}
       />
+      {segment === 'tasks' ? <TaskList header={switcher} /> : <>
       <FlatList
         data={rows}
         keyExtractor={row => 'title' in row ? `h:${row.title}` : 'more' in row ? 'more' : row.id}
@@ -102,62 +108,55 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
         initialNumToRender={40}
         {...underBar}
         refreshControl={<RefreshControl {...refresh} />}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
         ListHeaderComponent={
           <View>
+            {switcher}
             <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
-            {devices.length ? <ListSectionHeader title="设备" /> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {devices.map(m => {
                 const active = machine === m.id
                 return (
                   <Pressable key={m.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => setMachine(active ? null : m.id)} style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.7 }]}>
+                    {m.online ? <View style={styles.online} accessibilityLabel="在线" /> : null}
                     <MachineIcon machine={m.kind} size={16} color={active ? colors.onInk : colors.ink} />
                     <Text style={[styles.chipText, active && { color: colors.onInk }]}>{m.name}</Text>
-                    {m.online ? <View style={styles.online} /> : null}
                   </Pressable>
                 )
               })}
             </ScrollView>
-            {filter === 'all' ? null : <ListSectionHeader title={filters.find(f => f.id === filter)?.label ?? ''} count={list.length} />}
+            {filter === 'all' ? null : <ListSectionHeader title={FILTER_TITLE[filter]} />}
           </View>
         }
         ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>没有线程</Text>}
-        renderItem={({ item }) => 'title' in item ? <ListSectionHeader title={item.title} count={item.count} />
+        renderItem={({ item }) => 'title' in item ? <ListSectionHeader title={item.title} />
           : 'more' in item ? <ShowAllRow count={item.more} onPress={() => setAllResolved(true)} />
           : <ThreadRow thread={item} onStopped={reload} />}
       />
-      <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(false)}>
-          <View style={[styles.menu, { top: insets.top + 64 }]}>
-            {filters.map(f => (
-              <Pressable key={f.id} accessibilityRole="menuitem" onPress={() => { setFilter(f.id); setMenu(false) }} style={({ pressed }) => [styles.menuRow, pressed && { backgroundColor: colors.pressed }]}>
-                <View style={{ width: 18 }}>{filter === f.id ? <Check size={16} color={colors.ink} strokeWidth={2.4} /> : null}</View>
-                <f.icon size={18} color={colors.ink} strokeWidth={1.8} />
-                <Text style={{ fontSize: 16 }}>{f.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
+      <StatusSwitcher value={filter} onChange={setFilter} bottom={insets.bottom + 12} />
+      </>}
     </View>
   )
 }
 
-/** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等待你 adds a word (mobile.md), and a task's later attempt its number. */
+/**
+ * A thread (Comma design 13): its status icon, its name (等待你 leads with 等你回复 in orange) and one grey line, the
+ * bot that runs it, its Agent (R-78) and the machine icon; a blue dot while it waits on the person.
+ */
 export function ThreadRow({ thread, onStopped }: { thread: Thread; onStopped?: () => void }) {
+  const waiting = thread.status === 'waiting'
   return (
     <ThreadLink thread={thread} onStopped={onStopped} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <View style={styles.rowInner}>
         <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{waiting ? <Text style={styles.waitingWord}>等你回复 · </Text> : null}{thread.name}</Text>
           <View style={styles.rowMeta}>
-            <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等待你 · ' : ''}{(thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试 · ` : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
+            <Text style={styles.rowMetaText} numberOfLines={1}>{[thread.by, (thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试` : null, HARNESS[thread.harness] ?? thread.harness].filter(Boolean).join(' · ')}</Text>
             {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
           </View>
         </View>
-        {thread.status === 'waiting' ? <Dot /> : null}
+        {waiting ? <Dot /> : null}
       </View>
     </ThreadLink>
   )
@@ -165,20 +164,20 @@ export function ThreadRow({ thread, onStopped }: { thread: Thread; onStopped?: (
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  chips: { paddingHorizontal: 16, gap: 8 },
+  chips: { paddingHorizontal: 16, paddingBottom: 4, gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble },
   chipActive: { backgroundColor: colors.ink },
   chipText: { fontSize: 15 },
   online: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
-  row: { paddingHorizontal: 20, paddingVertical: 10 },
+  segment: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  row: { marginHorizontal: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10 },
   rowInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowIcon: { width: 22, alignItems: 'center' },
-  rowTitle: { fontSize: 16, lineHeight: 21 },
+  rowTitle: { fontSize: 17, lineHeight: 22 },
+  waitingWord: { color: colors.orange },
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   rowMetaText: { fontSize: 13, lineHeight: 18, color: colors.secondary },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40 },
   failed: { alignItems: 'center', gap: 10, marginTop: 40 },
   error: { fontSize: 13, color: colors.danger },
-  menu: { position: 'absolute', right: 16, width: 220, backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 44, paddingVertical: 10 },
 })

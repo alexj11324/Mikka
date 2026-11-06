@@ -1,6 +1,8 @@
 import { ReadNotice } from '@/components/ReadNotice'
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Puzzle } from 'lucide-react-native'
 import { SourceIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -9,25 +11,29 @@ import type { Suggestion, Suggestions } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
+import { ListSectionHeader } from '@/shared/components/list-section'
 
 const VERB: Record<string, string> = { reply: '回复', review: '审阅', handle: '处理', read: '查看' }
 const APP: Record<string, string> = { gmail: 'Gmail', slack: 'Slack', notion: 'Notion', github: 'GitHub', linear: 'Linear' }
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 /**
- * 建议: today's items in one list, each led by its app's icon and a verb
- * (R-21, R-45). Tapping one hands it to the Coordinator, as on the web.
+ * 建议 (Comma design 16): a row of cards, one per app with today's count, then today's items, each led by its app's
+ * icon and a verb (R-21, R-45). Tapping one hands it to the Coordinator, as on the web. 插件 is the bar button.
  */
 export default function SuggestionsScreen() {
+  const router = useRouter()
   const insets = useSafeAreaInsets()
   const { data, error, loading, reload } = useApi<Suggestions>(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`)
   const refresh = useRefresh(reload)
-  const items = (data?.groups ?? []).flatMap(group => group.items).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+  const groups = (data?.groups ?? []).filter(group => group.items.length)
+  const items = groups.flatMap(group => group.items).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
   const arrange = (item: Suggestion) => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', draft: [`${VERB[item.action] ?? ''}：${item.title}`, item.url].filter(Boolean).join('\n') } })
 
   return (
     <View style={styles.screen}>
-      <NavBar title="建议" large />
+      <NavBar title="建议" large
+        right={{ icon: 'puzzlepiece.extension', label: '插件', web: <Puzzle size={20} color={colors.ink} strokeWidth={2} />, onPress: () => router.push('/suggestions/plugins') }} />
       <FlatList
         data={items}
         keyExtractor={item => item.id}
@@ -36,15 +42,28 @@ export default function SuggestionsScreen() {
         ListHeaderComponent={<>
           {loading ? <View style={styles.center}><Spinner /></View> : null}
           <ReadNotice error={error} hasData={Boolean(data)} label="建议" onRetry={reload} />
-          {!loading && !error && data && !items.length ? <Text style={styles.note}>今天还没有新的建议。</Text> : null}
+          {groups.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
+              {groups.map(group => (
+                <View key={group.source} style={styles.card} accessible accessibilityLabel={`${APP[group.source] ?? group.source}，${group.items.length} 条`}>
+                  <View style={styles.cardHead}>
+                    <View style={styles.badge}><SourceIcon source={group.source} size={16} /></View>
+                    <Text style={styles.cardName} numberOfLines={1}>{APP[group.source] ?? group.source}</Text>
+                  </View>
+                  <Text style={styles.cardCount}>{group.items.length} 条</Text>
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
+          {items.length ? <ListSectionHeader title="今天" /> : null}
+          {!loading && !error && data && !items.length ? <Text style={styles.note}>今天没有建议</Text> : null}
         </>}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
-        renderItem={({ item, index }) => (
-          <Pressable accessibilityRole="button" onPress={() => arrange(item)}
-            style={({ pressed }) => [styles.row, index === 0 && styles.first, index === items.length - 1 && styles.last, pressed && { backgroundColor: colors.pressed }]}>
-            <SourceIcon source={item.source} size={20} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title} numberOfLines={1}>{VERB[item.action] ? `${VERB[item.action]}：` : ''}{item.title}</Text>
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        renderItem={({ item }) => (
+          <Pressable accessibilityRole="button" onPress={() => arrange(item)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+            <View style={styles.badge}><SourceIcon source={item.source} size={16} /></View>
+            <View style={styles.body}>
+              <Text style={styles.title} numberOfLines={2}>{VERB[item.action] ? <Text style={styles.verb}>{VERB[item.action]} </Text> : null}{item.title}</Text>
               <Text style={styles.meta} numberOfLines={1}>{[APP[item.source] ?? item.source, item.actor, shortWhen(item.occurredAt)].filter(Boolean).join(' · ')}</Text>
             </View>
           </Pressable>
@@ -55,13 +74,18 @@ export default function SuggestionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.grouped },
+  screen: { flex: 1, backgroundColor: colors.page },
   center: { paddingTop: 40, alignItems: 'center' },
   note: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
-  list: { paddingHorizontal: 16, paddingTop: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, paddingHorizontal: 14, paddingVertical: 10 },
-  first: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 14 },
-  last: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16, paddingBottom: 14 },
-  title: { fontSize: 16 },
-  meta: { fontSize: 12, color: colors.secondary, marginTop: 2 },
+  cards: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, gap: 10 },
+  card: { width: 168, gap: 10, padding: 12, borderRadius: 16, borderCurve: 'continuous', backgroundColor: colors.bubble },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardName: { flexShrink: 1, fontSize: 15, fontWeight: '600' },
+  cardCount: { fontSize: 13, color: colors.secondary },
+  badge: { width: 26, height: 26, borderRadius: 7, borderCurve: 'continuous', backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10 },
+  body: { flex: 1, minWidth: 0, gap: 2 },
+  title: { fontSize: 17, lineHeight: 22 },
+  verb: { fontWeight: '600' },
+  meta: { fontSize: 13, lineHeight: 18, color: colors.secondary },
 })

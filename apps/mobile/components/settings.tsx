@@ -94,7 +94,7 @@ export function ChoiceRow({ label, selected, busy = false, disabled = false, onP
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: colors.surface },
   icon: { minWidth: 24, alignItems: 'center' },
-  label: { fontSize: 16 },
+  label: { fontSize: 17 },
   detail: { fontSize: 12, color: colors.secondary, marginTop: 2 },
   value: { fontSize: 15, color: colors.secondary, maxWidth: 200 },
   avatar: { backgroundColor: '#55705F', alignItems: 'center', justifyContent: 'center' },
