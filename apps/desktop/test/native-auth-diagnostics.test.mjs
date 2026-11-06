@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
-import { authDiagnosticRoute, nativeDiagnosticFailure, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
+import { authDiagnosticRoute, nativeDiagnosticFailure, nativeCleanupFailure, recordNativeCleanup, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
 
 const expected = { profile: '/tmp/owned-auth-profile', serverUrl: 'https://backend.example/mikka', ownerId: 'private-user-id' }
 const secret = 'private-bearer-value-never-export'
@@ -338,4 +338,70 @@ test('observation refuses another profile and keeps a bounded closed event strea
   assert.equal(probe.context.__mikkaAcceptanceAuthDiagnostics.overflow(), true)
   assert.ok(probe.events().every(value => value.route === 'other'))
   assertNoSecrets(probe.events())
+})
+
+test('cleanup stages preserve asynchronous completion and the exact original release error', async () => {
+  const records = []
+  const closing = deferred()
+  const close = recordNativeCleanup('browser-close', () => closing.promise, records)
+  assert.deepEqual(records, [{ stage: 'browser-close', result: 'running' }])
+  const closedValue = {}
+  closing.resolve(closedValue)
+  assert.equal(await close, closedValue)
+
+  let sensitiveReads = 0
+  const failure = { name: 'TestAccountError', code: 'ACCOUNT_DIRTY' }
+  for (const key of ['message', 'stack']) Object.defineProperty(failure, key, { get() { sensitiveReads++; throw new Error('must not read private text') } })
+  const releasing = deferred()
+  const release = recordNativeCleanup('lease-release', () => releasing.promise, records)
+  const rejected = assert.rejects(release, error => error === failure)
+  releasing.reject(failure)
+  await rejected
+  assert.deepEqual(records, [
+    { stage: 'browser-close', result: 'passed' },
+    { stage: 'lease-release', result: 'failed', error: { kind: 'TestAccountError', code: 'ACCOUNT_DIRTY' } },
+  ])
+  assert.equal(sensitiveReads, 0)
+})
+
+test('cleanup projection retains closed browser and aggregate causes without message or identifiers', async () => {
+  const browser = Object.assign(new Error(secret), { name: 'TimeoutError', code: secret, requestId: secret })
+  const lease = Object.assign(new Error(secret), { name: 'TestAccountError', code: 'LEASE_LOST' })
+  const aggregate = new AggregateError([browser, lease, browser, lease, browser], secret, { cause: lease })
+  const records = []
+  await assert.rejects(recordNativeCleanup('browser-close', () => { throw browser }, records), error => error === browser)
+  assert.deepEqual(records[0], { stage: 'browser-close', result: 'failed', error: { kind: 'TimeoutError', code: 'other' } })
+  const diagnostic = nativeCleanupFailure(aggregate)
+  assert.equal(diagnostic.kind, 'AggregateError')
+  assert.equal(diagnostic.errors.length, 4)
+  assert.deepEqual(diagnostic.cause, { kind: 'TestAccountError', code: 'LEASE_LOST' })
+  for (const [name, codes] of [
+    ['TestAccountError', ['ACCOUNT_DIRTY', 'ACCOUNT_POOL_DATABASE_ERROR', 'LEASE_LOST', 'LEASE_CLOSED',
+      'SESSION_STATE_RETENTION_FAILED', 'INVALID_REQUEST', 'STALE_LEASE', 'SESSION_REVOCATION_NOT_AUTHORIZED',
+      'RESOURCE_NOT_OWNED', 'RESOURCE_OWNER_MISMATCH', 'ACCOUNT_FOOTPRINT_UNPROVEN']],
+    ['EnvironmentError', ['ACTUAL_DATABASE_MISMATCH', 'DATABASE_IDENTITY_MISMATCH', 'DATABASE_IDENTITY_UNAVAILABLE',
+      'DOCKER_DESCRIPTOR_SIGNING_INVALID', 'DOCKER_DESCRIPTOR_SIGNATURE_MISMATCH',
+      'DOCKER_TARGET_FORBIDDEN', 'DOCKER_PUBLICATION_MISMATCH']],
+  ]) {
+    for (const code of codes) assert.deepEqual(nativeCleanupFailure({ name, code, message: secret }), { kind: name, code })
+  }
+  // These are persisted quarantine reasons, not errors thrown by release.
+  for (const code of ['RUN_DIRTY', 'RUN_CANCELLED', 'RESOURCES_NOT_CLEANED', 'ACCOUNT_SESSION_STILL_ACTIVE']) {
+    assert.deepEqual(nativeCleanupFailure({ name: 'TestAccountError', code }), { kind: 'TestAccountError', code: 'other' })
+  }
+  assert.ok(!JSON.stringify(diagnostic).includes(secret))
+  const cycle = { name: 'Error', code: 'ECONNRESET' }
+  cycle.cause = cycle
+  assert.deepEqual(nativeCleanupFailure(cycle), { kind: 'Error', code: 'ECONNRESET', cause: { kind: 'Error', code: 'ECONNRESET', cause: { kind: 'Error', code: 'ECONNRESET' } } })
+})
+
+test('cleanup diagnostics refuse unknown stages and never replace the original rejection', async () => {
+  const records = []
+  let calls = 0
+  await assert.rejects(recordNativeCleanup(secret, () => { calls++ }, records), { code: 'ERR_ASSERTION' })
+  assert.equal(calls, 0)
+  assert.deepEqual(records, [])
+  const failure = { get code() { throw new Error(secret) } }
+  await assert.rejects(recordNativeCleanup('electron-close', () => Promise.reject(failure), records), error => error === failure)
+  assert.deepEqual(records, [{ stage: 'electron-close', result: 'failed', error: { kind: 'other', code: 'other' } }])
 })

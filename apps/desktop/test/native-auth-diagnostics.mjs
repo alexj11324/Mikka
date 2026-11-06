@@ -40,6 +40,51 @@ export function nativeDiagnosticFailure(error, depth = 0) {
     ...(depth < 2 && Array.isArray(error?.errors) ? { errors: error.errors.slice(0, 4).map(value => nativeDiagnosticFailure(value, depth + 1)) } : {}) }
 }
 
+
+const CLEANUP_STAGES = ['browser-close', 'electron-close', 'daemon-drain', 'native-resources', 'lease-release']
+const CLEANUP_ERROR_CODES = new Set([
+  'ACCOUNT_DIRTY', 'ACCOUNT_POOL_DATABASE_ERROR', 'LEASE_LOST', 'LEASE_CLOSED',
+  'SESSION_STATE_RETENTION_FAILED', 'INVALID_REQUEST', 'STALE_LEASE',
+  'SESSION_REVOCATION_NOT_AUTHORIZED', 'RESOURCE_NOT_OWNED', 'RESOURCE_OWNER_MISMATCH',
+  'ACCOUNT_FOOTPRINT_UNPROVEN',
+  // Every pool transaction verifies the existing database/descriptor binding.
+  'ACTUAL_DATABASE_MISMATCH', 'DATABASE_IDENTITY_MISMATCH', 'DATABASE_IDENTITY_UNAVAILABLE',
+  'DOCKER_DESCRIPTOR_SIGNING_INVALID', 'DOCKER_DESCRIPTOR_SIGNATURE_MISMATCH',
+  'DOCKER_TARGET_FORBIDDEN', 'DOCKER_PUBLICATION_MISMATCH',
+  'ERR_ASSERTION', 'ECONNREFUSED', 'ECONNRESET',
+  'EPIPE', 'ENOENT', 'EACCES', 'EPERM',
+])
+const CLEANUP_ERROR_NAMES = new Set(['Error', 'AssertionError', 'TimeoutError', 'TestAccountError', 'EnvironmentError', 'AggregateError', 'TypeError'])
+
+/** Cleanup errors can contain credentials in message/stack or nested causes.
+ * Only exact known code/name values and a bounded cause chain leave the test. */
+export function nativeCleanupFailure(error, depth = 0) {
+  try {
+    return {
+      kind: CLEANUP_ERROR_NAMES.has(error?.name) ? error.name : 'other',
+      code: CLEANUP_ERROR_CODES.has(error?.code) ? error.code : 'other',
+      ...(depth < 2 && error?.cause ? { cause: nativeCleanupFailure(error.cause, depth + 1) } : {}),
+      ...(depth < 2 && Array.isArray(error?.errors) ? { errors: error.errors.slice(0, 4).map(value => nativeCleanupFailure(value, depth + 1)) } : {}),
+    }
+  } catch { return { kind: 'other', code: 'other' } }
+}
+
+/** Observe the existing cleanup call; preserve its result or original rejection. */
+export async function recordNativeCleanup(stage, action, records) {
+  assert.ok(CLEANUP_STAGES.includes(stage), 'NATIVE_CLEANUP_DIAGNOSTIC_STAGE_REQUIRED')
+  const record = { stage, result: 'running' }
+  records.push(record)
+  try {
+    const result = await action()
+    record.result = 'passed'
+    return result
+  } catch (error) {
+    record.result = 'failed'
+    record.error = nativeCleanupFailure(error)
+    throw error
+  }
+}
+
 /** Test inspector only; observes the actual transport without changing any
  * request/response. Stop before further UI work. Publish only on failure. */
 export async function startNativeAuthDiagnostics(application, expected) {

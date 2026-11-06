@@ -9,6 +9,7 @@ import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { nativeCleanupFailure, recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 
@@ -138,23 +139,26 @@ try {
   failure = error
 } finally {
   const cleanupErrors = []
+  evidence.cleanupStages = []
+  const cleanup = (stage, action) => recordNativeCleanup(stage, action, evidence.cleanupStages)
   const failedCleanup = error => { passed = false; cleanupErrors.push(error) }
-  await browser?.close().catch(failedCleanup)
+  if (browser) await cleanup('browser-close', () => browser.close()).catch(failedCleanup)
   let closed = true
-  await closeElectron(application).catch(error => { closed = false; failedCleanup(error) })
+  await cleanup('electron-close', () => closeElectron(application)).catch(error => { closed = false; failedCleanup(error) })
   let drained = false
   if (closed) {
-    try { drained = (await stopLocalDaemons([profile])).profilesStopped } catch (error) { failedCleanup(error) }
+    try { drained = (await cleanup('daemon-drain', () => stopLocalDaemons([profile]))).profilesStopped } catch (error) { failedCleanup(error) }
   }
   if (drained && nativeResources) {
-    try { evidence.nativeCleanup = await nativeResources.cleanup({ drained: true }) } catch (error) { failedCleanup(error) }
+    try { evidence.nativeCleanup = await cleanup('native-resources', () => nativeResources.cleanup({ drained: true })) } catch (error) { failedCleanup(error) }
   }
-  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' }).catch(failedCleanup)
+  if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(failedCleanup)
+  if (cleanupErrors.length) failure = new AggregateError([...(failure ? [failure] : []), ...cleanupErrors], 'DESKTOP_SMOKE_CLEANUP_FAILED')
+  if (failure) evidence.failure = nativeCleanupFailure(failure)
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'smoke.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   await auditEvidence([output], { environment })
   if (!cleanupErrors.length) await rm(profile, { recursive: true, force: true })
-  if (cleanupErrors.length) failure = new AggregateError([...(failure ? [failure] : []), ...cleanupErrors], 'DESKTOP_SMOKE_CLEANUP_FAILED')
 }
 if (failure) throw failure
