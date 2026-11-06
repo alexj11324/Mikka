@@ -48,6 +48,7 @@ import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
 import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials } from './agents/github-runtime'
+import { prepareLocalGitHub } from './agents/local-github'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
@@ -68,6 +69,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
+import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
@@ -147,6 +149,8 @@ export interface DaemonOptions {
    * for a device's own harnesses; tests that set `harnesses` turn it on with `true`.
    */
   modelProbe?: boolean
+  /** Anonymous official-CLI probes held in memory by the trusted preloader. */
+  preloadedModels?: HostedModelProbe
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
@@ -342,7 +346,7 @@ export class Daemon {
     if (this.runControlPush) this.options.link.setRunControlMode?.('fallback')
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
-    if (this.localComputerDriver && this.options.link.syncComputerReviews && this.options.link.localComputerAuthority) {
+    if (this.localComputerDriver && this.options.link.syncComputerReviews) {
       this.localComputerBroker = new ComputerBroker({
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
@@ -358,9 +362,9 @@ export class Daemon {
           const initial = this.journal.get(runId)?.assignment.localComputer
           if (!initial || display !== undefined) throw new Error('Local computer unavailable')
           const recheck = async () => {
-            const current = await this.options.link.localComputerAuthority!(this.device.deviceId!, runId)
+            const current = this.journal.get(runId)?.assignment.localComputer
             context.assertLive()
-            if (current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
+            if (!this.supervisor.computerRunAllowed(runId) || !current || current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
               throw new Error('Local computer authority changed')
           }
           try {
@@ -426,6 +430,16 @@ export class Daemon {
         })
       : undefined
     this.hostedBinaries = hosted?.binaries
+    const preloadedModels = hosted && this.modelProbeOn()
+      ? reusableHostedModels(this.options.preloadedModels, hosted.binaries) : undefined
+    if (preloadedModels) {
+      for (const info of preloadedModels) this.modelReports.set(info.harness, {
+        models: info.models, modelSlots: info.modelSlots, defaultModelSlot: info.defaultModelSlot,
+      })
+      // A frozen template can be weeks old. The binaries were checked above;
+      // the natural refresh period starts when this machine accepts its owner.
+      this.lastModelProbe = Date.now()
+    }
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
@@ -473,6 +487,10 @@ export class Daemon {
       startCredential: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
+      prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
+        stateDir: join(this.paths.adapterState, 'github'), link: this.options.link, signal, onCredential,
+        onRefreshError: () => this.log.warn({ event: 'github_refresh_deferred' }, 'GitHub renewal will retry in the background'),
+      }),
       verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
         // resumeAll runs before the first sync; establish the existing device
         // session before fetching the independent signing context.
@@ -508,7 +526,7 @@ export class Daemon {
           }
         : undefined,
       repository: assignment => this.repository(assignment),
-      prepareRepository: async (assignment, signal) => {
+      prepareRepository: async (assignment, signal, githubEnvironment) => {
         const remoteUrl = assignment.remoteUrl
         if (!remoteUrl) return
         await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir, async (env, github) => {
@@ -523,7 +541,7 @@ export class Daemon {
             await this.repositories.seedEmpty(remoteUrl, branch, signal, env)
             await this.repositories.prepare(remoteUrl, signal, env)
           }
-        })
+        }, githubEnvironment)
       },
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
@@ -548,14 +566,16 @@ export class Daemon {
             )
         : this.verifier(),
       publisher: {
-        snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
-        publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
-          assignment.github?.branch && assignment.mcp ? agentPublishedReceipt({
+        snapshot: ({ worktree, repo, signal }) => snapshotTree(repo.path, worktree, undefined, signal),
+        publish: async ({ runId, worktree, repo, assignment, report, tree, githubEnvironment, signal }) =>
+          assignment.github?.branch && (assignment.github.token || assignment.mcp || githubEnvironment) ? agentPublishedReceipt({
             runId, repoPath: repo.path, worktree, tree,
-            github: { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId },
+            github: { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId },
             privateDir: join(paths.adapterState, 'pids'),
             ...(hosted ? { hosted: true } : {}),
-            env: githubReceiptEnvironment(),
+            env: hosted ? process.env : githubReceiptEnvironment(),
+            githubEnvironment,
+            signal,
           }) : publishRun({
             runId,
             repoPath: repo.path,
@@ -563,6 +583,7 @@ export class Daemon {
             tree,
             issueId: assignment.issueId,
             summary: report.summary,
+            signal,
             pushBranch: assignment.pushBranch,
             baseBranch: assignment.remoteUrl ? await this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch) : assignment.baseBranch,
             push: (() => {
@@ -637,7 +658,7 @@ export class Daemon {
     this.schedule(0)
     this.commandsLoop = this.pollCommands()
     // The CLIs' own model lists, in the background: a first install downloads the pinned CLI.
-    if (this.modelProbeOn()) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+    if (this.modelProbeOn() && !preloadedModels) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
     // No folder-request poll: the app adds repositories by path and never queues one
     // (app/v1/devices/[deviceId]/fs/requests), and each idle poll was a database read.
     return this
@@ -1164,6 +1185,7 @@ export class Daemon {
       timeoutMs,
       signal,
       readOnly,
+      githubEnvironment,
     }) => {
       const paths = runPaths(this.paths.adapterState, runId)
       return runVerify(sandbox, {
@@ -1173,7 +1195,7 @@ export class Daemon {
         privateDir: paths.privateDir,
         pidFile: paths.pidFile.replace(/\.pgid$/, ".verify.pgid"),
         networkAllow: repo.networkAllow,
-        env: { ...buildChildEnv(), MIKKA_HANDOFF_FILE: join(paths.runDir, "handoff.json") },
+        env: { ...buildChildEnv(), ...githubEnvironment, MIKKA_HANDOFF_FILE: join(paths.runDir, "handoff.json") },
         timeoutMs,
         signal,
         readOnly,
@@ -1861,7 +1883,7 @@ export class Daemon {
     await this.tick
     // The commands poll starts claims outside the heartbeat tick. Abort their
     // HTTP requests and settle them before stopping the run supervisor.
-    await Promise.allSettled([...this.claims.values()])
+    await Promise.allSettled(this.claims.values())
     await this.rpc?.close()
     try {
       await this.supervisor?.stop()

@@ -1,9 +1,10 @@
-import { constants, closeSync, existsSync, fstatSync, openSync, readFileSync, unlinkSync, watch } from 'node:fs'
+import { constants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, unlinkSync, watch, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { readJson, writeJsonAtomic } from './fs-util'
 import { DAEMON_VERSION, daemonPaths } from './paths'
 import { connectDaemonInDataDir, isNoDaemon } from './rpc/client'
+import { probeHostedRuntimeModels, type HostedModelProbe } from './cloud-model-probe'
 
 const configSchema = z.object({
   deviceId: z.uuid(), workspaceId: z.uuid(),
@@ -51,6 +52,26 @@ export function watchCloudBootstraps(directory: string, accept: () => Promise<vo
   return () => { closed = true; watcher.close(); process.off('SIGUSR1', wake) }
 }
 
+/** A snapshot is ready only after anonymous official CLI probes and all of
+ * their processes finish. The one-use handoff receives only in-memory models;
+ * no device identity or credential is read while preparing the snapshot. */
+export async function preloadCloudWorker(directory: string, accept: (models: HostedModelProbe) => Promise<void>,
+  failed: (error: unknown) => void, probe = probeHostedRuntimeModels) {
+  mkdirSync(directory, { recursive: true, mode: 0o700 })
+  const models = await probe()
+  const closeWatcher = watchCloudBootstraps(directory, () => accept(models), failed)
+  const ready = join(directory, 'preloaded.pid')
+  const close = () => {
+    process.off('exit', close)
+    closeWatcher()
+    try { unlinkSync(ready) } catch { /* Already removed. */ }
+  }
+  process.once('exit', close)
+  try { writeFileSync(ready, `${process.pid}\n`, { mode: 0o600 }) }
+  catch (error) { close(); throw error }
+  return close
+}
+
 /** Seed a new daemon, or rotate a live daemon's credential over its private
  * authenticated socket. The caller serializes handoffs for this machine. */
 export async function installCloudCredential(dataDir: string, config: z.infer<typeof configSchema>): Promise<'start' | 'updated'> {
@@ -68,7 +89,7 @@ export async function installCloudCredential(dataDir: string, config: z.infer<ty
     } finally { client.close() }
   } catch (error) {
     if (!isNoDaemon(error)) throw error
-    writeJsonAtomic(file, { ...(current ?? {}), deviceId: config.deviceId, workspaceId: config.workspaceId, credential: config.credential })
+    writeJsonAtomic(file, { ...current, deviceId: config.deviceId, workspaceId: config.workspaceId, credential: config.credential })
     return 'start'
   }
 }

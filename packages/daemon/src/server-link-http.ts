@@ -20,7 +20,7 @@ import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
-import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { nativeBrokerContextSchema, nativeLeaseSchema, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
@@ -29,6 +29,7 @@ import {
   REPO_ORIGIN_HEADER,
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
+  RUN_CREDENTIALS_HEADER,
   MAILBOX_NOTICE_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
@@ -41,6 +42,7 @@ import {
   heartbeatResultSchema,
   pendingRunsResponse,
   runAssignmentSchema,
+  runGitHubCredentialSchema,
   runCommandsResponse,
   daemonVersionsSchema,
   runCompletePath,
@@ -61,6 +63,7 @@ import {
 import { DAEMON_VERSION } from "./paths"
 import { createRunMailbox } from './run-mailbox'
 import { daemonTracer, routeTemplate, runIdHash } from "./tracing"
+import { runRuntimeTimings } from "./run-runtime-timing"
 import type {
   ChunkBatch,
   DeviceInfo,
@@ -120,7 +123,7 @@ export class HttpServerLink implements ServerLink {
   private readonly runControls = new Set<ToolApprovalGate>()
   private runControlMode: RunControlMode = 'legacy'
 
-  /** Work frames are hints, never authority: re-read each active run. */
+  /** Wake local waiters; the same push drains authoritative stop commands. */
   invalidateRunControls() {
     for (const gate of this.runControls) gate.invalidate()
   }
@@ -135,7 +138,7 @@ export class HttpServerLink implements ServerLink {
     const url = new URL(transfer.downloadUrl)
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com') || url.username || url.password || url.port) throw Error('Invalid attachment storage origin')
     // The capability is sufficient: never forward the device session to storage.
-    const response = await this.fetchImpl(url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
+    const response = await this.taskFetch(assignment.runId, 'storage_transfer', url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
     if (!response.ok || !response.body) throw Error('Attachment storage unavailable')
     const reader = response.body.getReader(), chunks: Uint8Array[] = []
     let size = 0
@@ -186,79 +189,25 @@ export class HttpServerLink implements ServerLink {
 
   async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
-    let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
-    const policyRevision = assignment.policyRevision
-    const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
-    const liveness = new AbortController()
-    let reported = false
-    const refusal = (phase: string, reason: 'check_failed' | 'run_not_live', error?: unknown) => {
-      if (reported || liveness.signal.aborted || signal.aborted) return
-      reported = true
-      void daemonTracer.span("daemon.tool_approval.refused", { "mikka.run.id_hash": runIdHash(assignment.runId), "mikka.harness": assignment.harness, "mikka.outcome": reason },
-        async span => { if (error !== undefined) span.fail(error, reason) }).catch(() => undefined)
-      const status = error instanceof DaemonError && error.code >= 100 && error.code <= 599 ? error.code : null
-      try { console.warn(JSON.stringify({ event: 'run_liveness_refused', runId: assignment.runId, deviceId: assignment.deviceId,
-        phase, reason, errorClass: error instanceof ServerUnreachableError ? 'ServerUnreachableError' : error instanceof DaemonError ? 'DaemonError' : reason === 'run_not_live' ? null : 'unknown', status: reason === 'run_not_live' ? 200 : status })) }
-      catch { /* Diagnostics never change whether a run is live. */ }
-    }
+    // The claim and entry policy verification already bind this task to its
+    // owner and device. Operation-time checks use the held local lease only.
+    // Server revocations arrive through the existing commands push/heartbeat,
+    // whose stop command revokes this gate and terminates the CLI group.
     const gate = new ToolApprovalGate(assignment.runId, {
-      // A paused run stays pending here; its session and checkpoint remain intact.
-      isLive: async () => {
-        const pause = () => new Promise<void>((resolve, reject) => {
-          const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
-          const timer = setTimeout(() => { liveness.signal.removeEventListener('abort',stop); resolve() },1000)
-          liveness.signal.addEventListener('abort',stop,{once:true})
-          if (liveness.signal.aborted) stop()
-        })
-        let phase = 'local_authority'
-        try {
-          let unreachableSince: number | undefined
-          for (;;) {
-            phase = 'local_authority'
-            check()
-            if (assignment.policySnapshot) {
-              phase = 'policy_snapshot'
-              if (!context) return false
-              if (assignment.policySnapshot.payload.expiresAt - Date.now() <= POLICY_SNAPSHOT_REFRESH_MS) context = await this.verifyRunPolicy(assignment,liveness.signal)
-              if (!context) return false
-              verifyPolicySnapshot(assignment.policySnapshot,context,{runId:assignment.runId,deviceId:assignment.deviceId,revision:policyRevision,policy:assignment.policy})
-            }
-            let current: { live: boolean; paused?: boolean; revokeReason?: 'device_lost' }
-            try {
-              phase = 'server_check'
-              current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional(), revokeReason: z.literal('device_lost').optional() }), signal:liveness.signal, timeoutMs:5000 })
-            } catch (error) {
-              // A timeout, network failure, 5xx or 429 (a cold deployment) is no
-              // answer about the run. Ask again for a bounded time; nothing passes
-              // the gate meanwhile. Any answer the server gives still counts at once.
-              if (!(error instanceof ServerUnreachableError) || liveness.signal.aborted) throw error
-              unreachableSince ??= Date.now()
-              if (Date.now() - unreachableSince >= LIVENESS_UNREACHABLE_GRACE_MS) throw error
-              await pause()
-              continue
-            }
-            unreachableSince = undefined
-            phase = 'local_authority'
-            check()
-            if (!current.live) refusal('server_check', 'run_not_live')
-            if (!current.live && current.revokeReason) gate.revoke(current.revokeReason)
-            if (!current.live || !current.paused) return current.live
-            // Resume arrives as a push (or on the fallback cadence), not a 1 s re-ask.
-            await gate.changed(liveness.signal)
-          }
-        } catch (error) { refusal(phase, 'check_failed', error); return false }
-      }
+      isLive: () => {
+        if (signal.aborted) return false
+        try { check(); return true } catch { return false }
+      },
     }, this.runControlMode)
     this.runControls.add(gate)
-    const offMonitor = gate.watch()
     const abort = () => gate.revoke()
-    gate.onRevoke(() => { liveness.abort(); offMonitor(); this.runControls.delete(gate); signal.removeEventListener('abort',abort) })
+    gate.onRevoke(() => { this.runControls.delete(gate); signal.removeEventListener('abort', abort) })
     if (signal.aborted) gate.revoke()
     else signal.addEventListener('abort', abort, { once: true })
     return gate
   }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
-    return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
+    return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: (url, init) => this.taskFetch(assignment.runId, 'mailbox_operation', url, init),
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
   }
   async claimCoordinator(deviceId: string, signal: AbortSignal) {
@@ -292,6 +241,18 @@ export class HttpServerLink implements ServerLink {
     }
   }
 
+  /** Count raw task transports too; preserve their existing redirects, body,
+   * headers and response streaming without introducing a request. */
+  private async taskFetch(runId: string, endpoint: "mailbox_operation" | "storage_transfer" | "task_data", input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
+    const measured = runRuntimeTimings.taskRequest(runId, endpoint, init?.method ?? "GET")
+    let status: number | undefined
+    try {
+      const response = await this.fetchImpl(input, init)
+      status = response.status
+      return response
+    } finally { measured(status) }
+  }
+
   private async send(
     method: string,
     path: string,
@@ -318,6 +279,8 @@ export class HttpServerLink implements ServerLink {
     token: string | null,
     { timeoutMs, signal }: { timeoutMs: number; signal?: AbortSignal },
   ): Promise<Response> {
+    const measured = runRuntimeTimings.request(method, path, body)
+    let status: number | undefined
     try {
       const response = await this.fetchImpl(serverUrl(this.baseUrl, path), {
         method,
@@ -331,6 +294,8 @@ export class HttpServerLink implements ServerLink {
           [REPO_ORIGIN_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
+          [RUN_CREDENTIALS_HEADER]: '1',
+          [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -342,6 +307,7 @@ export class HttpServerLink implements ServerLink {
           ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
           : AbortSignal.timeout(timeoutMs),
       })
+      status = response.status
       // Deployment protection is not device-session rejection; never follow it with credentials.
       if (response.redirected || (response.status >= 300 && response.status < 400))
         throw new Error(`Unexpected server redirect (${response.status})`)
@@ -354,6 +320,8 @@ export class HttpServerLink implements ServerLink {
       return response
     } catch (error) {
       throw new ServerUnreachableError(error)
+    } finally {
+      measured(status)
     }
   }
 
@@ -470,6 +438,12 @@ export class HttpServerLink implements ServerLink {
   async nativeLease(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription-lease`, {schema:nativeLeaseSchema,signal})
   }
+  async githubLease(deviceId: string, runId: string, signal?: AbortSignal) {
+    return this.call('POST', `/v1/devices/${seg(deviceId)}/github-token?runId=${seg(runId)}`, {
+      schema: runGitHubCredentialSchema, signal,
+    })
+  }
+
   async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
     const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})
     const contentType=response.headers.get('content-type')?.split(';')[0]
@@ -493,7 +467,7 @@ export class HttpServerLink implements ServerLink {
     const server = upload.target === "server"
     let response: Response
     try {
-      response = await this.fetchImpl(server ? serverUrl(this.baseUrl, capturePaths.upload(checkId(runId), checkId(captureId))) : upload.url, {
+      response = await this.taskFetch(runId, server ? "task_data" : "storage_transfer", server ? serverUrl(this.baseUrl, capturePaths.upload(checkId(runId), checkId(captureId))) : upload.url, {
         method: "PUT",
         headers: server
           ? { "content-type": contentType, [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.credential ? { authorization: `Bearer ${this.credential}` } : {}), ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) }

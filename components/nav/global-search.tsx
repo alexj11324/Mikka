@@ -133,7 +133,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{tNav('coordinator')}</span>{coordinatorLine && <span className="truncate text-xs text-muted-foreground">{coordinatorLine}</span>}</span>
           </CommandItem>}
           {botRows.map(bot => <CommandItem key={bot.id} value={`bot ${bot.id}`} onSelect={() => pick(() => onChat({ kind: 'bot', botId: bot.id }))} className="gap-3 py-2">
-            <BotAvatar color={bot.color} shape={bot.shape} size="search" />
+            <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="search" />
             <span className="truncate font-medium">{bot.name}</span>
           </CommandItem>)}
         </CommandGroup>}

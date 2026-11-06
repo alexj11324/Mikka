@@ -114,6 +114,8 @@ export interface ServerLink {
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
   /** A device run's subscription access lease (never a refresh grant); asked again before it expires. */
   nativeLease?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeLease>
+  /** Natural-expiry renewal only; initial GitHub credentials arrive with the claim. */
+  githubLease?(deviceId:string,runId:string,signal?:AbortSignal):Promise<{ token: string; expiresAt: string | null }>
   /**
    * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).
    * Optional: links without them keep the files on this machine.

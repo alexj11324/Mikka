@@ -5,7 +5,8 @@
   for a person's own computer or server: 「自己的服务器和电脑直接走自己的Claude/codex，也不做沙箱了」;
   for permissions: 「那就不要decision api 了，直接走bypass」
 - Rule: —
-- Superseded in part by: [2026-11-03-1430-official-e2b-templates-unchanged](2026-11-03-1430-official-e2b-templates-unchanged.md) (official template files stay untouched; not yet in code, #1131)
+- Superseded in part by: [2026-11-03-1430-official-e2b-templates-unchanged](2026-11-03-1430-official-e2b-templates-unchanged.md) (official files stay intact; additive versioned derivatives are allowed under #1505)
+- Superseded in part by: [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md) for credential delivery, ordinary HOME/environment/Git and removal of extra per-call remote authorization.
 - Replaces: [2026-11-01-1201 template public, released by CI](2026-11-01-1201-e2b-template-public-auto-release.md)
   (Mikka's own worker template), the sandbox-runtime part and the device
   paragraph of [2026-11-01-1312 cloud runs without Docker](2026-11-01-1312-cloud-runs-without-docker.md),
@@ -71,15 +72,16 @@ Checked with a real key on 2026-11-01 (each sandbox killed right after):
   credential; Alex accepts this (2026-11-01: 「我完全接受 Agent 能够读到
   worker 凭证的这个风险……哪怕就是 Claude Code，Agent 也是能够看到凭证的」). The E2B
   sandbox, one per task, is the only boundary.
-- **Credentials keep the existing path** (subscription or API key through
-  Mikka's gateway or BYOK broker); the CLI still gets a placeholder and reaches
-  the model only through the run's broker. Nothing new is stored or logged.
-- **What stays in plain code:** git push is the daemon's (a read-only run
-  never pushes, an unadmitted run never pushes); Claude Code's deny rules for
-  `git push`, read-only edit tools and denied installs; Codex's shell tool is
-  off when installs are not allowed; the run's live gate still stops a run
-  whose lease, owner or policy is no longer live. The desktop's computer
-  broker keeps its own policy and its `computer-action` judgment.
+- **Credentials and authority are prepared up front** ([1800](2026-11-06-1800-machine-is-the-execution-boundary.md)).
+  Give the assigned machine the task's real subscription, GitHub and model
+  credentials. Claude Code and Codex connect directly to their providers;
+  no placeholder, model proxy or extra remote permission check precedes each
+  tool or provider call. Use the machine's normal HOME, environment and `.git`.
+- **Stops replace per-call gates.** A revoked connection, share or task causes
+  a persisted stop to be pushed to the runner, or the VM to be reclaimed.
+  Existing scheduling heartbeats carry lifecycle state. GitHub operations use
+  the assigned person's real credential and the Agent's judgment under
+  [1600](2026-11-02-1600-agents-use-own-github-credential.md).
 - **No network ceiling is enforced.** The run's network policy is still in the
   agent's instructions, but nothing filters its connections any more.
 - **A read-only run can write its worktree.** The agent of a read-only check
@@ -95,20 +97,24 @@ Checked with a real key on 2026-11-01 (each sandbox killed right after):
 
 ## How it is built
 
-- `scripts/e2b/build-template.py` builds three templates in one run, each
-  `Template().from_template(<official>)` plus the worker: `desktop` (with
-  `bootstrap-desktop.sh` and the viewer and preload boot services), `claude`
-  and `codex` (preload service only; the codex one keeps the Codex E2B
-  ships, the claude one runs the Agent SDK's own Claude Code build). Mikka
-  checks no Codex version: any Codex works (Alex, 2026-11-02). `scripts/e2b/bootstrap.sh` adds Node 24 and
-  the worker's tools and creates no user.
-- `.github/workflows/e2b-template.yml` builds and publishes them when the
-  worker hash changes, and `scripts/e2b/publish-template-env.mjs` sets
-  `E2B_BYO_COMPUTER_TEMPLATE` (desktop), `E2B_CLAUDE_TEMPLATE`,
-  `E2B_CODEX_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` in one Vercel request.
-- `lib/secrets/e2b-runtime.ts` `taskTemplate(harness)` picks a repository
-  task's template (`lib/cloud-computer/thread-machines.ts`); a task machine
-  has no desktop, so its worker starts no computer broker.
-- The daemon (`packages/daemon`) has no sandbox-runtime dependency, no per-run
-  Docker container, no per-tool approval policy and no egress proxy; see the
-  pull request that adds this section for the files.
+- `scripts/e2b/build-template.py` builds three versioned private candidates
+  with `Template().from_template(<official>)`. All Mikka Node, worker,
+  dependencies, `gh` and any missing CLI live under `/opt/mikka`. Original
+  official CLI bytes and paths remain intact; the official CLI is passed
+  explicitly to the daemon. The build freezes an anonymous preloaded worker,
+  with no task login or device identity in the reusable image.
+- `.github/workflows/e2b-template.yml` only builds candidates. The coordinating
+  `e2b-official-runtime.yml` checks original-file conservation and executes
+  both real official subscriptions on those exact candidates before making
+  them public. The application source, worker digest, template IDs and model
+  reports must agree. See [1430](2026-11-03-1430-official-e2b-templates-unchanged.md)
+  for the complete release gates and rollback contract.
+- `scripts/e2b/publish-template-env.mjs` writes the three template IDs, worker
+  digest, source commit and measured model catalogue in one upsert, then reads
+  every value back. A partial or mismatched tuple refuses release and requires
+  revalidation; it never overwrites the last valid previous configuration.
+- `lib/secrets/e2b-runtime.ts` picks the task's template from the matching
+  released catalogue. A task machine has no desktop, so its worker starts no
+  computer broker. New tasks receive the normal owner-bound handoff after
+  creation; the preloaded process does not rely on create-time environment
+  changes to deliver credentials.

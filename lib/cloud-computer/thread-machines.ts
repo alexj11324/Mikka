@@ -15,6 +15,7 @@ import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease } from '@/lib/computer/e2b-provider'
 import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
+import { cloudTemplateOrigin, threadMachineTemplateKind } from '@/lib/cloud-template-models'
 import { computerTemplate, e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { bootstrapOfficialInstance, isOfficialE2BTemplate, stageOfficialWorkerRelease, switchOfficialWorkerRelease, runtimeCommandOptions, runtimeRequestOptions, type RuntimeBudget } from '@/lib/computer/official-runtime'
 import type { Actor } from './subagents'
@@ -63,9 +64,9 @@ export function threadMachineStartFailure(error: unknown): FailedThreadStart | n
  * With a lease, only that lease's row is reset.
  */
 async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, template: string, leaseId?: string) {
-  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,state='starting',
+  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,"templateKind"=$5,state='starting',
       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
-    WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template])).rows[0]
+    WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template, cloudTemplateOrigin(template)?.kind ?? null])).rows[0]
 }
 
 // Prepare the owner's key before a stop holds an APP client. The existing key
@@ -81,6 +82,7 @@ export const threadMachineProvider = {
   ...threadMachineStopPreparation,
   connect: (sandboxId: string, workspaceId: string, budget?: RuntimeBudget) => connectComputer(workspaceId, sandboxId, undefined, budget),
   create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, ownerId: string) => {
+    if (!cloudTemplateOrigin(snapshotId)) throw new ComputerError(409, 'Verified cloud template required')
     const attributes = metadata.runId ? cloudStartupRunAttributes(metadata.runId) : {}
     const base = await cloudStartupSpan('cloud.sandbox.credentials', attributes, () => options(ownerId))
     const sandbox = await cloudStartupSpan('cloud.sandbox.create', attributes, () => withE2BErrors(ownerId, true, () => Sandbox.create(snapshotId, { ...base, idempotencyKey: operationId, timeoutMs: 15 * 60_000, metadata, lifecycle: { onTimeout: 'pause', autoResume: false } })))
@@ -183,8 +185,9 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
  */
 async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
-  // A repository task's machine holds only its harness's CLI: a run on another harness (or a
-  // since-released template) starts its own machine, and the old one stays parked for the task.
+  // A repository task's machine holds only its harness's CLI. Keep the same
+  // harness's VM across additive releases; its private worker upgrades below.
+  const templateKind = template ? cloudTemplateOrigin(template)?.kind ?? template : null
   const previous = (await client.query(`SELECT m.* FROM thread_machines m
       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
@@ -192,22 +195,22 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
       AND m.state='paused' AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=now()) AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
       AND r.status IN ('succeeded','failed','stopped','cancelled')
       AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
-      AND ($7::text IS NULL OR m."snapshotId"=$7)
-    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, template])).rows[0]
+      AND ($7::text IS NULL OR m."templateKind"=$7 OR (m."templateKind" IS NULL AND m."snapshotId"=$7))
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, templateKind])).rows[0]
   if (!previous) {
     const busy = await client.query(`SELECT 1 FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
       WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4 AND m.state='paused'
         AND m."sandboxId" IS NOT NULL AND m."workerLeaseUntil">now() AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
-        AND ($7::text IS NULL OR m."snapshotId"=$7) LIMIT 1`,[actor.userId,actor.workspaceId,run.issueId,runId,run.repoPath,run.remoteUrl,template])
+        AND ($7::text IS NULL OR m."templateKind"=$7 OR (m."templateKind" IS NULL AND m."snapshotId"=$7)) LIMIT 1`,[actor.userId,actor.workspaceId,run.issueId,runId,run.repoPath,run.remoteUrl,templateKind])
     if (busy.rowCount) throw new ComputerError(409,'Task runtime maintenance in progress')
     return null
   }
   await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
-  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,'paused',$8,$9,$10)
-    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId",state='paused',"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId"
-    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId])).rows[0]
+  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId","templateKind")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'paused',$8,$9,$10,$11)
+    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind",state='paused',"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId"
+    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous)])).rows[0]
 }
 
 /**
@@ -494,7 +497,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       if (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime()>Date.now()) throw new ComputerError(409,'Thread provisioning in progress')
     }
     refreshPhase = timings.next('admission')
-    if (refreshRuntime && (!machine?.sandboxId || !machine.deviceId || !isOfficialE2BTemplate(machine.snapshotId))) throw new ComputerError(409, 'Existing official task runtime required')
+    if (refreshRuntime && (!machine?.sandboxId || !machine.deviceId || !threadMachineTemplateKind(machine))) throw new ComputerError(409, 'Existing official task runtime required')
     if (refreshRuntime) {
       if (machine.ownerId!==actor.userId || machine.workspaceId!==actor.workspaceId || machine.deviceId!==run.deviceId) throw new ComputerError(404,'Thread unavailable')
       const idle = await client.query(`SELECT 1 FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND d.enabled=true
@@ -527,7 +530,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     }
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
-    if (!machine || machine.snapshotId === 'pending' || (!machine.sandboxId && !isOfficialE2BTemplate(machine.snapshotId))) {
+    if (!machine || machine.snapshotId === 'pending' || (!machine.sandboxId && !cloudTemplateOrigin(machine.snapshotId))) {
       // A follow-up keeps this task's own machine. A new repository task starts
       // from the anonymous ready template of its harness (E2B's claude or codex
       // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
@@ -537,8 +540,8 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) { machine = adopted; retainedSandboxId = adopted.sandboxId }
       else {
-        machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, template, randomUUID()])).rows[0]
+        machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"templateKind")
+          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting',$8) ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, template, randomUUID(), cloudTemplateOrigin(template)?.kind ?? null])).rows[0]
       }
     }
     if (retainedSandboxId && !refreshRuntime) {
@@ -617,7 +620,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
-    if (!machine.sandboxId && !repositoryTask && isOfficialE2BTemplate(machine.snapshotId) && run.repoPath === botWorkspacePath(run.runtimeBotId)) {
+    if (!machine.sandboxId && !repositoryTask && threadMachineTemplateKind(machine) && run.repoPath === botWorkspacePath(run.runtimeBotId)) {
       // A fresh official instance never inherits the parent Bot's files. Give
       // its registered private workspace a Git base before the daemon starts.
       await initializeBotWorkspace(sandbox, run.runtimeBotId)
@@ -640,7 +643,8 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     refreshPhase = timings.next('verify_worker')
     const upgradeQuestion = exactQuestionMachine && run.status === 'queued' && !run.startedAt && !run.sessionId &&
       !run.stopRequestedAt && (!run.leaseExpiresAt || new Date(run.leaseExpiresAt).getTime() <= Date.now())
-    upgradeRetainedRuntime = Boolean(!refreshRuntime && (retainedSandboxId || upgradeQuestion) && expectedSha && sourceSha !== expectedSha && isOfficialE2BTemplate(machine.snapshotId))
+    const officialKind = threadMachineTemplateKind(machine)
+    upgradeRetainedRuntime = Boolean(!refreshRuntime && (retainedSandboxId || upgradeQuestion) && expectedSha && sourceSha !== expectedSha && officialKind)
     if (refreshRuntime || upgradeRetainedRuntime) {
       if (upgradeRetainedRuntime && upgradeQuestion) {
         // Same VM, native CLI data and child. Only an idle Mikka worker moves
@@ -710,7 +714,8 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
             AND (NOT $6::boolean OR r.id<>$1) AND r.status NOT IN ('succeeded','failed','stopped','cancelled'))`, [runId,actor.userId,actor.workspaceId,sandbox.sandboxId,leaseId,upgradeRetainedRuntime])
       if (!idle.rowCount) throw new ComputerError(409, 'Task runtime is busy')
       refreshPhase = timings.next('stage_release')
-      const release = await stageOfficialWorkerRelease(sandbox,machine.snapshotId,sourceSha,process.env,undefined,refreshBudget)
+      if (!officialKind) throw new ComputerError(409, 'Verified cloud template required')
+      const release = await stageOfficialWorkerRelease(sandbox,officialKind,sourceSha,process.env,undefined,refreshBudget)
       runtimeRollback = async () => {
         // Staging alone did not switch the worker. Once a switch may have
         // started, restore under this lease even if its answer/permission was
@@ -722,7 +727,9 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       verifyRefreshedRuntime = () => switchOfficialWorkerRelease(sandbox,release,{deviceId:machine.deviceId,workspaceId:actor.workspaceId,operationId:leaseId},'verify',undefined,refreshBudget)
     } else if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
     refreshPhase = timings.next('read_refreshed_worker')
-    const refreshedSha = (await sandbox.files.read('/opt/mikka/worker-source-sha',{user:'root',...runtimeRequestOptions(refreshBudget)})).trim()
+    const refreshedSha = refreshRuntime || upgradeRetainedRuntime
+      ? (await sandbox.files.read('/opt/mikka/worker-source-sha',{user:'root',...runtimeRequestOptions(refreshBudget)})).trim()
+      : sourceSha
     refreshPhase = timings.next('verify_refreshed_worker')
     if (!expectedSha || refreshedSha!==expectedSha) throw new Error('Worker version mismatch')
     // Every computer action runs through lease-driver.py, which needs display :1 and its lease.

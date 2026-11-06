@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { overlayAliases, resolveOverlaySpecifier } from '../../../lib/ui-overlay.mjs'
 import { actionReferences, actionSignatures, nativeOfflineView, bundledIconCatalogue, bundledSyntaxCatalogue } from '../../desktop/scripts/renderer-transforms.mjs'
 
 export const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -72,6 +73,8 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
   const offline = fileLoader(nativeOfflineView())
   const catalogues = [fileLoader(bundledIconCatalogue()), fileLoader(bundledSyntaxCatalogue())]
   const webRpc = resolve(frontend, 'src/web/rpc.ts')
+  // UI slots and the hosted layer's `@hosted/` imports, as next.config.mjs resolves them (docs/ui-overlay.md).
+  const uiSlots = overlayAliases(repository)
   let development = false
   let inventory
   return {
@@ -95,7 +98,7 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
         if (target === 'desktop') throw new Error('FRONTEND_DESKTOP_REMOTE_SCRIPT_FORBIDDEN')
         return resolve(frontend, 'src/web/next-script.tsx')
       }
-      const candidate = source.startsWith('@/') ? resolve(repository, source.slice(2)) : source
+      const candidate = resolveOverlaySpecifier(source, uiSlots) ?? (source.startsWith('@/') ? resolve(repository, source.slice(2)) : source)
       // Keep require-call/import semantics when resolving conditional package
       // exports; a CommonJS helper must not become an ESM namespace object.
       const resolved = await this.resolve(candidate, importer, { ...options, skipSelf: true })

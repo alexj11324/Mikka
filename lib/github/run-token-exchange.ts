@@ -26,6 +26,8 @@ export function createRunGitHubTokenExchange(deps: {
   issue(userId: string): Promise<{ token: string; expiresAt: Date | null; githubAccountId?: string }>
   /** Bookkeeping after a successful answer; a failure here never withholds the token. */
   afterIssue?(scope: RunGitHubScope, issued: { token: string; githubAccountId?: string }): Promise<void>
+  /** Direct machine credentials refresh at the provider's natural expiry. */
+  naturalExpiry?: boolean
   /** Where a failure's structured line goes; the server log by default. */
   log?: (line: string) => void
   now?: () => number
@@ -48,7 +50,8 @@ export function createRunGitHubTokenExchange(deps: {
       if (!current || current.runId !== scope.runId || current.userId !== scope.userId) return denied()
       await deps.afterIssue?.(current, issued).catch(() => undefined)
       const cap = now() + MAX_ANSWER_MS
-      const expiresAt = new Date(issued.expiresAt ? Math.min(issued.expiresAt.getTime(), cap) : cap).toISOString()
+      const expiresAt = deps.naturalExpiry ? issued.expiresAt?.toISOString() ?? null
+        : new Date(issued.expiresAt ? Math.min(issued.expiresAt.getTime(), cap) : cap).toISOString()
       // Daemons up to 0.0.315 check that the answer names the run's repository
       // (their claim's github.repository) and refuse it otherwise, so a clone
       // fails with git asking for a username. Keep naming it; it scopes nothing.

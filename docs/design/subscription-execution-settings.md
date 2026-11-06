@@ -23,9 +23,11 @@ same-model quota fallback and personal credential ownership.
 
 One's own credential works across one's workspaces without an additional
 workspace-use switch. A share never changes the credential owner into the
-run owner. Claim and subsequent credential access recheck the share and
-both memberships. A Bot's chat API-key preference never overrides an
-explicitly resolved thread credential.
+run owner. Admission resolves the explicit share and both memberships before
+issuing the machine's assignment. Later revocation pushes a stop or reclaims
+the VM, without adding remote authorization before every provider/tool call
+([1800](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)). A Bot's
+chat API-key preference never overrides an explicitly resolved thread credential.
 
 ## States and recovery
 

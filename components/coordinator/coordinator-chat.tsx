@@ -158,7 +158,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const tCommon = useTranslations('Common')
   const botId = bot?.id ?? null
   const name = bot?.name ?? t('label')
-  const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
+  const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { id: bot.id, color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const { cache, mutate: mutateAll } = useSWRConfig()

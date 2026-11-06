@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import { hostedBrokerDevice, leaseDevice } from './subscription-native-device'
 import { subscriptionNativeLease } from './subscription-native-lease'
 import { subscriptionNativeHTTP } from './subscription-native-http'
-import { SubscriptionRefusal } from '@mikka/protocol/subscription'
+import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, SubscriptionRefusal } from '@mikka/protocol/subscription'
 import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
 import { DeviceAuthorityRevoked, DeviceFenceUnavailable } from './db/device-scope'
 import { ModelAdmissionError } from './model-admission/contract'
@@ -18,6 +18,18 @@ test('only a person\'s own enabled device with the capability takes a lease', ()
   assert.equal(leaseDevice({ enabled: true, kind: 'local', harnesses: [{}] }), false)
   assert.equal(leaseDevice({ enabled: false, kind: 'local', harnesses: broker }), false)
   assert.equal(leaseDevice(null), false)
+})
+
+test('a cloud run receives a lease only on the exact machine bound to its device token', () => {
+  const cloud = { enabled: true, kind: 'cloud', harnesses: broker }
+  assert.equal(leaseDevice(cloud, ids.deviceId, ids.deviceId), true)
+  assert.equal(leaseDevice(cloud, ids.deviceId), false)
+  assert.equal(leaseDevice(cloud), false)
+  assert.equal(leaseDevice(cloud, ids.deviceId, ids.runId), false)
+  assert.equal(leaseDevice({ ...cloud, kind: 'local' }, ids.deviceId, ids.runId), false)
+  assert.equal(leaseDevice({ ...cloud, enabled: false }, ids.deviceId, ids.deviceId), false)
+  assert.equal(leaseDevice({ ...cloud, harnesses: [{}] }, ids.deviceId, ids.deviceId), false)
+  assert.equal(leaseDevice({ ...cloud, harnesses: [{ subscriptionBroker: true, subscriptionPreflight: 'cli_missing' }] }, ids.deviceId, ids.deviceId), false)
 })
 
 test('the hosted broker takes a cloud computer bound to its own token, or an allow-listed device', () => {
@@ -171,6 +183,24 @@ test('the lease is returned uncached to an authorized device', async () => {
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
   assert.deepEqual(await response.json(), lease)
+})
+
+test('lease catalogue evidence is negotiated without changing old strict responses', async () => {
+  const checks: boolean[] = []
+  const original = service()()
+  const handler = subscriptionNativeLease({ authorize: async () => 'o', service: () => ({ ...original,
+    nativeLease: async (_use, _signal, includeCatalogue = false) => {
+      checks.push(includeCatalogue)
+      return { ...lease, ...(includeCatalogue ? { modelCatalogueVerified: true } : {}) } as never
+    },
+  }) })
+  for (const enabled of [false, true]) {
+    const request = new Request('http://local/lease', { method: 'POST', headers: enabled ? { [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1' } : {} })
+    const response = await handler(request, { params: Promise.resolve(ids) })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { ...lease, ...(enabled ? { modelCatalogueVerified: true } : {}) })
+  }
+  assert.deepEqual(checks, [false, true])
 })
 
 test('an unauthorized device, a bad id or a refusal gets no token and no detail', async () => {

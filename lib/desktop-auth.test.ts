@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthCallbackPath, desktopAuthReturnPath, desktopAuthState, desktopLoopbackCallback } from './desktop-auth'
+import { SELECT_ACCOUNT_PARAMS, desktopAuthCallbackPath, desktopAuthReturnPath, desktopAuthState, desktopBrowserStep, desktopLoopbackCallback } from './desktop-auth'
 
 const state = 'a'.repeat(48)
 
@@ -63,4 +63,24 @@ test('challenge, verifier and code shapes are bounded', async () => {
   assert.equal(desktopAuthVerifier('a'.repeat(129)), null)
   assert.equal(desktopAuthCode('a'.repeat(31)), null)
   assert.equal(desktopAuthCode('a'.repeat(43)), 'a'.repeat(43))
+})
+
+test('the browser starts the provider the app asked for, and never hands over a web session unseen', () => {
+  const base = { desktop: true, signedIn: false, addAccount: false, switchAccount: false, refused: false, provider: null } as const
+  assert.deepEqual(desktopBrowserStep({ ...base, provider: 'google' }), { kind: 'oauth', provider: 'google', selectAccount: false })
+  assert.deepEqual(desktopBrowserStep({ ...base, provider: 'github' }), { kind: 'oauth', provider: 'github', selectAccount: false })
+  assert.deepEqual(desktopBrowserStep(base), { kind: 'form' })
+  // A web session is shown first, whatever the app asked for.
+  assert.deepEqual(desktopBrowserStep({ ...base, signedIn: true, provider: 'google' }), { kind: 'choose-account' })
+  assert.deepEqual(desktopBrowserStep({ ...base, signedIn: true }), { kind: 'choose-account' })
+  // 换个账号 asks the provider for its account picker; without a provider, the form.
+  assert.deepEqual(desktopBrowserStep({ ...base, signedIn: true, switchAccount: true, provider: 'google' }), { kind: 'oauth', provider: 'google', selectAccount: true })
+  assert.deepEqual(desktopBrowserStep({ ...base, signedIn: true, switchAccount: true }), { kind: 'form' })
+  assert.deepEqual(desktopBrowserStep({ ...base, signedIn: true, addAccount: true, provider: 'github' }), { kind: 'oauth', provider: 'github', selectAccount: true })
+  // A refused or failed attempt shows the card and its error instead of looping.
+  assert.deepEqual(desktopBrowserStep({ ...base, refused: true, provider: 'google' }), { kind: 'form' })
+  assert.deepEqual(desktopBrowserStep({ ...base, signedIn: true, refused: true }), { kind: 'form' })
+  // Not a desktop handoff: the ordinary page, even with ?continue=google.
+  assert.deepEqual(desktopBrowserStep({ ...base, desktop: false, provider: 'google' }), { kind: 'form' })
+  assert.deepEqual(SELECT_ACCOUNT_PARAMS, { prompt: 'select_account' })
 })
