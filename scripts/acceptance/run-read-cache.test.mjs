@@ -14,12 +14,13 @@ test('diagnostic source names come only from tracked files and declared package 
     cwd: '/repo',
     execFileImpl: async (command, args, options) => {
       assert.equal(command, 'git'); assert.deepEqual(args, ['ls-files', '-z']); assert.equal(options.cwd, '/repo')
-      return { stdout: 'package.json\0packages/protocol/package.json\0lib/db.ts\0app/[locale]/layout.tsx\0.env\0../private.ts\0/private.ts\0' }
+      return { stdout: 'package.json\0packages/protocol/package.json\0apps/api/package.json\0lib/db.ts\0app/[locale]/layout.tsx\0.env\0../private.ts\0/private.ts\0' }
     },
-    readFileImpl: async path => JSON.stringify(path.endsWith('protocol/package.json') ? { name: '@mikka/protocol' } : { name: 'mikka', dependencies: { next: 'private-version', react: 'private-version' }, scripts: { private: 'private-command' } }),
+    readFileImpl: async path => JSON.stringify(path.endsWith('api/package.json') ? { name: '@mikka/api', dependencies: { nitro: 'private-version' } }
+      : path.endsWith('protocol/package.json') ? { name: '@mikka/protocol' } : { name: 'mikka', dependencies: { next: 'private-version', react: 'private-version' }, scripts: { private: 'private-command' } }),
   })
   assert.deepEqual(sources.files, ['lib/db.ts', 'app/[locale]/layout.tsx'])
-  assert.deepEqual(sources.modules, ['mikka', 'next', 'react', '@mikka/protocol'])
+  assert.deepEqual(sources.modules, ['mikka', 'next', 'react', '@mikka/protocol', '@mikka/api', 'nitro'])
   assert.doesNotMatch(JSON.stringify(sources), /private|\.env/u)
   assert.deepEqual(await loadOwnedDiagnosticSources({ cwd: '/repo', execFileImpl: async () => { throw new Error('private git failure') } }), { root: '/repo', files: [], modules: [] })
 })

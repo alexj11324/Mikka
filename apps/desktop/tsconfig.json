@@ -6,5 +6,5 @@
     "module": "ESNext",
     "moduleResolution": "bundler"
   },
-  "include": ["src", "scripts"]
+  "include": ["src/main", "src/preload", "scripts"]
 }

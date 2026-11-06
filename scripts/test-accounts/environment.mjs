@@ -7,6 +7,7 @@ import { MVP_DECISION_KEY, hasBoundMvpTransport, verifyMvpTransport } from '../.
 import { hasBoundDevLocalTransport, verifyDevLocalTransport } from '../dev-local/transport.mjs'
 import { LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from '../dev-local/services.mjs'
 import { databaseTarget, EnvironmentError } from './database-target.mjs'
+import { dockerDatabaseTarget, validateDockerBinding } from './docker-target.mjs'
 
 export { databaseTarget, EnvironmentError }
 
@@ -25,19 +26,30 @@ export function bindingValue(value) {
     database: { host: value.database.host, port: value.database.port, name: value.database.name, schema: value.database.schema, user: value.database.user },
     instanceId: value.instanceId,
     capabilities: { provision: value.capabilities.provision, mail: value.capabilities.mail, reset: value.capabilities.reset },
+    ...(value.kind === 'isolated-docker' ? { docker: validateDockerBinding(value.docker, value.origin) } : {}),
   }
 }
 export function environmentFingerprint(value) { return createHash('sha256').update(JSON.stringify(bindingValue(value))).digest('hex') }
 
+export function dockerDescriptorSignature(descriptor, key) {
+  if (descriptor.kind !== 'isolated-docker' || !/^[a-f0-9]{64}$/.test(key ?? '')) fail('DOCKER_DESCRIPTOR_SIGNING_INVALID')
+  return createHmac('sha256', key).update(`mikka-isolated-docker-descriptor-v1\n${environmentFingerprint(descriptor)}`).digest('hex')
+}
+
 export function validateEnvironment(value, env = process.env) {
   if (!value || value.version !== 1 || !LABEL.test(value.id ?? '') || !SHA.test(value.deploymentSha ?? '') || !INSTANCE.test(value.instanceId ?? '')) fail('ENVIRONMENT_DESCRIPTOR_INVALID')
-  if (!['isolated-ci', 'isolated-preview'].includes(value.kind)) fail('ENVIRONMENT_KIND_FORBIDDEN')
+  if (!['isolated-ci', 'isolated-preview', 'isolated-docker'].includes(value.kind)) fail('ENVIRONMENT_KIND_FORBIDDEN')
   // Preview onboarding requires a separately authorized adapter. An arbitrary flag
   // or a descriptor called "preview" cannot authorize its database or credentials.
-  if (value.kind !== 'isolated-ci') fail('PREVIEW_APPROVAL_REQUIRED')
+  if (value.kind === 'isolated-preview') fail('PREVIEW_APPROVAL_REQUIRED')
   let origin
   try { origin = new URL(value.origin) } catch { fail('ENVIRONMENT_ORIGIN_INVALID') }
-  if (origin.origin !== value.origin || origin.username || origin.password || origin.search || origin.hash || !LOOPBACK.has(origin.hostname) || !['http:', 'https:'].includes(origin.protocol) || value.basePath !== '/mikka') fail('ENVIRONMENT_ORIGIN_FORBIDDEN')
+  if (origin.origin !== value.origin || origin.username || origin.password || origin.search || origin.hash || !['http:', 'https:'].includes(origin.protocol) || value.basePath !== '/mikka') fail('ENVIRONMENT_ORIGIN_FORBIDDEN')
+  if (value.kind === 'isolated-docker') {
+    validateDockerBinding(value.docker, value.origin)
+    if (!/^[a-f0-9]{64}$/.test(value.descriptorSignature ?? '')) fail('DOCKER_DESCRIPTOR_SIGNATURE_REQUIRED')
+    if (['DOCKER_PAT', 'DOCKER_ACCESS_TOKEN', 'DOCKER_TOKEN'].some(name => Boolean(env[name]))) fail('DOCKER_OWNER_CREDENTIAL_IN_RUNTIME')
+  } else if (!LOOPBACK.has(origin.hostname)) fail('ENVIRONMENT_ORIGIN_FORBIDDEN')
   if (env.VERCEL_ENV || env.VERCEL === '1') fail('DEPLOYED_ENVIRONMENT_REQUIRES_APPROVAL')
   if (!value.database || !LOOPBACK.has(value.database.host) || !Number.isInteger(value.database.port) || value.database.port < 1 || value.database.port > 65535 || !IDENTIFIER.test(value.database.name ?? '') || !value.database.name.endsWith('_e2e') || value.database.schema !== 'public' || !IDENTIFIER.test(value.database.user ?? '')) fail('ENVIRONMENT_DATABASE_FORBIDDEN')
   if (typeof value.capabilities?.provision !== 'boolean' || value.capabilities.mail !== 'disabled' || typeof value.capabilities.reset !== 'boolean') fail('ENVIRONMENT_CAPABILITIES_INVALID')
@@ -48,10 +60,11 @@ export function validateEnvironment(value, env = process.env) {
   if (!env.E2E_DATABASE_URL || !env.MIKKA_DATABASE_URL || !env.DATABASE_URL) fail('DATABASE_TARGET_CONFIGURATION_REQUIRED')
   if (env.MIKKA_DATABASE_URL !== env.E2E_DATABASE_URL || env.DATABASE_URL !== env.E2E_DATABASE_URL || (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL)) fail('DATABASE_FALLBACK_MISMATCH')
   const target = databaseTarget(env.E2E_DATABASE_URL)
+  if (value.kind === 'isolated-docker') dockerDatabaseTarget(env.E2E_DATABASE_URL)
   if (JSON.stringify(target) !== JSON.stringify(bindingValue(value).database)) fail('DATABASE_TARGET_MISMATCH')
   if (env.BETTER_AUTH_URL !== value.origin || (env.E2E_BASE_URL && env.E2E_BASE_URL !== value.origin)) fail('AUTH_ORIGIN_MISMATCH')
   if (env.MIKKA_TEST_DEPLOYMENT_SHA !== value.deploymentSha) fail('DEPLOYMENT_SHA_MISMATCH')
-  return Object.freeze(bindingValue(value))
+  return Object.freeze({ ...bindingValue(value), ...(value.kind === 'isolated-docker' ? { descriptorSignature: value.descriptorSignature } : {}) })
 }
 
 export async function loadEnvironment(env = process.env) {
@@ -86,9 +99,13 @@ export async function assertDatabaseIdentity(client, descriptor) {
     const actual = await client.query('SELECT current_database() AS name, current_schema() AS schema, session_user AS "user"')
     const row = actual.rows[0]
     if (row?.name !== descriptor.database.name || row?.schema !== descriptor.database.schema || row?.user !== descriptor.database.user) fail('ACTUAL_DATABASE_MISMATCH')
-    const marker = await client.query('SELECT environment_id, instance_id, binding_sha256 FROM mikka_test_accounts.environment WHERE singleton = true')
+    const marker = await client.query(`SELECT environment_id, instance_id, binding_sha256${descriptor.kind === 'isolated-docker' ? ', attestation_key' : ''} FROM mikka_test_accounts.environment WHERE singleton = true`)
     const record = marker.rows[0]
     if (marker.rowCount !== 1 || record.environment_id !== descriptor.id || record.instance_id !== descriptor.instanceId || record.binding_sha256 !== environmentFingerprint(descriptor)) fail('DATABASE_IDENTITY_MISMATCH')
+    if (descriptor.kind === 'isolated-docker') {
+      const expected = dockerDescriptorSignature(descriptor, record.attestation_key)
+      if (!/^[a-f0-9]{64}$/.test(descriptor.descriptorSignature ?? '') || !timingSafeEqual(Buffer.from(descriptor.descriptorSignature, 'hex'), Buffer.from(expected, 'hex'))) fail('DOCKER_DESCRIPTOR_SIGNATURE_MISMATCH')
+    }
   } catch (error) {
     if (error instanceof EnvironmentError) throw error
     fail('DATABASE_IDENTITY_UNAVAILABLE')

@@ -64,7 +64,6 @@ export async function findAgentImage(query: string, signal?: AbortSignal) {
   }).toString()
   const response = await fetch(url, {
     headers: { 'User-Agent': 'Mikka-UI-Agent/1.0 (Wikimedia Commons image lookup)' },
-    next: { revalidate: 86400 },
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
   })
   if (!response.ok) throw new Error(agentCopy.imageSourcesAreTemporarilyUnavailablePleaseTry)

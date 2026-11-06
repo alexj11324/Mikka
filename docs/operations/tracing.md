@@ -1,7 +1,7 @@
 # Server tracing (PostHog)
 
 The web backend sends OpenTelemetry traces to PostHog distributed tracing
-(beta), so each request or Server Action shows the database statements it ran.
+(beta), so sampled API requests and actions show the database statements they ran.
 Group by route and caller to find who drives database transfer, instead of
 diffing `pg_stat_statements`. This adds to the
 [database transfer monitoring](database-egress.md); the ops snapshot and the
@@ -9,14 +9,16 @@ diffing `pg_stat_statements`. This adds to the
 
 ## What is traced
 
-Mikka's own Next.js server, Node runtime (`instrumentation.ts` →
-`lib/tracing/node.ts`), and the daemon's own operations (service
+Mikka's independent Node API (`apps/api`) and the daemon's own operations (service
 `mikka-daemon`, see [Daemon](#daemon)). Nothing from the desktop app or users'
 own Claude Code or Codex sessions. The mobile app sends trace context, not
 spans (see [Mobile app](#mobile-app)).
 
-- Next.js request spans: the root `GET /route/[param]` span, route handler,
-  render and outbound `fetch` spans.
+- API server spans: `apps/api/runtime/request-trace.ts` starts
+  `<METHOD> <route template>` from the generated route inventory and extracts
+  only the standard `traceparent`/`tracestate` carrier. H3 ends the span when the
+  actual response is disposed, including streamed responses, before deferred
+  jobs run. The Vite frontend does not produce Next server-render spans.
 - One `pg.query:<COMMAND> <db>` span per statement, from
   `@opentelemetry/instrumentation-pg` on the `pg` pool behind `lib/db`
   (drizzle `node-postgres`). Statements outside any span are not traced, and
@@ -29,7 +31,7 @@ Every span has `service.name=mikka-web` and `deployment.environment`
 
 | Attribute | Meaning |
 | --- | --- |
-| `mikka.route` | Grouping key: the `withRequestLog('/api/…')` route, the `withDatabaseOperation('/actions/…')` action, a background job (`after:<job>`, `cron:<name>`, `workflow:<workflow>/<step>`), or Next's route template |
+| `mikka.route` | Grouping key: the `withRequestLog('/api/…')` route, the `withDatabaseOperation('/actions/…')` action, a background job (`after:<job>`, `cron:<name>`, `workflow:<workflow>/<step>`), or the generated API route template |
 | `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`, or any other `/api/*` request the iOS app sends; see [Mobile app](#mobile-app)), `cron` (`/api/cron/*`, `cron:` jobs), `workflow` (Workflow steps, `/.well-known/workflow/*`), `background` (`after:` jobs), `worker` (`/api/webhooks/*`) or `web` |
 | `mikka.app.version` | The iOS app's version (`1.2.3`), on `mobile` spans only |
 | `error.type`, `mikka.error.code`, `mikka.error.detail` | On a failed request or job: the error's class name, and the code and detail of the first coded error in its cause chain (`@mikka/protocol/tracing`). Never the message |
@@ -59,6 +61,23 @@ Database spans also have:
 | `db.query.text` | Parameterized SQL, literals replaced by `?`, cut to 200 characters |
 | `db.response.returned_rows` | Rows returned or affected |
 | `mikka.db.response_bytes_approx` | Result JSON size, estimated from the first 50 rows (not wire bytes) |
+
+## Runtime initialization
+
+`apps/api/scripts/finalize-build.mjs` compiles
+`apps/api/runtime/tracing-start.ts`, which calls `lib/tracing/node.ts`, with pg
+and OpenTelemetry packages left external. Every Vercel function, including the
+Workflow handlers, starts through `mikka-entry.mjs`: it imports tracing first,
+then dynamically imports Nitro's generated application. The function's queue,
+duration and streaming metadata stay intact. The independent Node server and
+Docker adapter use the same ordering through their generated entry wrappers.
+
+The development launcher (`apps/api/scripts/dev.mjs`) wraps each Nitro worker
+entry in the same order, including workers replaced during hot reload. This
+must happen before application modules load pg; a Nitro plugin alone is too
+late for database instrumentation. `.vercel/output/mikka-build.json` or
+`.output/mikka-build.json` records the compiled tracing hash. An artifact hash
+proves the entry was packaged, not that production spans reached PostHog.
 
 ## Mobile app
 
@@ -137,12 +156,14 @@ groups like a route.
 | Workflow steps (every `'use step'` body) | `workflow:<workflow>/<step>` | `workflow` | Inside the step delivery request, under the SDK's own `step.execute` spans |
 
 - Schedule deferred work with `afterJob('after:<job>', task)` from
-  `lib/background.ts`, never next/server's `after` directly (oxlint
-  `no-restricted-imports`). Next runs an `after()` callback in a snapshot of
-  the scheduling request's async context, so a bare `after()` keeps the
-  request's route and parents its queries to a request span that has already
-  ended. `afterJob` enters the job inside that callback, after the snapshot
-  is restored, so the job's label is the one in force. Do not bind the task
+  `lib/background.ts`, never the `next/server` compatibility adapter's `after`
+  directly (oxlint `no-restricted-imports`). The adapter binds callbacks to the
+  scheduling request's async context. Its `AfterQueue` starts them at H3's
+  actual response-disposal boundary, with their complete lifetime retained by
+  `waitUntil`. A bare `after()` would keep the request's route and parent its
+  queries to a request span that has already ended. `afterJob` enters the job
+  inside that callback, after the context is restored, so the job's label is
+  the one in force. Do not bind the task
   with `AsyncLocalStorage.bind`/`snapshot`: entering it would restore the
   request's context over the label. Work that must keep its scheduling
   context when called back from elsewhere (live notifications) passes
@@ -158,9 +179,9 @@ groups like a route.
 
 `requireParentSpan` stays on, so a statement outside every span is still not
 traced. Turning it off would make each such statement its own single-span
-trace, labelled from a stack trace: in the bundled server those frames are
-`.next/server/chunks/*.js` files, not modules, and capturing a stack on every
-unparented query costs CPU on hot paths. Labelling the entry points instead
+trace, labelled from a stack trace: in the bundled server those frames refer
+to generated Nitro chunks, not stable source module names, and capturing a
+stack on every unparented query costs CPU on hot paths. Labelling the entry points instead
 gives every background statement a parent, a real name and a trace.
 
 ## Querying
@@ -262,8 +283,11 @@ repository or it is overwritten on the next `--apply`.
 
 - Head sampling per trace, `MIKKA_TRACE_SAMPLE_RATE` (0–1), default `0.1`. A
   caller's `traceparent` cannot force a trace to be kept.
-- `0` turns tracing off: no provider is registered. Tests (`NODE_ENV=test`), CI
-  and `next build` always get 0. Set `1` locally to see every request.
+- `0` or a missing PostHog project token turns tracing off: no provider is
+  registered. `NODE_ENV=test` and CI without `VERCEL` force the rate to 0;
+  the historical `NEXT_PHASE=phase-production-build` guard does too. Nitro
+  compilation emits the tracing entry; initialization happens when that runtime
+  entry loads. Set `1` locally to see every request.
 - Batch span processor (5 s, 512 spans per export, queue of 2048, then
   dropped). On Vercel a flush is handed to `waitUntil` when a request's root
   span ends, after the response.

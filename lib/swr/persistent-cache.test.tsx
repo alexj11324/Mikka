@@ -31,6 +31,7 @@ const stored = (data: unknown): StoredRead => ({ key: 'preferences', rawKey: 'pr
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let swr: typeof import('swr')
+let useSWRInfinite: typeof import('swr/infinite')['default']
 let HydrateReadCache: typeof import('../../components/authenticated-read-cache')['HydrateReadCache']
 let AuthenticatedReadCache: typeof import('../../components/authenticated-read-cache')['AuthenticatedReadCache']
 let swrDefaults: typeof import('../../components/swr-defaults')['swrDefaults']
@@ -47,6 +48,7 @@ before(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   swr = await import('swr')
+  ;({ default: useSWRInfinite } = await import('swr/infinite'))
   ;({ HydrateReadCache, AuthenticatedReadCache } = await import('../../components/authenticated-read-cache'))
   ;({ swrDefaults } = await import('../../components/swr-defaults'))
 })
@@ -57,6 +59,27 @@ test('disk namespaces distinguish owner, viewed workspace, build and authorized 
   for (const change of [{ userId: 'other' }, { workspaceId: 'other' }, { build: 'build-two' }, { role: 'member' }]) {
     assert.notEqual(readCacheNamespace({ ...scope, ...change }), baseline)
   }
+})
+
+test('installed UI may supply its build identity while retaining server workspace authority', async () => {
+  const observed: (string | null)[] = []
+  function Read() {
+    const { cache } = swr.useSWRConfig()
+    observed.push(cache instanceof PersistentReadCache ? cache.namespace : null)
+    return <output>shared cache</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  const workspace = { workspaceId: scope.workspaceId, role: 'admin' as const }
+  const nativeBuild = 'desktop:installed-content-hash:https://mikka.example'
+  try {
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace}><Read /></AuthenticatedReadCache>))
+    assert.equal(observed.at(-1), readCacheNamespace(scope), 'web keeps its deployment build by default')
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace} build={nativeBuild}><Read /></AuthenticatedReadCache>))
+    assert.equal(observed.at(-1), readCacheNamespace({ ...scope, build: nativeBuild }))
+    requestedWorkspace = 'unproven-workspace'
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace} build={nativeBuild}><Read /></AuthenticatedReadCache>))
+    assert.equal(observed.at(-1), null, 'changing the URL cannot borrow the old workspace authority')
+  } finally { requestedWorkspace = null; await act(async () => root.unmount()) }
 })
 
 test('fresh server seed and an optimistic write both win over a late disk hydration', async () => {
@@ -206,6 +229,30 @@ test('real SWR starts a cold read after an empty or failed disk hydrate', async 
       assert.equal(reads, 1)
     } finally { await act(async () => root.unmount()); await cache.flushed() }
   }
+})
+
+test('a cold paginated settings read resumes after hydration with its real aggregate key', async () => {
+  const storage = new MemoryStorage(), disk = deferred<StoredRead[]>()
+  storage.activation = disk.promise
+  const cache = new PersistentReadCache(scope, storage)
+  let reads = 0
+  function Audit() {
+    const pages = useSWRInfinite((index, previous: { events: string[]; nextCursor: string | null } | null) => {
+      if (previous && !previous.nextCursor) return null
+      return ['settings:audit', scope.workspaceId, 'all', index === 0 ? null : previous?.nextCursor]
+    }, async () => { reads++; return { events: ['authorized audit row'], nextCursor: null } }, { revalidateFirstPage: false })
+    return <output>{pages.data?.[0]?.events[0] ?? (pages.isLoading ? 'loading' : 'empty')}</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  try {
+    await act(async () => root.render(<swr.SWRConfig value={{ ...swrDefaults, provider: () => cache }}><HydrateReadCache /><Audit /></swr.SWRConfig>))
+    assert.equal(reads, 0, 'the private paginated read waits for authenticated cache hydration')
+    await act(async () => { disk.resolve([]); await cache.hydrated })
+    assert.equal(reads, 1, 'hydration must resume the infinite hook, not mutate an unmounted ordinary page key')
+    assert.equal(container.textContent, 'authorized audit row')
+    await cache.flushed()
+    assert.equal(storage.rows.size, 0, 'private audit responses remain excluded from persistence')
+  } finally { await act(async () => root.unmount()); await cache.flushed() }
 })
 
 test('the authenticated boundary seeds real SWR before an inner fallback can be replaced by disk', async () => {

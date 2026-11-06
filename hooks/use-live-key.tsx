@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
-import { withBasePath } from '@/lib/base-path'
-import { type LiveRuntime, type LiveTicket, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
+import { browserRuntime } from '@/lib/live/browser-runtime'
+import { type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
 import { TabShare, tabShareChannelName } from '@/lib/live/tab-share'
 import type { LiveKind } from '@/lib/live/events'
@@ -33,38 +33,7 @@ function tabShares(namespace: string) {
   }
 }
 
-/** Shared visibility subscription for live transport and local display clocks.
- * Subscribers decide their own catch-up; this helper never reads application data. */
-export function watchPageVisibility(changed: () => void) {
-  document.addEventListener('visibilitychange', changed)
-  return () => document.removeEventListener('visibilitychange', changed)
-}
-
-function browserRuntime(workspaceId: string | null): LiveRuntime {
-  return {
-    async ticket(signal) {
-      // An unresolved/inaccessible entity has slow fallback reads, never a guessed channel.
-      if (!workspaceId) return null
-      const response = await fetch(withBasePath(`/api/live/ticket?workspace=${encodeURIComponent(workspaceId)}`), {
-        cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
-      })
-      if (!response.ok) return null
-      const value = await response.json() as Partial<LiveTicket>
-      return typeof value.url === 'string' && /^wss?:\/\//.test(value.url) && typeof value.protocol === 'string' && typeof value.expiresAt === 'number' ? value as LiveTicket : null
-    },
-    socket: ticket => new WebSocket(ticket.url, ticket.protocol),
-    visible: () => document.visibilityState === 'visible',
-    watchVisibility(changed) {
-      const unwatch = watchPageVisibility(changed)
-      window.addEventListener('online', changed)
-      return () => { unwatch(); window.removeEventListener('online', changed) }
-    },
-    now: Date.now,
-    monotonicNow: () => performance.now(),
-    later: (callback, milliseconds) => setTimeout(callback, milliseconds),
-    cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
-  }
-}
+export { watchPageVisibility } from '@/lib/live/browser-runtime'
 
 export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: string; workspaceId?: string; children: ReactNode }) {
   const { cache } = useSWRConfig()

@@ -27,7 +27,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: process.env.E2E_BASE_URL ? undefined : {
-    command: 'pnpm exec next start --port 3100',
+    command: 'node scripts/start-app.mjs --port 3100',
     url: 'http://localhost:3100/mikka/sign-in',
     reuseExistingServer: false,
     // Opt-in harness for the credential login card (mocked API, no vault), and

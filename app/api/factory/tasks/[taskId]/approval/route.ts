@@ -19,7 +19,8 @@ async function respond(
   const { taskId } = await context.params;
   const result = await handleFactoryApproval(factoryApprovals, {
     actor,
-    authorization,
+    // A real native session was checked above; delegated tokens never yield actor.
+    authorization: actor ? null : authorization,
     method: request.method,
     taskId,
     origin: request.headers.get("origin"),

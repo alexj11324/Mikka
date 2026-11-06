@@ -293,7 +293,7 @@ test('runtime env, build and upload are ordered under the same job with fixed id
   const publisher = readFileSync(new URL('../e2b/publish-template-env.mjs', import.meta.url), 'utf8')
   const firstGuard = web.indexOf('node scripts/release/web-deploy.mjs main')
   const envWrite = web.indexOf('run: node scripts/e2b/publish-template-env.mjs')
-  const build = web.indexOf('run: npx --yes "$VERCEL_CLI" build --prod')
+  const build = web.indexOf('run: node scripts/release/build-vercel.mjs')
   const finalGuard = web.lastIndexOf('node scripts/release/web-deploy.mjs main')
   const upload = web.indexOf('deploy --prebuilt --prod')
   assert.ok(firstGuard > 0 && firstGuard < web.indexOf('uses: Infisical/'))

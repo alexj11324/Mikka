@@ -8,6 +8,18 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  desktop_client_update_required: [],
+  desktop_session_expired: [],
+  desktop_session_changed: [],
+  desktop_account_limit_reached: [],
+  desktop_request_failed: [],
+  desktop_backend_unreachable: [],
+  desktop_rpc_request_invalid: [],
+  desktop_rpc_action_unknown: [],
+  desktop_rpc_failed: [],
+  desktop_rpc_request_rejected: [],
+  desktop_rpc_response_invalid: [],
+  desktop_rpc_value_invalid: [],
   factory_spec_approval_required: [],
   map_invalid_request: ["invalid_query", "invalid_token"],
   map_not_found: [],

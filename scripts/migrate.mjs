@@ -1,5 +1,5 @@
 // Applies pending drizzle/*.sql files in order and records each one, so a
-// file runs once per database. `pnpm build` runs it last, after `next build`
+// file runs once per database. `pnpm build` runs it last, after the application build
 // succeeds, so a Vercel production deploy applies pending migrations itself
 // (Alex, 2026-10-30). It runs in Vercel production, with MIGRATE=1, or off
 // Vercel when every configured target is a loopback database; MIGRATE=0 skips

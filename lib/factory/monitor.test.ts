@@ -1,3 +1,4 @@
+import { isDeviceOnline } from '@mikka/protocol/device';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
@@ -246,7 +247,16 @@ test(
     }).trim();
     const ensureOwner = async (owner: string) => {
       const cached = ownerFixtures.get(owner);
-      if (cached) return cached;
+      if (cached) {
+        // This helper prepares an explicitly online Harness identity for the
+        // next scenario. Earlier scenarios can outlive the real heartbeat TTL.
+        const heartbeat = await pool.query(
+          'UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1 AND "ownerId"=$2',
+          [cached.deviceId, owner],
+        );
+        assert.equal(heartbeat.rowCount, 1, "the owned fixture device still exists");
+        return cached;
+      }
       const f = {
         deviceId: randomUUID(),
         repoId: randomUUID(),
@@ -713,6 +723,31 @@ test(
       scopes.set(issueId, "workspace:a");
       assert.deepEqual((await pool.query('SELECT "externalTargetVerified","linearIssueId" FROM linear_issue_links WHERE "issueId"=$1', [issueId])).rows[0], { externalTargetVerified: true, linearIssueId: issueId });
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM linear_sync_outbox WHERE "issueId"=$1', [issueId])).rows[0].n, 0, "an incoming import must not enqueue itself");
+      await t.test(
+        "preparing the online fixture renews an expired heartbeat without changing its authority",
+        async () => {
+          const fixture = await ensureOwner("owner");
+          const stale = await pool.query(
+            `UPDATE devices SET "lastSeenAt"=clock_timestamp()-interval '61 seconds'
+             WHERE id=$1 AND "ownerId"=$2
+             RETURNING id,"ownerId",enabled,harnesses,"lastSeenAt"`,
+            [fixture.deviceId, "owner"],
+          );
+          assert.equal(stale.rowCount, 1);
+          assert.equal(isDeviceOnline(stale.rows[0].lastSeenAt), false);
+          assert.equal(await ensureOwner("owner"), fixture);
+          const renewed = await pool.query(
+            'SELECT id,"ownerId",enabled,harnesses,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2',
+            [fixture.deviceId, "owner"],
+          );
+          assert.equal(renewed.rowCount, 1);
+          const { lastSeenAt: previousHeartbeat, ...previousIdentity } = stale.rows[0];
+          const { lastSeenAt: currentHeartbeat, ...currentIdentity } = renewed.rows[0];
+          assert.deepEqual(currentIdentity, previousIdentity);
+          assert.ok(currentHeartbeat.getTime() > previousHeartbeat.getTime());
+          assert.equal(isDeviceOnline(currentHeartbeat), true);
+        },
+      );
       const first = await toMonitor("owner", issueId);
       await t.test(
         "ten concurrent replays retain one observation and one original logical issue",

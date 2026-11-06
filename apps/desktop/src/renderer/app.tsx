@@ -1,0 +1,211 @@
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { NextIntlClientProvider, useTranslations } from 'next-intl'
+import { SWRConfig } from 'swr'
+import { ArrowLeft } from 'lucide-react'
+import { toast } from 'sonner'
+import en from '@/messages/en.json'
+import zh from '@/messages/zh-CN.json'
+import { ThemeProvider } from '@/components/theme-provider'
+import { SWRDefaults } from '@/components/swr-defaults'
+import { Toaster } from '@/components/ui/sonner'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Auth } from '@/components/blocks/auth-19/components/auth'
+import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
+import { WorkspaceLoading } from '@/components/workspace/workspace-loading'
+import { CreateWorkspaceForm } from '@/components/workspace/create-workspace-form'
+import { InvitationCard } from '@/components/workspace/invitation-card'
+import { DeviceAuthorization } from '@/components/device-authorization'
+import NotFound from '@/app/[locale]/not-found'
+import { safeAuthReturn } from '@/lib/auth-return'
+import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
+import { readBootstrap, type DesktopBootstrap } from './bootstrap'
+import { Link } from './i18n-navigation'
+import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
+import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
+import { Offline } from './offline'
+import { setClientConfiguration } from './client-configuration'
+import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, PlatformExtras, requireUpdate } from 'mikka:platform'
+import { loadWorkspace, preloadWorkspace } from './workspace-loader'
+import { InstalledWorkspace } from './installed-workspace'
+
+const Workspace = lazy(loadWorkspace)
+const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
+const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
+
+/** Runtime-specific composition only. The application surfaces below are the
+ * exact same components, data hooks and lazy chunks as the web application. */
+export function App() {
+  const location = useLocation()
+  const locale = localeOf(location.pathname)
+  useEffect(() => { document.documentElement.lang = locale }, [locale])
+  return <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
+    <ThemeProvider><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></ThemeProvider>
+  </NextIntlClientProvider>
+}
+
+function SessionApplication() {
+  const [bootstrap, setBootstrap] = useState<DesktopBootstrap | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [pending, setPending] = useState(true)
+  const requestedWorkspace = useLocation().searchParams.get('workspace')
+  const workspace = useRef(requestedWorkspace)
+  workspace.current = requestedWorkspace
+  const lastRequestedWorkspace = useRef(requestedWorkspace)
+  const generation = useRef(0)
+  const inFlight = useRef<{ workspace: string | null; promise: Promise<void> } | null>(null)
+  const state = useSyncExternalStore(subscribeTransport, getTransportState, getTransportState)
+  const reload = useCallback((changedOwner = false) => {
+    const requested = workspace.current
+    if (inFlight.current?.workspace === requested && !changedOwner) return inFlight.current.promise
+    const changedScope = changedOwner || requested !== lastRequestedWorkspace.current
+    lastRequestedWorkspace.current = requested
+    if (changedScope) setBootstrap(null)
+    if (changedOwner) { setClientConfiguration(null); setSession(null) }
+    const current = ++generation.current
+    setPending(true)
+    // Record this request before clearing the old provider: its shared
+    // invalidation calls router.refresh(), which should join this same read.
+    const promise = Promise.resolve().then(async () => {
+      if (changedScope) await clearPersistentReadCaches()
+      if (current !== generation.current) return
+      const value = await readBootstrap(requested)
+      if (current !== generation.current) return
+      if (!value.user) await clearPersistentReadCaches()
+      if (current !== generation.current) return
+      setClientConfiguration(value)
+      setSession(value.user && value.session ? { user: value.user, session: value.session } : null)
+      setBootstrap(value)
+      setFailed(false)
+      setTransportState('ready')
+    }).catch(() => {
+      if (current === generation.current) setFailed(true)
+    }).finally(() => {
+      if (current === generation.current) { setPending(false); inFlight.current = null }
+    })
+    inFlight.current = { workspace: requested, promise }
+    return promise
+  }, [])
+  useEffect(() => {
+    void reload()
+    // Load only installed code in parallel with bootstrap. The shared provider
+    // and all business effects remain behind the authenticated Routes boundary.
+    void preloadWorkspace().catch(() => {})
+    const changed = () => { void reload() }
+    const sessionChanged = () => { void reload(true) }
+    const offline = () => setTransportState('offline')
+    const stop = onSessionChanged(sessionChanged)
+    window.addEventListener(REFRESH_EVENT, changed)
+    window.addEventListener('online', changed)
+    window.addEventListener('offline', offline)
+    return () => {
+      generation.current++
+      stop()
+      window.removeEventListener(REFRESH_EVENT, changed)
+      window.removeEventListener('online', changed)
+      window.removeEventListener('offline', offline)
+    }
+  }, [reload])
+  useEffect(() => {
+    // Only workspace navigation needs a fresh server authorization. Bot, task,
+    // panel and settings navigation keep the same hydrated shared provider.
+    if (requestedWorkspace !== lastRequestedWorkspace.current) void reload()
+  }, [requestedWorkspace, reload])
+  useEffect(() => {
+    // A confirmed expiry discards every owner-scoped cache together. Network
+    // failures retain the visible conversation and its unsent local draft.
+    if (state === 'unauthenticated' && bootstrap?.user) {
+      generation.current++
+      inFlight.current = null
+      setClientConfiguration(null)
+      setSession(null)
+      setBootstrap(current => current ? { ...current, user: null, session: null, cacheWorkspace: null, onboarding: undefined } : null)
+      void clearPersistentReadCaches()
+    }
+  }, [state, bootstrap?.user])
+  if (state === 'update-required') return <UpdateRequired />
+  if (!bootstrap) return failed ? <Offline pending={pending} retry={() => void reload()} /> : <WorkspaceLoading />
+  return <><ConnectionStatus offline={state === 'offline' || failed} retry={() => void reload()} /><AccountCache key={bootstrap.user?.id ?? 'signed-out'}><Routes bootstrap={bootstrap} /></AccountCache></>
+}
+
+function AccountCache({ children }: { children: ReactNode }) {
+  const [config] = useState(() => ({ provider: () => new Map() }))
+  return <SWRConfig value={config}>{children}</SWRConfig>
+}
+
+function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
+  const location = useLocation()
+  const path = withoutLocale(location.pathname)
+  const query = location.searchParams
+  const locale = localeOf(location.pathname)
+  const user = bootstrap.user
+  const authentication = path === '/sign-in' || path === '/sign-up'
+  const invitation = /^\/invite\/([^/]+)$/.exec(path)
+  const sharedArtifact = /^\/a\/([^/]+)$/.exec(path)
+  const workspaceLink = /^\/w\/([a-z0-9]([a-z0-9-]{1,62}[a-z0-9]))$/.exec(path)
+  const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent'
+  useEffect(() => {
+    if (path === '/dashboard') navigate(`/${location.search}`, true, { locale }, true)
+    else if (path === '/devices') navigate('/settings?section=devices', true, { locale }, true)
+    else if (user && authentication) {
+      const destination = authenticatedReturn(location)
+      if (destination !== null) navigate(destination, true)
+    }
+    else if (!user && !authentication && !invitation && !browserRoute && !sharedArtifact) {
+      const next = safeAuthReturn(`${path}${location.search}`)
+      navigate(`/sign-in${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`, true, { locale }, true)
+    }
+  }, [location.href, user?.id])
+  if (browserRoute || (platform === 'desktop' && path === '/sign-up')) return <BrowserRoute signUp={path === '/sign-up'} account={user?.email ?? null} />
+  if (sharedArtifact) return <Suspense fallback={<WorkspaceLoading />}><SharedArtifactRoute key={sharedArtifact[1]} token={sharedArtifact[1]} /></Suspense>
+  if (invitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><InvitationCard token={/^[a-f0-9]{64}$/.test(invitation[1]) ? invitation[1] : ''} email={user?.email ?? null} /></main>
+  if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.googleEnabled} githubEnabled={bootstrap.githubEnabled} emailEnabled={bootstrap.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} />
+  if (workspaceLink) return <Suspense fallback={<WorkspaceLoading />}><WorkspaceLinkRoute key={workspaceLink[1]} slug={workspaceLink[1]} /></Suspense>
+  if (path === '/device') return <DeviceAuthorization account={user.email} initialCode={query.get('user_code') ?? ''} />
+  if (path === '/workspaces/new') return <NewWorkspace email={user.email} />
+  if (path === '/devices') return <WorkspaceLoading />
+  if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
+  if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap} />
+  return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap} /></Suspense>
+}
+
+function NewWorkspace({ email }: { email: string }) {
+  const t = useTranslations()
+  return <div className="flex min-h-dvh flex-col bg-background">
+    <header className="flex items-center justify-between gap-4 px-4 py-5 sm:px-8">
+      <Link href="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}><ArrowLeft data-icon="inline-start" />{t('Devices.connect.back')}</Link>
+      <span className="max-w-[60%] truncate text-xs text-muted-foreground" title={email}>{email}</span>
+    </header>
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-6 pt-12 pb-16 sm:pt-24">
+      <div className="mb-10 flex flex-col gap-3"><h1 className="text-3xl font-semibold tracking-tight">{t('FeatureCopy.c_0155bce8')}</h1></div>
+      <CreateWorkspaceForm />
+    </main>
+  </div>
+}
+
+function ConnectionStatus({ offline, retry }: { offline: boolean; retry: () => void }) {
+  const t = useTranslations('DesktopRenderer')
+  useEffect(() => {
+    if (offline) toast.error(t('serverUnavailable'), { id: 'desktop-offline', duration: Infinity, description: t('offlineHint'), action: { label: t('retry'), onClick: retry } })
+    else toast.dismiss('desktop-offline')
+    return () => { toast.dismiss('desktop-offline') }
+  }, [offline, t])
+  return null
+}
+
+function UpdateRequired() {
+  const t = useTranslations('DesktopRenderer')
+  return <Auth><AuthCard title={t('updateTitle')} description={t('updateHint')}>
+    <Button onClick={requireUpdate}>{t('checkUpdate')}</Button>
+  </AuthCard></Auth>
+}
+
+class RendererBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? <RenderFailure retry={() => this.setState({ failed: false })} /> : this.props.children }
+}
+
+function RenderFailure({ retry }: { retry: () => void }) {
+  const t = useTranslations('DesktopRenderer')
+  return <Auth><AuthCard title={t('renderFailed')} description={t('renderHint')}><Button onClick={retry}>{t('retry')}</Button></AuthCard></Auth>
+}

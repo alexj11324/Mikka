@@ -4932,6 +4932,18 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "desktop_client_update_required": { "default": "Update Mikka to continue" },
+    "desktop_session_expired": { "default": "Sign in to Mikka again" },
+    "desktop_session_changed": { "default": "The account or workspace changed. Try again" },
+    "desktop_account_limit_reached": { "default": "Five accounts are already signed in" },
+    "desktop_request_failed": { "default": "The desktop request failed. Try again" },
+    "desktop_backend_unreachable": { "default": "Cannot connect to Mikka" },
+    "desktop_rpc_request_invalid": { "default": "Check the information and try again" },
+    "desktop_rpc_action_unknown": { "default": "This action is unavailable in this version of Mikka" },
+    "desktop_rpc_failed": { "default": "The action could not be completed" },
+    "desktop_rpc_request_rejected": { "default": "Mikka could not accept this request" },
+    "desktop_rpc_response_invalid": { "default": "Mikka returned an unreadable response" },
+    "desktop_rpc_value_invalid": { "default": "This content could not be sent" },
     "subscription_local_runtime_unavailable": {
       "default": "The subscription run could not start on this computer",
       "assignment_invalid": "This thread's subscription setting is no longer valid. Please choose the model again.",
@@ -5099,5 +5111,22 @@
       },
       "retryApprove": "Check again"
     }
+  },
+  "DesktopRenderer": {
+    "serverUnavailable": "Can't reach Mikka",
+    "networkUnavailable": "No network",
+    "reconnecting": "Reconnecting…",
+    "offlineHint": "Waiting for the connection to recover.",
+    "retry": "Retry now",
+    "browserTitle": "Continue in your browser",
+    "browserOpened": "The page is open in your browser. You can return to Mikka when finished.",
+    "browserFailed": "The browser did not open. Try opening the page again.",
+    "openBrowser": "Open in browser",
+    "back": "Back to Mikka",
+    "updateTitle": "Update Mikka to continue",
+    "updateHint": "This version can no longer connect to Mikka. Check for an app update.",
+    "checkUpdate": "Check for update",
+    "renderFailed": "This view could not open",
+    "renderHint": "Retry to reopen the view."
   }
 }

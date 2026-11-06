@@ -1,8 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { chmod, mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { frontendRuntimeSource } from '../apps/frontend/scripts/frontend-runtime.mjs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
+import { analyticsEnvironment, analyticsKey, analyticsPaths, inspectAnalyticsBuild, localAnalyticsRequest, requiredRuntimeResources, syntheticPostHogRequest, verifyRuntimeResources } from '../scripts/check-analytics-ssr.mjs'
+import { analyticsBrowserProfile } from '../scripts/analytics-browser-sandbox.mjs'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -75,10 +83,97 @@ test('the 电脑 tab has its own kill switch, apart from the cloud computer roll
   assert.match(hook, /export function useComputerTab\(\)[\s\S]*?killSwitches\.computerTab[\s\S]*?!== true/)
 })
 
-test('the locale layout mounts the pageview tracker whenever PostHog is configured', () => {
-  // instrumentation-client.ts turns off automatic pageviews; without this component nothing is ever sent.
-  const layout = readFileSync(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
-  assert.match(layout, /posthogConfig\.token && <PostHogAnalytics \/>/)
+test('the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker', () => {
+  const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+  assert.match(source('apps/frontend/src/index.tsx'), /import 'mikka:frontend-runtime'[\s\S]*await import\('\.\.\/\.\.\/desktop\/src\/renderer\/index'\)/)
+  const plugin = source('apps/frontend/scripts/application-plugin.mjs')
+  assert.match(plugin, /import \{ frontendRuntimeSource \} from '\.\/frontend-runtime\.mjs'/)
+  assert.match(plugin, /if \(id === '\\0mikka:frontend-runtime'\) \{\s*return frontendRuntimeSource\(target, \{ development, frontend, renderer \}\)/)
+  const frontend = fileURLToPath(new URL('../apps/frontend', import.meta.url))
+  const renderer = fileURLToPath(new URL('../apps/desktop/src/renderer', import.meta.url))
+  for (const development of [false, true]) {
+    const code = frontendRuntimeSource('web', { development, frontend, renderer })
+    const prefix = development ? 'globalThis[Symbol.for("openui.devtools.autoMount")] = true;\n' : ''
+    assert.equal(code, `${prefix}import ${JSON.stringify(join(frontend, 'src/web/runtime.ts'))};\n`)
+  }
+  assert.match(source('apps/frontend/src/web/runtime.ts'), /import '@\/instrumentation-client'/)
+  assert.match(source('instrumentation-client.ts'), /posthog\.init\(posthogConfig\.token/)
+  assert.match(source('instrumentation-client.ts'), /capture_pageview: false/)
+  assert.match(source('apps/desktop/src/renderer/app.tsx'), /<PlatformExtras \/>/)
+  assert.match(source('apps/frontend/src/web/platform.tsx'), /posthogConfig\.token && <PostHogAnalytics \/>/)
+})
+
+test('analytics acceptance preserves the three real anonymous routes and isolated database restriction', () => {
+  assert.deepEqual(analyticsPaths, ['/mikka', '/mikka/sign-in', '/mikka/en/sign-in'])
+  const database = 'postgresql://e2e:disposable@127.0.0.1:5432/mikka_e2e'
+  const env = { CI: 'true', NEXT_PUBLIC_POSTHOG_KEY: analyticsKey, E2E_DATABASE_URL: database, DATABASE_URL: database, MIKKA_DATABASE_URL: database }
+  assert.equal(analyticsEnvironment(env), database)
+  for (const change of [{ CI: 'false' }, { NEXT_PUBLIC_POSTHOG_KEY: 'another-project' }, { DATABASE_URL: database + '?options=other' },
+    { E2E_DATABASE_URL: database.replace('127.0.0.1', 'remote.example') }, { E2E_DATABASE_URL: database.replace('/mikka_e2e', '/mikka') }]) {
+    assert.throws(() => analyticsEnvironment({ ...env, ...change }))
+  }
+})
+
+test('all non-local browser HTTP and WebSocket requests are blocked before sending analytics', () => {
+  const origin = 'http://localhost:3186'
+  for (const value of ['/mikka', 'http://localhost:3186/mikka', 'ws://localhost:3186/live']) {
+    assert.equal(localAnalyticsRequest(value.startsWith('/') ? origin + value : value, origin), true)
+  }
+  for (const value of ['http://localhost:3187/mikka', 'http://127.0.0.1:3186/mikka', 'https://localhost:3186/mikka',
+    'wss://localhost:3186/live', 'https://us.i.posthog.com/e/', 'https://other.example', 'file:///tmp/page', 'http://private@localhost:3186/mikka']) {
+    assert.equal(localAnalyticsRequest(value, origin), false)
+  }
+  const request = (url, body = null) => ({ url: () => url, postData: () => body })
+  assert.equal(syntheticPostHogRequest(request(`https://us-assets.i.posthog.com/array/${analyticsKey}/config.js`)), true)
+  assert.equal(syntheticPostHogRequest(request('https://us.i.posthog.com/e/', JSON.stringify({ token: analyticsKey }))), true)
+  assert.equal(syntheticPostHogRequest(request(`https://foreign.example/${analyticsKey}`)), false)
+  assert.equal(syntheticPostHogRequest(request('https://us.i.posthog.com/e/', 'another-token')), false)
+})
+
+async function analyticsBuildFixture(t) {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-analytics-artifacts-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const write = async (path, value) => { const filename = join(root, path); await mkdir(dirname(filename), { recursive: true }); await writeFile(filename, value) }
+  const resources = []
+  for (const [index, path] of requiredRuntimeResources.entries()) {
+    const source = `actual source ${index}\n`
+    await write(path, source); await write(`.output/${path}`, source)
+    resources.push({ path, bytes: Buffer.byteLength(source), sha256: createHash('sha256').update(source).digest('hex') })
+  }
+  const built = { version: 1, preset: 'node-server', basePath: '/mikka', revision: 'a'.repeat(40), node: process.version,
+    appBuild: 'synthetic-build', testDeploymentSha: '', lockSha256: 'b'.repeat(64), routesSha256: 'c'.repeat(64), tracingSha256: 'd'.repeat(64), resources }
+  await write('.output/mikka-build.json', JSON.stringify(built))
+  await write('.output/server/mikka-entry.mjs', 'export {}\n')
+  const script = `export const project = '${analyticsKey}';\n`
+  await write('apps/frontend/dist/web/.vite/manifest.json', JSON.stringify({ 'index.html': { isEntry: true, file: 'assets/index-real.js' } }))
+  await write('apps/frontend/dist/web/assets/index-real.js', script)
+  await write('.output/public/mikka/assets/index-real.js', script)
+  return { root, built, write }
+}
+
+test('analytics build proof checks actual packaged bytes, public Vite entry and the synthetic key', async t => {
+  const { root, built, write } = await analyticsBuildFixture(t)
+  const result = await inspectAnalyticsBuild(root)
+  assert.equal(result.assets.size, 1)
+  assert.deepEqual([...result.configuredAssets], ['/mikka/assets/index-real.js'])
+  assert.equal(result.resources.count, 3)
+  await write('.output/public/mikka/assets/index-real.js', 'wrong asset')
+  await assert.rejects(inspectAnalyticsBuild(root), /served asset/)
+  await assert.rejects(verifyRuntimeResources(root, { ...built, resources: built.resources.slice(1) }), /Required runtime/)
+  await assert.rejects(verifyRuntimeResources(root, { ...built, resources: [...built.resources, built.resources[0]] }))
+  await write(`.output/${requiredRuntimeResources[0]}`, 'changed packaged resource')
+  await assert.rejects(verifyRuntimeResources(root, built))
+})
+
+test('artifact verification rejects escaping and symlinked files instead of accepting their filenames', async t => {
+  const { root, built } = await analyticsBuildFixture(t)
+  for (const path of ['../private', '/private', 'packages//private', 'packages/./private', 'packages\\private']) {
+    await assert.rejects(verifyRuntimeResources(root, { resources: [{ ...built.resources[0], path }] }))
+  }
+  const source = requiredRuntimeResources[0]
+  await rm(join(root, '.output', source))
+  await symlink(join(root, source), join(root, '.output', source))
+  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
 })
 
 test('runtime separates the desktop shell and still drops other client details', () => {
@@ -92,4 +187,54 @@ test('smoke accounts are recognised only by their +mikka-smoke tag, and the tag 
   for (const email of ['alex@gmail.com', 'alex+mikka-smoker@gmail.com', 'mikka-smoke@gmail.com', 'alex+other+mikka-smoke@@gmail.com', '', null, undefined]) assert.equal(isSmokeAccountEmail(email), false, String(email))
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: { distinct_id: 'opaque-user-id', test_account: true } })
   assert.deepEqual(event.properties, { distinct_id: 'opaque-user-id', test_account: true })
+})
+
+async function analyticsBrowserFixture(t) {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'mikka-analytics-browser-')))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const executable = join(root, 'chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell')
+  await mkdir(dirname(executable), { recursive: true })
+  await writeFile(executable, Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1]), { mode: 0o755 })
+  return { root, executable }
+}
+
+test('the CI AppArmor attachment authorizes only the actual installed headless Chromium path', async t => {
+  const { root, executable } = await analyticsBrowserFixture(t)
+  const profile = await analyticsBrowserProfile(root)
+  assert.equal(profile, `abi <abi/4.0>,\ninclude <tunables/global>\n\nprofile mikka-analytics-chromium "${executable}" flags=(unconfined) {\n  userns,\n}\n`)
+  assert.equal(profile.includes('*'), false)
+  assert.equal(profile.includes('sysctl'), false)
+})
+
+test('the CI AppArmor helper rejects missing and ambiguous installed browser revisions', async t => {
+  const { root } = await analyticsBrowserFixture(t)
+  await mkdir(join(root, 'chromium_headless_shell-1249'))
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_REVISION_AMBIGUOUS/)
+  await rm(join(root, 'chromium_headless_shell-1248'), { recursive: true })
+  await rm(join(root, 'chromium_headless_shell-1249'), { recursive: true })
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_REVISION_AMBIGUOUS/)
+})
+
+test('the CI AppArmor helper rejects glob syntax, path aliases, and executable symlinks', async t => {
+  const { root, executable } = await analyticsBrowserFixture(t)
+  for (const directory of [root + '*', root + '\n', root + '/..', root + '/./', 'relative/browser']) {
+    await assert.rejects(analyticsBrowserProfile(directory), /ANALYTICS_BROWSER_DIRECTORY_/)
+  }
+  const linked = join(root, 'linked')
+  await symlink(root, linked)
+  await assert.rejects(analyticsBrowserProfile(linked), /ANALYTICS_BROWSER_DIRECTORY_SYMLINK/)
+  await rm(executable)
+  const outside = join(root, 'unapproved-binary')
+  await writeFile(outside, Buffer.from([0x7f, 0x45, 0x4c, 0x46]), { mode: 0o755 })
+  await symlink(outside, executable)
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_SYMLINK/)
+})
+
+test('the CI AppArmor helper refuses non-executable or non-ELF files', async t => {
+  const { root, executable } = await analyticsBrowserFixture(t)
+  await chmod(executable, 0o644)
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_INVALID/)
+  await chmod(executable, 0o755)
+  await writeFile(executable, '#!/bin/sh\nexit 0\n')
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_NOT_ELF/)
 })

@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { botViewSchema, computerStateSchema, viewerGrantSchema } from '@mikka/protocol/computer'
 import { withBasePath } from '@/lib/base-path'
+import { computerRequest as call } from '@/lib/computer/request'
+import { ComputerRequestError } from './request-error'
 import { MOCK_HOSTS, mockComputer, mockSetup } from './mock'
 import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
 
@@ -9,21 +11,7 @@ export const computerMock = process.env.NEXT_PUBLIC_COMPUTER_MOCK === '1'
 /** The component library's demo bots (ids start with "demo-") always play the mock. */
 export const isMockedComputer = (botId: string) => computerMock || botId.startsWith('demo-')
 
-export class ComputerRequestError extends Error {
-  constructor(readonly status: number, readonly body: unknown) { super(`HTTP ${status}`) }
-}
-
-async function call<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
-  const response = await fetch(withBasePath(path), {
-    credentials: 'same-origin',
-    ...init,
-    headers: init?.json === undefined ? init?.headers : { 'content-type': 'application/json', ...init.headers },
-    body: init?.json === undefined ? init?.body : JSON.stringify(init.json),
-  })
-  const body = response.status === 204 ? null : await response.json().catch(() => null)
-  if (!response.ok) throw new ComputerRequestError(response.status, body)
-  return body as T
-}
+export { ComputerRequestError }
 
 const botPath = (botId: string, rest = '') => `/api/bots/${encodeURIComponent(botId)}/computer${rest}`
 

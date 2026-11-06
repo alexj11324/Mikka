@@ -31,7 +31,7 @@ const workflowDirectory = await mkdtemp(join(tmpdir(), 'mikka-mvp-workflow-'))
 await indexMvpResource('workflow-directory', workflowDirectory)
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = fileURLToPath(new URL('../tests/mvp/preload.mjs', import.meta.url))
-const child = spawn(process.execPath, ['--import', preload, 'node_modules/next/dist/bin/next', 'start', '--port', '3100'], {
+const child = spawn(process.execPath, ['--import', preload, 'scripts/start-app.mjs', '--port', '3100'], {
   cwd: fileURLToPath(new URL('..', import.meta.url)), stdio: 'inherit',
   env: { ...process.env, AI_GATEWAY_API_KEY: MVP_DECISION_KEY,
     MIKKA_BYOS_ENABLED:'1',MIKKA_BYOS_WORKER_BINARY:fileURLToPath(new URL('../tests/mvp/subscription-worker.mjs',import.meta.url)),

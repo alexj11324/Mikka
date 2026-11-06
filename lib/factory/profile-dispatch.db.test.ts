@@ -17,9 +17,11 @@ import type { FactorySnapshot } from './store'
 process.env.MIKKA_BYOS_ENABLED = '1'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
-// #1449 adds ten sequential cross-Harness candidate rechecks. Allow their
-// measured CI work while retaining the per-statement and lock timeouts below.
-test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 180_000 }, async t => {
+// This parent includes all migrations and the sequential Profile/recheck
+// matrix. Give the expanded matrix its own total budget; per-query statement
+// (15s) and lock (5s) deadlines below remain unchanged. A parent timeout runs
+// teardown while the current child is still unwinding, obscuring that failure.
+test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 240_000 }, async t => {
   assert.ok(dbUrl)
   const admin = new Pool({ connectionString: dbUrl })
   const database = `factory_profile_dispatch_${randomUUID().replaceAll('-', '')}_e2e`

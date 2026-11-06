@@ -3,6 +3,7 @@ import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { readCliAgentPolicy, readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { setCliAgentPolicy, setCliPolicy } from '@/lib/agent-tool-approval/policy-settings'
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
 export const dynamic = 'force-dynamic'
 const schema = z.discriminatedUnion('operation', [
@@ -12,8 +13,9 @@ const schema = z.discriminatedUnion('operation', [
   z.object({ operation:z.literal('set'), runId:z.uuid(), target:z.enum(['agent','worker','workspace','team','project']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
 ])
 export async function POST(request: Request) {
-  if (!request.headers.get('cookie') || request.headers.has('authorization') || request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error:'unauthorized' }, { status:401 })
-  const session = await auth.api.getSession({ headers:request.headers, query:{ disableCookieCache:true } })
+  const sessionHeaders = humanSessionHeaders(request)
+  if (!sessionHeaders || request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error:'unauthorized' }, { status:401 })
+  const session = await auth.api.getSession({ headers:sessionHeaders, query:{ disableCookieCache:true } })
   if (!session?.user) return Response.json({ error:'unauthorized' }, { status:401 })
   const result = schema.safeParse(await request.json().catch(() => null))
   if (!result.success) return Response.json({ error:'invalidRequest' }, { status:400 })

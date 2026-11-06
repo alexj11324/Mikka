@@ -3,8 +3,8 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
-import type { MikkaBridge, SshInstallState } from '@mikka/protocol/bridge'
-import { IPC } from '@mikka/protocol/ipc'
+import type { MikkaBridge, SshInstallState, BundledBridge, BundledLiveEvent, BundledViewerEvent } from '@mikka/protocol/bridge'
+import { IPC, BUNDLED_IPC } from '@mikka/protocol/ipc'
 
 const prefix = '--mikka-app-origin='
 const appOrigin = process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length)
@@ -15,7 +15,12 @@ function onNotificationClick(listener: (href: string) => void): () => void {
   return () => { ipcRenderer.removeListener(IPC.notificationsClicked, handler) }
 }
 
-if (appOrigin && window.location.origin === appOrigin) {
+const localOrigin = `${window.location.protocol}//${window.location.host}`
+const bundled = appOrigin === 'mikka://app'
+let decodedPath = ''
+try { decodedPath = decodeURIComponent(window.location.pathname) } catch { /* Malformed paths never get native privileges. */ }
+const localPage = (decodedPath === '/mikka' || decodedPath.startsWith('/mikka/')) && !/^\/mikka\/(?:api|assets)(?:\/|$)/.test(decodedPath)
+if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin && localPage : window.location.origin === appOrigin)) {
   // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
   // The preload runs before <html> exists, so wait for the document.
   // A translucent window (macOS vibrancy) also marks the page, so only its rail and list go see-through.
@@ -75,12 +80,46 @@ if (appOrigin && window.location.origin === appOrigin) {
     },
     device: {
       status: () => ipcRenderer.invoke(IPC.deviceStatus),
+      pickRepo: () => ipcRenderer.invoke(IPC.devicePickRepo),
     },
     quota: {
       get: () => ipcRenderer.invoke(IPC.quotaGet),
     },
   }
-  // v1 implements the native capabilities only; auth and local settings stay
-  // in the web session until their server support exists.
-  contextBridge.exposeInMainWorld('mikka', bridge as unknown as MikkaBridge)
+  const bundledBridge: BundledBridge = {
+    session: () => ipcRenderer.invoke(BUNDLED_IPC.session),
+    signIn: input => ipcRenderer.invoke(BUNDLED_IPC.signIn, input),
+    signInEmail: input => ipcRenderer.invoke(BUNDLED_IPC.signInEmail, input),
+    signOut: () => ipcRenderer.invoke(BUNDLED_IPC.signOut),
+    accounts: () => ipcRenderer.invoke(BUNDLED_IPC.accounts),
+    linkAccount: provider => ipcRenderer.invoke(BUNDLED_IPC.linkAccount, provider),
+    onSessionChanged: listener => {
+      const handler = () => listener()
+      ipcRenderer.on(BUNDLED_IPC.sessionChanged, handler)
+      return () => { ipcRenderer.removeListener(BUNDLED_IPC.sessionChanged, handler) }
+    },
+    live: {
+      prepare: workspace => ipcRenderer.invoke(BUNDLED_IPC.livePrepare, workspace),
+      connect: id => ipcRenderer.invoke(BUNDLED_IPC.liveConnect, id),
+      send: (id, data) => ipcRenderer.invoke(BUNDLED_IPC.liveSend, id, data),
+      close: id => ipcRenderer.invoke(BUNDLED_IPC.liveClose, id),
+      onEvent: listener => {
+        const handler = (_event: IpcRendererEvent, event: BundledLiveEvent) => listener(event)
+        ipcRenderer.on(BUNDLED_IPC.liveEvent, handler)
+        return () => { ipcRenderer.removeListener(BUNDLED_IPC.liveEvent, handler) }
+      },
+    },
+    viewer: {
+      prepare: input => ipcRenderer.invoke(BUNDLED_IPC.viewerPrepare, input),
+      connect: id => ipcRenderer.invoke(BUNDLED_IPC.viewerConnect, id),
+      send: (id, data) => ipcRenderer.invoke(BUNDLED_IPC.viewerSend, id, data),
+      close: id => ipcRenderer.invoke(BUNDLED_IPC.viewerClose, id),
+      onEvent: listener => {
+        const handler = (_event: IpcRendererEvent, event: BundledViewerEvent) => listener(event)
+        ipcRenderer.on(BUNDLED_IPC.viewerEvent, handler)
+        return () => { ipcRenderer.removeListener(BUNDLED_IPC.viewerEvent, handler) }
+      },
+    },
+  }
+  contextBridge.exposeInMainWorld('mikka', { ...bridge, ...(bundled ? { bundled: bundledBridge } : {}) } as unknown as MikkaBridge)
 }

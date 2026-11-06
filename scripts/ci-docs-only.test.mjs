@@ -438,7 +438,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(job('ui-policy-integrations').includes('run: pnpm test:issues'))
   assert(!job('ui-policy-full').includes('run: pnpm test:issues'))
   const checks = job('source-checks')
-  for (const command of ['pnpm lint:code', 'pnpm exec next typegen', 'pnpm typecheck', 'pnpm --filter @mikka/protocol typecheck', 'pnpm --filter @mikka/mobile typecheck']) assert(checks.includes(`run: ${command}\n`), command)
+  for (const command of ['pnpm lint:code', 'node apps/api/scripts/generate-routes.mjs --check', 'pnpm typecheck', 'pnpm --filter @mikka/protocol typecheck', 'pnpm --filter @mikka/mobile typecheck']) assert(checks.includes(`run: ${command}\n`), command)
   const daemon = job('daemon-checks')
   // Runs use no sandbox (decision 2026-11-01-2335): the daemon lane runs its unit suite, no sandbox acceptance.
   assert(daemon.includes('pnpm --filter @mikka/daemon exec vitest run'))

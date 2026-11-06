@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
-import { deviceAuthorization, multiSession } from 'better-auth/plugins'
+import { bearer, deviceAuthorization, multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
@@ -18,6 +18,7 @@ import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-
 import { issueDeviceToken } from '@/lib/device-link'
 import { auditAuthentication } from '@/lib/audit/authentication'
 import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
+import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop-rpc/session-cache'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export const MOBILE_APP_ORIGIN = 'mikka://'
@@ -95,6 +96,7 @@ export const auth = betterAuth({
   // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in
   // the database, and lib/mcp/auth.ts checks them.
   plugins: [
+    bearer(),
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
     expo(),
@@ -118,7 +120,10 @@ export const auth = betterAuth({
     nextCookies(),
   ],
   hooks: {
-    before: createAuthMiddleware(async ctx => { await beforeSignup(pool,ctx); return email.before(ctx) }),
+    before: createAuthMiddleware(async ctx => {
+      await beforeSignup(pool,ctx)
+      return email.before(ctx)
+    }),
     after: createAuthMiddleware(async ctx => {
       await auditAuthentication(ctx)
       const deviceToken = await exchangeDaemonSession({
@@ -140,6 +145,9 @@ export const auth = betterAuth({
       }
       const requestResult = await email.publicRequestResult(ctx.path, ctx.context.returned, ctx.request)
       if (requestResult) return Response.json(requestResult, { status: 202, headers: { 'cache-control': 'no-store' } })
+      // Publish the private SDK cache only after sign-in auditing succeeds;
+      // a withheld/revoked sign-in must never receive a usable cached proof.
+      desktopSessionCacheAfter(ctx)
       // Preserve sessions issued before multi-session was enabled when adding the first extra account.
       if (ctx.path !== '/get-session' || !ctx.request || ctx.headers?.get('cookie')?.includes('_multi-')) return
       const active = ctx.context.session
@@ -166,4 +174,5 @@ export const auth = betterAuth({
 })
 
 // Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
-readFreshSessionsInScope(auth.api)
+readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })
+auth.handler = withDesktopSessionCache(auth.handler, async () => (await auth.$context).authCookies.sessionData.name)

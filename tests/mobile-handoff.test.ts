@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { oneTimeToken } from 'better-auth/plugins'
+import { bearer, oneTimeToken } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { openHandoff, sealHandoff } from '../lib/mobile-handoff'
 
@@ -19,7 +19,7 @@ const data: Record<string, any[]> = { user: [], session: [], account: [], verifi
 const auth = betterAuth({
   baseURL: 'https://handoff.test', secret: 'isolated-test-secret-123456789012345678901234',
   database: memoryAdapter(data), emailAndPassword: { enabled: true },
-  plugins: [oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }), nextCookies()],
+  plugins: [bearer(), oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }), nextCookies()],
 })
 mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth } })
 mock.module(new URL('../lib/mcp/resource.ts', import.meta.url).href, { namedExports: { appOrigin: 'https://handoff.test' } })
@@ -28,7 +28,7 @@ const route = import('../app/api/mobile/open/route')
 const cookieHeader = (headers: Headers) => headers.getSetCookie().map(cookie => cookie.split(';')[0]).join('; ')
 async function signUp(name: string) {
   const result = await auth.api.signUpEmail({ body: { name, email: `${name}@example.test`, password: 'synthetic-password-123' }, returnHeaders: true })
-  return { id: result.response.user.id, cookie: cookieHeader(result.headers) }
+  return { id: result.response.user.id, token: result.response.token, cookie: cookieHeader(result.headers) }
 }
 async function issue(cookie: string) {
   return (await auth.api.generateOneTimeToken({ headers: new Headers({ cookie }) })).token
@@ -93,6 +93,20 @@ test('induced GET does not switch accounts; confirmation requires same origin an
   assert.equal((await confirm(response, 'https://handoff.test', undefined, 'wrong')).status, 403)
   const confirmed = await confirm(response)
   assert.equal((await session(cookieHeader(confirmed.headers)))?.user.id, alice.id)
+})
+
+test('desktop bearer opens the intended account and integration page only after browser confirmation', async () => {
+  const alice = await signUp('desktop-alice'), bob = await signUp('desktop-bob')
+  const token = (await auth.api.generateOneTimeToken({ headers: new Headers({ authorization: `Bearer ${alice.token}` }) })).token
+  const response = await open(token, bob.cookie, '/en/settings?section=connections&app=gmail')
+  assert.equal(response.status, 200)
+  assert.match(await response.clone().text(), /desktop-alice@example.test/)
+  assert.equal((await session(bob.cookie))?.user.id, bob.id)
+  assert.equal((await session(cookieHeader(response.headers))), null)
+  const confirmed = await confirm(response)
+  assert.equal(confirmed.headers.get('location'), 'https://handoff.test/en/settings?section=connections&app=gmail')
+  assert.equal((await session(cookieHeader(confirmed.headers)))?.user.id, alice.id)
+  assert.equal((await open(token, bob.cookie)).headers.getSetCookie().length, 0, 'one-use token cannot replay the account handoff')
 })
 
 test('confirmation rejects expired, tampered state and a revoked underlying session', async () => {

@@ -1,3 +1,4 @@
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/api-auth';
@@ -10,8 +11,9 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 export async function POST(request: Request, {params}: {params:Promise<{questionId:string}>}) {
   if(!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});
-  if(request.headers.get('authorization')) return NextResponse.json({error:'authRequired'},{status:401});
-  const session=await auth.api.getSession({headers:request.headers});
+  const sessionHeaders=request.headers.has('authorization')?humanSessionHeaders(request):request.headers;
+  if(!sessionHeaders) return NextResponse.json({error:'authRequired'},{status:401});
+  const session=await auth.api.getSession({headers:sessionHeaders,query:{disableCookieCache:true}});
   if(!session?.user || !session.session?.id) return NextResponse.json({error:'authRequired'},{status:401});
   try {
     if(new URL(request.headers.get('origin') ?? '').origin!==new URL(request.url).origin) throw new Error('origin');

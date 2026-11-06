@@ -10,13 +10,15 @@ export interface TestDatabaseTarget {
 export interface TestEnvironment {
   version: 1
   id: string
-  kind: 'isolated-ci' | 'isolated-preview'
+  kind: 'isolated-ci' | 'isolated-preview' | 'isolated-docker'
   origin: string
   basePath: '/mikka'
   deploymentSha: string
   database: TestDatabaseTarget
   instanceId: string
   capabilities: { provision: boolean; mail: 'disabled'; reset: boolean }
+  docker?: { sandboxUid: string; port: 3000; publicationUid: string }
+  descriptorSignature?: string
 }
 export class EnvironmentError extends Error {
   code: string
@@ -25,6 +27,7 @@ export class EnvironmentError extends Error {
 export function databaseTarget(connectionString: string | undefined): TestDatabaseTarget
 export function bindingValue(value: TestEnvironment): TestEnvironment
 export function environmentFingerprint(value: TestEnvironment): string
+export function dockerDescriptorSignature(value: TestEnvironment, key: string): string
 export function validateEnvironment(value: unknown, env?: Record<string, string | undefined>): TestEnvironment
 export function loadEnvironment(env?: Record<string, string | undefined>): Promise<TestEnvironment>
 export function assertDatabaseIdentity(client: Pool | PoolClient, descriptor: TestEnvironment): Promise<void>

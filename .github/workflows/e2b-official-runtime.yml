@@ -21,6 +21,7 @@ on:
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
+      - 'scripts/release/build-vercel.mjs'
       - 'scripts/release/web-deploy.test.mjs'
       # This issue's acceptance requires a same-application-SHA runtime proof.
       - '.github/workflows/model-provider-fallback-acceptance.yml'

@@ -1,16 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --filter '!@mikka/mobile'",
-  "build": {
-    "env": {
-      "NEXT_ENABLE_ADAPTER": "0"
-    }
-  },
-  "functions": {
-    "app/api/coordinator/stream/route.ts": {
-      "supportsCancellation": true
-    }
-  },
   "git": {
     "deploymentEnabled": {
       "main": false,
@@ -18,5 +8,7 @@
       "**": false
     }
   },
-  "ignoreCommand": "node scripts/vercel-ignore-build.mjs"
+  "ignoreCommand": "node scripts/vercel-ignore-build.mjs",
+  "framework": null,
+  "buildCommand": "NITRO_PRESET=vercel pnpm build"
 }

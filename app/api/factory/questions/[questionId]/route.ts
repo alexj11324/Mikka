@@ -1,3 +1,4 @@
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/api-auth';
@@ -7,8 +8,9 @@ import { handleFactoryQuestion } from '@/lib/factory/questions/http';
 export const dynamic = 'force-dynamic';
 async function handle(request: Request,{params}:{params:Promise<{questionId:string}>}) {
   if (!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});
-  if (request.headers.get('authorization')) return NextResponse.json({error:'authRequired'},{status:401});
-  const session=await auth.api.getSession({headers:request.headers});
+  const sessionHeaders=request.headers.has('authorization')?humanSessionHeaders(request):request.headers;
+  if (!sessionHeaders) return NextResponse.json({error:'authRequired'},{status:401});
+  const session=await auth.api.getSession({headers:sessionHeaders,query:{disableCookieCache:true}});
   if (!session?.user || !session.session?.id) return NextResponse.json({error:'authRequired'},{status:401});
   const id=z.uuid().safeParse((await params).questionId);
   if (!id.success) return NextResponse.json({error:'factoryInvalid'},{status:422});

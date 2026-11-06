@@ -150,3 +150,207 @@ test('an empty private registry cannot authorize evidence publication', async ()
     await assert.rejects(auditEvidence([evidence], { environment: { instanceId: 'synthetic' }, stateDirectory }), { code: 'SECRET_AUDIT_MISSING' })
   } finally { console.error(`Retained test fixture directory: ${root}`) }
 })
+
+
+// These subprocesses exercise the actual account-scope implementation with
+// explicit unit-only pool/environment doubles and a bounded synthetic HTTP
+// transport. They do not create a deployment, database, or real test account.
+async function reauthenticationUnit(scenario, moduleURL) {
+  const assert = (await import('node:assert/strict')).default
+  const { mock } = await import('node:test')
+  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { randomBytes, randomUUID } = await import('node:crypto')
+  const root = await mkdtemp(join(tmpdir(), 'mikka-reauth-unit-'))
+  const privateRoot = join(root, 'private')
+  await mkdir(join(privateRoot, 'credentials'), { recursive: true, mode: 0o700 })
+  const environment = { instanceId: randomUUID(), origin: 'http://localhost:3100', basePath: '/mikka', capabilities: { provision: false } }
+  const binding = 'unit-only-binding'
+  const accounts = ['owner', 'peer'].map(role => ({ role, slotId: randomUUID(), userId: randomUUID(), namespace: randomUUID(),
+    email: role + '@example.test', credentialRef: randomUUID() + '.json', password: randomBytes(32).toString('base64url') }))
+  for (const account of accounts) await writeFile(join(privateRoot, 'credentials', account.credentialRef),
+    JSON.stringify({ binding, slotId: account.slotId, email: account.email, password: account.password }), { mode: 0o600 })
+  const lease = { id: randomUUID(), pairId: randomUUID(), environmentId: environment.instanceId, generation: 1,
+    state: 'active', remainingMs: 60000, accounts: accounts.map(({ password: _password, ...account }) => account) }
+  const resources = [], calls = [], releases = [], sessions = new Map()
+  let active = true, mode = 'initial', databaseWrites = 0
+  let lastToken, lastCookie, bodyStarted, finishBody
+  const bodyStartedPromise = new Promise(resolve => { bodyStarted = resolve })
+  const bodyFinishPromise = new Promise(resolve => { finishBody = resolve })
+  class UnitAccountError extends Error {
+    constructor(code) { super(code); this.name = 'TestAccountError'; this.code = code }
+  }
+  class UnitPool {
+    async prepare(value) { assert.deepEqual(value, { pairs: 2 }) }
+    async acquire() { return lease }
+    async attachSession(value) { assert.equal(value, lease) }
+    async assertLease(value) { assert.equal(value, lease); if (!active) throw new UnitAccountError('LEASE_LOST') }
+    async renew() { return lease }
+    async recordResource(value, resource) { assert.equal(value, lease); resources.push(resource) }
+    async revokeSessions() { sessions.clear() }
+    async release(value, options) { assert.equal(value, lease); releases.push(options.outcome); return { state: options.outcome === 'clean' ? 'released' : 'quarantined' } }
+  }
+  mock.module(new URL('./environment.mjs', moduleURL).href, { namedExports: {
+    assertDeploymentIdentity: async value => assert.equal(value, environment),
+    environmentFingerprint: () => binding, loadEnvironment: async () => environment, validateEnvironment: value => value,
+  } })
+  mock.module(new URL('./pool.mjs', moduleURL).href, { namedExports: { TestAccountPool: UnitPool, TestAccountError: UnitAccountError } })
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (url, init) => {
+    const target = new URL(url)
+    assert.equal(target.origin, environment.origin)
+    assert.equal(init.redirect, 'manual')
+    assert.equal(init.headers.get('origin'), environment.origin)
+    assert.equal(init.headers.has('authorization'), false)
+    assert.equal(init.headers.has('host'), false)
+    assert.ok(init.signal instanceof AbortSignal)
+    const path = target.pathname
+    calls.push({ path, method: init.method ?? 'GET' })
+    if (path === '/mikka/api/auth/sign-in/email') {
+      assert.equal(init.method, 'POST')
+      const body = JSON.parse(init.body)
+      assert.deepEqual(Object.keys(body).sort(), ['email', 'password'])
+      const account = accounts.find(value => value.email === body.email)
+      assert.ok(account && account.password === body.password)
+      lastToken = randomBytes(24).toString('base64url')
+      lastCookie = randomBytes(24).toString('base64url')
+      const session = { user: { id: account.userId, email: account.email }, session: { id: randomUUID(), token: lastToken } }
+      sessions.set(lastCookie, session)
+      if (mode === 'login-rejected') return Response.json({ message: 'private-service-error' }, { status: 401 })
+      const user = { ...session.user }
+      if (mode === 'login-user') user.id = randomUUID()
+      if (mode === 'login-email') user.email = 'different@example.test'
+      const text = JSON.stringify({ user, token: lastToken })
+      const headers = { 'content-type': 'application/json', 'set-cookie': 'unit.session=' + lastCookie + '; Path=/mikka; HttpOnly; SameSite=Lax' }
+      if (mode === 'drain') {
+        const split = Math.floor(text.length / 2)
+        return new Response(new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(text.slice(0, split))); bodyStarted()
+            void bodyFinishPromise.then(() => {
+              controller.enqueue(new TextEncoder().encode(text.slice(split))); controller.close()
+            })
+          },
+        }), { headers })
+      }
+      return new Response(text, { headers })
+    }
+    if (path === '/mikka/api/auth/get-session') {
+      const cookie = init.headers.get('cookie')?.match(/(?:^|; )unit\.session=([^;]+)/)?.[1]
+      const retained = sessions.get(cookie)
+      if (!retained) return Response.json(null, { status: 401 })
+      const session = structuredClone(retained)
+      if (mode === 'session-user') session.user.id = randomUUID()
+      if (mode === 'session-email') session.user.email = 'different@example.test'
+      if (mode === 'session-id') delete session.session.id
+      if (mode === 'session-rejected') return Response.json({ error: 'private-session-error' }, { status: 401 })
+      return Response.json(session)
+    }
+    assert.ok(mode === 'initial')
+    assert.ok(['/mikka/api/workspace', '/mikka/api/conversations/coordinator/read', '/mikka'].includes(path))
+    return Response.json({ initialized: true })
+  }
+  const { acquireTestAccounts, auditEvidence } = await import(moduleURL)
+  let scope, released = false, completed = false
+  try {
+    scope = await acquireTestAccounts({
+      database: { query: async sql => { assert.ok(sql.startsWith('insert into user_onboarding')); databaseWrites++; return { rows: [] } } },
+      environment, stateDirectory: privateRoot, runId: 'unit-reauth', workerId: 'unit', requestId: 'unit', ttlMs: 60000,
+    })
+    assert.equal(typeof scope.owner.reauthenticate, 'function')
+    assert.equal(scope.owner.reauthenticate.length, 0)
+    assert.equal(resources.length, 2)
+    const startCalls = calls.length, writesBefore = databaseWrites
+    if (scenario === 'success' || scenario === 'release-pending') {
+      await scope.pool.revokeSessions(scope.lease)
+      mode = 'drain'
+      let settled = false
+      const pending = scope.owner.reauthenticate().finally(() => { settled = true })
+      await bodyStartedPromise
+      assert.equal(settled, false)
+      assert.equal(resources.length, 2, 'a partial response cannot register a completed new session')
+      if (scenario === 'release-pending') {
+        const reauthRejected = assert.rejects(pending, { code: 'LEASE_CLOSED' })
+        const releaseRejected = assert.rejects(scope.release({ outcome: 'clean' }), { code: 'ACCOUNT_DIRTY' })
+        released = true
+        finishBody()
+        await Promise.all([reauthRejected, releaseRejected])
+        assert.deepEqual(releases, ['dirty'])
+        assert.equal(resources.length, 2)
+        completed = true
+        return
+      }
+      finishBody()
+      assert.equal(await pending, undefined)
+      assert.deepEqual(calls.slice(startCalls), [
+        { path: '/mikka/api/auth/sign-in/email', method: 'POST' },
+        { path: '/mikka/api/auth/get-session', method: 'GET' },
+      ])
+      assert.equal(databaseWrites, writesBefore, 'reauthentication does not initialize or reseal account data')
+      assert.equal(resources.length, 3)
+      assert.equal(resources[2].type, 'session')
+      assert.equal(resources[2].ownerId, scope.owner.userId)
+      assert.ok(typeof resources[2].id === 'string' && resources[2].id !== resources[0].id)
+      const publicShape = JSON.stringify(scope.owner)
+      assert.ok(!publicShape.includes(lastToken) && !publicShape.includes(lastCookie))
+      assert.ok(accounts.every(account => !publicShape.includes(account.password)))
+      const journal = await readFile(join(privateRoot, 'secret-audit.jsonl'), 'utf8')
+      assert.ok(journal.includes(lastToken) && journal.includes(lastCookie))
+      const evidence = join(root, 'leaked.txt')
+      await writeFile(evidence, lastToken)
+      await assert.rejects(auditEvidence([evidence], { environment, stateDirectory: privateRoot }), { code: 'EVIDENCE_SECRET_DETECTED' })
+      await scope.release({ outcome: 'clean' }); released = true
+      assert.deepEqual(releases, ['clean'])
+    } else if (scenario === 'arguments') {
+      await assert.rejects(scope.owner.reauthenticate({ email: 'different@example.test' }), { code: 'TEST_ACCOUNT_REAUTH_ARGUMENTS_FORBIDDEN' })
+      assert.equal(calls.length, startCalls)
+    } else if (scenario === 'closed') {
+      await scope.release({ outcome: 'clean' }); released = true
+      await assert.rejects(scope.owner.reauthenticate(), { code: 'LEASE_CLOSED' })
+      assert.equal(calls.length, startCalls)
+    } else if (scenario === 'lost') {
+      active = false
+      await assert.rejects(scope.owner.reauthenticate(), { code: 'LEASE_LOST' })
+      assert.equal(calls.length, startCalls)
+    } else {
+      mode = scenario
+      const expected = scenario.startsWith('login-') && scenario !== 'login-rejected' ? 'ACCOUNT_IDENTITY_MISMATCH'
+        : scenario === 'login-rejected' ? 'ACCOUNT_LOGIN_FAILED' : 'ACCOUNT_SESSION_INVALID'
+      await assert.rejects(scope.owner.reauthenticate(), error => error.code === expected && error.message === expected)
+      assert.equal(resources.length, 2, 'an unverified session is never registered under the leased owner')
+      await assert.rejects(scope.release({ outcome: 'clean' }), { code: 'ACCOUNT_DIRTY' }); released = true
+      assert.deepEqual(releases, ['dirty'])
+    }
+    completed = true
+  } finally {
+    if (scope && !released) await scope.release({ outcome: completed ? 'clean' : 'dirty' }).catch(() => {})
+    globalThis.fetch = originalFetch
+    if (completed) await rm(root, { recursive: true, force: true })
+  }
+}
+
+function runReauthenticationUnit(scenario) {
+  const source = '(' + reauthenticationUnit.toString() + ')('
+    + JSON.stringify(scenario) + ',' + JSON.stringify(new URL('./session.mjs', import.meta.url).href) + ')'
+  const child = spawnSync(process.execPath, ['--experimental-test-module-mocks', '--input-type=module', '--eval', source],
+    { encoding: 'utf8', timeout: 15000, env: { PATH: process.env.PATH, HOME: process.env.HOME, LANG: 'C.UTF-8' } })
+  assert.equal(child.status, 0, child.stderr)
+}
+
+test('reauthenticate uses the original leased identity, drains both responses, registers and audits the new private session', () => {
+  runReauthenticationUnit('success')
+})
+test('reauthenticate rejects arguments and closed or lost leases before HTTP', () => {
+  for (const scenario of ['arguments', 'closed', 'lost']) runReauthenticationUnit(scenario)
+})
+test('reauthenticate rejects login and session identity changes without weakening clean release', () => {
+  for (const scenario of ['login-user', 'login-email', 'session-user', 'session-email', 'session-id']) runReauthenticationUnit(scenario)
+})
+test('reauthenticate preserves closed errors for rejected login or session responses', () => {
+  for (const scenario of ['login-rejected', 'session-rejected']) runReauthenticationUnit(scenario)
+})
+
+test('reauthenticate remains in the existing pending-request guard until concurrent release has drained it', () => {
+  runReauthenticationUnit('release-pending')
+})

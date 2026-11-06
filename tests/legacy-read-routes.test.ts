@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test, { before, beforeEach, mock } from 'node:test'
-import { agentImageQuery } from '../lib/agent-images'
 import { hashUserId } from '../lib/request-log'
 
 // Real GET handlers and request-log wrapper; only auth, image transport and the
@@ -19,9 +18,8 @@ let historyGET: typeof import('../app/api/agent/sessions/route').GET
 
 before(async () => {
   mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => user ? { user: { id: user } } : null } } } })
-  mock.module(new URL('../lib/agent-images.ts', import.meta.url).href, { namedExports: {
-    agentImageQuery,
-    findAgentImage: async (query: string, signal?: AbortSignal) => {
+  mock.module(new URL('../lib/agent-images-server.ts', import.meta.url).href, { namedExports: {
+    findCachedAgentImage: async (query: string, signal?: AbortSignal) => {
       images.push({ query, signal })
       if (imageError) throw new Error('private image upstream')
       return image

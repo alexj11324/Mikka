@@ -6,6 +6,9 @@ import { desktopAuthRequests } from '@/lib/db/schema'
 import { desktopAuthCode, desktopAuthState, desktopAuthVerifier } from '@/lib/desktop-auth'
 import { sha256Hex, verifierMatches } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
+import { auth } from '@/lib/auth'
+import { safeDesktopSession } from '@/lib/desktop-rpc/session'
+import { DESKTOP_SESSION_CACHE_HEADER, desktopSessionCacheFromHeaders } from '@/lib/desktop-rpc/session-cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +32,7 @@ async function handlePOST(request: Request) {
   const state = desktopAuthState(value.state)
   const code = desktopAuthCode(value.code)
   const verifier = desktopAuthVerifier(value.verifier)
-  if (!state || !code || !verifier) return NextResponse.json({ error: 'invalidRequest' }, { status: 400, headers: noStore })
+  if (!state || !code || !verifier || (value.client !== undefined && value.client !== 'bundled')) return NextResponse.json({ error: 'invalidRequest' }, { status: 400, headers: noStore })
 
   const now = new Date()
   const [row] = await db.update(desktopAuthRequests).set({ usedAt: now })
@@ -39,6 +42,17 @@ async function handlePOST(request: Request) {
   if (row) await db.update(desktopAuthRequests).set({ token: null }).where(eq(desktopAuthRequests.stateHash, sha256Hex(state)))
   if (!row?.token || row.codeHash !== sha256Hex(code) || !verifierMatches(verifier, row.challenge)) {
     return NextResponse.json({ error: 'exchangeRejected' }, { status: 400, headers: noStore })
+  }
+  if (value.client === 'bundled') {
+    try {
+      // The same single-use PKCE handoff, redeemed here so only the main process
+      // receives a bearer. Never expose the parked token to the local renderer.
+      const { response: session, headers } = await auth.api.verifyOneTimeToken({ body: { token: row.token }, headers: new Headers(), returnHeaders: true })
+      const cache = desktopSessionCacheFromHeaders(headers, (await auth.$context).authCookies.sessionData.name)
+      return NextResponse.json({ token: session.session.token, ...safeDesktopSession(session) }, { headers: { ...noStore, ...(cache !== undefined ? { [DESKTOP_SESSION_CACHE_HEADER]: cache } : {}) } })
+    } catch {
+      return NextResponse.json({ error: 'exchangeRejected' }, { status: 400, headers: noStore })
+    }
   }
   return NextResponse.json({ token: row.token }, { headers: noStore })
 }

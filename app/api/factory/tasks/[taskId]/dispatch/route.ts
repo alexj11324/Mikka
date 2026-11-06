@@ -1,3 +1,4 @@
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/api-auth';
 import { factoryLifecycleEnabled } from '@/lib/factory/runtime';
@@ -6,8 +7,9 @@ import { handleFactoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-h
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request,{params}:{params:Promise<{taskId:string}>}) {
   if (!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});
-  if (request.headers.get('authorization')) return NextResponse.json({error:'authRequired'},{status:401});
-  const session=await auth.api.getSession({headers:request.headers});
+  const sessionHeaders=request.headers.has('authorization')?humanSessionHeaders(request):request.headers;
+  if (!sessionHeaders) return NextResponse.json({error:'authRequired'},{status:401});
+  const session=await auth.api.getSession({headers:sessionHeaders,query:{disableCookieCache:true}});
   const result=await handleFactoryDispatchRecovery(factoryDispatchRecovery,{userId:session?.user?.id ?? null,taskId:(await params).taskId,action:'status'});
   return NextResponse.json(result.body,{status:result.status,headers:result.headers});
 }

@@ -16,7 +16,7 @@ test('only the exact app origin is trusted', () => {
 
 test('credentials and non-URLs have no origin', () => {
   assert.equal(originOf('https://user:pass@app.example/'), null)
-  assert.equal(originOf('javascript:alert(1)'), 'null')
+  assert.equal(originOf('javascript:alert(1)'), null)
   assert.equal(originOf('not a url'), null)
 })
 

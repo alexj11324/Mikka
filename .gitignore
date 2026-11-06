@@ -5,6 +5,9 @@ node_modules/
 
 # next.js
 /.next/
+/.output/
+/apps/frontend/dist/
+/apps/api/generated/spa.ts
 /out/
 
 # production
@@ -27,6 +30,7 @@ yarn-error.log*
 /.cache/e2e/
 /.cache/mvp-retained/
 /.cache/dev-local/
+/.cache/dev-runtime/
 /playwright-mvp-report/
 /mvp-test-results/
 
@@ -56,6 +60,10 @@ next-env.d.ts
 # Electron shell build output and packaged apps.
 /apps/desktop/dist/
 /apps/desktop/release/
+/apps/desktop/release-dev/
+/apps/desktop/release-acceptance/
+/.cache/desktop-evidence/
+/.cache/desktop-runtime/
 # Generated standalone credential broker bundles.
 /services/credential-broker/dist/
 /services/credential-broker/public/

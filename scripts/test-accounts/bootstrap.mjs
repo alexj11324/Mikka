@@ -5,9 +5,10 @@ import { mkdir, lstat, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
-import { assertDatabaseIdentity, databaseTarget, environmentFingerprint, EnvironmentError, validateEnvironment } from './environment.mjs'
+import { assertDatabaseIdentity, databaseTarget, dockerDescriptorSignature, environmentFingerprint, EnvironmentError, validateEnvironment } from './environment.mjs'
 import { recordAuthenticationSecrets } from './session.mjs'
 import { localDatabaseTarget } from './database-target.mjs'
+import { consumeDockerOwnership } from './docker-ownership.mjs'
 
 /** Capture the runner's existing secrets before a server or account can start. */
 export async function recordRunnerEvidenceSecrets(environment) {
@@ -24,6 +25,21 @@ export async function recordRunnerEvidenceSecrets(environment) {
  * this exact disposable resource belongs to the harness before the first DDL.
  */
 export async function bootstrapEnvironment({ connectionString, origin, deploymentSha, id, outputFile, authorizeDatabase }) {
+  return bootstrapBoundEnvironment({ connectionString, origin, deploymentSha, id, outputFile, authorizeDatabase })
+}
+
+/** Public bootstrap has no caller-provided authorization callback or flag. */
+export async function bootstrapDockerEnvironment({ ownership, connectionString, origin, deploymentSha, id, outputFile }) {
+  const docker = consumeDockerOwnership(ownership, { connectionString, origin, deploymentSha })
+  return bootstrapBoundEnvironment({ connectionString, origin, deploymentSha, id, outputFile,
+    authorizeDatabase: async pool => {
+      const server = (await pool.query('SELECT inet_server_addr() AS address, inet_server_port() AS port')).rows[0]
+      if (server?.address !== '127.0.0.1' || server.port !== 5432) throw new EnvironmentError('DOCKER_DATABASE_UNVERIFIED')
+    },
+  }, docker)
+}
+
+async function bootstrapBoundEnvironment({ connectionString, origin, deploymentSha, id, outputFile, authorizeDatabase }, docker) {
   if (typeof authorizeDatabase !== 'function') throw new EnvironmentError('DISPOSABLE_RESOURCE_OWNERSHIP_REQUIRED')
   const output = resolve(outputFile)
   let existing
@@ -32,10 +48,14 @@ export async function bootstrapEnvironment({ connectionString, origin, deploymen
     if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) throw new EnvironmentError('ENVIRONMENT_FILE_UNSAFE')
     existing = JSON.parse(await readFile(output, 'utf8'))
   } catch (error) { if (error.code !== 'ENOENT') throw new EnvironmentError('ENVIRONMENT_BOOTSTRAP_FILE_INVALID') }
-  const descriptor = validateEnvironment({
-    version: 1, id, kind: 'isolated-ci', origin, basePath: '/mikka', deploymentSha,
+  if (docker && existing) throw new EnvironmentError('DOCKER_BOOTSTRAP_ALREADY_BOUND')
+  let descriptor = validateEnvironment({
+    version: 1, id, kind: docker ? 'isolated-docker' : 'isolated-ci', origin, basePath: '/mikka', deploymentSha,
     database: databaseTarget(connectionString), instanceId: existing?.instanceId ?? randomUUID(),
     capabilities: { provision: true, mail: 'disabled', reset: true },
+    // Shape validation happens before connecting. This pending signature never
+    // leaves bootstrap; the actual marker key signs the final descriptor below.
+    ...(docker ? { docker, descriptorSignature: '0'.repeat(64) } : {}),
   })
   if (existing && environmentFingerprint(existing) !== environmentFingerprint(descriptor)) throw new EnvironmentError('ENVIRONMENT_BOOTSTRAP_BINDING_MISMATCH')
   const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5000, statement_timeout: 5000 })
@@ -45,6 +65,7 @@ export async function bootstrapEnvironment({ connectionString, origin, deploymen
     if (actual.name !== descriptor.database.name || actual.schema !== descriptor.database.schema || actual.user !== descriptor.database.user) throw new EnvironmentError('ACTUAL_DATABASE_MISMATCH')
     const marker = (await pool.query("SELECT to_regclass('mikka_test_accounts.environment') AS marker")).rows[0].marker
     if (marker) {
+      if (docker) throw new EnvironmentError('DOCKER_BOOTSTRAP_ALREADY_BOUND')
       if (!existing) throw new EnvironmentError('ENVIRONMENT_OWNERSHIP_FILE_REQUIRED')
       await assertDatabaseIdentity(pool, descriptor)
       return descriptor
@@ -55,6 +76,8 @@ export async function bootstrapEnvironment({ connectionString, origin, deploymen
     const authTable = (await pool.query("SELECT to_regclass('public.\"user\"') AS users")).rows[0].users
     if (authTable && (await pool.query('SELECT 1 FROM public."user" LIMIT 1')).rowCount) throw new EnvironmentError('ENVIRONMENT_DATABASE_NOT_FRESH')
     if ((await pool.query('SELECT 1 FROM pg_namespace WHERE nspname=$1', ['mikka_test_accounts'])).rowCount) throw new EnvironmentError('ENVIRONMENT_NAMESPACE_ALREADY_EXISTS')
+    const key = randomBytes(32).toString('hex')
+    if (docker) descriptor = validateEnvironment({ ...descriptor, descriptorSignature: dockerDescriptorSignature(descriptor, key) })
     await pool.query('BEGIN')
     try {
       await pool.query('CREATE SCHEMA mikka_test_accounts')
@@ -66,7 +89,7 @@ export async function bootstrapEnvironment({ connectionString, origin, deploymen
         attestation_key text NOT NULL,
         created_at timestamptz NOT NULL DEFAULT clock_timestamp()
       )`)
-      await pool.query('INSERT INTO mikka_test_accounts.environment (environment_id, instance_id, binding_sha256, attestation_key) VALUES ($1,$2,$3,$4)', [descriptor.id, descriptor.instanceId, environmentFingerprint(descriptor), randomBytes(32).toString('hex')])
+      await pool.query('INSERT INTO mikka_test_accounts.environment (environment_id, instance_id, binding_sha256, attestation_key) VALUES ($1,$2,$3,$4)', [descriptor.id, descriptor.instanceId, environmentFingerprint(descriptor), key])
       await pool.query('COMMIT')
     } catch (error) { await pool.query('ROLLBACK'); throw error }
     await mkdir(dirname(output), { recursive: true, mode: 0o700 })

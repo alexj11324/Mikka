@@ -10,11 +10,12 @@ import type { QuotaSnapshotReport } from '@mikka/protocol/quota'
 import type { NotificationCenter } from './notification-center'
 import { SshInstaller } from './ssh-install'
 import type { Updates } from './updates'
-import { isTrustedFrame } from './security'
+import { isTrustedFrame, trustedIpcSender } from './security'
 import { localSetupController } from './local-setup'
 
 export interface BridgeOptions {
   appUrl: string
+  rendererUrl?: string
   /** The desktop's flavor: 添加这台电脑 installs the matching daemon. */
   flavor?: 'prod' | 'dev'
   mintEnrollment(): Promise<string>
@@ -23,6 +24,7 @@ export interface BridgeOptions {
   prepareReturn(state: string): Promise<string>
   claudeCallback(authorizationUrl: unknown): Promise<string | null>
   localDevice(): Promise<LocalDevice>
+  pickRepo?(): Promise<import('@mikka/protocol/bridge').PickRepoResult>
   localAccount(): Promise<LocalDeviceAccount>
   quota(): Promise<QuotaSnapshotReport>
   notifications: NotificationCenter
@@ -35,7 +37,7 @@ export interface BridgeOptions {
 export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstaller): void {
   const trusted = (event: IpcMainInvokeEvent): boolean => {
     const frame = event.senderFrame
-    return frame !== null && frame.parent === null && isTrustedFrame(frame.url, options.appUrl)
+    return trustedIpcSender(frame, options.rendererUrl ?? options.appUrl)
   }
 
   function handle(channel: string, run: (...args: unknown[]) => unknown): void {
@@ -47,7 +49,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
 
   const installer = sshInstaller ?? new SshInstaller(options.appUrl, options.mintEnrollment, state => {
     for (const contents of webContents.getAllWebContents()) {
-      if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), options.appUrl)) contents.send(IPC.sshChanged, state)
+      if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), options.rendererUrl ?? options.appUrl)) contents.send(IPC.sshChanged, state)
     }
   }, undefined, undefined, undefined, undefined, options.flavor, undefined, async (deviceId, ownerId) => {
     const current = await options.localAccount()
@@ -84,6 +86,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   handle(IPC.appInstallUpdate, () => options.updates.install())
   handle(IPC.appRequireUpdate, () => options.requireUpdate())
   handle(IPC.deviceStatus, () => options.localDevice())
+  handle(IPC.devicePickRepo, () => options.pickRepo?.() ?? { status: 'cancelled' })
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))
   handle(IPC.notificationsSetBadge, count => options.notifications.setBadge(count))

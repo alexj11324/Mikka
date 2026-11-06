@@ -1,4 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { readDesktopSession } from '@/lib/desktop-rpc/session'
+import { nativeSessionHeaders } from '@/lib/desktop-rpc/session-cache'
+import { readBrowserSession } from '@/lib/browser-rpc/session'
 
 /**
  * The session is cached in a signed cookie for 5 minutes (lib/auth.ts
@@ -31,7 +34,21 @@ export const SESSION_OPTIONS = {
 
 /** Makes `auth.api.getSession` skip the cookie cache inside withFreshSession. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- better-auth's getSession is overloaded; the wrapper only adds a query flag.
-export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }) {
+export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }, native?: { cookieName: () => Promise<string> }) {
   const read = api.getSession
-  api.getSession = (context: { query?: Record<string, unknown> } | undefined) => read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
+  api.getSession = (context: { headers?: Headers; query?: Record<string, unknown> } | undefined) => {
+    const mustBeFresh = sessionMustBeFresh() || context?.query?.disableCookieCache === true
+    const desktop = readDesktopSession(mustBeFresh)
+    if (desktop) return desktop
+    if (context?.headers?.has('authorization')) {
+      const input = context.headers
+      return (async () => {
+        const headers = nativeSessionHeaders(input, native ? await native.cookieName() : undefined, Boolean(native && !mustBeFresh))
+        return read({ ...context, headers, query: { ...context.query, disableCookieCache: mustBeFresh || !native } })
+      })()
+    }
+    const browser = readBrowserSession(context, mustBeFresh)
+    if (browser) return browser
+    return read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
+  }
 }

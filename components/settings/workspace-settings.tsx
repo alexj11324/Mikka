@@ -20,6 +20,7 @@ import { resetOnboarding } from '@/app/actions/onboarding'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
+import { publicAppOrigin } from '@/lib/platform/public-origin'
 
 const ICON_MAX_BYTES = 200 * 1024
 const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
@@ -61,7 +62,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const inFlight = useRef(false)
   // A save asked for while another runs goes next; dropping it would leave a draft that looks saved.
   const queued = useRef<{ field: Field; value: string | null } | null>(null)
-  const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
+  const host = typeof window === 'undefined' ? '' : `${new URL(publicAppOrigin()).host}${withBasePath('/w/')}`
 
   if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
   if (!data) return <div role="alert" className="flex flex-col items-start gap-3 text-sm">

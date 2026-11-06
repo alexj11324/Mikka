@@ -1,10 +1,12 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 import { useRef, useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createWorkspace } from '@/app/actions/workspace'
+import { getPathname } from '@/i18n/navigation'
+import { withBasePath } from '@/lib/base-path'
 import { workspaceSlug, workspaceSlugSuffix } from '@/lib/workspace-slug'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -14,6 +16,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/
 
 export function CreateWorkspaceForm() {
   const i18nText = useTranslations();
+  const locale = useLocale()
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [slugEdited, setSlugEdited] = useState(false)
@@ -31,7 +34,7 @@ export function CreateWorkspaceForm() {
       const result = await createWorkspace({ name: name.trim(), slug: slug.trim() })
       if (!result.ok) { setError(result.error); return }
       toast.success(i18nText("FeatureCopy.c_9023f815"))
-      window.location.assign('/')
+      window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
     } catch {
       setError(i18nText("FeatureCopy.c_3f765954"))
     } finally {

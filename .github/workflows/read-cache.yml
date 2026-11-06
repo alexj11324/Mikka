@@ -3,6 +3,11 @@ name: Read cache API acceptance
 on:
   pull_request:
     paths:
+      - 'apps/api/**'
+      - 'apps/frontend/**'
+      - 'lib/browser-rpc/**'
+      - 'scripts/start-app*'
+      - 'scripts/acceptance/read-action-transport.mjs'
       - '.github/workflows/read-cache.yml'
       - 'scripts/acceptance/read-cache*.mjs'
       - 'scripts/acceptance/run-read-cache*.mjs'
@@ -82,7 +87,7 @@ jobs:
       - name: Bind the isolated database and application to this checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Build this isolated application for production-mode acceptance
-        run: pnpm exec next build
+        run: pnpm build:app
       - name: Accept real incremental Server Actions and Settings GET
         run: node scripts/acceptance/run-read-cache.mjs
       - name: Check the public evidence for authentication material

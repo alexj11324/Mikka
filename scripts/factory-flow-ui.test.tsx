@@ -43,6 +43,7 @@ let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let FactoryAcceptance: typeof import('../components/workspace/factory-acceptance')['FactoryAcceptance']
 let ownCapture: typeof import('../components/artifacts/artifact-document')['ownCapture']
+let ArtifactDocument: typeof import('../components/artifacts/artifact-document')['ArtifactDocument']
 
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
@@ -51,7 +52,7 @@ before(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FactoryAcceptance } = await import('../components/workspace/factory-acceptance'))
-  ;({ ownCapture } = await import('../components/artifacts/artifact-document'))
+  ;({ ownCapture, ArtifactDocument } = await import('../components/artifacts/artifact-document'))
 })
 beforeEach(() => {
   flow = undefined; flowError = undefined; flowReloads = 0; reloaded = []; navigated = []
@@ -238,4 +239,24 @@ test('only this app\'s own capture links listed as media become players', () => 
   assert.equal(ownCapture(`${origin}/api/captures/33333333-3333-4333-8333-333333333333`, media, origin), null)
   assert.equal(ownCapture(`${origin}/api/captures/22222222-2222-4222-8222-222222222222?x=1`, media, origin), null)
   assert.equal(ownCapture(`${origin}/api/captures/22222222-2222-4222-8222-222222222222`, [], origin), null)
+})
+
+test('bundled artifact captures use the trusted backend origin and local authenticated path', async () => {
+  const captureId = '22222222-2222-4222-8222-222222222222'
+  const media = [{ captureId, kind: 'video' as const, title: 'Recording' }]
+  const markdown = `[Recording](https://mikka.example/mikka/api/captures/${captureId})`
+  const props = { title: 'Acceptance', markdown, author: { authorName: '', authorColor: null, authorShape: null }, meta: '', quoted: [], quoting: null }
+  browser.happyDOM.setURL('mikka://app/mikka')
+  Object.defineProperty(browser, 'mikka', { configurable: true, value: { app: { runtime: 'electron', serverUrl: 'https://mikka.example/mikka' }, bundled: {} } })
+  try {
+    await act(async () => root.render(<ArtifactDocument {...props} media={media} />))
+    assert.match(container.querySelector('video')?.getAttribute('src') ?? '', /^\/(?:mikka\/)?api\/captures\/22222222-2222-4222-8222-222222222222$/)
+    await act(async () => root.render(<ArtifactDocument {...props} />))
+    assert.equal(container.querySelector('video'), null, 'public details without authorized media remain plain links')
+    await act(async () => root.render(<ArtifactDocument {...props} markdown={markdown.replace('mikka.example', 'foreign.example')} media={media} />))
+    assert.equal(container.querySelector('video'), null, 'a listed ID does not authorize a foreign origin')
+  } finally {
+    Reflect.deleteProperty(browser, 'mikka')
+    browser.happyDOM.setURL('https://mikka.example/zh-CN')
+  }
 })

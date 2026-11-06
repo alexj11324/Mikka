@@ -45,3 +45,4 @@ export const IPC = {
   /** main -> renderer push of AuthState. */
   authChanged: "mikka:auth:changed",
 } as const
+export { BUNDLED_IPC } from './bundled'

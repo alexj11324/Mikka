@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { MailboxError } from '@/lib/mailbox-error'
 import type { WriteRequestContext } from './write-transaction'
 import { discoveryInput, type createApprovedWriteDiscovery } from './write-discovery'
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
 const requestSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('propose'), action: z.enum(WRITE_ACTIONS), input: z.unknown(), intentId: z.uuid() }).strict(),
@@ -18,10 +19,11 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 export function approvedWriteHandler(auth: { api: { getSession: (args: { headers: Headers; query: { disableCookieCache: boolean } }) => Promise<{ user: { id: string }; session: { id: string } } | null> } }, operations: (action: WriteActionName, context?: WriteRequestContext) => Pick<ReturnType<typeof createApprovedWrites>, 'propose' | 'decide' | 'view'>, discovery?: ReturnType<typeof createApprovedWriteDiscovery>) {
   return async (request: Request): Promise<Response> => {
     if (request.method !== 'POST') return new Response(null, { status: 405 })
-    if (request.headers.has('authorization') || !request.headers.get('cookie')) return new Response(null, { status: 401 })
+    const sessionHeaders = humanSessionHeaders(request)
+    if (!sessionHeaders) return new Response(null, { status: 401 })
     if (request.headers.get('origin') !== new URL(request.url).origin) return new Response(null, { status: 403 })
     try {
-      const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+      const session = await auth.api.getSession({ headers: sessionHeaders, query: { disableCookieCache: true } })
       if (!session) return new Response(null, { status: 401 })
       let raw: unknown
       try { raw = await request.json() }

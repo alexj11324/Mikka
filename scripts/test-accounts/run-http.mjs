@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { checkSummary, parseSummary } from '../run-db-tests.mjs'
 import { assertDeploymentIdentity, loadEnvironment, EnvironmentError } from './environment.mjs'
 
-// This runner owns its Next child. It never attaches to an existing application
+// This runner owns its production child. It never attaches to an existing application
 // process or guesses a production/Preview URL. Raw server output is not retained.
 async function stop(child) {
   if (!child?.pid) return
@@ -38,8 +38,8 @@ export async function runHttpAcceptance() {
   let serverStdoutBytes = 0, serverStderrBytes = 0
   const started = new Date().toISOString()
   try {
-    const next = fileURLToPath(import.meta.resolve('next/dist/bin/next'))
-    server = spawn(process.execPath, [next, 'start', '--hostname', origin.hostname.replaceAll(/[[\]]/g, ''), '--port', origin.port || (origin.protocol === 'https:' ? '443' : '80')], {
+    const application = fileURLToPath(new URL('../start-app.mjs', import.meta.url))
+    server = spawn(process.execPath, [application, '--hostname', origin.hostname.replaceAll(/[[\]]/g, ''), '--port', origin.port || (origin.protocol === 'https:' ? '443' : '80')], {
       env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     })
     server.once('error', () => { serverExited = true })

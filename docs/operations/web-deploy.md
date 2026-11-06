@@ -1,9 +1,7 @@
 # Production web deploy
 
-Production builds of the web app run on GitHub Actions, not on Vercel's build
-machines. Mikka is a public repository, so GitHub's standard runners are free,
-while each Vercel build cost about 5 minutes of a 4-core machine, around 100
-times a day. Vercel still hosts the deployment and serves `app.aspectlylabs.com`.
+GitHub Actions builds the shared Vite frontend and independent Nitro API.
+Vercel hosts their Build Output API artifact and serves `app.aspectlylabs.com`.
 
 ## Flow
 
@@ -20,7 +18,7 @@ See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/w
    then reads `VERCEL_DEPLOY_TOKEN` from Infisical `prod:/platform`
    through the existing GitHub OIDC identity. This is a dedicated Mikka-team
    token, so it can be rotated without touching `VERCEL_TOKEN` or
-   `VERCEL_TEAM_TOKEN`. It expires on 2027-02-02.
+   `VERCEL_TEAM_TOKEN`.
 2. **Skip.** Applies the same documentation-only rule the old Vercel Ignored
    Build Step used (`scripts/vercel-ignore-build.mjs`). The comparison is
    against the commit production serves now, not the previous push, so a
@@ -35,44 +33,73 @@ See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/w
      commit SHA, which the migration guard requires.
    - It refuses to build if a required value is missing. The error names the
      variable, never its value.
-4. **Build.** Runs `vercel build --prod`, which is the same `pnpm build` as
-   before, ending with typecheck and then migrations against the production
-   database.
+4. **Build.** Runs `node scripts/release/build-vercel.mjs`. The wrapper requires
+   Node 24, pnpm 10.34.3, the exact checked-out SHA and a unique deployment ID.
+   It selects `NITRO_PRESET=vercel` and runs the normal `pnpm build`: subscription
+   worker, agent UI generation, Vite frontend, Nitro API, typecheck, then
+   migrations against the production databases. It checks the resulting
+   `.vercel/output/config.json`; it does not invoke `vercel build` or Next.
 5. **Deploy.** Rechecks current `main` immediately before
-   `vercel deploy --prebuilt --prod`. The Git metadata (org,
+   `vercel deploy --prebuilt --prod --archive=tgz`. The Git metadata (org,
    repo, ref, SHA) lets the device gateway release
    (`docs/operations/device-gateway-release.md`) identify the serving commit.
 6. **Verify.** Before releasing the queue, requires the unauthenticated public
    `/mikka/api/version` response's `build` to equal the complete commit SHA.
 
 The deployment's runtime environment comes from the Vercel project as before.
-The workflow uploads build output only.
+The workflow uploads build output only. The local acceptance switches
+`MIGRATE=0` and `MIKKA_BUILD_BYOS_WORKER=0` do not prove the production migration
+and worker build; keep the normal production settings for this release path.
 
-`vercel.json` keeps `git.deploymentEnabled.main` off, so Vercel does not also
-build each push.
+`vercel.json` sets `framework: null` (Other), overriding the dashboard framework
+preset, and keeps Git-triggered deployments disabled. The prebuilt workflow
+therefore needs no Vercel source build or second dependency installation. See
+[the framework override](https://vercel.com/docs/project-configuration/vercel-json#framework)
+and [prebuilt uploads](https://vercel.com/docs/cli/deploy#prebuilt).
+
+`apps/api/scripts/finalize-build.mjs` preserves Nitro and Workflow function
+metadata, requires Node 24, adds the tracing entry before the application,
+and copies the runtime resources. `.vercel/output/mikka-build.json` records
+the source SHA, function contracts and resource hashes. These build checks do
+not prove hosted queue delivery or production OAuth callbacks.
+
+Keep **Automatically expose System Environment Variables** enabled in the
+existing project. Workflow uses the platform's runtime `VERCEL_DEPLOYMENT_ID`,
+project ID, OIDC and encryption configuration; the custom client deployment
+ID below does not replace them. Production must not inherit the local
+`WORKFLOW_TARGET_WORLD=local` or `WORKFLOW_LOCAL_*` configuration. See the
+[Workflow Vercel World contract](https://workflow-sdk.dev/worlds/vercel#system-environment-variables).
 
 ## Skew Protection
 
-A page left open across a deploy keeps calling its own build's Server Actions.
-Without Skew Protection the new deployment answers them with "action not
-found", and `watchRemovedActions` in `lib/app-build.ts` reloads the page.
+A page left open across a deploy must load its remaining assets and call the
+API from the same deployment. The shared frontend implements these pins
+explicitly; it does not rely on Next's Server Action or RSC transport.
 
 A prebuilt upload has no Vercel deployment id at build time, so the workflow's
 **Choose the deployment id** step sets `MIKKA_DEPLOYMENT_ID` from
 `lib/deployment-id.mjs`: `<first 12 of the sha>-<run id>-<run attempt>`, at
 most 32 characters, never starting with `dpl_`. Each run attempt gets a new id,
-because Vercel fails a deploy that reuses one. `next.config.mjs` sets
-`deploymentId` from it, and `experimental.runtimeServerDeploymentId: false`
-so pages keep this id instead of the runtime `dpl_` id
-([vercel/next.js#94734](https://github.com/vercel/next.js/issues/94734)).
-Next.js 16 then sends it as `x-deployment-id` on Server Action and RSC
-requests. Local builds and CI checks leave it unset.
+because Vercel fails a deploy that reuses one. The build writes the same value
+to `.vercel/output/config.json`'s `deploymentId` and the frontend bundle:
 
-The id does nothing until Skew Protection is on for the Vercel project. Turn it
-on in the dashboard: Project Settings → Advanced → Skew Protection. The API
-returned "Skew Protection not found" for this project, so the dashboard toggle
-comes first, and it may need the Pro plan. `watchRemovedActions` stays as the
-fallback for pages older than the Skew Protection window.
+- `apps/frontend/scripts/deployment-plugin.mjs` adds `?dpl=` to the HTML's local
+  asset links and emitted JavaScript and CSS asset references, including lazy
+  chunks. The renderer-build module URL uses the same ID.
+- `apps/frontend/src/web/deployment-fetch.ts` adds `x-deployment-id` to browser
+  fetches for the same origin's `/mikka/api/*` routes, including JSON RPC.
+- `/mikka/api/version` deliberately has no deployment pin. The existing
+  `VersionGuard` and explicit-action build checks can therefore detect a new
+  public build and require refresh. Full document navigations load the current
+  deployment.
+
+Vercel supports custom IDs for the
+[Build Output API](https://vercel.com/docs/skew-protection#build-output-api).
+The project's Skew Protection setting must still be enabled for the platform
+to honor the pins. Verify that setting and its retention window on the actual
+project; the presence of pins in a local artifact is not a platform routing
+test. Builds without `MIKKA_DEPLOYMENT_ID` omit the pins; the production wrapper
+requires it.
 
 ## Official runtime configuration
 

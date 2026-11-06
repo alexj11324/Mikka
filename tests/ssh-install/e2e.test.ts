@@ -103,8 +103,11 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     const appUrl = 'https://app.example.test/mikka'
     registerBridge({ appUrl, mintEnrollment: async () => '', openExternal: async () => {}, localDevice: async () => ({}), quota: async () => ({}), notifications: {}, consumePendingClick: () => null } as unknown as Parameters<typeof registerBridge>[0], installer)
     let bridge!: MikkaBridge
+    // The hardened preload checks the complete URL and top-frame identity.
+    const preloadWindow: { location: URL; top?: unknown } = { location: new URL(appUrl) }
+    preloadWindow.top = preloadWindow
     runInNewContext(await readFile(new URL('../../apps/desktop/dist/preload.cjs', import.meta.url), 'utf8'), {
-      window: { location: { origin: new URL(appUrl).origin } },
+      window: preloadWindow,
       document: { documentElement: { dataset: {} } },
       process: { platform: 'linux', argv: [`--mikka-app-origin=${new URL(appUrl).origin}`] },
       require: () => ({

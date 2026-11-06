@@ -4,6 +4,8 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedWorkspace } from './support/workspace-admin-db'
 import { TestAccountPool } from '../scripts/test-accounts/pool.mjs'
+import { SESSION_OPTIONS } from '../lib/fresh-session'
+import { DESKTOP_SESSION_CACHE_HEADER, desktopSessionCacheAfter, validDesktopSessionCache } from '../lib/desktop-rpc/session-cache'
 
 // Real Better Auth and PostgreSQL. Only Next's request cookie-store port is
 // explicit fixture IO; no provider, mailbox or OAuth flow is invoked.
@@ -18,7 +20,8 @@ test('authentication writes tenant-bound durable intent and withholds every new 
   const origin = 'http://localhost:3187', password = `fixture-${randomBytes(20).toString('hex')}`, email = `audit-login-${randomUUID()}@example.invalid`
   const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
     emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [nextCookies()],
-    hooks: { after: createAuthMiddleware(auditAuthentication) },
+    session: SESSION_OPTIONS,
+    hooks: { after: createAuthMiddleware(async ctx => { await auditAuthentication(ctx); desktopSessionCacheAfter(ctx) }) },
   })
   const created = await auth.api.signUpEmail({ body: { name: 'Audit Login Fixture', email, password } })
   const userId = created.user.id, workspaces: string[] = []
@@ -43,7 +46,7 @@ test('authentication writes tenant-bound durable intent and withholds every new 
       return await deliverWorkspaceAudits({ main: database, workspace: database })
     } finally { await holder.query('ROLLBACK'); holder.release() }
   }
-  const post = (body: unknown) => auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/email`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+  const post = (body: unknown) => auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/email`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-mikka-client': 'desktop' }, body: JSON.stringify(body) }))
   await t.test('wrong passwords name an attempted subject, never a forged authenticated actor or client-selected tenant', async () => {
     const denied = await post({ email, password: 'wrong-fixture-password', userId: 'forged-actor', workspaceId: workspaces[2] })
     assert.equal(denied.status, 401)
@@ -62,6 +65,7 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     const response = await post({ email, password }); assert.equal(response.status, 200)
     const body = await response.json(); assert.equal(body.user.id, userId)
     assert.ok(response.headers.getSetCookie().length)
+    assert.ok(validDesktopSessionCache(response.headers.get(DESKTOP_SESSION_CACHE_HEADER)))
     const session = (await database.query('SELECT id FROM session WHERE token=$1', [body.token])).rows[0]
     const rows = (await events()).filter(row => row.payload.action === 'auth.signed_in'); assert.equal(rows.length, 2)
     assert.ok(rows.every(row => row.payload.actorType === 'user' && row.payload.actorId === userId && row.payload.targetType === 'session' && row.payload.targetId === session.id))
@@ -91,6 +95,7 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     try {
       const response = await post({ email, password }); assert.equal(response.status, 503)
       assert.equal(response.headers.getSetCookie().length, 0)
+      assert.equal(response.headers.has(DESKTOP_SESSION_CACHE_HEADER), false, 'withheld sign-in must not expose a reusable native proof')
       const body = await response.json(); assert.equal(body.code, 'AUTH_AUDIT_UNAVAILABLE'); assert.equal(Object.hasOwn(body, 'token'), false)
       cookieWrites.length = 0
       await assert.rejects(auth.api.signInEmail({ body: { email, password }, headers: new Headers({ origin }) }), { statusCode: 503 })

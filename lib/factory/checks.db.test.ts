@@ -70,7 +70,10 @@ import {
 
 test(
   "actual migrated PG/HTTP: review/verify receipt consumers and bounded repair",
-  { timeout: 120000 },
+  // This parent includes migrations/setup and more than 90 sequential PG/HTTP cases.
+  // Allow their aggregate work under the normal four-suite CI concurrency;
+  // individual SQL, lock and model deadlines and all assertions stay unchanged.
+  { timeout: 300_000 },
   async (t) => {
     assert.equal(process.env.REQUIRE_DB, "1");
     const url = process.env.E2E_DATABASE_URL;

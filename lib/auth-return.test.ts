@@ -47,6 +47,28 @@ test('OAuth resume URLs omit app-only parameters while preserving the signed req
   assert.equal(path, '/api/auth/oauth2/authorize?client_id=client&response_type=code')
 })
 
+test('cold desktop links retain the existing workspace selection through sign-in', () => {
+  for (const path of [
+    `/?bot=${workspaceId}`,
+    `/?group=${workspaceId}`,
+    `/?bot=${workspaceId}&thread=${issueId}`,
+    `/?issue=${issueId}&thread=${workspaceId}`,
+    `/?artifact=${issueId}`,
+    '/?threads=all',
+    `/?threads=${workspaceId}`,
+    '/?section=all-issues',
+    `/?section=team-projects&team=${workspaceId}&project=${issueId}`,
+    `/?section=agent&session=${workspaceId}`,
+  ]) assert.equal(safeAuthReturn(path), path)
+  for (const path of [
+    `/?bot=${workspaceId}&next=https://attacker.example`,
+    `/?bot=${workspaceId}&bot=${issueId}`,
+    '/?bot=https://attacker.example', '/?artifact=bad-id', '/?threads=everything',
+    '/?section=constructor', '/?section=all-issues#https://attacker.example',
+    '/?section=all-issues&app=https://attacker.example', '/?thread=',
+  ]) assert.equal(safeAuthReturn(path), '/', path)
+})
+
 test('returns to the plugins page and any store app page, nothing else', () => {
   assert.equal(safeAuthReturn('/?section=plugins'), '/?section=plugins')
   assert.equal(safeAuthReturn('/?section=plugins&app=gmail'), '/?section=plugins&app=gmail')

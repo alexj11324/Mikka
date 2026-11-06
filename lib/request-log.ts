@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
 import { channel } from 'node:diagnostics_channel'
+import { withNativeSessionCache } from './desktop-rpc/session-cache-context.ts'
 
 // Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
@@ -116,7 +117,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
       try { sink(JSON.stringify(entry), entry.level) } catch { /* logging never breaks a request */ }
     }
     try {
-      const response = await requestScope.run(store, () => routeScope.run(route, () => handler(request, ...rest)))
+      const response = await withNativeSessionCache(request.headers, () => requestScope.run(store, () => routeScope.run(route, () => handler(request, ...rest))))
       write(response.status)
       return response
     } catch (error) {

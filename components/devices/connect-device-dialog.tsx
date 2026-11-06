@@ -11,9 +11,8 @@ import { IconTile } from '@/components/reui/icon-tile'
 import { BASE_PATH } from '@/lib/base-path'
 import { daemonCommands } from '@/lib/daemon-commands'
 import { FieldError } from '@/components/ui/field'
-
-/** The public name is confirmed with the release; no workspace checkout is needed. */
-const packageName = process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka'
+import { publicAppOrigin } from '@/lib/platform/public-origin'
+import { daemonPackageName } from '@/lib/platform/client-config'
 
 export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false, reconnect = false }: {
   open?: boolean
@@ -64,7 +63,7 @@ export function DaemonCommandList({ open = true, reconnect = false }: { open?: b
   const [commands, setCommands] = useState<ReturnType<typeof daemonCommands> | null>(null)
   useEffect(() => {
     if (!open) return
-    try { setCommands(daemonCommands({ origin: window.location.origin, basePath: BASE_PATH, packageName })) }
+    try { setCommands(daemonCommands({ origin: publicAppOrigin(), basePath: BASE_PATH, packageName: daemonPackageName() })) }
     catch { setCommands(null) }
   }, [open])
   return commands ? <div className="flex min-w-0 flex-col gap-4">

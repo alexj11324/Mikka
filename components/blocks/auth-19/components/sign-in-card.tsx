@@ -27,6 +27,8 @@ type SignInCardProps = {
   unverified?: boolean
   notice: string
   next?: string
+  /** A validated desktop browser handoff survives the sign-in/sign-up switch. */
+  authQuery?: Record<string, string>
   onSubmit: FormEventHandler<HTMLFormElement>
   onGoogleSignIn: () => Promise<void>
   onGitHubSignIn: () => Promise<void>
@@ -39,7 +41,7 @@ type FieldErrors = Partial<Record<FieldName, string>>
 const FIELD_ORDER: FieldName[] = ['name', 'email', 'password']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
   const t = useTranslations('Auth')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const oauthEnabled = googleEnabled || githubEnabled
@@ -47,6 +49,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
     const params = new URLSearchParams()
     if (next !== '/') params.set('next', next)
     if (addAccount) params.set('addAccount', '1')
+    for (const [key, value] of Object.entries(authQuery ?? {})) params.set(key, value)
     const query = params.toString()
     return `${path}${query ? `?${query}` : ''}`
   }

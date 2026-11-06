@@ -212,6 +212,8 @@ export const localDeviceAccount = z.object({
 export type LocalDeviceAccount = z.infer<typeof localDeviceAccount>
 
 export interface MikkaBridge {
+  /** Present only in the bundled desktop, never includes a token API. */
+  bundled?: import('./bundled').BundledBridge
   ssh?: {
     onChange(listener: (state: SshInstallState) => void): () => void
     hosts(): Promise<{ alias: string; user: string; hostName: string; port: number }[]>
@@ -349,3 +351,4 @@ export interface MikkaBridge {
     html(html: string): Promise<string>
   }
 }
+export type { BundledBridge, BundledSession, BundledSignIn, BundledLiveEvent, BundledViewerInput, BundledViewerEvent, BundledViewerResult } from './bundled'

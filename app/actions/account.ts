@@ -1,6 +1,7 @@
 'use server'
 
 import { withFreshSession } from '@/lib/fresh-session'
+import { recordDesktopTokenRotation } from '@/lib/desktop-rpc/session'
 import { headers } from 'next/headers'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
@@ -96,7 +97,10 @@ async function changePasswordBody(input: { currentPassword: string; newPassword:
     const { headers: requestHeaders } = await requireSession()
     const revokeOtherSessions = parsed.data.revokeOtherSessions ?? false
     try {
-      await auth.api.changePassword({ body: { currentPassword: parsed.data.currentPassword, newPassword: parsed.data.newPassword, revokeOtherSessions }, headers: requestHeaders })
+      const changed = await auth.api.changePassword({ body: { currentPassword: parsed.data.currentPassword, newPassword: parsed.data.newPassword, revokeOtherSessions }, headers: requestHeaders })
+      // Better Auth rotates the current token when it revokes other sessions.
+      // The desktop main process consumes it privately; action data stays unchanged.
+      if (changed?.token) recordDesktopTokenRotation(changed.token)
     } catch (error) {
       throw passwordFailure(error) ?? error
     }

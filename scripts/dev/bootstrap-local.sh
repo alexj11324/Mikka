@@ -129,7 +129,7 @@ if [ "$("${PSQL[@]}" -d mikka_e2e -c "SELECT obj_description('public'::regnamesp
   "${PSQL[@]}" -d mikka_e2e -c "COMMENT ON SCHEMA public IS 'mikka-bootstrap $MIGRATIONS'"
 fi
 
-# 7. Better Auth for a local server (next dev / next start): a random secret made on this machine,
+# 7. Better Auth for a local development or compiled API server: a random secret made on this machine,
 # kept in a 0600 file and never printed (the export line reads the file), and the local origin.
 AUTH_FILE="$STATE/better-auth-secret"
 if [ ! -s "$AUTH_FILE" ]; then

@@ -8,6 +8,7 @@ import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { getLocale } from 'next-intl/server'
 import { pointsPurchase, pointsPurchaseUrl } from '@/lib/billing/points-purchase'
 import { workspaceCreditBillingView, type CreditBillingView } from '@/lib/billing/history'
+import { currentDesktopSession } from '@/lib/desktop-rpc/session'
 
 /** 设置 › 计费. Admins only. */
 export async function getBilling(workspaceId?: string): Promise<ActionResult<BillingView>> {
@@ -56,7 +57,7 @@ async function startPointsPurchaseBody(workspaceId: string, amount: number): Pro
 async function startChatPointsPurchaseBody(amount: number, botId: string | null): Promise<ActionResult<{ url: string } | { clientSecret: string }>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
-    return pointsPurchase(actor.userId, actor.workspaceId, amount, await getLocale(), { chat: { botId } })
+    return pointsPurchase(actor.userId, actor.workspaceId, amount, await getLocale(), { chat: { botId }, hosted: Boolean(currentDesktopSession()) })
   })
 }
 

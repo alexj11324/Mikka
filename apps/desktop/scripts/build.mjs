@@ -1,10 +1,11 @@
-// Build the main and preload bundles. The renderer is the web app served at
-// `__MIKKA_APP_URL__`; nothing from this app is shipped to it.
+// Ship the existing application's React renderer beside main and preload.
+// __MIKKA_APP_URL__ identifies the backend; normal launch never downloads UI.
 
 import { build } from 'esbuild'
 import { cp, mkdir, readFile, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildRenderer } from './build-renderer.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const outdir = resolve(root, 'dist')
@@ -29,6 +30,7 @@ const define = {
 
 await rm(outdir, { recursive: true, force: true })
 await mkdir(outdir, { recursive: true })
+await buildRenderer({ outdir: resolve(outdir, 'renderer') })
 
 const common = {
   bundle: true,

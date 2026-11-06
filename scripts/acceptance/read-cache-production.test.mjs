@@ -537,3 +537,68 @@ test('a failed sign-out blocks success, and a pre-login build mismatch never sen
   assert.equal(report.code, 'build_mismatch')
   assert.equal(f.calls.some(call => call.path.includes('/api/auth/')), false)
 })
+
+
+function migrationProof(options = {}) {
+  const calls = []
+  let mainReads = 0
+  const fetchImpl = async (input, init) => {
+    const url = new URL(input); calls.push(url.toString())
+    assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error')
+    if (url.origin === 'https://api.github.com') {
+      assert.equal(init.headers.authorization, 'Bearer SYNTHETIC-GH-TOKEN')
+      if (url.pathname.endsWith('/issues/1415')) return json({ number: 1415, url: repositoryApi + '/issues/1415',
+        repository_url: repositoryApi, state: 'open', ...options.issue })
+      if (url.pathname.endsWith('/git/ref/heads/main')) return json({ ref: 'refs/heads/main', object: { type: 'commit',
+        sha: ++mainReads === options.mainChangesAt ? OTHER : APP } })
+      assert.equal(url.toString(), repositoryApi + '/actions/runs/10')
+      return json({ ...webRelease(), ...options.run })
+    }
+    assert.equal(url.toString(), ORIGIN + '/mikka/api/version')
+    assert.equal(init.headers.authorization, undefined)
+    return json({ build: options.wrongBuild ? OTHER : APP })
+  }
+  return { calls, attest: () => attestProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(),
+    issueNumber: 1415, fetchImpl, now: () => NOW }) }
+}
+
+test('1415 explicitly enables the original real read suite without pretending the closed 1372 is open', async () => {
+  const old = await automaticProof({ issue: { state: 'closed' } }).attest()
+  assert.equal(old.readable, false)
+  const f = migrationProof(), proof = await f.attest()
+  assert.equal(proof.issueNumber, 1415); assert.equal(proof.purpose, 'production-read-cache-migration')
+  assert.equal(proof.readable, true)
+  assert.ok(f.calls.every(url => !url.includes('/issues/1372')))
+  assert.equal(f.calls.filter(url => url.endsWith('/git/ref/heads/main')).length, 2)
+  const run = fixture()
+  const report = await run.run({ env: automaticEnv(), event: automaticEvent(), attestation: proof, issueNumber: 1415 })
+  assert.equal(report.status, 'pass'); assert.equal(report.issue, 1415); assert.equal(report.sessionClosed, true)
+  assert.ok(run.actions.length > 20, 'the actual original five business read actions execute')
+  assert.deepEqual([...new Set(run.actions.map(action => action.name))].sort(), [...READ_ACTIONS].sort())
+  assert.equal(report.businessMutationRequests, 0)
+})
+
+test('1415 closed means no credentials, production calls or standing extra work', async () => {
+  const f = migrationProof({ issue: { state: 'closed' } }), proof = await f.attest()
+  assert.deepEqual(f.calls, [repositoryApi + '/issues/1415'])
+  assert.equal(proof.readable, false)
+  const result = await runProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(),
+    issueNumber: 1415, attestation: proof, now: () => NOW, fetchImpl: () => assert.fail('closed migration touched production') })
+  assert.deepEqual(productionOutcome(result), { readable: false, exitCode: 0 })
+})
+
+test('migration cannot adapt manual events or reuse another issue, stale main, foreign run or deployment proof', async () => {
+  await assert.rejects(attestProductionReadCache({ env: noCredentials(env()), event: event(), issueNumber: 1415,
+    fetchImpl: () => assert.fail('manual mutation mode reached the network') }), /trigger_rejected/)
+  for (const patch of [{ wrongBuild: true }, { mainChangesAt: 1 }, { mainChangesAt: 2 },
+    { run: { head_sha: OTHER } }, { issue: { number: 1372 } }, { issue: { pull_request: {} } }])
+    await assert.rejects(migrationProof(patch).attest())
+  const proof = await migrationProof().attest()
+  for (const patch of [{ issueNumber: 1372 }, { purpose: 'production-read-cache' }, { applicationSha: OTHER },
+    { issueState: 'closed' }, { checkedAt: new Date(NOW - 300_001).toISOString() }])
+    await assert.rejects(runProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(),
+      issueNumber: 1415, attestation: { ...proof, ...patch }, now: () => NOW,
+      fetchImpl: () => assert.fail('invalid proof read production') }), /attestation_required/)
+  await assert.rejects(runProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(),
+    attestation: proof, now: () => NOW, fetchImpl: () => assert.fail('1415 proof silently replaced default mode') }), /attestation_required/)
+})

@@ -6,20 +6,33 @@
     "out/**",
     "build/**",
     "packages/**",
-    "apps/**",
+    "apps/desktop/**",
+    "apps/mobile/**",
+    "apps/frontend/dist/**",
+    "apps/frontend/node_modules/**",
+    "apps/api/generated/**",
     "components/reui/code-block/**",
     "next-env.d.ts",
     "user_read_only_context/**",
     "v0_memories/**",
-    ".claude/**"
+    ".claude/**",
+    ".output/**",
+    ".vercel/**"
   ],
   "rules": {
-    "no-restricted-imports": ["error", {
-      "paths": [{
-        "name": "next/server",
-        "importNames": ["after"],
-        "message": "Use afterJob from @/lib/background, so the deferred work is traced and labelled as its own job (docs/operations/tracing.md)."
-      }]
-    }]
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "next/server",
+            "importNames": [
+              "after"
+            ],
+            "message": "Use afterJob from @/lib/background, so the deferred work is traced and labelled as its own job (docs/operations/tracing.md)."
+          }
+        ]
+      }
+    ]
   }
 }

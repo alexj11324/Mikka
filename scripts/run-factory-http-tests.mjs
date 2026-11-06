@@ -46,9 +46,9 @@ const probes = [
 ]
 // These rollout gates belong to this already-validated ephemeral test process.
 // The built question endpoints exercise the same enabled consumers as dispatch.
-// Locally the built server's auth origin is this runner's own origin (bootstrap-local exports :3000 for next dev).
+// Locally the built server's auth origin is this runner's own origin (bootstrap-local exports :3000 for development).
 const factoryEnv = { ...process.env, MIKKA_FACTORY_ROUTING_ENABLED: '1', MIKKA_FACTORY_LIFECYCLE_ENABLED: '1', ...(localTestAccountsMode(process.env) ? { BETTER_AUTH_URL: origin } : {}) }
-const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--port', '3100'], { stdio: 'inherit', env: factoryEnv })
+const server = spawn(process.execPath, ['scripts/start-app.mjs', '--port', '3100'], { stdio: 'inherit', env: factoryEnv })
 try {
   let ready = false
   for (let attempt = 0; attempt < 60; attempt++) {
