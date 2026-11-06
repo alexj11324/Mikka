@@ -35,7 +35,7 @@ function runtime(overrides = {}) {
       }
       if (executable.endsWith('/lipo')) return { status: 0, stdout: overrides.architecture ?? 'arm64\n', stderr: '' }
       if (args.at(-1) === '-') return input?.startsWith('<plist') ? { status: 0, stdout: JSON.stringify(overrides.entitlements ?? entitlements), stderr: '' } : { status: 1, stdout: 'Unexpected character at line 1', stderr: '' }
-      return { status: 0, stdout: JSON.stringify(overrides.info ?? { CFBundleIdentifier: 'com.aspectlylabs.mikka.dev', CFBundleExecutable: 'Mikka Dev' }), stderr: '' }
+      return { status: 0, stdout: JSON.stringify(overrides.info ?? { CFBundleIdentifier: 'com.aspectlylabs.mikka.dev', CFBundleExecutable: 'Mikka Dev', CFBundleURLTypes: [{ CFBundleURLName: 'Mikka Dev sign-in', CFBundleURLSchemes: ['mikka-dev-auth'] }] }), stderr: '' }
     },
   }
 }
@@ -68,6 +68,8 @@ test('signed but wrong identity, architecture, hardened runtime or entitlements 
     [{ identity: identity.replace('TeamIdentifier=not set', 'TeamIdentifier=OTHERTEAM') }, 'MAC_PACKAGE_IDENTITY'],
     [{ identity: identity.replace('flags=0x10002', 'flags=0x2') }, 'MAC_PACKAGE_HARDENED_RUNTIME'],
     [{ architecture: 'x86_64 arm64' }, 'MAC_PACKAGE_ARCHITECTURE'],
+    [{ info: { CFBundleIdentifier: 'com.aspectlylabs.mikka.dev', CFBundleExecutable: 'Mikka Dev' } }, 'MAC_PACKAGE_URL_SCHEME'],
+    [{ info: { CFBundleIdentifier: 'com.aspectlylabs.mikka.dev', CFBundleExecutable: 'Mikka Dev', CFBundleURLTypes: [{ CFBundleURLSchemes: ['mikka-auth', 'mikka-dev-auth'] }] } }, 'MAC_PACKAGE_URL_SCHEME'],
     [{ entitlements: { ...entitlements, 'com.apple.security.get-task-allow': true } }, 'MAC_PACKAGE_ENTITLEMENTS'],
     [{ entitlements: { ...entitlements, 'com.apple.security.cs.disable-library-validation': false } }, 'MAC_PACKAGE_ENTITLEMENTS'],
   ]) {

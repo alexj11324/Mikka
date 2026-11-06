@@ -252,6 +252,8 @@
     "continueGoogle": "Continue with Google",
     "googleLinkHint": "If this email already has a Mikka account, sign in with your password and link Google under Settings → Account.",
     "continueGithub": "Continue with GitHub",
+    "continueAs": "Continue as {name}",
+    "switchAccount": "Use another account",
     "orEmail": "or",
     "name": "Name",
     "namePlaceholder": "What should we call you?",
