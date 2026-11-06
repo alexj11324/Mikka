@@ -1,4 +1,4 @@
-name: Issues 1504 and 1506 production preflight
+name: Issues 1504 and 1506 production source inventory
 
 # Branch-only, ordinary smoke login and read-only metadata. No task dispatch.
 on:
@@ -29,8 +29,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Check the preflight client
-        run: node --check scripts/acceptance/issue-1504-1506/production-session.mjs
+      - name: Check the metadata clients
+        run: |
+          node --check scripts/acceptance/issue-1504-1506/production-session.mjs
+          node --check scripts/acceptance/issue-1504-1506/workspace-subscriptions.mjs
       - name: Read the existing smoke email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -55,13 +57,13 @@ jobs:
           secret-name: SMOKE_OWNER_PASSWORD
           recursive: false
           include-imports: false
-      - name: Read production metadata and sign out
-        run: node scripts/acceptance/issue-1504-1506/production-session.mjs preflight
-      - name: Retain the sanitized preflight result
+      - name: Read workspace subscription metadata and sign out
+        run: node scripts/acceptance/issue-1504-1506/workspace-subscriptions.mjs
+      - name: Retain the sanitized inventory result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: production-issues-1504-1506-${{ github.run_id }}
-          path: issue-1504-1506-report/preflight.json
+          path: issue-1504-1506-report/workspace-subscriptions.json
           if-no-files-found: ignore
           retention-days: 7
