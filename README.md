@@ -408,9 +408,12 @@ follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
 
 ## License
 
-Mikka is licensed under [AGPL-3.0-only](LICENSE). Third-party components keep
-their own licenses; see
+Mikka is copyright © 2026 Aspectly Labs and licensed under
+[AGPL-3.0-only](LICENSE). Third-party components keep their own licenses; see
 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md).
+
+Commercial licenses for use without the AGPL's obligations are available from
+Aspectly Labs: [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
 
 If you run a modified version of Mikka as a network service, the AGPL requires
 you to offer its users the source code of your version.
@@ -418,5 +421,7 @@ you to offer its users the source code of your version.
 ## Contributing
 
 Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
-Contributions are made under the project's [AGPL-3.0-only](LICENSE) license;
-no separate contributor agreement is required.
+Contributors keep the copyright in their work and license it under
+[AGPL-3.0-only](LICENSE); by submitting it they also allow Aspectly Labs to
+offer it under other terms, including commercial licenses. There is no form to
+sign. The terms are in [`CONTRIBUTING.md`](CONTRIBUTING.md#license).
