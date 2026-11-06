@@ -3,8 +3,10 @@
 This is a development-runtime integration check at one fixed Git revision. It
 runs the real HTTP API, Postgres, WorkflowAgent and durable steps, source daemon,
 repository clone, worktree, verification, commit, push and completion handlers.
-It uses the existing isolated MVP subscription/model, GitHub API and mock-harness
-boundaries. It makes **zero real model calls**, creates **no E2B VM**, and is not a
+It uses the existing isolated MVP subscription/model and GitHub API boundaries.
+The real Codex adapter drives a **synthetic app-server protocol peer**, selected
+through the daemon's existing test binary override. It makes **zero real model
+calls**, creates **no E2B VM**, and is not a
 production, Preview, session-replay UI or live-provider acceptance gate.
 
 ## Run inside the isolated Docker workspace
@@ -39,7 +41,7 @@ rewrite to the fixture's real bare repository. No global Git config is changed.
 ## Assertions and retained evidence
 
 Two cases run through the real RPC action `coordinator.sendCoordinatorMessage`:
-successful mock execution and an intentional mock failure. Each carries a new
+successful synthetic execution and an intentional synthetic failure. Each carries a new
 W3C trace parent and browser-session reference. The check verifies the persisted
 run carrier; daemon registration, repo, worktree and adapter stages; workflow and
 Postgres spans; the completion HTTP parent's span; trace-linked stage logs; and
@@ -52,9 +54,16 @@ official OTel serializers.
 The source daemon receives a synthetic equivalent of the cloud's public trace
 bootstrap before registration. The test therefore checks the public-bootstrap
 contract and HTTP propagation, not provisioning of a real official E2B image.
-The mock adapter emits no provider generations. Evidence explicitly records
-`realProviderGenerations: 0`; successful scripted model events must not be
-reported as live Claude, Codex or Cursor acceptance.
+The fixture seeds the current source-bound model order and its owner's synthetic
+subscription, then lets the application create the real run binding. The real
+native-lease HTTP handler checks the run, device, owner and binding; the private
+test worker supplies only synthetic account/context/access values. The daemon's
+normal version and model probes call the synthetic peer. Its fixed version and
+usage values exercise protocol compatibility and telemetry, never attest an
+official CLI or provider. Evidence explicitly records `syntheticCLI: true` and
+`realProviderGenerations: 0`; scripted events must not be reported as live Claude,
+Codex or Cursor acceptance. Model policy, run authority and real MCP submit are
+unchanged.
 
 The final line gives the path of a mode-0600 `trace-chain.json` containing only
 metadata, stage names, safe identifiers, numeric telemetry and stated boundaries.

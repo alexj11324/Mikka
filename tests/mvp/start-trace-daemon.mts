@@ -1,9 +1,15 @@
-// Real CLI, HTTP transport, journal, repo/worktree manager and mock adapter.
+// Real CLI login, HTTP transport, journal, repo/worktree and Codex adapter.
+// Only the app-server process is a labelled synthetic protocol peer.
 // No real provider generation or E2B runtime is claimed by this fixture.
+import { join } from 'node:path'
 import { runCli } from '../../packages/daemon/src/cli'
+import { startDaemon, DAEMON_VERSION } from '../../packages/daemon/src/main'
+import { HttpServerLink } from '../../packages/daemon/src/server-link-http'
+import { NoSandbox } from '../../packages/daemon/src/agents/sandbox'
 import { daemonTracer } from '../../packages/daemon/src/tracing'
 import { sanitizeTraceContext } from '@mikka/protocol/trace-context'
 import { assertMvpEnvironment, MVP_ORIGIN } from './isolated-env.mjs'
+import { createTraceCodexBinary } from './trace-codex.mjs'
 
 assertMvpEnvironment()
 const directory = process.env.MIKKA_E2E_DAEMON_DIR, token = process.env.MIKKA_E2E_DEVICE_TOKEN
@@ -16,6 +22,14 @@ daemonTracer.configure({ endpoint: 'http://127.0.0.1:3196/i/v1/traces', projectT
 await daemonTracer.withContext(traceContext, async () => {
   const result = await runCli(['daemon', 'login', '--token', token, '--data-dir', directory, '--server', `${MVP_ORIGIN}/mikka`])
   if (result !== 0) throw new Error('TRACE_DAEMON_LOGIN_FAILED')
-  const code = await runCli(['daemon', '--data-dir', directory, '--server', `${MVP_ORIGIN}/mikka`, '--mock-speed', '100', '--fixtures-dir', fixtures, '--retain-resources'])
-  if (code !== null) process.exitCode = code
+  const binary = createTraceCodexBinary(directory, join(fixtures, 'mvp-core-loop.jsonl'))
+  const daemon = await startDaemon({
+    dataDir: directory, flavor: 'dev', link: new HttpServerLink(`${MVP_ORIGIN}/mikka`, fetch, DAEMON_VERSION),
+    agentSandbox: new NoSandbox(), harnessBinaries: { codex: binary },
+    harnesses: [{ harness: 'codex', installed: true, version: 'synthetic' }], modelProbe: true,
+    retainResources: true, onDrained: () => process.exit(0), onLockLost: () => process.exit(1),
+  })
+  let stopping = false
+  const stop = () => { if (!stopping) { stopping = true; void daemon.stop().then(() => process.exit(0)) } }
+  process.once('SIGINT', stop); process.once('SIGTERM', stop)
 })

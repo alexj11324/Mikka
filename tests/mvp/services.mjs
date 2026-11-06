@@ -89,7 +89,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         await git(source, ['clone', '--bare', '--no-hardlinks', '.', barePath])
         // dev:local (scripts/dev-local.mjs) runs a real agent, not the mock harness.
         const harness = input.harness ?? 'mock'
-        assert.ok(harness === 'mock' || harness === 'any')
+        assert.ok(harness === 'mock' || harness === 'any' || harness === 'synthetic-codex')
         scenario = { marker: input.marker, title: input.title, repo: REPOSITORY, deviceId: null, barePath, githubAccountId, harness }
         return reply({ barePath, repo: REPOSITORY, baseBranch: 'trunk' })
       }

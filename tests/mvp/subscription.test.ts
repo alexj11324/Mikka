@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 import { streamText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
@@ -10,7 +15,138 @@ import type { SubscriptionRepository } from '../../lib/subscription-repository'
 import { SubscriptionWorkerClient } from '../../packages/daemon/src/subscription-worker-client'
 import { startMvpServices } from './services.mjs'
 import { MVP_SERVICES,REPOSITORY } from './isolated-env.mjs'
-import { MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
+import { MVP_NATIVE_ACCOUNT, MVP_NATIVE_TOKEN, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
+import { createTraceCodexBinary } from './trace-codex.mjs'
+import { preflightLocalSubscription } from '../../packages/daemon/src/subscription-preflight'
+import { HARNESS_PINS } from '../../packages/daemon/src/harness-install'
+import { answerModel, tracePublicationReady } from './model.mjs'
+
+test('trace subscription fixture supports the current catalogue and native lease ABI, scoped to a run', async () => {
+  const config = { scope: { ownerId: 'mvp-owner', workspaceId: randomUUID(), connectionId: randomUUID(), provider: 'codex' as const },
+    databaseUrl: 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e', infisicalOrigin: MVP_SERVICES,
+    project: 'mvp-synthetic', environment: 'test', path: '/custody', workloadToken: 'mvp-synthetic-custody', accessPath: '/access', accessToken: 'mvp-synthetic-access' }
+  const launch = { binary: fileURLToPath(new URL('./subscription-worker.mjs', import.meta.url)) }
+  const worker = new SubscriptionWorkerClient(launch, config)
+  assert.deepEqual(await worker.call('models', { revision: 1 }), [{ id: MVP_SUBSCRIPTION_MODEL, name: 'Synthetic trace model' }])
+  assert.equal((await worker.call<{ status: number }>('usage', { revision: 1 })).status, 200)
+  await assert.rejects(worker.call('nativeContext', { revision: 1 }), { code: 'subscription_fixture_refused' })
+  const use = { bindingId: randomUUID(), consumerId: randomUUID(), runId: randomUUID() }
+  const scoped = worker.forUse(use)
+  const context = await scoped.call<{ accountId: string; expiresAt: string }>('nativeContext', { revision: 1 })
+  assert.equal(context.accountId, MVP_NATIVE_ACCOUNT)
+  assert.ok(Date.parse(context.expiresAt) > Date.now())
+  await assert.rejects(scoped.call('nativeAuth', { revision: 1 }), { code: 'subscription_fixture_refused' })
+  const lease = await new SubscriptionWorkerClient(launch, { ...config, exportAccessLease: true }).forUse(use)
+    .call<{ accessToken: string }>('nativeAuth', { revision: 1 })
+  assert.equal(lease.accessToken, MVP_NATIVE_TOKEN)
+  await assert.rejects(scoped.call('models', { revision: 2 }), { code: 'subscription_fixture_refused' })
+})
+
+test('trace Coordinator fixture chooses the source-bound Codex identity on the selected device', () => {
+  const marker = `mvp-${randomUUID()}`, deviceId = randomUUID(), issueId = randomUUID(), agentId = randomUUID()
+  const toolResult = (toolName: string, value: unknown) => ({ role: 'tool', content: [{ type: 'tool-result', toolName, output: { type: 'json', value } }] })
+  const request = { prompt: [
+    { role: 'user', content: `${marker}\nThe person selected device ${deviceId} in the task dialog.` },
+    toolResult('create_issue', { id: issueId }),
+    toolResult('list_agents', [{ id: randomUUID(), deviceId, harness: 'mock', deviceOnline: true },
+      { id: randomUUID(), deviceId: randomUUID(), harness: 'codex', deviceOnline: true },
+      { id: agentId, deviceId, harness: 'codex', deviceOnline: true }]),
+  ], tools: [{ name: 'dispatch_run' }] }
+  const answer = answerModel(request, { marker, deviceId, repo: REPOSITORY, harness: 'synthetic-codex' })
+  assert.equal(answer.content[0].toolName, 'dispatch_run')
+  assert.deepEqual(JSON.parse(answer.content[0].input), { issueId, agentId, repo: REPOSITORY })
+})
+
+test('trace completion accepts publication not yet observed while the execute publication gate stays pending', () => {
+  const marker = `mvp-${randomUUID()}`, deviceId = randomUUID(), runId = randomUUID(), issueId = randomUUID()
+  const observed: Record<string, unknown>[] = []
+  const run = { id: runId, issueId, status: 'succeeded', summary: 'Synthetic task complete' }
+  const request = { prompt: [
+    { role: 'user', content: `${marker}\nThe person selected device ${deviceId} in the task dialog.` },
+    { role: 'user', content: `[Event] Run ${runId} ended with status succeeded (submitted).` },
+    { role: 'tool', content: [
+      { type: 'tool-result', toolName: 'get_run', output: { type: 'json', value: run } },
+      { type: 'tool-result', toolName: 'get_issue', output: { type: 'json', value: { id: issueId } } },
+    ] },
+  ] }
+  const scenario = { marker, deviceId, repo: REPOSITORY, harness: 'synthetic-codex' }
+  assert.match(answerModel(request, scenario, (value?: Record<string, unknown>) => { if (value) observed.push(value) }).content[0].text, /发布状态尚未确认/)
+  assert.ok(!observed.some(value => value.pullRequest || value.kind === 'result'))
+  assert.equal(tracePublicationReady(undefined), false)
+  assert.equal(tracePublicationReady({ status: 'pending' }), false)
+  assert.equal(tracePublicationReady({ status: 'published' }), true)
+  assert.throws(() => tracePublicationReady({ status: 'blocked' }), /EXECUTION_PUBLICATION_FAILED/)
+  assert.throws(() => answerModel(request, { ...scenario, harness: 'mock' }), /PR receipt/)
+  run.id = randomUUID()
+  assert.throws(() => answerModel(request, scenario), /real run, task or summary/)
+})
+
+test('trace synthetic Codex peer passes real version/model probes and requires synthetic auth before fixture turns', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-peer-'))
+  const fixture = join(directory, 'fixture.jsonl'), home = join(directory, 'home'), cwd = join(directory, 'worktree')
+  const mcp = join(directory, 'synthetic-submit.mjs'), submitted = join(directory, 'submitted.json')
+  await mkdir(home); await mkdir(cwd)
+  await writeFile(fixture, JSON.stringify({ t: 0, exit: { outcome: 'failed', error: 'private-fixture-error' } }) + '\n')
+  // This unit test has only a stdio peer. Full HTTP acceptance uses the real
+  // Mikka MCP process, current run authority and durable handoff.
+  await writeFile(mcp, `import { createInterface } from 'node:readline'
+import { writeFileSync } from 'node:fs'
+for await (const line of createInterface({ input: process.stdin })) {
+  const request = JSON.parse(line)
+  if (request.id === undefined) continue
+  if (request.method === 'tools/call') writeFileSync(${JSON.stringify(submitted)}, JSON.stringify(request.params))
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { content: [], isError: false } }) + '\\n')
+}`)
+  const binary = createTraceCodexBinary(directory, fixture)
+  try {
+    const ready = await preflightLocalSubscription('codex', { store: { root: directory }, scratchDir: directory, binary })
+    assert.deepEqual(ready, { ready: true, version: HARNESS_PINS.harnesses.codex.version })
+    // The standalone daemon is typechecked in its own environment, without
+    // the web app's global Next ProcessEnv augmentation. Load its probe here
+    // through the runtime fixture boundary, as the daemon process does.
+    const { probeHarnessModels } = await import(new URL('../../packages/daemon/src/model-probe.ts', import.meta.url).href)
+    const report = await probeHarnessModels('codex', binary, { scratchDir: directory, timeoutMs: 5_000 })
+    assert.deepEqual(report?.models, [MVP_SUBSCRIPTION_MODEL])
+    const child = spawn(binary, ['app-server', '-c', `mcp_servers.mikka.command=${JSON.stringify(process.execPath)}`, '-c', `mcp_servers.mikka.args=${JSON.stringify([mcp])}`],
+      { cwd, env: { PATH: process.env.PATH, HOME: home, CODEX_HOME: home, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
+    const output: Record<string, any>[] = []
+    const lines = createInterface({ input: child.stdout })
+    lines.on('line', line => output.push(JSON.parse(line)))
+    const awaitMessage = async (find: (message: Record<string, any>) => boolean) => {
+      const deadline = Date.now() + 5_000
+      while (Date.now() < deadline) { const value = output.find(find); if (value) return value; await delay(10) }
+      assert.fail('SYNTHETIC_CODEX_RESPONSE_TIMEOUT')
+    }
+    let id = 0
+    const request = (method: string, params: unknown = {}) => {
+      const current = ++id
+      child.stdin.write(JSON.stringify({ id: current, method, params }) + '\n')
+      return awaitMessage(message => message.id === current)
+    }
+    try {
+      assert.match((await request('initialize')).result.userAgent, /synthetic-trace-fixture/)
+      assert.equal((await request('thread/start', { model: MVP_SUBSCRIPTION_MODEL, cwd })).error.code, -32603)
+      assert.equal((await request('account/login/start', { type: 'chatgptAuthTokens', accessToken: 'incorrect', chatgptAccountId: MVP_NATIVE_ACCOUNT })).error.code, -32603)
+      assert.equal((await request('account/login/start', { type: 'chatgptAuthTokens', accessToken: MVP_NATIVE_TOKEN, chatgptAccountId: MVP_NATIVE_ACCOUNT })).result.type, 'chatgptAuthTokens')
+      const started = (await request('thread/start', { model: MVP_SUBSCRIPTION_MODEL, cwd })).result
+      assert.equal(started.model, MVP_SUBSCRIPTION_MODEL)
+      const turn = (await request('turn/start', { threadId: started.thread.id, input: [{ type: 'text', text: 'private prompt must not be read by fixture' }] })).result.turn.id
+      const ended = await awaitMessage(message => message.method === 'turn/completed' && message.params.turn.id === turn)
+      assert.equal(ended.params.turn.status, 'failed')
+      assert.equal(ended.params.turn.error.message, 'private-fixture-error')
+      const usage = output.find(message => message.method === 'thread/tokenUsage/updated')!
+      assert.deepEqual(usage.params.tokenUsage.last, { inputTokens: 5, outputTokens: 2, cachedInputTokens: 1 })
+      await assert.rejects(readFile(join(cwd, 'MIKKA_MOCK.md')), { code: 'ENOENT' })
+      const submission = { summary: 'Synthetic change submitted', nextStep: 'Review this fixture' }
+      await writeFile(fixture, [{ t: 0, write: { path: 'MIKKA_MOCK.md', content: 'synthetic change\n' } },
+        { t: 1, submit: submission }, { t: 2, exit: { outcome: 'succeeded' } }].map(value => JSON.stringify(value)).join('\n') + '\n')
+      const next = (await request('turn/start', { threadId: started.thread.id, input: [] })).result.turn.id
+      assert.equal((await awaitMessage(message => message.method === 'turn/completed' && message.params.turn.id === next)).params.turn.status, 'completed')
+      assert.equal(await readFile(join(cwd, 'MIKKA_MOCK.md'), 'utf8'), 'synthetic change\n')
+      assert.deepEqual(JSON.parse(await readFile(submitted, 'utf8')), { name: 'submit', arguments: submission })
+    } finally { child.kill(); lines.close(); await new Promise(resolve => child.once('close', resolve)) }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
 
 test('MVP subscription boundary retains real service authorization, private worker IPC and streamed tool calls',async()=>{
  const services=await startMvpServices(3191)

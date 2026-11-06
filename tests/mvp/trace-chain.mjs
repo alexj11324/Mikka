@@ -13,7 +13,8 @@ import { Pool } from 'pg'
 import { assertMvpEnvironment, MVP_ORIGIN, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { startMvpServices } from './services.mjs'
 import { startTraceCollector } from './trace-collector.mjs'
-import { seedMvpSubscription, seedMvpExecutionRule } from './subscription.mjs'
+import { tracePublicationReady } from './model.mjs'
+import { MVP_SUBSCRIPTION_MODEL, seedMvpSubscription, seedMvpExecutionOrder } from './subscription.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
 import { DESKTOP_RPC_VERSION, encode, decode } from '../../lib/desktop-rpc/wire.ts'
@@ -95,6 +96,7 @@ try {
     MIKKA_BYOS_INFISICAL_ORIGIN: MVP_SERVICES, MIKKA_BYOS_INFISICAL_PROJECT: 'mvp-synthetic', MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'test',
     MIKKA_BYOS_INFISICAL_PATH: '/custody', MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/access',
     MIKKA_BYOS_INFISICAL_TOKEN: 'mvp-synthetic-custody', MIKKA_BYOS_ACCESS_INFISICAL_TOKEN: 'mvp-synthetic-access', MIKKA_BYOS_VALIDATED_MODEL_ROUTES: 'codex_cpa',
+    MIKKA_BYOS_VALIDATED_NATIVE_ROUTES: 'codex_cli',
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
   })
   checkpoint('api-ready')
@@ -131,7 +133,7 @@ try {
     const traceparent = `00-${traceId}-${randomBytes(8).toString('hex')}-01`
     const privatePrompt = `trace-private-prompt-${randomUUID()}`, privateFailure = `trace-private-error-${randomUUID()}`
     collector.forbid(privatePrompt); collector.forbid(privateFailure)
-    const scenario = await service('/scenario', { marker, title: `Trace ${kind}`, githubAccountId })
+    const scenario = await service('/scenario', { marker, title: `Trace ${kind}`, githubAccountId, harness: 'synthetic-codex' })
     const caseDirectory = join(directory, kind), fixtureDirectory = join(caseDirectory, 'fixtures'), daemonDirectory = join(caseDirectory, 'daemon')
     await mkdir(fixtureDirectory, { recursive: true, mode: 0o700 })
     if (kind === 'success') await copyFile(join(root, 'tests/mvp/fixtures/mvp-core-loop.jsonl'), join(fixtureDirectory, 'mvp-core-loop.jsonl'))
@@ -152,8 +154,10 @@ try {
         assert.equal(daemon.exitCode, null, 'DAEMON_PROCESS_EXITED')
         return (await pool.query('SELECT d.id FROM devices d JOIN device_token_devices t ON t."deviceId"=d.id WHERE t."tokenId"=$1 AND d."ownerId"=$2 AND d."lastSeenAt" IS NOT NULL', [tokenId, ownerId])).rows[0]
       })
-      await until(async () => (await pool.query('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=\'mock\'', [ownerId, device.id])).rows[0])
-      await seedMvpExecutionRule(pool, ownerId, subscription.workspaceId, device.id)
+      await until(async () => (await pool.query(`SELECT a.id FROM agents a JOIN devices d ON d.id=a."deviceId"
+        WHERE a."userId"=$1 AND a."deviceId"=$2 AND a.harness='codex' AND d.harnesses @> $3::jsonb`,
+      [ownerId, device.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: [MVP_SUBSCRIPTION_MODEL] }])])).rows[0])
+      await seedMvpExecutionOrder(pool, ownerId, subscription.workspaceId, device.id, subscription.connectionId)
       await service('/scenario/device', { deviceId: device.id })
       checkpoint(`${kind}-http-dispatch`)
       const response = await accounts.owner.request('/api/rpc', { method: 'POST', headers: {
@@ -189,8 +193,7 @@ try {
         checkpoint(`${kind}-publication`)
         await until(async () => {
           const row = (await pool.query('SELECT status FROM run_publications WHERE "runId"=$1 AND "userId"=$2', [run.id, ownerId])).rows[0]
-          if (row && ['blocked', 'skipped'].includes(row.status)) assert.fail('EXECUTION_PUBLICATION_FAILED')
-          return row?.status === 'published'
+          return tracePublicationReady(row)
         }, 60_000)
       }
       checkpoint(`${kind}-telemetry`)
@@ -220,7 +223,7 @@ try {
       if (kind === 'failure') { assert.equal(daemonRun.status, 2, 'FAILED_RUN_SPAN_STATUS'); assert.equal(runLog.body, 'mikka.stage.failed'); assert.equal(runLog.severity, 17) }
       const generations = collector.evidence.generations.filter(event => event.properties.$ai_trace_id === traceId)
       results.push({ kind, runId: run.id, factoryTaskId: execution.factoryTaskId, attemptId: execution.attemptId, stage: 'execute', traceId, sessionId, status: run.status, spanCount: spans.length,
-        syntheticGenerations: generations.length, realProviderGenerations: 0,
+        syntheticGenerations: generations.length, syntheticCLI: true, realProviderGenerations: 0,
         spans, logs: collector.evidence.logs.filter(log => log.traceId === traceId), generations })
     } finally {
       await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
@@ -253,7 +256,7 @@ try {
   await services?.close()
   for (const current of collectors) await current.close()
   await pool.end()
-  const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, workflowHealth, cases: results,
+  const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, workflowHealth, syntheticCLI: true, cases: results,
     processes: children.map(job => ({ label: job.label, exitCode: job.exitCode, signal: job.signalCode,
       privateLogRetained: !job.logFailed, privateLogBytes: job.logBytes })),
     counts: collector ? { spans: collector.evidence.spans.length, logs: collector.evidence.logs.length,
@@ -261,7 +264,7 @@ try {
       privacyViolations: collector.evidence.privacyViolations, malformed: collector.evidence.malformed, dropped: collector.evidence.dropped } : {},
     boundaries: ['real development HTTP API, Postgres, WorkflowAgent/durable steps and source daemon',
       'synthetic model/subscription and GitHub API; real git clone/worktree/verify/commit/push',
-      'existing test-only mock harness, no real CLI model generation', 'synthetic equivalent of cloud public trace bootstrap; no E2B VM was created',
+      'real CodexAdapter with a synthetic app-server protocol peer; no official CLI or real provider', 'synthetic equivalent of cloud public trace bootstrap; no E2B VM was created',
       'no browser, production, Preview, real-provider, replay-UI or deployment acceptance'],
   }
   await writeFile(join(evidenceDirectory, 'trace-chain.json'), JSON.stringify(evidence, null, 2) + '\n', { mode: 0o600 })

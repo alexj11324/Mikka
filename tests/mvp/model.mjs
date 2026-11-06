@@ -7,6 +7,13 @@ function result(content, reason = 'stop') {
 const text = value => result([{ type: 'text', text: value }])
 const body = message => typeof message.content === 'string' ? message.content : (message.content ?? []).filter(part => part.type === 'text').map(part => part.text).join('\n')
 
+/** The trace runner reads this only after selecting its exact execute run. A
+ * completed model response cannot satisfy the independent publication wait. */
+export function tracePublicationReady(row) {
+  if (row && ['blocked', 'skipped'].includes(row.status)) throw new Error('EXECUTION_PUBLICATION_FAILED')
+  return row?.status === 'published'
+}
+
 function output(messages, toolName) {
   const part = messages.flatMap(message => Array.isArray(message.content) ? message.content : []).findLast(part => part.type === 'tool-result' && part.toolName === toolName)
   if (!part) return undefined
@@ -39,6 +46,11 @@ export function answerModel(request, scenario, observe = () => {}) {
     const task = output(recent, 'get_issue')
     if (!task) return call('get_issue', { issueId: run.issueId }, 'result')
     const url = event.match(/https:\/\/github\.com\/mikka-e2e\/core-loop\/pull\/\d+/)?.[0]
+    if (scenario.harness === 'synthetic-codex' && !url) {
+      if (run.id !== runId || task.id !== run.issueId || !run.summary) throw new Error('Completion reached the trace model without its real run, task or summary')
+      observe({ kind: 'execution-ended', runId, issueId: task.id, publication: 'not_observed' })
+      return text(`执行已结束：${run.summary}\n\n发布状态尚未确认。`)
+    }
     if (!url || task.id !== run.issueId || !run.summary) throw new Error('Completion reached the model without the real task, summary or PR receipt')
     observe({ kind: 'result', runId, issueId: task.id, pullRequest: url })
     return text(`已完成：${run.summary}\n\nPR：${url}`)
@@ -47,8 +59,9 @@ export function answerModel(request, scenario, observe = () => {}) {
   if (!issue) return call('create_issue', { title: scenario.title, body: `Add MIKKA_MOCK.md to ${scenario.repo}. ${scenario.marker}` })
   const identities = output(messages, 'list_agents')
   if (!identities) return call('list_agents', {})
-  const identity = identities.find(row => row.deviceId === selected && row.harness === 'mock' && row.deviceOnline)
-  if (!identity) throw new Error('The real daemon did not register an online mock execution identity')
+  const harness = scenario.harness === 'synthetic-codex' ? 'codex' : 'mock'
+  const identity = identities.find(row => row.deviceId === selected && row.harness === harness && row.deviceOnline)
+  if (!identity) throw new Error('The real daemon did not register the selected online fixture execution identity')
   const run = output(messages, 'dispatch_run')
   if (!run) return call('dispatch_run', { issueId: issue.id, agentId: identity.id, repo: scenario.repo })
   if (!run.runId) throw new Error('Real dispatch_run did not queue a thread')
