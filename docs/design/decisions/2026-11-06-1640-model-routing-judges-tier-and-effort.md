@@ -8,7 +8,7 @@
 Automatic model routing asks the Decision judge two independent `score`
 questions about the task: the model strength it needs (light, standard,
 strongest) and the reasoning effort it needs (low … max). The judge never sees
-the person's candidates. The host rounds the strength score, takes the first
+the person's candidates. The host rounds the strength score (a score 0.3 or more past a level rounds up, since a too-weak model costs a failed run), takes the first
 listed runnable model of that tier, else of the nearest higher tier, and only
 when nothing at or above it can run, the strongest tier that can. Effort is
 the level nearest its score that the model supports; a model with no effort

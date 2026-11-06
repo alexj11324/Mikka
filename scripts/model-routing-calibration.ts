@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { DECISION_MODEL, DECISIONS_URL, validatedAnswers, type DecisionAnswer } from '../lib/coordinator/decision'
-import { MODEL_ROUTING_EFFORTS, MODEL_ROUTING_TIERS, routingDecisionQuestions, type ModelRoutingEffort, type ModelRoutingTier } from '../lib/model-routing'
+import { levelForScore, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_TIERS, routingDecisionQuestions, type ModelRoutingEffort, type ModelRoutingTier } from '../lib/model-routing'
 
 /** Replays the labeled routing set against the real Decision route, once per
  * example and never retried, and reports how each confidence threshold trades
@@ -13,17 +13,19 @@ export interface Observation { issue: number; expected: ModelRoutingTier; effort
 export const labeledExamples = (): LabeledExample[] =>
   JSON.parse(readFileSync(new URL('../tests/fixtures/model-routing-labeled.json', import.meta.url), 'utf8')).examples
 
-/** At each threshold: share of examples routed, and how many of those landed on the labeled tier. */
+/** At each threshold: share of examples routed, how many landed on the labeled
+ * tier, and how many fell below it (the costly direction). Uses the host's rounding. */
 export function summarize(observations: readonly Observation[], thresholds = [0, .2, .3, .4, .5, .55, .6, .7]) {
   return thresholds.map(threshold => {
     const routed = observations.filter(row => row.tier && (row.tier.confidence ?? 1) >= threshold)
-    const exact = routed.filter(row => MODEL_ROUTING_TIERS[Math.round(row.tier!.score)] === row.expected).length
+    const exact = routed.filter(row => MODEL_ROUTING_TIERS[levelForScore(row.tier!.score, MODEL_ROUTING_TIERS.length)] === row.expected).length
     const effortRows = routed.filter(row => row.effort && (row.effort.confidence ?? 1) >= threshold)
     const effortInRange = effortRows.filter(row => {
-      const level = Math.round(row.effort!.score)
+      const level = levelForScore(row.effort!.score, MODEL_ROUTING_EFFORTS.length)
       return level >= MODEL_ROUTING_EFFORTS.indexOf(row.effortRange[0]) && level <= MODEL_ROUTING_EFFORTS.indexOf(row.effortRange[1])
     }).length
-    return { threshold, routed: routed.length, total: observations.length, tierExact: exact,
+    const under = routed.filter(row => levelForScore(row.tier!.score, MODEL_ROUTING_TIERS.length) < MODEL_ROUTING_TIERS.indexOf(row.expected)).length
+    return { threshold, routed: routed.length, total: observations.length, tierExact: exact, tierUnder: under,
       tierAccuracy: routed.length ? exact / routed.length : null, effortApplied: effortRows.length, effortInRange }
   })
 }
