@@ -10,7 +10,7 @@ permissions:
   contents: read
 concurrency:
   group: issue1503-production-operator
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   delivery:
     if: github.repository == 'alexj11324/Mikka'
@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -27,6 +28,13 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - name: Read the cancelled attempt checkpoint before any production change
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: issue1503-delivery
+          run-id: 42280863233
+          github-token: ${{ github.token }}
+          path: issue1503-abandoned
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -37,6 +45,12 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
+      - name: Restore only the aborted attempt configuration through normal APIs
+        run: node --import tsx scripts/ops/issue1503/recover-abandoned.mjs
+        env:
+          NODE_ENV: production
+          MIKKA_1503_ABANDONED_REPORT: issue1503-abandoned/delivery.json
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 2960d783f0196fed5375593d910a43430a101747
       - name: Exercise real production Factory delivery for both official subscriptions
         run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:

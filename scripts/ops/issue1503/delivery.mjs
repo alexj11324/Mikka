@@ -33,6 +33,18 @@ export function rpcFailureMetadata(action, result, fallback) {
   return { action, code: rpcErrorCodes.has(code) ? code : fallback }
 }
 
+/** Existing issue chat: the source retains the explicit Profile. A task-dialog
+ * destination is a different creation contract, not this message's placement.
+ * The message and normal dispatch_run target keep execution cloud-only. */
+export function existingIssueMessageArguments(text, botId, submissionId, profileId) {
+  return [text, null, botId, submissionId, undefined, null, [], undefined, profileId]
+}
+
+export function chatSubmissionComplete(chat, text, after) {
+  return chat?.working === false && Array.isArray(chat.items) && chat.items.some(item =>
+    item.from === 'person' && item.position > after && item.text === text)
+}
+
 /** The first edit materializes default:* IDs as UUIDs. Consume every mutation's
  * returned view; at most the initial row count may be removed. */
 export async function removeModelOrderEntries(view, change) {
@@ -152,14 +164,15 @@ export async function restoreRepositoryVerification(json, post, originalCommand,
  * business reads occur on initial load, acknowledged writes, or live messages.
  */
 export class LiveChanges {
-  constructor(json, workspaceId, { Socket = WebSocket } = {}) {
-    Object.assign(this, { json, workspaceId, Socket, sequence: 0, connection: 0, versions: new Map(), waiters: new Set(), closed: false,
+  constructor(json, workspaceId, { Socket = WebSocket, kinds = ['factory_task', 'factory_issue'], onNotify } = {}) {
+    Object.assign(this, { json, workspaceId, Socket, kinds, onNotify, sequence: 0, connection: 0, versions: new Map(), waiters: new Set(), closed: false,
       socket: null, heartbeat: null, renewal: null, reconnect: null, reconnects: 0, messages: 0 })
   }
   stamp(keys) { return `${this.connection}:${keys.map(key => this.versions.get(key) ?? 0).join(':')}` }
   notify(key) {
     if (key) this.versions.set(key, ++this.sequence)
     for (const waiter of [...this.waiters]) waiter()
+    this.onNotify?.(key)
   }
   async start() { await this.connect() }
   async connect() {
@@ -189,7 +202,7 @@ export class LiveChanges {
         let value
         try { value = JSON.parse(event.data) } catch { return }
         if (value.type === 'live_ready') {
-          if (![1, 2].includes(value.version) || !['factory_task', 'factory_issue'].every(kind => value.kinds?.includes(kind))) {
+          if (![1, 2].includes(value.version) || !this.kinds.every(kind => value.kinds?.includes(kind))) {
             clearTimeout(timeout); reject(new Error('issue1503_live_capabilities_missing')); return
           }
           if (ready) return
@@ -198,7 +211,7 @@ export class LiveChanges {
           this.renewal = setTimeout(reconnect, Math.max(1, ticket.expiresAt - Date.now()))
           return
         }
-        if (ready && uuid(value.id) && ['factory_task', 'factory_issue', 'pull_request_status'].includes(value.kind)) {
+        if (ready && uuid(value.id) && [...this.kinds, 'pull_request_status'].includes(value.kind)) {
           this.messages++; this.notify(`${value.kind}:${value.id}`)
         }
       }
@@ -257,7 +270,13 @@ export async function runDeliveryAcceptance(env = process.env) {
   const specifications = cases.map(item => fileSpecification(marker, item.harness))
   const report = { issue: 1503, phase: 'delivery', startedAt: new Date().toISOString(), expectedSha, workspaceId, teamId,
     marker, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
-  let session, live, originalOrder, currentOrder, profile, activeCase, project, originalVerification
+  let session, live, chatLive, originalOrder, currentOrder, profile, activeCase, project, originalVerification
+  const chatLiveCounts = { messages: 0, reconnects: 0 }
+  const closeChatLive = () => {
+    if (!chatLive) return
+    chatLiveCounts.messages += chatLive.messages; chatLiveCounts.reconnects += chatLive.reconnects
+    chatLive.close(); chatLive = null
+  }
   const installedVerificationCommands = new Set()
   const reportPath = resolve(env.MIKKA_1503_REPORT ?? 'issue1503-report/delivery.json')
   const checkpoint = async () => { await mkdir(resolve(reportPath, '..'), { recursive: true }); await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 }) }
@@ -370,15 +389,42 @@ export async function runDeliveryAcceptance(env = process.env) {
       const before = await json(`/api/factory/tasks?issueId=${issue.id}`)
       check(before.liveWorkspaceId === workspaceId && before.tasks.length === 0, 'fixture_task_not_fresh')
       await stage('dispatch'); await pin()
-      // This is the existing task-dialog submission, including its human
-      // source, explicit destination and Profile. The Coordinator performs
-      // ordinary dispatch_run, which binds the real remote repository.
+      // The ordinary chat dispatches this existing issue. Keep the human source
+      // and Profile, with cloud-only placement in its normal dispatch_run call.
       const submissionId = randomUUID()
       const dispatchText = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read its existing description and use that exact task; do not create a duplicate. This is repository work, so use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, and the selected Profile ${profile.id}. It is a tiny file task and needs no specification approval: needsSpec false. Preserve the task's existing acceptance criteria, publish automatically, and leave its PR for my Factory review. I will request one change and then merge it.`
-      const dispatched = await rpc('coordinator.sendCoordinatorMessage', [dispatchText, null, bot.id, submissionId, { kind: 'cloud' }, null, [], undefined, profile.id])
+      const readChat = async () => (await rpc('coordinator.syncCoordinatorChat', [bot.id])).chat
+      const beforeChat = await readChat()
+      check(beforeChat?.botId === bot.id && beforeChat.live?.ownerId === SMOKE_ID && uuid(beforeChat.live.workspaceId)
+        && Number.isSafeInteger(beforeChat.cursor) && beforeChat.cursor >= 0, 'chat_live_scope_missing')
+      const chatKey = `bot_chat:${bot.id}`
+      // Chat invalidations use the owner's home channel, which may differ from
+      // the task workspace. Forward only a wake-up, never message contents.
+      chatLive = new LiveChanges(json, beforeChat.live.workspaceId, { kinds: ['bot_chat'], onNotify: key => { if (!key || key === chatKey) live.notify(chatKey) } })
+      await chatLive.start()
+      const dispatched = await rpc('coordinator.sendCoordinatorMessage', existingIssueMessageArguments(dispatchText, bot.id, submissionId, profile.id))
       check(dispatched.queued === true, 'dispatch_failed'); activeCase.submissionId = submissionId
-      const found = await live.until(issueKeys, () => json(`/api/factory/tasks?issueId=${issue.id}`), value => value.tasks.length > 0, timeoutMs)
+      const readDispatched = async () => {
+        if (chatLive.failure) throw chatLive.failure
+        const found = await json(`/api/factory/tasks?issueId=${issue.id}`)
+        if (found.tasks.length) return found
+        const chat = await readChat()
+        check(chat?.botId === bot.id && chat.live?.ownerId === SMOKE_ID
+          && chat.live.workspaceId === beforeChat.live.workspaceId, 'chat_live_scope_changed')
+        if (chatSubmissionComplete(chat, dispatchText, beforeChat.cursor)) {
+          // The queue commit precedes the completed reply. Read after observing
+          // that reply to avoid racing a dispatch that committed during chat read.
+          const completed = await json(`/api/factory/tasks?issueId=${issue.id}`)
+          if (completed.tasks.length) return completed
+          activeCase.dispatchFailure = { cursor: chat.cursor, working: false,
+            code: ['wake_exhausted', 'wake_failed', 'wake_start_unconfirmed', 'turn_failed', 'length'].includes(chat.error) ? chat.error : 'completed_without_dispatch' }
+          fail('coordinator_completed_without_dispatch')
+        }
+        return found
+      }
+      const found = await live.until([...issueKeys, chatKey], readDispatched, value => value.tasks.length > 0, timeoutMs)
       check(found.tasks.length === 1, 'multiple_factory_tasks'); activeCase.taskId = found.tasks[0].id
+      closeChatLive()
       const keys = [`factory_task:${activeCase.taskId}`, ...issueKeys, `pull_request_status:${issue.id}`]
       let lastState = ''
       const read = async () => {
@@ -513,6 +559,7 @@ export async function runDeliveryAcceptance(env = process.env) {
     report.code = /^issue1503_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'issue1503_delivery_failed'
     if (activeCase) activeCase.status = 'failed'
   } finally {
+    closeChatLive()
     live?.close()
     // Stop only this invocation's unfinished tasks. Leave evidence and receipts.
     if (activeCase?.taskId && json) {
@@ -566,7 +613,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       } catch { report.cleanup.push({ kind: 'model_order_restore_failed' }); report.status = 'failed' }
     }
     await session?.close().catch(() => undefined)
-    report.live = { messages: live?.messages ?? 0, reconnects: live?.reconnects ?? 0 }
+    report.live = { messages: live?.messages ?? 0, reconnects: live?.reconnects ?? 0, chat: chatLiveCounts }
     report.completedAt = new Date().toISOString(); await checkpoint()
   }
   return report
