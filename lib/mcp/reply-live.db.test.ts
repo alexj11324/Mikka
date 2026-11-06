@@ -18,6 +18,8 @@ import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionScope } from '../live/coordinator-session'
 import { liveReady } from '../live/events'
 import { presenceReply } from '../live/presence'
+import { LiveChannel } from '../live/channel'
+import { liveTicket } from '../live/scope'
 import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
 import { ScheduleError, type Definition } from '../schedules/contract'
 
@@ -43,7 +45,7 @@ async function bounded<T>(promise: Promise<T>, milliseconds = 5_000) {
   } finally { clearTimeout(timer) }
 }
 
-test('MCP waits use real PostgreSQL writers and the existing workerd channel', { skip: !valid, timeout: 120_000 }, async t => {
+test('MCP waits use committed PG notifications; independent web observers still receive the existing live keys', { skip: !valid, timeout: 120_000 }, async t => {
   const pending: Promise<void>[] = []
   const deliveries: { ownerId: string; workspaceId: string; events: unknown }[] = []
   let onSchedule = () => {}
@@ -106,6 +108,16 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
   observePoolCommits(independent)
   const app = await import('../db/request-scope')
   const store = await import('../coordinator/store')
+  const live = await import('./reply-live')
+  const replyObservers: { botId: string; closed: number; lost: () => boolean }[] = []
+  const replies = mock.module('./reply-live', { namedExports: {
+    subscribeToCoordinatorReplies: async (...args: Parameters<typeof live.subscribeToCoordinatorReplies>) => {
+      const observer = await live.subscribeToCoordinatorReplies(...args)
+      const row = { botId: args[1], closed: 0, lost: () => observer.lost }
+      replyObservers.push(row)
+      return { get lost() { return observer.lost }, close() { row.closed++; observer.close() } }
+    },
+  } })
   const { readCoordinatorMessages } = await import('./tools')
   const request = app.createRequestDatabaseScope(target!)
   const chats: { owner: string; botId: string; workspaceId: string }[] = []
@@ -132,11 +144,25 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
     const controller = new AbortController()
     controllers.push(controller)
     const before = sockets.length
+    const observerBefore = replyObservers.length
+    // This independent web consumer preserves the existing CF writer coverage.
+    // It does not wake MCP, which now only receives the transaction PG signal.
+    const web = new LiveChannel({
+      ticket: async () => liveTicket({ ownerId: identity.owner, workspaceId: identity.workspaceId }, { url: origin, secret }),
+      socket: ticket => new WebSocket(ticket.url, ticket.protocol), visible: () => true,
+      watchVisibility: () => () => {}, now: Date.now, monotonicNow: () => performance.now(),
+      later: (callback, milliseconds) => setTimeout(callback, milliseconds),
+      cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
+    })
+    const closeWeb = web.subscribe('coordinator_session', identity.botId, [identity.botId], () => {})
+    controller.signal.addEventListener('abort', closeWeb, { once: true })
     const promise = request.run(() => readCoordinatorMessages(identity.owner, { waitSeconds: 90 }, controller.signal))
     // A later failure still cancels this local waiter; tests never leave a 90s timer.
     void promise.catch(() => {})
     return { controller, promise, open: async () => {
       await eventually(() => sockets.length > before && sockets[before].socket.readyState === WebSocket.OPEN && sockets[before].ready, 'MCP channel did not become ready')
+      await eventually(() => replyObservers.slice(observerBefore).some(row => row.botId === identity.botId), 'PG reply subscriptions did not become ready')
+      assert.equal(replyObservers.findLast(row => row.botId === identity.botId)!.lost(), false)
       return sockets[before]
     } }
   }
@@ -215,7 +241,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
       } finally { waiter.controller.abort() }
     })
 
-    await t.test('a separate application writer process reaches the waiting MCP request over real WebSocket', async () => {
+    await t.test('a separate application writer reaches MCP over PG and the independent web observer over WebSocket', async () => {
       const identity = await chat(), waiter = waiting(identity)
       try {
         const socket = await waiter.open()
@@ -231,7 +257,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         assert.equal(code, 0, stderr)
         assert.equal(signal, null)
         assert.deepEqual(JSON.parse(stdout.trim()), { written: true, notifications: 2 })
-        assert.ok(socket.received.some(value => JSON.stringify(value) === JSON.stringify({ kind: 'coordinator_session', id: identity.botId })), 'the actual server notification crossed the independent process boundary')
+        await eventually(() => socket.received.some(value => JSON.stringify(value) === JSON.stringify({ kind: 'coordinator_session', id: identity.botId })), 'the independent web observer did not receive the committed live key')
         assert.deepEqual(reply.messages.map(value => value.text), ['Reply from a separate writer process'])
       } finally { waiter.controller.abort() }
     })
@@ -289,19 +315,18 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
       } finally { waiter.controller.abort() }
     })
 
-    await t.test('workspace revocation suppresses producer notifications and a waiter rechecks scope before reading', async () => {
+    await t.test('workspace revocation itself wakes MCP even when the CF producer suppresses its live key', async () => {
       const identity = await chat(), waiter = waiting(identity)
       try {
         await waiter.open()
+        const denied = assert.rejects(waiter.promise, /workspaceAccessDenied/)
         await independent.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [identity.workspaceId, identity.owner])
+        await bounded(denied)
         assert.equal(await coordinatorSessionScope(independent, independent, identity.owner, identity.botId), null)
         const before = deliveries.length
         await request.run(() => store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Must remain unread' }], null, identity.botId))
         await flush()
         assert.equal(deliveries.length, before)
-        const denied = assert.rejects(waiter.promise, /workspaceAccessDenied/)
-        await original.sendLiveInvalidations({ ownerId: identity.owner, workspaceId: identity.workspaceId }, [{ kind: 'coordinator_session', id: identity.botId }])
-        await bounded(denied)
       } finally { waiter.controller.abort() }
     })
 
@@ -353,6 +378,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
       waiter.controller.abort(new Error('MCP request cancelled'))
       await cancelled
       assert.equal(socket.closes, 1)
+      assert.equal(replyObservers.findLast(row => row.botId === identity.botId)!.closed, 1, 'MCP detaches its own PG subscriptions independently of the web observer')
       assert.deepEqual((await independent.query('SELECT status,"stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0], { status: 'running', stopRequestedAt: null })
       assert.equal((await independent.query('SELECT "leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [identity.owner, identity.botId])).rows[0].leaseHolder, 'mcp-fixture-holder')
     })
@@ -364,6 +390,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
     for (const { socket } of sockets) if (socket.readyState === NativeWebSocket.OPEN) socket.close()
     await runtime.dispose()
     notification.restore()
+    replies.restore()
     scheduler.restore()
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
