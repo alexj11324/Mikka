@@ -11,7 +11,7 @@ import { responseCookieJar } from '../acceptance/read-cache-production.mjs'
 import { publishedActions } from '../acceptance/read-action-transport.mjs'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
 import { DeployedTargetError, deployedTargetGuard, assertDeployedTarget, publicTargetFailure } from '../acceptance/deployed-target.mjs'
-import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
+import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const BASE = '/mikka'
@@ -91,6 +91,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   const report = { version: 1, scope: 'production-mobile-and-source-daemon-http', status: 'fail',
     applicationSha: SHA.test(env.APPLICATION_SHA ?? '') ? env.APPLICATION_SHA : null,
     runnerSha: SHA.test(env.GITHUB_SHA ?? '') ? env.GITHUB_SHA : null,
+    teamAdminMembershipVerified: false,
     client: { version: null, protocolVersion: null, osInstallationExercised: false },
     checks: { deployment: false, sessionOwner: false, mobileHomeOwner: false, publishedActions: false,
       enrollment: false, registration: false, deviceOwner: false, schedulingDisabled: false,
@@ -131,7 +132,8 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const known = new Set(['/api/auth/sign-in/email', '/api/auth/sign-out',
       '/api/auth/get-session?disableCookieCache=true', '/api/auth/get-session', '/api/workspace', '/api/mobile/home',
       '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json'])
-    check(known.has(path) || (tokenId && path === '/api/device-tokens/' + tokenId + '/revoke'),
+    check(known.has(path) || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
+      || (tokenId && path === '/api/device-tokens/' + tokenId + '/revoke'),
       'request_rejected')
     const url = new URL(BASE + path, ORIGIN)
     const cookie = cookieOverride ?? jar.header(url)
@@ -227,7 +229,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     phase = 'team-workspace'
     Object.assign(report, await selectTeamWorkspace({ ownerId, json: async (path, body) => {
       check(body === undefined
-        ? path === BASE + '/api/workspace' || path === BASE + '/api/auth/get-session'
+        ? isTeamWorkspaceReadPath(path) || path === BASE + '/api/auth/get-session'
         : path === BASE + '/api/rpc' && isTeamWorkspaceSwitchRequest(body), 'request_rejected')
       const response = await owner(path.slice(BASE.length), body === undefined ? 'GET' : 'POST', body)
       check(response.status === 200, 'response_invalid')

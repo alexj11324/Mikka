@@ -45,7 +45,10 @@ import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
 import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coordinator/chat-dedupe'
-import { ActivityExpansionContext, ReplyActivity, ReplyWaiting, useActivityExpansion } from './reply-activity'
+import { ActivityExpansionContext, ReplyActivity, useActivityExpansion } from './reply-activity'
+import { CHAT_SURFACE, ChatMessage, ChatWaiting } from '@ui-slot/chat-message'
+import { PERSON_BUBBLE } from '@/components/slots/chat-message'
+import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
@@ -450,12 +453,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // 全部展开 / 全部收起 for the chat's tool groups (R-83).
   const expansion = useActivityExpansion()
 
-  const personBubble = cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')
+  const speaker: ChatSpeaker = bot ? { id: bot.id, name: bot.name, color: bot.color, shape: bot.shape } : { name, coordinator: true }
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
       reaches past the column is clipped here instead of scrolling the whole page sideways. */}
-  <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
+  <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip', CHAT_SURFACE)}>
     {/* Follow the end while the person is there, never anchor rows to the top: the scroller re-anchors any person row
         whose element it has not seen, and a stored message remounts its pending row, so the chat jumped up the history.
         Rows render at their real height: an estimated height on a new row shifts the end by the difference. */}
@@ -491,17 +494,17 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 ? item.notice
                   ? <QuotaSwitchLine notice={item.notice} botId={botId} />
                   : item.line ? <ChatEventLine line={item.line} citations={citations} /> : null
-                : <Message align={item.from === 'person' ? 'end' : 'start'} tabIndex={-1} className="outline-none"><MessageContent>
-                    {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
-                    {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
-                    {/* Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
-                        The same rows live and stored, so storing keeps them in place. */}
-                    {item.welcome ? null : item.from === 'coordinator'
+                : <ChatMessage from={item.from === 'person' ? 'person' : 'bot'} speaker={speaker} compact={compact} streaming={Boolean(live && live.committedThrough === undefined)}
+                    // A tapped 建议 card: the same card, then only what it adds (R-21, R-40).
+                    lead={item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
+                    // Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
+                    // The same rows live and stored, so storing keeps them in place.
+                    body={item.welcome ? null : item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}>{replyRows(item, live).map((segment, index) => segment.kind === 'tools'
                         ? <AgentCitationsContext key={index} value={citations}><ReplyActivity tools={segment.tools} {...(index === 0 && item.activity ? { thinking: live ? liveThinking(live) : undefined, thought: item.activity.thought, reasoningAt: item.activity.reasoningAt } : {})} botId={botId} live={Boolean(live && live.committedThrough === undefined)} /></AgentCitationsContext>
                         : <CoordinatorReply key={index} text={segment.text} carded={cardsOf(item, Boolean(live)).join(',')} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} />)}</ReplyAnswer>
-                      : item.text && <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} /></BubbleContent></Bubble>}
-                    {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
+                      : item.text && <PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} />}
+                    extras={<>{item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
                         : <ArtifactReviewCard key={id} artifact={artifact} onOpen={openArtifact} />] : [] })}
@@ -509,25 +512,26 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {cardsOf(item, Boolean(live)).map(id => {
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
-                    })}
-                    {/* Copy and the pages it cites, on one line under the reply, only while it is hovered or tapped (R-83). */}
-                    {item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
+                    })}</>}
+                    // Copy and the pages it cites, on one line under the reply, only while it is hovered or tapped (R-83).
+                    actions={item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
                       <CopyAction text={item.from === 'coordinator' ? replyCopyText(item.text) : splitReplyQuote(item.text).text} />
                       {item.from === 'coordinator' && <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext>}
                     </MessageActions>}
-                    {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
+                    copyText={item.text ? item.from === 'coordinator' ? replyCopyText(item.text) : splitReplyQuote(item.text).text : undefined}
+                    sources={item.from === 'coordinator' && item.text ? <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext> : undefined}
+                    after={<>{item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
                       ? <div data-message-failure={item.welcome ? 'welcome' : 'live'} className={cn('flex w-full max-w-md flex-col gap-2', item.welcome ? 'self-start' : 'self-end')}>{failureNotice}</div>
-                      : <MessageFooter className={cn(item.welcome ? 'self-start' : 'self-end')}><FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /></MessageFooter>)}
-                  </MessageContent></Message>}
+                      : <MessageFooter className={cn(item.welcome ? 'self-start' : 'self-end')}><FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /></MessageFooter>)}</>} />}
             </MessageScrollerItem>
             </Fragment>)}
             {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
                   <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />
-                  <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={failed.text} /></BubbleContent></Bubble>
+                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={failed.text} /></BubbleContent></Bubble>
                 </span>
                 <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive-foreground">
                   {failed.message}
@@ -540,7 +544,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 reply lands and pull the scroll position back (coordinator-scroll.spec). */}
             {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && (stopping
               ? <Message align="start"><MessageContent><MessageFooter><p role="status">{t('stopped')}</p></MessageFooter></MessageContent></Message>
-              : <div className={cn('flex', workingEnter && ENTER)}><ReplyWaiting /></div>)}
+              : <div className={cn('flex', workingEnter && ENTER)}><ChatWaiting speaker={speaker} /></div>)}
             </ActivityExpansionContext>
           </MessageScrollerContent>
         </MessageScrollerViewport>
