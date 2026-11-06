@@ -195,6 +195,7 @@ Object.assign(fixtures, {
   'agents.pollIssueThreads': () => ({ threads: [thread], live: { workspaceId: WORKSPACE } }),
   'agents.getIssueThread': () => ({ live: { runs: [{ id: RUN, workspaceId: WORKSPACE }], issueWorkspaceId: WORKSPACE, questionDeadline: null }, thread: { ...thread, prompt: 'Fix the sign-in redirect', stopRequestedAt: null, feedbackEligible: false, error: null, quota: null }, chunks: [{ chunk: { type: 'text-delta', id: 't1', delta: 'Looking at the redirect handler.' }, at: new Date(AT) }], messages: [], chunkCursor: null, chunksAppend: false }),
   'agents.getThreadChanges': () => ({ state: 'none' }),
+  'agents.getThreadMachine': () => ({ kind: 'laptop', state: 'online', name: 'Ada’s MacBook', platform: 'darwin', arch: 'arm64', hostname: null, lastSeenAt: new Date(AT).toISOString(), cloud: null }),
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],
   'linear-sync.getLinearBoardSync': () => ({ synced: false }),
   'task-runs.pollTaskRuns': () => ({ items: [{ issueId: ISSUE, runId: RUN, issueTitle: 'Fix sign-in redirect', agentId: AGENT, agentName: 'Claude Code', status: 'running', outcome: null, error: null, finishedAt: null, bot: null, harnesses: ['claude_code'] }], live }),

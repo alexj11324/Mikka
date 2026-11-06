@@ -12,6 +12,8 @@ export const pullRequestSchema = z.object({
   deletions: z.number().int().nonnegative().optional(),
 })
 export const assigneeSchema = z.object({ kind: z.enum(['member', 'agent']), id: z.string().min(1).max(128), name: z.string().max(200), image: z.string().nullable() })
+/** The person's say on 受阻 (lib/task-blocked.ts): flagged, or cleared for the thread `runId`. */
+export const blockFlagSchema = z.object({ blocked: z.boolean(), runId: z.string().max(128).nullable() })
 export const metadataSchema = z.object({
   number: z.number().int().positive().optional(),
   assignee: assigneeSchema.nullable().default(null),
@@ -22,6 +24,7 @@ export const metadataSchema = z.object({
   blockedByIds: z.array(z.uuid()).max(100).default([]),
   relatedIds: z.array(z.uuid()).max(100).default([]),
   duplicateOfId: z.uuid().nullable().default(null),
+  block: blockFlagSchema.nullable().default(null),
   dueDate: z.iso.date().nullable().default(null),
   estimate: z.number().int().min(0).max(100).nullable().default(null),
   favoriteUserIds: z.array(z.string().max(128)).max(200).default([]),

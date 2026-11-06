@@ -66,7 +66,8 @@
       "review": "In Review",
       "done": "Done",
       "canceled": "Canceled",
-      "duplicate": "Duplicate"
+      "duplicate": "Duplicate",
+      "blocked": "Blocked"
     },
     "priority": {
       "urgent": "Urgent",
@@ -3761,6 +3762,34 @@
     "needsModelCloudUnavailable": "Cloud execution is temporarily unavailable",
     "needsModelChecking": "Subscription allowance could not be checked. Try again."
   },
+  "ThreadRunPlace": {
+    "cloudName": "Cloud computer {id}",
+    "label": "Runs on {name} · {state}",
+    "kinds": {
+      "cloud": "Cloud computer",
+      "laptop": "Computer",
+      "server": "Server"
+    },
+    "states": {
+      "online": "Online",
+      "offline": "Offline",
+      "starting": "Starting",
+      "running": "Running",
+      "paused": "Sleeping",
+      "ended": "Stopped",
+      "error": "Error"
+    },
+    "id": "ID",
+    "template": "Template",
+    "created": "Created",
+    "stopped": "Stopped",
+    "system": "System",
+    "host": "Host",
+    "lastSeen": "Last seen",
+    "copyId": "Copy ID",
+    "copied": "ID copied",
+    "copyFailed": "Couldn't copy"
+  },
   "IssueThreads": {
     "title": "Threads",
     "modelSwitched": "Switched to",
@@ -3875,8 +3904,12 @@
       "routingDifficulty": {
         "easy": "Easy",
         "medium": "Medium",
-        "hard": "Hard",
-        "unknown": "Difficulty not assessed"
+        "hard": "Hard"
+      },
+      "routingTier": {
+        "light": "Light model",
+        "standard": "Standard model",
+        "strongest": "Strongest model"
       },
       "routingEffort": {
         "low": "Low reasoning effort",
@@ -3886,11 +3919,11 @@
         "max": "Maximum reasoning effort"
       },
       "routingReasons": {
-        "difficulty_fit": "Selected by task difficulty",
+        "difficulty_fit": "Selected by the model strength the task needs",
         "list_order": "Selected in model list order",
-        "low_confidence": "Difficulty was uncertain; used model list order",
-        "decision_unavailable": "Difficulty assessment was unavailable; used model list order",
-        "invalid_answer": "Difficulty assessment was invalid; used model list order",
+        "low_confidence": "Model strength was uncertain; used model list order",
+        "decision_unavailable": "Model strength assessment was unavailable; used model list order",
+        "invalid_answer": "Model strength assessment was invalid; used model list order",
         "no_selection": "No suitable model was selected; used model list order",
         "escalated": "The previous model could not finish the task; retried with a stronger model"
       }
@@ -4253,7 +4286,18 @@
           "running": "Running",
           "waiting": "Waiting for you",
           "blocked": "Blocked"
-        }
+        },
+        "block": {
+          "question": "Needs your answer",
+          "quota": "Out of quota",
+          "run": "Run blocked",
+          "failed": "Run failed",
+          "dependency": "Waiting on a task",
+          "dependencyOn": "Waiting on {id}",
+          "flagged": "Flagged"
+        },
+        "markBlocked": "Mark as blocked",
+        "unblock": "Move out of Blocked"
       },
       "title": "Board",
       "synced": "Synced with Linear",

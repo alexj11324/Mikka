@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
-import { assigneeSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
+import { assigneeSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
@@ -35,6 +35,7 @@ const metadata = object({
   project: text(100).trim().min(1).nullable().optional(), labels: z.array(labelSchema.strict()).max(12).optional(),
   pullRequests: z.array(pullRequestSchema.strict()).max(10).optional(), dueDate: z.iso.date().nullable().optional(),
   estimate: z.number().int().min(0).max(100).nullable().optional(),
+  block: blockFlagSchema.strict().nullable().optional(),
 })
 const quote = object({ artifactId: uuid, version: positive, kind: z.enum(['text', 'element']), text: text(2000).trim().min(1), label: text(200).optional(), selector: text(1000).optional() })
 const note = object({
@@ -99,6 +100,7 @@ export const desktopActionSchemas = {
   'agents.findThreadIssue': oneId,
   'agents.getIssueThread': tuple(uuid.nullable(), uuid, object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }).nullish()),
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
+  'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.sendIssueThreadReply': tuple(object({ issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,

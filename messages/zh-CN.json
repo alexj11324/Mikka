@@ -66,7 +66,8 @@
       "review": "评审中",
       "done": "已完成",
       "canceled": "已取消",
-      "duplicate": "重复"
+      "duplicate": "重复",
+      "blocked": "受阻"
     },
     "priority": {
       "urgent": "紧急",
@@ -3761,6 +3762,34 @@
     "needsModelCloudUnavailable": "云端暂时无法启动",
     "needsModelChecking": "订阅额度暂未确认，请重试"
   },
+  "ThreadRunPlace": {
+    "cloudName": "云电脑 {id}",
+    "label": "运行在 {name} · {state}",
+    "kinds": {
+      "cloud": "云电脑",
+      "laptop": "电脑",
+      "server": "服务器"
+    },
+    "states": {
+      "online": "在线",
+      "offline": "离线",
+      "starting": "启动中",
+      "running": "运行中",
+      "paused": "休眠",
+      "ended": "已停止",
+      "error": "出错"
+    },
+    "id": "ID",
+    "template": "模板",
+    "created": "创建",
+    "stopped": "停止",
+    "system": "系统",
+    "host": "主机",
+    "lastSeen": "上次在线",
+    "copyId": "复制 ID",
+    "copied": "ID 已复制",
+    "copyFailed": "复制失败"
+  },
   "IssueThreads": {
     "title": "线程",
     "modelSwitched": "已改用",
@@ -3875,8 +3904,12 @@
       "routingDifficulty": {
         "easy": "简单",
         "medium": "中等",
-        "hard": "困难",
-        "unknown": "难度未判断"
+        "hard": "困难"
+      },
+      "routingTier": {
+        "light": "轻量模型",
+        "standard": "标准模型",
+        "strongest": "最强模型"
       },
       "routingEffort": {
         "low": "低推理强度",
@@ -3886,11 +3919,11 @@
         "max": "最高推理强度"
       },
       "routingReasons": {
-        "difficulty_fit": "按任务难度选择",
+        "difficulty_fit": "按任务所需的模型强度选择",
         "list_order": "按模型列表顺序选择",
-        "low_confidence": "难度判断不确定，沿用模型列表顺序",
-        "decision_unavailable": "难度判断暂不可用，沿用模型列表顺序",
-        "invalid_answer": "难度判断无效，沿用模型列表顺序",
+        "low_confidence": "模型强度判断不确定，沿用模型列表顺序",
+        "decision_unavailable": "模型强度判断暂不可用，沿用模型列表顺序",
+        "invalid_answer": "模型强度判断无效，沿用模型列表顺序",
         "no_selection": "没有选出合适模型，沿用模型列表顺序",
         "escalated": "原模型未能完成任务，已升级重试"
       }
@@ -4253,7 +4286,18 @@
           "running": "进行中",
           "waiting": "等待你",
           "blocked": "受阻"
-        }
+        },
+        "block": {
+          "question": "等你回答",
+          "quota": "额度用完",
+          "run": "运行受阻",
+          "failed": "运行失败",
+          "dependency": "等其他任务",
+          "dependencyOn": "等 {id}",
+          "flagged": "已标记"
+        },
+        "markBlocked": "标记为受阻",
+        "unblock": "移出受阻"
       },
       "title": "看板",
       "synced": "已与 Linear 同步",

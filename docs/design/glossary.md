@@ -59,7 +59,7 @@ Decided by Alex, 2026-10-28.
 
 | Word | 中文 | What it is |
 | --- | --- | --- |
-| **Artifact** | Artifact | Something a thread produces for the person to look at or accept, such as an acceptance (验收), a document or a web page. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). |
+| **Artifact** | Artifact | Something a thread produces for the person to look at or accept, such as an acceptance (验收), a PR, a document or a web page. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). An open thread's header always has an Artifact button, and the message that finishes a thread carries its Artifact card (Alex, 2026-11-06). |
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
 | **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
@@ -165,6 +165,9 @@ A unit of work to be done, with a status and an assignee who is always a
 person (`MIK-xx`). A thread works on it; it is not a thread.
 _Owner_: the workspace; in a shared workspace, its team (Task aggregate).
 _Avoid_: issue in the UI, ticket, 工单, thread.
+_Note_: 受阻 (Blocked) is a board column a task falls into while its newest
+thread, a task it is blocked by or the person's flag stops it; it is not one of
+the task's statuses ([2026-11-06-1600](decisions/2026-11-06-1600-blocked-board-column.md)).
 
 ### Resources
 
