@@ -100,7 +100,7 @@ export function summarizeTimings(report, logs) {
     durationRule: 'parent_child_and_parallel_intervals_overlap_do_not_sum',
     proxyRule: 'preparation_is_measured_lower_bound_headers_include_upstream_ttfb',
     excludedSamples: report.samples.filter(sample => !eligibleSample(sample)).map(sample => ({ sampleId: sample.sampleId, reason: sample.error ?? sample.timing?.reason ?? 'incomplete' })), groups: [] }
-  for (const harness of [...new Set(report.samples.map(sample => sample.harness))]) {
+  for (const harness of new Set(report.samples.map(sample => sample.harness))) {
     const rows = report.samples.filter(sample => sample.harness === harness && eligibleSample(sample))
     report.summary.groups.push({ harness, strategy: report.requestedStrategy, samples: rows.length,
       dispatchToAgentStart: stats(rows.map(sample => sample.timing?.dispatchToAgentStartMs).filter(Number.isFinite)),

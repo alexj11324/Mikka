@@ -28,6 +28,12 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 文件；仅排除内核挂载、运行态、临时文件、活跃日志及新增的 `/opt/mikka`。
 安装完成的检查是完整的逐文件严格检查，任一原有文件变化即构建失败。
 
+匿名 worker 在 ready 前并行向实际官方 CLI 探测模型目录，等探测进程及其子进程
+退出后才允许保存 snapshot。目录只留在预加载进程内存中，按同一 CLI 选择结果和
+文件身份复用；首次设备注册即包含真实目录，任务领取后不再等待两个 CLI 串行
+重探测。没有可复用结果或文件身份变化时仍走真实探测，不硬编码模型；自然刷新
+周期从实例接收 handoff 起算。探测不读取账号、凭证或任务，也不发模型请求。
+
 匿名 worker 预加载后另做 finalization 检查。2026-11-06 的
 [纯官方控制实验](https://github.com/alexj11324/Mikka/actions/runs/42277103323) 证明，
 即使只添加检查器、不安装或启动 Mikka，E2B 的最终启动也会更新自身机器标识、
@@ -81,8 +87,12 @@ source/run/attempt 标记关闭全部探测实例，再按唯一名称和 ID 删
 正式起点必须是 `dispatchRun` 第一行，日志标记 `boundary: 'dispatch_run_entry'`，
 包含最初的 Profile/模型等前置校验；终点取服务端执行 stage 和本任务官方 CLI
 exact ACK 两者较晚的时间。没有入口标记或确切 ACK 的样本不能通过。
-旧流程的 92/77 秒基线从 legacy dispatch body 起算，只是完整入口延迟的下界，
-可用于分析真实分段，不得冒充完整起点或用于证明 ≤5 秒。
+固定生产版本的[六次基线](../research/2026-11-06-cloud-startup-production-baseline.md)
+从 legacy dispatch body 起算，到执行 stage 为 Claude 82.528–94.567 秒、Codex
+80.400–90.430 秒，只是完整入口延迟的下界；可用于分析真实分段，不得冒充完整
+起点或用于证明 ≤5 秒。[三模板组件对照](../research/2026-11-06-e2b-natural-cache-comparison.json)
+另记派生 create 与实际 pool claim/resume，保留每组缓存、资源、worker 和 source
+边界；它不包含任务派发、领取和官方 ACK，也不能代替生产端到端成绩。
 先测原流程分段基线，再测派生模板。只有仍不能达标时才按实测选择预热池或组合。
 运行费用由任务所有者自己的 E2B key 承担，空闲机器自动暂停或回收，不新增数据库轮询。
 

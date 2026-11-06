@@ -469,11 +469,14 @@ def verify_release_evidence(report):
     subscriptions = report.get('subscriptionAcceptance', {})
     for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]:
         row = subscriptions.get(kind, {})
-        ack, authorization = row.get('agentAcceptance', {}), row.get('runtimeAuthorization', {})
+        ack, authorization, tool = row.get('agentAcceptance', {}), row.get('runtimeAuthorization', {}), row.get('toolEvidence')
         if (row.get('status') != 'passed' or row.get('templateId') != report['templates'][kind]['templateId']
                 or row.get('sourceCommit') != report['sourceCommit'] or row.get('workerSha') != report['workerSha']
                 or row.get('harness') != harness or row.get('model') != model
                 or row.get('credentialRoute') != 'subscription' or row.get('replyVerified') is not True
+                or row.get('replyVerifiedAfterTool') is not True or not isinstance(tool, dict)
+                or set(tool) != {'toolCallHash', 'outcome'} or tool.get('outcome') != 'ok'
+                or not isinstance(tool.get('toolCallHash'), str) or not re.fullmatch(r'[a-f0-9]{16}', tool['toolCallHash'])
                 or not re.fullmatch(r'[a-f0-9]{64}', row.get('officialBinarySha256', ''))
                 or not isinstance(row.get('officialCliVersion'), str) or not row['officialCliVersion']
                 or not row.get('runId') or not row.get('deviceId')

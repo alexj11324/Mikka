@@ -1,11 +1,10 @@
 // Each hosted task owns its E2B machine. The owner-bound claim supplies
 // credentials once; official CLIs connect directly to their providers and use
 // the machine's normal HOME, environment and working directory Git metadata.
-import { execFile, spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk'
 import { harnessReportsModel, type HarnessInfo, type RunAssignment } from '@mikka/protocol'
 import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
@@ -29,29 +28,62 @@ import { daemonTracer, runIdHash } from './tracing'
 import { runRuntimeTimings } from './run-runtime-timing'
 import { startCliTimingCollector } from './official-cli-timing'
 import { hostedBinaries } from './hosted-binaries'
+import { stopGroup } from './process-group'
 export { hostedBinaries } from './hosted-binaries'
 
-const exec = promisify(execFile)
 const computerProxy = fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url))
 type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable'>
 const unavailable = (detail: Detail, cause?: unknown) => cause instanceof ClaudeInitializationError
   ? new Error(cause.code, { cause }) : new CodedError('subscription_hosted_runtime_unavailable', { detail, cause })
 
-/** Stop the complete task CLI process group, including MCP/shell descendants. */
-async function stopGroup(child: ReturnType<typeof spawn>, graceMs = 3000) {
-  if (child.pid === undefined) return
-  const signal = (name: NodeJS.Signals) => { try { process.kill(-child.pid!, name) } catch { /* Already gone. */ } }
-  if (child.exitCode === null && child.signalCode === null) {
-    signal('SIGTERM')
-    await new Promise<void>(resolve => {
-      if (child.exitCode !== null || child.signalCode !== null) return resolve()
-      const timer = setTimeout(resolve, graceMs)
-      child.once('exit', () => { clearTimeout(timer); resolve() })
-    })
-  }
-  signal('SIGKILL')
-}
 const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { throw unavailable('host_unsupported') } }
+
+/** Verification owns the same task directory as its CLI. Its entire process
+ * group must stop on cancellation, timeout or a shell leader's early exit. */
+export async function runHostedCommand(worktree: string, script: string, _readOnly: boolean, timeoutMs: number, signal?: AbortSignal) {
+  const began = performance.now()
+  let child: ChildProcess | undefined, stopping: Promise<void> | undefined, timer: NodeJS.Timeout | undefined
+  let timedOut = false, overflow = false
+  let exitCode: number | null = null, exitSignal: string | null = null, output = 'hosted_command_failed'
+  const stop = () => child ? stopping ??= stopGroup(child) : Promise.resolve()
+  const abort = () => { void stop() }
+  try {
+    signal?.throwIfAborted()
+    const stdout: Buffer[] = [], stderr: Buffer[] = []
+    const lengths = { stdout: 0, stderr: 0 }
+    const collect = (stream: 'stdout' | 'stderr', chunks: Buffer[], chunk: Buffer) => {
+      lengths[stream] += chunk.length
+      if (lengths[stream] > 1024 * 1024) { overflow = true; abort() }
+      else chunks.push(chunk)
+    }
+    const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+      child = spawn('/bin/sh', ['-c', script], {
+        cwd: realpathSync(worktree), env: process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      child.stdout?.on('data', (chunk: Buffer) => collect('stdout', stdout, chunk))
+      child.stderr?.on('data', (chunk: Buffer) => collect('stderr', stderr, chunk))
+      child.once('error', reject)
+      child.once('close', (code, term) => resolve({ code, signal: term }))
+      child.once('exit', abort)
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) abort()
+      if (timeoutMs > 0) timer = setTimeout(() => { timedOut = true; abort() }, timeoutMs)
+    })
+    exitCode = result.code; exitSignal = result.signal
+    if (exitCode === 0 && !timedOut && !overflow && !signal?.aborted)
+      output = (Buffer.concat(stdout).toString('utf8') + Buffer.concat(stderr).toString('utf8')).slice(-4000)
+    else if (exitCode === 0) exitCode = null
+  } catch {
+    exitCode = child?.exitCode ?? null
+    exitSignal = child?.signalCode ?? null
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
+    await stop()
+  }
+  return { exitCode, signal: exitSignal, timedOut: timedOut && !signal?.aborted, output,
+    timing: { createMs: 0, runMs: Math.round(performance.now() - began) } }
+}
 
 export async function createHostedBotRunner(host: {
   stateDir: string
@@ -67,25 +99,9 @@ export async function createHostedBotRunner(host: {
   if (host.dockerSocket !== undefined && host.dockerSocket !== 'unix:///run/mikka-container/docker.sock') throw unavailable('host_unsupported')
   const binaries = hostedBinaries(host.binaries)
   if (!binaries.codex && !binaries.claude_code) throw unavailable('cli_missing')
-  const command = async (worktree: string, script: string, _readOnly: boolean, timeoutMs: number, signal?: AbortSignal) => {
-    const began = performance.now()
-    try {
-      // Verification uses this same task's directory and Git, just like the CLI.
-      const result = await exec('/bin/sh', ['-c', script], {
-        cwd: realpathSync(worktree), env: process.env, timeout: timeoutMs, signal, maxBuffer: 1024 * 1024,
-      })
-      return { exitCode: 0, signal: null, timedOut: false, output: (result.stdout + result.stderr).slice(-4000),
-        timing: { createMs: 0, runMs: Math.round(performance.now() - began) } }
-    } catch (error) {
-      const value = error as { code?: number; signal?: string; killed?: boolean }
-      return { exitCode: typeof value.code === 'number' ? value.code : null, signal: value.signal ?? null,
-        timedOut: Boolean(value.killed && !signal?.aborted), output: 'hosted_command_failed',
-        timing: { createMs: 0, runMs: Math.round(performance.now() - began) } }
-    }
-  }
   return {
     harnesses: Object.keys(binaries).filter(kind => binaries[kind as keyof typeof binaries]) as ('codex' | 'claude_code')[],
-    binaries: { ...binaries }, command,
+    binaries: { ...binaries }, command: runHostedCommand,
     async start(assignment: RunAssignment, options: StartOptions): Promise<AgentSession> {
       const gate = requireRunToolApproval(options.runId, options.toolApproval)
       const selected = assignment.subscriptionBinding

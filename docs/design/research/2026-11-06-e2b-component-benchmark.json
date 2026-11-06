@@ -1,6 +1,7 @@
 {
   "version": 1,
   "scope": "component-only; excludes production dispatch, credentials, and real agent execution",
+  "workerVersionLimit": "This run precedes the later real official CLI model-catalogue preload change. It proves only the source and worker digest recorded below; final release and production acceptance must verify the newer worker.",
   "issue": 1505,
   "run": {
     "url": "https://github.com/alexj11324/Mikka/actions/runs/42285968840",

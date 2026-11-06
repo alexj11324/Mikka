@@ -31,14 +31,15 @@ const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', windo
     events: [{ name: `${sample.harness}.api_request`, kind: 'provider', receivedAt: epoch + 4900, eventAt: epoch + 4000,
       durationMs: 1000, model: models[sample.harness], outcome: 'ok', status: 200, attempt: 1, sequence: 2 }] } })
 
-function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false } = {}) {
+function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false } = {}) {
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
   const json = value => Response.json(value)
   const rpc = result => json({ version: 1, ok: true, result })
   const readDetail = sample => {
     sample.reads++
-    return { thread: { id: sample.runId, status: sample.finished ? 'stopped' : sample.reads > 1 ? 'running' : 'preparing', createdAt: new Date(epoch).toISOString() },
+    if (candidate && runtime && sample.reads > 1 && !deferTerminal) sample.finished = true
+    const detail = { thread: { id: sample.runId, status: sample.finished ? 'stopped' : sample.reads > 1 ? 'running' : 'preparing', createdAt: new Date(epoch).toISOString() },
       chunks: sample.reads > 1 ? [stage('repository', 1000), startedStage(sample),
         { at: new Date(epoch + 3700).toISOString(), chunk: { type: 'tool-input-start', toolCallId: 'safe-id' } },
         { at: new Date(epoch + 3800).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'safe-id', output: 'PRIVATE_README_CONTENT' } },
@@ -46,9 +47,15 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: (() => { const value = runtimeTiming(sample)
             if (extraAuth) { value.requests[0].endpoint = 'permission_check'; value.counts[0].endpoint = 'permission_check' }; return value })() } } }] : [])] : [stage('repository', 1000)],
       live: { runs: [{ id: sample.runId, workspaceId: workspace }] } }
+    io.onDetail?.(sample, detail)
+    return detail
   }
   const io = {
     calls, samples, sockets, now: () => clock += 10,
+    pushTerminal() {
+      current.finished = true
+      for (const socket of sockets) if (!socket.closed) socket.onmessage?.({ data: JSON.stringify({ kind: 'run', id: current.runId }) })
+    },
     WebSocketImpl: class {
       constructor(url, protocol) {
         assert.equal(url.searchParams.get('revisions'), '1')
@@ -107,7 +114,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         if (action === 'agents.pollIssueThreads') return rpc({ threads: [{ id: current.runId, ownedByCurrentUser: true }] })
         if (action === 'agents.getIssueThread') return rpc(readDetail(samples.find(sample => sample.runId === args[1])))
         if (action === 'agents.stopRun') {
-          current.finished = true
+          current.stopRequested = true; current.finished ||= !deferTerminal
           if (stopRace) return Response.json({ version: 1, ok: false, error: { code: 'runChainEnded' } }, { status: 409 })
           return rpc({ stoppedRunIds: [args[0]] })
         }
@@ -143,7 +150,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       if (path === '/api/live/ticket') return json({ url: 'wss://live.example/v1/live/opaque/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 })
       if (path === '/api/factory/tasks') return json({ contractVersion: 1, issueId: current.issueId, tasks: [{ id: current.taskId, issueId: current.issueId }] })
       if (path === `/api/factory/tasks/${current.taskId}`) {
-        if (init.method === 'POST') { current.cancelled = true; current.finished = !stopRace; return json({ cancelled: true }) }
+        if (init.method === 'POST') { current.cancelled = true; current.finished ||= !stopRace && !deferTerminal; return json({ cancelled: true }) }
         return json({ task: { id: current.taskId, issueId: current.issueId, status: 'running', revision: 1 }, attempts: [{ runId: current.runId }] })
       }
       if (/^\/api\/threads\/.*\/machine$/.test(path)) { assert.equal(candidate, false); current.machineEnded = true; return json({ ended: true }) }
@@ -174,6 +181,36 @@ test('claim/running state and daemon stages do not prove provider execution; spl
   assert.equal(observeChunks(record, { chunks: [stage('agent_start', 20), delta('STARTUP_'), delta('OK_test')] }, epoch), true)
   assert.equal(record.replyVerified, true)
   assert.doesNotMatch(JSON.stringify(record), /STARTUP_OK_test/)
+})
+
+test('an early marker stays before the tool when full run history is replayed', () => {
+  const record = { sampleId: 'ordered', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+  const detail = { chunks: [stage('agent_start', 20), delta('STARTUP_OK_ordered'),
+    { chunk: { type: 'tool-input-start', toolCallId: 'read-file' } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README_CONTENT' } }] }
+  for (let read = 0; read < 3; read++) {
+    assert.equal(observeChunks(record, detail, epoch + read), false)
+    assert.equal(record.replyVerified, true)
+    assert.equal(record.toolCalls[0].outcome, 'ok')
+    assert.equal(record.replyVerifiedAfterTool, false, 'previously accumulated tools cannot reorder a replayed marker')
+  }
+  detail.chunks.push(delta('An unrelated later reply'))
+  assert.equal(observeChunks(record, detail, epoch + 10), false, 'old marker text cannot carry into the post-tool buffer')
+  const baseline = { sampleId: 'ordered', requireReply: true, minToolCalls: 1 }
+  assert.equal(observeChunks(baseline, detail, epoch), true, 'optional baseline keeps its original reply-plus-tool criterion')
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_ordered/)
+})
+
+test('a completed tool followed by the task marker proves reply order', () => {
+  const record = { sampleId: 'ordered', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+  const detail = { chunks: [stage('agent_start', 20),
+    { chunk: { type: 'tool-input-start', toolCallId: 'read-file' } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README_CONTENT' } },
+    delta('STARTUP_'), delta('OK_ordered')] }
+  assert.equal(observeChunks(record, detail, epoch), true)
+  assert.equal(record.replyVerifiedAfterTool, true)
+  assert.equal(observeChunks(record, detail, epoch + 10), true)
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_ordered/)
 })
 
 test('three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup', async () => {
@@ -243,6 +280,7 @@ test('direct diagnostics use and delete only this test repository variable, and 
     const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
     assert.equal(report.status, extraAuth ? 'failed' : 'awaiting_server_timings', JSON.stringify(report))
     assert.ok(report.samples.every(sample => sample.runtimeEvidence?.status === (extraAuth ? 'failed' : 'passed')))
+    assert.ok(report.samples.every(sample => sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true))
     assert.equal(report.officialTiming.cleaned, true)
     assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
     assert.equal(io.calls.filter(call => call.init.body?.includes('workspace-secrets.deleteSecret')).length, 1)
@@ -252,11 +290,73 @@ test('direct diagnostics use and delete only this test repository variable, and 
 
 test('candidate gate checks frozen device and marker without representing itself as cloud latency acceptance', async () => {
   const io = fixture({ candidate: true, runtime: true })
-  const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), { env, ...io })
+  const report = await runCloudStartup({ ...options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), minToolCalls: 1 }, { env, ...io })
   assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
   assert.equal(report.target, 'candidate_device'); assert.equal(report.samples[0].execution.deviceId, deviceId)
   assert.equal(report.samples[0].replyVerified, true)
+  assert.equal(report.samples[0].requireReplyAfterTool, true)
+  assert.equal(report.samples[0].replyVerifiedAfterTool, true)
   assert.equal(io.calls.some(call => call.path.endsWith('/machine')), false)
+})
+
+test('candidate finish receipt waits for the same run terminal push before cleanup', async () => {
+  const io = fixture({ candidate: true, runtime: true, deferTerminal: true })
+  let receiptObserved
+  const receipt = new Promise(resolve => { receiptObserved = resolve })
+  io.onDetail = (sample, detail) => {
+    if (detail.chunks.some(item => item.chunk.type === 'finish')) receiptObserved()
+  }
+  let settled = false
+  const pending = runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), { env, ...io })
+    .then(report => { settled = true; return report })
+  await receipt
+  await new Promise(setImmediate)
+  assert.equal(settled, false, 'a finish chunk does not attest the server terminal state')
+  assert.equal(io.calls.some(call => call.path === '/api/factory/tasks'), false, 'cleanup cannot begin before terminal acknowledgement')
+  io.pushTerminal()
+  const report = await pending
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  assert.equal(report.samples[0].lastStatus, 'stopped')
+  assert.equal(report.samples[0].cleanup.status, 'passed')
+  assert.equal(io.samples[0].deleted, true)
+  assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('candidate failure cleanup waits for actual terminal after an accepted stop request', async () => {
+  const io = fixture({ candidate: true, runtime: true, badEvidence: true, deferTerminal: true })
+  let stopObserved
+  const stopped = new Promise(resolve => { stopObserved = resolve })
+  io.onDetail = sample => { if (sample.stopRequested) stopObserved() }
+  let settled = false
+  const pending = runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), { env, ...io })
+    .then(report => { settled = true; return report })
+  await Promise.race([stopped, pending])
+  await new Promise(setImmediate)
+  assert.equal(io.samples[0].stopRequested, true)
+  assert.equal(settled, false, 'stopRequestedAt alone does not mean the daemon ended')
+  assert.equal(io.samples[0].deleted, undefined, 'the owned issue stays available while the run remains live')
+  io.pushTerminal()
+  const report = await pending
+  assert.equal(report.status, 'failed')
+  assert.equal(report.samples[0].error, 'startup_subscription_provenance_mismatch')
+  assert.equal(report.samples[0].cleanup.status, 'passed', JSON.stringify(report.samples[0].cleanup))
+  assert.equal(io.samples[0].deleted, true)
+  assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('candidate cleanup deadline retains its fixture when the daemon never confirms terminal', async () => {
+  const io = fixture({ candidate: true, runtime: true, badEvidence: true, deferTerminal: true })
+  const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), { env, ...io })
+  const sample = report.samples[0]
+  assert.equal(report.status, 'failed')
+  assert.equal(sample.cleanup.status, 'failed')
+  assert.equal(sample.cleanup.errors[0].code, 'startup_cleanup_terminal_timeout')
+  assert.deepEqual(sample.cleanup.retainedFixture, { issueId: sample.issueId, runIds: [sample.runId] })
+  assert.equal(io.samples[0].deleted, undefined)
+  assert.equal(io.samples[0].reads, 4, 'only the initial read, watch opening, live-ready and final deadline read occur')
+  assert.ok(io.sockets.every(socket => socket.closed))
+  assert.equal(io.calls.filter(call => call.path === '/api/auth/sign-out').length, 1)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_/)
 })
 
 test('wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed', async () => {

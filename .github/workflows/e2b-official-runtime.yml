@@ -211,9 +211,17 @@ jobs:
           import { writeFileSync } from 'node:fs'
           writeFileSync(process.argv[2], process.env.CANDIDATE_REPORT, { mode: 0o600 })
           JS
-          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/accepted.json"
+          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
         env:
           CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+      - name: Preserve closed subscription gate diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-template-subscription-diagnostics
+          path: ${{ runner.temp }}/subscription-diagnostics.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Make only fully accepted candidates public
         id: publish
         run: |

@@ -111,9 +111,11 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
   }
   for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
     const row = releaseEvidence.subscriptionAcceptance?.[kind]
-    const ack = row?.agentAcceptance, authorization = row?.runtimeAuthorization
+    const ack = row?.agentAcceptance, authorization = row?.runtimeAuthorization, tool = row?.toolEvidence
     if (row?.status !== 'passed' || row?.templateId !== templates[kind] || row?.sourceCommit !== sourceCommit || row?.workerSha !== sourceSha
       || row?.harness !== harness || row?.model !== model || row?.credentialRoute !== 'subscription' || row?.replyVerified !== true
+      || row?.replyVerifiedAfterTool !== true || tool?.outcome !== 'ok' || !/^[a-f0-9]{16}$/.test(tool?.toolCallHash ?? '')
+      || Object.keys(tool).length !== 2
       || !/^[a-f0-9]{64}$/.test(row?.officialBinarySha256 ?? '') || typeof row?.officialCliVersion !== 'string' || !row.officialCliVersion
       || !row?.runId || !row?.deviceId
       || ack?.harness !== harness || ack?.runIdHash !== createHash('sha256').update(row.runId).digest('hex').slice(0, 16)

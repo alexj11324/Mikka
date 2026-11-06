@@ -11,7 +11,7 @@ import { startDaemon } from '../../packages/daemon/src/main.ts'
 import { registrationLogin } from '../../packages/daemon/src/login.ts'
 import { HttpServerLink } from '../../packages/daemon/src/server-link-http.ts'
 import { DAEMON_VERSION } from '../../packages/daemon/src/paths.ts'
-import { probeHarnessModels } from '../../packages/daemon/src/model-probe.ts'
+import { probeHostedRuntimeModels } from '../../packages/daemon/src/cloud-model-probe.ts'
 import { hostedBinaries, readHostedCliManifest } from '../../packages/daemon/src/hosted-binaries.ts'
 
 async function main() {
@@ -37,11 +37,16 @@ async function main() {
   const measuredVersion = (await promisify(execFile)(binary, ['--version'], { timeout: 10000, maxBuffer: 16384 })).stdout.trim()
   const version = (harness === 'codex' ? /^codex-cli\s+(\d+\.\d+\.\d+)$/ : /^(\d+\.\d+\.\d+)(?:\s+\(Claude Code\))?$/).exec(measuredVersion)?.[1]
   if (!version) throw Error('candidate_cli_version_missing')
-  const catalogue = await probeHarnessModels(harness, binary, { scratchDir: dataDir })
-  if (!catalogue) throw Error('candidate_cli_models_missing')
-  const measured: NonNullable<Parameters<typeof startDaemon>[0]['harnesses']> = [
-    { harness, installed: true, version, ...catalogue },
-  ]
+  // Use the same anonymous probe and in-memory handoff as the preloaded
+  // production worker. Registration must already contain the real catalogue;
+  // a later second probe must not hide an incomplete first registration.
+  const probe = await probeHostedRuntimeModels()
+  const catalogue = probe.reports.find(row => row.harness === harness)
+  if (!catalogue?.installed || !catalogue.models?.length) throw Error('candidate_cli_models_missing')
+  if (realpathSync(probe.binaries[harness] ?? '') !== binary
+    || createHash('sha256').update(readFileSync(binary)).digest('hex') !== binarySha256) {
+    throw Error('candidate_official_cli_not_preserved')
+  }
   let input = ''
   for await (const chunk of process.stdin) {
     input += chunk
@@ -63,7 +68,7 @@ async function main() {
     return registered
   }
   const daemon = await startDaemon({ dataDir, flavor: 'prod', link, credential, hostedSubscriptions: true,
-    harnesses: measured, modelProbe: true })
+    harnesses: probe.reports, preloadedModels: probe, modelProbe: true })
   const stop = () => { void daemon.stop().then(() => process.exit(0)) }
   process.once('SIGTERM', stop)
   process.once('SIGINT', stop)

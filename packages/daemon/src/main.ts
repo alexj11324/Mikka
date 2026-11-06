@@ -69,6 +69,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
+import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
@@ -148,6 +149,8 @@ export interface DaemonOptions {
    * for a device's own harnesses; tests that set `harnesses` turn it on with `true`.
    */
   modelProbe?: boolean
+  /** Anonymous official-CLI probes held in memory by the trusted preloader. */
+  preloadedModels?: HostedModelProbe
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
@@ -427,6 +430,16 @@ export class Daemon {
         })
       : undefined
     this.hostedBinaries = hosted?.binaries
+    const preloadedModels = hosted && this.modelProbeOn()
+      ? reusableHostedModels(this.options.preloadedModels, hosted.binaries) : undefined
+    if (preloadedModels) {
+      for (const info of preloadedModels) this.modelReports.set(info.harness, {
+        models: info.models, modelSlots: info.modelSlots, defaultModelSlot: info.defaultModelSlot,
+      })
+      // A frozen template can be weeks old. The binaries were checked above;
+      // the natural refresh period starts when this machine accepts its owner.
+      this.lastModelProbe = Date.now()
+    }
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
@@ -645,7 +658,7 @@ export class Daemon {
     this.schedule(0)
     this.commandsLoop = this.pollCommands()
     // The CLIs' own model lists, in the background: a first install downloads the pinned CLI.
-    if (this.modelProbeOn()) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+    if (this.modelProbeOn() && !preloadedModels) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
     // No folder-request poll: the app adds repositories by path and never queues one
     // (app/v1/devices/[deviceId]/fs/requests), and each idle poll was a database read.
     return this
@@ -1869,7 +1882,7 @@ export class Daemon {
     await this.tick
     // The commands poll starts claims outside the heartbeat tick. Abort their
     // HTTP requests and settle them before stopping the run supervisor.
-    await Promise.allSettled([...this.claims.values()])
+    await Promise.allSettled(this.claims.values())
     await this.rpc?.close()
     try {
       await this.supervisor?.stop()

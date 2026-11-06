@@ -259,7 +259,10 @@ function readStartupTiming(value, record) {
 export function observeChunks(record, detail, observedAt) {
   const stages = record.stages ??= []
   const toolCalls = record.toolCalls ??= []
-  let started = false, reply = ''
+  // getIssueThread replays the stream. Derive ordering afresh from this read,
+  // never from toolCalls retained by an earlier read of the same chunks.
+  const toolInputs = new Set()
+  let started = false, reply = '', completedTool = false, replyAfterTool = '', replyVerifiedAfterTool = false
   for (const item of detail.chunks ?? []) {
     const { chunk } = item
     const at = dateValue(item.at)
@@ -290,6 +293,8 @@ export function observeChunks(record, detail, observedAt) {
       if (['tool-input-start', 'tool-input-available', 'tool-output-available', 'tool-output-error'].includes(chunk?.type)
         && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
         const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+        if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
+        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash)) completedTool = true
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
         if (!tool && chunk.type.startsWith('tool-input-') && toolCalls.length < 64) {
           tool = { toolCallHash, startedAt: Number.isFinite(at) ? iso(at) : null, outcome: 'pending' }; toolCalls.push(tool)
@@ -309,21 +314,34 @@ export function observeChunks(record, detail, observedAt) {
         reply += output
         if (reply.includes(`STARTUP_OK_${record.sampleId}`)) record.replyVerified = true
         reply = reply.slice(-256)
+        if (completedTool) {
+          replyAfterTool += output
+          if (replyAfterTool.includes(`STARTUP_OK_${record.sampleId}`)) replyVerifiedAfterTool = true
+          replyAfterTool = replyAfterTool.slice(-256)
+        }
       }
     }
   }
+  record.replyVerifiedAfterTool = replyVerifiedAfterTool
   record.lastStatus = typeof detail.thread?.status === 'string' && /^[a-z_]+$/.test(detail.thread.status) ? detail.thread.status : null
   return Boolean(record.agentStart && record.firstProviderChunk && (!record.requireReply || record.replyVerified)
     && toolCalls.filter(tool => tool.outcome === 'ok').length >= (record.minToolCalls ?? 0)
-    && (!record.requireRuntimeReceipt || record.runtimeTimingStatus === 'complete'))
+    && (!record.requireReplyAfterTool || record.replyVerifiedAfterTool)
+    && (!record.requireRuntimeReceipt || record.runtimeTimingStatus === 'complete')
+    && (!record.requireTerminal || (detail.thread?.id === record.runId && TERMINAL.has(record.lastStatus))))
 }
 
 /** One live owner channel per server-reported scope. Reads happen on pushes,
  * once on connection (to cover the opening race), and once at the deadline. */
-async function watchExecution(client, record, timeoutMs, WebSocketImpl, now) {
+async function watchRun(client, record, timeoutMs, WebSocketImpl, now, terminalOnly = false) {
   const sockets = new Map(), timers = new Set()
   let closed = false, reading = false, dirty = false, settle
   const outcome = new Promise((resolve, reject) => { settle = { resolve, reject } })
+  const observed = detail => {
+    if (!terminalOnly) return observeChunks(record, detail, now())
+    assert(detail.thread?.id === record.runId, 'cleanup_scope_mismatch')
+    return TERMINAL.has(detail.thread.status)
+  }
   const later = (work, ms) => { const timer = setTimeout(() => { timers.delete(timer); work() }, ms); timers.add(timer); return timer }
   const reject = error => { if (!closed) settle.reject(error) }
   const kick = () => {
@@ -368,8 +386,8 @@ async function watchExecution(client, record, timeoutMs, WebSocketImpl, now) {
         const detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
         record.detailReads = (record.detailReads ?? 0) + 1
         record.runCreatedAt ??= detail.thread?.createdAt ?? null
-        if (observeChunks(record, detail, now())) { settle.resolve(); return }
-        if (TERMINAL.has(record.lastStatus)) fail('ended_before_execution_proof')
+        if (observed(detail)) { settle.resolve(); return }
+        if (!terminalOnly && TERMINAL.has(record.lastStatus)) fail('ended_before_execution_proof')
         const scopes = [...new Set((detail.live?.runs ?? []).filter(run => run.id === record.runId).map(run => run.workspaceId))]
         assert(scopes.length && scopes.every(id => UUID.test(id ?? '')), 'live_scope_missing')
         for (const scope of scopes) await connect(scope)
@@ -378,8 +396,8 @@ async function watchExecution(client, record, timeoutMs, WebSocketImpl, now) {
   }
   later(() => {
     void client.rpc('agents.getIssueThread', [record.issueId, record.runId]).then(detail => {
-      if (observeChunks(record, detail, now())) settle.resolve()
-      else fail('execution_timeout')
+      if (observed(detail)) settle.resolve()
+      else fail(terminalOnly ? 'cleanup_terminal_timeout' : 'execution_timeout')
     }).catch(reject)
   }, timeoutMs)
   kick()
@@ -414,11 +432,13 @@ async function subscriptionProof(client, record) {
     deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity) }
 }
 
-export async function cleanupCase(client, record, target) {
+export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now } = {}) {
   const cleanup = record.cleanup ??= { status: 'running', errors: [] }
   const runIds = new Set(record.runId ? [record.runId] : [])
+  let runsEnded = true
   const step = async (name, operation) => {
-    try { await operation(); cleanup[name] = true } catch (error) { cleanup.errors.push({ step: name, code: safeError(error) }) }
+    try { await operation(); cleanup[name] = true; return true }
+    catch (error) { cleanup.errors.push({ step: name, code: safeError(error) }); return false }
   }
   if (record.issueId) await step('factoryCancelled', async () => {
     const listing = await client.json(`/api/factory/tasks?issueId=${record.issueId}`)
@@ -433,24 +453,34 @@ export async function cleanupCase(client, record, target) {
     }
   })
   for (const runId of runIds) {
-    await step(`runStopped_${runId}`, async () => {
+    const stopped = await step(`runStopped_${runId}`, async () => {
       const detail = await client.rpc('agents.getIssueThread', [record.issueId, runId])
+      if (target === 'device') assert(detail.thread?.id === runId, 'cleanup_scope_mismatch')
       if (TERMINAL.has(detail.thread?.status)) return
       try { await client.rpc('agents.stopRun', [runId]) }
       catch (error) {
         // Completion racing a stop legitimately returns runChainEnded (409).
         // Confirm the owned run ended; never swallow an unrelated stop error.
         const latest = await client.rpc('agents.getIssueThread', [record.issueId, runId])
+        if (target === 'device') assert(latest.thread?.id === runId, 'cleanup_scope_mismatch')
         if (!TERMINAL.has(latest.thread?.status)) throw error
+        return
       }
+      // A local device cannot be removed while any run is live. An accepted
+      // stop only records stopRequestedAt; wait for the daemon's real terminal
+      // update using the same owner live channel as execution observation.
+      if (target === 'device') await watchRun(client, { issueId: record.issueId, runId },
+        Math.min(timeoutMs, 60000), WebSocketImpl, now, true)
     })
+    if (target === 'device' && !stopped) runsEnded = false
     if (target === 'cloud') await step(`machineEnded_${runId}`, () => client.json(`/api/threads/${runId}/machine`, post({ action: 'end' }), 120000))
   }
-  if (record.issueId) await step('taskDeleted', async () => {
+  if (record.issueId && runsEnded) await step('taskDeleted', async () => {
     const { issue } = await client.rpc('issues.getIssue', [record.issueId])
     assert(issue?.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
     await client.rpc('issue-operations.setIssueDeleted', [{ id: issue.id, revision: issue.revision }])
   })
+  if (!runsEnded) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
 }
 
@@ -471,7 +501,8 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
-    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireOfficialTiming: officialTiming === 'enabled',
+    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId), requireOfficialTiming: officialTiming === 'enabled',
+    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required'),
     stages: [], status: 'running', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')
@@ -492,7 +523,7 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
     await subscriptionProof(client, record)
-    await watchExecution(client, record, timeoutMs, WebSocketImpl, now)
+    await watchRun(client, record, timeoutMs, WebSocketImpl, now)
     await subscriptionProof(client, record)
     await pin()
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
@@ -511,7 +542,7 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
       try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]); record.coordinatorStopped = true }
       catch (error) { record.status = 'failed'; record.stopError = safeError(error) }
     }
-    await cleanupCase(client, record, deviceId ? 'device' : 'cloud')
+    await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now })
   }
   return record
 }

@@ -170,10 +170,15 @@ class Publish(unittest.TestCase):
                    'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
                                        'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
                    'runtimeAuthorization': {'source': 'http_server_link', 'complete': True, 'truncated': False, 'extraRemoteCalls': 0},
+                   'replyVerifiedAfterTool': True, 'toolEvidence': {'toolCallHash': 'd' * 16, 'outcome': 'ok'},
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
         self.assertIs(bt.verify_release_evidence(report), report)
-        for field, value in [('templateId', 'old-template'), ('sourceCommit', 'c' * 40), ('credentialRoute', 'api_key'), ('replyVerified', False), ('model', 'other')]:
+        for field, value in [('templateId', 'old-template'), ('sourceCommit', 'c' * 40), ('credentialRoute', 'api_key'), ('replyVerified', False), ('model', 'other'),
+                             ('replyVerifiedAfterTool', None), ('replyVerifiedAfterTool', False), ('toolEvidence', None),
+                             ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'error'}),
+                             ('toolEvidence', {'toolCallHash': 'raw-id', 'outcome': 'ok'}),
+                             ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'ok', 'providerText': 'must-not-pass'})]:
             invalid = json.loads(json.dumps(report))
             invalid['subscriptionAcceptance']['codex'][field] = value
             with self.assertRaisesRegex(ValueError, 'release_subscription_acceptance_missing codex'):

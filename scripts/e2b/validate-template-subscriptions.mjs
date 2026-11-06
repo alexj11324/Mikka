@@ -13,6 +13,41 @@ const KINDS = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex',
 const fail = (code, cause) => { throw Error(`template_gate_${code}`, cause ? { cause } : undefined) }
 const check = (value, code) => { if (!value) fail(code) }
 const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+const GATE_CODES = new Set([
+  'source_invalid', 'source_mismatch', 'account_required', 'fixtures_required', 'application_build_mismatch',
+  'sign_in_failed', 'account_mismatch', 'candidate_invalid', 'candidate_worker_mismatch', 'enrollment_failed',
+  'registration_timeout', 'registration_output_invalid', 'daemon_exited', 'daemon_failed', 'registration_invalid',
+  'registered_agent_missing', 'execution_failed', 'execution_evidence_invalid', 'official_agent_acceptance_missing', 'tool_reply_evidence_missing',
+  'device_cleanup_failed', 'sandbox_cleanup_failed', 'application_build_changed', 'sign_out_failed',
+  'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required',
+].map(code => `template_gate_${code}`))
+const STARTUP_CODES = new Set([
+  'dispatch_refused', 'dispatch_run_missing', 'dispatch_not_new', 'dispatch_device_mismatch',
+  'subscription_provenance_mismatch', 'execution_device_mismatch', 'execution_timeout', 'ended_before_execution_proof',
+  'official_agent_acceptance_missing', 'runtime_evidence_failed', 'live_disconnected', 'live_scope_missing',
+  'request_failed', 'response_invalid', 'build_mismatch', 'build_changed',
+  'cleanup_terminal_timeout',
+].map(code => `startup_${code}`))
+const safeCode = error => GATE_CODES.has(error?.message) || STARTUP_CODES.has(error?.message) ? error.message : 'template_gate_failed'
+const SAMPLE_STATUSES = new Set(['running', 'failed', 'execution_proved_awaiting_server_timing'])
+
+function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId) {
+  const sample = acceptance?.samples?.[0]
+  const cleanup = new Set(cleanupErrors)
+  if (acceptance?.cleanup?.errors?.length || sample?.cleanup?.errors?.length || sample?.cleanup?.status === 'failed') cleanup.add('acceptance_cleanup_failed')
+  if (sample?.cleanup?.errors?.some(row => row?.code === 'startup_cleanup_terminal_timeout')) cleanup.add('terminal_timeout')
+  const retained = sample?.cleanup?.retainedFixture
+  const retainedRunIds = Array.isArray(retained?.runIds) ? [...new Set(retained.runIds.map(id => typeof id === 'string' ? id.toLowerCase() : id))] : []
+  const retainedFixture = UUID.test(retained?.issueId ?? '') && retained.issueId === sample.issueId
+    && retainedRunIds.length > 0 && retainedRunIds.length <= 4 && retainedRunIds.every(id => typeof id === 'string' && UUID.test(id))
+    ? { issueId: retained.issueId, runIds: retainedRunIds } : undefined
+  return { kind, stage, code: error ? safeCode(error) : 'passed',
+    runIdHash: UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null,
+    sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
+    sampleError: sample?.error ? STARTUP_CODES.has(sample.error) ? sample.error : 'startup_failed' : null,
+    cleanupErrors: [...cleanup], ...(retainedFixture ? { retainedFixture } : {}),
+    ...(cleanup.has('device_remove_failed') && UUID.test(deviceId ?? '') ? { registeredDeviceId: deviceId } : {}) }
+}
 
 export function candidateReceipt(report, kind, proof, acceptance) {
   const [, harness, model] = KINDS.find(row => row[0] === kind)
@@ -24,6 +59,8 @@ export function candidateReceipt(report, kind, proof, acceptance) {
     && sample.execution?.deviceId === proof.deviceId && sample.execution?.credentialType === 'subscription'
     && sample.credentialRoute === 'subscription' && sample.replyVerified === true
     && sample.sourceCommit === report.sourceCommit && UUID.test(sample.runId ?? ''), 'execution_evidence_invalid')
+  const tool = Array.isArray(sample.toolCalls) && sample.toolCalls.find(row => row?.outcome === 'ok' && /^[a-f0-9]{16}$/.test(row.toolCallHash ?? ''))
+  check(sample.minToolCalls === 1 && sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true && tool, 'tool_reply_evidence_missing')
   const runIdHash = createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
   const runtime = readRuntimeTiming(sample.runtimeTiming, { runIdHash, harness })
   const authorization = runtimeEvidence(runtime)
@@ -32,6 +69,7 @@ export function candidateReceipt(report, kind, proof, acceptance) {
     && authorization.status === 'passed', 'official_agent_acceptance_missing')
   return { status: 'passed', templateId: report.templates[kind].templateId, sourceCommit: report.sourceCommit,
     workerSha: report.workerSha, harness, model, credentialRoute: 'subscription', replyVerified: true,
+    replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: tool.toolCallHash, outcome: 'ok' },
     runId: sample.runId, deviceId: proof.deviceId, officialBinarySha256: proof.binarySha256,
     officialCliVersion: proof.version,
     agentAcceptance: { runIdHash, harness, ...runtime.agentAccepted },
@@ -39,7 +77,7 @@ export function candidateReceipt(report, kind, proof, acceptance) {
 }
 
 export async function validateTemplateSubscriptions(report, { env = process.env, fetchImpl = fetch,
-  sandboxFactory, runAcceptance = runCloudStartup } = {}) {
+  sandboxFactory, runAcceptance = runCloudStartup, onDiagnostic = () => {} } = {}) {
   check(/^[a-f0-9]{40}$/.test(report.sourceCommit ?? '') && /^[a-f0-9]{40}$/.test(report.workerSha ?? ''), 'source_invalid')
   check(!env.GITHUB_SHA || env.GITHUB_SHA === report.sourceCommit, 'source_mismatch')
   check(env.ACME_DEMO_EMAIL?.toLowerCase() === 'alex@acme.aspectlylabs.com' && env.ACME_DEMO_PASSWORD, 'account_required')
@@ -60,20 +98,24 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
     check(identity.user?.email?.toLowerCase() === env.ACME_DEMO_EMAIL.toLowerCase(), 'account_mismatch')
     await client.rpc('workspace.switchWorkspace', [env.MIKKA_ACCEPTANCE_WORKSPACE_ID])
     for (const [kind, harness] of KINDS) {
-      let sandbox, deviceId, enrollmentIssued = false
+      let sandbox, deviceId, acceptance, diagnosticError, enrollmentIssued = false, stage = 'candidate'
+      const cleanupErrors = []
       try {
         const template = report.templates?.[kind]
         check(template?.baseTemplate === kind && template?.preinstalled === true && /^[A-Za-z0-9_-]+$/.test(template?.templateId ?? ''), 'candidate_invalid')
         sandbox = await sandboxFactory(template.templateId, { apiKey: env.E2B_API_KEY, timeoutMs: 600000,
           metadata: { application: 'mikka-template-release', sourceCommit: report.sourceCommit, kind,
             runId: env.GITHUB_RUN_ID ?? 'manual', runAttempt: env.GITHUB_RUN_ATTEMPT ?? 'manual' } })
+        stage = 'worker'
         const installed = await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
         check(installed.trim() === report.workerSha, 'candidate_worker_mismatch')
+        stage = 'enrollment'
         const grant = await client.json('/api/devices/enrollment', post({}))
         check(typeof grant.token === 'string', 'enrollment_failed')
         enrollmentIssued = true
         await sandbox.commands.run('install -d -m 700 /run/mikka-template-acceptance', { user: 'root', timeoutMs: 10000 })
         await sandbox.files.write('/run/mikka-template-acceptance/enrollment', grant.token, { user: 'root' })
+        stage = 'registration'
         let resolveReady, rejectReady, buffer = ''
         const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
         const timer = setTimeout(() => rejectReady(Error('template_gate_registration_timeout')), 90000)
@@ -93,16 +135,19 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
           const proof = await ready
           check(UUID.test(proof.deviceId ?? '') && proof.harness === harness && /^[a-f0-9]{64}$/.test(proof.binarySha256 ?? ''), 'registration_invalid')
           deviceId = proof.deviceId
+          stage = 'agents'
           const agents = await client.rpc('agents.listAgents', [])
           const matching = agents.filter(agent => agent.deviceId === deviceId && agent.harness === harness)
           check(matching.length === 1, 'registered_agent_missing')
-          const acceptance = await runAcceptance({ origin, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID,
+          stage = 'acceptance'
+          acceptance = await runAcceptance({ origin, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID,
             botId: env.MIKKA_ACCEPTANCE_BOT_ID, mode: 'candidate', strategy: 'derived', runs: 1, harness,
             deviceId, agentId: matching[0].id, revision: report.sourceCommit, expectedBuild: version.build,
-            timeoutMs: 240000, maxStartupMs: 5000 }, { env, fetchImpl })
+            timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1 }, { env, fetchImpl })
+          stage = 'receipt'
           passed[kind] = candidateReceipt(report, kind, proof, acceptance)
         } finally { clearTimeout(timer) }
-      } catch (error) { failures.push({ kind, error }) }
+      } catch (error) { diagnosticError = error; failures.push({ kind, error }) }
       finally {
         // If registration succeeded but its stream response was lost, recover
         // only this instance's locally recorded proof before revoking it.
@@ -114,12 +159,21 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
         }
         if (deviceId) {
           try { await client.rpc('agents.removeDevice', [deviceId]) }
-          catch (error) { failures.push({ kind, error: Error('template_gate_device_cleanup_failed', { cause: error }) }) }
+          catch (error) {
+            const failure = Error('template_gate_device_cleanup_failed', { cause: error })
+            failures.push({ kind, error: failure }); cleanupErrors.push('device_remove_failed')
+            if (!diagnosticError) { diagnosticError = failure; stage = 'cleanup' }
+          }
         }
         if (sandbox) {
           try { await sandbox.kill() }
-          catch (error) { failures.push({ kind, error: Error('template_gate_sandbox_cleanup_failed', { cause: error }) }) }
+          catch (error) {
+            const failure = Error('template_gate_sandbox_cleanup_failed', { cause: error })
+            failures.push({ kind, error: failure }); cleanupErrors.push('sandbox_kill_failed')
+            if (!diagnosticError) { diagnosticError = failure; stage = 'cleanup' }
+          }
         }
+        onDiagnostic(candidateDiagnostic(kind, stage, diagnosticError, acceptance, cleanupErrors, deviceId))
       }
     }
     check((await client.json('/api/version')).build === version.build, 'application_build_changed')
@@ -135,15 +189,33 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
   return { ...report, subscriptionAcceptance: passed }
 }
 
+/** The failure artifact is a closed projection, never an exception/report dump. */
+export async function validateSubscriptionFiles(input, output, diagnosticsPath, options = {}) {
+  const diagnostics = { version: 1, status: 'running', code: null, candidates: [] }
+  try {
+    check(input && output && diagnosticsPath, 'paths_required')
+    const result = await validateTemplateSubscriptions(JSON.parse(await readFile(input, 'utf8')), {
+      ...options, onDiagnostic: row => { diagnostics.candidates.push(row) },
+    })
+    await writeFile(output, `${JSON.stringify(result)}\n`, { mode: 0o600 })
+    diagnostics.status = 'passed'
+    return result
+  } catch (error) {
+    diagnostics.status = 'failed'; diagnostics.code = safeCode(error)
+    throw error
+  } finally {
+    if (diagnosticsPath) await writeFile(diagnosticsPath, `${JSON.stringify(diagnostics)}\n`, { mode: 0o600 })
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
-    const [input, output] = process.argv.slice(2)
+    const [input, output, diagnosticsPath = `${output}.diagnostics.json`] = process.argv.slice(2)
     check(input && output, 'paths_required')
-    const result = await validateTemplateSubscriptions(JSON.parse(await readFile(input, 'utf8')))
-    await writeFile(output, `${JSON.stringify(result)}\n`, { mode: 0o600 })
+    await validateSubscriptionFiles(input, output, diagnosticsPath)
     console.log('Both candidate images passed real official subscription execution and cleanup')
   } catch (error) {
-    console.error(/^template_gate_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'template_gate_failed')
+    console.error(safeCode(error))
     process.exitCode = 1
   }
 }
