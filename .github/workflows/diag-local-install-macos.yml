@@ -7,27 +7,47 @@ permissions:
 jobs:
   mac:
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [root-owned-prefix-and-cache, old-homebrew-node-first]
     steps:
-      - name: nodejs.org Node 24 with an earlier sudo install, then a normal reinstall
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { ref: fix/desktop-local-setup-reason }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { path: diag }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with: { version: 10.34.3 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile --filter @mikka/desktop... >/dev/null
+      - name: Break npm like a Mac that once ran sudo npm (nodejs.org Node 24)
+        if: matrix.scenario == 'root-owned-prefix-and-cache'
         run: |
-          set +e
+          brew uninstall --ignore-dependencies node >/dev/null 2>&1 || true
           v=$(curl -fsSL https://nodejs.org/dist/index.json | python3 -c 'import json,sys;print(next(r["version"] for r in json.load(sys.stdin) if r["version"].startswith("v24.")))')
           curl -fsSLO https://nodejs.org/dist/$v/node-$v.pkg && sudo installer -pkg node-$v.pkg -target / >/dev/null
-          sudo env PATH=/usr/local/bin:/usr/bin:/bin npm install --global @aspectlylabs/mikka@0.0.500 >/dev/null 2>&1; echo "sudo exit=$?"
-          ls -la /usr/local/lib/node_modules/@aspectlylabs
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c 'npm install --global @aspectlylabs/mikka' > out.txt 2> err.txt; echo "exit=$?"
-          echo "--- stderr"; cat err.txt
-      - name: Fallback into a user prefix, then service and status by absolute path
+          sudo env PATH=/usr/local/bin:/usr/bin:/bin npm install --global @aspectlylabs/mikka@0.0.500 >/dev/null 2>&1
+          ls -ld ~/.npm /usr/local/lib/node_modules/@aspectlylabs/mikka
+      - name: Old Homebrew Node first in the login shell, Node 24 only under nvm
+        if: matrix.scenario == 'old-homebrew-node-first'
         run: |
-          set +e
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c 'npm install --global --prefix "$HOME/.mikka/npm" @aspectlylabs/mikka' > out.txt 2> err.txt; echo "exit=$?"
-          cat err.txt
-          ls -la ~/.mikka/npm/bin
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c '"$HOME/.mikka/npm/bin/mikka" daemon service install --server https://app.aspectlylabs.com/mikka --device-type laptop'; echo "exit=$?"
-          plutil -p ~/Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist | grep -A4 ProgramArguments
-          sleep 5
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c '"$HOME/.mikka/npm/bin/mikka" daemon status' | head -12; echo "exit=$?"
+          brew install node@22 >/dev/null 2>&1
+          echo 'export PATH="/opt/homebrew/opt/node@22/bin:$PATH"' >> ~/.zprofile
+          v=$(curl -fsSL https://nodejs.org/dist/index.json | python3 -c 'import json,sys;print(next(r["version"] for r in json.load(sys.stdin) if r["version"].startswith("v24.")))')
+          mkdir -p ~/.nvm/versions/node && curl -fsSL https://nodejs.org/dist/$v/node-$v-darwin-arm64.tar.gz | tar -xz -C ~/.nvm/versions/node && mv ~/.nvm/versions/node/node-$v-darwin-arm64 ~/.nvm/versions/node/$v
+          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'command -v node; node -v'
+      - name: Run 添加这台电脑 as a Finder-launched app (minimal environment)
+        run: |
+          node_bin="$(command -v node)"
+          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/bin:/bin "$node_bin" --import tsx diag/.github/diag/run-local.mts "$PWD/apps/desktop/src/main/ssh-install.ts" | tee result.txt
+          grep -q 'RESULT INSTALLED' result.txt
+      - name: Daemon service runs the installed package
+        run: |
+          plutil -p ~/Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist | grep -A3 ProgramArguments
+          sleep 3
+          for m in "$HOME/.mikka/npm/bin/mikka" /usr/local/bin/mikka /opt/homebrew/bin/mikka; do test -x "$m" && echo "$m" && break; done
       - name: Stop the daemon service
         if: always()
         run: launchctl bootout gui/$(id -u)/com.aspectlylabs.mikka.daemon 2>/dev/null || true
