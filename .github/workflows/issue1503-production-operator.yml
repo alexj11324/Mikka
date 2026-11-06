@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/issue1503-production-operator.yml
       - scripts/ops/issue1503/**
+      - scripts/ops/issue1503-smoke-github*
 permissions:
   contents: read
 concurrency:
@@ -26,6 +27,7 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - run: node --test scripts/ops/issue1503-smoke-github.test.mjs
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc

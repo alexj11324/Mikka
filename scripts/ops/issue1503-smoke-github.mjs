@@ -75,9 +75,9 @@ export function createSmokeGitHubFixture({ application, appId, fetchImpl = fetch
     return { data, next: /rel="next"/.test(response.headers.get('link') ?? '') }
   }
 
-  async function verifyRepositories(token, restricted, expectedRepositoryId) {
-    const stage = restricted ? 'scoped_installations' : 'owner_installations'
-    let found = null
+  async function verifyRepositories(token, scoped, expectedRepositoryId) {
+    const stage = scoped ? 'scoped_installations' : 'owner_installations'
+    let found = null, listedRepositoryCount = 0, otherRepositoryMetadataCount = 0
     for (let page = 1; ; page++) {
       if (page > 20) fail('pagination_limit', { stage })
       const result = await request(`/user/installations?per_page=100&page=${page}`, { token, stage })
@@ -92,8 +92,12 @@ export function createSmokeGitHubFixture({ application, appId, fetchImpl = fetch
           if (!Array.isArray(repos.data.repositories)) fail('provider_schema', { stage })
           for (const repo of repos.data.repositories) {
             if (!object(repo) || !validId(repo.id) || typeof repo.full_name !== 'string') fail('provider_schema', { stage })
-            if (restricted && repo.full_name !== REPOSITORY) fail('scope_exceeded', { stage })
-            if (repo.full_name !== REPOSITORY) continue
+            listedRepositoryCount++
+            // This endpoint lists the authenticated user's explicit repository
+            // access for an installation. Its directory is not documented as a
+            // scoped-token allowlist, and production returns extra metadata.
+            // Scope comes from our exact mint request + authorization response.
+            if (repo.full_name !== REPOSITORY) { otherRepositoryMetadataCount++; continue }
             if (found || String(repo.id) !== expectedRepositoryId || installation.account?.login !== GITHUB_LOGIN || String(installation.account?.id) !== GITHUB_ACCOUNT_ID) fail('repository_mismatch', { stage })
             found = { repositoryId: String(repo.id), installationId: String(installation.id) }
           }
@@ -103,7 +107,7 @@ export function createSmokeGitHubFixture({ application, appId, fetchImpl = fetch
       if (!result.next) break
     }
     if (!found) fail('repository_unavailable', { stage })
-    return found
+    return { ...found, listedRepositoryCount, otherRepositoryMetadataCount }
   }
 
   async function verifyAndDiscoverApp(token) {
@@ -140,6 +144,20 @@ export function createSmokeGitHubFixture({ application, appId, fetchImpl = fetch
     const { data } = await request(`/repos/${REPOSITORY}`, { token, stage })
     if (!validId(data.id) || data.full_name !== REPOSITORY || data.permissions?.push !== true || data.archived !== false || data.disabled === true) fail('repository_unavailable', { stage })
     return String(data.id)
+  }
+
+  function verifyScopedAuthorization(data, stage, requireScope) {
+    if (data.app?.client_id !== application.clientId) fail('scoped_app_mismatch')
+    if (data.user != null) identity(data.user, stage)
+    // Check-token's shared authorization schema permits absent installation;
+    // the original scoped mint response must always establish selected scope.
+    if (data.installation == null && !requireScope) return false
+    if (data.installation?.repository_selection !== 'selected') fail('scope_not_selected')
+    const actualPermissions = data.installation?.permissions
+    if (!object(actualPermissions) || Object.keys(actualPermissions).some(key => actualPermissions[key] !== 'none' && actualPermissions[key] !== PERMISSIONS[key]) ||
+        Object.keys(PERMISSIONS).some(key => actualPermissions[key] !== PERMISSIONS[key])) fail('scope_permissions_mismatch')
+    if (data.installation.account != null) identity(data.installation.account, stage)
+    return true
   }
 
   async function revoke(token) {
@@ -190,15 +208,20 @@ export function createSmokeGitHubFixture({ application, appId, fetchImpl = fetch
       // Never consider the source token ours to revoke, even on a bad response.
       if (typeof minted.token !== 'string' || !minted.token || minted.token === sourceToken) fail('scoped_token_not_distinct')
       mintedToken = minted.token
-      if (minted.app?.client_id !== application.clientId) fail('scoped_app_mismatch')
-      if (minted.user != null) identity(minted.user, 'scoped_response_identity')
-      const providerExpiry = Date.parse(minted.expires_at)
+      verifyScopedAuthorization(minted, 'scoped_response_identity', true)
+      let providerExpiry = Date.parse(minted.expires_at)
       if (!Number.isFinite(providerExpiry) || providerExpiry <= now() + SCOPED_MIN_VALIDITY_MS) fail('scoped_expiry_invalid')
-      if (minted.installation?.repository_selection !== 'selected') fail('scope_not_selected')
-      const actualPermissions = minted.installation?.permissions
-      if (!object(actualPermissions) || Object.keys(actualPermissions).some(key => actualPermissions[key] !== 'none' && actualPermissions[key] !== PERMISSIONS[key]) ||
-          Object.keys(PERMISSIONS).some(key => actualPermissions[key] !== PERMISSIONS[key])) fail('scope_permissions_mismatch')
       identity((await request('/user', { token: mintedToken, stage: 'scoped_identity' })).data, 'scoped_identity')
+      const confirmation = (await request(`/applications/${encodeURIComponent(application.clientId)}/token`, {
+        method: 'POST', appAuth: true, body: { access_token: mintedToken }, stage: 'check_scoped_token',
+      })).data
+      if (typeof confirmation.token === 'string' && confirmation.token && confirmation.token !== mintedToken) fail('scoped_token_mismatch')
+      const checkTokenScopeConfirmed = verifyScopedAuthorization(confirmation, 'check_scoped_token', false)
+      if (confirmation.expires_at != null) {
+        const checkedExpiry = Date.parse(confirmation.expires_at)
+        if (!Number.isFinite(checkedExpiry) || checkedExpiry <= now() + SCOPED_MIN_VALIDITY_MS) fail('scoped_expiry_invalid')
+        providerExpiry = Math.min(providerExpiry, checkedExpiry)
+      }
       if (await verifyRepository(mintedToken, 'scoped_repository') !== repositoryId) fail('repository_mismatch', { stage: 'scoped_repository' })
       const scopedRepository = await verifyRepositories(mintedToken, true, repositoryId)
       if (scopedRepository.installationId !== sourceRepository.installationId) fail('repository_mismatch', { stage: 'scoped_installations' })
@@ -210,7 +233,7 @@ export function createSmokeGitHubFixture({ application, appId, fetchImpl = fetch
       saveAttempted = true
       const saved = await credentials.saveIfVacant({ token: mintedToken, expiresIn: Math.floor((localExpiry - now()) / 1000), providerExpiry, tokenSha256 })
       const candidate = { version: 1, issue: 1503, userId: SMOKE_USER_ID, ownerUserId, githubAccountId: GITHUB_ACCOUNT_ID, githubLogin: GITHUB_LOGIN,
-        repository: REPOSITORY, appId: resolvedAppId, ...scopedRepository, providerExpiresAt: new Date(providerExpiry).toISOString(),
+        repository: REPOSITORY, appId: resolvedAppId, ...scopedRepository, checkTokenScopeConfirmed, providerExpiresAt: new Date(providerExpiry).toISOString(),
         connectionExpiresAt: saved.expiresAt, connectionUpdatedAt: saved.updatedAt, tokenSha256 }
       validateState(candidate)
       state = Object.freeze(candidate)

@@ -63,9 +63,12 @@ function fixture({ vacant = true, source = {}, minted = {}, appId = '456', respo
       body = { token: SCOPED_TOKEN, expires_at: new Date(NOW + 8 * 60 * 60_000).toISOString(), app: { client_id: 'fixture-client' }, user: githubUser,
         installation: { repository_selection: 'selected', permissions }, ...minted }
     } else if (path === '/applications/fixture-client/token' && init.method === 'POST') {
-      assert.equal(JSON.parse(init.body).access_token, SOURCE_TOKEN)
+      const checkedToken = JSON.parse(init.body).access_token
+      assert.ok([SOURCE_TOKEN, SCOPED_TOKEN].includes(checkedToken))
       assert.equal(init.headers.authorization, `Basic ${Buffer.from('fixture-client:' + SECRET).toString('base64')}`)
       body = { app: { client_id: 'fixture-client', name: 'Mikka', url: 'https://github.com/apps/example' }, user: githubUser }
+      if (checkedToken === SCOPED_TOKEN) body = { ...body, token: SCOPED_TOKEN, expires_at: new Date(NOW + 8 * 60 * 60_000).toISOString(),
+        installation: { repository_selection: 'selected', permissions, account: githubUser } }
     } else if (path === '/applications/fixture-client/token') {
       assert.equal(init.method, 'DELETE')
       assert.equal(JSON.parse(init.body).access_token, SCOPED_TOKEN, 'only the newly minted token may be revoked')
@@ -171,10 +174,38 @@ test('scoped token must still support the actual product installation listing', 
   assert.deepEqual(f.revoked, [SCOPED_TOKEN]); assert.equal(f.saved.length, 0)
 })
 
-test('a token that can enumerate an extra repository is refused', async () => {
+test('installation directory metadata is not mistaken for the scoped token repository allowlist', async () => {
   const f = fixture({ response: ({ path, scoped }) => path.endsWith('/repositories') && scoped ? { body: { repositories: [repo, { id: 1488, full_name: 'alexj11324/Mikka' }] } } : null })
-  await assert.rejects(f.api.setup({ ownerUserId }), { code: 'scope_exceeded' })
+  const result = await f.api.setup({ ownerUserId })
+  assert.equal(result.state.otherRepositoryMetadataCount, 1)
+  assert.equal(result.state.listedRepositoryCount, 2)
+  assert.equal(result.state.checkTokenScopeConfirmed, true)
+  assert.equal(result.state.repository, REPOSITORY)
+  assert.ok(!JSON.stringify(result.state).includes('alexj11324/Mikka"'), 'additional repository names are not copied into the receipt')
+  assert.equal(f.saved.length, 1)
+  await result.cleanup()
+  assert.deepEqual(f.revoked, [SCOPED_TOKEN])
+})
+
+test('an installation directory lacking the selected target still fails', async () => {
+  const f = fixture({ response: ({ path, scoped }) => path.endsWith('/repositories') && scoped ? { body: { repositories: [{ id: 1488, full_name: 'alexj11324/Mikka' }] } } : null })
+  await assert.rejects(f.api.setup({ ownerUserId }), { code: 'repository_unavailable' })
   assert.deepEqual(f.revoked, [SCOPED_TOKEN]); assert.equal(f.saved.length, 0)
+})
+
+test('Check-token independently rejects broader returned scope after minting', async () => {
+  const f = fixture({ response: ({ path, init, body }) => path === '/applications/fixture-client/token' && init.method === 'POST' && JSON.parse(init.body).access_token === SCOPED_TOKEN
+    ? { body: { ...body, installation: { repository_selection: 'all', permissions } } } : null })
+  await assert.rejects(f.api.setup({ ownerUserId }), { code: 'scope_not_selected' })
+  assert.deepEqual(f.revoked, [SCOPED_TOKEN]); assert.equal(f.saved.length, 0)
+})
+
+test('optional Check-token scope metadata does not invalidate verified scoped mint evidence', async () => {
+  const f = fixture({ response: ({ path, init, body }) => path === '/applications/fixture-client/token' && init.method === 'POST' && JSON.parse(init.body).access_token === SCOPED_TOKEN
+    ? { body: { ...body, installation: null } } : null })
+  const result = await f.api.setup({ ownerUserId })
+  assert.equal(result.state.checkTokenScopeConfirmed, false)
+  await result.cleanup()
 })
 
 test('a persistence failure revokes the minted token and redacts raw database causes', async () => {

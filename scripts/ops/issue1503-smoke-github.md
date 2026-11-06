@@ -90,11 +90,25 @@ limited to four hours, with a margin below provider expiry, and has no refresh
 token. A local expiry cap does not shorten the provider token's own expiry.
 
 Before saving, the new token must pass live `/user`, repository push-access and
-the same installation/repository listing endpoints used by Mikka. Every listed
-repository through this App must be `alexj11324/Mikka-handoff`; the installation
-and repository IDs must match the Owner's live listing. Unsupported scoped
-listing, extra permissions, an extra repository or any identity mismatch fails
-closed and revokes the newly created token. There is no broad-token fallback.
+the same installation/repository listing endpoints used by Mikka. The target
+installation and repository IDs must match the Owner's live listing. GitHub's
+installation directory describes the authenticated user's explicit repository
+access; it does not promise a scoped-token allowlist. The first production
+attempt confirmed that the directory also returns additional installed-repository
+metadata even after a successful selected-repository mint. Therefore extra
+directory entries are counted in the safe receipt, without logging their names,
+and are not interpreted as proof that the token has additional write access.
+The exact `target`/`repositories` mint request and selected/permission-scoped
+authorization response remain mandatory evidence of the token's requested scope.
+
+The module also calls Check-token for the newly minted token. App and identity
+must agree; any returned installation scope must still be selected with exactly
+the permitted access. GitHub's authorization schema permits this installation
+metadata to be omitted: the receipt distinguishes that case with
+`checkTokenScopeConfirmed: false`, while retaining the verified mint evidence.
+Unsupported installation listing, missing target, extra permissions, wrong
+authorization scope, or any identity mismatch still fails and revokes the new
+token. There is no broad-token fallback and no change to product authorization.
 
 Saving calls the existing `saveGitHubConnection` under a serializable transaction
 that rechecks the absence of a connection, then validates the sealed row and its
@@ -124,5 +138,6 @@ Official references:
 - [Create a scoped access token](https://docs.github.com/en/rest/apps/apps#create-a-scoped-access-token)
 - [Delete an app token](https://docs.github.com/en/rest/apps/oauth-applications#delete-an-app-token)
 - [Check a token](https://docs.github.com/en/rest/apps/oauth-applications#check-a-token)
+- [List repositories accessible to the user access token](https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-user-access-token)
 - [Official REST OpenAPI schema](https://github.com/github/rest-api-description/blob/main/descriptions/api.github.com/api.github.com.json)
 - [Refreshing user access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens)
