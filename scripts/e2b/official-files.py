@@ -11,8 +11,11 @@ import os
 import stat
 from pathlib import Path
 
-ROOTS = ('/bin', '/sbin', '/lib', '/lib64', '/usr', '/etc', '/opt', '/root',
-         '/home', '/var/lib/dpkg')
+ROOTS = ('/',)
+# Kernel mounts, process state, temporary files and live logs are not shipped
+# software. Every other original path is protected, including /var/lib, /srv,
+# /data, unusual CLI locations and future base-template directories.
+TRANSIENT = frozenset(map(Path, ('/dev', '/proc', '/sys', '/run', '/tmp', '/var/tmp', '/var/log')))
 PRIVATE = Path('/opt/mikka')
 
 
@@ -37,16 +40,19 @@ def entry(path):
 
 def capture(roots=ROOTS, private=PRIVATE):
     paths = set()
+    excluded = TRANSIENT | {private}
+    def refused_scan(error):
+        raise error
     for base in map(Path, roots):
         if not base.exists() and not base.is_symlink():
             continue
         paths.add(base)
         if base.is_dir() and not base.is_symlink():
-            for directory, directories, files in os.walk(base, followlinks=False):
+            for directory, directories, files in os.walk(base, followlinks=False, onerror=refused_scan):
                 here = Path(directory)
-                directories[:] = [name for name in directories if here / name != private]
+                directories[:] = [name for name in directories if here / name not in excluded]
                 paths.update(here / name for name in (*directories, *files)
-                             if here / name != private)
+                             if here / name not in excluded)
     return {'version': 1, 'roots': list(roots),
             'entries': [entry(path) for path in sorted(paths) if path != private]}
 
@@ -65,7 +71,12 @@ def verify(manifest):
     except (FileNotFoundError, NotADirectoryError) as error:
         raise RuntimeError('official_files_removed') from error
     if before != after:
-        raise RuntimeError('official_files_changed')
+        changed = [{'path': original['path'], 'before': {key: original.get(key) for key in set(original) | set(current) if original.get(key) != current.get(key)},
+                    'after': {key: current.get(key) for key in set(original) | set(current) if original.get(key) != current.get(key)}}
+                   for original, current in zip(before, after) if original != current]
+        # Diagnostics contain metadata/digests only, never file bytes. Keep the
+        # precise path so platform-managed changes cannot justify broad exclusions.
+        raise RuntimeError('official_files_changed ' + json.dumps(changed, sort_keys=True, separators=(',', ':')))
     return {'before': receipt(before), 'after': receipt(after)}
 
 
