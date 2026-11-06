@@ -79,7 +79,7 @@ for (const [file, names] of [
   ['./pending-actions.tsx', ['PendingActions']], ['./subagent-login-needs.tsx', ['SubagentLoginNeeds']],
   ['./hosted-unavailable-notice.tsx', ['HostedUnavailableNotice']], ['./quota-notice.tsx', ['QuotaNotice', 'QuotaSwitchLine']],
   ['../billing/hosted-refusal-notice.tsx', ['HostedRefusalNotice']], ['../nav/bot-avatar.tsx', ['BotAvatar', 'COORDINATOR_AVATAR']],
-  ['../suggestions/mobile-card.tsx', ['SentSuggestion']], ['../artifacts/artifact-card.tsx', ['ArtifactCard', 'ArtifactChip']],
+  ['../suggestions/mobile-card.tsx', ['SentSuggestion']], ['../artifacts/artifact-card.tsx', ['ArtifactCard', 'ArtifactChip']], ['../workspace/artifact-review.tsx', ['ArtifactReviewCard']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, nothing])) })
 mock.module(new URL('./bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: nothing, openModelPicker: (botId: string | null) => { modelPicks.push(botId) }, botModelMenuKey: (botId: string | null) => ['bot-model-menu', botId ?? 'coordinator'] } })
 let quoteReply: (text: string) => void = nothing

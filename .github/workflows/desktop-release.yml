@@ -62,7 +62,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-release
+  group: ${{ github.ref == 'refs/heads/main' && 'desktop-release' || format('desktop-release-{0}', github.ref) }}
   cancel-in-progress: true
 
 env:
@@ -99,7 +99,7 @@ jobs:
         with:
           node-version: 24
       - name: Require the matching production Web deployment
-        run: node scripts/release/web-deploy.mjs await-web
+        run: node scripts/release/web-deploy.mjs await-desktop-web
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Select the production Web overlay
@@ -261,10 +261,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/ci-gate.mjs
       - name: Require the matching production Web deployment
-        # The installed shared UI needs its matching backend before it is published.
+        # The deployed Web source must contain the installed UI's source before publication.
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/web-deploy.mjs await-web
+        run: node scripts/release/web-deploy.mjs await-desktop-web
       - name: Verify the signed candidate before creating the release
         env:
           RELEASE_MANIFEST_SHA256: ${{ steps.seal.outputs.manifest-sha256 }}

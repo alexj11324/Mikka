@@ -65,6 +65,9 @@ test('official jobs keep private code out of public artifacts and pin desktop to
     const install = job.steps.find(step => step.name === 'Install private UI runtime dependencies without license scripts')
     assert.match(install?.run ?? '', /--ignore-workspace --prod --ignore-scripts --frozen-lockfile/)
   }
+  for (const job of [desktop.jobs.preflight, desktop.jobs.macos]) {
+    assert.ok(job.steps.some(step => step.run === 'node scripts/release/web-deploy.mjs await-desktop-web'))
+  }
   const checkout = desktop.jobs.macos.steps.find(step => step.with?.repository === 'alexj11324/mikka-hosted-ui')
   assert.equal(checkout.with.ref, '${{ needs.preflight.outputs.overlay-sha }}')
   assert.equal(checkout.with['persist-credentials'], false)

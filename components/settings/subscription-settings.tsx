@@ -21,7 +21,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Skeleton } from '@/components/ui/skeleton'
 import { withBasePath } from '@/lib/base-path'
@@ -62,9 +61,8 @@ async function post(body: unknown, signal?: AbortSignal) {
  * next one (decision 2026-11-02-1200).
  */
 /** `heading` replaces the section title where the rows appear outside Settings (the first-run guide's 绑定订阅). */
-export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { workspaceId: string; workspaceName?: string; heading?: string }) {
+export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: string; heading?: string }) {
   const t = useTranslations('Settings.subscriptions')
-  const scopeT = useTranslations('Settings.modelScope')
   // Cached per workspace: a return to the page shows the last list at once and re-reads it behind.
   const list = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
   const state = list.data ?? null
@@ -355,7 +353,6 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
                 const account = read?.account ?? connection.account ?? null
                 const plan = read?.plan ? planName(read.plan) : null
                 const product = plan ? t(provider === 'codex' ? 'codexPlan' : 'claudePlan', { plan }) : t(provider === 'codex' ? 'codexProduct' : 'claudeProduct')
-                const bots = connection.bots?.filter(bot => bot.workspaceId === workspaceId) ?? []
                 const signingIn = starting?.id === connection.id || attempt?.connectionId === connection.id
                 const canReconnect = available && !pending && !attempt
                 return <div key={connection.id} id={`subscription-${connection.id}`} tabIndex={-1} className="flex scroll-mt-6 flex-col gap-3 px-5 py-4">
@@ -397,10 +394,6 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
                     {failed
                       ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={reloadUsage}>{t('retry')}</Button></span>
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
-                    {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      {t('selectedBy', { workspace: workspaceName ?? scopeT('currentWorkspace') })}
-                      {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
-                    </span>}
                   </div>}
                 </div>
               })}
