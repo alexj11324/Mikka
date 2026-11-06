@@ -29,6 +29,7 @@ import { BundledLive } from './bundled-live'
 import { BundledViewer } from './bundled-viewer'
 import { registerBundledBridge } from './bundled-bridge'
 import { SessionVault } from './session-vault'
+import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
 import { openBundledWebPage } from './bundled-web'
 import { markStartup } from '../startup'
@@ -66,6 +67,30 @@ let authTimer: NodeJS.Timeout | null = null
 let bundledAuth: BundledAuth | null = null
 let bundledLive: BundledLive | null = null
 let bundledViewer: BundledViewer | null = null
+let gateWindow: BrowserWindow | null = null
+// A browser sign-in ends on a page that opens this app's link; the system then
+// brings the app forward, which macOS does not let the app do by itself.
+const appLinks = new AppLinks(appLinkScheme(FLAVOR))
+
+function bringToFront(): void {
+  if (gateWindow && !gateWindow.isDestroyed()) { gateWindow.show(); gateWindow.focus(); return }
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    if (app.isReady()) createMainWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  // Opened by the person's click in the browser, so taking the front is expected.
+  if (process.platform === 'darwin') app.focus({ steal: true })
+  mainWindow.focus()
+}
+
+// macOS delivers an opened link here, before `ready` on a cold start. A link
+// this process did not hand out (or one that expired) is ignored.
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (appLinks.accepts(url)) bringToFront()
+})
 
 function closeAuthServer(): void {
   if (authTimer) { clearTimeout(authTimer); authTimer = null }
@@ -75,8 +100,8 @@ function closeAuthServer(): void {
 /**
  * Starts a one-shot HTTP listener bound to 127.0.0.1 and returns its callback.
  * The renderer registers that callback with the web app before opening the
- * browser, so the token can only be delivered to this process. No custom URL
- * scheme is registered.
+ * browser, so the token can only be delivered to this process. The app link
+ * on its last page only brings the window forward; it carries no credential.
  */
 async function prepareAuth(rawState: unknown): Promise<string> {
   const state = desktopAuthState(rawState)
@@ -85,6 +110,7 @@ async function prepareAuth(rawState: unknown): Promise<string> {
   const listener = await startLoopbackAuth({
     state,
     appUrl: APP_URL,
+    link: appLinks.issue(),
     onFinish: finish => {
       authServer = null
       if (authTimer) { clearTimeout(authTimer); authTimer = null }
@@ -337,7 +363,6 @@ const updates = new Updates(autoUpdater, {
   }
 })
 
-let gateWindow: BrowserWindow | null = null
 let gate: UpdateGate | null = null
 
 /**
@@ -493,6 +518,9 @@ function installMenu(): void {
 
 async function start(): Promise<void> {
   markStartup('main.ready')
+  // The packaged Info.plist (electron-builder `protocols`) declares the scheme;
+  // this makes this build its default handler. An unpackaged run would register Electron itself.
+  if (app.isPackaged) app.setAsDefaultProtocolClient(appLinks.scheme)
   registerSession()
   let restoring = Promise.resolve()
   if (BUNDLED) {
@@ -506,6 +534,7 @@ async function start(): Promise<void> {
       serverUrl: APP_URL, version: APP_VERSION, vault,
       fetch: (url, init) => backend.fetch(url, init),
       openExternal: url => shell.openExternal(url),
+      appLink: () => appLinks.issue(),
       changed: () => {
         bundledLive?.closeAll()
         bundledViewer?.closeAll()
@@ -599,12 +628,12 @@ async function start(): Promise<void> {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
-    if (gateWindow && !gateWindow.isDestroyed()) { gateWindow.show(); gateWindow.focus(); return }
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.show()
-    mainWindow.focus()
+  app.on('second-instance', (_event, argv) => {
+    // Windows and Linux open the app link by starting a second instance with it.
+    const link = appLinkFromArgv(argv, appLinks.scheme)
+    if (link !== null && !appLinks.accepts(link)) return
+    if (!mainWindow && !(gateWindow && !gateWindow.isDestroyed())) return
+    bringToFront()
   })
   app.on('before-quit', closeAuthServer)
   app.on('before-quit', closeReturnListener)

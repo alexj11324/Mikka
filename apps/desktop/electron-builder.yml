@@ -16,6 +16,12 @@ electronFuses:
   enableNodeOptionsEnvironmentVariable: false
   onlyLoadAppFromAsar: true
 compression: normal
+# The link a browser sign-in page opens to bring the app forward
+# (src/main/app-link.ts). An object, not a list: electron-builder concatenates
+# lists from `extends`, and Mikka Dev must declare only its own scheme.
+protocols:
+  name: Mikka sign-in
+  schemes: [mikka-auth]
 publish:
   provider: github
   owner: alexj11324

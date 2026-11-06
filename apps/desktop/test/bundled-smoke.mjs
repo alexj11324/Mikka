@@ -11,6 +11,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { continueInSystemBrowser, openAppLink } from './browser-handoff.mjs'
 import { nativeCleanupFailure, recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
@@ -102,13 +103,19 @@ try {
   }
   assert.ok(external, 'main must open the system browser')
   assert.equal(new URL(external).origin, environment.origin)
-  await systemBrowser.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const appLink = await continueInSystemBrowser(systemBrowser, external)
   await handoff
   const publicSession = await waitForBundledSession(page, scope.owner.userId)
   assert.equal(publicSession.user.id, scope.owner.userId)
   assert.deepEqual(Object.keys(publicSession.session), ['id'])
   await scope.recordResource({ type: 'session', id: publicSession.session.id, ownerId: scope.owner.userId })
-  check('system browser, loopback and single-use PKCE session handoff')
+  check('system browser shows the signed-in account, then loopback and single-use PKCE session handoff')
+  assert.match(appLink ?? '', /^mikka-dev-auth:\/\/auth\/done\?id=[A-Za-z0-9_-]{32,64}$/)
+  check('the callback page opens the Dev build\'s own app link')
+  if (process.platform === 'darwin' && process.env.MIKKA_DESKTOP_EXECUTABLE) {
+    assert.equal(await openAppLink(application, appLink, process.env.MIKKA_DESKTOP_EXECUTABLE), true, 'the app link must bring the hidden app to the front')
+    check('opening the app link brings the packaged app to the front')
+  }
 
   const state = await readFile(scope.owner.storageStatePath, 'utf8')
   const secrets = JSON.parse(state).cookies.map(cookie => cookie.value).filter(Boolean)
