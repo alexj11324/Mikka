@@ -237,7 +237,18 @@ export async function runRoutingAcceptance({ mode = 'dispatch', receiptPath = nu
       }
       context.verifyBot = verifyBot; context.verifyIssue = verifyIssue; context.discoverIssue = discoverIssue; context.collectRunsOnce = collectRunsOnce
       try {
-        if (mode !== 'cleanup') await op('routing.preflight', verifyOrder)
+        if (mode !== 'cleanup') {
+          await op('fixture.share_existing_smoke_credits', async () => {
+            const before = await rpc('personal-policy.getCreditShare', [workspaceId])
+            if (before.canShare !== true || before.admin !== true || typeof before.mine !== 'boolean') fail('fixture_scope_mismatch')
+            report.smokeCreditShare = { previous: before.mine, enabled: false }
+            if (!before.mine) await rpc('personal-policy.updateCreditShare', [true, workspaceId])
+            const after = await rpc('personal-policy.getCreditShare', [workspaceId])
+            if (after.mine !== true || after.canShare !== true) fail('routing_unavailable')
+            report.smokeCreditShare.enabled = true
+          })
+          await op('routing.preflight', verifyOrder)
+        }
         const bots = await op('bot.discover', () => api('/api/bots'))
         if (!Array.isArray(bots)) fail('fixture_scope_mismatch')
         const matching = bots.filter(bot => bot.name === botName(runKey))
