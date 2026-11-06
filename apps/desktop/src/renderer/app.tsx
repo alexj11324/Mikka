@@ -26,6 +26,7 @@ import { Offline } from './offline'
 import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, PlatformExtras, requireUpdate } from 'mikka:platform'
 import { loadWorkspace, preloadWorkspace } from './workspace-loader'
+import { InstalledWorkspace } from './installed-workspace'
 
 const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
@@ -163,6 +164,7 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   if (path === '/workspaces/new') return <NewWorkspace email={user.email} />
   if (path === '/devices') return <WorkspaceLoading />
   if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
+  if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap} />
   return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap} /></Suspense>
 }
 

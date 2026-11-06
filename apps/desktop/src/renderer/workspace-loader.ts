@@ -4,17 +4,24 @@ import { rendererHost } from './host'
 
 let loading: Promise<typeof import('./workspace')> | undefined
 let preloading: Promise<void> | undefined
+let loaded: typeof import('./workspace') | undefined
 
 /** Both React.lazy and the optional warm-up join the same local module load. */
 export function loadWorkspace() {
   if (!loading) {
     markStartup('renderer.workspace.import.start')
     loading = import('./workspace').then(module => {
+      loaded = module
       markStartup('renderer.workspace.import.end')
       return module
     })
   }
   return loading
+}
+
+/** A completed preload can render synchronously after normal authorization. */
+export function readLoadedWorkspace() {
+  return loaded?.default
 }
 
 /** A retained main-process identity is only a hint to load installed code.
