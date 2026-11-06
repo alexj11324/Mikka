@@ -96,6 +96,33 @@ Glossary: the word 产物 is not used in the UI; the entry is named by the PR.
   (confirmation bar with unverified items and 「以 @<login> 合并到 main」).
   Failure states name the reason and offer retry.
 
+## Part 3 · Execution identity dialog
+
+The shield button's 「执行身份与费用归属」 dialog (#1199,
+`ThreadExecutionIdentity`) showed raw IDs. Redrawn with the same parts as the
+hover card.
+
+| Frame | Node |
+| --- | --- |
+| D1 Personal: everyone is you, one row; light / dark | `1065:3890` / `1065:4176` |
+| D2 Team: someone else started it, a shared computer; light / dark | `1065:4344` / `1065:4633` |
+
+- Agent, 模型 (with the routing reason in grey), 运行在 (the run-location
+  mark, which opens the same hover card), 工作区 by name.
+- People as avatar + name, 「你」 for the viewer. Requester, Bot owner,
+  execution principal and output owner that are the same person collapse into
+  one row that names the roles.
+- 用到的资源: 「Claude 订阅 · <account>」, 「你的 E2B key ····<last 4>」, a
+  device by name with 「工作区分享」 when shared, 「工作区的 Anthropic API key
+  ····<last 4>」.
+- 费用 is one plain sentence built from the two billing accounts, for example
+  「模型费用由你的 Claude 订阅承担，云电脑费用由你的 E2B 账号承担，Mikka 不收费。」
+- Raw IDs (run, workspace, accounts, resource references and revisions) only go
+  into 「复制诊断信息」, which copies them as text. They are not shown.
+- Needs names the evidence does not carry yet: workspace name, people's names
+  and images, device name, subscription account label, key suffix. Read them
+  for the IDs the snapshot already holds, owner-only as today.
+
 ## Reviews (2026-11-06)
 
 - `interface-design:design-review`: three blockers fixed — the PR title was shown
