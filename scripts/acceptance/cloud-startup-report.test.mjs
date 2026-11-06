@@ -51,3 +51,15 @@ test('uses bounded read-only provider queries and never retains raw envelopes or
       : { events: [], pagination: { hasMore: false } } })
   assert.equal(missing.status, 'failed'); assert.match(missing.serverLogCollection.coverage, /not_proof_of_zero/)
 })
+
+test('keeps drifted raw evidence but excludes it from fixed-version statistics', () => {
+  const input = report()
+  input.samples.push({ ...input.samples[0], sampleId: 'drifted', status: 'failed', error: 'startup_build_mismatch' })
+  input.error = 'startup_build_mismatch'
+  const result = summarizeTimings(input, [dispatch, native])
+  assert.equal(result.status, 'failed')
+  assert.equal(result.samples[1].timing.dispatchToAgentStartMs, 3500)
+  assert.deepEqual(result.summary.excludedSamples, [{ sampleId: 'drifted', reason: 'startup_build_mismatch' }])
+  assert.equal(result.summary.groups[0].samples, 1)
+  assert.deepEqual(result.summary.groups[0].dispatchToAgentStart.valuesMs, [3500])
+})

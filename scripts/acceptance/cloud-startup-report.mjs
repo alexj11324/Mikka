@@ -75,6 +75,7 @@ export function sanitizeTimingLog(value, { hashes, workflows }) {
 const median = values => { const sorted = values.filter(Number.isFinite).sort((a,b) => a-b), middle = Math.floor(sorted.length/2)
   return sorted.length ? sorted.length % 2 ? sorted[middle] : (sorted[middle-1] + sorted[middle])/2 : null }
 const stats = values => ({ valuesMs: values, medianMs: median(values), maxMs: values.length ? Math.max(...values) : null })
+const eligibleSample = sample => sample.status !== 'failed' && sample.timing?.status === 'aligned' && sample.cleanup?.status === 'passed'
 
 export function summarizeTimings(report, logs) {
   for (const sample of report.samples) {
@@ -92,9 +93,10 @@ export function summarizeTimings(report, logs) {
   alignServerTimings(report, logs)
   report.summary = { grouping: 'harness_and_requested_strategy', statistics: 'raw_values_median_max_no_percentile_estimate',
     durationRule: 'parent_child_and_parallel_intervals_overlap_do_not_sum',
-    proxyRule: 'preparation_is_measured_lower_bound_headers_include_upstream_ttfb', groups: [] }
+    proxyRule: 'preparation_is_measured_lower_bound_headers_include_upstream_ttfb',
+    excludedSamples: report.samples.filter(sample => !eligibleSample(sample)).map(sample => ({ sampleId: sample.sampleId, reason: sample.error ?? sample.timing?.reason ?? 'incomplete' })), groups: [] }
   for (const harness of [...new Set(report.samples.map(sample => sample.harness))]) {
-    const rows = report.samples.filter(sample => sample.harness === harness)
+    const rows = report.samples.filter(sample => sample.harness === harness && eligibleSample(sample))
     report.summary.groups.push({ harness, strategy: report.requestedStrategy, samples: rows.length,
       dispatchToAgentStart: stats(rows.map(sample => sample.timing?.dispatchToAgentStartMs).filter(Number.isFinite)),
       dispatchToExecutionStart: stats(rows.map(sample => sample.timing?.dispatchToExecutionStartMs).filter(Number.isFinite)),
@@ -133,13 +135,14 @@ export function markdown(report) {
     '', `应用 commit：\`${report.build}\`。worker SHA：\`${report.workerRelease?.configuration?.workerSha ?? 'unavailable'}\`；worker source：\`${report.workerRelease?.configuration?.sourceCommit ?? 'unavailable'}\`。`,
     `部署：\`${report.serverLogCollection?.deploymentId ?? 'unavailable'}\`。日志查询：\`${report.serverLogCollection?.status ?? 'unavailable'}\`。`,
     '', '时长单位为秒。派发起点取对应 workflow 的 dispatch_timing.startedAt；agent_start 与首实际 provider/tool chunk 使用服务端存储时点。旧 worker 缺少官方任务 ACK 时明确留空。',
-    '', '| Sample | Harness | Run ID | 派发→agent_start | 派发→真实接收上界 | 派发→首 provider/tool chunk | 清理 |', '|---|---|---|---:|---:|---:|---|']
-  for (const sample of report.samples) lines.push(`| ${sample.sampleId} | ${sample.harness} | \`${sample.runId ?? 'unavailable'}\` | ${seconds(sample.timing?.dispatchToAgentStartMs)} | ${seconds(sample.timing?.dispatchToExecutionStartMs)} | ${seconds(sample.timing?.dispatchToFirstProviderChunkMs)} | ${sample.cleanup?.status ?? 'unavailable'} |`)
+    '', '| Sample | Harness | Run ID | 派发→agent_start | 派发→真实接收上界 | 派发→首 provider/tool chunk | 清理 | 分组资格 |', '|---|---|---|---:|---:|---:|---|---|']
+  for (const sample of report.samples) lines.push(`| ${sample.sampleId} | ${sample.harness} | \`${sample.runId ?? 'unavailable'}\` | ${seconds(sample.timing?.dispatchToAgentStartMs)} | ${seconds(sample.timing?.dispatchToExecutionStartMs)} | ${seconds(sample.timing?.dispatchToFirstProviderChunkMs)} | ${sample.cleanup?.status ?? 'unavailable'} | ${eligibleSample(sample) ? '有效单样本' : sample.error ?? '不完整，排除'} |`)
   lines.push('', '### 分组统计', '', '| Harness | n | agent_start median / max | 首 provider/tool chunk median / max |', '|---|---:|---:|---:|')
   for (const group of report.summary?.groups ?? []) lines.push(`| ${group.harness} | ${group.samples} | ${seconds(group.dispatchToAgentStart.medianMs)} / ${seconds(group.dispatchToAgentStart.maxMs)} | ${seconds(group.dispatchToFirstProviderChunk.medianMs)} / ${seconds(group.dispatchToFirstProviderChunk.maxMs)} |`)
   lines.push('', '### 启动分段', '', '父子阶段和并行阶段会重叠，不能跨行求和。相同 daemon 阶段在一轮内取区间并集；同名串行 server 阶段合计。缺失值不补零；小样本不计算 P95。')
   for (const harness of new Set(report.samples.map(sample => sample.harness))) {
-    const samples = report.samples.filter(sample => sample.harness === harness), maps = samples.map(perSamplePhases)
+    const samples = report.samples.filter(sample => sample.harness === harness && eligibleSample(sample)), maps = samples.map(perSamplePhases)
+    if (!samples.length) continue
     const names = [...new Set(maps.flatMap(map => [...map.keys()]))].sort()
     lines.push('', `#### ${harness}`, '', `| 阶段 | ${samples.map(sample => sample.sampleId).join(' | ')} | median | max |`, `|---|${samples.map(() => '---:|').join('')}---:|---:|`)
     for (const name of names) {
