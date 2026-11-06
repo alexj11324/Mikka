@@ -31,6 +31,7 @@ import { registerBundledBridge } from './bundled-bridge'
 import { SessionVault } from './session-vault'
 import { pickRepo } from './repo-picker'
 import { openBundledWebPage } from './bundled-web'
+import { markStartup } from '../startup'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
@@ -246,6 +247,7 @@ function reloadApp(): void {
 }
 
 function createMainWindow(): void {
+  markStartup('main.window.start')
   // Read once at launch; a changed Reduce transparency setting applies from the next launch.
   const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors, reduceTransparency: nativeTheme.prefersReducedTransparency })
   mainWindow = new BrowserWindow({
@@ -273,6 +275,7 @@ function createMainWindow(): void {
       additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
     },
   })
+  markStartup('main.window.created')
   mainWindow.setMenuBarVisibility(false)
   mainWindow.once('ready-to-show', () => mainWindow?.show())
   mainWindow.on('closed', () => { mainWindow = null })
@@ -487,7 +490,9 @@ function installMenu(): void {
 }
 
 async function start(): Promise<void> {
+  markStartup('main.ready')
   registerSession()
+  let restoring = Promise.resolve()
   if (BUNDLED) {
     const backend = session.fromPartition(`${PARTITION}-backend`)
     const vault = new SessionVault(join(app.getPath('userData'), 'credentials'), APP_URL, {
@@ -513,7 +518,8 @@ async function start(): Promise<void> {
         void mainWindow.loadURL(`${RENDERER_ORIGIN}${path}`)
       },
     })
-    await bundledAuth.restore()
+    markStartup('main.restore.start')
+    restoring = bundledAuth.restore().then(() => { markStartup('main.restore.end') })
     bundledLive = new BundledLive(bundledAuth, (owner, event) => {
       const contents = webContents.fromId(owner)
       if (contents && !contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.liveEvent, event)
@@ -542,6 +548,7 @@ async function start(): Promise<void> {
     openExternal: async url => {
       const target = appExternalUrl(url, APP_URL)
       if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
+      await bundledAuth?.whenRestored()
       if (bundledAuth && await openBundledWebPage(target, { serverUrl: APP_URL, auth: bundledAuth, openExternal: page => shell.openExternal(page) })) return
       await shell.openExternal(target)
     },
@@ -577,6 +584,9 @@ async function start(): Promise<void> {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0 && !gate) createMainWindow()
   })
+  // Only disk assets and the loading shell may overtake restoration. API and
+  // IPC handlers already wait on BundledAuth's barrier before using any identity.
+  await restoring
 }
 
 if (!app.requestSingleInstanceLock()) {

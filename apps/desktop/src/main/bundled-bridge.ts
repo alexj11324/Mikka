@@ -17,7 +17,12 @@ export function registerBundledBridge(auth: BundledAuth, live: BundledLive, view
         event.sender.once('destroyed', () => { observed.delete(owner); live.closeOwner(owner); viewer.closeOwner(owner) })
         event.sender.on('did-start-navigation', details => { if (details.isMainFrame && !details.isSameDocument) { live.closeOwner(owner); viewer.closeOwner(owner) } })
       }
-      return Promise.resolve().then(() => run(owner, ...input)).catch(() => {
+      return auth.whenRestored().then(() => {
+        // Keychain restoration can outlive the invoking document. Recheck the
+        // sender after that wait before running a privileged operation.
+        if (event.sender.isDestroyed() || !trustedIpcSender(event.senderFrame, RENDERER_URL)) throw new Error('Untrusted IPC sender')
+        return run(owner, ...input)
+      }).catch(() => {
         // Never serialize an upstream response, token-bearing URL or native stack.
         throw new Error('desktop_request_failed')
       })

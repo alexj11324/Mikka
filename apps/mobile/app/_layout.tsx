@@ -13,7 +13,6 @@ import { SignIn } from '@/components/SignIn'
 import { StartupGate } from '@/components/StartupGate'
 import { authClient } from '@/lib/auth'
 import { apiCache } from '@/lib/api-cache'
-import { AppDrawer } from '@/features/shell/components/app-drawer'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
@@ -53,19 +52,18 @@ function SessionGate() {
   return (
     <HomeProvider key={data.user.id}>
       <PushSetup />
-      {/* One Stack on the drawer's surface (#1408 Phase 2): the chat list is home; the rest is pushed over it. */}
-      <AppDrawer>
+      {/* The tabs (docs/design/mobile-comma-redesign.md); a chat, a thread and the rest are pushed over them, so the
+          tab bar goes away there. */}
       <Stack screenOptions={screenOptions(colors.page)}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* A long press on a message: its actions as a system sheet, and 选择文本 over the chat. */}
         <Stack.Screen name="message" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.42], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="attach" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.22], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
-        <Stack.Screen name="new-bot" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
+        {/* 新建 Bot and 新建群聊: full-height form sheets with the grabber (docs/design/mobile-comma, 06–07). */}
+        <Stack.Screen name="new-bot" options={{ presentation: 'formSheet', sheetAllowedDetents: [1], sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.grouped } }} />
+        <Stack.Screen name="new-group" options={{ presentation: 'formSheet', sheetAllowedDetents: [1], sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
       </Stack>
-      </AppDrawer>
     </HomeProvider>
   )
 }

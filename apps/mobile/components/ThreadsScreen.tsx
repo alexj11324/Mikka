@@ -16,6 +16,8 @@ import { botPageLive, threadsLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
 import { colors, lift } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
+import { CLOSED_SHOWN, ListSectionHeader, ShowAllRow } from '@/shared/components/list-section'
+import { ThreadLink } from '@/shared/components/thread-link'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
 type Filter = 'all' | 'waiting' | 'running' | 'resolved'
@@ -74,10 +76,14 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const list = useMemo(() => (data?.threads ?? [])
     .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
     .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
-  // 全部: grouped as on the web (R-52).
-  const rows: (Thread | { title: string })[] = filter !== 'all' ? list : GROUPS.flatMap(group => {
+  // 全部: grouped as on the web (R-52), each with its count; 已解决 shows its first rows until 显示全部.
+  const [allResolved, setAllResolved] = useState(false)
+  type Row = Thread | { title: string; count: number } | { more: number }
+  const rows: Row[] = filter !== 'all' ? list : GROUPS.flatMap((group): Row[] => {
     const items = list.filter(thread => groupOf(thread) === group.id)
-    return items.length ? [{ title: group.title }, ...items] : []
+    if (!items.length) return []
+    const cut = group.id === 'resolved' && !allResolved && items.length > CLOSED_SHOWN
+    return [{ title: group.title, count: items.length }, ...(cut ? items.slice(0, CLOSED_SHOWN) : items), ...(cut ? [{ more: items.length }] : [])]
   })
 
   return (
@@ -91,14 +97,16 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
       />
       <FlatList
         data={rows}
-        keyExtractor={row => 'title' in row ? `h:${row.title}` : row.id}
+        keyExtractor={row => 'title' in row ? `h:${row.title}` : 'more' in row ? 'more' : row.id}
+        // The sections, their first rows and 显示全部 draw at once rather than ten rows at a time.
+        initialNumToRender={40}
         {...underBar}
         refreshControl={<RefreshControl {...refresh} />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListHeaderComponent={
           <View>
             <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
-            {devices.length ? <Text style={styles.section}>设备</Text> : null}
+            {devices.length ? <ListSectionHeader title="设备" /> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {devices.map(m => {
                 const active = machine === m.id
@@ -111,11 +119,13 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
                 )
               })}
             </ScrollView>
-            {filter === 'all' ? null : <Text style={styles.section}>{filters.find(f => f.id === filter)?.label}</Text>}
+            {filter === 'all' ? null : <ListSectionHeader title={filters.find(f => f.id === filter)?.label ?? ''} count={list.length} />}
           </View>
         }
         ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>没有线程</Text>}
-        renderItem={({ item }) => 'title' in item ? <Text style={styles.section}>{item.title}</Text> : <ThreadRow thread={item} onPress={() => router.push(`/thread/${item.id}`)} />}
+        renderItem={({ item }) => 'title' in item ? <ListSectionHeader title={item.title} count={item.count} />
+          : 'more' in item ? <ShowAllRow count={item.more} onPress={() => setAllResolved(true)} />
+          : <ThreadRow thread={item} onStopped={reload} />}
       />
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(false)}>
@@ -135,35 +145,37 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
 }
 
 /** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等待你 adds a word (mobile.md), and a task's later attempt its number. */
-export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
+export function ThreadRow({ thread, onStopped }: { thread: Thread; onStopped?: () => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} /></View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
-        <View style={styles.rowMeta}>
-          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等待你 · ' : ''}{(thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试 · ` : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
-          {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
+    <ThreadLink thread={thread} onStopped={onStopped} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+      <View style={styles.rowInner}>
+        <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
+          <View style={styles.rowMeta}>
+            <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等待你 · ' : ''}{(thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试 · ` : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
+            {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
+          </View>
         </View>
+        {thread.status === 'waiting' ? <Dot /> : null}
       </View>
-      {thread.status === 'waiting' ? <Dot /> : null}
-    </Pressable>
+    </ThreadLink>
   )
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 12, marginBottom: 8 },
   chips: { paddingHorizontal: 16, gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble },
   chipActive: { backgroundColor: colors.ink },
   chipText: { fontSize: 15 },
   online: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 11, gap: 12 },
+  row: { paddingHorizontal: 20, paddingVertical: 10 },
+  rowInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowIcon: { width: 22, alignItems: 'center' },
-  rowTitle: { fontSize: 16 },
+  rowTitle: { fontSize: 16, lineHeight: 21 },
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  rowMetaText: { fontSize: 12, color: colors.secondary },
+  rowMetaText: { fontSize: 13, lineHeight: 18, color: colors.secondary },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40 },
   failed: { alignItems: 'center', gap: 10, marginTop: 40 },
   error: { fontSize: 13, color: colors.danger },

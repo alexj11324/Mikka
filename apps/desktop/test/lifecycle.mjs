@@ -18,6 +18,7 @@ import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
+import { readNativeStartup } from './native-startup.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
@@ -64,14 +65,16 @@ async function launch(mode, extraArgs = []) {
     args: [...(process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')]), ...extraArgs],
     cwd: root, env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profiles[mode] }, timeout: 90_000,
   })
+  const connectedMs = performance.now() - started
   active.add(app)
   appProfiles.set(app, profiles[mode])
   const page = await app.firstWindow({ timeout: 90_000 })
+  const firstWindowMs = performance.now() - started
   page.setDefaultTimeout(60_000)
   const errors = []
   page.on('pageerror', error => errors.push(error.name))
   evidence.nativeViewports.push({ mode, launch: evidence.nativeViewports.length + 1, ...await setNativeViewport(app, page, viewport) })
-  return { app, page, errors, started }
+  return { app, page, errors, started, launchTiming: { connectedMs, firstWindowMs, viewportReadyMs: performance.now() - started } }
 }
 async function close(app) {
   if (!app) return
@@ -259,7 +262,8 @@ try {
       application = run.app
       await usable(run.page, 'Lifecycle readiness draft')
       const milliseconds = Math.round((performance.now() - run.started) * 100) / 100
-      evidence.samples.push({ pair, order: order.indexOf(mode) + 1, mode, milliseconds })
+      evidence.samples.push({ pair, order: order.indexOf(mode) + 1, mode, milliseconds,
+        launchTiming: run.launchTiming, startup: await readNativeStartup(run.app, run.page) })
       await recordNativeState(run.page, `cold-pair-${pair}`, mode)
       assert.equal(run.errors.length, 0, 'cold launch must not produce uncaught renderer errors')
       await run.page.locator('textarea[data-chat-composer]').first().fill('')

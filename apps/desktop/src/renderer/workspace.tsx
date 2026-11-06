@@ -7,8 +7,11 @@ import { publicAppOrigin } from '@/lib/platform/public-origin'
 import type { DesktopBootstrap } from './bootstrap'
 import type { DesktopSession } from './host'
 import { useLocation } from './location'
+import { useEffect } from 'react'
+import { markStartup } from '../startup'
 
 export default function Workspace({ user, bootstrap }: { user: DesktopSession['user']; bootstrap: DesktopBootstrap }) {
+  useEffect(() => { markStartup('renderer.workspace.mounted') }, [])
   // The installed UI and validated backend origin version this namespace. The
   // shared cache retains its exact hydration, field allowlist and invalidation.
   return <AuthenticatedReadCache ownerId={user.id} workspace={bootstrap.cacheWorkspace} build={`desktop:${rendererBuild}:${publicAppOrigin()}`}>

@@ -113,7 +113,7 @@ export default function BotInfo() {
         {unsaved ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.unsaved}>{unsaved}没保存，请稍后重试</Text> : null}
         {threads.length ? (
           <Group label="线程">
-            {threads.slice(0, SHOWN).map(thread => <ThreadRow key={thread.id} thread={thread} onPress={() => router.push(`/thread/${thread.id}`)} />)}
+            {threads.slice(0, SHOWN).map(thread => <ThreadRow key={thread.id} thread={thread} />)}
             {threads.length > SHOWN ? <Row label="全部线程" value={String(threads.length)} onPress={() => router.push(`/bots/${id}/threads`)} /> : null}
           </Group>
         ) : null}

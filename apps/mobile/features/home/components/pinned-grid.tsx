@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import { Star } from 'lucide-react-native'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { BotAvatar } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
@@ -11,7 +12,10 @@ import { ChatLink } from './chat-link'
 
 type Actions = ReturnType<typeof useHomeChats>
 
-/** The pinned chats above the list: a grid of four columns, each tile with the row's link, preview, menu and drag. */
+/**
+ * The pinned chats above the list: a grid of three columns (Comma design 01), each tile with the row's link, preview,
+ * menu and drag. An orange star on the upper corner marks the pin; the chat's mark sits on the lower corner.
+ */
 export function PinnedGrid({ pinned, actions }: { pinned: HomeChat[]; actions: Actions }) {
   if (!pinned.length) return null
   return <View style={styles.grid}>{pinned.map(chat => <PinnedTile key={chat.key} chat={chat} actions={actions} />)}</View>
@@ -28,7 +32,10 @@ function PinnedTile({ chat, actions }: { chat: HomeChat; actions: Actions }) {
             <View>
               {chat.row.kind === 'bot' ? <BotAvatar color={chat.row.bot.color} shape={chat.row.bot.shape} size={64} />
                 : <View style={styles.group}><Symbol name="person.2.fill" size={26} color={colors.secondary} web={<Text style={styles.glyph}>群</Text>} /></View>}
-              <ChatBadge chat={chat} />
+              <View style={styles.star} accessibilityElementsHidden importantForAccessibility="no">
+                <Symbol name="star.fill" size={14} color={colors.orange} web={<Star size={14} color={colors.orange} fill={colors.orange} strokeWidth={0} />} />
+              </View>
+              <ChatBadge chat={chat} avatar />
             </View>
             <Text style={styles.name} numberOfLines={1}>{name}</Text>
           </View>
@@ -39,11 +46,12 @@ function PinnedTile({ chat, actions }: { chat: HomeChat; actions: Actions }) {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingTop: 12, paddingBottom: 8, rowGap: 16 },
-  cell: { width: '25%' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8, rowGap: 16 },
+  star: { position: 'absolute', right: -6, top: -4 },
+  cell: { width: '33.333%' },
   tile: { paddingHorizontal: 4 },
   tileInner: { alignItems: 'center', gap: 8 },
   group: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   glyph: { fontSize: 20, color: colors.secondary },
-  name: { fontSize: 12.5, lineHeight: 16, textAlign: 'center' },
+  name: { fontSize: 13, lineHeight: 17, textAlign: 'center' },
 })

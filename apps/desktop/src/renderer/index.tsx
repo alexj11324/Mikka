@@ -2,7 +2,9 @@ import { createRoot } from 'react-dom/client'
 import { App } from './app'
 import { installNavigation } from './location'
 import './styles.css'
+import { markStartup } from '../startup'
 
+markStartup('renderer.entry')
 installNavigation()
 // Set the same saved/system theme before the first local paint. The web's
 // next-themes inline bootstrap is unnecessary in this CSP-restricted document.
