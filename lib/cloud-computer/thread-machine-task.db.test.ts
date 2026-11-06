@@ -583,8 +583,8 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
     }));
 
-    await t.test('spec preclaim runtime refresh waits for real question settlement before locking the failed run', () => withRefreshWorker(async () => {
-      const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused');
+    await t.test('spec preclaim runtime refresh waits behind idempotent blocked question settlement without owning the run lock', () => withRefreshWorker(async () => {
+      const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused'), before = await unclaimedHistory(f);
       const [{ createFactoryQuestions }, { createFactoryStore }, { factoryTestLifecycle }] = await Promise.all([
         import('../factory/questions/store'), import('../factory/store'), import('../../tests/helpers/factory-test-authority'),
       ]);
@@ -612,7 +612,13 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         }
         assert.equal(waiting, true, 'maintenance must wait for the current settlement transaction');
         assert.deepEqual(fixture.calls, []);
-        await questions.settle(owner, f.next, settlement);
+        // A blocked question is already closed, so settle is intentionally
+        // idempotent and does not acquire the run lock itself. Probe that lock
+        // explicitly: maintenance must not own it while waiting on the task.
+        await settlement.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [f.next]);
+        const replay = await questions.settle(owner, f.next, settlement);
+        assert.equal(replay?.status, before.question[0].status);
+        assert.equal(replay?.revision, before.question[0].revision);
         await settlement.query('COMMIT');
         settled = await unclaimedHistory(f);
       } finally {
@@ -624,8 +630,8 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const outcome = await refresh;
       if (outcome.error) throw outcome.error;
       assert.deepEqual(outcome.result, { runId: f.next, state: 'running' });
-      assert.ok(settled); assert.equal(settled.question[0].revision, 4);
-      assert.deepEqual(await unclaimedHistory(f), settled, 'maintenance observes the committed settlement without overwriting it');
+      assert.ok(settled); assert.deepEqual(settled, before, 'settling an already blocked question is an immutable replay');
+      assert.deepEqual(await unclaimedHistory(f), before, 'maintenance preserves the original history after the settlement releases its locks');
       assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
       assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
     }));
