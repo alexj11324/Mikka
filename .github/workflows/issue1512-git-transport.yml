@@ -1,0 +1,39 @@
+name: Issue 1512 branch transport
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths: ['.github/workflows/issue1512-git-transport.yml', '.github/issue1512-source.json']
+permissions:
+  contents: write
+jobs:
+  import:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: issue-1512-git-transport
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Verify and import the issue owner's exact Git objects
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          import crypto from 'node:crypto'
+          import { execFileSync } from 'node:child_process'
+          const manifest = JSON.parse(fs.readFileSync('.github/issue1512-source.json', 'utf8'))
+          if (!/^[a-f0-9]{40}$/.test(manifest.revision)) throw new Error('Invalid revision')
+          const bundle = Buffer.from(manifest.bundle, 'base64')
+          if (crypto.createHash('sha256').update(bundle).digest('hex') !== manifest.sha256) throw new Error('Bundle checksum mismatch')
+          const file = process.env.RUNNER_TEMP + '/issue1512.bundle'
+          fs.writeFileSync(file, bundle, { mode: 0o600 })
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+          git('bundle', 'verify', file)
+          git('fetch', file, 'refs/heads/feat/1512-run-observability:refs/remotes/issue1512/import')
+          if (git('rev-parse', 'refs/remotes/issue1512/import') !== manifest.revision) throw new Error('Imported revision mismatch')
+          git('push', 'origin', manifest.revision + ':refs/heads/feat/1512-run-observability')
+          console.log('Imported issue #1512 revision ' + manifest.revision + ' without force-push')
+          fs.rmSync(file)
+          JS
