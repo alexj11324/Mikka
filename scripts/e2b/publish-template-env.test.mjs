@@ -1,18 +1,51 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { currentWorkerSha, pairEnv, publish, PROJECT, TEAM } from './publish-template-env.mjs'
+import { createHash } from 'node:crypto'
+import { assertConservation, currentWorkerSha, pairEnv, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
 const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [report('claude_code')], codex: [report('codex')] }
-const TEMPLATES = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
-const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+const TEMPLATES = { desktop: 'tpl-desktop', claude: 'tpl-claude', codex: 'tpl-codex' }
+const PROOF = { entries: 100, sha256: 'd'.repeat(64) }
+const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))).digest('hex')
+const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
+  kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
+} })
+const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
+  templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
+  conservation: conservation(kind), models: MODELS[kind],
+}])), subscriptionAcceptance: Object.fromEntries([['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([kind, harness, model]) => [kind, {
+  status: 'passed', templateId: TEMPLATES[kind], sourceCommit: COMMIT, workerSha: SHA, harness, model,
+  credentialRoute: 'subscription', replyVerified: true, runId: `run-${kind}`, deviceId: `device-${kind}`,
+  officialBinarySha256: 'e'.repeat(64), officialCliVersion: 'fixture-version',
+}])) }
+const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
+const OLD_STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: OTHER, sourceCommit: OTHER, models: MODELS }).map(row => [row.key, row.value]))
+OLD_STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
+
+test('conservation requires both strict installation and exact provider-only finalization changes', () => {
+  const proof = conservation('claude')
+  proof.finalization.providerChanges.push({ path: '/.e2b', before: { sha256: 'a'.repeat(64) }, after: { sha256: 'b'.repeat(64) } })
+  assert.doesNotThrow(() => assertConservation(proof, 'claude'))
+  for (const mutate of [
+    value => { delete value.finalization },
+    value => { value.after = { ...PROOF, sha256: 'e'.repeat(64) } },
+    value => { value.finalization.providerChanges[0].path = '/usr/local/bin/codex' },
+    value => { value.finalization.providerChanges[0] = { path: '/.e2b', before: { uid: 0 }, after: { uid: 1000 } } },
+    value => { value.finalization.providerChanges[0] = { path: '/usr/local/share/e2b/ssl-certs.tar', before: { mode: 420 }, after: { mode: 438 } } },
+    value => { value.finalization.originalBefore = { ...PROOF, sha256: 'e'.repeat(64) } },
+  ]) {
+    const invalid = structuredClone(proof); mutate(invalid)
+    assert.throws(() => assertConservation(invalid, 'claude'), /runtime_release_conservation_invalid/)
+  }
+})
 
 function fixture(options = {}) {
-  const calls = [], logs = [], stored = options.stored ?? STORED
+  const calls = [], logs = [], stored = { ...(options.stored ?? STORED), ...(options.previous ? { MIKKA_CLOUD_RUNTIME_PREVIOUS: options.previous } : {}) }
   let wrote = false, mainReads = 0, uncertain = options.uncertainPost === true
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), method = init.method ?? 'GET'
@@ -37,11 +70,12 @@ function fixture(options = {}) {
     if (url.pathname === '/v13/deployments/dpl_live') return Response.json({ meta: { githubCommitSha: options.aliasBuild ?? COMMIT } })
     if (method === 'POST' && url.pathname.endsWith('/env')) {
       wrote = true
+      for (const row of JSON.parse(init.body)) if (!options.stored || !(row.key in options.stored)) stored[row.key] = row.value
       if (uncertain) { uncertain = false; throw Error('fixture response lost after mutation') }
       if (options.postStatus) return new Response('private-response-marker', { status: options.postStatus })
       return Response.json({ created: [] })
     }
-    const source = wrote || options.unchanged ? stored : options.before ?? { ...stored, MIKKA_CLOUD_WORKER_SHA: OTHER }
+    const source = wrote || options.unchanged ? stored : options.before ?? OLD_STORED
     if (url.pathname.endsWith('/env')) return Response.json({ envs: Object.keys(stored).flatMap(key => [
       { id: `preview-${key}`, key, target: ['preview'] },
       { id: `branch-${key}`, key, target: ['production'], gitBranch: 'other' },
@@ -51,19 +85,19 @@ function fixture(options = {}) {
     assert.fail(`unexpected release request ${method} ${url.pathname}`)
   }
   const run = extra => publish({ token: 'vercel-fixture', githubToken: 'github-read-fixture', templates: TEMPLATES,
-    sourceSha: SHA, sourceCommit: COMMIT, models: MODELS, fetchImpl, log: message => logs.push(message), ...extra })
-  return { calls, logs, fetchImpl, run }
+    sourceSha: SHA, sourceCommit: COMMIT, models: MODELS, releaseEvidence: EVIDENCE, fetchImpl, log: message => logs.push(message), ...extra })
+  return { calls, logs, fetchImpl, run, stored }
 }
 
-test('official templates, worker, source and measured capabilities go to production in one verified upsert', async () => {
+test('verified versioned templates, worker and previous release go to production in one upsert', async () => {
   const fake = fixture()
   assert.deepEqual(await fake.run(), { changed: true, requiresWebBuild: true, sourceCommit: COMMIT, workerSha: SHA })
   const writes = fake.calls.filter(call => call.method === 'POST')
   assert.equal(writes.length, 1)
   assert.equal(writes[0].path, `/v10/projects/${PROJECT}/env`)
   assert.match(writes[0].search, /upsert=true/)
-  assert.deepEqual(writes[0].body.map(row => [row.key, row.value, row.target]), Object.entries(STORED).map(([key, value]) => [key, value, ['production']]))
-  assert.equal(fake.calls.filter(call => call.path.includes('/env/id-')).length, 12, 'read each exact production value before and after the write')
+  assert.deepEqual(writes[0].body.map(row => [row.key, row.value, row.target]), Object.entries({ ...STORED, MIKKA_CLOUD_RUNTIME_PREVIOUS: JSON.stringify({ version: 1, configuration: OLD_STORED }) }).map(([key, value]) => [key, value, ['production']]))
+  assert.equal(fake.calls.filter(call => call.path.includes('/env/id-')).length, 13, 'read current configuration and verify new configuration plus rollback receipt')
   assert.doesNotMatch(fake.logs.join('\n'), /fixture-model|vercel-fixture|github-read-fixture/)
 })
 
@@ -135,10 +169,10 @@ test('does not search past a newer application for an older matching READY deplo
   assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
 })
 
-test('refuses missing or short source identities and custom official templates before requests', async () => {
+test('refuses missing or short source identities and candidate mismatches before requests', async () => {
   for (const extra of [{ sourceCommit: undefined }, { sourceCommit: 'short' }, { templates: { ...TEMPLATES, codex: 'private-old' } }]) {
     const fake = fixture()
-    await assert.rejects(fake.run(extra), /official_(source_commit|template)_invalid/)
+    await assert.rejects(fake.run(extra), /official_source_commit_invalid|runtime_release_template_invalid/)
     assert.equal(fake.calls.length, 0)
   }
 })
@@ -151,13 +185,45 @@ test('pair validation still rejects short worker SHA, odd or missing template ID
   assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: { ...MODELS, desktop: [report('codex')] } }), /template_models_missing desktop claude_code/)
 })
 
-test('reads only the exact production worker hash and returns empty when unset', async () => {
+test('only a complete matching runtime tuple returns the current worker hash', async () => {
   assert.equal(await currentWorkerSha({ token: 'vercel-fixture', fetchImpl: fixture({ unchanged: true }).fetchImpl }), SHA)
   assert.equal(await currentWorkerSha({ token: 'vercel-fixture', fetchImpl: fixture({ stored: {} }).fetchImpl }), '')
+  for (const partial of [
+    { ...STORED, E2B_CODEX_TEMPLATE: 'other-template' },
+    { ...STORED, MIKKA_CLOUD_WORKER_SHA: OTHER },
+    { ...STORED, MIKKA_CLOUD_WORKER_SOURCE_COMMIT: OTHER },
+    { ...STORED, MIKKA_CLOUD_TEMPLATE_MODELS: '{}' },
+  ]) {
+    assert.equal(await currentWorkerSha({ token: 'vercel-fixture', fetchImpl: fixture({ unchanged: true, stored: partial }).fetchImpl }), '')
+  }
+})
+
+test('repairing a partial upsert keeps the last valid rollback snapshot', async () => {
+  const previous = JSON.stringify({ version: 1, configuration: OLD_STORED })
+  const fake = fixture({ before: { ...OLD_STORED, MIKKA_CLOUD_WORKER_SHA: SHA }, previous })
+  assert.equal((await fake.run()).changed, true)
+  const write = fake.calls.find(call => call.method === 'POST')
+  assert.equal(write.body.some(row => row.key === 'MIKKA_CLOUD_RUNTIME_PREVIOUS'), false)
+  assert.equal(fake.stored.MIKKA_CLOUD_RUNTIME_PREVIOUS, previous)
+  assert.equal(runtimeConfigurationSha(fake.stored), SHA)
+})
+
+test('a valid legacy official catalogue can be backed up while requiring fresh validation', async () => {
+  const legacy = Object.fromEntries(pairEnv({ templates: { desktop: 'desktop', claude: 'claude', codex: 'codex' }, sourceSha: OTHER, models: MODELS }).map(row => [row.key, row.value]))
+  legacy.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
+  const catalogue = JSON.parse(legacy.MIKKA_CLOUD_TEMPLATE_MODELS)
+  for (const row of Object.values(catalogue.templates)) { delete row.baseTemplate; delete row.preinstalled }
+  legacy.MIKKA_CLOUD_TEMPLATE_MODELS = JSON.stringify(catalogue)
+  assert.equal(runtimeConfigurationSha(legacy), '')
+  assert.equal(runtimeConfigurationSha(legacy, { allowLegacy: true }), OTHER)
+  const fake = fixture({ before: legacy })
+  await fake.run()
+  const previous = fake.calls.find(call => call.method === 'POST').body.find(row => row.key === 'MIKKA_CLOUD_RUNTIME_PREVIOUS')
+  assert.deepEqual(JSON.parse(previous.value), { version: 1, configuration: legacy })
 })
 
 test('GitHub-only build timeline waits for source upload before the single runtime env publication', async () => {
-  let elapsed = 0, wrote = false
+  let elapsed = 0, wrote = false, published
   const calls = []
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), method = init.method ?? 'GET'
@@ -177,8 +243,8 @@ test('GitHub-only build timeline waits for source upload before the single runti
     }
     if (url.origin === 'https://app.aspectlylabs.com') return Response.json({ build: elapsed < 300 ? OTHER : COMMIT })
     assert.equal(url.origin, 'https://api.vercel.com')
-    if (method === 'POST' && url.pathname.endsWith('/env')) { wrote = true; return Response.json({ created: [] }) }
-    const values = wrote ? STORED : { ...STORED, MIKKA_CLOUD_WORKER_SHA: OTHER }
+    if (method === 'POST' && url.pathname.endsWith('/env')) { wrote = true; published = Object.fromEntries(JSON.parse(init.body).map(row => [row.key, row.value])); return Response.json({ created: [] }) }
+    const values = wrote ? published : { ...STORED, MIKKA_CLOUD_WORKER_SHA: OTHER }
     if (url.pathname.endsWith('/env')) return Response.json({ envs: Object.keys(values).map(key => ({ id: `id-${key}`, key, target: ['production'] })) })
     if (url.pathname.includes('/env/id-')) return Response.json({ value: values[url.pathname.split('/env/id-')[1]] })
     // Reproduce the observed gap: while GitHub is building there is NO Vercel
@@ -196,8 +262,28 @@ test('GitHub-only build timeline waits for source upload before the single runti
   if (workflow.includes('\n  await-web:')) await webRelease.waitForWebDeployment({ expectedBuild: COMMIT, token: 'github-read-fixture',
     fetchImpl, now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: 500 })
   const result = await publish({ token: 'vercel-fixture', githubToken: 'github-read-fixture', templates: TEMPLATES, sourceSha: SHA,
-    sourceCommit: COMMIT, models: MODELS, fetchImpl, log: () => {}, wait: async ms => { elapsed += ms } })
+    sourceCommit: COMMIT, models: MODELS, releaseEvidence: EVIDENCE, fetchImpl, log: () => {}, wait: async ms => { elapsed += ms } })
   assert.equal(result.requiresWebBuild, true)
   assert.equal(elapsed, 300)
   assert.deepEqual(calls.filter(call => call.method === 'POST'), [{ origin: 'https://api.vercel.com', path: `/v10/projects/${PROJECT}/env`, method: 'POST', at: 300 }])
+})
+
+
+test('publication requires both real subscriptions on these exact candidates before any network request', async () => {
+  for (const mutate of [
+    value => { delete value.subscriptionAcceptance.codex },
+    value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
+    value => { value.subscriptionAcceptance.codex.model = 'other-model' },
+    value => { value.subscriptionAcceptance.claude.workerSha = OTHER },
+    value => { delete value.subscriptionAcceptance.codex.officialBinarySha256 },
+    value => { value.templates.codex.models[0].models = ['unmeasured-model'] },
+    value => { value.templates.desktop.conservation.after = { ...PROOF, sha256: 'e'.repeat(64) } },
+    value => { value.templates.codex.public = false },
+  ]) {
+    const releaseEvidence = structuredClone(EVIDENCE)
+    mutate(releaseEvidence)
+    const fake = fixture()
+    await assert.rejects(fake.run({ releaseEvidence }), /runtime_release_/)
+    assert.equal(fake.calls.length, 0)
+  }
 })

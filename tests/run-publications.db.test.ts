@@ -67,7 +67,7 @@ test('run result publication commits one owner-scoped result through retries and
       permission: 'push_to_origin', targetBranch: fixture.branch, approvedAt: now, authority: 'github_app', acceptedAt: now, ...overrides }
     await pool.query('update agent_runs set "agentDefinition"=$2 where id=$1', [fixture.runId, JSON.stringify({ repositoryAdmission: fixture.admission })])
   }
-  const fixture = async (options: { approved?: boolean; prefix?: string; number?: number; remoteKey?: string; remoteUrl?: string } = {}) => {
+  const fixture = async (options: { approved?: boolean; prefix?: string; number?: number; remoteKey?: string; remoteUrl?: string; scope?: 'personal' | 'workspace' } = {}) => {
     const seed = randomUUID()
     const prefix = options.prefix ?? 'TEST'
     const number = options.number ?? 1
@@ -83,7 +83,7 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',\'personal\')', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] })])
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal'])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -92,6 +92,34 @@ test('run result publication commits one owner-scoped result through retries and
 
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+
+    await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
+      const { admitCloudPush } = await import('../lib/computer/cloud-push')
+      const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
+      const client = await pool.connect()
+      const cloudAdmission = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, now: new Date() })
+      try {
+        await client.query('BEGIN')
+        const admitted = await cloudAdmission()
+        assert.ok(admitted, 'a task without a local team still gets a publication receipt')
+        assert.equal(admitted.publication.identifier, 'MINE-12')
+        assert.equal(admitted.publication.branch, f.branch)
+        assert.equal(admitted.publication.remoteUrl, f.remoteUrl)
+        await client.query('COMMIT')
+        assert.equal((await prepareRunPublication(assignment(f), f.remoteUrl)).pushBranch, f.branch)
+        assert.equal((await receipt(f)).identifier, f.identifier)
+        await pool.query('update issue_prefixes set prefix=\'NEXT\' where "userId"=$1', [f.userId])
+        await client.query('BEGIN')
+        assert.equal((await cloudAdmission())?.publication.branch, f.branch, 'a later prefix edit does not move the existing PR branch')
+        await client.query('COMMIT')
+        assert.equal((await task(f)).scope, 'workspace')
+        assert.equal((await task(f)).userId, f.userId)
+        assert.equal((await pool.query('select count(*)::int n from mikka_team_issues where "issueId"=$1', [f.issueId])).rows[0].n, 0, 'naming does not assign a team or change access')
+      } finally {
+        await client.query('ROLLBACK')
+        client.release()
+      }
+    })
 
     await t.test('a run that ends during human control accepts its terminal report and clears pause metadata', async () => {
       const f = await fixture()

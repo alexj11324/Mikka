@@ -40,6 +40,7 @@ import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
 import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
+import { stdSerializers } from 'pino'
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
 import { ProviderFailureError, providerFailureSchema, type ProviderFailure } from "@mikka/protocol/provider-failure"
@@ -120,7 +121,7 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
-  /** A hosted (cloud) worker's API-key runs: the key stays behind the worker's broker, out of the task container. */
+  /** The task VM prepares its actual API key and starts the official CLI directly. */
   startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   /** Authenticated policy validation before repository/setup effects, including resume. */
@@ -344,7 +345,7 @@ export class RunSupervisor {
         run.lastCheckpointAt = now
         return checkpoint ? !checkpoint.unavailableReason : !force
       } catch (error) {
-        this.deps.log.warn({ run_id: runId, err: error }, "checkpoint failed")
+        this.deps.log.warn({ run_id: runId, err: this.logError(runId, error) }, "checkpoint failed")
         return false
       }
     })()
@@ -377,7 +378,7 @@ export class RunSupervisor {
   private forceStop(runId: string, run: ActiveRun, reason: StopReason) {
     this.deps.log.warn({ run_id: runId, stop_reason: reason }, "stopping run")
     run.forcedStop = reason
-    this.requestCancel(run)
+    this.requestCancel(runId, run)
   }
 
   private closeMailbox(run: ActiveRun): Promise<void> {
@@ -390,7 +391,7 @@ export class RunSupervisor {
   }
 
   /** Asks the session to stop; detaches it if it does not within the grace. */
-  private requestCancel(run: ActiveRun): Promise<void> {
+  private requestCancel(runId: string, run: ActiveRun): Promise<void> {
     run.cancelRequested = true
     run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
@@ -404,7 +405,7 @@ export class RunSupervisor {
       run.cancelTimer.unref()
     }
     return Promise.resolve(run.session?.cancel()).catch((error: unknown) => {
-      this.deps.log.warn({ err: error }, "session cancel failed")
+      this.deps.log.warn({ run_id: runId, err: this.logError(runId, error) }, "session cancel failed")
     })
   }
 
@@ -487,7 +488,7 @@ export class RunSupervisor {
         )
       return removed
     } catch (err) {
-      this.deps.log.warn({ run_id: logRunId, err }, "could not clean up")
+      this.deps.log.warn({ run_id: logRunId, err: this.logError(logRunId, err) }, "could not clean up")
       return false
     }
   }
@@ -683,7 +684,7 @@ export class RunSupervisor {
     if (!entry) throw new RunNotFoundError(runId)
     const run = this.active.get(runId)
     if (run) {
-      await this.requestCancel(run)
+      await this.requestCancel(runId, run)
       await run.done
     } else if (!isTerminalRunState(entry.state)) {
       this.finish(runId, "cancelled")
@@ -835,6 +836,25 @@ export class RunSupervisor {
     this.maskers.delete(runId)
   }
 
+  /** Serialize Errors before masking so non-enumerable message/stack/cause
+   * fields cannot bypass the same dynamic credential set as run output. */
+  private logError(runId: string, error: unknown) {
+    const masker = this.maskers.get(runId)
+    if (!masker) return error
+    const seen = new WeakSet<object>()
+    const plain = (value: unknown): unknown => {
+      if (!value || typeof value !== 'object') return value
+      if (seen.has(value)) return '[Circular]'
+      seen.add(value)
+      // Pino's serialized Errors have a custom prototype; normalize nested
+      // errors too so the JSON-value masker sees message, stack and causes.
+      const serialized = value instanceof Error ? stdSerializers.err(value) : value
+      return Array.isArray(serialized) ? serialized.map(plain)
+        : Object.fromEntries(Object.entries(serialized).map(([key, item]) => [key, plain(item)]))
+    }
+    return masker.deep(plain(error))
+  }
+
   /**
    * The only way into a terminal state: the terminal patch, then exactly one
    * completion for the server, then the outbox is compacted.
@@ -972,6 +992,7 @@ export class RunSupervisor {
       stopReason?: StopReason
     } = {},
   ) {
+    if (extra.error !== undefined) extra = { ...extra, error: this.maskers.get(runId)?.text(extra.error) ?? extra.error }
     const entry = this.deps.journal.update(runId, {
       state,
       ...(extra.sessionId !== undefined ? { sessionId: extra.sessionId } : {}),
@@ -1199,7 +1220,7 @@ export class RunSupervisor {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.deps.log.error({ run_id: runId, err: error }, "publish failed")
+      this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "publish failed")
       data = {
         branch: "",
         commit: null,
@@ -1232,7 +1253,7 @@ export class RunSupervisor {
       .catch(async (error: unknown) => {
         run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
-        this.deps.log.error({ run_id: runId, err: error }, "run failed")
+        this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "run failed")
         if (this.stopping) return
         try {
           const providerFailure = run.cancelRequested ? undefined : startupProviderFailure(error)
@@ -1245,7 +1266,7 @@ export class RunSupervisor {
           )
         } catch (finishError) {
           this.deps.log.error(
-            { run_id: runId, err: finishError },
+            { run_id: runId, err: this.logError(runId, finishError) },
             "could not record the run's end",
           )
         }
@@ -1259,7 +1280,10 @@ export class RunSupervisor {
   }
 
   private async drive(runId: string, repo: DeviceRepo, run: ActiveRun) {
-    const log = this.deps.log.child({ run_id: runId })
+    const log = this.deps.log.child({ run_id: runId }, { serializers: {
+      err: error => this.logError(runId, error),
+      stderr: value => typeof value === 'string' ? this.maskers.get(runId)?.text(value) ?? value : value,
+    } })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
     if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
@@ -1383,9 +1407,8 @@ export class RunSupervisor {
     const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
       () => this.deps.prepareRunToolApproval!(assignment, run.abort.signal, checkMailbox, worktree))
     run.toolApproval = toolApproval
-    // Register before an adapter can attach its cancellation callback. The
-    // 1s live gate may learn of a host revocation before the next heartbeat;
-    // preserve that cause before SIGTERM/SDK close races an exit event.
+    // Register before an adapter can attach its cancellation callback. Keep
+    // a known local lease revocation before SIGTERM/SDK close races an exit.
     toolApproval?.onRevoke(() => {
       if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
         && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
@@ -1599,7 +1622,7 @@ export class RunSupervisor {
         worktree,
       })
     }
-    if (run.cancelRequested) await this.requestCancel(run)
+    if (run.cancelRequested) await this.requestCancel(runId, run)
 
     const iterator = session.events()[Symbol.asyncIterator]()
     const aborted = abortPromise(run.abort.signal)

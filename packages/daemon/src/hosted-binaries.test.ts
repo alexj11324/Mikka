@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { hostedBinaries, readHostedCliManifest, type HostedCliManifest } from './hosted-binaries'
+import { HOSTED_CLI_MANIFEST, LEGACY_HOSTED_CLI_MANIFEST, hostedBinaries, readHostedCliManifest, type HostedCliManifest } from './hosted-binaries'
 import { cleanupTempDirs, tempDir } from '../test/helpers'
 
 afterEach(cleanupTempDirs)
@@ -60,4 +60,47 @@ it('uses a legacy image original PATH without implicitly finding the SDK bundled
     .toEqual({ claude_code: join(f.official, 'claude'), codex: join(f.official, 'codex') })
   rmSync(join(f.official, 'claude')); chmodSync(join(f.official, 'codex'), 0o600)
   expect(hostedBinaries(undefined, { path: f.official, manifestPath: missingManifest })).toEqual({})
+})
+
+it('follows the worker release symlink on activation and rollback before the legacy inventory', () => {
+  const f = fixture(), worker = join(f.root, 'worker')
+  const paths = [join(worker, '.mikka-original-cli.json'), f.manifestPath]
+  for (const version of ['old', 'new']) {
+    const release = join(f.root, version)
+    mkdirSync(release)
+    writeFileSync(join(release, '.mikka-original-cli.json'), JSON.stringify({ ...f.manifest,
+      original: { ...f.manifest.original, codex: null },
+      added: { codex: { path: `/opt/mikka/releases/${version}/bin/codex`, sha256: 'c'.repeat(64) } },
+    }))
+  }
+  const switchTo = (version: string) => {
+    rmSync(worker, { force: true }); symlinkSync(join(f.root, version), worker)
+  }
+  switchTo('old')
+  expect(readHostedCliManifest(paths)?.added.codex?.path).toBe('/opt/mikka/releases/old/bin/codex')
+  switchTo('new')
+  expect(readHostedCliManifest(paths)?.added.codex?.path).toBe('/opt/mikka/releases/new/bin/codex')
+  switchTo('old')
+  expect(readHostedCliManifest(paths)?.added.codex?.path).toBe('/opt/mikka/releases/old/bin/codex')
+  expect(HOSTED_CLI_MANIFEST).toBe('/opt/mikka/worker/.mikka-original-cli.json')
+  expect(LEGACY_HOSTED_CLI_MANIFEST).toBe('/opt/mikka/original-cli.json')
+})
+
+it('uses the legacy inventory only when the release has none, then the original PATH when both are absent', () => {
+  const f = fixture(), paths = [join(f.root, 'missing-release-manifest.json'), f.manifestPath]
+  expect(hostedBinaries(undefined, { manifestPath: paths, path: f.additions }))
+    .toEqual({ claude_code: join(f.official, 'claude'), codex: join(f.official, 'codex') })
+  rmSync(f.manifestPath)
+  expect(hostedBinaries(undefined, { manifestPath: paths, path: f.official }))
+    .toEqual({ claude_code: join(f.official, 'claude'), codex: join(f.official, 'codex') })
+})
+
+it('does not downgrade to legacy or PATH when the current release inventory or recorded CLI is broken', () => {
+  const f = fixture(), primary = join(f.root, 'release-manifest.json'), paths = [primary, f.manifestPath]
+  writeFileSync(primary, 'not json')
+  expect(() => hostedBinaries(undefined, { manifestPath: paths, path: f.official })).toThrow()
+  writeFileSync(primary, JSON.stringify({ ...f.manifest,
+    original: { ...f.manifest.original, claude_code: { path: join(f.root, 'missing-claude'), sha256: 'a'.repeat(64) } },
+  }))
+  expect(() => hostedBinaries(undefined, { manifestPath: paths, path: f.official })).toThrow('recorded_cli_unavailable')
 })

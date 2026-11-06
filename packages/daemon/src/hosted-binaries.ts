@@ -1,12 +1,14 @@
 // One selection rule for the production worker, model catalogue and release
 // gate. The template records which CLI bytes were present before installation.
 // Runtime reads only that small receipt; CI checksums the full binaries.
-import { accessSync, constants, existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { accessSync, constants, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { delimiter, isAbsolute } from 'node:path'
 import { z } from 'zod'
 import { findOnPath } from './path-search'
 
-export const HOSTED_CLI_MANIFEST = '/opt/mikka/original-cli.json'
+export const HOSTED_CLI_MANIFEST = '/opt/mikka/worker/.mikka-original-cli.json'
+export const LEGACY_HOSTED_CLI_MANIFEST = '/opt/mikka/original-cli.json'
+const MANIFEST_PATHS = [HOSTED_CLI_MANIFEST, LEGACY_HOSTED_CLI_MANIFEST] as const
 type Harness = 'claude_code' | 'codex'
 const binarySchema = z.object({ path: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 const manifestSchema = z.object({
@@ -16,9 +18,21 @@ const manifestSchema = z.object({
 }).strict()
 export type HostedCliManifest = z.infer<typeof manifestSchema>
 
-export function readHostedCliManifest(path = HOSTED_CLI_MANIFEST): HostedCliManifest | undefined {
-  if (!existsSync(path)) return undefined
-  const file = lstatSync(path)
+export function readHostedCliManifest(paths: string | readonly string[] = MANIFEST_PATHS): HostedCliManifest | undefined {
+  for (const path of typeof paths === 'string' ? [paths] : paths) {
+    const value = readManifest(path)
+    if (value) return value
+  }
+  return undefined
+}
+
+function readManifest(path: string): HostedCliManifest | undefined {
+  let file
+  try { file = lstatSync(path) }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw Error('hosted_cli_manifest_unavailable', { cause: error })
+  }
   if (!file.isFile() || file.size > 8192) throw Error('hosted_cli_manifest_invalid')
   const value = manifestSchema.parse(JSON.parse(readFileSync(path, 'utf8')))
   if ((value.kind === 'claude' && !value.original.claude_code) || (value.kind === 'codex' && !value.original.codex))
@@ -44,7 +58,7 @@ function executable(path: string | undefined): string | undefined {
  * recorded template selection may not be replaced by an accidental override.
  * Legacy unrecorded images use only their original PATH binaries; the SDK's
  * bundled Claude never silently substitutes for a missing official CLI. */
-export function hostedBinaries(passed?: Partial<Record<Harness, string>>, settings: { path?: string; manifestPath?: string } = {}): Partial<Record<Harness, string>> {
+export function hostedBinaries(passed?: Partial<Record<Harness, string>>, settings: { path?: string; manifestPath?: string | readonly string[] } = {}): Partial<Record<Harness, string>> {
   const manifest = readHostedCliManifest(settings.manifestPath)
   const path = settings.path ?? process.env.PATH ?? ''
   const selected: Partial<Record<Harness, string>> = {}

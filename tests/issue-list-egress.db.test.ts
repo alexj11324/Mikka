@@ -198,10 +198,33 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     const full = await measured(() => inWorkspace(workspaces[0], () => pollIssues()))
     assert.deepEqual(full.value.items?.map(row => row.id).sort(), [...firstWorkspace, personal, unlinked].sort())
     assert.ok(full.value.items?.filter(row => firstWorkspace.includes(row.id)).every(row => teams.slice(0, 2).includes(row.teamId!)))
+    assert.match(full.value.items?.find(row => row.id === unlinked)?.identifier ?? '', /^SCOP-[1-9][0-9]*$/, 'an unlinked workspace task keeps its owner number')
     const quiet = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version)))
     assert.ok('unchanged' in quiet.value && quiet.value.unchanged)
     assert.equal(quiet.value.items, undefined)
     t.diagnostic(JSON.stringify({ linkedTasks: 80, fullWorkspaceListBytes: full.bytes, unchangedWorkspaceListBytes: quiet.bytes }))
+
+    // The task documents stay unchanged when a team key changes. Both the
+    // overall cursor and each affected row must depend on the current key.
+    await pool.query('update mikka_teams set identifier=$2 where id=$1', [teams[0], 'RENAMED'])
+    const renamed = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version, full.value.positions)))
+    assert.notEqual(renamed.value.version, full.value.version)
+    assert.deepEqual(renamed.value.items?.map(row => row.id).sort(), firstWorkspace.filter((_, index) => index % 2 === 0).sort(), 'only the renamed team\'s task projections are sent')
+    assert.ok(renamed.value.items?.every(row => /^RENAMED-[1-9][0-9]*$/.test(row.identifier ?? '')))
+    assert.deepEqual(mergeList(full.value.items!, renamed.value), (await inWorkspace(workspaces[0], () => pollIssues())).items)
+    await pool.query('update mikka_teams set identifier=$2 where id=$1', [teams[0], 'EG0'])
+
+    // A removed and re-added team link gets a new number, even for the same
+    // team. Its row cursor cannot depend on teamId alone.
+    const changedNumberId = firstWorkspace[0]
+    const oldNumber = (await pool.query('select number from mikka_team_issues where "issueId"=$1', [changedNumberId])).rows[0].number
+    await pool.query('delete from mikka_team_issues where "issueId"=$1', [changedNumberId])
+    await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [changedNumberId, teams[0], workspaces[0], owner])
+    const renumbered = await inWorkspace(workspaces[0], () => pollIssues(full.value.version, full.value.positions))
+    assert.deepEqual(renumbered.items?.map(row => row.id), [changedNumberId])
+    assert.notEqual(renumbered.items?.[0].identifier, full.value.items?.find(row => row.id === changedNumberId)?.identifier)
+    await pool.query('update mikka_team_issues set number=$2 where "issueId"=$1', [changedNumberId, oldNumber])
+    t.diagnostic(JSON.stringify({ event: 'task_number_list_measurement', cold: readMetrics(full), unchanged: readMetrics(quiet), teamRename: readMetrics(renamed) }))
 
     const switched = await inWorkspace(workspaces[1], () => pollIssues(full.value.version))
     assert.deepEqual(switched.items?.map(row => row.id).sort(), [...secondWorkspace, personal, unlinked].sort())
@@ -238,6 +261,24 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     assert.ok(!('unchanged' in corrected), 'a concurrent relation edit is not acknowledged unseen')
     assert.equal(corrected.items?.find(row => row.id === firstWorkspace[2])?.teamId, teams[1])
 
+    // Identifier metadata keeps the same ACL and ordered page boundary even
+    // when a workspace has more than one 128-link page.
+    const { issueTeamScope } = await import('../lib/issue-team-access')
+    const extraIds = Array.from({ length: 70 }, () => randomUUID())
+    ids.push(...extraIds)
+    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) select id,$2,$3,$4,$5,$6,$7 from unnest($1::uuid[]) id',
+      [extraIds, owner, 'Paging fixture', content, 'todo', 'normal', 'workspace'])
+    await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") select id,$2,$3,$4 from unnest($1::uuid[]) id',
+      [extraIds, teams[0], workspaces[0], owner])
+    const plainLinks = await issueTeamScope(peer)
+    const numberedLinks = await issueTeamScope(peer, [], { withTaskNumbers: true })
+    assert.equal(numberedLinks.length, 150)
+    assert.deepEqual(numberedLinks.map(({ key: _key, number: _number, ...link }) => link), plainLinks,
+      'number metadata preserves every authorized link and its ordering across pages')
+    assert.ok(numberedLinks.every(link => /^EG[012]$/.test(link.key ?? '') && Number.isSafeInteger(link.number) && link.number! > 0))
+    await pool.query('delete from mikka_team_issues where "issueId"=any($1::uuid[])', [extraIds])
+    await pool.query('delete from issues where id=any($1::uuid[])', [extraIds])
+
     await pool.query('update mikka_team_issues set "teamId"=$2 where "issueId"=$1', [firstWorkspace[0], teams[1]])
     const moved = await inWorkspace(workspaces[0], () => pollIssues(full.value.version))
     assert.notEqual(moved.version, full.value.version, 'a relation change invalidates the snapshot')
@@ -251,8 +292,9 @@ test('workspace task polls keep permission reads bounded and recheck the next re
 
     // The list needs team identity and links, never long team descriptions.
     // Budgets include both PostgreSQL pools and every returned protocol byte.
-    assert.ok(full.bytes < 64_000, 'full workspace list exceeded 64 KB: ' + full.bytes)
-    assert.ok(quiet.bytes < 20_000, 'unchanged workspace list exceeded 20 KB: ' + quiet.bytes)
+    // Stay below the pre-number-metadata baseline (46 KB cold, 12.4 KB warm).
+    assert.ok(full.bytes < 44_000, 'full workspace list exceeded 44 KB: ' + full.bytes)
+    assert.ok(quiet.bytes < 12_000, 'unchanged workspace list exceeded 12 KB: ' + quiet.bytes)
   } finally {
     await pool.query('delete from mikka_team_issues where "issueId"=any($1::uuid[])', [ids])
     await pool.query('delete from issues where id=any($1::uuid[])', [ids])
@@ -260,5 +302,44 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     await pool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])', [workspaces])
     await pool.query('delete from mikka_workspaces where id=any($1::uuid[])', [workspaces])
     await pool.query('delete from "user" where id=any($1::text[])', [people])
+  }
+})
+
+test('singleton teams with long keys retain their task-list traffic budget', { skip: !enabled }, async t => {
+  const { pool } = await import('../lib/db')
+  const { actAs } = await import('../lib/acting-user')
+  const { pollIssues } = await import('../app/actions/issues')
+  const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
+  const owner = 'singleton-owner-' + randomUUID(), peer = 'singleton-peer-' + randomUUID()
+  const workspace = randomUUID(), teams = Array.from({ length: 20 }, () => randomUUID())
+  const ids = teams.map(() => randomUUID())
+  const read = (version?: string) => withActivitySession(peer, () => actAs(peer, () => pollIssues(version)), workspace) as Promise<Awaited<ReturnType<typeof pollIssues>>>
+  try {
+    for (const user of [owner, peer]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
+    await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,$3)', [workspace, owner, 'Singleton traffic fixture'])
+    for (const user of [owner, peer]) await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)', [workspace, user, user + '@example.invalid', user === owner ? 'admin' : 'member'])
+    for (const [index, team] of teams.entries()) {
+      const key = 'TEAM' + String(index).padStart(8, '0')
+      await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [team, workspace, owner, key, key])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)', [ids[index], owner, 'Task ' + index, '{"type":"doc","content":[]}', 'todo', 'normal', 'workspace'])
+      await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [ids[index], team, workspace, owner])
+    }
+    await read()
+    const cold = await measured(() => read())
+    assert.equal(cold.value.items?.length, 20)
+    const unchanged = await measured(() => read(cold.value.version))
+    assert.ok('unchanged' in unchanged.value && unchanged.value.unchanged)
+    t.diagnostic(JSON.stringify({ event: 'task_number_singleton_measurement', teams: 20, keyLength: 12, cold: readMetrics(cold), unchanged: readMetrics(unchanged) }))
+    // This shape has no repeated team UUID to amortize identifier metadata.
+    // The original two-column links cost 15.9 KB cold and 5.17 KB unchanged.
+    assert.ok(cold.bytes < 15_000, 'singleton-team list exceeded 15 KB: ' + cold.bytes)
+    assert.ok(unchanged.bytes < 5_000, 'unchanged singleton-team list exceeded 5 KB: ' + unchanged.bytes)
+  } finally {
+    await pool.query('delete from mikka_team_issues where "issueId"=any($1::uuid[])', [ids])
+    await pool.query('delete from issues where id=any($1::uuid[])', [ids])
+    await pool.query('delete from mikka_teams where id=any($1::uuid[])', [teams])
+    await pool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspace])
+    await pool.query('delete from mikka_workspaces where id=$1', [workspace])
+    await pool.query('delete from "user" where id=any($1::text[])', [[owner, peer]])
   }
 })

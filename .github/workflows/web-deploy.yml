@@ -18,6 +18,12 @@ on:
       runtime-template-models:
         type: string
         default: '{}'
+      runtime-template-ids:
+        type: string
+        default: '{}'
+      runtime-release-evidence:
+        type: string
+        default: '{}'
 permissions:
   contents: read
 jobs:
@@ -83,17 +89,18 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
-      - name: Publish the verified official runtime pair inside the deployment queue
+      - name: Publish the verified additive runtime pair inside the deployment queue
         if: inputs.runtime-refresh == true
         run: node scripts/e2b/publish-template-env.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          DESKTOP_TEMPLATE_ID: desktop
-          CLAUDE_TEMPLATE_ID: claude
-          CODEX_TEMPLATE_ID: codex
+          DESKTOP_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids).desktop }}
+          CLAUDE_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids).claude }}
+          CODEX_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids).codex }}
           SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
           MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
           TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
+          RUNTIME_RELEASE_EVIDENCE: ${{ inputs.runtime-release-evidence }}
       # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
       # Infisical source Vercel production is synced from; the next step fills only
       # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.

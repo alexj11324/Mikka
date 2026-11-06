@@ -1,6 +1,6 @@
 #!/bin/bash
-# Add Mikka to a new official E2B instance. Never build/update a template or
-# overwrite/remove official packages, system files or the original CLI tree.
+# Add Mikka to an official E2B base, during a derived template build or instance
+# fallback. Never overwrite/remove official packages, system files or CLI trees.
 set -euo pipefail
 # Fixed, secret-free receipts; no extra process or installation work.
 mikka_phase_started=${EPOCHREALTIME/./}
@@ -68,12 +68,10 @@ ln -s node-v24.19.0-linux-x64 /opt/mikka/runtime/node
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 mkdir -p /opt/mikka/runtime/bootstrap-home /opt/mikka/runtime/harness-bin
 mikka_phase_done node
-if ! command -v gh >/dev/null; then
-  curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
-  echo 'ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e  /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz' | sha256sum --check --strict
-  tar -xzf /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz -C /opt/mikka/runtime
-  ln -s /opt/mikka/runtime/gh_2.83.2_linux_amd64/bin/gh /opt/mikka/runtime/harness-bin/gh
-fi
+curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
+echo 'ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e  /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz' | sha256sum --check --strict
+tar -xzf /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz -C /opt/mikka/runtime
+ln -s /opt/mikka/runtime/gh_2.83.2_linux_amd64/bin/gh /opt/mikka/runtime/harness-bin/gh
 mikka_phase_done gh
 fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH

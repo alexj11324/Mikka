@@ -28,7 +28,9 @@
       "settingsList": "Resize settings list",
       "groupPanel": "Resize right panel",
       "browser": "Resize browser"
-    }
+    },
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "Issue": {
     "scope": {
@@ -3904,8 +3906,12 @@
       "routingDifficulty": {
         "easy": "Easy",
         "medium": "Medium",
-        "hard": "Hard",
-        "unknown": "Difficulty not assessed"
+        "hard": "Hard"
+      },
+      "routingTier": {
+        "light": "Light model",
+        "standard": "Standard model",
+        "strongest": "Strongest model"
       },
       "routingEffort": {
         "low": "Low reasoning effort",
@@ -3915,16 +3921,18 @@
         "max": "Maximum reasoning effort"
       },
       "routingReasons": {
-        "difficulty_fit": "Selected by task difficulty",
+        "difficulty_fit": "Selected by the model strength the task needs",
         "list_order": "Selected in model list order",
-        "low_confidence": "Difficulty was uncertain; used model list order",
-        "decision_unavailable": "Difficulty assessment was unavailable; used model list order",
-        "invalid_answer": "Difficulty assessment was invalid; used model list order",
+        "low_confidence": "Model strength was uncertain; used model list order",
+        "decision_unavailable": "Model strength assessment was unavailable; used model list order",
+        "invalid_answer": "Model strength assessment was invalid; used model list order",
         "no_selection": "No suitable model was selected; used model list order",
         "escalated": "The previous model could not finish the task; retried with a stronger model"
       }
     },
-    "errorDetails": "Details"
+    "errorDetails": "Details",
+    "fullInstructions": "View full instructions",
+    "hideInstructions": "Hide full instructions"
   },
   "Computer": {
     "status": {

@@ -866,7 +866,7 @@ export class ClaudeAdapter implements AgentAdapter {
         throw new Error(externalAuth ? SUBSCRIPTION_ERROR : 'Original Claude question session is unavailable; refusing a fresh session')
       }
       log.info(
-        { stderr: stderrTail() },
+        { stderr: redactDiagnostic(stderrTail(), secrets) },
         "could not continue the earlier claude session; starting a new one",
       )
       // Close the failed transport and its pending callbacks. The same live

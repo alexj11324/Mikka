@@ -1793,7 +1793,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
         assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId)
         assert.equal(input.task.candidateId, reviewAttempt.candidateId)
-        assert.deepEqual(JSON.parse(input.acceptanceReference.originalTask.content), contractDocument)
+        // The database adds the task's number to its document; the contract text is unchanged.
+        assert.deepEqual(JSON.parse(input.acceptanceReference.originalTask.content).content, contractDocument.content)
         assert.equal(input.acceptanceReference.currentOwnerRequest, expectedOwnerRequest, 'reuse the receipt-bound Owner answer already used by this candidate')
         assert.equal(JSON.stringify(input.task).includes(producerContract), false)
         assert.equal(JSON.stringify(input.task).includes(answer.text), false)

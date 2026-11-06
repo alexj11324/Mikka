@@ -24,7 +24,7 @@ import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
-import { runPrompt } from '@/lib/run-prompt'
+import { runPromptParts } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
@@ -253,7 +253,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   const repo = internal?.repo ?? await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
   const runId = crypto.randomUUID()
   const instructions = [agent.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
-  const prompt = runPrompt(issue.title, tiptapToText(issue.content), instructions, parsed.data.note)
+  const { prompt, taskLength: promptTaskLength } = runPromptParts(issue.title, tiptapToText(issue.content), instructions, parsed.data.note)
   const captureDefinition = true
   const query = internal?.client ?? pool
   const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId
@@ -285,7 +285,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */

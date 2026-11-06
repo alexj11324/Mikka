@@ -3,7 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
-import { runControlChanged } from '@/lib/device-gateway-notify'
+import { runPolicyStopSQL, notifyStoppedPolicyRuns, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 import { issues, issueVersions, teamIssuePromotions } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teams, teamIssues, teamIssuePromotionReceipts, teamProjects } from '@/lib/db/team-schema'
@@ -97,8 +97,10 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
         await documentScopeChanged(tx, saved.id, previousScopes)
         await issueListScopeChanged(tx, issueId, previousLists)
-        // A task's scope is part of its runs' policy revision.
-        runControlChanged(tx, { userId })
+        // A scope change stops this task's admitted direct runner. Other
+        // tasks owned by the person keep their machines and credentials.
+        const stopped = await tx.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId }))
+        notifyStoppedPolicyRuns(tx, stopped.rows)
         return { issue: await issueView(saved, tx), linearSync: syncResult }
       })
     })
