@@ -15,6 +15,55 @@ import { sweepFactoryWatchdog, type WatchdogDependencies } from './watchdog'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 process.env.MIKKA_BYOS_ENABLED = '1'
 
+test('handoff batches its bounded history without changing the existing Date and digest receipt', async () => {
+  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const task: FactoryTask = {
+    id: id(1), userId: 'handoff-owner', botId: null, issueId: id(2), scopeVersion: null,
+    sourceEventId: id(3), stage: 'execute', status: 'pending', revision: 3, attemptId: id(4), candidateId: id(5), reason: 'Continue',
+    route: { issueId: id(2), eventId: id(6), sourceEventId: id(3), rationale: 'Owner request', missingInformation: [], missingPermissions: [], needsSpec: false },
+  }
+  // These are the pg results before batching. PostgreSQL text retains both the
+  // offset and sub-millisecond fraction; the existing pg Date does not.
+  const timestamp = '2026-11-06 23:59:59.123456+05:30'
+  const date = new Date('2026-11-06T18:29:59.123Z')
+  const history = {
+    source: [{ id: task.sourceEventId, createdAt: date, text: 'Retain the exact output', title: 'Task', content: { type: 'doc', content: [] } }],
+    attempts: [{ id: id(7), stage: 'execute', status: 'passed', runId: id(8), reason: 'Done', candidateId: id(5), requestEpoch: id(9),
+      finishedAt: date, runStatus: 'succeeded', stopReason: 'submitted', error: null, deviceId: id(10), sessionId: 'fixture-session',
+      sha: 'a'.repeat(40), repository: 'fixture/repository', environment: 'test', candidateCreatedAt: date,
+      checkpointCommit: 'b'.repeat(40), checkpointAt: date, checkpointFiles: 2, unavailableReason: null }],
+    effects: [{ id: id(11), status: 'uncertain', action: 'merge', target: 'fixture-target',
+      receipt: { updatedAt: timestamp, nested: { finishedAt: timestamp }, note: 'x'.repeat(10001) }, candidateId: id(5), finishedAt: null }],
+    publications: [{ runId: id(8), status: 'processing', remoteKey: 'fixture/repository', branch: 'fixture-branch',
+      pullRequest: { number: 1, updatedAt: timestamp }, errorCode: null, updatedAt: date }],
+    operations: [{ operationId: id(12), status: 'uncertain', runId: id(8), action: 'fixture_observation', target: null, receipt: null, updatedAt: date }],
+    dependencies: [{ id: id(13), status: 'open', originRunId: id(8), kind: 'context' }],
+  }
+  const asWire = (rows: Record<string, unknown>[]) => rows.map(row => Object.values(row).map(value => value instanceof Date ? timestamp : value))
+  const batch = { source: asWire(history.source)[0], attempts: asWire(history.attempts), effects: asWire(history.effects),
+    publications: asWire(history.publications), operations: asWire(history.operations), dependencies: asWire(history.dependencies) }
+  let reads = 0
+  const writes: unknown[][] = []
+  const query = async (sql: string, values: unknown[]) => {
+    if (sql.startsWith('INSERT INTO factory_events')) { writes.push(values); return { rows: [] } }
+    reads++
+    return { rows: structuredClone(sql.includes('AS source') ? [batch] : Object.values(history)[reads - 1]) }
+  }
+  const handoff = await persistFactoryHandoff({ query: query as PoolClient['query'] }, task)
+  // Captured from the six-read implementation: field order, nulls, masking,
+  // truncation, embedded JSON and timestamp precision all affect this digest.
+  assert.equal(handoff.digest, '7ce1b343a988b179b4782da14fb9574426ea99213c0625ef041b8df9502bb6ad')
+  assert.equal(handoff.goal.recordedAt, date.toISOString())
+  assert.equal(handoff.checkpoint?.storedAt, date.toISOString())
+  assert.equal(handoff.externalEffects.publications[0].updatedAt, date.toISOString())
+  assert.equal(handoff.externalEffects.effects[0].finishedAt, null)
+  assert.equal(handoff.externalEffects.effects[0].receipt.updatedAt, timestamp, 'receipt strings are not database Date columns')
+  assert.equal(handoff.externalEffects.effects[0].receipt.note.length, 10000)
+  assert.equal(writes.length, 1)
+  assert.equal(JSON.parse(writes[0][2] as string).digest, handoff.digest)
+  assert.equal(reads, 1, 'one database read replaces the six serial history reads')
+})
+
 test('PG: request epochs, stale completion fences and unattended handoff are durable', { skip: !dbUrl, timeout: 120000 }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 8 })
   const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
@@ -139,7 +188,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     assert.equal(wakes, 1)
     assert.equal(dispatches, 0)
   })
-  await t.test('an older uncertain receipt survives a full handoff window and blocks lease recovery', async () => {
+  await t.test('an older uncertain receipt survives a full handoff window and blocks lease recovery', async t => {
     const task = await fixture()
     const pending = await advance(task, await followup(task, 'Continue the same work'))
     const operationId = randomUUID()
@@ -153,6 +202,16 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
         VALUES($1,$2,$3,$4,$5,'succeeded',$6,$7,$8)`, [completedId, owner, workspace.id,
         JSON.stringify({ executionRunId: task.runId, action: 'fixture_observation' }), `continuity:${completedId}`, randomUUID(), task.runId, JSON.stringify({ reference: `synthetic-receipt-${index}` })])
     }
+    // These newer unresolved rows would outrank the legitimate receipt if the
+    // combined read lost either its owner or its task/run predicate.
+    const foreign = await fixture()
+    const excludedIds = [randomUUID(), randomUUID()]
+    t.after(async () => { await pool.query('DELETE FROM operation_ledger WHERE "operationId"=ANY($1::uuid[])', [excludedIds]) })
+    for (const [index, other] of [{ owner: `${owner}-other`, runId: task.runId }, { owner, runId: foreign.runId }].entries()) {
+      await pool.query(`INSERT INTO operation_ledger("operationId","ownerId","workspaceId",binding,"idempotencyKey",status,"attemptToken","runId")
+        VALUES($1,$2,$3,$4,$5,'uncertain',$6,$7)`, [excludedIds[index], other.owner, workspace.id,
+        JSON.stringify({ executionRunId: other.runId, action: 'fixture_observation' }), `continuity:${excludedIds[index]}`, randomUUID(), other.runId])
+    }
     const leaseRecovery = await factoryRecoveryHandoff(pool, { id: task.runId, userId: owner }, 'Resume the current request.')
     assert.match(leaseRecovery.blocked ?? '', /Reconcile its existing receipt/)
     await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [task.id])
@@ -161,10 +220,16 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     assert.equal(dispatches, count)
     assert.equal((await pool.query('SELECT status FROM operation_ledger WHERE "operationId"=$1', [operationId])).rows[0].status, 'uncertain')
     assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [task.id])).rows[0].status, 'blocked')
-    const handoff = await persistFactoryHandoff(pool, pending)
+    let reads = 0
+    const query = async (sql: string, values: unknown[]) => { if (sql.startsWith('SELECT')) reads++; return pool.query(sql, values) }
+    const handoff = await persistFactoryHandoff({ query: query as PoolClient['query'] }, pending)
+    assert.equal(reads, 1, 'real PostgreSQL executes one bounded history read')
     assert.equal(handoff.externalEffects.operations.length, 20, 'handoff remains bounded without hiding unresolved effects')
     assert.equal(handoff.externalEffects.operations[0].operationId, operationId)
     assert.equal(handoff.externalEffects.operations[0].status, 'uncertain')
+    assert.ok(handoff.externalEffects.operations.every(row => !excludedIds.includes(row.operationId)))
+    const { rows: [originalReceipt] } = await pool.query('SELECT "updatedAt" FROM operation_ledger WHERE "operationId"=$1', [operationId])
+    assert.equal(handoff.externalEffects.operations[0].updatedAt, originalReceipt.updatedAt.toISOString())
   })
   await t.test('missing executor admission has bounded, backoff-protected recovery', async () => {
     const task = await fixture()

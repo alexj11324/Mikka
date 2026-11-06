@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { deploymentSwitch } from '../deployment-switches'
-import type { Pool, PoolClient } from 'pg'
+import { types, type Pool, type PoolClient, type QueryResultRow } from 'pg'
 import type { FactoryTask } from './store'
 import { factoryEventId } from './event-id'
 import { maskFactoryNote } from './note-mask'
@@ -11,6 +11,17 @@ function sanitize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitize)
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitize(entry)]))
   return value
+}
+
+function restoreDateColumns(rows: QueryResultRow[], fields: string[]) {
+  const parse = types.getTypeParser(types.builtins.TIMESTAMPTZ)
+  for (const row of rows) for (const field of fields) {
+    if (typeof row[field] === 'string') row[field] = parse(row[field])
+  }
+}
+
+function decodeRows(rows: unknown[][], fields: string[]): QueryResultRow[] {
+  return rows.map(row => Object.fromEntries(fields.map((field, index) => [field, row[index]])))
 }
 
 /** Copy approved planning evidence, never the planner's session or permissions. */
@@ -42,29 +53,61 @@ async function approvedSpecificationHandoff(tx: Pick<PoolClient, 'query'>, task:
 /** A handoff is a reproducible host observation, never acceptance or authority.
  * No checkpoint bytes, secrets or native session state are copied into it. */
 export async function persistFactoryHandoff(tx: Pick<PoolClient, 'query'>, task: FactoryTask) {
-  const { rows: [source] } = await tx.query(`SELECT e.id,e."createdAt",e.payload->>'text' AS text,i.title,i.content
-    FROM coordinator_events e JOIN issues i ON i.id=$3 WHERE e.id=$1 AND e."userId"=$2`, [task.sourceEventId, task.userId, task.issueId])
-  const { rows: attempts } = await tx.query(`SELECT a.id,a.stage,a.status,a."runId",a.reason,a."candidateId",a.output->>'requestEpoch' AS "requestEpoch",
-    a."finishedAt",r.status AS "runStatus",r."stopReason",r.error,r."deviceId",r."sessionId",
-    c.sha,c.repository,c.environment,c."createdAt" AS "candidateCreatedAt",
-    cp."baseCommit" AS "checkpointCommit",cp."updatedAt" AS "checkpointAt",cp.files AS "checkpointFiles",cp."unavailableReason"
-    FROM factory_attempts a LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2 AND r."issueId"=$3
-    LEFT JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
-    LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=$2
-    WHERE a."taskId"=$1 ORDER BY a.position DESC LIMIT 20`, [task.id, task.userId, task.issueId])
-  const { rows: effects } = await tx.query(`SELECT id,status,action,target,receipt,"candidateId","finishedAt"
-    FROM factory_publications WHERE "taskId"=$1 ORDER BY (status IN ('reserved','uncertain')) DESC,"createdAt" DESC LIMIT 20`, [task.id])
-  const { rows: publications } = await tx.query(`SELECT p."runId",p.status,p."remoteKey",p.branch,p."pullRequest",p."errorCode",p."updatedAt"
-    FROM run_publications p WHERE p."userId"=$2 AND p."issueId"=$3
-      AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1 AND a."runId"=p."runId")
-    ORDER BY (p.status='processing') DESC,p."updatedAt" DESC LIMIT 20`, [task.id, task.userId, task.issueId])
-  const { rows: operations } = await tx.query(`SELECT o."operationId",o.status,o."runId",o.binding->>'action' AS action,
-    o.binding->>'target' AS target,o.receipt,o."updatedAt" FROM operation_ledger o WHERE o."ownerId"=$2
-      AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1
-        AND (a."runId"=o."runId" OR a."runId"::text=o.binding->>'executionRunId'))
-    ORDER BY (o.status IN ('executing','uncertain')) DESC,o."updatedAt" DESC LIMIT 20`, [task.id, task.userId])
-  const { rows: dependencies } = await tx.query(`SELECT id,status,"originRunId",kind FROM factory_questions
-    WHERE "taskId"=$1 AND "userId"=$2 AND status NOT IN ('resolved','cancelled','expired','superseded') ORDER BY "createdAt" DESC LIMIT 10`, [task.id, task.userId])
+  // One snapshot/round trip for the same bounded observations. Compact row
+  // arrays avoid repeating column names in every history entry; decode them in
+  // the original SELECT order to preserve the digest. Timestamp text goes
+  // through pg's original parser; nested receipt JSON stays untouched.
+  const { rows: [history] } = await tx.query<{
+    source: unknown[] | null; attempts: unknown[][]; effects: unknown[][];
+    publications: unknown[][]; operations: unknown[][]; dependencies: unknown[][];
+  }>(`SELECT
+    (SELECT json_build_array(e.id,e."createdAt"::text,e.payload->>'text',i.title,i.content)
+      FROM coordinator_events e JOIN issues i ON i.id=$3 WHERE e.id=$4 AND e."userId"=$2
+    ) AS source,
+    (SELECT COALESCE(json_agg(a.entry),'[]'::json) FROM (
+      SELECT json_build_array(a.id,a.stage,a.status,a."runId",a.reason,a."candidateId",a.output->>'requestEpoch',
+        a."finishedAt"::text,r.status,r."stopReason",r.error,r."deviceId",r."sessionId",
+        c.sha,c.repository,c.environment,c."createdAt"::text,
+        cp."baseCommit",cp."updatedAt"::text,cp.files,cp."unavailableReason") AS entry
+      FROM factory_attempts a LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2 AND r."issueId"=$3
+      LEFT JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
+      LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=$2
+      WHERE a."taskId"=$1 ORDER BY a.position DESC LIMIT 20
+    ) a) AS attempts,
+    (SELECT COALESCE(json_agg(e.entry),'[]'::json) FROM (
+      SELECT json_build_array(id,status,action,target,receipt,"candidateId","finishedAt"::text) AS entry
+      FROM factory_publications WHERE "taskId"=$1 ORDER BY (status IN ('reserved','uncertain')) DESC,"createdAt" DESC LIMIT 20
+    ) e) AS effects,
+    (SELECT COALESCE(json_agg(p.entry),'[]'::json) FROM (
+      SELECT json_build_array(p."runId",p.status,p."remoteKey",p.branch,p."pullRequest",p."errorCode",p."updatedAt"::text) AS entry
+      FROM run_publications p WHERE p."userId"=$2 AND p."issueId"=$3
+        AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1 AND a."runId"=p."runId")
+      ORDER BY (p.status='processing') DESC,p."updatedAt" DESC LIMIT 20
+    ) p) AS publications,
+    (SELECT COALESCE(json_agg(o.entry),'[]'::json) FROM (
+      SELECT json_build_array(o."operationId",o.status,o."runId",o.binding->>'action',
+        o.binding->>'target',o.receipt,o."updatedAt"::text) AS entry FROM operation_ledger o WHERE o."ownerId"=$2
+        AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1
+          AND (a."runId"=o."runId" OR a."runId"::text=o.binding->>'executionRunId'))
+      ORDER BY (o.status IN ('executing','uncertain')) DESC,o."updatedAt" DESC LIMIT 20
+    ) o) AS operations,
+    (SELECT COALESCE(json_agg(q.entry),'[]'::json) FROM (
+      SELECT json_build_array(id,status,"originRunId",kind) AS entry FROM factory_questions
+      WHERE "taskId"=$1 AND "userId"=$2 AND status NOT IN ('resolved','cancelled','expired','superseded') ORDER BY "createdAt" DESC LIMIT 10
+    ) q) AS dependencies`, [task.id, task.userId, task.issueId, task.sourceEventId])
+  const [source] = decodeRows(history.source ? [history.source] : [], ['id', 'createdAt', 'text', 'title', 'content'])
+  const attempts = decodeRows(history.attempts, ['id', 'stage', 'status', 'runId', 'reason', 'candidateId', 'requestEpoch', 'finishedAt',
+    'runStatus', 'stopReason', 'error', 'deviceId', 'sessionId', 'sha', 'repository', 'environment', 'candidateCreatedAt',
+    'checkpointCommit', 'checkpointAt', 'checkpointFiles', 'unavailableReason'])
+  const effects = decodeRows(history.effects, ['id', 'status', 'action', 'target', 'receipt', 'candidateId', 'finishedAt'])
+  const publications = decodeRows(history.publications, ['runId', 'status', 'remoteKey', 'branch', 'pullRequest', 'errorCode', 'updatedAt'])
+  const operations = decodeRows(history.operations, ['operationId', 'status', 'runId', 'action', 'target', 'receipt', 'updatedAt'])
+  const dependencies = decodeRows(history.dependencies, ['id', 'status', 'originRunId', 'kind'])
+  restoreDateColumns(source ? [source] : [], ['createdAt'])
+  restoreDateColumns(attempts, ['finishedAt', 'candidateCreatedAt', 'checkpointAt'])
+  restoreDateColumns(effects, ['finishedAt'])
+  restoreDateColumns(publications, ['updatedAt'])
+  restoreDateColumns(operations, ['updatedAt'])
   const latest = attempts.find(a => a.runId)
   const artifact = attempts.find(a => a.sha)
   const checkpoint = attempts.find(a => a.checkpointAt)

@@ -409,25 +409,80 @@ def cleanup_templates(candidates, api_key, request=None):
     return receipts
 
 
-def probe_models(template_id, kind, api_key, sandbox_factory=None):
-    """Read the built image's actual CLI catalogues, never a handwritten model list."""
+def validate_model_receipt(receipt, source_commit, worker_sha, manifest, kind):
+    """Bind the completed anonymous probe to this immutable release and CLI selection."""
+    if (not isinstance(receipt, dict)
+            or set(receipt) != {'version', 'sourceCommit', 'workerSha', 'manifest', 'binaries', 'reports'}
+            or type(receipt.get('version')) is not int or receipt['version'] != 1
+            or receipt.get('sourceCommit') != source_commit or receipt.get('workerSha') != worker_sha):
+        raise RuntimeError('model_receipt_identity_invalid')
+    official_files_guard().validate_cli_manifest(manifest, kind)
+    if (type(manifest['version']) is not int
+            or json.dumps(receipt['manifest'], sort_keys=True) != json.dumps(manifest, sort_keys=True)):
+        raise RuntimeError('model_receipt_manifest_mismatch')
+    selected = {harness: binary['path'] for harness in ('claude_code', 'codex')
+                if (binary := manifest['original'][harness] or manifest['added'].get(harness))}
+    if not selected or receipt['binaries'] != selected:
+        raise RuntimeError('model_receipt_selection_mismatch')
+    reports = receipt['reports']
+    if not isinstance(reports, list) or len(reports) != len(selected):
+        raise RuntimeError('model_receipt_reports_invalid')
+    seen = set()
+    required_fields = {'harness', 'installed', 'version', 'models', 'modelSlots'}
+    def text(value, limit):
+        return isinstance(value, str) and 0 < len(value) <= limit and value.strip() == value
+    for row in reports:
+        if (not isinstance(row, dict) or not required_fields.issubset(row)
+                or set(row) - (required_fields | {'defaultModelSlot'})
+                or not isinstance(row['harness'], str) or row['harness'] not in selected or row['harness'] in seen
+                or row['installed'] is not True or row['version'] is not None):
+            raise RuntimeError('model_receipt_reports_invalid')
+        models, slots = row['models'], row['modelSlots']
+        if (not isinstance(models, list) or not 0 < len(models) <= 500
+                or not all(text(model, 128) and model != 'auto' for model in models)
+                or len(set(models)) != len(models) or not isinstance(slots, list) or len(slots) != len(models)):
+            raise RuntimeError('model_receipt_reports_invalid')
+        for model, slot in zip(models, slots):
+            if (not isinstance(slot, dict) or set(slot) != {'slot', 'model', 'name'} or slot['slot'] != model
+                    or not text(slot['model'], 128) or not text(slot['name'], 200)):
+                raise RuntimeError('model_receipt_reports_invalid')
+        if 'defaultModelSlot' in row and row['defaultModelSlot'] not in models:
+            raise RuntimeError('model_receipt_reports_invalid')
+        seen.add(row['harness'])
+    required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
+    if any(harness not in seen for harness in required):
+        raise RuntimeError('model_receipt_required_harness_missing')
+    return [row for row in reports if row['harness'] in required]
+
+
+def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_factory=None):
+    """Read the real probe that made the snapshot ready; never launch a second cold worker."""
+    if (not re.fullmatch(r'[a-f0-9]{40}', source_commit) or not re.fullmatch(r'[a-f0-9]{40}', worker_sha)
+            or kind not in KINDS):
+        raise ValueError('model_receipt_expected_identity_invalid')
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
-    required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
     try:
-        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
-        if result.exit_code != 0:
-            raise RuntimeError('model_probe_failed')
-        reports = json.loads(result.stdout)
-        if not isinstance(reports, list):
-            raise RuntimeError('model_probe_invalid')
-        for harness in required:
-            found = next((row for row in reports if isinstance(row, dict) and row.get('harness') == harness and row.get('installed') is True), None)
-            if not found or not (found.get('models') or found.get('modelSlots')):
-                raise RuntimeError(f'model_probe_missing {harness}')
-        return [row for row in reports if row.get('harness') in required]
+        path = '/home/user/.mikka/preloaded-models.json'
+        # No identity has been handed to this disposable instance. Check that
+        # the writer is still the anonymous, ready process before trusting its
+        # private read-only receipt. Full fresh-image conservation follows.
+        result = sandbox.commands.run(ANONYMOUS_WORKER_READY +
+            ' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json' +
+            f' && test -f {path} && test ! -L {path} && test ! -w {path}' +
+            f' && test "$(stat -c %u {path})" = "$(id -u)" && readlink -f /opt/mikka/worker', user='user', timeout=45)
+        if result.exit_code != 0 or result.stdout.strip() != f'/opt/mikka/releases/{source_commit}/source':
+            raise RuntimeError('model_receipt_worker_not_ready')
+        installed_sha = sandbox.files.read('/opt/mikka/worker-source-sha', user='user', request_timeout=30).strip()
+        if installed_sha != worker_sha:
+            raise RuntimeError('model_receipt_worker_mismatch')
+        manifest = json.loads(sandbox.files.read('/opt/mikka/worker/.mikka-original-cli.json', user='user', request_timeout=30))
+        raw = sandbox.files.read(path, user='user', request_timeout=30)
+        if len(raw) > 1_048_576:
+            raise RuntimeError('model_receipt_too_large')
+        return validate_model_receipt(json.loads(raw), source_commit, worker_sha, manifest, kind)
     finally:
         # This probe created this disposable sandbox; no existing worker is touched.
         sandbox.kill()
@@ -546,6 +601,7 @@ def main(argv=None):
         parser.error('--name is required to build')
     kinds = list(dict.fromkeys(args.kind or KINDS))
     sha = commit(args.source_ref)
+    worker_sha = worker_hash(sha)
     # Confirm absence before claiming cleanup ownership. A manual collision
     # must never turn into deletion of a previous candidate.
     candidates = [{'kind': kind, 'name': f'{args.name}-{kind}'} for kind in kinds]
@@ -558,7 +614,7 @@ def main(argv=None):
         _, result = build(name, sha, api_key=api_key, on_build_logs=logs, kind=kind)
         entry = {'templateId': result.template_id, 'buildId': result.build_id, 'name': name,
                  'baseTemplate': kind, 'preinstalled': True}
-        entry['models'] = probe_models(result.template_id, kind, api_key)
+        entry['models'] = probe_models(result.template_id, kind, api_key, sha, worker_sha)
         entry['conservation'] = probe_conservation(result.template_id, api_key, kind)
         return kind, entry
 
@@ -571,7 +627,7 @@ def main(argv=None):
         cleanup = cleanup_templates(candidates, api_key)
         print('mikka-template-cleanup ' + json.dumps(cleanup, separators=(',', ':')), file=sys.stderr, flush=True)
         raise
-    out = {'sourceCommit': sha, 'workerSha': worker_hash(sha), 'templates': templates}
+    out = {'sourceCommit': sha, 'workerSha': worker_sha, 'templates': templates}
     if args.json:
         print(json.dumps(out))
     else:

@@ -1,4 +1,5 @@
-import { chmodSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { preloadCloudWorker } from '../src/cloud-bootstrap'
@@ -6,7 +7,21 @@ import { probeHostedRuntimeModels, reusableHostedModels } from '../src/cloud-mod
 import { Daemon } from '../src/main'
 import { RpcServer } from '../src/rpc/server'
 import { MemoryServer } from '../src/server-link'
+import * as fsUtil from '../src/fs-util'
 import { cleanupTempDirs, tempDir, waitFor } from './helpers'
+
+const identity = { sourceCommit: 'a'.repeat(40), workerSha: 'b'.repeat(40) }
+
+async function receiptProbe(binaries: Partial<Record<'codex' | 'claude_code', string>>) {
+  const probe = await probeHostedRuntimeModels(binaries)
+  return { ...probe, manifest: { version: 1 as const, kind: 'desktop' as const,
+    original: Object.fromEntries(['claude_code', 'codex'].map(harness => {
+      const path = binaries[harness as keyof typeof binaries]
+      return [harness, path ? { path, sha256: createHash('sha256').update(readFileSync(path)).digest('hex') } : null]
+    })) as { claude_code: { path: string; sha256: string } | null; codex: { path: string; sha256: string } | null },
+    added: {},
+  } }
+}
 
 const daemons: Daemon[] = []
 afterEach(async () => {
@@ -47,14 +62,41 @@ process.once('exit', () => clearInterval(timer))
   return { binary, started, calls: () => existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n').length : 0 }
 }
 
-function active(pid: number) {
+function active(pid: number, readState = () => readFileSync(`/proc/${pid}/stat`, 'utf8')) {
+  // A container's /proc view can retain a readable entry after this PID has
+  // exited in the caller's process namespace. Check that namespace first.
+  try { process.kill(pid, 0) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false; throw error }
   try {
     // Orphan zombies can await the test container's init reaper, but cannot
     // execute or hold the anonymous CLI's pipes/configuration open.
-    if (process.platform === 'linux') return !/\) [ZX] /.test(readFileSync(`/proc/${pid}/stat`, 'utf8'))
-    process.kill(pid, 0); return true
-  } catch { return false }
+    if (process.platform === 'linux') return !/\) [ZX] /.test(readState())
+    return true
+  } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error }
 }
+
+it('checks the caller PID namespace before trusting a surviving proc entry and preserves observation errors', () => {
+  const state = vi.fn(() => '77 (node) S 1 1 ')
+  const kill = vi.spyOn(process, 'kill').mockImplementation(() => { throw Object.assign(new Error('gone'), { code: 'ESRCH' }) })
+  expect(active(77, state)).toBe(false)
+  expect(kill).toHaveBeenCalledWith(77, 0)
+  expect(state).not.toHaveBeenCalled()
+  const denied = Object.assign(new Error('denied'), { code: 'EPERM' })
+  kill.mockImplementation(() => { throw denied })
+  expect(() => active(77, state)).toThrow(denied)
+  expect(state).not.toHaveBeenCalled()
+  kill.mockReturnValue(true)
+  expect(active(77, state)).toBe(true)
+  if (process.platform === 'linux') {
+    state.mockReturnValue('77 (node) Z 1 1 ')
+    expect(active(77, state)).toBe(false)
+    state.mockImplementation(() => { throw Object.assign(new Error('gone'), { code: 'ENOENT' }) })
+    expect(active(77, state)).toBe(false)
+    const io = Object.assign(new Error('failed to inspect'), { code: 'EIO' })
+    state.mockImplementation(() => { throw io })
+    expect(() => active(77, state)).toThrow(io)
+  }
+})
 
 it('probes both official selections concurrently without credentials, then marks ready only after their groups exit', async () => {
   const root = tempDir(), directory = tempDir()
@@ -62,15 +104,33 @@ it('probes both official selections concurrently without credentials, then marks
   vi.stubEnv('ANTHROPIC_API_KEY', 'must-not-enter-snapshot'); vi.stubEnv('GH_TOKEN', 'must-not-enter-probe')
   let accepted: unknown
   const failed = vi.fn()
+  const atomicWrite = fsUtil.writeFileAtomic
+  const record = vi.spyOn(fsUtil, 'writeFileAtomic').mockImplementation((file, data, mode) => {
+    expect(file).toBe(join(directory, 'preloaded-models.json'))
+    expect(existsSync(join(directory, 'preloaded.pid'))).toBe(false)
+    for (const fixture of [codex, claude]) expect(active(JSON.parse(readFileSync(fixture.started, 'utf8')).pid)).toBe(false)
+    expect(active(Number(readFileSync(join(root, 'codex.child'), 'utf8')))).toBe(false)
+    atomicWrite(file, data, mode)
+  })
   const started = preloadCloudWorker(directory, async models => { accepted = models }, failed,
-    () => probeHostedRuntimeModels({ codex: codex.binary, claude_code: claude.binary }))
+    () => receiptProbe({ codex: codex.binary, claude_code: claude.binary }), () => identity)
   await waitFor(() => existsSync(codex.started) && existsSync(claude.started))
   expect(existsSync(join(directory, 'preloaded.pid'))).toBe(false)
   expect(readdirSync(directory)).toEqual([])
   writeFileSync(join(root, 'release'), '')
   const close = await started
   try {
+    expect(record).toHaveBeenCalledTimes(1)
     expect(readFileSync(join(directory, 'preloaded.pid'), 'utf8')).toBe(`${process.pid}\n`)
+    const catalogue = join(directory, 'preloaded-models.json')
+    expect(statSync(catalogue).mode & 0o777).toBe(0o444)
+    const saved = JSON.parse(readFileSync(catalogue, 'utf8'))
+    expect(Object.keys(saved).sort()).toEqual(['binaries', 'manifest', 'reports', 'sourceCommit', 'version', 'workerSha'])
+    expect(saved).toMatchObject({ version: 1, ...identity,
+      binaries: { claude_code: claude.binary, codex: codex.binary },
+      reports: [{ harness: 'claude_code', models: ['fixture-claude'] }, { harness: 'codex', models: ['fixture-codex'] }],
+    })
+    expect(readFileSync(catalogue, 'utf8')).not.toContain('must-not-enter')
     for (const fixture of [codex, claude]) {
       const receipt = JSON.parse(readFileSync(fixture.started, 'utf8'))
       expect(receipt.env).toEqual(['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'HOME', 'LANG', 'PATH'])
@@ -88,6 +148,7 @@ it('probes both official selections concurrently without credentials, then marks
     expect(failed).not.toHaveBeenCalled()
   } finally { close() }
   expect(existsSync(join(directory, 'preloaded.pid'))).toBe(false)
+  expect(existsSync(join(directory, 'preloaded-models.json'))).toBe(false)
 })
 
 it('drains the other live probe before rejecting a failed catalogue and never announces ready', async () => {
@@ -95,7 +156,7 @@ it('drains the other live probe before rejecting a failed catalogue and never an
   const codex = cli(root, 'codex', { held: true }), claude = cli(root, 'claude_code', { fail: true })
   let settled = false
   const result = preloadCloudWorker(directory, async () => {}, () => {},
-    () => probeHostedRuntimeModels({ codex: codex.binary, claude_code: claude.binary }))
+    () => receiptProbe({ codex: codex.binary, claude_code: claude.binary }), () => identity)
   const outcome = result.then(() => { settled = true; return null }, error => { settled = true; return error })
   await waitFor(() => existsSync(codex.started) && existsSync(claude.started))
   await waitFor(() => !active(JSON.parse(readFileSync(claude.started, 'utf8')).pid))
@@ -107,6 +168,29 @@ it('drains the other live probe before rejecting a failed catalogue and never an
   expect(active(receipt.pid)).toBe(false)
   expect(existsSync(receipt.home)).toBe(false)
   expect(readdirSync(directory)).toEqual([])
+})
+
+it('never publishes PID-ready or installs a handoff watcher if the read-only receipt cannot be written', async () => {
+  const root = tempDir(), directory = tempDir()
+  const codex = cli(root, 'codex'), claude = cli(root, 'claude_code')
+  const before = process.listenerCount('SIGUSR1'), error = Object.assign(new Error('fixture write failed'), { code: 'ENOSPC' })
+  vi.spyOn(fsUtil, 'writeFileAtomic').mockImplementation(() => { throw error })
+  await expect(preloadCloudWorker(directory, async () => {}, () => {},
+    () => receiptProbe({ codex: codex.binary, claude_code: claude.binary }), () => identity)).rejects.toBe(error)
+  expect(readdirSync(directory)).toEqual([])
+  expect(process.listenerCount('SIGUSR1')).toBe(before)
+  for (const fixture of [codex, claude]) expect(active(JSON.parse(readFileSync(fixture.started, 'utf8')).pid)).toBe(false)
+})
+
+it('refuses a release switch during the probe without writing a receipt or announcing ready', async () => {
+  const root = tempDir(), directory = tempDir()
+  const codex = cli(root, 'codex'), claude = cli(root, 'claude_code')
+  const identify = vi.fn().mockReturnValueOnce(identity).mockReturnValueOnce({ ...identity, sourceCommit: 'c'.repeat(40) })
+  const before = process.listenerCount('SIGUSR1')
+  await expect(preloadCloudWorker(directory, async () => {}, () => {},
+    () => receiptProbe({ codex: codex.binary, claude_code: claude.binary }), identify)).rejects.toThrow('cloud_model_receipt_identity_changed')
+  expect(readdirSync(directory)).toEqual([])
+  expect(process.listenerCount('SIGUSR1')).toBe(before)
 })
 
 it('does not reuse models after a binary changes or when a selected CLI is missing from the report', async () => {
