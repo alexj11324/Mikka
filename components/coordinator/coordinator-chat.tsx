@@ -28,6 +28,7 @@ import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
+import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { ReplyAnswer } from '@/components/workspace/agent-decision'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
@@ -123,7 +124,7 @@ function liveThinking(reply: CoordinatorLiveReply) {
 /** A sent message's words, under the reply words it quotes (lib/chat-quote.ts) and anything else it carries. */
 function PersonWords({ text, before }: { text: string; before?: ReactNode }) {
   const { quote, text: words } = splitReplyQuote(text)
-  return <>{quote && <QuoteLine slot="reply-quote" text={quote} />}{before}<UserMessageText text={words} /></>
+  return <CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}{before}<UserMessageText text={words} /></CollapsibleMessage>
 }
 
 /** A message the person just sent brings the chat back to its end, wherever they had scrolled. */

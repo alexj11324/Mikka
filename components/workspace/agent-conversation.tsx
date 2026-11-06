@@ -7,6 +7,7 @@ import { MessageBubble, MessageBubbleContent } from '@/components/agents/message
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from '@/components/agents/message'
 import { MessageScroller } from '@/components/agents/message-scroller'
 import { UserMessageText } from '@/components/workspace/user-message-text'
+import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 
 export type AgentTurn = { id: number | string; question: string; response: ReactNode }
 
@@ -20,7 +21,7 @@ export function AgentConversation({ turns, streaming }: { turns: AgentTurn[]; st
           <MessageAvatar><User aria-hidden="true" /></MessageAvatar>
           <MessageContent>
             <MessageHeader>{agentCopy.you}</MessageHeader>
-            <MessageBubble variant="solid"><MessageBubbleContent className="whitespace-pre-wrap break-words"><UserMessageText text={turn.question} /></MessageBubbleContent></MessageBubble>
+            <MessageBubble variant="solid"><MessageBubbleContent className="whitespace-pre-wrap break-words"><CollapsibleMessage><UserMessageText text={turn.question} /></CollapsibleMessage></MessageBubbleContent></MessageBubble>
             <MessageFooter>{agentCopy.sent}</MessageFooter>
           </MessageContent>
         </Message>

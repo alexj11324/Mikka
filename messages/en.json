@@ -28,7 +28,9 @@
       "settingsList": "Resize settings list",
       "groupPanel": "Resize right panel",
       "browser": "Resize browser"
-    }
+    },
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "Issue": {
     "scope": {
@@ -3895,7 +3897,9 @@
         "escalated": "The previous model could not finish the task; retried with a stronger model"
       }
     },
-    "errorDetails": "Details"
+    "errorDetails": "Details",
+    "fullInstructions": "View full instructions",
+    "hideInstructions": "Hide full instructions"
   },
   "Computer": {
     "status": {
