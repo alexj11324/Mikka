@@ -9,6 +9,16 @@ async function exists(path) {
   try { await lstat(path); return true } catch (error) { if (error.code === 'ENOENT') return false; throw error }
 }
 
+/** Each independent listener is a real same-origin application. Keep the
+ * descriptor/DB/lease environment unchanged; only its public auth/RPC origin
+ * follows this instance's already selected listening port. */
+export function productionEnvironment(env, { origin, port }) {
+  const endpoint = new URL(origin)
+  if (endpoint.origin !== origin || !Number.isSafeInteger(port) || port < 1 || port > 65535) fail('DESKTOP_TEST_SERVER_ADDRESS_INVALID')
+  endpoint.port = String(port)
+  return { ...env, BETTER_AUTH_URL: endpoint.origin }
+}
+
 /** Identify a real compiled application before starting it. A present but stale
  * Nitro build is an error, never a reason to silently launch an old Next build.
  * HTTP attestation and the exact database/lease checks remain with the caller. */

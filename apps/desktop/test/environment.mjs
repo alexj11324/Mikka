@@ -12,7 +12,7 @@ import { Pool } from 'pg'
 import { assertDatabaseIdentity, loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { recordRunnerEvidenceSecrets } from '../../../scripts/test-accounts/bootstrap.mjs'
 import { localDatabaseTarget } from '../../../scripts/test-accounts/database-target.mjs'
-import { productionApplication, stopOwnedApplication } from './production-application.mjs'
+import { productionApplication, productionEnvironment, stopOwnedApplication } from './production-application.mjs'
 import { startLiveWorker } from './live-worker.mjs'
 
 const harnessRoot = fileURLToPath(new URL('../../..', import.meta.url))
@@ -84,7 +84,7 @@ async function run(command, args, env = process.env) {
 async function start(directory, serverPort, label, metrics) {
   const logPath = resolve('.cache/desktop-runtime', `${label}-${sha.slice(0, 12)}-${process.pid}.log`)
   const log = await open(logPath, 'wx', 0o600)
-  const env = { ...process.env, ...(metrics ? { MIKKA_DESKTOP_METRICS_SOCKET: `/tmp/mikka-${label}-${process.pid}.sock` } : {}) }
+  const env = { ...productionEnvironment(process.env, { origin, port: serverPort }), ...(metrics ? { MIKKA_DESKTOP_METRICS_SOCKET: `/tmp/mikka-${label}-${process.pid}.sock` } : {}) }
   // Next reconstructs request.url from its listen hostname. Keep it identical
   // to the attested loopback origin, including localhost versus 127.0.0.1.
   const application = await productionApplication(directory, { expectedRevision: sha, hostname, port: serverPort,
