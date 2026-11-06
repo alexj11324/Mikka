@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { Server } from 'node:http'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -10,7 +11,7 @@ import { createGateway, generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
 import { assertMvpEnvironment, REPOSITORY } from './isolated-env.mjs'
 import { answerModel } from './model.mjs'
-import { fixtureFailure, fixtureModelError, recordPeerFailure, readPeerFailures, observeTraceMcpFetch } from './diagnostics.mjs'
+import { fixtureFailure, fixtureModelError, recordPeerFailure, readPeerFailures, observeTraceMcpFetch, observeTraceHttpParser } from './diagnostics.mjs'
 import { decisionRequestInput } from '../../lib/coordinator/decision.ts'
 import { startMvpServices } from './services.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
@@ -19,6 +20,28 @@ import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
+
+test('parser diagnostics preserve original emit arguments, receiver, return and default error handling', () => {
+  const original = Server.prototype.emit, observed = [], server = new Server(), socket = {}
+  const error = Object.assign(new Error('private-message'), { code: 'HPE_INVALID_METHOD', bytesParsed: 71, rawPacket: Buffer.from('private-wire-body') })
+  let calls = 0
+  server.on('clientError', function (actual, connection) { calls++; assert.equal(this, server); assert.equal(actual, error); assert.equal(connection, socket) })
+  const restore = observeTraceHttpParser(value => observed.push(value))
+  try {
+    assert.equal(server.emit('clientError', error, socket), true)
+    assert.equal(calls, 1); assert.equal(server.listenerCount('clientError'), 1)
+    const unhandled = new Server()
+    assert.equal(unhandled.emit('clientError', error, socket), false)
+    assert.equal(unhandled.listenerCount('clientError'), 0)
+    assert.deepEqual(observed, [{ code: 'HPE_INVALID_METHOD', bytesParsed: 71 }, { code: 'HPE_INVALID_METHOD', bytesParsed: 71 }])
+    assert.ok(!JSON.stringify(observed).includes('private'))
+    assert.equal(server.emit('unrelated', 'private-event'), false); assert.equal(observed.length, 2)
+  } finally { restore() }
+  assert.equal(Server.prototype.emit, original)
+  const quiet = observeTraceHttpParser(() => { throw new Error('private-sink-error') })
+  try { assert.equal(server.emit('clientError', error, socket), true); assert.equal(calls, 2) }
+  finally { quiet() }
+})
 
 test('diagnostics retain closed source provenance without messages, private paths or assertion values', () => {
   const own = fileURLToPath(new URL('./model.mjs', import.meta.url))

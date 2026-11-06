@@ -2,8 +2,10 @@
 // The existing MVP fence still refuses every other external request.
 import './preload.mjs'
 import { assertMvpEnvironment } from './isolated-env.mjs'
+import { observeTraceHttpParser } from './diagnostics.mjs'
 
 assertMvpEnvironment()
+observeTraceHttpParser()
 const underlying = globalThis.fetch
 globalThis.fetch = (input, init) => {
   const request = new Request(input, init), url = new URL(request.url)

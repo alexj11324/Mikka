@@ -110,6 +110,11 @@ credentials are never inspected; no body or error message is retained. The
 wrapper returns the original response without waiting for the failed clone
 and preserves the real signal, timeout, response and error. No mailbox
 authorization or retry policy changes.
+The isolated API preload also observes at most 64 Node HTTP `clientError`
+events as `traceFixtureParser`, retaining only an enumerated parser code and
+bounded numeric `bytesParsed`. It forwards the original emit receiver,
+arguments and return value, adds no listener, and preserves Node's default
+rejection behavior. It never reads the raw packet, message or headers.
 Child stdout/stderr, authentication files, source prompts, responses and raw OTLP
 bodies are not copied into that report. Bounded child diagnostics are retained as
 mode-0600 files under `private-logs/`; they must never be published or printed

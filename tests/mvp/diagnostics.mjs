@@ -1,6 +1,7 @@
 // Closed metadata for the isolated fixture report. No message, response, URL,
 // argument, function name, absolute path or raw stack belongs in this output.
 import { closeSync, constants, fstatSync, openSync, readFileSync, writeSync } from 'node:fs'
+import { Server } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
@@ -27,6 +28,30 @@ const sources = new Set(['diagnostics.mjs', 'services.mjs', 'model.mjs', 'subscr
   'trace-chain.mjs', 'trace-codex.mjs', 'fixture.test.mjs'])
 const escapedDirectory = dirname(fileURLToPath(import.meta.url)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const frame = new RegExp(`(?:file:\\/\\/)?${escapedDirectory}/([a-z0-9.-]+\\.mjs):([0-9]{1,5}):([0-9]{1,5})(?:\\)|$)`)
+
+/** The isolated API's Node parser can reject a request before any route runs.
+ * Observe its closed code without installing a listener, which would suppress
+ * Node's default 400 response. Never inspect rawPacket, headers or message. */
+export function observeTraceHttpParser(sink = value => console.info(JSON.stringify({ traceFixtureParser: value }))) {
+  const original = Server.prototype.emit
+  const codes = new Set(['HPE_INVALID_METHOD', 'HPE_INVALID_URL', 'HPE_INVALID_VERSION', 'HPE_INVALID_CONSTANT',
+    'HPE_INVALID_HEADER_TOKEN', 'HPE_UNEXPECTED_CONTENT_LENGTH', 'HPE_INVALID_CONTENT_LENGTH', 'HPE_INVALID_CHUNK_SIZE',
+    'HPE_INVALID_EOF_STATE', 'HPE_HEADER_OVERFLOW', 'HPE_CLOSED_CONNECTION', 'HPE_INVALID_TRANSFER_ENCODING', 'ECONNRESET'])
+  let remaining = 64, active = true
+  function observed(event, ...args) {
+    if (active && event === 'clientError' && remaining > 0) {
+      remaining--
+      try {
+        const error = args[0]
+        sink({ code: codes.has(error?.code) ? error.code : 'OTHER',
+          ...(Number.isSafeInteger(error?.bytesParsed) && error.bytesParsed >= 0 && error.bytesParsed <= 2_147_483_647 ? { bytesParsed: error.bytesParsed } : {}) })
+      } catch { /* Preserve Node's parser error handling and original event. */ }
+    }
+    return Reflect.apply(original, this, [event, ...args])
+  }
+  Server.prototype.emit = observed
+  return () => { active = false; if (Server.prototype.emit === observed) Server.prototype.emit = original }
+}
 
 function failureMetadata(value) {
   return {
