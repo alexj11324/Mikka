@@ -15,7 +15,7 @@ const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL &
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Run recovery tests require matching isolated loopback _e2e URLs')
 
 const TABLES = ['agent_runs', 'devices', 'cloud_machines', 'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns',
-  'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events', 'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges']
+  'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events', 'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'thread_machine_pool']
 
 test('run-recovery due times match what each sweep selects', { skip: !valid }, async t => {
   const schema = `run_recovery_due_${randomUUID().replaceAll('-', '')}`
@@ -83,6 +83,16 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     const attempted = new Date(Date.now() - 15_000)
     await pool.query(`INSERT INTO sandbox_kill_retries ("sandboxId","ownerId","lastAttemptAt") VALUES ('sbx','owner',$1)`, [attempted])
     assert.equal(await due(), attempted.getTime() + 60_000)
+    await clear()
+  })
+
+  await t.test('a ready thread machine is due a week after it was readied; a dead refill after 20 minutes', async () => {
+    const readied = new Date(Date.now() - 60_000)
+    await pool.query(`INSERT INTO thread_machine_pool (id,"ownerId",template,"workerSha",state,"sandboxId","readyAt") VALUES ($1,'owner','claude','sha','ready','sbx-ready',$2)`, [randomUUID(), readied])
+    assert.equal(await due(), readied.getTime() + 7 * 86_400_000 + 1)
+    const started = new Date(Date.now() - 60_000)
+    await pool.query(`INSERT INTO thread_machine_pool (id,"ownerId",template,"workerSha",state,"createdAt") VALUES ($1,'owner','codex','sha','warming',$2)`, [randomUUID(), started])
+    assert.equal(await due(), started.getTime() + 20 * 60_000 + 1)
     await clear()
   })
 

@@ -44,6 +44,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/cloud-computer/browser-authority.ts', file: 'lib/cloud-computer/unattended.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/credentials/store.ts', file: 'lib/credentials/store.db.test.ts', script: 'test:credentials-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/cloud-computer/backend.db.test.ts', script: 'test:cloud-backend-db' },
+  { marker: 'lib/cloud-computer/thread-machine-pool.ts', file: 'lib/cloud-computer/thread-machine-pool.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/factory/approval.ts', file: 'lib/factory/public-consumers.db.test.ts', script: 'test:factory-approval-db' },
   { marker: 'lib/factory/merge.ts', file: 'lib/factory/merge.db.test.ts', script: 'test:factory-approval-db' },
   { marker: 'lib/suggestions/card.ts', file: 'tests/suggestion-claim.integration.test.ts', script: 'test:suggestion-artifact-db' },

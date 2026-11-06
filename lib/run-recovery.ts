@@ -26,10 +26,12 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   const taskMachines = runs('taskMachines') ? await endClosedTaskMachines(pool).catch(() => null) : null
   // Sandboxes of deleted workspaces whose kill did not go through are killed again.
   const sandboxKills = runs('sandboxKills') ? await retrySandboxKills(pool).catch(() => null) : null
+  // Ready thread machines nobody will use are killed (thread-machine-pool.ts).
+  const threadPool = runs('threadPool') ? await (await import('@/lib/cloud-computer/thread-machine-pool')).reapThreadMachinePool(pool).catch(() => null) : null
   // Durable task progress, independent of heartbeat or an open client.
   const tasks = runs('tasks') ? await (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool).catch(() => null) : null
   // Group turns left queued when their request ended: they no longer wait for someone to read the group.
   const started = Date.now()
   if (runs('groupTurns')) await groupTurns(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
-  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, taskMachines, sandboxKills, tasks }
+  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, taskMachines, sandboxKills, tasks, threadPool }
 }

@@ -238,6 +238,16 @@ switch line requires the host adoption receipt, matching definition and both
 attempts on the same owned task. This read-only association does not extend
 the conversation's send or stop chain.
 
+**Ready thread machines (#1507).** A new official instance takes about 1 s to
+create, but adding Mikka's worker to it takes about 60 s. So each owner keeps,
+per official template they have used, one new instance with the worker
+installed in `/opt/mikka` and preloaded, paused. A dispatch resumes it (under
+1 s) and only then hands it a device identity; the slot is refilled after the
+dispatch, off its path. The template itself is never changed
+([1430](decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)). It runs
+on the owner's own E2B key: one refill is one bootstrap of compute, a paused
+instance uses none, and one unused for 7 days is killed.
+
 **When a machine goes away during a thread:**
 
 - **The E2B sandbox is gone:** start a new one from the template and continue

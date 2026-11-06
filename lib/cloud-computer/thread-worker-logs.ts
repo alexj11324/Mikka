@@ -21,7 +21,7 @@ const LINES_PER_INVOCATION = 500
 export const TAIL_MAX = 8000
 
 export type RuntimeRefreshPhase = 'admission' | 'execution_identity' | 'question_machine' | 'question_source' |
-  'provider_state' | 'connect' | 'record_sandbox' | 'post_connect_admission' |
+  'provider_state' | 'connect' | 'create' | 'record_sandbox' | 'post_connect_admission' |
   'runtime_configuration' | 'read_worker' | 'verify_worker' | 'install_computer' | 'stage_admission' | 'stage_release' | 'switch_release' |
   'read_refreshed_worker' | 'verify_refreshed_worker' | 'start_desktop' | 'credential_bootstrap' | 'publish_bootstrap' | 'start_worker' | 'worker_register' |
   'verify_runtime' | 'finish' | 'rollback'

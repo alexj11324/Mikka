@@ -23,6 +23,9 @@ let retried = 0
 mock.module(new URL('../../../../lib/cloud-computer/workspace-teardown.ts', import.meta.url).href, { namedExports: {
   retrySandboxKills: async () => { retried++; return { killed: 1, pending: 1 } },
 } })
+mock.module(new URL('../../../../lib/cloud-computer/thread-machine-pool.ts', import.meta.url).href, { namedExports: {
+  reapThreadMachinePool: async () => ({ killed: 2, pending: 0 }),
+} })
 mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 let swept: number[] = []
 let taskSweeps = 0
@@ -57,7 +60,7 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
   // Stale Bot computers are reconciled, ended runs judged (R-52), closed tasks' sandboxes ended and deleted workspaces' unfinished kills retried, in the same pass.
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, taskMachines: { ended: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, taskMachines: { ended: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 }, threadPool: { killed: 2, pending: 0 } })
   assert.equal(taskSweeps, 1)
   assert.equal(reconciled, 1)
   assert.equal(judged, 1)
