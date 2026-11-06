@@ -98,6 +98,13 @@ web and daemon generation spans by fixed service, operation and error category,
 including when no case completed. Failed runs leave the API alive for one
 20-second telemetry drain before shutdown so its existing batch timer can
 export already-created events; no model call or business request is retried.
+The peer also retains only closed command-stage/code/source diagnostics in its
+owned mode-0600 `trace-peer-failures.jsonl`; the report revalidates these fields
+before including `peerFailures`. The daemon's fixture-only fetch wrapper writes
+at most 64 mailbox HTTP records to its private stdout log: fixed route/method,
+status, time until fetch resolves, or a whitelisted error name/code. It never
+reads request/response bodies or credentials and preserves the real signal,
+timeout, response and error. No mailbox authorization or retry policy changes.
 Child stdout/stderr, authentication files, source prompts, responses and raw OTLP
 bodies are not copied into that report. Bounded child diagnostics are retained as
 mode-0600 files under `private-logs/`; they must never be published or printed

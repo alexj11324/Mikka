@@ -14,6 +14,7 @@ import { assertMvpEnvironment, MVP_ORIGIN, MVP_SERVICES, REPOSITORY, REPOSITORY_
 import { startMvpServices } from './services.mjs'
 import { startTraceCollector, summarizeAiSpans } from './trace-collector.mjs'
 import { tracePublicationReady } from './model.mjs'
+import { readPeerFailures } from './diagnostics.mjs'
 import { MVP_SUBSCRIPTION_MODEL, seedMvpSubscription, seedMvpExecutionOrder } from './subscription.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
@@ -36,7 +37,7 @@ const evidenceDirectory = resolve(process.env.MIKKA_TRACE_EVIDENCE_DIR ?? join(r
 await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 })
 const privateLogDirectory = join(evidenceDirectory, 'private-logs')
 await mkdir(privateLogDirectory, { recursive: true, mode: 0o700 })
-const children = [], results = [], collectors = [], routeReadiness = []
+const children = [], results = [], collectors = [], routeReadiness = [], peerDirectories = []
 let accounts, services, collector, phase = 'starting', failure, workflowHealth, telemetryDrainMs = 0
 const checkpoint = value => { phase = value; console.info(`trace-acceptance ${value}`) }
 const child = (label, args, env) => {
@@ -147,6 +148,7 @@ try {
     collector.forbid(privatePrompt); collector.forbid(privateFailure)
     const scenario = await service('/scenario', { marker, title: `Trace ${kind}`, githubAccountId, harness: 'synthetic-codex' })
     const caseDirectory = join(directory, kind), fixtureDirectory = join(caseDirectory, 'fixtures'), daemonDirectory = join(caseDirectory, 'daemon')
+    peerDirectories.push({ kind, directory: daemonDirectory })
     await mkdir(fixtureDirectory, { recursive: true, mode: 0o700 })
     if (kind === 'success') await copyFile(join(root, 'tests/mvp/fixtures/mvp-core-loop.jsonl'), join(fixtureDirectory, 'mvp-core-loop.jsonl'))
     else await writeFile(join(fixtureDirectory, 'mvp-core-loop.jsonl'), JSON.stringify({ t: 0, exit: { outcome: 'failed', error: privateFailure } }) + '\n', { mode: 0o600 })
@@ -274,6 +276,7 @@ try {
   await pool.end()
   const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, workflowHealth, routeReadiness, syntheticCLI: true, cases: results,
     serviceFailures: services?.failureDiagnostics() ?? [],
+    peerFailures: peerDirectories.flatMap(({ kind, directory }) => readPeerFailures(directory).map(failure => ({ kind, ...failure }))),
     telemetryDrainMs, aiSpans: summarizeAiSpans(collector?.evidence.spans ?? []),
     processes: children.map(job => ({ label: job.label, exitCode: job.exitCode, signal: job.signalCode,
       privateLogRetained: !job.logFailed, privateLogBytes: job.logBytes })),
@@ -287,5 +290,5 @@ try {
   }
   await writeFile(join(evidenceDirectory, 'trace-chain.json'), JSON.stringify(evidence, null, 2) + '\n', { mode: 0o600 })
   console.info(JSON.stringify({ traceAcceptance: evidence.result, revision, phase, cases: results.map(({ kind, runId, traceId, status }) => ({ kind, runId, traceId, status })), counts: evidence.counts, serviceFailures: evidence.serviceFailures,
-    telemetryDrainMs, aiSpans: evidence.aiSpans, evidenceFile: join(evidenceDirectory, 'trace-chain.json'), ...(failure ? { failure } : {}) }))
+    peerFailures: evidence.peerFailures, telemetryDrainMs, aiSpans: evidence.aiSpans, evidenceFile: join(evidenceDirectory, 'trace-chain.json'), ...(failure ? { failure } : {}) }))
 }

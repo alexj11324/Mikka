@@ -78,17 +78,32 @@ test('trace completion accepts publication not yet observed while the execute pu
   assert.throws(() => tracePublicationReady({ status: 'blocked' }), /EXECUTION_PUBLICATION_FAILED/)
   assert.throws(() => answerModel(request, { ...scenario, harness: 'mock' }), /PR receipt/)
   run.id = randomUUID()
-  assert.throws(() => answerModel(request, scenario), /real run, task or summary/)
+  assert.throws(() => answerModel(request, scenario), { code: 'MODEL_COMPLETION_MISMATCH' })
+})
+
+test('trace completion distinguishes a failed run detail from a refused get_run tool call', () => {
+  const marker = `mvp-${randomUUID()}`, deviceId = randomUUID(), runId = randomUUID(), issueId = randomUUID()
+  const scenario = { marker, deviceId, repo: REPOSITORY, harness: 'synthetic-codex' }
+  const returned = (value: unknown) => ({ prompt: [
+    { role: 'user', content: `${marker}\nThe person selected device ${deviceId} in the task dialog.` },
+    { role: 'user', content: `[Event] Run ${runId} ended with status failed (error).` },
+    { role: 'tool', content: [{ type: 'tool-result', toolName: 'get_run', output: { type: 'json', value } }] },
+  ] })
+  const answer = answerModel(returned({ id: runId, issueId, status: 'failed', error: 'private provider failure', summary: null }), scenario)
+  assert.equal(answer.content[0].text, '线程已停止。')
+  assert.ok(!JSON.stringify(answer).includes('private'))
+  assert.throws(() => answerModel(returned({ error: 'runNotFound' }), scenario), { code: 'MODEL_RESULT_REFUSED', sourceCode: 'runNotFound' })
+  assert.throws(() => answerModel(returned({ id: randomUUID(), issueId, status: 'failed', error: 'private provider failure' }), scenario), { code: 'MODEL_RESULT_REFUSED' })
 })
 
 test('trace synthetic Codex peer passes real version/model probes and requires synthetic auth before fixture turns', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-peer-'))
-  const fixture = join(directory, 'fixture.jsonl'), home = join(directory, 'home'), cwd = join(directory, 'worktree')
+  const fixture = join(directory, 'fixture.jsonl'), home = join(directory, 'home'), cwd = join(directory, 'worktree'), childTmp = join(directory, 'run-tmp')
   const mcp = join(directory, 'synthetic-submit.mjs'), submitted = join(directory, 'submitted.json')
   const services = await startMvpServices(3191)
   const scenario = await (await fetch(`${services.origin}/scenario`, { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'Synthetic native delivery', harness: 'synthetic-codex' }) })).json()
-  await mkdir(home); await mkdir(cwd)
+  await mkdir(home); await mkdir(cwd); await mkdir(childTmp)
   const git = (args: string[]) => traceGitCommand(scenario.barePath, cwd, args)
   await traceGitCommand(scenario.barePath, directory, ['clone', REPOSITORY, cwd])
   const originalBranch = await git(['branch', '--show-current'])
@@ -120,7 +135,9 @@ for await (const line of createInterface({ input: process.stdin })) {
     const report = await probeHarnessModels('codex', binary, { scratchDir: directory, timeoutMs: 5_000 })
     assert.deepEqual(report?.models, [MVP_SUBSCRIPTION_MODEL])
     const child = spawn(binary, ['app-server', '-c', `mcp_servers.mikka.command=${JSON.stringify(process.execPath)}`, '-c', `mcp_servers.mikka.args=${JSON.stringify([mcp])}`],
-      { cwd, env: { PATH: `${bridge}${delimiter}${process.env.PATH ?? ''}`, HOME: home, CODEX_HOME: home, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
+      // Match RunContext.tempEnv: its CLI-only TMPDIR differs from the host
+      // root that owns the scenario's bare origin.
+      { cwd, env: { PATH: `${bridge}${delimiter}${process.env.PATH ?? ''}`, HOME: home, CODEX_HOME: home, TMPDIR: childTmp, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
     const output: Record<string, any>[] = []
     const lines = createInterface({ input: child.stdout })
     lines.on('line', line => output.push(JSON.parse(line)))

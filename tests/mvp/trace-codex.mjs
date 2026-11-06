@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { callMcpTool } from '../../packages/daemon/test/fakes/mcp-call.mjs'
 import { REPOSITORY } from './isolated-env.mjs'
+import { recordPeerFailure } from './diagnostics.mjs'
 import { MVP_NATIVE_ACCOUNT, MVP_NATIVE_TOKEN, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
 
 const execute = promisify(execFile)
@@ -47,19 +48,19 @@ export function checkTracePrerequisites(directory) {
 /** Same disposable path shape as the daemon's localGitOrigin contract. The
  * launcher validates its local-test environment before serializing this path;
  * native child processes receive no database URL or inherited Git credentials. */
-function traceGitOrigin(value) {
+function traceGitOrigin(value, temporaryRoot = realpathSync(tmpdir())) {
   const path = resolve(value ?? '')
   assert.ok(basename(path) === 'origin.git' && /^mvp-[a-f0-9-]{36}$/.test(basename(dirname(path)))
     && basename(dirname(dirname(path))).startsWith('mikka-mvp-origin-')
-    && dirname(dirname(dirname(path))) === realpathSync(tmpdir())
+    && dirname(dirname(dirname(path))) === temporaryRoot
     && lstatSync(path).isDirectory() && realpathSync(path) === path, 'SYNTHETIC_GIT_ORIGIN_REQUIRED')
   return path
 }
 
 /** Only this known fixture URL can resolve, and Git itself refuses every
  * non-file protocol even if a local or inherited config tries to override it. */
-export function traceGitCommand(barePath, cwd, args) {
-  const origin = pathToFileURL(traceGitOrigin(barePath)).href
+export function traceGitCommand(barePath, cwd, args, temporaryRoot) {
+  const origin = pathToFileURL(traceGitOrigin(barePath, temporaryRoot)).href
   return execute('git', ['-c', 'credential.helper=', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false',
     '-c', 'tag.gpgSign=false', '-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always',
     '-c', `url.${origin}.insteadOf=${REPOSITORY}`, ...args], { cwd, encoding: 'utf8', timeout: 30_000,
@@ -80,14 +81,19 @@ function deliveryContext(instructions) {
   return { branch, issueId: receipt[2] }
 }
 
-async function deliverTraceChange(config, delivery) {
+async function deliverTraceChange(config, delivery, stage) {
+  stage('git_validate')
   assert.ok(delivery, 'SYNTHETIC_DELIVERY_CONTEXT_REQUIRED')
-  const git = args => traceGitCommand(config.barePath, process.cwd(), args)
+  // RunContext gives the CLI its own TMPDIR. Compare the origin with the
+  // launcher's canonical root, captured before that child-only override.
+  const git = args => traceGitCommand(config.barePath, process.cwd(), args, config.temporaryRoot)
   assert.equal(await git(['config', '--get', 'remote.origin.url']), REPOSITORY, 'SYNTHETIC_REPOSITORY_REQUIRED')
-  assert.equal(await git(['ls-remote', '--get-url', REPOSITORY]), pathToFileURL(traceGitOrigin(config.barePath)).href, 'SYNTHETIC_GIT_REWRITE_REQUIRED')
+  assert.equal(await git(['ls-remote', '--get-url', REPOSITORY]), pathToFileURL(traceGitOrigin(config.barePath, config.temporaryRoot)).href, 'SYNTHETIC_GIT_REWRITE_REQUIRED')
   await git(['diff', '--check'])
   await git(['add', '--', 'MIKKA_MOCK.md'])
+  stage('git_commit')
   await git(['commit', '-m', 'Exercise isolated trace delivery', '-m', `Mikka-Issue: ${delivery.issueId}`])
+  stage('git_push')
   await git(['push', '--porcelain', REPOSITORY, `HEAD:refs/heads/${delivery.branch}`])
   const commit = await git(['rev-parse', 'HEAD'])
   assert.equal((await git(['ls-remote', '--exit-code', REPOSITORY, `refs/heads/${delivery.branch}`])).split(/\s+/)[0], commit, 'SYNTHETIC_PUSH_RECEIPT_REQUIRED')
@@ -99,9 +105,11 @@ async function deliverTraceChange(config, delivery) {
       GH_CONFIG_DIR: join(config.directory, 'synthetic-gh-home'), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
       GIT_CONFIG_COUNT: '0', GIT_TERMINAL_PROMPT: '0', GIT_ALLOW_PROTOCOL: 'file' },
   }).then(result => result.stdout.trim())
+  stage('pr_create')
   const pr = await gh(['pr', 'create', '--repo', 'mikka-e2e/core-loop', '--head', delivery.branch, '--base', 'trunk',
     '--title', 'Synthetic trace delivery', '--body', `Isolated synthetic fixture delivery.\n\n<!-- mikka-issue:${delivery.issueId} -->`])
   assert.match(pr, /^https:\/\/github\.com\/mikka-e2e\/core-loop\/pull\/[1-9][0-9]*$/, 'SYNTHETIC_PR_RECEIPT_REQUIRED')
+  stage('pr_checks')
   await gh(['pr', 'checks', pr, '--watch'])
   assert.equal(await git(['status', '--porcelain']), '', 'SYNTHETIC_CLEAN_WORKTREE_REQUIRED')
 }
@@ -111,7 +119,7 @@ async function deliverTraceChange(config, delivery) {
 export function createTraceCodexBinary(directory, fixture, barePath) {
   const version = JSON.parse(readFileSync(new URL('../../packages/daemon/harness/pins.json', import.meta.url), 'utf8')).harnesses.codex.version
   const binary = join(directory, 'synthetic-codex.mjs')
-  writeFileSync(binary, `#!/usr/bin/env node\nimport { runTraceCodex } from ${JSON.stringify(import.meta.url)}\nawait runTraceCodex(${JSON.stringify({ version, fixture: resolve(fixture), directory: resolve(directory), barePath: traceGitOrigin(barePath) })})\n`, { mode: 0o700 })
+  writeFileSync(binary, `#!/usr/bin/env node\nimport { runTraceCodex } from ${JSON.stringify(import.meta.url)}\nawait runTraceCodex(${JSON.stringify({ version, fixture: resolve(fixture), directory: resolve(directory), barePath: traceGitOrigin(barePath), temporaryRoot: realpathSync(tmpdir()) })})\n`, { mode: 0o700 })
   return binary
 }
 
@@ -137,14 +145,18 @@ export async function runTraceCodex(config) {
     const request = JSON.parse(line)
     if (request.id === undefined) continue
     const { id, method, params } = request
+    let operation
     try {
       if (method === 'initialize') {
+        operation = 'initialize'
         initialized = true
         send({ id, result: { userAgent: `codex_cli_rs/${config.version} synthetic-trace-fixture` } })
       } else if (method === 'model/list') {
+        operation = 'model_list'
         assert.ok(initialized)
         send({ id, result: { data: [{ id: MVP_SUBSCRIPTION_MODEL, model: MVP_SUBSCRIPTION_MODEL, displayName: 'Synthetic trace model', isDefault: true }], nextCursor: null } })
       } else if (method === 'account/login/start') {
+        operation = 'oauth_login'
         assert.ok(initialized)
         assert.equal(params.type, 'chatgptAuthTokens')
         assert.equal(params.accessToken, MVP_NATIVE_TOKEN)
@@ -152,6 +164,7 @@ export async function runTraceCodex(config) {
         authenticated = true
         send({ id, result: { type: 'chatgptAuthTokens' } })
       } else if (method === 'thread/start') {
+        operation = 'thread_start'
         assert.ok(authenticated)
         assert.equal(params.model, MVP_SUBSCRIPTION_MODEL)
         assert.equal(resolve(params.cwd), process.cwd())
@@ -159,6 +172,7 @@ export async function runTraceCodex(config) {
         threadId = `synthetic-${randomUUID()}`
         send({ id, result: { thread: { id: threadId }, model: MVP_SUBSCRIPTION_MODEL } })
       } else if (method === 'turn/start') {
+        operation = 'turn_start'
         assert.ok(authenticated && threadId && params.threadId === threadId)
         const turnId = `synthetic-turn-${++turn}`
         activeTurn = turnId
@@ -172,13 +186,15 @@ export async function runTraceCodex(config) {
           for (const part of fixture) {
             assert.ok(!part.exec, 'SYNTHETIC_CODEX_SHELL_REFUSED')
             if (part.write) {
+              operation = 'fixture_write'
               assert.equal(part.write.path, 'MIKKA_MOCK.md')
               writeFileSync(join(process.cwd(), part.write.path), part.write.content)
               send({ method: 'item/completed', params: { threadId, turnId, item: { type: 'fileChange', id: 'synthetic-write', changes: [{ path: part.write.path, kind: { type: 'add' } }], status: 'completed' } } })
             }
             if (part.submit) {
               assert.ok(mcp.command && mcp.args.length, 'SYNTHETIC_CODEX_MCP_REQUIRED')
-              await deliverTraceChange(config, delivery)
+              await deliverTraceChange(config, delivery, value => { operation = value })
+              operation = 'mcp_submit'
               const reply = await callMcpTool(mcp, 'submit', part.submit)
               assert.ok(reply.result && !reply.result.isError, 'SYNTHETIC_CODEX_SUBMIT_REFUSED')
             }
@@ -192,7 +208,8 @@ export async function runTraceCodex(config) {
         activeTurn = undefined
       } else if (method === 'turn/interrupt') send({ id, result: {} })
       else send({ id, error: { code: -32601, message: 'synthetic_method_unsupported' } })
-    } catch {
+    } catch (error) {
+      recordPeerFailure(config.directory, error, operation)
       send({ id, error: { code: -32603, message: 'synthetic_fixture_refused' } })
       if (activeTurn) {
         send({ method: 'turn/completed', params: { threadId, turn: { id: activeTurn, status: 'failed', error: { message: 'synthetic_fixture_refused' } } } })

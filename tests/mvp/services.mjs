@@ -159,15 +159,13 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
             answers: [{ type: 'choice', name: 'push', choice: 'none' }],
           })
         }
-        assert.equal(input.input?.length, 1)
-        assert.equal(input.input[0].role, 'user')
-        assert.equal(input.input[0].content?.length, 1)
-        assert.equal(input.input[0].content[0].type, 'input_text')
         if (question.name === 'outcome') {
           handler = 'decisions_outcome'
-          // An ended run's outcome (lib/run-outcome.ts): the run's facts, one per line.
+          // run-outcome-judge passes outcomeText directly. decisionRequestInput
+          // preserves plain strings; only DecisionContext callers use messages.
           assert.deepEqual(question.choices?.map(choice => choice.value), ['done', 'blocked', 'needs_input', 'failed', 'idle'])
-          const facts = input.input[0].content[0].text
+          assert.equal(typeof input.input, 'string')
+          const facts = input.input
           const status = /^status: (succeeded|stopped|failed|cancelled)\nstop reason: .+\nattempts on this task: [1-9][0-9]*\ntask: .+\npull requests: .+\nsummary \(quoted\): .+\nlast reply \(quoted\): .+$/.exec(facts)?.[1]
           assert.ok(status, 'Unexpected run outcome evidence')
           observe({ kind: 'outcome-request', requestId, status })
@@ -180,6 +178,10 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         handler = 'decisions_tier'
         assert.equal(question.name, 'tier')
         assert.deepEqual(question.choices?.map(choice => choice.value), ['attention', 'result', 'background'])
+        assert.equal(input.input?.length, 1)
+        assert.equal(input.input[0].role, 'user')
+        assert.equal(input.input[0].content?.length, 1)
+        assert.equal(input.input[0].content[0].type, 'input_text')
         const state = JSON.parse(input.input[0].content[0].text)
         const host = JSON.parse(state.hostObservation)
         assert.ok(['run_finished', 'action_decided'].includes(host.eventKind), 'Unexpected MVP runtime event')

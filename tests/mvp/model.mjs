@@ -15,10 +15,14 @@ export function tracePublicationReady(row) {
   return row?.status === 'published'
 }
 
-function output(messages, toolName) {
+function output(messages, toolName, expectedRunId) {
   const part = messages.flatMap(message => Array.isArray(message.content) ? message.content : []).findLast(part => part.type === 'tool-result' && part.toolName === toolName)
   if (!part) return undefined
-  if (part.output?.type !== 'json' || part.output.value?.error) throw fixtureModelError('MODEL_RESULT_REFUSED', toolName, part.output?.value)
+  // get_run returns the ended run's error as data. A real tool refusal has no
+  // matching run identity/status; never confuse those two response contracts.
+  const value = part.output?.value
+  const runDetail = toolName === 'get_run' && value?.id === expectedRunId && ['succeeded', 'stopped', 'failed', 'cancelled'].includes(value?.status)
+  if (part.output?.type !== 'json' || value?.error && !runDetail) throw fixtureModelError('MODEL_RESULT_REFUSED', toolName, value)
   return part.output.value
 }
 
@@ -41,8 +45,9 @@ export function answerModel(request, scenario, observe = () => {}) {
     const event = body(messages[ended])
     const runId = event.match(/\[Event\] Run ([a-f0-9-]{36}) ended/)?.[1]
     const recent = messages.slice(ended)
-    const run = output(recent, 'get_run')
+    const run = output(recent, 'get_run', runId)
     if (!run) return call('get_run', { runId }, 'result')
+    if (run.id !== runId) throw fixtureModelError('MODEL_COMPLETION_MISMATCH', 'get_run')
     if (run.status !== 'succeeded') return text('线程已停止。')
     const task = output(recent, 'get_issue')
     if (!task) return call('get_issue', { issueId: run.issueId }, 'result')

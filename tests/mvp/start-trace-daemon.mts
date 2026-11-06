@@ -11,6 +11,7 @@ import { localGitOrigin } from '../../packages/daemon/src/agents/local-git-origi
 import { sanitizeTraceContext } from '@mikka/protocol/trace-context'
 import { assertMvpEnvironment, MVP_ORIGIN } from './isolated-env.mjs'
 import { createTraceCodexBinary, createTraceGitHubBinary } from './trace-codex.mjs'
+import { observeTraceMcpFetch } from './diagnostics.mjs'
 
 assertMvpEnvironment()
 const directory = process.env.MIKKA_E2E_DAEMON_DIR, token = process.env.MIKKA_E2E_DEVICE_TOKEN
@@ -29,7 +30,7 @@ await daemonTracer.withContext(traceContext, async () => {
   if (result !== 0) throw new Error('TRACE_DAEMON_LOGIN_FAILED')
   const binary = createTraceCodexBinary(directory, join(fixtures, 'mvp-core-loop.jsonl'), barePath)
   const daemon = await startDaemon({
-    dataDir: directory, flavor: 'dev', link: new HttpServerLink(`${MVP_ORIGIN}/mikka`, fetch, DAEMON_VERSION),
+    dataDir: directory, flavor: 'dev', link: new HttpServerLink(`${MVP_ORIGIN}/mikka`, observeTraceMcpFetch(fetch), DAEMON_VERSION),
     agentSandbox: new NoSandbox(), harnessBinaries: { codex: binary },
     harnesses: [{ harness: 'codex', installed: true, version: 'synthetic' }], modelProbe: true,
     retainResources: true, onDrained: () => process.exit(0), onLockLost: () => process.exit(1),

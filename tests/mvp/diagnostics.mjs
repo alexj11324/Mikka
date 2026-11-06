@@ -1,26 +1,49 @@
 // Closed metadata for the isolated fixture report. No message, response, URL,
 // argument, function name, absolute path or raw stack belongs in this output.
-import { dirname } from 'node:path'
+import { closeSync, constants, fstatSync, openSync, readFileSync, writeSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
 
 const handlers = new Set(['route', 'extension', 'health', 'observations', 'streaming_scenario', 'streaming_control',
   'scenario', 'scenario_device', 'subscription_model', 'subscription_prompt', 'subscription_answer', 'subscription_chunks',
-  'language_model', 'decisions', 'decisions_push', 'decisions_outcome', 'decisions_tier', 'github'])
-const methods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])
+  'language_model', 'decisions', 'decisions_push', 'decisions_outcome', 'decisions_tier', 'github', 'synthetic_codex'])
+const methods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'RPC'])
 const operations = new Set(['create_issue', 'list_agents', 'dispatch_run', 'get_run', 'get_issue',
-  'prepare', 'models', 'usage', 'quota', 'nativeContext', 'nativeAuth', 'executeStream'])
+  'prepare', 'models', 'usage', 'quota', 'nativeContext', 'nativeAuth', 'executeStream',
+  'initialize', 'model_list', 'oauth_login', 'thread_start', 'turn_start', 'fixture_write', 'git_validate', 'git_commit', 'git_push', 'pr_create', 'pr_checks', 'mcp_submit'])
 const names = new Set(['Error', 'TypeError', 'SyntaxError', 'RangeError', 'AssertionError', 'AbortError', 'AggregateError', 'ActionFailureError', 'WorkerRefusal'])
 const codes = new Set([...ACTION_ERROR_CODES, 'ERR_ASSERTION', 'ERR_MODULE_NOT_FOUND', 'ERR_INVALID_ARG_TYPE', 'ENOENT', 'EACCES',
   'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'ABORT_ERR', 'subscription_fixture_refused',
   'githubReconnectRequired', 'repositoryRequired', 'machineUnavailable', 'modelNotAllowed', 'factoryLifecycleUnavailable',
   'agentProfileUnavailable', 'agentProfilePinConflict', 'MODEL_RESULT_REFUSED', 'MODEL_TOOL_MISSING',
-  'MODEL_DESTINATION_MISMATCH', 'MODEL_IDENTITY_MISSING', 'MODEL_RUN_NOT_QUEUED', 'MODEL_COMPLETION_MISMATCH'])
+  'MODEL_DESTINATION_MISMATCH', 'MODEL_IDENTITY_MISSING', 'MODEL_RUN_NOT_QUEUED', 'MODEL_COMPLETION_MISMATCH',
+  'SYNTHETIC_GIT_ORIGIN_REQUIRED', 'SYNTHETIC_DELIVERY_CONTEXT_REQUIRED', 'SYNTHETIC_REPOSITORY_REQUIRED', 'SYNTHETIC_GIT_REWRITE_REQUIRED',
+  'SYNTHETIC_PUSH_RECEIPT_REQUIRED', 'SYNTHETIC_PR_RECEIPT_REQUIRED', 'SYNTHETIC_CLEAN_WORKTREE_REQUIRED', 'SYNTHETIC_CODEX_METHOD_REQUIRED',
+  'SYNTHETIC_CODEX_HOME_REQUIRED', 'SYNTHETIC_CODEX_AUTH_FILE_REFUSED', 'SYNTHETIC_CODEX_SHELL_REFUSED', 'SYNTHETIC_CODEX_MCP_REQUIRED',
+  'SYNTHETIC_CODEX_SUBMIT_REFUSED', 'SYNTHETIC_CODEX_SUBMIT_REQUIRED', 'SYNTHETIC_COMMAND_FAILED', 'SYNTHETIC_FIXTURE_FAILED'])
 const reasons = new Set(['noModels', 'cloudNotConfigured', 'cloudModelsUnknown', 'cloudModelNotReported', 'noDevice', 'checking', 'unavailable'])
 const sources = new Set(['diagnostics.mjs', 'services.mjs', 'model.mjs', 'subscription.mjs', 'subscription-worker.mjs',
   'trace-chain.mjs', 'trace-codex.mjs', 'fixture.test.mjs'])
 const escapedDirectory = dirname(fileURLToPath(import.meta.url)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const frame = new RegExp(`(?:file:\\/\\/)?${escapedDirectory}/([a-z0-9.-]+\\.mjs):([0-9]{1,5}):([0-9]{1,5})(?:\\)|$)`)
+
+function failureMetadata(value) {
+  return {
+    handler: handlers.has(value?.handler) ? value.handler : 'route',
+    method: methods.has(value?.method) ? value.method : 'OTHER',
+    name: names.has(value?.name) ? value.name : 'Error',
+    ...(codes.has(value?.code) ? { code: value.code } : {}),
+    ...(operations.has(value?.operation) ? { operation: value.operation } : {}),
+    ...(codes.has(value?.sourceCode) ? { sourceCode: value.sourceCode } : {}),
+    ...(reasons.has(value?.sourceReason) ? { sourceReason: value.sourceReason } : {}),
+    source: (Array.isArray(value?.source) ? value.source : []).slice(0, 3).flatMap(location =>
+      typeof location?.file === 'string' && location.file.startsWith('tests/mvp/') && sources.has(location.file.slice('tests/mvp/'.length))
+        && Number.isInteger(location.line) && location.line >= 1 && location.line <= 10_000
+        && Number.isInteger(location.column) && location.column >= 1 && location.column <= 4096
+        ? [{ file: location.file, line: location.line, column: location.column }] : []),
+  }
+}
 
 export function fixtureFailure(error, handler = 'route', method) {
   const source = []
@@ -33,15 +56,62 @@ export function fixtureFailure(error, handler = 'route', method) {
     source.push({ file: `tests/mvp/${found[1]}`, line: row, column })
     if (source.length === 3) break
   }
-  return {
-    handler: handlers.has(handler) ? handler : 'route',
-    method: methods.has(method) ? method : 'OTHER',
-    name: names.has(error?.name) ? error.name : 'Error',
-    ...(codes.has(error?.code) ? { code: error.code } : {}),
-    ...(operations.has(error?.fixtureOperation) ? { operation: error.fixtureOperation } : {}),
-    ...(codes.has(error?.sourceCode) ? { sourceCode: error.sourceCode } : {}),
-    ...(reasons.has(error?.sourceReason) ? { sourceReason: error.sourceReason } : {}),
-    source,
+  return failureMetadata({ handler, method, name: error?.name, code: error?.code, operation: error?.fixtureOperation,
+    sourceCode: error?.sourceCode, sourceReason: error?.sourceReason, source })
+}
+
+/** Owned peer-only evidence. Keep no command, stderr, prompt or raw stack. */
+export function recordPeerFailure(directory, error, operation) {
+  const firstLine = typeof error?.message === 'string' ? error.message.split('\n', 1)[0] : ''
+  const code = codes.has(firstLine) ? firstLine : codes.has(error?.code) ? error.code
+    : typeof error?.code === 'number' ? 'SYNTHETIC_COMMAND_FAILED' : 'SYNTHETIC_FIXTURE_FAILED'
+  const metadata = fixtureFailure({ name: error?.name, stack: error?.stack, code, fixtureOperation: operation }, 'synthetic_codex', 'RPC')
+  let fd
+  try {
+    fd = openSync(join(directory, 'trace-peer-failures.jsonl'), constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | constants.O_NOFOLLOW, 0o600)
+    const stat = fstatSync(fd)
+    if (stat.isFile() && stat.nlink === 1 && (stat.mode & 0o077) === 0 && stat.size < 65_536) writeSync(fd, JSON.stringify(metadata) + '\n')
+  } catch { /* Diagnostic IO must not replace the original fixture failure. */ }
+  finally { if (fd !== undefined) closeSync(fd) }
+}
+
+export function readPeerFailures(directory) {
+  let fd
+  try {
+    fd = openSync(join(directory, 'trace-peer-failures.jsonl'), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+    const stat = fstatSync(fd)
+    if (!stat.isFile() || stat.nlink !== 1 || stat.size > 70_000) return []
+    return readFileSync(fd, 'utf8').trim().split('\n').slice(0, 16).flatMap(line => {
+      try { return [failureMetadata(JSON.parse(line))] } catch { return [] }
+    })
+  } catch { return [] }
+  finally { if (fd !== undefined) closeSync(fd) }
+}
+
+/** Observe the exact real mailbox transport without consuming or changing its
+ * request/response, signal, timeout or error. Output only closed HTTP metadata. */
+export function observeTraceMcpFetch(fetcher, sink = value => console.info(JSON.stringify({ traceFixtureHttp: value }))) {
+  let remaining = 64
+  const names = new Set(['Error', 'TypeError', 'AbortError', 'TimeoutError', 'DOMException'])
+  const errors = new Set(['ABORT_ERR', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_SOCKET'])
+  return async (input, options) => {
+    let url
+    try { url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url) }
+    catch { return fetcher(input, options) }
+    if (url.origin !== 'http://localhost:3100' || url.pathname !== '/mikka/api/mcp' || remaining <= 0) return fetcher(input, options)
+    remaining--
+    const requested = options?.method ?? (input instanceof Request ? input.method : 'GET')
+    const method = ['GET', 'POST', 'DELETE'].includes(requested) ? requested : 'OTHER'
+    const started = Date.now()
+    const report = fields => { try { sink({ route: 'mcp', method, durationMs: Date.now() - started, ...fields }) } catch { /* Preserve transport behavior. */ } }
+    try {
+      const response = await fetcher(input, options)
+      report({ status: response.status })
+      return response
+    } catch (error) {
+      report({ errorName: names.has(error?.name) ? error.name : 'Error', ...(errors.has(error?.code) ? { code: error.code } : {}) })
+      throw error
+    }
   }
 }
 
