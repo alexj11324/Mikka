@@ -107,11 +107,14 @@ export function routingDecisionQuestions(): DecisionQuestion[] {
   ]
 }
 
-/** Below this the tier judgement carries no usable signal (a uniform split
- * over three levels is 0.33) and the person's list order is kept. Effort
- * below it sends no override. Provisional: recalibrate against the labeled
- * set with scripts/model-routing-calibration.mjs. */
-export const ROUTING_MIN_CONFIDENCE = 0.3
+/** Below this the tier judgement keeps the person's list order. Calibrated on
+ * the labeled set (scripts/model-routing-calibration.ts, 2026-11-06): at 0.55,
+ * 12 of 16 route, 7 of them to the labeled tier and 1 below it. A too-weak
+ * choice is the costly error, since list order usually starts strongest. */
+export const ROUTING_MIN_CONFIDENCE = 0.55
+/** Effort below this sends no override; it never discards the model. A uniform
+ * split carries no signal, and an override that is off by a level is cheap. */
+export const ROUTING_MIN_EFFORT_CONFIDENCE = 0.3
 
 /** Nearest level. Upward rounding was tried and dropped: on the labeled set
  * with full task text the judge already scores high, not low. */
@@ -147,7 +150,7 @@ const scoreAnswer = (answers: RoutingAnswers, name: string, levels: number): Sco
     || (answer.confidence !== undefined && (!Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1))) return 'invalid'
   return answer
 }
-const confident = (answer: ScoreAnswer) => answer.confidence === undefined || answer.confidence >= ROUTING_MIN_CONFIDENCE
+const confident = (answer: ScoreAnswer, minimum: number) => answer.confidence === undefined || answer.confidence >= minimum
 
 const firstInOrder = (catalog: readonly ModelRoutingCandidate[]) => catalog.reduce<ModelRoutingCandidate | undefined>(
   (first, candidate) => !first || candidate.position < first.position ? candidate : first, undefined)
@@ -191,11 +194,11 @@ export function selectModelRouting(catalog: readonly ModelRoutingCandidate[], an
   const tier = scoreAnswer(answers, 'tier', MODEL_ROUTING_TIERS.length)
   if (!tier) return fallback('no_selection')
   if (tier === 'invalid') return fallback('invalid_answer')
-  if (!confident(tier)) return fallback('low_confidence')
+  if (!confident(tier, ROUTING_MIN_CONFIDENCE)) return fallback('low_confidence')
   const required = MODEL_ROUTING_TIERS[levelForScore(tier.score, MODEL_ROUTING_TIERS.length)]
   const candidate = candidateForTier(catalog, required)!
   const effort = scoreAnswer(answers, 'effort', MODEL_ROUTING_EFFORTS.length)
-  const chosenEffort = effort && effort !== 'invalid' && confident(effort) ? nearestEffort(candidate.efforts, effort.score) : undefined
+  const chosenEffort = effort && effort !== 'invalid' && confident(effort, ROUTING_MIN_EFFORT_CONFIDENCE) ? nearestEffort(candidate.efforts, effort.score) : undefined
   return selection(candidate, required, 'difficulty_fit', chosenEffort)
 }
 

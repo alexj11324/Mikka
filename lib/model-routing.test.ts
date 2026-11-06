@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { validatedAnswers, type DecisionAnswer } from './coordinator/decision'
-import { candidateForTier, escalateModelRouting, levelForScore, routingTaskContent, MODEL_ROUTING_EFFORTS, modelRoutingDiagnostics, modelTier, nearestEffort, ROUTING_MIN_CONFIDENCE, routingDecisionQuestions, selectModelRouting, supportedModelEfforts, type ModelRoutingCandidate, type ModelRoutingSnapshot, type ModelRoutingSnapshotV1 } from './model-routing.ts'
+import { candidateForTier, escalateModelRouting, levelForScore, routingTaskContent, ROUTING_MIN_EFFORT_CONFIDENCE, MODEL_ROUTING_EFFORTS, modelRoutingDiagnostics, modelTier, nearestEffort, ROUTING_MIN_CONFIDENCE, routingDecisionQuestions, selectModelRouting, supportedModelEfforts, type ModelRoutingCandidate, type ModelRoutingSnapshot, type ModelRoutingSnapshotV1 } from './model-routing.ts'
 
 const candidate = (id: string, model: string, harness: ModelRoutingCandidate['harness'], position: number): ModelRoutingCandidate => ({
   id, model, harness, tier: modelTier(model), position, efforts: supportedModelEfforts(model, harness),
@@ -128,6 +128,13 @@ test('only an uncertain, missing or malformed tier keeps list order', () => {
   assert.equal(selectModelRouting(catalog, null)?.snapshot.reason, 'decision_unavailable')
   assert.equal(selectModelRouting(catalog, null, { fallbackReason: 'list_order' })?.snapshot.reason, 'list_order')
   assert.equal(selectModelRouting([], answers(0)), null)
+})
+
+test('tier and effort use separate confidence floors', () => {
+  const between = (ROUTING_MIN_EFFORT_CONFIDENCE + ROUTING_MIN_CONFIDENCE) / 2
+  assert.equal(selectModelRouting(catalog, answers(2, 2, { tier: between }))?.snapshot.reason, 'low_confidence')
+  assert.equal(selectModelRouting(catalog, answers(2, 2, { effort: between }))?.snapshot.effort, 'high')
+  assert.equal(selectModelRouting(catalog, answers(2, 2, { effort: ROUTING_MIN_EFFORT_CONFIDENCE - .01 }))?.snapshot.effort, undefined)
 })
 
 test('confidence combinations: effort never abandons the tier judgement', () => {
