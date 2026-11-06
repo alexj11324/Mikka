@@ -1969,8 +1969,7 @@
       "pauseFailed": "无法更改这个订阅。",
       "claudePlan": "Claude {plan}",
       "disconnectTitle": "断开 {label}？",
-      "enabled": "启用",
-      "selectedBy": "{workspace} · 聊天已选用："
+      "enabled": "启用"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",

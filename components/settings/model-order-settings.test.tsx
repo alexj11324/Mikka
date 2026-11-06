@@ -87,7 +87,13 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.close())
 const render = async () => { await act(async () => root.render(<ModelOrderSettings workspaceId={workspaceId} />)) }
 const row = (block: OrderRow['block'], source: OrderRow['source'] = { kind: 'subscription', connectionId }): OrderRow => ({ id: randomUUID(), model: 'fixture-model', harness: 'claude_code', provider: 'claude', agents: ['claude_code'], source, block })
-const button = (label: string) => [...container.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
+const button = (label: string) => [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
+/** A row's state is a dot; its reason and repair open in a popover (on hover or tap). */
+const openStatus = async (index: number) => {
+  const dot = [...container.querySelectorAll('li [role="status"]')][index].closest('button')!
+  await act(async () => dot.click())
+  return document.querySelector('[data-slot="popover-content"]')
+}
 
 test('empty model order offers distinct subscription and API key destinations', async () => {
   data.credentials = 0
@@ -99,7 +105,12 @@ test('empty model order offers distinct subscription and API key destinations', 
 test('blocked entries point to their own credential or the workspace devices', async () => {
   data.entries = [row({ reason: 'paused' }), row({ reason: 'expired' }), row({ reason: 'keyRefused' }, { kind: 'api_key', keyId }), row({ reason: 'noDevice', device: { why: 'none' } })]
   await render()
-  const links = [...container.querySelectorAll('li a')]
+  const links: Element[] = []
+  for (const index of [0, 1, 2, 3]) {
+    const popover = await openStatus(index)
+    links.push(...popover!.querySelectorAll('a'))
+    await act(async () => [...container.querySelectorAll('li [role="status"]')][index].closest('button')!.click())
+  }
   assert.deepEqual(links.slice(0, 3).map(link => link.getAttribute('href')), [`#subscription-${connectionId}`, `#subscription-${connectionId}`, `#api-key-${keyId}`])
   const devices = new URL(links[3].getAttribute('href')!, 'https://mikka.test')
   assert.equal(devices.pathname, '/settings')
@@ -113,7 +124,8 @@ test('an unknown allowance stays neutral and checks the provider before rereadin
   await render()
   const status = container.querySelector('li [role="status"]')
   assert.equal(status?.textContent, 'blocked.checking')
-  assert.ok(!status?.querySelector('.bg-warning'))
+  assert.ok(!status?.parentElement?.querySelector('.bg-warning'))
+  await openStatus(0)
   assert.ok(button('checkQuota'))
   await act(async () => button('checkQuota')!.click())
   assert.deepEqual(events, ['probe', 'order-cache'])
@@ -124,6 +136,7 @@ test('a shared subscription allowance check uses the authorized row action witho
   const sharedConnectionId = randomUUID()
   data.entries = [row({ reason: 'checking' }, { kind: 'subscription', connectionId: sharedConnectionId })]
   await render()
+  await openStatus(0)
   await act(async () => button('checkQuota')!.click())
   assert.deepEqual(events, ['probe', 'order-cache'])
   assert.equal(container.querySelector('[role="alert"]'), null)
@@ -161,6 +174,7 @@ test('云端 without an E2B key: rows stay ready, the 运行位置 line says whe
 test('a refused allowance check keeps the selection and offers retry', async () => {
   data.entries = [row({ reason: 'checking' })]; refreshFails = true
   await render()
+  await openStatus(0)
   await act(async () => button('checkQuota')!.click())
   assert.equal(data.entries.length, 1)
   assert.ok(container.querySelector('[role="alert"]'))
@@ -173,6 +187,7 @@ test('a refused allowance check keeps the selection and offers retry', async () 
 test('an unavailable provider read keeps checking even when the HTTP request succeeds', async () => {
   data.entries = [row({ reason: 'checking' })]; refreshUnconfirmed = true
   await render()
+  await openStatus(0)
   await act(async () => button('checkQuota')!.click())
   assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('quotaCheckUnconfirmed'))
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'blocked.checking')

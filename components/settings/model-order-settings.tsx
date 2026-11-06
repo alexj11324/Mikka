@@ -14,6 +14,7 @@ import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -305,12 +306,17 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>}
-    <span className="flex shrink-0 flex-col items-end gap-1.5">
-      <span role="status" className={cn('flex items-center gap-1.5 text-xs', retry ? 'text-destructive-foreground' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
-        <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : checking ? 'bg-muted-foreground' : 'bg-success')} />{status}
-      </span>
-      {!retry && repair}
-    </span>
+    {/* The row's state is a dot (R-24); its reason and repair open on hover or tap, so a long reason never pushes the row apart. */}
+    <Popover>
+      <PopoverTrigger openOnHover delay={150} closeDelay={150} render={<Button type="button" variant="ghost" size="icon-sm" aria-label={status} />}>
+        <span aria-hidden="true" className={cn('size-2 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : checking ? 'bg-muted-foreground' : 'bg-success')} />
+        <span role="status" className="sr-only">{status}</span>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 gap-2.5 p-3">
+        <span className={cn('text-sm', retry ? 'text-destructive-foreground' : warn ? 'text-warning-foreground' : 'text-foreground')}>{status}</span>
+        {!retry && repair && <span className="self-start">{repair}</span>}
+      </PopoverContent>
+    </Popover>
     {retry && <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={retry}>{commonT('retry')}</Button>}
     <DropdownMenu>
       <DropdownMenuTrigger disabled={pending} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { model: row.model })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>

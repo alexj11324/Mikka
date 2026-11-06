@@ -1969,8 +1969,7 @@
       "pauseFailed": "The subscription could not be changed.",
       "claudePlan": "Claude {plan}",
       "disconnectTitle": "Disconnect {label}?",
-      "enabled": "On",
-      "selectedBy": "{workspace} · Selected for chat:"
+      "enabled": "On"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
