@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "issue": 1504,
+  "applicationSha": "2cba2a841ab770692559f1e5e18a0a57cff99952",
+  "workspaceRef": "e917cd887945",
+  "runKey": "gha-42275714635",
+  "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+  "botCreateAttempted": true,
+  "ownerRef": "b823ba1c5729",
+  "cases": [
+    {
+      "key": "text-normalization",
+      "issueId": "dbb35e04-de5f-420a-b4aa-153146268259",
+      "runId": "d042af8b-5bf7-4b5e-876b-13e0639a3254",
+      "runIds": [
+        "d042af8b-5bf7-4b5e-876b-13e0639a3254",
+        "f815b8ef-002f-48f1-8be1-cd39781e0c5d"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true
+    },
+    {
+      "key": "event-rollup",
+      "issueId": "ea3afbd4-b328-4aca-8a2e-d9efe2f7af3e",
+      "runId": "a9d61f74-7b5f-421b-853e-4d6c69acfb3f",
+      "runIds": [
+        "a9d61f74-7b5f-421b-853e-4d6c69acfb3f"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "deleted": true
+    },
+    {
+      "key": "leased-job-queue",
+      "issueId": "3e413472-6bdd-46a0-a775-d4814bf60b40",
+      "runId": "500cecbe-4f32-432b-8054-104b8eb07623",
+      "runIds": [
+        "500cecbe-4f32-432b-8054-104b8eb07623"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "deleted": true
+    }
+  ]
+}
