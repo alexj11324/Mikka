@@ -466,20 +466,20 @@ LobeHub 有三条路径。
 
 | 阶段 | Issue | 依赖 |
 | --- | --- | --- |
-| P0-1 | 自托管基础：Docker 镜像和 compose、`MIKKA_EDITION`、去掉写死的生产地址和 App slug、社区版关闭计量 | — |
-| P0-2 | 不用 Cloudflare 的内置实时推送、设备网关和调度器 | P0-1 |
-| P0-3 | 自带 Key 补全：SMTP 和发件人、S3 兼容存储、密码箱本地密钥、OpenAI 兼容的默认模型、Decision 可配置、PostHog 缺省值 | P0-1 |
-| P0-4 | GitHub App Manifest 一键创建 | P0-1 |
+| P0-1 #1560 | 自托管基础：Docker 镜像和 compose、`MIKKA_EDITION`、去掉写死的生产地址和 App slug、社区版关闭计量 | — |
+| P0-2 #1561 | 不用 Cloudflare 的内置实时推送、设备网关和调度器 | P0-1 |
+| P0-3 #1562 | 自带 Key 补全：SMTP 和发件人、S3 兼容存储、密码箱本地密钥、OpenAI 兼容的默认模型、Decision 可配置、PostHog 缺省值 | P0-1 |
+| P0-4 #1563 | GitHub App Manifest 一键创建 | P0-1 |
 | #1556 | 发现接口和登录交接（已有；实时推送部分交给 P0-2，测试实例用 P0-1 的镜像） | P0-1、P0-2 |
 | #1557 | 桌面选择服务器（已有，基本不变） | #1556 |
-| P1-1 | Mikka 云服务骨架：`mikka-cloud`、服务器登记、两种连接方式、令牌、撤销、API 契约 | P0-1 |
-| P2-1 | GitHub App 代理和 webhook 转发 | P1-1 |
-| P2-2 | 推送转发 | P1-1 |
-| P2-3 | 托管模型和 Decision 额度 | P1-1 |
-| P2-4 | iOS 连接自托管服务器 | #1556 |
-| P2-5 | 云电脑按 Mikka 额度计费（等 Alex 确认 § 5.2） | P1-1 |
-| P3-1 | 云实时中继、云端 Composio 连接器（有真实用户需要再做） | P1-1 |
-| P3-2 | 云边界 CI 检查 | P1-1 |
+| P1-1 #1564 | Mikka 云服务骨架：`mikka-cloud`、服务器登记、两种连接方式、令牌、撤销、API 契约 | P0-1 |
+| P2-1 #1565 | GitHub App 代理和 webhook 转发 | P1-1 |
+| P2-2 #1566 | 推送转发 | P1-1 |
+| P2-3 #1567 | 托管模型和 Decision 额度 | P1-1 |
+| P2-4 #1568 | iOS 连接自托管服务器 | #1556 |
+| P2-5 #1569 | 云电脑按 Mikka 额度计费（等 Alex 确认 § 5.2） | P1-1 |
+| P3-1 #1570 | 云实时中继、云端 Composio 连接器（有真实用户需要再做） | P1-1 |
+| P3-2 #1571 | 云边界 CI 检查 | P1-1 |
 
 验收：每个 issue 都用不同于生产的域名起一个自托管实例。连云的 issue 先连到 Mikka 云的 preview 或测试项目
 （不是生产），再在生产上用共享测试账号验收。涉及模型的验收按 `AGENTS.md`，两条订阅路径各跑一次。
