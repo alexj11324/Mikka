@@ -4,6 +4,7 @@ import { cloudModelSupport, type CloudModelState } from './cloud-template-models
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { deviceOnlineStates } from './device-presence'
+import { deviceSchedulingView, type SchedulingNode } from './device-scheduling'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
@@ -39,6 +40,8 @@ export interface OrderRow extends OrderEntry {
 }
 
 export interface OrderView {
+  /** Actual dispatch rank and availability, from the same planner as new runs. */
+  dispatchOrder?: SchedulingNode[]
   location: RunLocation
   customized: boolean
   autoModelRouting: boolean
@@ -288,6 +291,7 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const plan = planDispatch({ entries: runnable, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
   const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
   return {
+    dispatchOrder: deviceSchedulingView({ location: order.location, entries: runnable, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] }),
     location: order.location,
     customized: order.customized,
     autoModelRouting: order.autoModelRouting,

@@ -11,10 +11,14 @@ const GATEWAY_ONLINE_WINDOW_MS = 90_000
  * rule. This is availability, not authority: callers still check owner/enabled.
  */
 export async function deviceIsOnline(device: DevicePresence, now = Date.now()): Promise<boolean> {
+  const seen = device.lastSeenAt instanceof Date ? device.lastSeenAt.getTime() : typeof device.lastSeenAt === 'number' ? device.lastSeenAt : Date.parse(device.lastSeenAt ?? '')
+  // A future stored heartbeat is invalid, even when a gateway happens to answer.
+  if (seen > now) return false
   if (isDeviceOnline(device.lastSeenAt, now)) return true
   const endpoint = deviceGatewayEndpoint(device.id, 'status')
   if (!endpoint) return false
   try {
+    const startedAt = Date.now()
     const response = await fetch(endpoint.url, {
       headers: { authorization: `Bearer ${endpoint.secret}` },
       cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(2_000),
@@ -24,8 +28,9 @@ export async function deviceIsOnline(device: DevicePresence, now = Date.now()): 
     if (!status || typeof status !== 'object' || !('online' in status) || status.online !== true
       || !('lastSeenAt' in status) || typeof status.lastSeenAt !== 'string') return false
     const seen = Date.parse(status.lastSeenAt)
-    // Tolerate a small clock difference, but not an unbounded future timestamp.
-    return Number.isFinite(seen) && seen <= now + 5_000 && now - seen <= GATEWAY_ONLINE_WINDOW_MS
+    // Future timestamps never prove a device is present.
+    const observedAt = now + Date.now() - startedAt
+    return Number.isFinite(seen) && seen <= observedAt && observedAt - seen <= GATEWAY_ONLINE_WINDOW_MS
   } catch { return false }
 }
 

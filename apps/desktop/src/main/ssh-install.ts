@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { readFile, mkdir, appendFile } from 'node:fs/promises'
+import { readFile, mkdir, appendFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import daemonPackage from '../../../../packages/daemon/package.json' with { type: 'json' }
 import { daemonCommands } from '../../../../lib/daemon-commands'
+import { InstallProcessError, installFailure, INSTALL_FAILURE_REASON, nodeDiscoveryScript, redactInstallLog } from './local-install'
 
 export const INSTALL_STEPS = ['login', 'check', 'install', 'service', 'connect'] as const
 export type InstallStep = typeof INSTALL_STEPS[number]
@@ -60,17 +61,17 @@ export function runProcess(command: string, args: string[], input?: string, time
     // Resolve/reject only after close, including timed out commands. Cleanup
     // must not start a new installation while the old command is still alive.
     const timer = setTimeout(() => { timedOut = true; stop() }, timeout)
-    child.stdout.on('data', chunk => { output = (output + chunk).slice(-65536) })
-    child.stderr.on('data', chunk => { error = (error + chunk).slice(-4096) })
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { error += chunk })
     child.on('error', reason => { closed = true; clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(reason) })
     child.on('close', code => {
       closed = true
       clearTimeout(timer)
       signal?.removeEventListener('abort', abort)
-      if (signal?.aborted) { reject(new Error('cancelled')); return }
-      if (timedOut) { reject(new Error('SSH operation timed out')); return }
-      if (code === 0) resolve(output.trim())
-      else reject(new Error(error.trim() || `Remote command failed (${code})`))
+      if (signal?.aborted) { reject(new InstallProcessError('cancelled', redactInstallLog(output, input), redactInstallLog(error, input), code)); return }
+      if (timedOut) { reject(new InstallProcessError('SSH operation timed out', redactInstallLog(output, input), redactInstallLog(error, input), code)); return }
+      if (code === 0) resolve(output.slice(-65536).trim())
+      else reject(new InstallProcessError(redactInstallLog(error.trim(), input) || `Remote command failed (${code})`, redactInstallLog(output, input), redactInstallLog(error, input), code))
     })
     child.stdin.on('error', () => {})
     child.stdin.end(input)
@@ -90,6 +91,7 @@ export class SshInstaller {
   /** Set by beginLocal / restartLocal: the steps run on this computer, not over SSH. */
   private local = false
   private localOwnerId?: string
+  private nodeBin?: string
   constructor(
     private appUrl: string,
     private mintToken: () => Promise<string>,
@@ -164,6 +166,7 @@ export class SshInstaller {
     try {
       await this.pending
       this.controller = new AbortController()
+      this.nodeBin = undefined
       const starting = run()
       this.pending = starting
       await starting
@@ -196,7 +199,7 @@ export class SshInstaller {
       } else {
         this.pending = this.install()
       }
-    } catch (error) { this.fail(error) }
+    } catch (error) { await this.fail(error) }
     return this.state()
   }
   async accept(id: string) {
@@ -211,7 +214,7 @@ export class SshInstaller {
         await appendFile(join(this.home, '.ssh/known_hosts'), `\n${keyLine}\n`, { mode: 0o600 })
         signal.throwIfAborted()
         this.pending = this.install()
-      } catch (error) { this.fail(error) }
+      } catch (error) { await this.fail(error) }
     })()
     this.pending = confirming
     await confirming
@@ -220,7 +223,7 @@ export class SshInstaller {
   async cancel(id: string) {
     if (this.current?.id !== id || !['running', 'fingerprint'].includes(this.current.status)) throw new Error('No active installation')
     this.controller.abort()
-    this.report({ status: 'failed', reason: 'cancelled', retryable: true })
+    this.report({ status: 'failed', reason: 'cancelled', retryable: true, error: { code: 'installer_failed', cause: 'cancelled', remedy: 'retry' } })
     await this.pending
     return this.state()
   }
@@ -231,11 +234,26 @@ export class SshInstaller {
     signal.throwIfAborted()
     return output
   }
-  private fail(error: unknown) {
-    if (!this.controller.signal.aborted && this.current) this.report({ status: 'failed', retryable: true, reason: error instanceof Error ? error.message : 'SSH installation failed' })
+  private async fail(error: unknown) {
+    if (this.controller.signal.aborted || !this.current) return
+    const failure = installFailure(error, this.current.step)
+    const logPath = join(this.home, '.mikka', 'logs', `installer-${this.current.id}.log`)
+    const diagnostic = error instanceof InstallProcessError
+      ? `exitCode=${error.exitCode}\n--- stdout ---\n${error.stdout}\n--- stderr ---\n${error.stderr}`
+      : error instanceof Error ? error.message : 'Unknown installer failure'
+    try {
+      await mkdir(join(this.home, '.mikka', 'logs'), { recursive: true, mode: 0o700 })
+      await writeFile(logPath, `step=${this.current.step}\ncode=${failure.code}\ncause=${failure.cause}\n${redactInstallLog(diagnostic)}\n`, { mode: 0o600 })
+      failure.logPath = logPath
+    } catch { /* A read-only home still gets the structured failure, without an invented log path. */ }
+    const reason = INSTALL_FAILURE_REASON[failure.cause] + (error instanceof InstallProcessError ? `\n\n${redactInstallLog(diagnostic)}` : '')
+    if (!this.controller.signal.aborted) this.report({ status: 'failed', retryable: true, reason, error: failure })
   }
   private remote(command: string, input?: string, timeout?: number) {
-    if (this.local) return this.run(this.shell.command, this.shell.args(command), input, timeout)
+    if (this.local) {
+      const path = this.nodeBin ? `export PATH=${quote(join(this.home, '.mikka/npm/bin'))}:${quote(this.nodeBin)}:"$PATH"; ` : ''
+      return this.run(this.shell.command, this.shell.args(path + command), input, timeout)
+    }
     return this.run('ssh', [...this.options, this.destination, command], input, timeout)
   }
   /** `--dev` for a dev desktop's own daemon on this computer; a remote host runs the production one. */
@@ -249,15 +267,20 @@ export class SshInstaller {
       const engine = daemonPackage.engines.node
       const minimum = /^>=(\d+)$/.exec(engine)?.[1]
       if (!minimum) throw new Error('Unsupported daemon Node engine range')
+      if (this.local) await this.selectNode(Number(minimum))
+      else {
       await this.remote(`case "$(uname -s)" in Linux|Darwin) ;; *) echo 'Linux or macOS required' >&2; exit 1;; esac; command -v node >/dev/null || { echo 'Node.js ${engine} required' >&2; exit 1; }; node -e 'if (+process.versions.node.split(".")[0] < ${minimum}) { console.error("Node.js ${engine} required"); process.exit(1) }'`)
+      }
       this.report({ step: 'install' })
       const url = new URL(this.appUrl)
       const commands = daemonCommands({ origin: url.origin, basePath: url.pathname.replace(/\/$/, ''), packageName: '@aspectlylabs/mikka' })
-      await this.remote(this.installCommand ?? commands.install, undefined, 300_000)
+      await this.remote(this.installCommand ?? (this.local
+        ? `npm install --global --cache ${quote(join(this.home, '.mikka/npm-cache'))} --prefix ${quote(join(this.home, '.mikka/npm'))} @aspectlylabs/mikka`
+        : commands.install), undefined, 300_000)
       this.report({ step: 'service' })
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type ${deviceType}${this.flags()}`)
       await this.connect()
-    } catch (error) { this.fail(error) }
+    } catch (error) { await this.fail(error) }
   }
   private async connect() {
     this.report({ step: 'connect' })
@@ -267,13 +290,19 @@ export class SshInstaller {
     await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin${this.flags()}`, `${token}\n`)
     await this.waitOnline()
   }
+  private async selectNode(minimum = 22) {
+    const result = await this.remote(`/bin/sh -c ${quote(nodeDiscoveryScript(minimum, this.home))}`)
+    const selected = result.split('\n').find(line => line.startsWith('MIKKA_NODE_BIN='))?.slice('MIKKA_NODE_BIN='.length)
+    if (selected?.startsWith('/') && !/[\r\n]/.test(selected)) this.nodeBin = selected
+  }
   private async repair() {
     try {
+      await this.selectNode()
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
       if (await this.waitOnline(true) === 'online') return
     } catch (error) {
       if (this.controller.signal.aborted) return
-      if (error instanceof LocalAccountUnconfirmed) { this.fail(error); return }
+      if (error instanceof LocalAccountUnconfirmed) { this.report({ step: 'connect' }); await this.fail(error); return }
       this.report({ step: 'check' })
       await this.install('laptop')
       return
@@ -281,15 +310,16 @@ export class SshInstaller {
     // The installed daemon answered and explicitly has no credential. Sign it
     // in through the same enrollment flow; reinstalling would stop a working
     // service and needlessly bootstrap it a second time.
-    try { await this.connect() } catch (error) { this.fail(error) }
+    try { await this.connect() } catch (error) { await this.fail(error) }
   }
   /** Rewrites and restarts the service (`service install` restarts it), then waits until it is online. */
   private async restart() {
     try {
+      await this.selectNode()
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
       this.report({ step: 'connect' })
       await this.waitOnline()
-    } catch (error) { this.fail(error) }
+    } catch (error) { await this.fail(error) }
   }
   private async waitOnline(allowUnregistered = false): Promise<'online' | 'unregistered'> {
     for (let attempt = 0; attempt < 30; attempt++) {
@@ -303,7 +333,7 @@ export class SshInstaller {
           if (typeof remote.deviceId !== 'string' || !remote.deviceId) throw new Error('Device does not belong to the signed-in account')
           let owned: boolean
           try { owned = await this.verifyLocalDevice(remote.deviceId, this.localOwnerId) }
-          catch { throw new LocalAccountUnconfirmed('Device account could not be confirmed') }
+          catch (error) { throw new LocalAccountUnconfirmed('Device account could not be confirmed', { cause: error }) }
           if (!owned) throw new Error('Device does not belong to the signed-in account')
         }
         this.controller.signal.throwIfAborted()

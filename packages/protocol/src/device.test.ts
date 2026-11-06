@@ -21,6 +21,8 @@ describe("device online state", () => {
     expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS - 1, now)).toBe(false)
     expect(isDeviceOnline(null, now)).toBe(false)
     expect(isDeviceOnline("not a date", now)).toBe(false)
+    expect(isDeviceOnline(now + 1, now)).toBe(false)
+    expect(isDeviceOnline("2036-11-06T12:00:00Z", now)).toBe(false)
   })
 
   it("summarizes 设备 n/m 在线", () => {
