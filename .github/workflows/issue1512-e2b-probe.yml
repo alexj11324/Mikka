@@ -1,4 +1,4 @@
-name: Issue 1512 desktop catalogue diagnosis
+name: Issue 1512 existing desktop catalogue diagnosis
 
 on:
   push:
@@ -56,11 +56,11 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Diagnose one private desktop candidate without an account
+      - name: Reuse only the recorded private desktop candidate
         run: >-
-          "$RUNNER_TEMP/issue1512-e2b/bin/python" ops/scripts/ops/issue1512-e2b-probe.py diagnose
+          "$RUNNER_TEMP/issue1512-e2b/bin/python" ops/scripts/ops/issue1512-e2b-probe.py probe-existing
           --source source --output "$RUNNER_TEMP/issue1512-e2b-probe.json"
-      - name: Finalize only this attempt's resources
+      - name: Finalize the exact original candidate and owned probe VMs
         if: always() && steps.key.outcome == 'success'
         run: >-
           "$RUNNER_TEMP/issue1512-e2b/bin/python" ops/scripts/ops/issue1512-e2b-probe.py cleanup
