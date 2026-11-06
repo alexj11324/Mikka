@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "baseSha": "e8dd7a1265027a0477819dde1a80178e7bcdb1ae",
+  "patches": [
+    {
+      "file": "stop.patch",
+      "sha256": "c20d86ba8f1cd658be977c66f92cb5bdd81e023b90e943e26e76e72f269e0dfd",
+      "sources": {
+        "lib/agent-kit/core-entry.test.ts": "9c19e4816616ec17741aef27708ad9bf7ca4d66a764fa3eb460bd70b03fc93b3",
+        "lib/agent-kit/instrument.ts": "2934a44c69d06b21fef040da3eb83666be4a5cc0d4d2dd412b195f0ed908785a",
+        "lib/agent-kit/store.db.test.ts": "772ca38f3e6de0f5baa0c403230a9367b114388c020f7d02fa44c0f90827d712",
+        "lib/agent-kit/store.ts": "8a33540c26c292b79802efe6a3799f60a2f633c233b4c915677c14a477c8322d",
+        "lib/subscription-workflow-turn.test.ts": "e58171d636e17930c77cc44f6a73dc5888e0e5108fd9c95f43e46ba92e1c3130",
+        "workflows/coordinator/workflow.ts": "fb545f5f6bfbdaad2b0865f66a9911429696351fb29ae2f8f3444985d8d8da52"
+      }
+    },
+    {
+      "file": "live.patch",
+      "sha256": "31bcbe99d0e645a018616ed477e1ae18fd925a6fc79571b9f3a574ac88be692a",
+      "sources": {
+        "hooks/use-live-key.tsx": "b285e80146fa936d2c40fbfdb23626e1c4630d023cde8a905a1345f22de8ba97",
+        "lib/live/channel.test.ts": "8b03cb1e74a8bcf4a368794c19926be8572ca0b4fe5ee1875ac5d3c93e8c7840",
+        "lib/live/channel.ts": "38b8f75e8e0888f81789da1f98a7e051c3462a36ce358e6748c35fa30cebf888",
+        "lib/live/channels.ts": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8",
+        "lib/live/revisions.ts": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+        "lib/live/tab-share.test.ts": "0386ec76668053f520d5b6868b55b41b9e8c7292739558c176bdc8aafc3bb62b",
+        "lib/live/tab-share.ts": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+        "scripts/use-live-lists.live.test.tsx": "7fbf8f4117778ef438ae041d9dd34834d0ecb0d0b58b3742d4a46987080b7d91"
+      }
+    }
+  ]
+}

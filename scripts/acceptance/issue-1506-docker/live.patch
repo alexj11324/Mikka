@@ -1,0 +1,495 @@
+diff --git a/hooks/use-live-key.tsx b/hooks/use-live-key.tsx
+index 1a0d4183e1f8c0b005efe2f5c3480aeb4ccaf940..36cf90c55d70e2ec968b84488457aaf2f7e7744b 100644
+--- a/hooks/use-live-key.tsx
++++ b/hooks/use-live-key.tsx
+@@ -3,8 +3,9 @@
+ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
+ import { useSWRConfig } from 'swr'
+ import { browserRuntime } from '@/lib/live/browser-runtime'
+-import { type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
++import { type LiveRefresh, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
+ import { LiveChannels } from '@/lib/live/channels'
++import { coversLiveRevisions } from '@/lib/live/revisions'
+ import { TabShare, tabShareChannelName } from '@/lib/live/tab-share'
+ import type { LiveKind } from '@/lib/live/events'
+ import { registerLiveKeyConnection } from '@/lib/swr/live-focus'
+@@ -83,18 +84,20 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
+     if (!channels) return
+     const subscriptions = (JSON.parse(references) as LiveEntity[]).map(({ kind, id, workspaceId: entityScope }, index) => {
+       const channelScope = entityScope === undefined ? scope : entityScope
+-      const refresh = (key: string) => {
++      const refresh: LiveRefresh = (key, requiredRevisions, reuseCompleted) => {
+         const authorized = () => ownerId && namespace && readCacheShareNamespace(cache, ownerId) === namespace
+         if (!share || !authorized()) return mutate(key)
+         const tabs = share(channelScope)
+         if (!tabs) return mutate(key)
+         const previous = cache.get(key)?.data
++        const accepts = (data: unknown) => coversLiveRevisions(data, requiredRevisions)
++          && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
+         // Share normalized snapshots, never a delta against another tab's
+         // cursor. A local write while waiting must not be overwritten either.
+         return tabs.run(key, () => mutate(key), data => {
+           if (!authorized()) return
+           return cache.get(key)?.data === previous ? mutate(key, data, { revalidate: false }) : mutate(key)
+-        })
++        }, accepts, reuseCompleted)
+       }
+       return channels.subscribe(channelScope, kind, id, JSON.parse(serialized) as string[], refresh, optionsFor(index))
+     })
+diff --git a/lib/live/channel.test.ts b/lib/live/channel.test.ts
+index 5a30b75459e4092d6719b5dca266a25493b4ed23..05a6f5ca3ab6a525cf39ee9401f63156febc8dec 100644
+--- a/lib/live/channel.test.ts
++++ b/lib/live/channel.test.ts
+@@ -533,6 +533,32 @@ function revisionFixture() {
+   return { ...f, urls, ready }
+ }
+ 
++test('one coalesced read requires the highest pushed revision of every entity behind its key', async () => {
++  const f = revisionFixture()
++  const reads: { key: string; required?: Readonly<Record<string, number>>; reuseCompleted?: boolean }[] = []
++  const refresh = (key: string, required?: Readonly<Record<string, number>>, reuseCompleted?: boolean) => { reads.push({ key, required, reuseCompleted }) }
++  f.channel.subscribe('bot_chat', task, ['chat'], refresh, { revisions: { chat: 5 } })
++  f.channel.subscribe('run', other, ['chat'], refresh, { revisions: { chat: 2 } })
++  await f.open()
++  f.sockets[0].message(JSON.stringify({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat', 'run'] }))
++  reads.length = 0
++  for (const rev of [6, 7, 6]) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
++  f.sockets[0].message(JSON.stringify({ kind: 'run', id: other, rev: 3 }))
++  await f.advance(1_000)
++  assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 7, [`run:${other}`]: 3 }, reuseCompleted: true }])
++  reads.length = 0
++  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
++  await f.advance(1_000)
++  assert.deepEqual(reads, [{ key: 'chat', required: undefined, reuseCompleted: false }], 'unversioned events retain their existing read path')
++  for (const revisions of [[6, undefined], [undefined, 6]]) {
++    reads.length = 0
++    for (const rev of revisions) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
++    await f.advance(1_000)
++    assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 6 }, reuseCompleted: false }], 'an unversioned event preserves known requirements but cannot reuse a completed read')
++  }
++  f.channel.dispose()
++})
++
+ test('a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one', async () => {
+   const f = revisionFixture()
+   const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
+@@ -589,9 +615,10 @@ test('a revision never skips a key it does not cover, a version 1 Worker, or a k
+ 
+ test('an unconditional push merged with a covered one still reads', async () => {
+   const f = revisionFixture()
+-  f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
++  const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
+   await f.open(); f.ready(2); f.reads.length = 0
+   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 6 }))
++  subscription.update({ revisions: { chat: 6 }, minIntervalMs: 2_000 })
+   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
+   await f.advance(3_000)
+   assert.deepEqual(f.reads, ['chat'])
+diff --git a/lib/live/channel.ts b/lib/live/channel.ts
+index ce30a5a681e970ffd948b17eba33d2d092a2b741..7dd879eddbd987b919b5b710d6842d3d5c599515 100644
+--- a/lib/live/channel.ts
++++ b/lib/live/channel.ts
+@@ -1,4 +1,5 @@
+ import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type LiveKind } from './events'
++import { liveRevisionKey, type LiveRevisions } from './revisions'
+ 
+ export const LIVE_FALLBACK_MS = 60_000
+ const HEARTBEAT_MS = 30_000
+@@ -25,9 +26,11 @@ export type LiveSubscriptionOptions = {
+    * key's read; a missing or unknown revision always reads. */ revisions?: Readonly<Record<string, number | null | undefined>> | null
+ }
+ export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
+-type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number> }
+-/** `waits: null` reads unconditionally; otherwise the read is skipped once every listed revision is held. */
+-type PendingRead = { refresh: Subscription['refresh']; at: number; waits: { subscription: Subscription; key: string; rev: number }[] | null }
++/** Shared reads cover every known revision; only fully versioned pushes may reuse a completed result. */
++export type LiveRefresh = (key: string, requiredRevisions?: Readonly<LiveRevisions>, reuseCompleted?: boolean) => unknown
++type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: LiveRefresh; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number> }
++/** An unversioned event always reads, while retaining any known revisions merged into that read. */
++type PendingRead = { refresh: Subscription['refresh']; at: number; unconditional: boolean; waits: { subscription: Subscription; key: string; rev: number }[] }
+ const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(Object.entries(value ?? {})
+   .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isSafeInteger(entry[1]) && entry[1] > 0))
+ 
+@@ -184,9 +187,9 @@ export class LiveChannel {
+         if (rev !== undefined && (subscription.revisions.get(key) ?? 0) >= rev) { this.skippedReads++; continue }
+         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
+         const previous = this.pending.get(key)
+-        const wait = rev === undefined ? null : [{ subscription, key, rev }]
+-        const waits = !wait || (previous && !previous.waits) ? null : [...previous?.waits ?? [], ...wait]
+-        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity), waits })
++        const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
++        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity),
++          unconditional: rev === undefined || previous?.unconditional === true, waits })
+       }
+     }
+     this.scheduleFlush()
+@@ -194,7 +197,7 @@ export class LiveChannel {
+ 
+   /** Every push behind this read is covered by data that arrived meanwhile. */
+   private covered(read: PendingRead) {
+-    return read.waits !== null && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
++    return !read.unconditional && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
+   }
+ 
+   private scheduleFlush() {
+@@ -225,7 +228,12 @@ export class LiveChannel {
+         // A notification during a read is still dirty: deliver one trailing read.
+         this.scheduleFlush()
+       }
+-      try { Promise.resolve(refresh(key)).catch(() => {}).finally(settled) }
++      const required = read.waits.length ? read.waits.reduce<LiveRevisions>((revisions, { subscription, rev }) => {
++        const ref = liveRevisionKey(subscription.kind, subscription.id.toLowerCase())
++        revisions[ref] = Math.max(revisions[ref] ?? 0, rev)
++        return revisions
++      }, {}) : undefined
++      try { Promise.resolve(refresh(key, required, !read.unconditional)).catch(() => {}).finally(settled) }
+       catch { settled() } // SWR owns read errors.
+     }
+     this.scheduleFlush()
+diff --git a/lib/live/channels.ts b/lib/live/channels.ts
+index bea0e289f62e502107e6db42505519347a36ce50..d459548cbd8785bf2764d23543109b99ae146d18 100644
+--- a/lib/live/channels.ts
++++ b/lib/live/channels.ts
+@@ -1,4 +1,4 @@
+-import { LiveChannel, type LiveRuntime, type LiveSubscriptionOptions } from './channel'
++import { LiveChannel, type LiveRefresh, type LiveRuntime, type LiveSubscriptionOptions } from './channel'
+ import type { LiveKind } from './events'
+ 
+ /** A page may display an owned task from another workspace. Share by its authorized scope. */
+@@ -16,7 +16,7 @@ export class LiveChannels {
+     return connected
+   }
+ 
+-  subscribe(workspaceId: string | null, kind: LiveKind, id: string, keys: readonly string[], refresh: (key: string) => unknown, options?: LiveSubscriptionOptions) {
++  subscribe(workspaceId: string | null, kind: LiveKind, id: string, keys: readonly string[], refresh: LiveRefresh, options?: LiveSubscriptionOptions) {
+     let entry = this.channels.get(workspaceId)
+     if (!entry) {
+       entry = { channel: new LiveChannel(this.runtime(workspaceId)), subscribers: 0 }
+diff --git a/lib/live/revisions.ts b/lib/live/revisions.ts
+index b21dd6db012a24c8cbfa49528980e0a3c129a490..dbef48a71d14c0f5a4f68b16c7a0aae32ecd184f 100644
+--- a/lib/live/revisions.ts
++++ b/lib/live/revisions.ts
+@@ -1,5 +1,5 @@
+ import type { PoolClient } from 'pg'
+-import { isLiveRevisionKind, LIVE_ID, type LiveInvalidation, type LiveKind } from './events'
++import { isLiveRevisionKind, liveRevision, LIVE_ID, type LiveInvalidation, type LiveKind } from './events'
+ 
+ type Database = Pick<PoolClient, 'query'>
+ export type LiveRef = { kind: LiveKind; id: string }
+@@ -58,3 +58,12 @@ export function heldRevision(read: { live?: { revisions?: LiveRevisions } } | un
+   const value = read?.live?.revisions?.[liveRevisionKey(kind, id.toLowerCase())]
+   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
+ }
++
++/** A shared snapshot may satisfy a push only when it proves every required revision. */
++export function coversLiveRevisions(read: unknown, required?: Readonly<LiveRevisions>): boolean {
++  const revisions = (read as { live?: { revisions?: Readonly<Record<string, unknown>> } } | null)?.live?.revisions
++  return Object.entries(required ?? {}).every(([key, revision]) => {
++    const held = revisions?.[key]
++    return liveRevision(held) && held >= revision
++  })
++}
+diff --git a/lib/live/tab-share.test.ts b/lib/live/tab-share.test.ts
+index 4142b9f0acf39deb8d644864e93e37c12ba489d7..b055e211e94e711b023f5fbbc6220e3e61ab0322 100644
+--- a/lib/live/tab-share.test.ts
++++ b/lib/live/tab-share.test.ts
+@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
+ import test from 'node:test'
+ import { CLAIM_WINDOW_MS, RESULT_TIMEOUT_MS, TabShare, tabShareChannelName, type TabChannel, type TabShareClock } from './tab-share'
+ import { PersistentReadCache, readCacheShareNamespace } from '../swr/persistent-cache'
++import { coversLiveRevisions } from './revisions'
+ 
+ /** BroadcastChannel semantics: same name, other instances only, delivered asynchronously. */
+ function hub() {
+@@ -51,6 +52,112 @@ test('three tabs woken by one push: one reads, the others take its result', asyn
+   assert.equal((stored[0] as { requestedAt: number }).requestedAt, CLAIM_WINDOW_MS - 5, "the read's age, rebased on this tab's own clock")
+ })
+ 
++test('a newer push cannot be satisfied by a shared read started before that revision', async () => {
++  const h = hub(), name = 'mikka-live-read:owner:workspace'
++  const [leader, follower] = [new TabShare(name, h.open, h.clock), new TabShare(name, h.open, h.clock)]
++  const key = 'bot_chat:00000000-0000-4000-8000-000000000001'
++  const snapshot = (revision: number) => ({ live: { revisions: { [key]: revision } } })
++  let release!: (data: ReturnType<typeof snapshot>) => void
++  const first = leader.run('chat', () => new Promise<ReturnType<typeof snapshot>>(resolve => { release = resolve }), () => {})
++  await h.advance(CLAIM_WINDOW_MS + 10)
++  let reads = 0, stored = snapshot(5)
++  const second = follower.run('chat', async () => { reads++; return stored = snapshot(6) }, data => { stored = data }, data => coversLiveRevisions(data, { [key]: 6 }))
++  await h.settle()
++  release(snapshot(5))
++  await h.advance(CLAIM_WINDOW_MS + 10)
++  await Promise.all([first, second])
++  assert.equal(stored.live.revisions[key], 6)
++  assert.equal(reads, 1, 'the follower reads once when the shared result does not cover its push')
++  assert.equal(follower.adopted, 0, 'an older snapshot must never reach the cache')
++  leader.close(); follower.close()
++})
++
++test('shared snapshots prove every required revision, including missing or malformed proofs', () => {
++  const bot = 'bot_chat:00000000-0000-4000-8000-000000000001'
++  const run = 'run:00000000-0000-4000-8000-000000000002'
++  const required = { [bot]: 6, [run]: 3 }
++  for (const data of [undefined, null, {}, { requestedAt: Number.MAX_SAFE_INTEGER }, { live: {} },
++    ...[undefined, 5, '6', 6.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1].map(revision => ({ live: { revisions: { [bot]: revision, [run]: 3 } } })),
++    { live: { revisions: { [bot]: 6 } } }, { live: { revisions: { [bot]: 6, [run]: 2 } } }]) {
++    assert.equal(coversLiveRevisions(data, required), false)
++  }
++  assert.equal(coversLiveRevisions({ live: { revisions: required } }, required), true)
++  assert.equal(coversLiveRevisions({ live: { revisions: { [bot]: 7, [run]: 4 } } }, required), true)
++  assert.equal(coversLiveRevisions(undefined), true, 'unversioned sharing retains its existing behavior')
++})
++
++test('three tabs with the same revision requirement share one current read on every push', async t => {
++  const h = hub(), name = 'mikka-live-read:owner:workspace'
++  const tabs = [0, 1, 2].map(() => new TabShare(name, h.open, h.clock))
++  t.after(() => { for (const tab of tabs) tab.close() })
++  let reads = 0, adoptions = 0
++  for (const revision of [6, 7]) {
++    const required = { 'bot_chat:00000000-0000-4000-8000-000000000001': revision }
++    const runs = tabs.map(tab => tab.run('chat', async () => { reads++; return { live: { revisions: required } } }, () => { adoptions++ }, data => coversLiveRevisions(data, required)))
++    await h.advance(CLAIM_WINDOW_MS + 10)
++    assert.equal(reads, revision - 5, 'a yielded claim must not hold the next push until its timeout')
++    await Promise.all(runs)
++    assert.equal(adoptions, 2 * (revision - 5))
++  }
++})
++
++for (const count of [2, 3]) test(`${count} tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh`, async t => {
++  const h = hub(), name = 'mikka-live-read:owner:workspace'
++  const tabs = Array.from({ length: count }, () => new TabShare(name, h.open, h.clock))
++  t.after(() => { for (const tab of tabs) tab.close() })
++  const key = 'bot_chat:00000000-0000-4000-8000-000000000001'
++  const snapshot = (revision: number) => ({ live: { revisions: { [key]: revision } }, requestedAt: h.clock.now() })
++  const stored = tabs.map(() => snapshot(5))
++  let oldReads = 0, freshReads = 0, release!: () => void
++  const old = tabs[0].run('chat', () => { oldReads++; return new Promise<ReturnType<typeof snapshot>>(resolve => { release = () => { stored[0] = snapshot(5); resolve(stored[0]) } }) }, () => assert.fail())
++  await h.advance(CLAIM_WINDOW_MS + 10)
++  const fresh = (index: number) => tabs[index].run('chat', async () => { freshReads++; return stored[index] = snapshot(6) }, data => { stored[index] = data }, data => coversLiveRevisions(data, { [key]: 6 }), true)
++  const followers = tabs.slice(1).map((_, index) => fresh(index + 1))
++  await h.settle(); release(); await old
++  await h.advance(2_000)
++  const trailing = fresh(0)
++  await h.advance(CLAIM_WINDOW_MS + 10)
++  await Promise.all([...followers, trailing])
++  assert.equal(oldReads, 1)
++  assert.equal(freshReads, 1, 'the retry participates in sharing, and a paced trailing refresh reuses its covered result')
++  assert.ok(stored.every(data => data.live.revisions[key] === 6))
++  for (const revision of [7, 8]) {
++    const next = tabs.map((tab, index) => tab.run('chat', async () => { freshReads++; return stored[index] = snapshot(revision) }, data => { stored[index] = data }, data => coversLiveRevisions(data, { [key]: revision }), true))
++    await h.advance(CLAIM_WINDOW_MS + 10)
++    assert.equal(freshReads, revision - 5, 'each subsequent push shares a new read immediately, without waiting for abandoned election claims')
++    await Promise.all(next)
++    assert.ok(stored.every(data => data.live.revisions[key] === revision))
++  }
++})
++
++test('completed results retain their observation age and require live coverage, an allowed reuse and an active channel', async t => {
++  const h = hub(), name = 'mikka-live-read:owner:workspace'
++  const [leader, follower] = [new TabShare(name, h.open, h.clock), new TabShare(name, h.open, h.clock)]
++  t.after(() => { leader.close(); follower.close() })
++  const required = { 'bot_chat:00000000-0000-4000-8000-000000000001': 6 }
++  let reads = 0, requestedAt = 0
++  const read = async () => { reads++; return { live: { revisions: required }, requestedAt: h.clock.now() - 5 } }
++  const accepts = (data: unknown) => coversLiveRevisions(data, required)
++  const first = leader.run('chat', read, () => assert.fail())
++  await h.advance(CLAIM_WINDOW_MS + 10); await first
++  await h.advance(2_000)
++  await follower.run('chat', read, data => { requestedAt = data.requestedAt }, accepts, true)
++  assert.equal(reads, 1)
++  assert.equal(requestedAt, CLAIM_WINDOW_MS - 5, 'taking a completed snapshot does not make its observation newer')
++  for (const [predicate, reuse] of [[accepts, false], [undefined, true]] as const) {
++    const pending = follower.run('chat', read, () => assert.fail('this refresh requires a new read'), predicate, reuse)
++    await h.advance(CLAIM_WINDOW_MS + 10); await pending
++  }
++  assert.equal(reads, 3, 'unversioned refreshes cannot borrow an earlier completion')
++  await h.advance(RESULT_TIMEOUT_MS + 1)
++  const expired = follower.run('chat', read, () => assert.fail('the retained result expired'), accepts, true)
++  await h.advance(CLAIM_WINDOW_MS + 10); await expired
++  assert.equal(reads, 4)
++  follower.close()
++  await follower.run('chat', read, () => assert.fail('a closed channel cannot reuse data'), accepts, true)
++  assert.equal(reads, 5)
++})
++
+ test('another user, workspace or key never shares; a closed channel or a silent leader reads itself', async () => {
+   const h = hub()
+   let reads = 0
+diff --git a/lib/live/tab-share.ts b/lib/live/tab-share.ts
+index 474f5e69117c5b020a97ca590dcbb57e61d2f64f..19b47679695258a0e89eb8c87bcbf349a299d3c2 100644
+--- a/lib/live/tab-share.ts
++++ b/lib/live/tab-share.ts
+@@ -11,6 +11,7 @@
+ export type TabChannel = Pick<BroadcastChannel, 'postMessage' | 'close'> & { onmessage: ((event: MessageEvent) => void) | null }
+ type Message =
+   | { type: 'claim'; key: string; id: string }
++  | { type: 'release'; key: string; id: string }
+   | { type: 'result'; key: string; id: string; data: unknown; age: number | null }
+   | { type: 'failed'; key: string; id: string }
+ 
+@@ -18,10 +19,13 @@ type Message =
+ export const CLAIM_WINDOW_MS = 30
+ /** A claim without a result after this is abandoned: read yourself. */
+ export const RESULT_TIMEOUT_MS = 8_000
++/** Only bridge delayed trailing refreshes; retained snapshots stay bounded. */
++const MAX_SHARED_RESULTS = 32
+ 
+ export const tabShareChannelName = (namespace: string, scope: string | null) => `mikka-live-read:${JSON.stringify([namespace, scope])}`
+ 
+-type Waiter = { resolve: (value: { data: unknown; age: number | null } | null) => void }
++type SharedResult = { data: unknown; age: number | null }
++type Waiter = { resolve: (value: SharedResult | null) => void }
+ export type TabShareClock = { now(): number; later(callback: () => void, ms: number): unknown; cancel(timer: unknown): void }
+ const browserClock: TabShareClock = { now: () => performance.now(), later: (callback, ms) => setTimeout(callback, ms), cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>) }
+ 
+@@ -30,6 +34,7 @@ export class TabShare {
+   /** Remote claims seen per key (id → when), until their result or failure. */
+   private claims = new Map<string, Map<string, number>>()
+   private waiters = new Map<string, Set<Waiter>>()
++  private results = new Map<string, SharedResult & { at: number }>()
+   /** Reads this tab took from another tab. */
+   adopted = 0
+ 
+@@ -38,7 +43,7 @@ export class TabShare {
+     if (this.channel) this.channel.onmessage = event => this.received(event.data as Message)
+   }
+ 
+-  close() { this.channel?.close(); this.channel = null; for (const set of this.waiters.values()) for (const waiter of set) waiter.resolve(null); this.waiters.clear(); this.claims.clear() }
++  close() { this.channel?.close(); this.channel = null; for (const set of this.waiters.values()) for (const waiter of set) waiter.resolve(null); this.waiters.clear(); this.claims.clear(); this.results.clear() }
+ 
+   private received(message: Message) {
+     if (!message || typeof message !== 'object' || typeof message.key !== 'string' || typeof message.id !== 'string') return
+@@ -49,6 +54,8 @@ export class TabShare {
+       return
+     }
+     this.claims.get(message.key)?.delete(message.id)
++    if (message.type === 'release') return
++    if (message.type === 'result') this.remember(message.key, { data: message.data, age: message.age })
+     const waiters = this.waiters.get(message.key)
+     if (!waiters) return
+     this.waiters.delete(message.key)
+@@ -56,7 +63,7 @@ export class TabShare {
+   }
+ 
+   private wait(key: string) {
+-    return new Promise<{ data: unknown; age: number | null } | null>(resolve => {
++    return new Promise<SharedResult | null>(resolve => {
+       const waiter: Waiter = { resolve: value => { this.clock.cancel(timer); resolve(value) } }
+       const timer = this.clock.later(() => { this.waiters.get(key)?.delete(waiter); resolve(null) }, RESULT_TIMEOUT_MS)
+       let set = this.waiters.get(key)
+@@ -72,15 +79,38 @@ export class TabShare {
+     return [...claims.keys()]
+   }
+ 
+-  /** `read` returns the key's new data; `adopt` stores another tab's result without reading. */
+-  async run<T>(key: string, read: () => Promise<T>, adopt: (data: T) => unknown): Promise<unknown> {
++  private remember(key: string, value: SharedResult) {
++    const now = this.clock.now()
++    for (const [cachedKey, result] of this.results) if (now - result.at >= RESULT_TIMEOUT_MS) this.results.delete(cachedKey)
++    this.results.delete(key)
++    this.results.set(key, { ...value, at: now })
++    if (this.results.size > MAX_SHARED_RESULTS) this.results.delete(this.results.keys().next().value!)
++  }
++
++  private recent(key: string): SharedResult | null {
++    const value = this.results.get(key)
++    if (!value) return null
++    const elapsed = this.clock.now() - value.at
++    if (elapsed >= RESULT_TIMEOUT_MS) { this.results.delete(key); return null }
++    return { data: value.data, age: value.age === null ? null : value.age + elapsed }
++  }
++
++  /** Only accepted results may be adopted. Completed results also require explicit revision coverage; unversioned refreshes join only active reads. */
++  async run<T>(key: string, read: () => Promise<T>, adopt: (data: T) => unknown, accepts?: (data: T) => boolean, reuseCompleted = false): Promise<unknown> {
+     const channel = this.channel
+     if (!channel) return read()
+-    const take = async (value: { data: unknown; age: number | null } | null) => {
++    const take = async (value: SharedResult | null): Promise<unknown> => {
+       if (!value) return read()
++      // A rejected old read does not consume this push. Rejoin arbitration so
++      // its waiting tabs share one fresh read without depending on the old leader.
++      if (accepts && !accepts(value.data as T)) return this.run(key, read, adopt, accepts, reuseCompleted)
+       this.adopted++
+       return adopt(rebased(value.data, value.age, this.clock.now()) as T)
+     }
++    if (reuseCompleted && accepts) {
++      const result = this.recent(key)
++      if (result && accepts(result.data as T)) return take(result)
++    }
+     // Another tab is already reading this key: take its result.
+     if (this.live(key).length) return take(await this.wait(key))
+     const id = `${this.clock.now().toFixed(3)}:${Math.random().toString(36).slice(2)}`
+@@ -89,11 +119,17 @@ export class TabShare {
+     const result = this.wait(key).then(value => { answered = value !== null; return value })
+     await new Promise(resolve => this.clock.later(() => resolve(undefined), CLAIM_WINDOW_MS))
+     // Woken by the same push: the lowest claim reads; a result that already arrived is taken.
+-    if (answered || this.live(key).some(other => other < id)) return take(await result)
++    if (answered || this.live(key).some(other => other < id)) {
++      // Losing candidates will not publish a result for their own claim.
++      try { channel.postMessage({ type: 'release', key, id } satisfies Message) } catch { /* closing */ }
++      return take(await result)
++    }
+     this.waiters.get(key)?.clear()
+     try {
+       const data = await read()
+-      try { channel.postMessage({ type: 'result', key, id, data, age: age(data, this.clock.now()) } satisfies Message) }
++      const result = { data, age: age(data, this.clock.now()) }
++      this.remember(key, result)
++      try { channel.postMessage({ type: 'result', key, id, ...result } satisfies Message) }
+       catch { channel.postMessage({ type: 'failed', key, id } satisfies Message) } // Not cloneable: the others read.
+       return data
+     } catch (error) {
+diff --git a/scripts/use-live-lists.live.test.tsx b/scripts/use-live-lists.live.test.tsx
+index ee0c4fdadb5bf65387a86c49a8a492d0a0aac668..d5ea4bca2a01adf3c3d1277613f9a671101765e3 100644
+--- a/scripts/use-live-lists.live.test.tsx
++++ b/scripts/use-live-lists.live.test.tsx
+@@ -6,6 +6,7 @@ import type { State } from 'swr'
+ import { Window } from 'happy-dom'
+ import { LIVE_KINDS } from '../lib/live/events'
+ import { liveKeyConnection } from '../lib/swr/live-focus'
++import { PersistentReadCache } from '../lib/swr/persistent-cache'
+ 
+ const home = '10000000-0000-4000-8000-000000000001'
+ const team = '20000000-0000-4000-8000-000000000001'
+@@ -205,6 +206,42 @@ test('real list hooks update held revisions after an asynchronous read without l
+   assert.equal(liveKeyConnection(cache, issueKey), true)
+ })
+ 
++test('real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes', { timeout: 15_000 }, async () => {
++  const scoped = [0, 1, 2].map(() => new PersistentReadCache({ userId: 'owner', workspaceId: team, build: 'fixture', role: 'member' }))
++  await Promise.all(scoped.map(value => value.hydrate(async () => undefined)))
++  const snapshotAt = (revision: number): Read => {
++    const value = snapshot('bots')
++    return { ...value, items: [{ id: 'bots', title: `revision-${revision}` }], live: { ...value.live, revisions: { [`bot_chat_list:${home}`]: revision } } }
++  }
++  replies.set('bots', async () => snapshotAt(5))
++  await act(async () => root.render(<>{scoped.map((provider, index) => <SWRConfig key={index} value={{ provider: () => provider, dedupingInterval: 0 }}>
++    <LiveProvider ownerId="owner" workspaceId={team}><div data-tab={index}><Bots owner="owner" /></div></LiveProvider>
++  </SWRConfig>)}</>))
++  await settled(); await wait(2_100)
++  assert.equal(sockets.length, 3)
++  for (const socket of sockets) socket.message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat_list'] })
++  const held = deferred<Read>()
++  const before = count('bots')
++  replies.set('bots', () => held.promise)
++  try {
++    await act(async () => sockets[0].message({ kind: 'bot_chat_list', id: home })); await wait()
++    assert.equal(count('bots'), before + 1, 'the first tab is reading a snapshot captured before revision 6')
++    replies.set('bots', async () => snapshotAt(6))
++    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 6 }) }); await wait()
++    assert.equal(count('bots'), before + 1, 'the other tabs join the outstanding claim')
++    await act(async () => held.resolve(snapshotAt(5))); await settled(); await wait(2_100)
++    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-6'), 'the newer push must reach every tab without another push or reconnect')
++    assert.equal(count('bots'), before + 2, 'old read + one fresh read, including the paced leader trailing read')
++
++    await wait(2_100)
++    replies.set('bots', async () => snapshotAt(7))
++    const fresh = count('bots')
++    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 7 }) }); await settled()
++    assert.equal(count('bots'), fresh + 1, 'matching pushes still coalesce across real providers')
++    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-7'))
++  } finally { held.resolve(snapshotAt(5)) }
++})
++
+ test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {
+   await render(['threads', 'tasks', 'bots']); await settled()
+   assert.deepEqual(new Set(tickets), new Set([home]), 'the selected team is not the owner-wide transport')
