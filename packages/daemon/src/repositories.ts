@@ -55,7 +55,7 @@ export class RepositoryCache {
     if (!existsSync(path)) {
       const temporary = `${path}.clone-${randomUUID()}`
       try {
-        await git(['clone', '--no-checkout', '--no-hardlinks', '--no-recurse-submodules', '--', remote, temporary])
+        await git(['clone', '--depth=50', '--no-single-branch', '--no-checkout', '--no-hardlinks', '--no-recurse-submodules', '--', remote, temporary])
         renameSync(temporary, path)
         cloned = true
       } finally { if (!this.retainResources) rmSync(temporary, { recursive: true, force: true }) }
@@ -64,7 +64,7 @@ export class RepositoryCache {
       // The validated assignment is authoritative. A cache's stale remote
       // must never select another repository or an executable transport.
       await git(['remote', 'set-url', 'origin', remote], path)
-      await git(['fetch', ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
+      await git(['fetch', '--depth=50', ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
     }
     this.assertClone(path)
     let freshHead = false

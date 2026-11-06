@@ -2,12 +2,12 @@
 // 2026-11-01): at run start the server hands this device the run's
 // short-lived access token, never the refresh grant. The CLI gets it on a
 // pipe (Claude Code) or over its own RPC (Codex), in its own run home, and
-// talks to Anthropic/OpenAI directly. Codex asks again when the token
-// expires; Claude Code cannot change token mid-process, so its run ends at
-// expiry. Every lease request is checked anew on the server (run, device,
-// binding, revocation, admission). Run end drops the token and wipes the
+// talks to Anthropic/OpenAI directly. A natural-expiry background renewal
+// prepares the next access token; both CLIs read it from memory. Tool/provider
+// operations make no additional server authorization request. Run end drops the token and wipes the
 // run's credential paths.
-import { nativeLeaseSchema, type NativeLease, type RunAssignment } from "@mikka/protocol"
+import { type RunAssignment } from "@mikka/protocol"
+import { prepareSubscriptionCredentials, type PreparedSubscription } from "./subscription-credentials"
 import { CodedError, findCodedError, logCodedError } from "@mikka/protocol/coded-error"
 import type { UserErrorDetail } from "@mikka/protocol/user-error-codes"
 
@@ -56,48 +56,38 @@ export function createLocalSubscriptionRunner(host: LocalSubscriptionHost) {
         removeRunCredentials(host.stateDir, assignment.runId)
       }
       const offRevoke = gate.onRevoke(close)
-      const lease = async (): Promise<NativeLease> => {
-        if (closed || gate.revoked || !await gate.checkLive()) throw unavailable("run_closed")
-        let value: NativeLease
-        try { value = nativeLeaseSchema.parse(await host.link.nativeLease(assignment.deviceId, assignment.runId, lifetime.signal)) }
-        catch (error) { throw unavailable("lease_refused", error) }
-        if (value.route !== selected.route || Date.parse(value.expiresAt) <= Date.now()) throw unavailable("lease_invalid")
-        return value
-      }
+      let prepared: PreparedSubscription | undefined
       try {
-        const first = await lease()
+        if (!await gate.checkLive()) throw unavailable('run_closed')
+        prepared = await prepareSubscriptionCredentials(assignment, {
+          link: host.link, signal: lifetime.signal, onCredential: options.onCredential,
+          onRefreshError: () => { options.log.warn({ event: 'subscription_refresh_deferred' }, 'Subscription renewal will retry in the background') },
+        })
+        const first = prepared.first
         if (options.model !== undefined && first.modelId !== options.model) throw unavailable("model_mismatch")
-        // The adapters refuse a run env with anything the clean child env would drop; say so here.
         const clean = buildChildEnv({ host: options.env, runId: options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId })
         if (Object.entries(options.env).some(([name, value]) => clean[name] !== value)) throw unavailable("env_not_clean")
-        const same = (value: NativeLease) => {
-          if (value.accountId !== first.accountId || value.modelId !== first.modelId) throw unavailable("account_changed")
-          return value
-        }
-        let initial: NativeLease | undefined = first
-        const next = async () => {
-          if (initial) { const value = initial; initial = undefined; return value }
-          return same(await lease())
-        }
+        const next = () => prepared!.current()
         const adapter = kind === "codex"
           ? new CodexAdapter({ ...host.codex, subscriptionAuth: {
               accountId: first.accountId,
               token: async () => {
-                const value = await next()
+                const value = next()
                 return { accessToken: value.accessToken, chatgptAccountId: value.accountId, ...(value.plan ? { chatgptPlanType: value.plan } : {}) }
               },
             } })
           : new ClaudeAdapter({ ...host.claude, subscriptionAuth: {
               accountId: first.accountId,
+              automaticRefresh: true,
               token: async () => {
-                const value = await next()
+                const value = next()
                 return { accessToken: value.accessToken, accountId: value.accountId, expiresAt: value.expiresAt }
               },
             } })
         let session: AgentSession
         try { session = await adapter.start(options) }
         catch (error) { throw startFailed(error) }
-        const finish = () => { offRevoke(); close() }
+        const finish = () => { offRevoke(); prepared?.close(); close() }
         return {
           sessionId: session.sessionId,
           get runtimeModel() { return session.runtimeModel },
@@ -108,6 +98,7 @@ export function createLocalSubscriptionRunner(host: LocalSubscriptionHost) {
           cancel: async () => { try { await session.cancel() } finally { finish() } },
         }
       } catch (error) {
+        prepared?.close()
         offRevoke()
         close()
         const refusal = startFailed(error)

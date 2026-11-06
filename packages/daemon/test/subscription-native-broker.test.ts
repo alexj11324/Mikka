@@ -24,24 +24,6 @@ const post = (socket: string, parts: Buffer[]) =>
     for (const part of parts) call.write(part);
     call.end();
   });
-it('reuses startup preparation only to open the socket, never to authorize a provider request', async () => {
-  const prepare = vi.fn(async () => {});
-  let live = false;
-  const check = vi.fn(async () => { if (!live) throw new Error('revoked'); });
-  const nativeRequest = vi.fn(async () => ({ contentType: 'application/json', body: new Response('ok').body! }));
-  const broker = await createNativeSubscriptionBroker({ root: tempDir(), revision: 7, prepare, check, worker: { nativeRequest } });
-  try {
-    expect(prepare).toHaveBeenCalledOnce();
-    expect(check).not.toHaveBeenCalled();
-    expect((await post(broker.socket, [Buffer.from('{"model":"bound-model"}')])).status).toBe(503);
-    expect(nativeRequest).not.toHaveBeenCalled();
-    live = true;
-    expect(await post(broker.socket, [Buffer.from('{"model":"bound-model"}')])).toEqual({ status: 200, text: 'ok' });
-    expect(check).toHaveBeenCalledTimes(2);
-    expect(prepare).toHaveBeenCalledOnce();
-    expect(nativeRequest).toHaveBeenCalledOnce();
-  } finally { await broker.close(); }
-});
 it("uses only its bound worker, preserves UTF-8 input and stops all provider use after revocation", async () => {
   let connected = true;
   let checks = 0;

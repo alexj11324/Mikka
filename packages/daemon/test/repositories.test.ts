@@ -70,6 +70,21 @@ describe('repository URL boundary', () => {
 })
 
 describe('daemon-owned clone cache', () => {
+  it('shallow-clones a fresh machine without losing current files or alternate branches', async () => {
+    const source = await makeRepo()
+    for (let i = 0; i < 60; i++) git(source, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--allow-empty', '-qm', `history ${i}`)
+    git(source, 'branch', 'alternate')
+    const remote = pathToFileURL(source).href, cache = new RepositoryCache(join(tempDir(), 'repos'), true)
+    await cache.prepare(remote)
+    const cloned = cache.pathFor(remote)
+    expect(git(cloned, 'rev-parse', '--is-shallow-repository')).toBe('true')
+    expect(Number(git(cloned, 'rev-list', '--count', 'origin/main'))).toBe(50)
+    expect(git(cloned, 'rev-parse', 'origin/alternate')).toBe(git(source, 'rev-parse', 'alternate'))
+    const worktree = await new WorktreeManager(tempDir()).create('shallow-task', cloned, await cache.baseRef(remote))
+    expect(readFileSync(join(worktree, 'README.md'), 'utf8')).toBe(readFileSync(join(source, 'README.md'), 'utf8'))
+    expect(git(worktree, 'status', '--porcelain')).toBe('')
+  })
+
   it('uses the default branch recorded by a new clone and refreshes it on later prepares', async () => {
     const source = await makeRepo()
     git(source, 'branch', 'trunk')

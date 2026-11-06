@@ -105,7 +105,8 @@ import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
-import { daemonTracer, runIdHash, type SpanHandle } from '../tracing'
+import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
+import { runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
 
 export interface SupervisorDeps {
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
@@ -195,6 +196,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  runtimeTiming?: RunRuntimeObservation
   toolApproval?: ToolApprovalGate
   /** The run's trace span; its outcome is the stop reason. */
   span?: SpanHandle
@@ -521,7 +523,10 @@ export class RunSupervisor {
     const masker = createRunMasker([...(assignment.taskSecretNames ?? []).flatMap(name => {
       const value = assignment.taskEnv?.[name]
       return typeof value === "string" ? [{ name, value }] : []
-    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : [])])
+    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : []),
+      ...(assignment.subscriptionLease ? [{ name: "SUBSCRIPTION_ACCESS_TOKEN", value: assignment.subscriptionLease.accessToken }] : []),
+      ...(assignment.github?.token ? [{ name: "GITHUB_TOKEN", value: assignment.github.token }] : []),
+    ])
     if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
     try { repo = this.deps.repository(assignment) } catch (error) {
@@ -728,6 +733,7 @@ export class RunSupervisor {
    * it to the run's stream.
    */
   private emit(runId: string, chunk: RunChunk) {
+    this.active.get(runId)?.runtimeTiming?.chunk(chunk)
     if (
       chunk.type.startsWith("data-") &&
       "transient" in chunk &&
@@ -792,10 +798,10 @@ export class RunSupervisor {
   }
 
   /** Closes the run's message in progress, if any. */
-  private endMessage(runId: string) {
+  private endMessage(runId: string, runtimeTiming?: RunRuntimeTiming) {
     this.cutMessages.delete(runId)
     this.openParts.get(runId)?.clear()
-    if (this.openMessages.delete(runId)) this.append(runId, { type: "finish" })
+    if (this.openMessages.delete(runId)) this.append(runId, { type: "finish", ...(runtimeTiming ? { messageMetadata: { mikkaRuntimeTiming: runtimeTiming } } : {}) })
   }
 
   /** Outbox first, then the journal: see `resumeAll` for the reconcile. Masked first when the run has secrets. */
@@ -888,7 +894,7 @@ export class RunSupervisor {
     }
     // A planning hand-in leaves its two cards in the conversation (ADR ORV-205).
     this.emitPlanCards(runId, report, planning)
-    this.endMessage(runId)
+    this.endMessage(runId, this.active.get(runId)?.runtimeTiming?.finish())
     this.flushMasker(runId)
     this.openParts.delete(runId)
     if (stopReason === "submitted") this.setState(runId, "finishing")
@@ -943,12 +949,15 @@ export class RunSupervisor {
   private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
+    let startupTiming: DaemonStartupTiming | undefined
     try {
-      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work())
-      this.emit(runId, runStageChunk(stage, performance.now() - started, true))
+      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
+        { onStartupTiming: timing => { startupTiming = timing } })
+      if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
+      this.emit(runId, runStageChunk(stage, performance.now() - started, true, startupTiming))
       return value
     } catch (error) {
-      this.emit(runId, runStageChunk(stage, performance.now() - started, false))
+      this.emit(runId, runStageChunk(stage, performance.now() - started, false, startupTiming))
       throw error
     }
   }
@@ -1213,12 +1222,15 @@ export class RunSupervisor {
       abort: new AbortController(),
     }
     this.active.set(runId, run)
-    const harness = this.deps.journal.get(runId)?.assignment.harness
+    const assignment = this.deps.journal.get(runId)?.assignment
+    const harness = assignment?.harness
+    if (assignment) run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
     run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run)
     }, { root: true })
       .catch(async (error: unknown) => {
+        run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
         if (this.stopping) return
@@ -1242,7 +1254,7 @@ export class RunSupervisor {
         run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
-        finally { clearTimeout(run.cancelTimer); this.active.delete(runId) }
+        finally { clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId) }
       })
   }
 
@@ -1406,8 +1418,16 @@ export class RunSupervisor {
     }
     const options = {
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
-      github: assignment.github && assignment.mcp
-        ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
+      github: assignment.github && (assignment.github.token || assignment.mcp)
+        ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
+      onCredential: (name: string, value: string) => {
+        const masker = this.maskers.get(runId)
+        if (masker) masker.add([{ name, value }])
+        else {
+          const created = createRunMasker([{ name, value }])
+          if (created) this.maskers.set(runId, created)
+        }
+      },
       apps: runApps(assignment.mcp),
       mcp: runMcp(assignment.mcp),
       toolApproval,
@@ -1618,6 +1638,7 @@ export class RunSupervisor {
           this.emit(runId, event.chunk)
           continue
         }
+        run.runtimeTiming?.finishing()
         await this.closeMailbox(run)
         const stopReason = stopReasonOf(event, run, assignment)
         const error =

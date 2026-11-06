@@ -22,8 +22,8 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Typecheck daemon
         run: pnpm --filter @mikka/daemon typecheck
-      - name: Validate startup isolation and revocation
-        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/daemon-1505.json" test/hosted-git.test.ts test/subscription-native-broker.test.ts test/subscription-hosted-runner.test.ts test/subscription-launcher.test.ts test/subscription.test.ts test/claude-subscription.test.ts test/codex-subscription.test.ts test/repositories.test.ts test/worktrees.test.ts
+      - name: Validate direct execution, refresh and pushed stops
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/daemon-1505.json" test/subscription-hosted-runner.test.ts test/subscription-question-resume.test.ts test/claude-subscription.test.ts test/codex-subscription.test.ts test/subscription-credentials.test.ts test/machine-github.test.ts test/credential-journal.test.ts test/server-link-http.test.ts test/policy-distribution.test.ts test/github-runtime.test.ts test/repositories.test.ts test/worktrees.test.ts test/runs.test.ts src/secret-mask.test.ts src/run-runtime-timing.test.ts src/official-cli-timing.test.ts
       - name: Preserve regression results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
