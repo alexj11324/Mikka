@@ -1,0 +1,75 @@
+name: Issue 1512 desktop catalogue diagnosis
+
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths:
+      - .github/workflows/issue1512-e2b-probe.yml
+      - scripts/ops/issue1512-e2b-probe.py
+      - scripts/ops/issue1512-e2b-probe.test.py
+      - scripts/ops/issue1512-e2b-probe-hook.mjs
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: issue1512-e2b-probe
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  diagnose:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-git-transport' && startsWith(github.event.head_commit.message, 'issue1512:probe')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out the immutable production source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: b8045b5661bcbf51eeecc74ceef19eceead93a10
+          path: source
+          persist-credentials: false
+      - name: Check out this diagnostic revision separately
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          persist-credentials: false
+      - name: Check offline guards before requesting the E2B key
+        run: python3 ops/scripts/ops/issue1512-e2b-probe.test.py
+      - name: Install the same pinned E2B SDK as the release
+        run: |
+          python3 -m venv "$RUNNER_TEMP/issue1512-e2b"
+          "$RUNNER_TEMP/issue1512-e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Read only the existing E2B build key
+        id: key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Diagnose one private desktop candidate without an account
+        run: >-
+          "$RUNNER_TEMP/issue1512-e2b/bin/python" ops/scripts/ops/issue1512-e2b-probe.py diagnose
+          --source source --output "$RUNNER_TEMP/issue1512-e2b-probe.json"
+      - name: Finalize only this attempt's resources
+        if: always() && steps.key.outcome == 'success'
+        run: >-
+          "$RUNNER_TEMP/issue1512-e2b/bin/python" ops/scripts/ops/issue1512-e2b-probe.py cleanup
+          --source source --output "$RUNNER_TEMP/issue1512-e2b-probe.json"
+      - name: Preserve the safe diagnostic and resource ledger
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-e2b-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1512-e2b-probe.json
+          if-no-files-found: warn
+          retention-days: 7
