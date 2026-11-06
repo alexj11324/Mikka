@@ -56,9 +56,21 @@ try {
   if (!team) team = (await session.rpc('teams.saveTeam', [{ workspaceId, name: 'Factory #1503 smoke', identifier: 'F1503', description: 'Issue #1503 production delivery acceptance; alexj11324/Mikka-handoff only.' }])).data
   report.teamId = team.id
   report.teamIdentifier = team.identifier
-  const e2b = (await pool.query('SELECT "userId","verifiedAt","lastErrorCode" FROM user_e2b_keys WHERE "userId"=$1', [SMOKE_ID])).rows[0]
+  let e2b = (await pool.query('SELECT "userId","verifiedAt","lastErrorCode","updatedAt" FROM user_e2b_keys WHERE "userId"=$1', [SMOKE_ID])).rows[0]
   report.e2bConfigured = Boolean(e2b)
   report.e2bChanged = false
+  if (!e2b) {
+    report.stage = 'authorized_e2b_setup'
+    const { getUserE2BApiKey } = await import('../../../lib/secrets/e2b')
+    // The same Alex owns this tagged smoke alias. Configure it through the
+    // normal write-only API, including E2B's live key check and normal sealing.
+    // The secret remains in this runner's memory and is never reported.
+    await session.rpc('workspace-secrets.saveE2BKey', [{ apiKey: await getUserE2BApiKey(OWNER_ID) }, workspaceId])
+    e2b = (await pool.query('SELECT "userId","verifiedAt","lastErrorCode","updatedAt" FROM user_e2b_keys WHERE "userId"=$1', [SMOKE_ID])).rows[0]
+    report.e2bChanged = true
+    report.e2bSetup = { userId: SMOKE_ID, updatedAt: e2b?.updatedAt?.toISOString() }
+    report.e2bConfigured = Boolean(e2b)
+  }
   if (!e2b || e2b.lastErrorCode) fail('smoke_e2b_unavailable')
   report.stage = 'official_subscription_quota'
   for (const connectionId of ['93b6ab23-900b-4e18-9ea0-baccf2d104ce', 'ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5']) {
