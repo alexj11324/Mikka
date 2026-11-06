@@ -5257,5 +5257,33 @@
     "checkUpdate": "Check for update",
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
+  },
+  "DesktopServer": {
+    "title": "Choose a server",
+    "server": "Server",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "Self-hosted server",
+    "address": "Server address",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "change": "Change",
+    "switch": "Switch",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect {name} and sign out of its accounts?",
+    "version": "Version {version}",
+    "errors": {
+      "invalidAddress": "This address isn't valid",
+      "httpsRequired": "The address must start with https://",
+      "unreachable": "Can't reach this server",
+      "notMikka": "This address isn't a Mikka server",
+      "serverUpdate": "This server runs {version}, which is too old. Update the server to the latest version",
+      "serverUpdateUnknown": "This server is too old. Update the server to the latest version",
+      "appUpdate": "Update Mikka to {version} or later",
+      "appUpdateUnknown": "Update Mikka to the latest version",
+      "failed": "That didn't work"
+    }
   }
 }

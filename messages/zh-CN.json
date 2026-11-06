@@ -5257,5 +5257,33 @@
     "checkUpdate": "检查更新",
     "renderFailed": "此页面未能打开",
     "renderHint": "请重试打开页面。"
+  },
+  "DesktopServer": {
+    "title": "选择服务器",
+    "server": "服务器",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "自托管服务器",
+    "address": "服务器地址",
+    "connect": "连接",
+    "connecting": "正在连接…",
+    "continue": "继续",
+    "cancel": "取消",
+    "change": "更改",
+    "switch": "切换",
+    "disconnect": "断开",
+    "disconnecting": "正在断开…",
+    "disconnectTitle": "断开 {name}，并退出这台服务器上的账号？",
+    "version": "版本 {version}",
+    "errors": {
+      "invalidAddress": "地址无效",
+      "httpsRequired": "地址要以 https:// 开头",
+      "unreachable": "连不上这台服务器",
+      "notMikka": "这个地址不是 Mikka 服务器",
+      "serverUpdate": "服务器版本 {version} 过旧，请把服务器升级到最新版本",
+      "serverUpdateUnknown": "服务器版本过旧，请把服务器升级到最新版本",
+      "appUpdate": "请把 Mikka 升级到 {version} 或更新版本",
+      "appUpdateUnknown": "请把 Mikka 升级到最新版本",
+      "failed": "操作失败，请重试"
+    }
   }
 }

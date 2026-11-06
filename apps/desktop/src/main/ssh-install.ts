@@ -91,7 +91,7 @@ export class SshInstaller {
   private local = false
   private localOwnerId?: string
   constructor(
-    private appUrl: string,
+    private server: string | (() => string),
     private mintToken: () => Promise<string>,
     private onState: (state: SshInstallState) => void = () => {},
     private execute = runProcess,
@@ -107,6 +107,8 @@ export class SshInstaller {
     this.current = { ...this.current!, ...patch }
     this.onState(this.state()!)
   }
+  /** Read at each step, so a daemon set up after a server switch registers with the new server. */
+  private get appUrl(): string { return typeof this.server === 'function' ? this.server() : this.server }
   state() { return this.current ? { ...this.current } : null }
   async hosts() {
     const aliases = parseHosts(await readFile(this.configFile ?? join(this.home, '.ssh/config'), 'utf8').catch(() => ''))
