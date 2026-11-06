@@ -53,6 +53,7 @@ jobs:
         env:
           BENCHMARK_DATABASE_URL: postgresql://benchmark:benchmark@127.0.0.1:5432/mikka_1505_components
           MIKKA_COMPONENT_PROGRESS_TOKEN: ${{ github.token }}
+          MIKKA_COMPONENT_KINDS: desktop
         run: '"$RUNNER_TEMP/e2b-benchmark/bin/python" scripts/e2b/benchmark-template-pool.py'
       - name: Close this attempt even after the component deadline
         if: always()

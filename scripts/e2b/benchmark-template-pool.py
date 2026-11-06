@@ -64,6 +64,9 @@ def run():
         raise ValueError('isolated_database_required')
     sha = builder.commit('HEAD')
     worker = builder.worker_hash(sha)
+    kinds = os.environ.get('MIKKA_COMPONENT_KINDS', 'claude,codex,desktop').split(',')
+    if not kinds or len(set(kinds)) != len(kinds) or any(kind not in builder.KINDS for kind in kinds):
+        raise ValueError('component_kinds_invalid')
     prefix = 'mikka-1505-component-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']
     owner = str(uuid.uuid4())
     source = (HERE / 'benchmark-fixtures/thread-machine-pool.ts').read_text()
@@ -75,6 +78,7 @@ def run():
               'cachePolicy': 'Both strategies preserve their natural preloaded state; the benchmark never drops filesystem caches.',
               'poolIdlePolicy': 'No artificial delay; three distinct instances are prepared and paused before timing the pairs. Actual paused age is recorded.',
               'officialControlRun': 42285968840,
+              'requestedKinds': kinds,
               'deadlineMinutes': 30,
               'sameRunnerAndApiKey': True, 'templates': {}, 'samples': [], 'buildErrors': [], 'cleanup': []}
     instances = set()
@@ -149,8 +153,10 @@ def run():
                 match = re.search(r'FROM TEMPLATE ' + kind + r' \[([a-f0-9]{64})\]', message)
                 if match:
                     observed['baseCacheKey'] = match[1]
-                    if match[1] != expected['baseCacheKey']:
-                        raise RuntimeError('official_base_changed_control_required')
+                    # This is an SDK build-cache key, not a content digest.
+                    # Resource/disk settings can alter it. Reuse of the old
+                    # official control is decided by the full protected-file
+                    # fingerprint below, never by ignoring changed software.
                 if '"original":' in message:
                     value = json.loads(message[message.index('{'):])
                     if value.get('kind') != kind or value.get('original') != expected['originalCli']:
@@ -162,10 +168,14 @@ def run():
                                       on_build_logs=build_log)
             templates[kind] = result.template_id
             try:
-                if observed != expected:
+                if not observed.get('baseCacheKey') or observed.get('originalCli') != expected['originalCli']:
                     raise RuntimeError('official_control_evidence_not_reproduced')
                 phase = 'conservation'
                 proof = builder.probe_conservation(result.template_id, key, kind)
+                observed['protectedFingerprint'] = proof['finalization']['before']
+                if observed['protectedFingerprint'] != expected['protectedFingerprint']:
+                    raise RuntimeError('official_base_contents_changed_control_required')
+                print('mikka-component-control-reuse ' + json.dumps({'kind': kind, **observed}, separators=(',', ':')), flush=True)
                 phase = 'models'
                 models = builder.probe_models(result.template_id, kind, key)
                 if kind == 'claude':
@@ -184,6 +194,9 @@ def run():
                         kill(probe)
             except Exception as error:
                 detail = {'kind': kind, 'phase': phase, 'error': type(error).__name__, 'elapsedMs': round((time.perf_counter() - began) * 1000)}
+                if str(error) in ('official_base_contents_changed_control_required',
+                                  'official_control_evidence_not_reproduced', 'official_claude_ack_missing'):
+                    detail.update(reason=str(error), observed=observed)
                 # Only our checker's metadata/hash diagnostic is allowed here;
                 # SDK error representations can contain response credentials.
                 for line in getattr(error, 'stderr', '').splitlines():
@@ -196,8 +209,8 @@ def run():
             return kind, {'templateId': result.template_id, 'buildId': result.build_id,
                           'baseTemplate': kind, 'preinstalled': True, 'resources': allocation,
                           'conservation': proof, 'models': models, 'reusedOfficialControl': observed}
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            pending = {executor.submit(build_one, kind): kind for kind in ['claude', 'codex', 'desktop']}
+        with ThreadPoolExecutor(max_workers=len(kinds)) as executor:
+            pending = {executor.submit(build_one, kind): kind for kind in kinds}
             for future in as_completed(pending):
                 kind = pending[future]
                 try:
