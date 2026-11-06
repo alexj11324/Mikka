@@ -81,7 +81,17 @@ jobs:
       - run: pnpm build
       - name: Verify compiled runtime resources and browser analytics assets
         run: node scripts/check-analytics-ssr.mjs --check-build
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install the pinned browser into this job's temporary directory
+        run: |
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mikka-analytics-browsers"
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
+          pnpm exec playwright install --with-deps chromium
+      - name: Permit the installed Chromium sandbox in this disposable runner
+        run: |
+          profile="$RUNNER_TEMP/mikka-analytics-chromium"
+          node scripts/analytics-browser-sandbox.mjs "$PLAYWRIGHT_BROWSERS_PATH" > "$profile"
+          sudo install -o root -g root -m 0644 "$profile" /etc/apparmor.d/mikka-analytics-chromium
+          sudo apparmor_parser --replace /etc/apparmor.d/mikka-analytics-chromium
       - name: Render real compiled HTTP pages with browser analytics enabled
         run: node scripts/check-analytics-ssr.mjs
 

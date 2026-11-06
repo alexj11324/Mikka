@@ -2,12 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 import { analyticsEnvironment, analyticsKey, analyticsPaths, inspectAnalyticsBuild, localAnalyticsRequest, requiredRuntimeResources, syntheticPostHogRequest, verifyRuntimeResources } from '../scripts/check-analytics-ssr.mjs'
+import { analyticsBrowserProfile } from '../scripts/analytics-browser-sandbox.mjs'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -175,4 +176,54 @@ test('smoke accounts are recognised only by their +mikka-smoke tag, and the tag 
   for (const email of ['alex@gmail.com', 'alex+mikka-smoker@gmail.com', 'mikka-smoke@gmail.com', 'alex+other+mikka-smoke@@gmail.com', '', null, undefined]) assert.equal(isSmokeAccountEmail(email), false, String(email))
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: { distinct_id: 'opaque-user-id', test_account: true } })
   assert.deepEqual(event.properties, { distinct_id: 'opaque-user-id', test_account: true })
+})
+
+async function analyticsBrowserFixture(t) {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'mikka-analytics-browser-')))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const executable = join(root, 'chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell')
+  await mkdir(dirname(executable), { recursive: true })
+  await writeFile(executable, Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1]), { mode: 0o755 })
+  return { root, executable }
+}
+
+test('the CI AppArmor attachment authorizes only the actual installed headless Chromium path', async t => {
+  const { root, executable } = await analyticsBrowserFixture(t)
+  const profile = await analyticsBrowserProfile(root)
+  assert.equal(profile, `abi <abi/4.0>,\ninclude <tunables/global>\n\nprofile mikka-analytics-chromium "${executable}" flags=(unconfined) {\n  userns,\n}\n`)
+  assert.equal(profile.includes('*'), false)
+  assert.equal(profile.includes('sysctl'), false)
+})
+
+test('the CI AppArmor helper rejects missing and ambiguous installed browser revisions', async t => {
+  const { root } = await analyticsBrowserFixture(t)
+  await mkdir(join(root, 'chromium_headless_shell-1249'))
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_REVISION_AMBIGUOUS/)
+  await rm(join(root, 'chromium_headless_shell-1248'), { recursive: true })
+  await rm(join(root, 'chromium_headless_shell-1249'), { recursive: true })
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_REVISION_AMBIGUOUS/)
+})
+
+test('the CI AppArmor helper rejects glob syntax, path aliases, and executable symlinks', async t => {
+  const { root, executable } = await analyticsBrowserFixture(t)
+  for (const directory of [root + '*', root + '\n', root + '/..', root + '/./', 'relative/browser']) {
+    await assert.rejects(analyticsBrowserProfile(directory), /ANALYTICS_BROWSER_DIRECTORY_/)
+  }
+  const linked = join(root, 'linked')
+  await symlink(root, linked)
+  await assert.rejects(analyticsBrowserProfile(linked), /ANALYTICS_BROWSER_DIRECTORY_SYMLINK/)
+  await rm(executable)
+  const outside = join(root, 'unapproved-binary')
+  await writeFile(outside, Buffer.from([0x7f, 0x45, 0x4c, 0x46]), { mode: 0o755 })
+  await symlink(outside, executable)
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_SYMLINK/)
+})
+
+test('the CI AppArmor helper refuses non-executable or non-ELF files', async t => {
+  const { root, executable } = await analyticsBrowserFixture(t)
+  await chmod(executable, 0o644)
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_INVALID/)
+  await chmod(executable, 0o755)
+  await writeFile(executable, '#!/bin/sh\nexit 0\n')
+  await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_NOT_ELF/)
 })

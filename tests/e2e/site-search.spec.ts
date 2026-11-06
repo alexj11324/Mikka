@@ -5,8 +5,9 @@ import { spawn, execFile, type ChildProcess } from 'node:child_process'
 import { promisify } from 'node:util'
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { Pool } from 'pg'
+import { productionApplication } from '../../apps/desktop/test/production-application.mjs'
 
-// Real Next HTTP + Better Auth + PostgreSQL; all records are synthetic and retained.
+// Real compiled HTTP + Better Auth + PostgreSQL; all records are synthetic and retained.
 const target = process.env.E2E_DATABASE_URL
 if (!target || !['127.0.0.1', 'localhost'].includes(new URL(target).hostname) || new URL(target).pathname !== '/mikka_e2e') throw new Error('Site search requires isolated mikka_e2e')
 const pool = new Pool({ connectionString: target, max: 2 })
@@ -16,7 +17,7 @@ if (!['127.0.0.1', 'localhost'].includes(workspaceURL.hostname) || !['/mikka_e2e
 if (process.env.SITE_SEARCH_REQUIRE_DUAL_PG === '1' && (workspaceTarget === target || workspaceURL.port === new URL(target).port || workspaceURL.pathname !== '/mikka_workspace_e2e' || process.env.DATABASE_URL !== workspaceTarget)) throw new Error('Dedicated search CI must use distinct application/workspace PG services')
 const workspacePool = new Pool({ connectionString: workspaceTarget, max: 2 })
 let databaseIdentity: unknown
-let nextProcess: ChildProcess | undefined
+let applicationProcess: ChildProcess | undefined
 const sockets = new Set<Socket>()
 type Gate = { released?: boolean; captured: boolean; ids: string[]; frames: Buffer[]; socket?: Socket }
 let gate: Gate | undefined
@@ -66,21 +67,23 @@ function releaseGate() {
   for (const frame of gate.frames) gate.socket?.write(frame)
   gate = undefined
 }
-async function startIsolatedNext() {
+async function startIsolatedApplication() {
   await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve))
   const address = proxy.address()
   if (!address || typeof address === 'string') throw new Error('PG proxy did not bind')
   const proxiedURL = new URL(target!)
   proxiedURL.port = String(address.port)
-  nextProcess = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3210'], {
+  const expectedRevision = (await execute('git', ['rev-parse', 'HEAD'])).stdout.trim()
+  const application = await productionApplication(process.cwd(), { expectedRevision, hostname: '127.0.0.1', port: 3210 })
+  applicationProcess = spawn(process.execPath, application.args, {
     env: { ...process.env, MIKKA_DATABASE_URL: proxiedURL.href, DATABASE_URL: workspaceTarget, BETTER_AUTH_URL: 'http://127.0.0.1:3210' },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   // Keep logs bounded; they contain only synthetic runtime failures in this isolated process.
   let stderr = ''
-  nextProcess.stderr?.on('data', chunk => { stderr = (stderr + String(chunk)).slice(-4000) })
+  applicationProcess.stderr?.on('data', chunk => { stderr = (stderr + String(chunk)).slice(-4000) })
   await expect.poll(async () => {
-    if (nextProcess?.exitCode !== null) throw new Error(`Search Next exited: ${stderr}`)
+    if (applicationProcess?.exitCode !== null) throw new Error(`Search compiled ${application.kind} application exited: ${stderr}`)
     return fetch('http://127.0.0.1:3210/mikka/api/search?source=history').then(response => response.status).catch(() => 0)
   }, { timeout: 45000 }).toBe(401)
 }
@@ -111,7 +114,7 @@ test.beforeAll(async () => {
     expect(workspaceIdentity.rows[0].name).toBe('mikka_workspace_e2e')
   }
   console.log('search131 database identity:', JSON.stringify(databaseIdentity))
-  await startIsolatedNext()
+  await startIsolatedApplication()
   for (const id of [owner, outsider]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [id, `${id}@example.invalid`])
   await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, token, owner])
   await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [randomUUID(), foreignToken, outsider])
@@ -182,9 +185,9 @@ test.afterAll(async () => {
     await writeFile('test-results/site-search-fixtures.json', JSON.stringify({ sha: process.env.GITHUB_SHA, databaseIdentity, boundary, owner, outsider, history: history.rows, groups: groups.rows, memberships: memberships.rows, workspaces: workspaces.rows, tasks: tasks.rows, retainedSession: retainedSession.rows }, null, 2))
   } finally {
     releaseGate()
-    if (nextProcess && nextProcess.exitCode === null) {
-      const exited = new Promise<void>(resolve => nextProcess!.once('exit', () => resolve()))
-      nextProcess.kill('SIGTERM')
+    if (applicationProcess && applicationProcess.exitCode === null) {
+      const exited = new Promise<void>(resolve => applicationProcess!.once('exit', () => resolve()))
+      applicationProcess.kill('SIGTERM')
       await exited
     }
     for (const socket of sockets) socket.destroy()

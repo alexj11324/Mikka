@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { ChevronRight, PanelLeft, SquarePen } from 'lucide-react-native'
+import { ChevronDown, ChevronRight, SquarePen } from 'lucide-react-native'
 import Reanimated, { useAnimatedRef, useScrollOffset } from 'react-native-reanimated'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { useAppDrawer } from '@/features/shell/components/app-drawer'
+import { useWorkspaces } from '@/features/workspace/model/use-workspaces'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { prefetch, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
@@ -20,20 +20,18 @@ import { homeList, type HomeItem, type SectionId } from '../model/home-list'
 import { useHomeChats, type HomeChat } from '../model/use-home-chats'
 
 /**
- * The home screen (#1408 Phase 2): the person's chats. The bar holds the workspace button, which opens the drawer,
- * and 新建; the system search field under it narrows the list by name. Pinned chats sit on top as tiles, then the
- * chats in folding sections (home-list.ts). Each row taps, long-presses, swipes and drags (home-chat-row.tsx).
+ * The 对话 tab (Comma designs 01–05): the person's chats under a large title. The bar holds the workspace menu on the
+ * left (switch, 编辑顺序, 工作区设置) and 新建 on the right; search is its own tab. Pinned chats sit on top as tiles,
+ * then the chats in folding sections (home-list.ts). Each row taps, long-presses, swipes and drags (home-chat-row.tsx).
  */
 export function HomeScreen() {
   const router = useRouter()
-  const drawer = useAppDrawer()
-  const [query, setQuery] = useState('')
-  const needle = query.trim().toLowerCase()
-  const actions = useHomeChats(needle)
+  const { workspaces, current, pick } = useWorkspaces()
+  const actions = useHomeChats('')
   const { chats, loading, error, reload } = actions
   const [collapsed, setCollapsed] = useState<ReadonlySet<SectionId>>(new Set())
   const [openKey, setOpenKey] = useState<string | null>(null)
-  const { pinned, items, hidden } = homeList(chats, { searching: Boolean(needle), collapsed })
+  const { pinned, items, hidden } = homeList(chats, { searching: false, collapsed })
   const refresh = useRefresh(reload)
   const updateReady = useUpdateReady()
   const list = useAnimatedRef<Reanimated.FlatList<HomeItem<HomeChat>>>()
@@ -52,14 +50,20 @@ export function HomeScreen() {
   return (
     <View style={styles.screen}>
       <NavBar
-        title=""
-        left={{ icon: 'sidebar.left', label: '工作区', web: <PanelLeft size={22} color={colors.ink} strokeWidth={2} />, onPress: drawer.open }}
+        title="对话"
+        large
+        left={{ icon: 'chevron.down', label: '工作区', text: current?.name ?? '工作区', plain: true, onOpen: () => {},
+          web: <View style={styles.workspace}><Text style={styles.workspaceName} numberOfLines={1}>{current?.name ?? '工作区'}</Text><ChevronDown size={18} color={colors.ink} strokeWidth={2.2} /></View>,
+          items: [
+            ...workspaces.map(workspace => ({ label: workspace.name, on: workspace.id === current?.id, onPress: () => void pick(workspace) })),
+            { label: '编辑顺序', icon: 'arrow.up.arrow.down', onPress: () => router.push('/settings/workspaces') },
+            { label: '工作区设置', icon: 'gearshape', onPress: () => router.push('/settings/workspace') },
+          ] }}
         right={{ icon: 'square.and.pencil', label: '新建', web: <SquarePen size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
           items: [
             { label: '新建 Bot', icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },
             { label: '新建群聊', icon: 'person.2', onPress: () => router.push('/new-group') },
           ] }}
-        search={{ placeholder: '搜索', onChange: setQuery }}
       />
       <ChatDragProvider chats={chats} list={list as never} scroll={scroll} onDrop={order => void actions.reorder(order)}>
         <Reanimated.FlatList<HomeItem<HomeChat>>
@@ -67,7 +71,6 @@ export function HomeScreen() {
           data={items}
           keyExtractor={item => item.kind === 'section' ? `section:${item.id}` : item.chat.key}
           {...underBar}
-          keyboardDismissMode="on-drag"
           onScrollBeginDrag={() => setOpenKey(null)}
           refreshControl={<RefreshControl {...refresh} />}
           contentContainerStyle={{ paddingBottom: 24 }}
@@ -83,9 +86,8 @@ export function HomeScreen() {
               <PinnedGrid pinned={pinned} actions={actions} />
             </View>
           }
-          ListEmptyComponent={loading && !chats.length ? <View style={styles.center}><Spinner /></View>
-            : needle ? <Text style={styles.none}>没有匹配的对话</Text> : undefined}
-          ListFooterComponent={!needle && hidden > 0 ? (
+          ListEmptyComponent={loading && !chats.length ? <View style={styles.center}><Spinner /></View> : undefined}
+          ListFooterComponent={hidden > 0 ? (
             <Pressable accessibilityRole="button" onPress={() => router.push('/hidden-chats')} style={({ pressed }) => [styles.hidden, pressed && { opacity: 0.6 }]}>
               <Symbol name="eye.slash" size={15} color={colors.secondary} />
               <Text style={styles.hiddenText}>隐藏的聊天</Text>
@@ -107,7 +109,8 @@ const styles = StyleSheet.create({
   update: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center', height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: colors.bubble, marginTop: 4 },
   updateText: { fontSize: 15, color: colors.accent, fontWeight: '600' },
   center: { paddingTop: 40, alignItems: 'center' },
-  none: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
+  workspace: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble, maxWidth: 200 },
+  workspaceName: { fontSize: 17, fontWeight: '600', color: colors.ink, flexShrink: 1 },
   hidden: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 20, marginTop: 12 },
   hiddenText: { flex: 1, fontSize: 15, color: colors.secondary },
   hiddenCount: { fontSize: 15, color: colors.tertiary },

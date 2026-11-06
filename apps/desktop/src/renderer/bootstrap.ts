@@ -4,6 +4,7 @@ import type { DesktopBootstrap as WireBootstrap } from '@/lib/desktop-rpc/wire'
 import type { DesktopSession } from './host'
 import { callAction, DesktopTransportError } from './rpc'
 import type { DesktopPublicConfiguration } from './client-configuration'
+import { markStartup } from '../startup'
 
 export type AuthConfiguration = { googleEnabled: boolean; githubEnabled: boolean; emailEnabled: boolean } & Partial<DesktopPublicConfiguration>
 export type DesktopBootstrap = AuthConfiguration & {
@@ -16,6 +17,12 @@ export type DesktopBootstrap = AuthConfiguration & {
 /** One authenticated bootstrap replaces the server page's initial read. An
  * unsigned window only asks for public sign-in choices, never a bearer token. */
 export async function readBootstrap(workspaceId?: string | null): Promise<DesktopBootstrap> {
+  markStartup('renderer.bootstrap.start')
+  try { return await fetchBootstrap(workspaceId) }
+  finally { markStartup('renderer.bootstrap.end') }
+}
+
+async function fetchBootstrap(workspaceId?: string | null): Promise<DesktopBootstrap> {
   const requested = workspaceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId) ? workspaceId : undefined
   try {
     const value = await callAction<WireBootstrap>('desktop.bootstrap', requested ? [requested] : [])

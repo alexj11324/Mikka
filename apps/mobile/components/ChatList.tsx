@@ -37,15 +37,16 @@ export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.gr
 /** A bot (avatar, name, last line, when) or a group chat (a people symbol, its last message, a dot while unread), as a messaging app's list. */
 export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => pressed && { backgroundColor: colors.pressed }}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.press, pressed && { backgroundColor: colors.pressed }]}>
       <ChatRowContent row={row} />
     </Pressable>
   )
 }
 
 /**
- * What a chat row draws, without its press: the home list wraps it in its link, swipe and drag. `badge` replaces the
- * unread dot with a mark on the avatar's corner (features/home `ChatBadge`).
+ * What a chat row draws, without its press: the home list wraps it in its link, swipe and drag. Avatar 44, name 17
+ * semibold, last line 15, time 13 (Comma design 01); a working bot says 进行中 where the time goes. `badge` takes the
+ * place of a group's unread dot, on the right under the time (features/home `ChatBadge`).
  */
 export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode }) {
   const bot = row.kind === 'bot' ? row.bot : null
@@ -54,20 +55,17 @@ export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode
   const dot = badge === undefined && group && Number(group.unreadCount) > 0
   return (
     <View style={styles.row}>
-      <View>
-        {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={54} />
-          : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
-        {badge}
-      </View>
+      {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={44} />
+        : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={18} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
       <View style={styles.body}>
         <View style={styles.top}>
           <Text style={styles.name} numberOfLines={1}>{bot ? bot.name : group!.title}</Text>
-          {bot?.working ? <Spinner size={13} /> : row.at ? <Text style={styles.when}>{shortWhen(row.at)}</Text> : null}
+          {bot?.working ? <Text style={styles.when}>进行中</Text> : row.at ? <Text style={styles.when}>{shortWhen(row.at)}</Text> : null}
         </View>
-        {line || dot ? (
+        {line || dot || badge ? (
           <View style={styles.top}>
             <Text style={[styles.line, { flex: 1 }]} numberOfLines={1}>{line ?? ''}</Text>
-            {dot ? <View style={styles.unread} /> : null}
+            {dot ? <View style={styles.unread} /> : badge}
           </View>
         ) : null}
       </View>
@@ -76,13 +74,15 @@ export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 10 },
-  body: { flex: 1, minWidth: 0, gap: 3 },
+  /** The pressed surface sits 10 pt in from each side, rounded 10 (Comma's list rows). */
+  press: { marginHorizontal: 10, borderRadius: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, paddingVertical: 9 },
+  body: { flex: 1, minWidth: 0, gap: 2 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { flex: 1, fontSize: 16, lineHeight: 21, fontWeight: '600' },
-  when: { fontSize: 13, color: colors.secondary },
-  line: { fontSize: 14, lineHeight: 19, color: colors.secondary },
-  groupIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
-  groupGlyph: { fontSize: 18, color: colors.secondary },
+  name: { flex: 1, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  when: { fontSize: 13, lineHeight: 18, color: colors.secondary },
+  line: { fontSize: 15, lineHeight: 20, color: colors.secondary },
+  groupIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
+  groupGlyph: { fontSize: 15, color: colors.secondary },
   unread: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
 })

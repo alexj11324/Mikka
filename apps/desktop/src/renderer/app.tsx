@@ -25,8 +25,9 @@ import { getTransportState, setTransportState, subscribeTransport } from './tran
 import { Offline } from './offline'
 import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, PlatformExtras, requireUpdate } from 'mikka:platform'
+import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 
-const Workspace = lazy(() => import('./workspace'))
+const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
 const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
 
@@ -85,6 +86,9 @@ function SessionApplication() {
   }, [])
   useEffect(() => {
     void reload()
+    // Load only installed code in parallel with bootstrap. The shared provider
+    // and all business effects remain behind the authenticated Routes boundary.
+    void preloadWorkspace().catch(() => {})
     const changed = () => { void reload() }
     const sessionChanged = () => { void reload(true) }
     const offline = () => setTransportState('offline')

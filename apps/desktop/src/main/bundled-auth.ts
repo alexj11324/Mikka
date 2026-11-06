@@ -14,6 +14,7 @@ export class BundledAuth {
   private readonly saved = new Map<string, StoredSession>()
   private generation = 0
   private pendingStorage: Promise<void> = Promise.resolve()
+  private restoration: Promise<void> | undefined
   private listener: LoopbackAuthServer | null = null
   private timeout: ReturnType<typeof setTimeout> | null = null
   private readonly base: URL
@@ -23,12 +24,16 @@ export class BundledAuth {
     scopeChanged?(): void
   }) { this.base = remoteBase(options.serverUrl) }
 
-  async restore(): Promise<void> {
-    const stored = await this.options.vault.loadAccounts()
-    this.saved.clear()
-    for (const account of stored?.accounts ?? []) this.saved.set(account.identity.user.id, account)
-    this.current = stored?.activeUserId ? this.saved.get(stored.activeUserId) ?? null : null
+  restore(): Promise<void> {
+    // The local window can load while the OS keychain reads. Every credential
+    // operation joins this same barrier; a still-loading account is not signed out.
+    return this.restoration ??= this.options.vault.loadAccounts().then(stored => {
+      this.saved.clear()
+      for (const account of stored?.accounts ?? []) this.saved.set(account.identity.user.id, account)
+      this.current = stored?.activeUserId ? this.saved.get(stored.activeUserId) ?? null : null
+    })
   }
+  whenRestored(): Promise<void> { return this.restoration ?? Promise.resolve() }
   private snapshot() {
     if (this.current) this.saved.set(this.current.identity.user.id, this.current)
     return this.saved.size ? { activeUserId: this.current?.identity.user.id ?? null, accounts: [...this.saved.values()] } : null
@@ -112,6 +117,7 @@ export class BundledAuth {
 
   /** Main-only primitive; callers supply known routes. Never accepts renderer credentials. */
   async request(path: string, init: RequestInit = {}, authenticated = true): Promise<Response> {
+    await this.whenRestored()
     const rpc = path === '/api/desktop/rpc' ? rpcEnvelope(init.body) : null
     const switchInput = rpc?.action === 'workspace.switchWorkspace' && rpc.args.length === 1 && rpc.args[0] && typeof rpc.args[0] === 'object' ? rpc.args[0] as { accountId?: unknown } : null
     if (authenticated && typeof switchInput?.accountId === 'string' && switchInput.accountId !== this.current?.identity.user.id) return this.switchAccount(path, init, switchInput.accountId, rpc?.version ?? 1)
@@ -227,6 +233,7 @@ export class BundledAuth {
   }
 
   async signIn(input: unknown): Promise<void> {
+    await this.whenRestored()
     const value = (input ?? {}) as BundledSignIn
     if (typeof input !== 'object' || !input || (value.provider !== undefined && !['google', 'github'].includes(value.provider)) || (value.locale !== undefined && !['zh-CN', 'en'].includes(value.locale)) || (value.mode !== undefined && !['sign-in', 'sign-up'].includes(value.mode)) || (value.addAccount !== undefined && typeof value.addAccount !== 'boolean')) throw new Error('Invalid sign-in request / 登录请求无效')
     this.cancel()
@@ -270,6 +277,7 @@ export class BundledAuth {
   }
 
   async signInEmail(input: unknown): Promise<{ code?: string; status?: number } | null> {
+    await this.whenRestored()
     if (!input || typeof input !== 'object') return { code: 'INVALID_EMAIL_OR_PASSWORD', status: 400 }
     const { email, password } = input as { email?: unknown; password?: unknown }
     if (typeof email !== 'string' || email.length > 320 || !email.includes('@') || typeof password !== 'string' || password.length < 1 || password.length > 4096) return { code: 'INVALID_EMAIL_OR_PASSWORD', status: 400 }
@@ -298,6 +306,7 @@ export class BundledAuth {
   }
 
   async signOut(): Promise<void> {
+    await this.whenRestored()
     this.generation++; this.cancel()
     const revocation = Promise.all([...this.saved.values()].map(account => this.fetchAs('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(10_000) }, account).catch(() => null)))
     this.current = null
@@ -307,6 +316,7 @@ export class BundledAuth {
     await revocation
   }
   async accounts(): Promise<{ providerId: string }[]> {
+    await this.whenRestored()
     if (!this.current) return []
     const response = await this.request('/api/auth/list-accounts', { signal: AbortSignal.timeout(15_000) })
     if (!response.ok) return []
@@ -314,6 +324,7 @@ export class BundledAuth {
     return Array.isArray(value) ? value.flatMap(item => item && typeof item === 'object' && typeof item.providerId === 'string' ? [{ providerId: item.providerId.slice(0, 100) }] : []) : []
   }
   async linkAccount(provider: unknown): Promise<void> {
+    await this.whenRestored()
     if (provider !== 'google' && provider !== 'github') throw new Error('Invalid account provider')
     if (!this.current) throw new Error('Sign in first / 请先登录')
     // Linking requires the browser's explicit authenticated account confirmation.

@@ -273,7 +273,7 @@ export async function exerciseReadCases({ owner, peer, fixture, environment }) {
   for (const scenario of ['warm', 'reload-restored']) {
     const restored = scenario === 'reload-restored'
     const c = clone(chat), i = clone(issues), t = clone(threads), h = clone(history), d = clone(detail)
-    const nextChat = success(await action('syncCoordinatorChat', [fixture.botId, restored ? null : c.version, continuation(c)], 'bot-chat', scenario)).chat
+    const nextChat = success(await action('syncCoordinatorChat', [fixture.botId, restored ? undefined : c.version, continuation(c)], 'bot-chat', scenario)).chat
     check(restored ? Number.isInteger(nextChat.after) : nextChat.unchanged === true, 'chat_cursor_not_used')
     check(snapshot(await action('syncIssueList', [i.version, i.positions], 'task-list', scenario)).unchanged === true, 'issue_cursor_not_used')
     check(snapshot(await action('syncThreadList', [t.version, t.positions], 'thread-list', scenario)).unchanged === true, 'thread_cursor_not_used')

@@ -1,6 +1,6 @@
 # Mobile app
 
-- **Redesign pending:** Alex dropped the push drawer on 2026-11-06 ([decision](decisions/2026-11-06-1200-ios-drop-drawer-comma-redesign.md)). The proposed tab-bar design after Comma is [`mobile-comma-redesign.md`](mobile-comma-redesign.md); until Alex accepts its frames, the drawer sections below describe `main` as it is.
+- **Redesign:** Alex dropped the push drawer and accepted the tab-bar design after Comma on 2026-11-06 ([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)); the frames are in [`mobile-comma-redesign.md`](mobile-comma-redesign.md). The shell and 对话 below are built; the other tabs move to their frames screen by screen.
 - **Status:** implemented baseline; UI/UX acceptance tracked in [#1296](https://github.com/alexj11324/Mikka/issues/1296) (2026-11-05)
 - **GitHub:** #1296
 - **Figma:** `zPe5LKycb2XuT1ivCLRw07`; page `268:4750` is archived per #1296 and is not a design authority. Page `358:9186` is a reference to verify. Current main and accepted decisions govern; do not redesign from archived or unaccepted frames.
@@ -31,38 +31,36 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-The app is one Stack inside a push drawer, as OpenBot's is; there is no tab bar
-([decision](decisions/2026-11-05-2005-ios-push-drawer.md), replacing
-[no drawer](decisions/2026-11-05-1300-ios-no-drawer.md)). It opens on the chat
-list. A chat, a thread, 线程, 任务, 建议, 插件 and 设置 open over it, with the
-system back button and edge swipe.
+The app is the system tab bar with four tabs, 对话 · 线程 · 建议 · 设置, and a
+search tab at its trailing end
+([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)). Each tab is
+its own Stack with a large title. A chat and a thread open over the tabs, so the
+tab bar hides there. 新建 Bot and 新建群聊 open as form sheets. 线程 and 建议 show
+their counts as the system's tab badges.
 
-The **home screen** is a messaging app's chat list. It has no title.
-- Its bar holds the workspace button (left), which opens the drawer, and 新建
-  (right): 新建 Bot and 新建群聊.
-- The system search field under the bar matches bots and group chats by name.
-- The pinned bots sit on top as tiles, each with a star. The star is the pin,
+**对话** (designs 01–05) is a messaging app's chat list under the large title 对话.
+- The bar holds the workspace menu (left: the workspaces with a check on the open
+  one, 编辑顺序, 工作区设置) and 新建 (right: 新建 Bot, 新建群聊).
+- The pinned chats sit on top as tiles, three to a row, each with a star. The star is the pin,
   the same for every bot; the Coordinator is pinned until the person unpins it
-  ([decision](decisions/2026-11-01-1215-star-is-the-pin.md)).
+  ([decision](decisions/2026-11-01-1215-star-is-the-pin.md)). An orange dot on a
+  tile is a thread waiting on the person; a blue number is unread messages.
 - Then come the sections 正在工作, Bot and 群聊. Each row has its last line and
-  time, newest first (the web bot list, R-01; R-06).
+  time (a working bot says 进行中), newest first (the web bot list, R-01; R-06).
+  Rows have no separators; the pressed surface sits 10 pt in from each side.
 - Each chat row taps open with the system's link transition. A long press opens its menu over a live preview. A
-  swipe left pins it, and holding then moving drags it among the pins or the list
-  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Sections fold. An avatar shows a waiting
-  mark or its unread count. Hidden chats are listed under 隐藏的聊天 at the foot.
+  swipe left shows two capsules, 置顶 and 隐藏, and a full swipe pins. Holding then moving drags it among the pins or the list
+  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Sections fold. The unread count or waiting
+  mark sits on the right under the time. Hidden chats are listed under 隐藏的聊天 at the foot.
 - 「重启以更新」 shows above the list once an update has downloaded
   ([decision](decisions/2026-10-31-2010-ota-updates.md)).
 
-The **drawer** lies under the app at the left edge. A drag to the right on the
-home screen, or the workspace button, slides the app aside to show it. The
-drawer is the system secondary background and its places are one inset group
-on the tertiary background. The open app keeps the page colour, rounded to the
-screen corners, with a soft shadow and a light veil
-([decision](decisions/2026-11-05-2205-drawer-native-surface.md)).
-- At the top is the open workspace. A tap lists the others to switch to, and
-  编辑顺序 arranges them on this device by dragging a handle.
-- Then 线程 and 建议, each with its count, and 任务 and 插件.
-- At the foot are the person (→ 个人资料) and 设置.
+**工作区** (design 19, 设置 › 工作区, also 编辑顺序 in the workspace menu) lists the
+workspaces with a check on the open one; a tap switches and goes back. 编辑 shows
+handles that arrange them on this device.
+
+**搜索** (design 20) is the search tab: the system search field matches bots, group
+chats and threads by name. It reads the thread list only while there is a query.
 The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
@@ -70,7 +68,7 @@ Controls are the system's where iOS has one
 the iOS navigation bar with its own bar buttons, menus and back button;
 capsules and the composer are Liquid Glass on iOS 26.
 
-**线程** (from the drawer, a large-title page; like the Claude app's Code screen): grouped as on the
+**线程** (a tab, a large-title page; like the Claude app's Code screen): grouped as on the
 web (R-52), 等待你 · 进行中 · 受阻 · 空闲 · 已解决, a task's attempts folded
 into its newest thread (「第 N 次尝试」); 新线程 and the filter menu sit in the bar.
 
@@ -164,7 +162,7 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from 设置 at the foot of the drawer. A hierarchy (R-70): the
+The 设置 tab. A hierarchy (R-70): the
 top screen holds categories, each opens its own page. Every row cites its
 precedent. Figma frames 07, 07a–07e.
 
@@ -203,7 +201,6 @@ What is still our own, and why:
 | Control | Why it is ours |
 |---|---|
 | Message bubbles, event lines, the thread card (`components/chat.tsx`) | iOS has no chat transcript control. |
-| The push drawer (`features/shell/components/app-drawer.tsx`) | iOS has no side drawer; ours follows OpenBot's, on a 300 ms spring with Reduce Motion. |
 | Swipe right to quote, swipe left for times (`TimedRow`, `useTimeReveal`) | Messages' gestures are not public API; ours follow them, on `lib/springs.ts`. |
 | Reactions in the long-press menu | A long press on iOS is the system context menu (`components/MessageMenu.ios.tsx`, `@expo/ui` `ContextMenu`), lifting the bubble itself. iOS has no reaction bar on a context menu, so the six reactions are two compact `ControlGroup` rows of three at its top. VoiceOver, the keyboard and the web build keep the actions sheet (`app/message.tsx`). |
 | The reply action row (copy · 回复 · 更多) | Not a system control; ChatGPT and Claude draw it the same way. |
@@ -223,7 +220,7 @@ large Dynamic Type. Plus:
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
 - Home: the chat list with the pinned bots on top, its sections, search, and 重启以更新.
-- Drawer: closed, mid-drag, open; the workspace list and 排序; with and without counts.
+- Tab bar: each tab, with and without badges; the workspace menu and 工作区 with 编辑.
 - 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.
 - Sign in: Google, GitHub (R-40 copy rules).

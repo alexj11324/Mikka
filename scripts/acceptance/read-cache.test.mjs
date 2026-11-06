@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { EnvironmentError } from '../test-accounts/environment.mjs'
 import { TestAccountError } from '../test-accounts/pool.mjs'
+import { desktopActionSchemas } from '../../lib/desktop-rpc/schemas.ts'
+import { decode } from '../../lib/desktop-rpc/wire.ts'
 import { READ_ACTIONS, ReadCacheAcceptanceError, ReadCacheDiagnosticError, actionResult, createReadClient, discoverReadActions, exerciseReadCases, publicFailure, requestAllowed } from './read-cache.mjs'
 import { observedAction, publishedReadActions, readRpcActions, rpcReadRequest } from './read-action-transport.mjs'
 
@@ -214,6 +216,9 @@ test('the HTTP scenario exercises real cursor arguments, account isolation, delt
     action: async (name, args, surface, scenario) => {
       calls.push({ name, args, actor, surface, scenario })
       assert.ok(READ_ACTIONS.includes(name))
+      const sent = JSON.parse(rpcReadRequest(name, args, environment, readRpcActions).init.body)
+      assert.deepEqual(desktopActionSchemas[sent.action].parse(decode(sent.args)), args)
+      if (name === 'syncCoordinatorChat' && scenario === 'reload-restored') assert.equal(args[1], undefined)
       if (actor === 'peer') {
         if (name === 'syncCoordinatorChat') return { error: 'botNotFound' }
         if (name === 'pollIssue') return { error: 'issueNotFound' }
@@ -225,7 +230,7 @@ test('the HTTP scenario exercises real cursor arguments, account isolation, delt
         if (phase === 'changed') return { chat: { version: changed, after: 12, items: [{ position: 13 }] } }
         if (args.length === 1) return { chat: { version, items: Array.from({ length: 12 }, (_, index) => ({ position: index + 1 })), continuation: { after: 12, cursor: 12, prefix: version } } }
         assert.deepEqual(args[2], { after: 12, cursor: 12, prefix: version, sourceIds: [], artifactIds: [] })
-        return { chat: args[1] === null ? { after: 12, items: [] } : { unchanged: true } }
+        return { chat: args[1] === undefined ? { after: 12, items: [] } : { unchanged: true } }
       }
       if (name === 'pollIssue') {
         if (phase === 'removed') return { error: 'issueNotFound' }

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { resolve, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
@@ -12,20 +12,37 @@ async function assetFiles(directory) {
     const path = resolve(directory, entry.name)
     if (entry.isDirectory()) result.push(...await assetFiles(path))
     else if (entry.isFile()) result.push(path)
+    else throw new Error(`FRONTEND_ASSET_NOT_REGULAR: ${entry.name}`)
   }
   return result
 }
 
 export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true } = {}) {
   const config = await frontendConfig({ target, outdir, clean })
+  outdir = resolve(config.root, config.build.outDir)
+  // This directory belongs to the build. Complete its removal before Vite
+  // writes anything, then verify the emitted inventory before publishing it.
+  if (clean) await rm(outdir, { recursive: true, force: true })
   const built = await build(config)
   const application = config.plugins.find(plugin => plugin.name === 'mikka-shared-application')
   const inventory = application?.api.inventory()
   if (!inventory || inventory.serverModules.length) throw new Error('FRONTEND_INVENTORY_MISSING')
+  const outputs = (Array.isArray(built) ? built : [built]).flatMap(value => value.output ?? [])
+  const assets = new Map(outputs.filter(value => value.fileName.startsWith('assets/')).map(value => [value.fileName, value]))
+  for (const path of await assetFiles(resolve(outdir, 'assets'))) {
+    const name = relative(outdir, path).split(sep).join('/')
+    if (clean && !assets.has(name)) throw new Error(`FRONTEND_ASSET_UNEXPECTED: ${name}`)
+  }
   const fingerprint = createHash('sha256')
-  for (const path of (await assetFiles(resolve(outdir, 'assets'))).sort()) {
-    fingerprint.update(relative(outdir, path).split(sep).join('/'))
-    fingerprint.update(await readFile(path))
+  // Incremental desktop development retains old chunks for existing windows,
+  // but only this build's emitted assets identify the current application.
+  for (const name of [...assets.keys()].sort()) {
+    const asset = assets.get(name)
+    const content = await readFile(resolve(outdir, name))
+    const emitted = Buffer.from(asset.type === 'chunk' ? asset.code : asset.source)
+    if (!content.equals(emitted)) throw new Error(`FRONTEND_ASSET_CONTENT_MISMATCH: ${name}`)
+    fingerprint.update(name)
+    fingerprint.update(content)
   }
   const rendererBuild = fingerprint.digest('hex')
   const result = { ...inventory, rendererBuild }
@@ -36,7 +53,6 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
   if (target === 'desktop') {
     const directory = resolve(repository, 'apps/desktop/dist')
     await mkdir(directory, { recursive: true })
-    const outputs = (Array.isArray(built) ? built : [built]).flatMap(value => value.output ?? [])
     const graph = { format: 'vite-rolldown', inputs: inventory.inputs, outputs: outputs.map(value => value.type === 'chunk'
       ? { fileName: value.fileName, type: value.type, isEntry: value.isEntry, imports: value.imports, dynamicImports: value.dynamicImports, modules: Object.keys(value.modules) }
       : { fileName: value.fileName, type: value.type }) }
