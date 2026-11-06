@@ -10,6 +10,7 @@ import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 import { streamText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
+import { nativeLeaseSchema } from '@mikka/protocol/subscription'
 import { SubscriptionService } from '../../lib/subscription-service'
 import type { SubscriptionRepository } from '../../lib/subscription-repository'
 import { SubscriptionWorkerClient } from '../../packages/daemon/src/subscription-worker-client'
@@ -36,9 +37,18 @@ test('trace subscription fixture supports the current catalogue and native lease
   assert.equal(context.accountId, MVP_NATIVE_ACCOUNT)
   assert.ok(Date.parse(context.expiresAt) > Date.now())
   await assert.rejects(scoped.call('nativeAuth', { revision: 1 }), { code: 'subscription_fixture_refused' })
-  const lease = await new SubscriptionWorkerClient(launch, { ...config, exportAccessLease: true }).forUse(use)
-    .call<{ accessToken: string }>('nativeAuth', { revision: 1 })
+  const exportable = new SubscriptionWorkerClient(launch, { ...config, exportAccessLease: true })
+  await assert.rejects(exportable.call('nativeAuth', { revision: 1 }), { code: 'subscription_fixture_refused' })
+  const auth = await exportable.forUse(use)
+    .call<{ accessToken: string; expiresAt: string; chatgptAccountId: string; chatgptPlanType?: string }>('nativeAuth', { revision: 1 })
+  // The claim's nativeLease now obtains identity and access in one nativeAuth call.
+  const lease = nativeLeaseSchema.parse({ route: 'codex_cli', modelId: MVP_SUBSCRIPTION_MODEL, revision: 1,
+    accountId: auth.chatgptAccountId, ...(typeof auth.chatgptPlanType === 'string' ? { plan: auth.chatgptPlanType } : {}),
+    accessToken: auth.accessToken, expiresAt: auth.expiresAt })
+  assert.equal(lease.accountId, MVP_NATIVE_ACCOUNT)
+  assert.equal(lease.plan, 'plus')
   assert.equal(lease.accessToken, MVP_NATIVE_TOKEN)
+  assert.ok(Date.parse(lease.expiresAt) > Date.now())
   await assert.rejects(scoped.call('models', { revision: 2 }), { code: 'subscription_fixture_refused' })
 })
 
@@ -110,7 +120,7 @@ test('trace synthetic Codex peer passes real version/model probes and requires s
   const github = createTraceGitHubBinary(directory), bridge = join(directory, 'test-credential-bin')
   await mkdir(bridge)
   // This protocol test supplies a labelled synthetic credential wrapper. The
-  // full chain uses the real authorized run-token exchange and run-local gh.
+  // full chain uses the real authorized claim's prepared login and run-local gh.
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
   await writeFile(join(bridge, 'gh'), `#!/bin/sh\nGH_TOKEN=mvp-synthetic-installation-run exec ${quote(github)} "$@"\n`, { mode: 0o700 })
   await writeFile(fixture, JSON.stringify({ t: 0, exit: { outcome: 'failed', error: 'private-fixture-error' } }) + '\n')

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -15,9 +15,40 @@ import { recordPeerFailure } from './diagnostics.mjs'
 import { MVP_NATIVE_ACCOUNT, MVP_NATIVE_TOKEN, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
 
 const execute = promisify(execFile)
-const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`
 const ghScript = fileURLToPath(new URL('../../scripts/dev-local/gh.mjs', import.meta.url))
-const ghWrapper = `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(ghScript)} "$@"\n`
+const syntheticGitHubTokens = ['mvp-synthetic-installation-run', 'mikka-local-synthetic-user-token']
+
+/** Match native gh's prepared login without reading a host login. Only the
+ * fixture daemon's private generated config and two synthetic values qualify. */
+export function traceGitHubEnvironment(directory, env = process.env) {
+  let fd
+  try {
+    assert.ok(!env.GITHUB_TOKEN)
+    if (env.GH_TOKEN) {
+      assert.ok(syntheticGitHubTokens.includes(env.GH_TOKEN))
+      return { ...env }
+    }
+    const root = resolve(directory), parent = join(root, 'adapters', 'github')
+    const config = resolve(env.GH_CONFIG_DIR ?? '')
+    assert.ok(dirname(config) === parent && /^github-[a-zA-Z0-9]{6}$/.test(basename(config)))
+    const uid = process.getuid?.()
+    assert.ok(uid !== undefined)
+    for (const path of [root, join(root, 'adapters'), parent, config]) {
+      const stat = lstatSync(path)
+      assert.ok(stat.isDirectory() && stat.uid === uid && (stat.mode & 0o077) === 0 && realpathSync(path) === path)
+    }
+    fd = openSync(join(config, 'hosts.yml'), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+    const stat = fstatSync(fd)
+    assert.ok(stat.isFile() && stat.nlink === 1 && stat.uid === uid && (stat.mode & 0o077) === 0 && stat.size > 0 && stat.size <= 4096)
+    const bytes = Buffer.alloc(4097), count = readSync(fd, bytes, 0, bytes.length, null)
+    assert.ok(count === stat.size && count <= 4096)
+    const match = /^github\.com:\n    oauth_token: "(mvp-synthetic-installation-run|mikka-local-synthetic-user-token)"\n    git_protocol: https\n$/.exec(bytes.subarray(0, count).toString('utf8'))
+    assert.ok(match)
+    return { ...env, GH_TOKEN: match[1], GITHUB_TOKEN: '' }
+  } catch (error) {
+    throw new Error('SYNTHETIC_GITHUB_CONFIG_REQUIRED', { cause: error })
+  } finally { if (fd !== undefined) closeSync(fd) }
+}
 
 /** Reuse dev:local's fixed loopback transport. Never select a machine's gh or
  * reuse its login; the real per-run credential helper wraps this executable. */
@@ -25,7 +56,7 @@ export function createTraceGitHubBinary(directory) {
   const bin = join(directory, 'fixture-bin')
   mkdirSync(bin, { recursive: true, mode: 0o700 })
   const binary = join(bin, 'gh')
-  writeFileSync(binary, ghWrapper, { mode: 0o700, flag: 'wx' })
+  writeFileSync(binary, `#!${process.execPath}\nimport { fixtureGh } from ${JSON.stringify(ghScript)}\nimport { traceGitHubEnvironment } from ${JSON.stringify(import.meta.url)}\ntry { await fixtureGh(process.argv.slice(2), { env: traceGitHubEnvironment(${JSON.stringify(realpathSync(directory))}) }) }\ncatch { process.stderr.write('SYNTHETIC_GITHUB_FIXTURE_FAILED\\n'); process.exitCode = 1 }\n`, { mode: 0o700, flag: 'wx' })
   return binary
 }
 
@@ -98,7 +129,7 @@ async function deliverTraceChange(config, delivery, stage) {
   const commit = await git(['rev-parse', 'HEAD'])
   assert.equal((await git(['ls-remote', '--exit-code', REPOSITORY, `refs/heads/${delivery.branch}`])).split(/\s+/)[0], commit, 'SYNTHETIC_PUSH_RECEIPT_REQUIRED')
   // PATH begins with the real run-local GitHub credential wrapper, which
-  // obtains the owner's synthetic token from the real authorized HTTP route.
+  // reads the owner's synthetic login prepared by the authorized claim.
   // Host gh login and proxy/Node configuration never reach this subprocess.
   const gh = args => execute('gh', args, { cwd: process.cwd(), encoding: 'utf8', timeout: 30_000,
     env: { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: process.env.NODE_ENV, NODE_OPTIONS: '',

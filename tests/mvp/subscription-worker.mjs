@@ -25,7 +25,7 @@ for await(const line of lines) {
       const expiresAt=new Date(Date.now()+5*60_000).toISOString()
       if(request.method==='nativeAuth') {
         assert.equal(config.exportAccessLease,true)
-        send({result:{accessToken:MVP_NATIVE_TOKEN,expiresAt}})
+        send({result:{accessToken:MVP_NATIVE_TOKEN,expiresAt,chatgptAccountId:MVP_NATIVE_ACCOUNT,chatgptPlanType:'plus'}})
       } else send({result:{accountId:MVP_NATIVE_ACCOUNT,plan:'plus',expiresAt}})
     }
     else if(request.method==='executeStream') {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { Server } from 'node:http'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, link, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,12 +16,41 @@ import { decisionRequestInput } from '../../lib/coordinator/decision.ts'
 import { triageInput, triageQuestions } from '../../lib/coordinator/triage.ts'
 import { artifactSubmittedEvent } from '../../lib/coordinator-events.ts'
 import { startMvpServices } from './services.mjs'
+import { traceGitHubEnvironment } from './trace-codex.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
 import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
 import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
+
+test('trace GitHub accepts only bounded private native config inside its owned daemon directory', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-github-'))
+  const parent = join(directory, 'adapters', 'github')
+  await mkdir(parent, { recursive: true, mode: 0o700 })
+  const config = await mkdtemp(join(parent, 'github-')), file = join(config, 'hosts.yml')
+  const contents = 'github.com:\n    oauth_token: "mvp-synthetic-installation-run"\n    git_protocol: https\n'
+  const env = { GH_CONFIG_DIR: config, GH_TOKEN: '', GITHUB_TOKEN: '' }
+  const refused = (values = env) => assert.throws(() => traceGitHubEnvironment(directory, values), { message: 'SYNTHETIC_GITHUB_CONFIG_REQUIRED' })
+  try {
+    await writeFile(file, contents, { mode: 0o600 })
+    assert.equal(traceGitHubEnvironment(directory, env).GH_TOKEN, 'mvp-synthetic-installation-run')
+    assert.equal(traceGitHubEnvironment(directory, { GH_TOKEN: 'mikka-local-synthetic-user-token' }).GH_TOKEN, 'mikka-local-synthetic-user-token')
+    refused({ ...env, GH_CONFIG_DIR: directory })
+    refused({ ...env, GH_TOKEN: 'private-host-token' })
+    refused({ ...env, GITHUB_TOKEN: 'private-host-token' })
+    await chmod(file, 0o644); refused(); await chmod(file, 0o600)
+    await writeFile(file, contents.replace('mvp-synthetic-installation-run', 'private-host-token')); refused()
+    await writeFile(file, 'x'.repeat(4097)); refused()
+    await writeFile(file, contents)
+    const alias = join(config, 'alias.yml')
+    await link(file, alias); refused(); await rm(alias)
+    await rm(file); await writeFile(alias, contents, { mode: 0o600 })
+    await symlink(alias, file); refused(); await rm(file); await rm(alias)
+    // Parent path aliases cannot turn an owned filename into a host login.
+    await rm(config, { recursive: true }); await symlink(directory, config); refused()
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
 
 test('parser diagnostics preserve original emit arguments, receiver, return and default error handling', () => {
   const original = Server.prototype.emit, observed = [], server = new Server(), socket = {}

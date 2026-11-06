@@ -49,8 +49,12 @@ supplies a fixed rewrite on every Git command, verifies that the repository's
 canonical origin is the expected fixture URL, and permits only Git's `file`
 protocol. CLI child processes cannot fall through to a real GitHub push. No
 global Git config is changed. The real per-run credential helper wraps the
-owned synthetic `gh`, so GitHub API requests remain on loopback while the
-application's normal run/device/owner authorization still applies.
+owned synthetic `gh`, which reads only the daemon's private prepared
+`hosts.yml` through a bounded, no-follow file read and accepts only the fixed
+synthetic tokens. The existing strict local-test/owned-origin guard supplies
+the Git rewrite to native credential preparation too. GitHub API requests
+remain on loopback while the application's normal run/device/owner
+authorization still applies.
 
 As in `dev:local`, unauthenticated POST requests warm the lazy MCP and GitHub
 credential routes before native execution. They create no task or credential;
@@ -75,8 +79,9 @@ bootstrap before registration. The test therefore checks the public-bootstrap
 contract and HTTP propagation, not provisioning of a real official E2B image.
 The fixture seeds the current source-bound model order and its owner's synthetic
 subscription, then lets the application create the real run binding. The real
-native-lease HTTP handler checks the run, device, owner and binding; the private
-test worker supplies only synthetic account/context/access values. The daemon's
+claim prepares the native lease after run, device, owner and binding checks;
+the private test worker supplies only synthetic account/context/access values
+through the current `nativeAuth` ABI. The daemon's
 normal version and model probes call the synthetic peer. Its fixed version and
 usage values exercise protocol compatibility and telemetry, never attest an
 official CLI or provider. Evidence explicitly records `syntheticCLI: true` and
