@@ -542,7 +542,7 @@ test('real PG: question receipts preserve one execution without opening a repair
         ...execution.data.sourceToolActivity.tools.find(tool => tool.inputChunkId === askInputId),
         kind: 'decision', question: exactQuestion, output: harness === 'codex' ? [{ type: 'text', text: 'Recorded. End your turn now.' }] : 'Recorded. End your turn now.',
       } } }
-      assert.equal(JSON.stringify(legacy.data), JSON.stringify(expectedLegacy), 'v1 must preserve the exact pre-summary projection, without new keys')
+      assert.deepEqual(legacy.data, expectedLegacy, 'v1 must preserve the pre-summary fields and content, without new keys; JSONB may reorder object keys')
       assert.equal(legacy.digest, digest(expectedLegacy))
       assert.notEqual(execution.digest, legacy.digest, 'the new projection must not reuse a v1 digest')
       for (const [version, recorded] of [[1, legacy], [2, execution]] as const) {
