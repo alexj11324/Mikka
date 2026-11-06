@@ -40,9 +40,13 @@ export interface MobileThread {
   attempts: number
 }
 
-/** A thread's name: its task as "MIK-11 群聊建表" when it has one, else the first line of its prompt (glossary). */
+/**
+ * A thread's name: its task's short title when the model has written one (Alex 2026-11-06), else the task as
+ * "MIK-11 群聊建表", else the first line of its prompt (glossary).
+ */
 function nameOf(source: RunSource | undefined, prompt: string, agentName: string) {
   const issue = source?.issue
+  if (issue?.shortTitle) return issue.shortTitle
   if (issue) {
     const key = issue.identifier ?? (issue.number === null ? null : `#${issue.number}`)
     return key ? `${key} ${issue.title}` : issue.title
