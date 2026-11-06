@@ -21,6 +21,9 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromE
   status: 'passed', templateId: TEMPLATES[kind], sourceCommit: COMMIT, workerSha: SHA, harness, model,
   credentialRoute: 'subscription', replyVerified: true, runId: `run-${kind}`, deviceId: `device-${kind}`,
   officialBinarySha256: 'e'.repeat(64), officialCliVersion: 'fixture-version',
+  agentAcceptance: { runIdHash: createHash('sha256').update(`run-${kind}`).digest('hex').slice(0, 16), harness,
+    kind: harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack', at: 1100, ms: 100 },
+  runtimeAuthorization: { source: 'http_server_link', complete: true, truncated: false, extraRemoteCalls: 0 },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
@@ -40,6 +43,26 @@ test('conservation requires both strict installation and exact provider-only fin
     value => { value.finalization.originalBefore = { ...PROOF, sha256: 'e'.repeat(64) } },
   ]) {
     const invalid = structuredClone(proof); mutate(invalid)
+    assert.throws(() => assertConservation(invalid, 'claude'), /runtime_release_conservation_invalid/)
+  }
+})
+
+test('certificate conversion proof fixes the original bytes and exact link target', () => {
+  const certificate = JSON.parse(readFileSync(new URL('./e2b-certificate-relinks.json', import.meta.url)))
+    .find(row => row.templates.includes('claude') && !row.providerRoot)
+  const proof = conservation('claude')
+  proof.finalization.providerChanges = [{ path: certificate.path, kind: 'file',
+    before: { kind: 'file', mode: 420, sha256: certificate.sha256, target: null },
+    after: { kind: 'link', mode: 511, sha256: null, target: certificate.target }, resolvedSha256: certificate.sha256 }]
+  assert.doesNotThrow(() => assertConservation(proof, 'claude'))
+  for (const mutate of [
+    row => { row.after.target = '/opt/mikka/replaced.crt' },
+    row => { row.resolvedSha256 = 'a'.repeat(64) },
+    row => { delete row.resolvedSha256 },
+    row => { row.path = '/etc/ssl/certs/unobserved.pem' },
+    row => { row.before.sha256 = 'a'.repeat(64) },
+  ]) {
+    const invalid = structuredClone(proof); mutate(invalid.finalization.providerChanges[0])
     assert.throws(() => assertConservation(invalid, 'claude'), /runtime_release_conservation_invalid/)
   }
 })
@@ -276,6 +299,9 @@ test('publication requires both real subscriptions on these exact candidates bef
     value => { value.subscriptionAcceptance.codex.model = 'other-model' },
     value => { value.subscriptionAcceptance.claude.workerSha = OTHER },
     value => { delete value.subscriptionAcceptance.codex.officialBinarySha256 },
+    value => { value.subscriptionAcceptance.claude.agentAcceptance.kind = 'claude_system_init' },
+    value => { value.subscriptionAcceptance.codex.agentAcceptance.runIdHash = 'f'.repeat(16) },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.extraRemoteCalls = 1 },
     value => { value.templates.codex.models[0].models = ['unmeasured-model'] },
     value => { value.templates.desktop.conservation.after = { ...PROOF, sha256: 'e'.repeat(64) } },
     value => { value.templates.codex.public = false },

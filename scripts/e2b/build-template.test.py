@@ -1,6 +1,7 @@
 """Publish step of build-template.py, against a fake E2B API (no network, no SDK)."""
 import importlib.util
 import io
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -134,6 +135,8 @@ class Publish(unittest.TestCase):
             self.assertIn(' '.join(['a' * 40, 'b' * 40, kind]), commands[install])
             self.assertFalse(any('apt-get' in command or 'ln -sf' in command or 'systemctl' in command for command in commands))
             self.assertEqual(called['start'], 'bash /opt/mikka/start-prebuilt.sh')
+            self.assertIn('kill -0 "$mikka_preloaded_pid"', called['ready'])
+            self.assertIn("grep -Fxq -- '--wait-bootstrap'", called['ready'])
             self.assertIn('test ! -e /home/user/.mikka/bootstrap.json', called['ready'])
             self.assertIn('test ! -e /home/user/.mikka/worker/device.json', called['ready'])
             if kind == 'desktop': self.assertIn('test ! -e /run/mikka-viewer/key', called['ready'])
@@ -164,6 +167,9 @@ class Publish(unittest.TestCase):
             kind: {'status': 'passed', 'templateId': 'tpl-' + kind, 'sourceCommit': report['sourceCommit'],
                    'workerSha': report['workerSha'], 'harness': harness, 'model': model, 'credentialRoute': 'subscription',
                    'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
+                   'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
+                                       'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
+                   'runtimeAuthorization': {'source': 'http_server_link', 'complete': True, 'truncated': False, 'extraRemoteCalls': 0},
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
         self.assertIs(bt.verify_release_evidence(report), report)

@@ -39,6 +39,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/e2b"
           "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
       - name: Read the existing E2B build key
+        id: e2b-key
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -68,3 +69,19 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\ncandidate-report=${JSON.stringify(report)}\n`)
           JS
+      - name: Close leftover probes and failed private builds
+        if: always() && steps.e2b-key.outcome == 'success'
+        run: |
+          args=()
+          if [ "$BUILD_OUTCOME" = success ]; then args+=(--sandboxes-only --report "$RUNNER_TEMP/candidates.json"); fi
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+      - name: Preserve candidate build cleanup receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-candidate-build-cleanup
+          path: ${{ runner.temp }}/build-cleanup.json
+          if-no-files-found: warn
+          retention-days: 7

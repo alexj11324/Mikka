@@ -64,7 +64,11 @@ export class RepositoryCache {
       // The validated assignment is authoritative. A cache's stale remote
       // must never select another repository or an executable transport.
       await git(['remote', 'set-url', 'origin', remote], path)
-      await git(['fetch', '--depth=50', ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
+      // Empty clones have no shallow boundary; Git 2.56 rejects --depth on
+      // their empty fetch. Preserve full legacy caches rather than truncating
+      // user history, and retain the depth only for the new shallow clones.
+      const depth = existsSync(join(path, '.git', 'shallow')) ? ['--depth=50'] : []
+      await git(['fetch', ...depth, ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
     }
     this.assertClone(path)
     let freshHead = false

@@ -1,0 +1,33 @@
+{
+  "run": 42285968840,
+  "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2",
+  "templates": {
+    "claude": {
+      "baseCacheKey": "f2306753344746c88c58efec5fbadd32002f17ff3949e18b33f501de95ec61f1",
+      "originalCli": {
+        "claude_code": {
+          "path": "/usr/local/bin/claude",
+          "sha256": "86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"
+        },
+        "codex": null
+      }
+    },
+    "codex": {
+      "baseCacheKey": "89b654d744c297eeafd18c9185a6fdaff4790c8ff0eb0d3a9a1f5c177c58d489",
+      "originalCli": {
+        "claude_code": null,
+        "codex": {
+          "path": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+          "sha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af"
+        }
+      }
+    },
+    "desktop": {
+      "baseCacheKey": "d3e633dfb0695ccb31a34c32a3a1325b65f6f37ace3131221bcd4172f623aae3",
+      "originalCli": {
+        "claude_code": null,
+        "codex": null
+      }
+    }
+  }
+}

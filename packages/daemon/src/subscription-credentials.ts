@@ -11,6 +11,14 @@ import { runRuntimeTimings } from './run-runtime-timing'
 const REFRESH_LEAD_MS = 30_000
 const MAX_TIMER_MS = 2 ** 31 - 1
 
+/** Keep preparation failures distinct from an official CLI startup failure. */
+export class SubscriptionCredentialError extends Error {
+  constructor(readonly detail: 'lease_refused' | 'lease_invalid' | 'model_mismatch', cause?: unknown) {
+    super(`subscription_${detail}`, { cause })
+    this.name = 'SubscriptionCredentialError'
+  }
+}
+
 export interface PreparedSubscription {
   readonly first: NativeLease
   current(): NativeLease
@@ -28,18 +36,27 @@ export async function prepareSubscriptionCredentials(assignment: RunAssignment, 
   const selected = assignment.subscriptionBinding
   if (!selected) throw Error('subscription_assignment_invalid')
   const attributes = { 'mikka.run.id_hash': runIdHash(assignment.runId), 'mikka.harness': assignment.harness }
+  const parse = (value: unknown) => {
+    try { return nativeLeaseSchema.parse(value) }
+    catch (error) { throw new SubscriptionCredentialError('lease_invalid', error) }
+  }
   const request = async () => {
-    if (!host.link.nativeLease || host.signal.aborted) throw Error('subscription_lease_unavailable')
-    return nativeLeaseSchema.parse(await host.link.nativeLease(assignment.deviceId, assignment.runId, host.signal))
+    let value: unknown
+    try {
+      if (!host.link.nativeLease || host.signal.aborted) throw Error('subscription_lease_unavailable')
+      value = await host.link.nativeLease(assignment.deviceId, assignment.runId, host.signal)
+    } catch (error) { throw new SubscriptionCredentialError('lease_refused', error) }
+    return parse(value)
   }
   // Older servers can still supply the same owner-bound lease once. A new
   // claim already prepared it alongside GitHub/setup and incurs no extra RTT.
-  const first = nativeLeaseSchema.parse(assignment.subscriptionLease ??
+  const first = parse(assignment.subscriptionLease ??
     await daemonTracer.span('daemon.adapter.auth.lease', attributes, request))
   const valid = (lease: NativeLease) => {
-    if (lease.route !== selected.route || lease.modelId !== assignment.model ||
+    if (lease.modelId !== assignment.model) throw new SubscriptionCredentialError('model_mismatch')
+    if (lease.route !== selected.route ||
       lease.accountId !== first.accountId || lease.revision !== first.revision ||
-      Date.parse(lease.expiresAt) <= Date.now()) throw Error('subscription_lease_changed')
+      Date.parse(lease.expiresAt) <= Date.now()) throw new SubscriptionCredentialError('lease_invalid')
     return lease
   }
   valid(first)

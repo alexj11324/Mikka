@@ -177,7 +177,7 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
   record.messageSubmittedAt = iso(now())
   await client.rpc('coordinator.sendCoordinatorMessage', [text, null, botId, randomUUID(),
-    deviceId ? { kind: 'device', deviceId } : { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, profileId],
+    deviceId ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId],
   { headers: { traceparent: trace.traceparent } })
   const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, timeoutMs)
   assert(response.status === 200 && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'coordinator_stream_unavailable')
@@ -198,15 +198,22 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
         try { event = JSON.parse(line) } catch (error) { fail('coordinator_stream_invalid', error) }
         if (event.type !== 'tool' || event.name !== 'dispatch_run') continue
         if (event.state === 'running') {
+          // A durable Coordinator workflow can replay earlier chat turns.
+          // Bind the call to this owned issue or its unique read-only marker.
+          if (!event.quote?.includes(marker) && !event.input?.includes(record.issueId)) continue
           assert(!selectedCall || selectedCall === event.call, 'multiple_dispatches')
           selectedCall = event.call
           record.dispatchCallId = event.call
           record.dispatchObservedAt ??= iso(now())
           continue
         }
-        if (selectedCall && event.call !== selectedCall) continue
+        if (!selectedCall || event.call !== selectedCall) continue
         record.dispatchReturnedAt = iso(now())
-        assert(event.state === 'done', 'dispatch_refused')
+        if (event.state !== 'done') {
+          const code = typeof event.errorCode === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(event.errorCode) ? event.errorCode : 'unavailable'
+          record.dispatchRefusal = { code }
+          fail('dispatch_refused')
+        }
         const result = readDispatchOutput(event.output)
         // The public stream intentionally truncates output at 200 characters.
         // Resolve the one thread of our newly-created issue after its push;
@@ -407,7 +414,7 @@ async function subscriptionProof(client, record) {
     deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity) }
 }
 
-async function cleanupCase(client, record, target) {
+export async function cleanupCase(client, record, target) {
   const cleanup = record.cleanup ??= { status: 'running', errors: [] }
   const runIds = new Set(record.runId ? [record.runId] : [])
   const step = async (name, operation) => {
@@ -440,8 +447,8 @@ async function cleanupCase(client, record, target) {
     if (target === 'cloud') await step(`machineEnded_${runId}`, () => client.json(`/api/threads/${runId}/machine`, post({ action: 'end' }), 120000))
   }
   if (record.issueId) await step('taskDeleted', async () => {
-    const issue = await client.rpc('issues.getIssue', [record.issueId])
-    assert(issue.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
+    const { issue } = await client.rpc('issues.getIssue', [record.issueId])
+    assert(issue?.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
     await client.rpc('issue-operations.setIssueDeleted', [{ id: issue.id, revision: issue.revision }])
   })
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
@@ -464,7 +471,7 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
-    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required', requireOfficialTiming: officialTiming === 'enabled',
+    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireOfficialTiming: officialTiming === 'enabled',
     stages: [], status: 'running', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')
@@ -488,7 +495,8 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
     await watchExecution(client, record, timeoutMs, WebSocketImpl, now)
     await subscriptionProof(client, record)
     await pin()
-    if (record.requireRuntimeReceipt) assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
+    if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
+    if (record.requireAgentAcceptance) assert(record.runtimeTiming?.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'), 'official_agent_acceptance_missing')
     if (!deviceId) assert(record.startupTimingStatus === 'complete' && record.daemonStartupTiming?.outcome === 'ok'
       && record.daemonStartupTiming.phases.some(phase => phase.name === 'daemon.adapter.cli_init'), 'daemon_startup_timing_incomplete')
     record.observed = { messageToAgentStartMs: dateValue(record.agentStart.observedAt) - dateValue(record.messageSubmittedAt),
@@ -587,8 +595,13 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         report.samples.push({ sampleId, harness, status: 'failed', error: profile.error, cleanup: { status: 'passed', errors: [] } })
         continue
       }
-      report.samples.push(await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl }))
+      const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, harness, sampleId,
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl })
+      report.samples.push(sample)
+      if (['startup_build_mismatch', 'startup_build_changed', 'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error)) {
+        report.batchAborted = 'version_pin_changed'
+        fail(sample.error.slice('startup_'.length))
+      }
     }
     await pin()
   } catch (error) { report.error = safeError(error) }
@@ -629,7 +642,14 @@ export function alignServerTimings(report, timings) {
     && Number.isFinite(item.totalMs) && item.failed === false)
   for (const sample of report.samples) {
     if (!sample.agentStart || !sample.firstProviderChunk) continue
-    const matching = clean.filter(item => item.workflowRunId === sample.workflowRunId)
+    let matching = clean.filter(item => item.workflowRunId === sample.workflowRunId)
+    // One durable workflow can dispatch several chat turns. Correlate using
+    // the owned run's server-side ensure interval, never runner wall clocks.
+    if (matching.length > 1) {
+      const owned = timings.filter(item => item?.msg === 'cloud_startup_timing' && item.stage === 'cloud.thread.ensure'
+        && item.runIdHash === sample.runIdHash && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt))
+      if (owned.length) matching = matching.filter(item => owned.some(run => run.startedAt >= item.startedAt && run.endedAt <= item.endedAt))
+    }
     if (matching.length !== 1) { sample.timing = { status: 'unavailable', reason: matching.length ? 'ambiguous_dispatch' : 'dispatch_log_missing' }; continue }
     const log = matching[0], end = dateValue(sample.agentStart.storedAt), provider = dateValue(sample.firstProviderChunk.storedAt)
     if (![end, provider].every(Number.isFinite) || end < log.startedAt || provider < end) {

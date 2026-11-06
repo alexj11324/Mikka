@@ -16,6 +16,7 @@ import sys
 import time
 from urllib.parse import urlparse
 import uuid
+import urllib.request
 
 HERE = Path(__file__).resolve().parent
 POOL_SOURCE = 'd14a5652e6a737944e8e5dbffc256833ca7f7eec'
@@ -66,14 +67,34 @@ def run():
     prefix = 'mikka-1505-component-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']
     owner = str(uuid.uuid4())
     source = (HERE / 'benchmark-fixtures/thread-machine-pool.ts').read_text()
+    baseline = json.loads((HERE / 'benchmark-fixtures/official-base-evidence.json').read_text())
     claim_sql(source, [owner, 'claude', worker, str(uuid.uuid4())])
     report = {'version': 1, 'scope': 'component-only; no dispatch or agent execution',
               'sourceCommit': sha, 'workerSha': worker, 'poolSourceCommit': POOL_SOURCE,
               'poolClaimSourceBlob': POOL_BLOB, 'runsPerKindAndStrategy': 3,
+              'cachePolicy': 'Both strategies preserve their natural preloaded state; the benchmark never drops filesystem caches.',
+              'poolIdlePolicy': 'No artificial delay; three distinct instances are prepared and paused before timing the pairs. Actual paused age is recorded.',
+              'officialControlRun': 42285968840,
+              'deadlineMinutes': 30,
               'sameRunnerAndApiKey': True, 'templates': {}, 'samples': [], 'buildErrors': [], 'cleanup': []}
     instances = set()
     templates = {}
     output = HERE / 'component-benchmark.json'
+    first_derived_reported = False
+    def progress(body):
+        token = os.environ.get('MIKKA_COMPONENT_PROGRESS_TOKEN')
+        if not token:
+            return
+        request = urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/issues/1505/comments',
+            data=json.dumps({'body': body}).encode(), method='POST',
+            headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                response.read()
+        except Exception as error:
+            # Reporting is outside all measurement windows. The parent can
+            # recover the full artifact even if the issue API is unavailable.
+            print('mikka-component-progress-unavailable ' + type(error).__name__, flush=True)
     def save():
         output.write_text(json.dumps(report, indent=2) + '\n')
     def measured(name, action, marks):
@@ -87,7 +108,7 @@ def run():
             raise RuntimeError('anonymous_worker_not_ready')
     def create(template):
         sandbox = Sandbox.create(template, api_key=key, timeout=600,
-                                 metadata={'application': 'mikka-1505-component', 'run': os.environ['GITHUB_RUN_ID']})
+                                 metadata={**builder.release_metadata(), 'application': 'mikka-1505-component'})
         instances.add(sandbox.sandbox_id)
         return sandbox
     def kill(sandbox):
@@ -96,6 +117,20 @@ def run():
     def resources(sandbox):
         info = sandbox.get_info()
         return {'cpuCount': info.cpu_count, 'memoryMB': info.memory_mb}
+    def prepare_pool(kind):
+        marks = {}
+        sandbox = measured('prepareCreate', lambda: create(kind), marks)
+        bootstrap = (builder.ROOT / builder.INSTANCE_BOOTSTRAP).read_text()
+        sandbox.files.write('/tmp/mikka-1505-bootstrap.sh', bootstrap, user='root')
+        measured('prepareBootstrap', lambda: sandbox.commands.run(
+            f'bash /tmp/mikka-1505-bootstrap.sh {sha} {worker} {kind}', user='root', timeout=300), marks)
+        measured('preparePreload', lambda: sandbox.commands.run(
+            PRELOAD, user='user', background=True, timeout=0), marks)
+        measured('prepareReady', lambda: sandbox.commands.run(
+            'for i in $(seq 1 300); do test -s /home/user/.mikka/preloaded.pid && break; sleep .05; done; '
+            + READY.replace('WORKER_SHA', worker), user='user', timeout=30), marks)
+        measured('preparePause', sandbox.pause, marks)
+        return {'sandbox': sandbox, 'marks': marks, 'pausedAt': time.perf_counter(), 'pausedEpoch': time.time()}
     try:
         def build_one(kind):
             phase = 'base_resources'
@@ -107,15 +142,46 @@ def run():
             finally:
                 kill(base)
             phase = 'build'
+            expected = baseline['templates'][kind]
+            observed = {}
+            def build_log(entry):
+                message = str(entry)
+                match = re.search(r'FROM TEMPLATE ' + kind + r' \[([a-f0-9]{64})\]', message)
+                if match:
+                    observed['baseCacheKey'] = match[1]
+                    if match[1] != expected['baseCacheKey']:
+                        raise RuntimeError('official_base_changed_control_required')
+                if '"original":' in message:
+                    value = json.loads(message[message.index('{'):])
+                    if value.get('kind') != kind or value.get('original') != expected['originalCli']:
+                        raise RuntimeError('official_cli_changed_control_required')
+                    observed['originalCli'] = value['original']
+                print(f'[{kind}] {entry}', file=sys.stderr, flush=True)
             _, result = builder.build(prefix + '-' + kind, sha, api_key=key, kind=kind,
                                       cpu_count=allocation['cpuCount'], memory_mb=allocation['memoryMB'],
-                                      on_build_logs=lambda entry: print(f'[{kind}] {entry}', file=sys.stderr, flush=True))
+                                      on_build_logs=build_log)
             templates[kind] = result.template_id
             try:
+                if observed != expected:
+                    raise RuntimeError('official_control_evidence_not_reproduced')
                 phase = 'conservation'
                 proof = builder.probe_conservation(result.template_id, key, kind)
                 phase = 'models'
                 models = builder.probe_models(result.template_id, kind, key)
+                if kind == 'claude':
+                    phase = 'offline_claude_ack'
+                    probe = create(result.template_id)
+                    try:
+                        probe.files.write('/tmp/mikka-official-ack.mjs', (HERE / 'probe-claude-ack.mjs').read_text(), user='user')
+                        ack_result = probe.commands.run('export PATH=/opt/mikka/runtime/node/bin:$PATH; node /tmp/mikka-official-ack.mjs',
+                                                       user='user', timeout=30, request_timeout=35)
+                        ack = json.loads(ack_result.stdout)
+                        if ack.get('exactUserAck') is not True or ack.get('shouldQuery') is not False:
+                            raise RuntimeError('official_claude_ack_missing')
+                        print('mikka-component-claude-protocol ' + json.dumps({'kind': kind, 'templateId': result.template_id,
+                              'sourceCommit': sha, 'workerSha': worker, **ack}, separators=(',', ':')), flush=True)
+                    finally:
+                        kill(probe)
             except Exception as error:
                 detail = {'kind': kind, 'phase': phase, 'error': type(error).__name__, 'elapsedMs': round((time.perf_counter() - began) * 1000)}
                 # Only our checker's metadata/hash diagnostic is allowed here;
@@ -129,7 +195,7 @@ def run():
             print('mikka-component-conservation ' + json.dumps({'kind': kind, 'conservation': proof}, separators=(',', ':')), flush=True)
             return kind, {'templateId': result.template_id, 'buildId': result.build_id,
                           'baseTemplate': kind, 'preinstalled': True, 'resources': allocation,
-                          'conservation': proof, 'models': models}
+                          'conservation': proof, 'models': models, 'reusedOfficialControl': observed}
         with ThreadPoolExecutor(max_workers=3) as executor:
             pending = {executor.submit(build_one, kind): kind for kind in ['claude', 'codex', 'desktop']}
             for future in as_completed(pending):
@@ -149,12 +215,18 @@ def run():
             db.execute((HERE / 'benchmark-fixtures/thread-machine-pool.sql').read_text())
             db.execute('INSERT INTO "user" (id) VALUES (%s)', (owner,))
             for kind, candidate in report['templates'].items():
+                # Preparation is outside every measured interval. All three
+                # distinct instances are paused before any pair starts, so
+                # bootstrap traffic cannot compete with the timed creates.
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    prepared = list(executor.map(prepare_pool, [kind] * 3))
                 for index in range(3):
                     # Alternate arms in each pair so runner/network drift is visible.
                     for strategy in ('derived', 'pool') if index % 2 == 0 else ('pool', 'derived'):
                         row = {'kind': kind, 'strategy': strategy, 'sample': index + 1, 'timingsMs': {}}
                         marks = row['timingsMs']
                         sandbox = None
+                        pending_progress = None
                         try:
                             if strategy == 'derived':
                                 began = time.perf_counter()
@@ -162,25 +234,17 @@ def run():
                                 measured('workerReady', lambda: ready(sandbox), marks)
                                 row['requestToReadyMs'] = round((time.perf_counter() - began) * 1000, 3)
                             else:
-                                sandbox = measured('prepareCreate', lambda: create(kind), marks)
-                                bootstrap = (builder.ROOT / builder.INSTANCE_BOOTSTRAP).read_text()
-                                sandbox.files.write('/tmp/mikka-1505-bootstrap.sh', bootstrap, user='root')
-                                measured('prepareBootstrap', lambda: sandbox.commands.run(
-                                    f'bash /tmp/mikka-1505-bootstrap.sh {sha} {worker} {kind}', user='root', timeout=300), marks)
-                                measured('preparePreload', lambda: sandbox.commands.run(
-                                    PRELOAD, user='user', background=True, timeout=0), marks)
-                                measured('prepareReady', lambda: sandbox.commands.run(
-                                    'for i in $(seq 1 300); do test -s /home/user/.mikka/preloaded.pid && exit 0; sleep .05; done; exit 1',
-                                    user='user', timeout=30), marks)
-                                measured('prepareDropCaches', lambda: sandbox.commands.run(
-                                    'sync; echo 3 > /proc/sys/vm/drop_caches', user='root', timeout=30), marks)
-                                measured('preparePause', sandbox.pause, marks)
-                                db.execute('INSERT INTO thread_machine_pool (id,"ownerId",template,"workerSha",state,"sandboxId","readyAt") VALUES (%s,%s,%s,%s,\'ready\',%s,now())',
-                                           (str(uuid.uuid4()), owner, kind, worker, sandbox.sandbox_id))
-                                # The upstream comparison leaves the pool idle for 60 seconds.
-                                time.sleep(60)
+                                pool = prepared[index]
+                                sandbox = pool['sandbox']
+                                marks.update(pool['marks'])
+                                # The real schema permits one unclaimed slot
+                                # per owner/template. Refill that slot only
+                                # after the prior claim has been removed.
+                                db.execute('INSERT INTO thread_machine_pool (id,"ownerId",template,"workerSha",state,"sandboxId","readyAt") VALUES (%s,%s,%s,%s,\'ready\',%s,to_timestamp(%s))',
+                                           (str(uuid.uuid4()), owner, kind, worker, sandbox.sandbox_id, pool['pausedEpoch']))
                                 operation = str(uuid.uuid4())
                                 sql, values = claim_sql(source, [owner, kind, worker, operation])
+                                row['pausedAgeMs'] = round((time.perf_counter() - pool['pausedAt']) * 1000, 3)
                                 began = time.perf_counter()
                                 claimed = measured('claimSql', lambda: db.execute(sql, values).fetchone(), marks)
                                 if not claimed or claimed[0] != sandbox.sandbox_id:
@@ -198,9 +262,17 @@ def run():
                             report['samples'].append(row)
                             print('mikka-component-sample ' + json.dumps(row, separators=(',', ':')), flush=True)
                             save()
+                            if strategy == 'derived' and not first_derived_reported:
+                                first_derived_reported = True
+                                pending_progress = ('组件测量首条真实样本（不是生产 E2E 验收）：\n\n'
+                                         + f"[运行 {os.environ['GITHUB_RUN_ID']}](https://github.com/alexj11324/Mikka/actions/runs/{os.environ['GITHUB_RUN_ID']})，不可变源 `{sha}`。"
+                                         + '\n\n```json\n' + json.dumps(row, ensure_ascii=False, indent=2) + '\n```\n\n'
+                                         + '这是 fresh derived create → 匿名 worker ready；三轮完整同条件比较及资源清理仍在继续。两臂都保留自然预加载状态，没有人为清空文件缓存。')
                         finally:
                             if sandbox is not None:
                                 kill(sandbox)
+                        if pending_progress:
+                            progress(pending_progress)
         report['summary'] = {kind: {strategy: {
             'medianMs': statistics.median(row['requestToReadyMs'] for row in report['samples'] if row['kind'] == kind and row['strategy'] == strategy),
             'maxMs': max(row['requestToReadyMs'] for row in report['samples'] if row['kind'] == kind and row['strategy'] == strategy),
@@ -221,17 +293,11 @@ def run():
                 report['cleanup'].append({'resource': 'sandbox', 'id': sandbox_id, 'error': type(error).__name__})
         # The ops source is intentionally never published. Remove only this
         # run's uniquely named candidates; released/previous templates stay intact.
-        for kind in ('claude', 'codex', 'desktop'):
-            name = prefix + '-' + kind
-            try:
-                info = builder._request('GET', '/templates/' + name, key)
-                names = info.get('names', []) + info.get('aliases', [])
-                if name not in names or info.get('isDefault') is True:
-                    raise RuntimeError('component_cleanup_name_mismatch')
-                builder._request('DELETE', '/templates/' + info['templateID'], key)
-            except Exception as error:
-                if getattr(error, 'code', None) != 404:
-                    report['cleanup'].append({'resource': 'candidate', 'kind': kind, 'error': type(error).__name__})
+        candidates = [{'name': prefix + '-' + kind, 'kind': kind,
+                       **({'templateId': templates[kind]} if kind in templates else {})}
+                      for kind in ('claude', 'codex', 'desktop')]
+        report['templateCleanup'] = builder.cleanup_templates(candidates, key)
+        report['cleanup'] += [row for row in report['templateCleanup'] if row['status'] == 'failed']
         report['remainingSandboxes'] = sorted(instances)
         save()
         print('mikka-component-result ' + json.dumps({key: report[key] for key in ('status', 'sourceCommit', 'workerSha', 'remainingSandboxes', 'cleanup')}, separators=(',', ':')), flush=True)

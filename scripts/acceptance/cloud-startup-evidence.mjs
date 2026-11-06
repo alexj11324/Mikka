@@ -1,7 +1,7 @@
 /** Content-free acceptance projections. Unknown keys never reach the report. */
 const ENDPOINTS = new Set(['policy_snapshot', 'permission_check', 'permission_request', 'server_decision', 'computer_authority',
   'subscription_context', 'provider_proxy', 'credential_lease', 'credential_refresh', 'github_credential_lease', 'github_credential_refresh',
-  'run_telemetry', 'device_control', 'run_control', 'task_data', 'other_run_request'])
+  'run_telemetry', 'device_control', 'run_control', 'task_data', 'mailbox_operation', 'storage_transfer', 'other_run_request'])
 const PHASES = new Set(['preparing', 'executing', 'finishing'])
 const METHODS = new Set(['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'other'])
 const EVENTS = new Set(['claude_code.api_request', 'claude_code.api_error', 'claude_code.tool_result',
@@ -43,7 +43,7 @@ export function readRuntimeTiming(value, record) {
     || (value.executionStartMs !== null && value.executionEndMs !== null && value.executionEndMs < value.executionStartMs)
     || !['providerOutputChunks', 'toolCallsStarted', 'toolCallsCompleted', 'toolCallsFailed'].every(key => count(value[key]))
     || value.toolCallsCompleted > value.toolCallsStarted || value.toolCallsFailed > value.toolCallsCompleted
-    || !Array.isArray(value.requests) || value.requests.length > 128 || !Array.isArray(value.counts) || value.counts.length > 102) return null
+    || !Array.isArray(value.requests) || value.requests.length > 128 || !Array.isArray(value.counts) || value.counts.length > 114) return null
   const requests = [], counts = [], seen = new Set()
   for (const request of value.requests) {
     if (!ENDPOINTS.has(request?.endpoint) || !PHASES.has(request.phase) || !METHODS.has(request.method) || typeof request.shared !== 'boolean'
@@ -68,7 +68,7 @@ export function readRuntimeTiming(value, record) {
   if (!value.truncated && counts.reduce((sum, item) => sum + item.started, 0) !== requests.length) return null
   const accepted = value.agentAccepted
   if (accepted !== undefined && (!epoch(accepted?.at) || !ms(accepted.ms) || accepted.ms > value.ms + 0.01
-    || !(value.harness === 'codex' ? accepted.kind === 'codex_turn_start_ack' : ['claude_system_init', 'claude_first_event'].includes(accepted.kind)))) return null
+    || !(value.harness === 'codex' ? accepted.kind === 'codex_turn_start_ack' : ['claude_user_ack', 'claude_system_init', 'claude_first_event'].includes(accepted.kind)))) return null
   const officialCliTiming = value.officialCliTiming === undefined ? undefined : readOfficialCliTiming(value.officialCliTiming, record)
   return { version: 1, source: 'http_server_link', window: value.window, runIdHash: value.runIdHash, harness: value.harness,
     startedAt: value.startedAt, endedAt: value.endedAt, ms: value.ms, executionStartMs: value.executionStartMs, executionEndMs: value.executionEndMs,
@@ -84,7 +84,7 @@ export function readRuntimeTiming(value, record) {
 export function runtimeEvidence(receipt, { requireOfficial = false } = {}) {
   if (!receipt?.complete || receipt.truncated || receipt.executionStartMs === null || receipt.executionEndMs === null)
     return { status: 'unavailable', reason: 'runtime_receipt_incomplete' }
-  if (!receipt.agentAccepted) return { status: 'unavailable', reason: 'official_agent_acceptance_missing' }
+  if (!receipt.agentAccepted || (receipt.harness === 'claude_code' && receipt.agentAccepted.kind !== 'claude_user_ack')) return { status: 'unavailable', reason: 'official_agent_acceptance_missing' }
   const forbidden = new Set(['policy_snapshot', 'permission_check', 'permission_request', 'server_decision', 'computer_authority',
     'subscription_context', 'provider_proxy', 'credential_lease', 'github_credential_lease', 'other_run_request'])
   const extras = receipt.counts.filter(item => item.started > 0 && ((item.phase === 'executing' && forbidden.has(item.endpoint))

@@ -51,10 +51,10 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await page.goto(app('/?section=coordinator'))
     const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
     const first = chat.getByRole('group', { name: '先确认一件事：2 秒按哪种网络来算？' })
-    // Answered rows stay disabled buttons (no height or colour jump); the picked one is pressed.
-    await expect(first.getByRole('button', { name: /手机 4G/ })).toHaveAttribute('aria-pressed', 'true')
-    await expect(first.getByRole('button', { name: /手机 4G/ })).toBeDisabled()
-    await expect(first.getByRole('button', { name: /桌面宽带/ })).toBeDisabled()
+    // Answered rows are plain rows, no longer buttons: the picked one is marked, the others stay readable.
+    await expect(first.locator('[data-choice="picked"]')).toHaveText(/手机 4G/)
+    await expect(first.locator('[data-choice="other"]').filter({ hasText: '桌面宽带' })).toBeVisible()
+    await expect(first.getByRole('button')).toHaveCount(0)
     const second = chat.getByRole('group', { name: /派不出去/ })
     const cloud = second.getByRole('button', { name: /在 Mikka Cloud 上运行/ })
     await expect(cloud).toBeEnabled()
@@ -75,9 +75,8 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await shoot(page, testInfo, `choice-${viewport.name}-sending`)
     release()
     await expect(chat.getByText('在 Mikka Cloud 上运行', { exact: true }).last()).toBeVisible()
-    await expect(cloud).toHaveAttribute('aria-pressed', 'true')
-    await expect(cloud).toBeDisabled()
-    await expect(second.getByRole('button', { name: /等它上线/ })).toBeDisabled()
+    await expect(second.locator('[data-choice="picked"]')).toHaveText(/在 Mikka Cloud 上运行/)
+    await expect(second.getByRole('button')).toHaveCount(0)
     await expect(page.getByText(/个来源/)).toHaveCount(0)
     await page.unroute('**/*')
     await shoot(page, testInfo, `choice-${viewport.name}-picked`)
@@ -111,9 +110,9 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await seed(email, [{ role: 'user', content: '官网首页在手机上太慢了' }, { role: 'assistant', content: dispatchFailed(task, true) }, { role: 'user', content: '等它上线' }])
     await page.goto(app('/?section=coordinator'))
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
-    await expect(card.getByRole('button', { name: /等它上线/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(card.locator('[data-choice="picked"]')).toHaveText(/等它上线/)
     await expect(card.getByRole('link', { name: /去设置 E2B 密钥/ })).toHaveCount(0)
-    await expect(card.getByText('去设置 E2B 密钥', { exact: true }).locator('xpath=ancestor::*[@data-slot="item"][1]')).toHaveAttribute('aria-disabled', 'true')
+    await expect(card.locator('[data-choice="other"]').filter({ hasText: '去设置 E2B 密钥' })).toBeVisible()
   })
 
   test(`no machine: 连接电脑 opens Settings › 电脑 and 填入 E2B Key opens the key dialog (${viewport.name})`, async ({ page }, testInfo) => {
@@ -155,7 +154,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     // 参与调度 is the device's one switch now (decision 2026-11-02-1400).
     const allow = card.getByRole('button', { name: /让这台电脑参与调度/ })
     await allow.click()
-    await expect(allow).toHaveAttribute('aria-pressed', 'true')
+    await expect(card.locator('[data-choice="picked"]')).toHaveText(/让这台电脑参与调度/)
     await expect(chat.getByText('让这台电脑参与调度', { exact: true }).last()).toBeVisible()
     const check = isolatedPool()
     try { expect((await check.query('SELECT enabled FROM devices WHERE id=$1', [deviceId])).rows[0].enabled).toBe(true) } finally { await check.end() }

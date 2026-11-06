@@ -4,7 +4,9 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
+import { createHash } from 'node:crypto'
 import { runCloudStartup, createSessionClient } from '../acceptance/cloud-startup.mjs'
+import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const KINDS = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]
@@ -22,10 +24,18 @@ export function candidateReceipt(report, kind, proof, acceptance) {
     && sample.execution?.deviceId === proof.deviceId && sample.execution?.credentialType === 'subscription'
     && sample.credentialRoute === 'subscription' && sample.replyVerified === true
     && sample.sourceCommit === report.sourceCommit && UUID.test(sample.runId ?? ''), 'execution_evidence_invalid')
+  const runIdHash = createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
+  const runtime = readRuntimeTiming(sample.runtimeTiming, { runIdHash, harness })
+  const authorization = runtimeEvidence(runtime)
+  check(sample.requireAgentAcceptance === true && runtime?.complete === true && runtime.truncated === false
+    && runtime.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
+    && authorization.status === 'passed', 'official_agent_acceptance_missing')
   return { status: 'passed', templateId: report.templates[kind].templateId, sourceCommit: report.sourceCommit,
     workerSha: report.workerSha, harness, model, credentialRoute: 'subscription', replyVerified: true,
     runId: sample.runId, deviceId: proof.deviceId, officialBinarySha256: proof.binarySha256,
-    officialCliVersion: proof.version }
+    officialCliVersion: proof.version,
+    agentAcceptance: { runIdHash, harness, ...runtime.agentAccepted },
+    runtimeAuthorization: { source: runtime.source, complete: true, truncated: false, extraRemoteCalls: authorization.extraRemoteCalls } }
 }
 
 export async function validateTemplateSubscriptions(report, { env = process.env, fetchImpl = fetch,
@@ -55,7 +65,8 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
         const template = report.templates?.[kind]
         check(template?.baseTemplate === kind && template?.preinstalled === true && /^[A-Za-z0-9_-]+$/.test(template?.templateId ?? ''), 'candidate_invalid')
         sandbox = await sandboxFactory(template.templateId, { apiKey: env.E2B_API_KEY, timeoutMs: 600000,
-          metadata: { application: 'mikka-template-subscription-gate', sourceCommit: report.sourceCommit, kind } })
+          metadata: { application: 'mikka-template-release', sourceCommit: report.sourceCommit, kind,
+            runId: env.GITHUB_RUN_ID ?? 'manual', runAttempt: env.GITHUB_RUN_ATTEMPT ?? 'manual' } })
         const installed = await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
         check(installed.trim() === report.workerSha, 'candidate_worker_mismatch')
         const grant = await client.json('/api/devices/enrollment', post({}))

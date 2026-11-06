@@ -7,7 +7,7 @@
 // operations make no additional server authorization request. Run end drops the token and wipes the
 // run's credential paths.
 import { type RunAssignment } from "@mikka/protocol"
-import { prepareSubscriptionCredentials, type PreparedSubscription } from "./subscription-credentials"
+import { prepareSubscriptionCredentials, SubscriptionCredentialError, type PreparedSubscription } from "./subscription-credentials"
 import { CodedError, findCodedError, logCodedError } from "@mikka/protocol/coded-error"
 import type { UserErrorDetail } from "@mikka/protocol/user-error-codes"
 
@@ -27,6 +27,7 @@ const isUnavailable = (error: unknown): error is CodedError =>
   error instanceof CodedError && error.code === "subscription_local_runtime_unavailable"
 /** A failure inside the adapter keeps the detail of a refusal it wraps (a later lease), else adapter_start_failed. */
 const startFailed = (error: unknown) => isUnavailable(error) ? error
+  : error instanceof SubscriptionCredentialError ? unavailable(error.detail, error.cause ?? error)
   : unavailable((findCodedError(error, "subscription_local_runtime_unavailable")?.detail as Detail | undefined) ?? "adapter_start_failed", error)
 
 type Common = Pick<ClaudeAdapterOptions & CodexAdapterOptions, "sandbox" | "stateDir" | "computerProvider">
