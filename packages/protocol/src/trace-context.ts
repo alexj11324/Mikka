@@ -4,6 +4,65 @@ export function validTraceparent(value: unknown): value is string {
     && value.slice(3, 35) !== '0'.repeat(32) && value.slice(36, 52) !== '0'.repeat(16)
 }
 
+/** Telemetry references only. This carrier never grants access to a run or account. */
+export type RunTraceContext = {
+  traceparent: string
+  runId?: string
+  threadId?: string
+  taskId?: string
+  taskNumber?: string
+  workflowRunId?: string
+  posthogDistinctId?: string
+  sessionId?: string
+}
+
+export const TRACE_FIELDS = {
+  runId: 'mikka.run_id', threadId: 'mikka.thread_id', taskId: 'mikka.task_id',
+  taskNumber: 'mikka.task_number', workflowRunId: 'mikka.workflow_run_id',
+  posthogDistinctId: 'posthogDistinctId', sessionId: 'sessionId',
+} as const
+
+/** Bounded opaque IDs only: never arbitrary text, email addresses, paths or credentials. */
+export function telemetryId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)
+    && !/^(?:ph[cx]_\w|sk[-_]|gh[pousr]_|github_pat_)/i.test(value)
+}
+
+export function sanitizeTraceContext(value: unknown): RunTraceContext | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const input = value as Record<string, unknown>
+  if (!validTraceparent(input.traceparent)) return undefined
+  const result: RunTraceContext = { traceparent: input.traceparent }
+  for (const key of Object.keys(TRACE_FIELDS) as (keyof typeof TRACE_FIELDS)[]) {
+    const field = input[key]
+    if (telemetryId(field)) result[key] = field
+  }
+  return result
+}
+
+export function traceAttributes(value: RunTraceContext | undefined): Record<string, string> {
+  const clean = sanitizeTraceContext(value)
+  const attributes: Record<string, string> = {}
+  if (clean) for (const [key, attribute] of Object.entries(TRACE_FIELDS)) {
+    const field = clean[key as keyof RunTraceContext]
+    if (field) attributes[attribute] = field
+  }
+  return attributes
+}
+
+/** App-to-app carrier; use only for Mikka endpoints and durable queue payloads. */
+export function runTraceHeaders(value: RunTraceContext | undefined): Record<string, string> {
+  const clean = sanitizeTraceContext(value)
+  if (!clean) return {}
+  return Object.fromEntries(Object.entries(clean).map(([key, field]) => [key === 'traceparent' ? key : `x-mikka-trace-${key.toLowerCase()}`, field]))
+}
+
+export function traceContextFromHeaders(get: (key: string) => unknown): RunTraceContext | undefined {
+  const values: Record<string, unknown> = { traceparent: get('traceparent') }
+  for (const key of Object.keys(TRACE_FIELDS)) values[key] = get(`x-mikka-trace-${key.toLowerCase()}`)
+  return sanitizeTraceContext(values)
+}
+
 /** No client span is exported. The server independently applies its configured sampling rate. */
 export function newTraceparent(random: () => number = Math.random): string {
   const hex = (words: number) => {

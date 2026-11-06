@@ -10,6 +10,7 @@ describe('safeErrorAttributes', () => {
       'error.type': 'CodedError',
       'mikka.error.code': 'subscription_local_runtime_unavailable',
       'mikka.error.detail': 'cli_missing',
+      'mikka.error.causes': 'CodedError:subscription_local_runtime_unavailable:cli_missing > Error:ECONNREFUSED',
     })
     expect(JSON.stringify(safeErrorAttributes(cause))).not.toContain('private')
   })

@@ -28,7 +28,7 @@ export function scrubLocalString(value: string): string {
 /** Only identifiers become codes: a message, path or token never matches. */
 const CODE = /^[a-z][a-z0-9_]{0,63}$/i
 
-export type ErrorAttributes = { "error.type": string; "mikka.error.code"?: string; "mikka.error.detail"?: string }
+export type ErrorAttributes = { "error.type": string; "mikka.error.code"?: string; "mikka.error.detail"?: string; "mikka.error.causes"?: string }
 
 /**
  * A failed operation's error by name and code only, read from the error and
@@ -42,5 +42,6 @@ export function safeErrorAttributes(error: unknown): ErrorAttributes {
     "error.type": chain[0]?.name ?? "unknown",
     ...(coded ? { "mikka.error.code": String(coded.code) } : {}),
     ...(coded?.detail ? { "mikka.error.detail": coded.detail } : {}),
+    ...(chain.length > 1 ? { "mikka.error.causes": chain.map(field => [field.name, field.code, field.detail].filter(value => value !== undefined).join(':')).join(' > ').slice(0, STRING_LIMIT) } : {}),
   }
 }

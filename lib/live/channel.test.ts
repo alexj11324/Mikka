@@ -83,6 +83,25 @@ test('duplicate badges share a connection and one revalidation per SWR key', asy
   stopDuplicate(); assert.equal(f.sockets[0].readyState, 3)
 })
 
+test('live observations describe received, skipped and read keys without changing reads', async () => {
+  const f = fixture(), observations: unknown[] = []
+  f.runtime.observe = observation => { observations.push(observation) }
+  f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
+  await f.open()
+  f.sockets[0].message(JSON.stringify({ type: 'live_ready', version: 2, kinds: ['bot_chat'], revisions: ['bot_chat'] }))
+  f.reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 5 }))
+  await f.advance(100)
+  assert.deepEqual(f.reads, [])
+  assert.ok(observations.some(value => JSON.stringify(value).includes('revision_held')))
+  assert.ok(observations.some(value => JSON.stringify(value).includes('received')))
+  f.runtime.observe = () => { throw new Error('analytics unavailable') }
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 6 }))
+  await f.advance(100)
+  assert.deepEqual(f.reads, ['chat'])
+  f.channel.dispose()
+})
+
 test('online idle channels send pings and perform no polling reads', async () => {
   const f = fixture(); f.subscribe(); await f.open(); f.reads.length = 0
   await f.advance(180_000)

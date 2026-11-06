@@ -1,6 +1,6 @@
 import posthog from 'posthog-js'
 import { posthogConfig } from '@/lib/posthog-config'
-import { sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
+import { redactReplayRequest, sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
 import { watchRemovedActions } from '@/lib/app-build'
 
 // A page older than the deployment reloads when it hits a removed server action.
@@ -25,7 +25,23 @@ if (posthogConfig.token) {
   capture_performance: false,
   capture_heatmaps: false,
   capture_dead_clicks: false,
-  disable_session_recording: true,
+  // Only this application's API hosts receive opaque person/session headers.
+  tracing_headers: [window.location.hostname, 'app.aspectlylabs.com'],
+  disable_session_recording: false,
+  session_recording: {
+    maskAllInputs: true,
+    maskTextSelector: '*',
+    maskAllElementAttributes: true,
+    blockSelector: 'img,video,audio,canvas,iframe,object,embed,input[type="hidden"],input[type="file"],[contenteditable="true"]',
+    captureJsonLd: false,
+    inlineStylesheet: false,
+    recordCrossOriginIframes: false,
+    captureCanvas: { recordCanvas: false },
+    recordHeaders: false,
+    recordBody: false,
+    maskCapturedNetworkRequestFn: redactReplayRequest,
+    sampleRate: 1,
+  },
   enable_recording_console_log: false,
   disable_surveys: true,
   disable_product_tours: true,

@@ -6,6 +6,7 @@ import type { PgRequestHookInformation, PgResponseHookInformation } from '@opent
 import { basePath } from '@/lib/base-path-config.mjs'
 import { routeScope, workflowStepRoute } from './labels'
 import { statementId, statementOperation } from './sanitize'
+import { captureTraceContext, traceAttributes } from './context'
 
 // What each span says about where it came from (docs/operations/tracing.md):
 // `mikka.route`, the grouping key, and `mikka.client_kind`, who called.
@@ -68,6 +69,9 @@ export class RouteAttributesProcessor implements SpanProcessor {
     try {
       const parent = (trace.getSpan(parentContext) as unknown as { attributes?: Attributes } | undefined)?.attributes
       const own = span.attributes
+      const inherited = traceAttributes(captureTraceContext({}, parentContext))
+      for (const [key, value] of Object.entries(inherited)) if (own[key] === undefined) span.setAttribute(key, value)
+      if (typeof own['workflow.run.id'] === 'string') span.setAttribute('mikka.workflow_run_id', own['workflow.run.id'])
       const step = workflowStepRoute()
       const route = text(own['mikka.route']) ?? routeScope.getStore() ?? step ?? text(parent?.['mikka.route']) ?? text(own['next.route']) ?? text(own['http.route'])
       const path = text(own['http.target']) ?? text(own['url.path'])

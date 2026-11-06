@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { appVersion, mobileTraceFetch, mobileTraceHeaders, newTraceparent, validTraceparent } from './trace-context'
+import { appVersion, mobileTraceFetch, mobileTraceHeaders, newTraceparent, validTraceparent, sanitizeTraceContext, runTraceHeaders, traceContextFromHeaders } from './trace-context'
+
+describe('durable run trace context', () => {
+  it('round trips only a bounded W3C carrier and safe opaque identifiers', () => {
+    const traceparent = newTraceparent()
+    const input = { traceparent, runId: 'run_1512', taskId: 'task_1512', threadId: 'thread_1512', posthogDistinctId: 'opaque_user', sessionId: 'session_1512', prompt: 'private', authorization: 'Bearer private' }
+    const clean = sanitizeTraceContext(input)!
+    expect(clean).toEqual({ traceparent, runId: 'run_1512', taskId: 'task_1512', threadId: 'thread_1512', posthogDistinctId: 'opaque_user', sessionId: 'session_1512' })
+    const headers = new Headers(runTraceHeaders(clean))
+    expect(traceContextFromHeaders(name => headers.get(name))).toEqual(clean)
+    expect(JSON.stringify(clean)).not.toContain('private')
+  })
+
+  it('ignores malformed telemetry without invalidating the run envelope', () => {
+    expect(sanitizeTraceContext({ traceparent: 'invalid', runId: 'valid_id' })).toBeUndefined()
+    const traceparent = newTraceparent()
+    expect(sanitizeTraceContext({ traceparent, runId: 'sk-private', taskId: 'private@example.com', sessionId: 'x'.repeat(129) })).toEqual({ traceparent })
+  })
+})
 
 describe('mobile trace context', () => {
   it('creates valid, fresh W3C IDs without marking an unrecorded client span sampled', () => {
