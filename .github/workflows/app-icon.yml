@@ -19,7 +19,11 @@ permissions:
 
 jobs:
   icon:
-    runs-on: macos-15
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -51,7 +55,17 @@ jobs:
           xcrun assetutil --info "$out/Assets.car" > "$out/assets-info.json"
           grep -o '"Appearance" : "[^"]*"' "$out/assets-info.json" | sort | uniq -c
           ls "$out"/AppIcon*.png
-      - name: Compile for macOS as electron-builder does
+      - name: TEMP repeat the macOS compile from cold
+        run: |
+          for i in 1 2 3 4 5; do
+            o="$RUNNER_TEMP/rep$i"; mkdir -p "$o"; rm -rf "$RUNNER_TEMP/R$i.icon"; cp -R apps/desktop/build/icon.icon "$RUNNER_TEMP/R$i.icon"
+            if actool "$RUNNER_TEMP/R$i.icon" --compile "$o" --output-format human-readable-text --errors \
+              --output-partial-info-plist "$o/p.plist" --app-icon R$i --include-all-app-icons \
+              --enable-on-demand-resources NO --development-region en \
+              --target-device mac --minimum-deployment-target 26.0 --platform macosx > "$o/log.txt" 2>&1 && test -s "$o/R$i.icns"
+            then echo "RESULT $i ok"; else echo "RESULT $i CRASH"; fi
+          done
+          sw_vers
         run: |
           out="$RUNNER_TEMP/out/mac"
           mkdir -p "$out"
@@ -79,6 +93,6 @@ jobs:
           ls -la "$out"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: app-icon-previews
+          name: app-icon-previews-${{ matrix.os }}
           path: ${{ runner.temp }}/out
           retention-days: 14
