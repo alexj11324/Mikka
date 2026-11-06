@@ -307,6 +307,9 @@ export async function runDeliveryAcceptance(env = process.env) {
       await changeOrder({ kind: 'location', location: 'cloud' })
       await changeOrder({ kind: 'autoRouting', enabled: false })
       await changeOrder({ kind: 'preferred', harness: definition.harness })
+      // Settings display only a 15-minute allowance snapshot. Refresh this
+      // selected subscription once, as the ordinary explicit quota action does.
+      currentOrder = await rpc('model-order.checkModelOrderQuota', [definition.source.connectionId, workspaceId])
       check(currentOrder.entries.length === 1 && currentOrder.entries[0].model === definition.model && !currentOrder.entries[0].block, 'required_model_unavailable')
       profile = (await json('/api/factory/agent-profiles', session.post({ workspaceId, requestId: randomUUID(), profile: {
         name: `1503 ${marker} ${definition.harness}`, description: 'Tiny code delivery and independent Factory review.', roles: ['execute', 'review', 'verify'],
