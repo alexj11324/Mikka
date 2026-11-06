@@ -97,13 +97,13 @@ export async function assertCurrentMain({ expectedBuild, token, fetchImpl = fetc
   if (ref.object.sha !== expectedBuild) throw Error(`webDeploy:mainChanged:expected=${expectedBuild}:actual=${ref.object.sha}`)
 }
 
-async function publicBuild(fetchImpl, timeoutMs) {
+async function publicBuild(fetchImpl, timeoutMs, expectedOverlay) {
   try {
     const response = await fetchImpl(PRODUCTION_VERSION_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' },
       signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error' })
     if (!response.ok) { await response.body?.cancel(); return null }
     const value = await response.json()
-    return SHA.test(value?.build ?? '') ? value.build : null
+    return SHA.test(value?.build ?? '') && (!expectedOverlay || value.overlaySha === expectedOverlay) ? value.build : null
   } catch { return null }
 }
 
@@ -118,10 +118,11 @@ export async function assertProductionSource({ expectedBuild, token, fetchImpl =
 /** This read-only wait runs OUTSIDE web-deploy-production: GitHub can still be
  * building while Vercel only knows the previous READY deployment. A successful
  * docs-only workflow is not a successful application build. */
-export async function waitForWebDeployment({ expectedBuild, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
+export async function waitForWebDeployment({ expectedBuild, expectedOverlay, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
   intervalMs = 10_000, now = () => performance.now(), wait = sleep }) {
   if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
   if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) throw Error('webDeploy:invalidVerificationWait')
+  if (expectedOverlay && !SHA.test(expectedOverlay)) throw Error('webDeploy:overlayShaRequired')
   const started = now(), remaining = () => maxWaitMs - (now() - started)
   while (remaining() > 0) {
     await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
@@ -147,7 +148,7 @@ export async function waitForWebDeployment({ expectedBuild, token, fetchImpl = f
         throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
       }
       if (remaining() <= 0) break
-      if (await publicBuild(fetchImpl, Math.min(10_000, remaining())) === expectedBuild && remaining() > 0) {
+      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === expectedBuild && remaining() > 0) {
         await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
         if (remaining() > 0) return { sourceCommit: expectedBuild, webRunId: run.id, webAttempt: run.run_attempt,
           publicBuild: expectedBuild, verifiedAt: new Date().toISOString() }
@@ -244,7 +245,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(`Runtime release control refresh: ${refresh}`)
     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `refresh=${refresh}\n`, { flag: 'a' })
   } else if (command === 'await-web') {
-    const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
+    const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA, expectedOverlay: process.env.EXPECTED_UI_OVERLAY_SHA, token: process.env.GITHUB_TOKEN })
     console.log(JSON.stringify({ event: 'matching_web_deployment_verified', ...result }))
   } else if (command === 'verify') {
     const result = await verifyProductionBuild({ expectedBuild: process.env.GITHUB_SHA })

@@ -35,6 +35,7 @@ export default defineConfig({
   workflow: { dirs: ['.'], runtime: 'nodejs24.x', sourcemap: false, dashboard: false } satisfies WorkflowOptions,
   vercel: { functions: { runtime: 'nodejs24.x' }, functionRules: await routeFunctionRules(root) },
   replace: {
+    'process.env.MIKKA_UI_OVERLAY_SHA': JSON.stringify(process.env.MIKKA_UI_OVERLAY_SHA ?? ''),
     'process.env.MIKKA_BASE_PATH': JSON.stringify('/mikka'),
     'process.env.NEXT_PUBLIC_MIKKA_BUILD': JSON.stringify(build),
     'process.env.MIKKA_TEST_BUILD_SHA': JSON.stringify(process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? ''),

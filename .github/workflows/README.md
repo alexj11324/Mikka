@@ -95,3 +95,25 @@ Do not skip the required gates, silently accept failed/skipped dependencies or
 publish from a red PR. The workflows run the trusted docs/CI classifier from
 `origin/main`; documentation-only PRs still publish their required gate names.
 CI source changes are not classified as documentation-only.
+
+## Official UI overlay
+
+`web-deploy.yml` and `desktop-release.yml` alone read the private UI through
+Infisical OIDC and `HOSTED_UI_READ_TOKEN` (`prod:/platform`, Contents: read on
+`alexj11324/mikka-hosted-ui` only). They set `MIKKA_UI_OVERLAY_DIR` and record
+`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build the default public UI
+without either variable or any private secret. The production Web job checks
+public main plus private main on each main update. Private main pushes dispatch
+the official Web job again with `overlay-refresh: true`, so docs-only changes
+cannot skip an overlay rebuild; they also dispatch desktop with the expected
+overlay SHA. No schedule is involved.
+
+Web verifies `/mikka/api/version`'s `build` and `overlaySha`. Desktop uses the
+existing matching-Web source gate and checks out **that Web overlay SHA**, then
+verifies equality again before publishing. New desktop runs cancel older runs.
+Desktop seals, verifies and publishes from one macOS job with no public Actions
+artifact upload. Release assets include the sealed `mikka-ui-overlay.json`.
+Official compiler logs stay on the ephemeral runner, and both distributable
+static output and the signed ASAR's app-owned dist are audited for source maps.
+See [the deployment runbook](../../docs/operations/web-deploy.md#official-private-ui-overlay)
+for identities, rollout, source exposure boundaries and recovery.

@@ -7,6 +7,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      overlay-refresh:
+        description: Rebuild current main after a private UI push
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       runtime-refresh:
@@ -70,7 +75,31 @@ jobs:
         run: node scripts/release/web-deploy.mjs skip
         env:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
-          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
+          RUNTIME_REFRESH: ${{ inputs.runtime-refresh || inputs.overlay-refresh }}
+      - name: Read the private UI checkout credential
+        if: steps.skip.outputs.skip != 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_TOKEN
+          include-imports: false
+      - name: Check out the private UI
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: main
+          token: ${{ env.HOSTED_UI_READ_TOKEN }}
+          path: .hosted-ui
+          persist-credentials: false
+      - name: Pin the private UI revision
+        if: steps.skip.outputs.skip != 'true'
+        run: node scripts/release/hosted-ui.mjs record .hosted-ui
       - name: Read the existing Vercel runtime release token
         if: inputs.runtime-refresh == true
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
@@ -137,6 +166,9 @@ jobs:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
           VERCEL_GIT_COMMIT_REF: main
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      - name: Audit the public output for source and source maps
+        if: steps.skip.outputs.skip != 'true'
+        run: node scripts/release/hosted-ui.mjs audit .vercel/output/static
       - name: Upload the prebuilt output to production
         if: steps.skip.outputs.skip != 'true'
         run: |
@@ -145,6 +177,7 @@ jobs:
           url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --archive=tgz --token "$VERCEL_TOKEN" \
             --meta githubDeployment=1 --meta githubOrg=alexj11324 --meta githubRepo=Mikka \
             --meta githubCommitRef=main --meta githubCommitSha="$GITHUB_SHA" \
+            --meta mikkaUiOverlaySha="$MIKKA_UI_OVERLAY_SHA" \
             --meta githubCommitMessage="$message")"
           echo "Deployed $url"
           echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
@@ -154,4 +187,6 @@ jobs:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
       - name: Verify the public production version before releasing the deployment queue
         if: steps.skip.outputs.skip != 'true'
-        run: node scripts/release/web-deploy.mjs verify
+        run: |
+          node scripts/release/web-deploy.mjs verify
+          node scripts/release/hosted-ui.mjs production
