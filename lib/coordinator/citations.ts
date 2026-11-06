@@ -33,7 +33,8 @@ export interface RunSource {
   outcome?: string | null
   /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
   group?: import('@/lib/thread-groups').ThreadGroup
-  issue: { id: string; number: number | null; identifier: string | null; title: string } | null
+  /** `shortTitle`: the task's short title while it keeps the title it was written from (lib/short-title.ts). */
+  issue: { id: string; number: number | null; identifier: string | null; title: string; shortTitle?: string | null } | null
   /** The first line of what it was asked to do; its shown name is runThreadName. */
   name: string
   /** How it ended, once it has. */

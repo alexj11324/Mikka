@@ -31,6 +31,11 @@ export const issueDocuments = pgTable('issue_documents', {
 export const issues = pgTable('issues', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   title: varchar('title', { length: 200 }).notNull(),
+  /**
+   * A short title the small model wrote once when the task was created (lib/short-title.ts), and the title it was
+   * written from. Lists show it only while `title` still equals `shortTitleFrom`: a person's or Linear's rename wins.
+   */
+  shortTitle: varchar('shortTitle', { length: 60 }), shortTitleFrom: varchar('shortTitleFrom', { length: 200 }),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
   // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).

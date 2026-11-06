@@ -3,6 +3,7 @@ import { actAs } from '@/lib/acting-user'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { listIssues, listWorkspaceIssues } from '@/app/actions/issues'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
+import { displayTaskTitle } from '@/lib/short-title'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,8 @@ async function handleGET(request: Request) {
   const issues = workspaceId ? await actAs(user, () => listWorkspaceIssues(workspaceId)) : await listIssues()
   return json({
     tasks: issues.map(issue => ({
-      id: issue.id, identifier: issue.identifier, title: issue.title, status: issue.status, priority: issue.priority,
+      // The short title the small model wrote, while the task keeps the title it was written from (lib/short-title.ts).
+      id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
       owner: issue.ownerName, updatedAt: issue.updatedAt,
     })),
   })
