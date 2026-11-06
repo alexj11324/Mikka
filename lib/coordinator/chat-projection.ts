@@ -72,3 +72,26 @@ export const compactChatToolMetadata: SQL<ChatToolMetadataPart[]> = sql`coalesce
   where (${coordinatorMessages.message}->>'role' = 'assistant' and p->>'type' = 'tool-call' and p->>'toolName' not in (${hiddenTools}))
     or (${coordinatorMessages.message}->>'role' = 'tool' and p->>'type' = 'tool-result')
 ), '[]'::jsonb)`
+
+/**
+ * A stored message as the bot list's preview line reads it (`botChatSnapshot`):
+ * its own fields and only its text parts. The line comes from the first chat
+ * item's text (`chatItems`), which for every role is built from text parts
+ * alone; tool calls, reasoning and files only decide the chat's activity and
+ * image counts, which the list does not show. A Mikka event (a person's
+ * message that is not `mikkaUserEvent`, starting `[Event]`) keeps only its
+ * first line: `chatItems` reads no more of it (its prefixes and cited
+ * artifacts), and the list shows no line for an event.
+ */
+const messageText = sql`case when jsonb_typeof(${coordinatorMessages.message}->'content') = 'string' then ${coordinatorMessages.message}->>'content'
+  else (select string_agg(p->>'text', E'\n' order by ord) from jsonb_array_elements(${coordinatorMessages.message}->'content') with ordinality as part(p, ord) where p->>'type' = 'text') end`
+const mikkaEvent = sql`${coordinatorMessages.message}->>'role' = 'user'
+  and coalesce(${coordinatorMessages.message}->'mikkaUserEvent', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb, '0'::jsonb, '""'::jsonb)
+  and starts_with(coalesce(${messageText}, ''), '[Event]')`
+export const summaryChatMessage: SQL<Record<string, unknown>> = sql`case
+  when ${mikkaEvent} then jsonb_set(${coordinatorMessages.message}, '{content}', jsonb_build_array(jsonb_build_object('type', 'text', 'text', split_part(${messageText}, E'\n', 1))))
+  when jsonb_typeof(${coordinatorMessages.message}->'content') = 'array'
+  then jsonb_set(${coordinatorMessages.message}, '{content}', coalesce((
+    select jsonb_agg(p order by ord) from jsonb_array_elements(${coordinatorMessages.message}->'content') with ordinality as part(p, ord)
+    where p->>'type' = 'text'), '[]'::jsonb))
+  else ${coordinatorMessages.message} end`

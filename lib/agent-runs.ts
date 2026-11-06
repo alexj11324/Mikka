@@ -30,7 +30,7 @@ import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/fac
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
-import { runBotName } from '@/lib/run-bot-name'
+import { runBotName, threadNameHead } from '@/lib/run-bot-name'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -322,22 +322,44 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
   return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, keyId, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
 }
 
-/** Every surface uses this gate. Workspace membership never grants run control,
- * personal agent/session access, or raw transcript access.
- * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
-export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
-  if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
-  if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
+/** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
+async function runVisibilityPredicate(userId: string, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
   // Asked about one task or known runs: only their tasks' team links are read.
   const onlyIssueIds = input.issueId ? [input.issueId]
     : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
     : undefined
   const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds, teams: input.teams })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
+  return or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared))
+}
+
+/**
+ * The cited runs' names only (the bot list's preview line, `namedCitations`):
+ * the same visibility as `visibleRuns`, with each own run's prompt cut to what
+ * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
+ * as `workspaceRunView` does. No report, error or provenance.
+ */
+export async function visibleRunNames(userId: string, runIds: string[], teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+  if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
+  const visible = await runVisibilityPredicate(userId, { runIds, teams })
+  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
+    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(visible, inArray(agentRuns.id, runIds))).limit(Math.max(1, Math.min(runIds.length, 100)))
+  return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
+}
+
+/** Every surface uses this gate. Workspace membership never grants run control,
+ * personal agent/session access, or raw transcript access.
+ * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
+export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
+  if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
+  if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
+  const visible = await runVisibilityPredicate(userId, input)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
-      or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),
+      visible,
       input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
       input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,

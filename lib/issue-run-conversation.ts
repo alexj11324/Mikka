@@ -82,8 +82,12 @@ export function chainChunks<T extends { runId: string; chunk: Record<string, unk
 }
 
 /** A thread read with a chunk cursor: the chunks held plus the appended ones, or the read alone (lib/thread-chunks.ts). */
-export function mergeThreadChunks<T extends { chunks: unknown[]; chunksAppend: boolean }>(held: T | undefined, read: T): T {
-  return read.chunksAppend && held ? { ...read, chunks: [...held.chunks, ...read.chunks] } : read
+export function mergeThreadChunks<T extends { chunks: unknown[]; chunksAppend: boolean; promptOmitted?: true; thread?: { prompt: string } }>(held: T | undefined, read: T): T {
+  if (!read.chunksAppend || !held) return read
+  // A cursor read leaves out the run's prompt (it never changes): keep the one already held.
+  const thread = read.promptOmitted && read.thread && held.thread ? { ...read.thread, prompt: held.thread.prompt } : read.thread
+  const { promptOmitted: _omitted, ...merged } = { ...read, chunks: [...held.chunks, ...read.chunks], ...(thread ? { thread } : {}) }
+  return merged as T
 }
 
 export type ThreadItem =
