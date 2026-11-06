@@ -66,6 +66,7 @@ const functions = {
   'agents.findThreadIssue': actions1.findThreadIssue,
   'agents.getIssueThread': actions1.getIssueThread,
   'agents.getThreadChanges': actions1.getThreadChanges,
+  'agents.getThreadMachine': actions1.getThreadMachine,
   'agents.getThreadInstructions': actions1.getThreadInstructions,
   'agents.sendIssueThreadReply': actions1.sendIssueThreadReply,
   'agents.getThreadName': actions1.getThreadName,

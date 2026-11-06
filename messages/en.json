@@ -3764,6 +3764,34 @@
     "needsModelCloudUnavailable": "Cloud execution is temporarily unavailable",
     "needsModelChecking": "Subscription allowance could not be checked. Try again."
   },
+  "ThreadRunPlace": {
+    "cloudName": "Cloud computer {id}",
+    "label": "Runs on {name} · {state}",
+    "kinds": {
+      "cloud": "Cloud computer",
+      "laptop": "Computer",
+      "server": "Server"
+    },
+    "states": {
+      "online": "Online",
+      "offline": "Offline",
+      "starting": "Starting",
+      "running": "Running",
+      "paused": "Sleeping",
+      "ended": "Stopped",
+      "error": "Error"
+    },
+    "id": "ID",
+    "template": "Template",
+    "created": "Created",
+    "stopped": "Stopped",
+    "system": "System",
+    "host": "Host",
+    "lastSeen": "Last seen",
+    "copyId": "Copy ID",
+    "copied": "ID copied",
+    "copyFailed": "Couldn't copy"
+  },
   "IssueThreads": {
     "title": "Threads",
     "modelSwitched": "Switched to",

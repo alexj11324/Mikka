@@ -13,6 +13,7 @@ import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-sub
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
+import { ThreadRunPlace } from './thread-run-place'
 import { acceptedProducerOutcome, threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
@@ -235,8 +236,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
       {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
-      <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
-      {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
+      <h2 ref={headingRef} tabIndex={-1} className="min-w-0 truncate text-sm font-semibold outline-none">{title}</h2>
+      {/* Icons only after the title: where it runs and its Agent; names on hover (Alex, 2026-11-06). */}
+      {detail && <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} />}
+      {acceptance && <AcceptanceStateBadge task={acceptance} />}
+      <span className="flex-1" />
       <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
       {data?.thread.ownedByCurrentUser && <ThreadExecutionIdentity runId={liveRunId} />}
       {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
