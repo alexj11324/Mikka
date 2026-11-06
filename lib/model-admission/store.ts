@@ -6,6 +6,7 @@ import { recordAudit } from '@/lib/audit/record'
 import { realCliMembershipGuard, type CliMembershipGuard } from '@/lib/agent-tool-approval/policy-store'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 import { admitModelRoute, GATEWAY_MODEL_ENDPOINT, ModelAdmissionError, modelAdmissionRevision,
   parseModelAdmissionPolicy, subscriptionModelRoute, ZEROCAT_MODEL_ENDPOINT, type GatewayAdmission } from './contract'
 
@@ -47,6 +48,7 @@ export class ModelAdmissionStore {
       if (current.revision !== expectedRevision) throw new ModelAdmissionError('modelPolicyChanged')
       installingPolicy = policy !== null && current.policy === null
       await tx.query('UPDATE workspace_computer_policies SET model_admission=$2,"updatedAt"=clock_timestamp() WHERE "workspaceId"=$1', [scope.workspaceId, policy])
+      if (modelAdmissionRevision(policy) !== current.revision) await stopRunsForPolicyChange(tx, { kind: 'workspace', workspaceId: scope.workspaceId })
       await withDatabaseClient(tx, () => recordAudit(db, {
         workspaceId: scope.workspaceId, actor: { type: 'user', id: scope.ownerId, name: scope.ownerId },
         action: 'model.policy_changed', target: { type: 'model-policy', id: scope.workspaceId, label: 'Model admission' },
@@ -56,8 +58,8 @@ export class ModelAdmissionStore {
     }, { guard: this.guard(scope, true), guardedWork: async (tx, value, lease) => {
       if (installingPolicy) {
         // Initial installation cannot recall credentials from earlier unmanaged
-        // work. Once installed, supported broker calls recheck current rules;
-        // live work must not prevent an administrator revoking those rules.
+        // work. Later policy changes stop admitted direct runners through the
+        // control channel; an active run cannot prevent an explicit revocation.
         const links = await lease!.workspaceClient!.query(`SELECT "issueId" FROM mikka_team_issues WHERE "workspaceId"=$1`, [scope.workspaceId])
         const active = await tx.query(`SELECT r.id FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" AND b."ownerId"=r."userId"
           WHERE r."deviceId" IS NOT NULL AND r.status=ANY($2::text[])

@@ -20,7 +20,7 @@ const observedFailure = {
 }
 function validPackage() {
   const { failure: _failure, ...report } = structuredClone(observedFailure)
-  return { ...report, passed: true, signedBundleCount: 2,
+  return { ...report, passed: true, urlScheme: 'mikka-dev-auth', signedBundleCount: 2,
     entitlements: { hardenedRuntime: true, devOnlyLibraryValidationException: true, unexpected: false, executables: 1, libraries: 1, librariesWithoutEntitlements: 1 },
     fuses: { RunAsNode: false, EnableCookieEncryption: true, EnableNodeOptionsEnvironmentVariable: false, EnableNodeCliInspectArguments: true,
       EnableEmbeddedAsarIntegrityValidation: false, OnlyLoadAppFromAsar: true, LoadBrowserProcessSpecificV8Snapshot: false, GrantFileProtocolExtraPrivileges: true } }

@@ -359,6 +359,10 @@ describe("mock runs", () => {
     expect(stageChunks[0].data.startupTiming).toBeUndefined()
     expect(stageChunks[1].data.startupTiming).toBeUndefined()
     expect(stageChunks[2].data.startupTiming).toMatchObject({ version: 1, runIdHash: runIdHash(runId), harness: "mock", outcome: "ok", phases: [], truncated: false })
+    const finalMessage = chunks.findLast(c => c.type === "finish")
+    expect(finalMessage?.type === "finish" && finalMessage.messageMetadata).toMatchObject({ mikkaRuntimeTiming: {
+      version: 1, runIdHash: runIdHash(runId), harness: "mock", source: "http_server_link", complete: true, truncated: false,
+    } })
     expect(chunks.some((c) => c.type === "data-file-change")).toBe(true)
     expect(server.issueStatus.get("issue-success-edit")).toBe("in_review")
     expect(server.runs.get(runId)?.state).toBe("succeeded")

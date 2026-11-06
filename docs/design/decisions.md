@@ -249,12 +249,17 @@ through dedicated theme tokens, including draft gray and merged purple.
 
 ## 2026-10-29 — Unattended sandbox execution
 
-Alex authorized implementation and tested delivery of an unattended sandbox workflow.
+~~Alex authorized implementation and tested delivery of an unattended sandbox workflow.
 Isolated cloud coding tasks default to public web egress and project dependency
 installation; explicit denials, read-only checks and administrator ceilings remain
 binding. Local execution retains its bounded destination policy. Project shell
 execution is independent of Git publication authority; publication still happens
-through the host's existing authorized delivery path.
+through the host's existing authorized delivery path.~~ Runtime isolation and
+per-call authority are superseded by
+[2026-11-06-1800](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md);
+GitHub publication authority follows
+[2026-11-02-1600](decisions/2026-11-02-1600-agents-use-own-github-credential.md).
+The saved-login/browser-service rules below do not add an Agent execution preflight.
 
 Web sub-agents receive current screenshots and produce structured mouse/keyboard
 operations. DOM text is optional observation evidence, never a keyword-based

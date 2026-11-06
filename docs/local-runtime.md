@@ -2,8 +2,13 @@
 
 A device is a runner like E2B ([`design/orchestration.md`](design/orchestration.md)
 § 3). Local threads run on a connected computer with the daemon's own pinned
-Claude Code or Codex, never one the person installed, in a run home of their
-own. The device reports OS, architecture, free disk, Docker and the install
+Claude Code or Codex, without replacing the person's own installed binaries.
+The task uses its real worktree and ordinary process environment; local
+configuration separation is only for preserving concurrent work and the
+person's files. Under [1800](design/decisions/2026-11-06-1800-machine-is-the-execution-boundary.md),
+real credentials are prepared before execution, provider calls are direct,
+and no extra remote permission check precedes a model or tool call.
+The device reports OS, architecture, free disk, Docker and the install
 state of those Agents, not detected Agents. Registering the daemon or
 reporting a changed harness set creates hidden execution records. Their
 names include the device UUID to
@@ -60,10 +65,11 @@ unverified and publication remains a draft PR, even when GitHub CI passed.
 The command editor follows the repository/project command setting used by
 [Vercel Build Command](https://vercel.com/docs/builds/configure-a-build#build-command),
 inside Mikka's existing authorized-repository dialog.
-Local sandbox writes include
-the run's Git administration, its branch ref and shared object store.
-Indirection files and repository configuration stay read-only. Daemon Git
-commands pin both the worktree Git directory and common Git directory.
+The Agent and verification command use the worktree's actual Git administration,
+branch ref and object store. No shadow `.git` or verification clone is created
+to hide that repository. Daemon Git operations retain the path and worktree
+checks that protect the person's unrelated files; they do not turn read-only
+task intent into another execution sandbox.
 
 Protocol version 3 adds clone URLs and optional base branches. The server
 returns `409 daemonUpgradeRequired` to an older local daemon before claiming
@@ -86,7 +92,7 @@ on both server and daemon. A production Next build alone does not enable test be
 The daemon integration tests use the existing `mikka daemon login --token`
 path, an in-memory transport, a real daemon and temporary bare Git origins.
 They check URL-only dispatch without repository registration, independent
-worktrees, concurrent clone creation, cancellation, sandbox policy and
+worktrees, concurrent clone creation, cancellation, task stopping and
 preservation of uncommitted personal files.
 
 `tests/local-runtime.integration.ts` runs in GitHub CI's disposable
@@ -219,11 +225,14 @@ daemon's device login over HTTP and starts `dev:local` on port 3110. It reads
 the development DeepSeek key through the existing Infisical identity and
 does not read local environment credential files or set CI variables.
 
-The items assert the real local commit/push and synthetic GitHub PR receipt,
-a normal read-only model run followed by an actual sandbox CLI push rejection
-with an identical writable control, a real repository
-startup failure and its thread API projection, two Bots exchanging messages,
-and subscribed-task inbox persistence, ownership and removal. No browser
+The items cover real local commit/push with a synthetic GitHub PR receipt,
+a normal read-only model task, repository startup failure and its thread API
+projection, two Bots exchanging messages, and subscribed-task inbox persistence,
+ownership and removal. The older item-2 sandbox push-rejection contract is
+superseded by [1800](design/decisions/2026-11-06-1800-machine-is-the-execution-boundary.md):
+read-only is task intent and does not remove the Agent's real GitHub credential.
+A result from that old rejection case is not acceptance of the direct-credential
+runtime. No browser
 test or production-provider acceptance is implied. Independent items continue
 after failures, and any failure produces a nonzero exit status.
 
@@ -255,7 +264,7 @@ items 1–7 pass in the same invocation, or when
 results and the same fixed source fingerprint. The private template ID and
 worker hash come from `E2B_ACCEPTANCE_TEMPLATE` / `E2B_WORKER_SHA` or the
 operator's non-secret `LOCAL_LOOP_CLOUD_TEMPLATE_FILE` metadata. Its independent
-normal account lease, restricted HTTPS relay, sandbox cleanup and timing
+normal account lease, test-service connectivity, owned-VM cleanup and timing
 evidence are owned by `scripts/e2b/cloud-local-acceptance.mjs`.
 
 Item 9 is an opt-in offline Factory handoff between two real local daemons.

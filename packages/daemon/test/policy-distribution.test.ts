@@ -68,21 +68,23 @@ describe('signed policy distribution',()=>{
     await expect(new HttpServerLink(issuer,async()=>json({...context,issuer:'https://other.invalid'})).verifyRunPolicy(run,new AbortController().signal)).rejects.toThrow()
     await expect(new HttpServerLink(issuer,async()=>json(context)).verifyRunPolicy({...run,policySnapshot:undefined},new AbortController().signal)).rejects.toThrow('Signed run policy required')
   })
-  it('keeps online liveness mandatory and revokes when renewal cannot reach the issuer',async()=>{
-    vi.useFakeTimers();const run=fixture();let offline=false,checks=0
-    const link=new HttpServerLink(issuer,async(url)=>{
-      if(offline)throw Error('offline')
-      if(String(url).includes('policy-snapshot'))return json(context)
-      checks++;return json({live:true})
-    })
-    const gate=await link.prepareRunToolApproval(run,new AbortController().signal,()=>{})
+  it('verifies entry once, then uses local control even after the signed snapshot expires', async () => {
+    vi.useFakeTimers(); const run = fixture()
+    const fetcher = vi.fn(async () => json(context))
+    const link = new HttpServerLink(issuer, fetcher)
+    await link.verifyRunPolicy(run, new AbortController().signal)
+    expect(fetcher).toHaveBeenCalledOnce()
+    const controller = new AbortController()
+    const gate = await link.prepareRunToolApproval(run, controller.signal, () => {})
     try {
-      expect(await gate.checkLive()).toBe(true);expect(checks).toBe(1)
-      offline=true;vi.setSystemTime(run.policySnapshot.payload.expiresAt)
-      expect(await gate.checkLive()).toBe(false);await vi.advanceTimersByTimeAsync(1000);expect(gate.revoked).toBe(true)
-      expect(checks).toBe(1)
-    } finally {gate.revoke()}
+      vi.setSystemTime(run.policySnapshot.payload.expiresAt + 1)
+      expect(await gate.checkLive()).toBe(true)
+      expect(fetcher).toHaveBeenCalledOnce()
+      controller.abort()
+      expect(await gate.checkLive()).toBe(false)
+    } finally { gate.revoke() }
   })
+
 })
 
 it.each([false,true])('rejects an invalid snapshot before repository, setup or adapter effects (resume=%s)',async resumed=>{

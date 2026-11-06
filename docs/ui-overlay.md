@@ -27,6 +27,7 @@ A missing directory, or one outside the repository, fails the build.
 | Slot | Default | Props | Callers import |
 | --- | --- | --- | --- |
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
+| `chat-message` | today's message rows (`Message`, `Bubble`, `ReplyWaiting`) | `ChatMessageProps`, `ChatWaitingProps` in `components/slots/chat-message-contract.ts`; also exports `CHAT_SURFACE` | `coordinator-chat.tsx`, through `@ui-slot/chat-message` |
 | `settings-frame` | app rail and window bar around settings (`AppFrame`) | `SettingsFrameProps` in `components/slots/settings-frame-contract.ts` | `SettingsFrame` from `@/components/settings/settings-shell` |
 | `settings-sidebar` | settings section list | `SettingsSidebarProps` in `components/slots/settings-sidebar-contract.ts` | `SettingsSidebar` from `@/components/settings/settings-sidebar` |
 | `settings-content` | heading and card around a section (`AppShellContent variant="settings"`) | `SettingsContentFrameProps` in `components/slots/settings-content-contract.ts` | `SettingsView` |
@@ -53,11 +54,16 @@ row above.
   `@/` in the layer means this repository: use it for this app's types,
   hooks and contracts, such as `@/components/slots/bot-avatar-contract`.
 - **Styles.** The layer has one style entry, `styles/overlay.css`, which its
-  slots import. It holds BoardUI's theme tokens and fonts and an `@source` for
+  slots import. Its utilities sit in the `components` layer, below this app's
+  `utilities`: a class both apps generate (`hidden`, `md:grid`) keeps this
+  app's order. A layer class that must win over one of this app's utilities
+  is marked important (`bg-transparent!`). It holds BoardUI's theme tokens and fonts and an `@source` for
   the layer's files: Tailwind skips gitignored paths, so without it BoardUI's
   classes are never generated. It does not import BoardUI's `globals.css`
-  base reset, and it does not redefine this app's tokens, so pages outside
-  the slots look the same in both builds.
+  base reset or the shadcn block of its `globals.css` (whose tokens share this
+  app's names). A few of BoardUI's theme variables share a name with this
+  app's (`--font-sans`, `--color-blue-400`); this app's utilities inline their
+  own values, so pages outside the slots look the same in both builds.
 - **Dependencies.** Packages BoardUI needs that this repository lacks are
   installed in the layer. `react` and `react-dom` come from this repository
   only.

@@ -11,7 +11,7 @@ import { decode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 import { attestProductionReadCache, mergeReadChat, productionGuard, responseCookieJar } from './read-cache-production.mjs'
 import { api as vercelRead, activeAlias, PROJECT, PRODUCTION_ALIAS, TEAM } from '../ops/deployment-regression.mjs'
 import { DeployedTargetError, assertDeployedTarget, publicTargetFailure } from './deployed-target.mjs'
-import { TeamWorkspaceError, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure, selectTeamWorkspace } from './team-workspace.mjs'
+import { TeamWorkspaceError, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure, selectTeamWorkspace } from './team-workspace.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const CHAT = '/mikka/api/coordinator/messages'
@@ -174,7 +174,7 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   const guard = productionGuard(env, event), deployed = guard.targetMode === 'deployed-target'
   const report = { version: 1, purpose: 'workflow-migration-production', issue: 1415,
     applicationSha: guard.applicationSha, driverRevision: guard.driverRevision, webDeployRunId: guard.webDeployRunId,
-    status: 'running', normalSessionObserved: false, sessionClosed: false, submissionCount: 0, cleanupSubmissionCount: 0,
+    status: 'running', normalSessionObserved: false, teamAdminMembershipVerified: false, sessionClosed: false, submissionCount: 0, cleanupSubmissionCount: 0,
     sdkMutations: 0, cronRequests: 0, databaseWritesByDriver: 0, providerLoginTested: false,
     startedAt: new Date(now()).toISOString(), futureScheduleConfirmedAbsent: false }
   if (deployed) Object.assign(report, { targetMode: guard.targetMode, driverRunId: guard.driverRunId,
@@ -194,8 +194,8 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   const definition = reminderDefinition(marker, at)
   let closeSession = false, owner, chat, baseline = 0, etag, schedule, occurrence, timerId, managed, deploymentId
   const request = async (path, body, cleanup = false) => {
-    check(path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
-      '/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out', '/mikka/api/workspace', '/mikka/api/rpc'].includes(path), 'http_failed')
+    check(isTeamWorkspaceReadPath(path) || path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
+      '/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out', '/mikka/api/rpc'].includes(path), 'http_failed')
     check(body === undefined || path === CHAT || path.endsWith('/sign-in/email') || path.endsWith('/sign-out')
       || path === '/mikka/api/rpc' && (isTeamWorkspaceSwitchRequest(body)
         || body.version === DESKTOP_RPC_VERSION && body.action === 'coordinator.coordinatorHistory'
