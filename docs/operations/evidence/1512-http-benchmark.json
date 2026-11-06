@@ -1,0 +1,53 @@
+{
+  "environment": {
+    "node": "v24.22.2",
+    "platform": "linux",
+    "postgres": "real loopback",
+    "requests_per_condition": 600,
+    "queries_per_request": 3
+  },
+  "boundary": "Real HTTP and pg driver; async batched in-memory collectors. Excludes external collector network, model and cloud provisioning latency.",
+  "handler": {
+    "off": {
+      "n": 600,
+      "mean_ms": 0.3612548300000007,
+      "p50_ms": 0.3207300000001396,
+      "p95_ms": 0.4922399999999243,
+      "p99_ms": 1.6451710000001185
+    },
+    "on": {
+      "n": 600,
+      "mean_ms": 0.8757746133333222,
+      "p50_ms": 0.7698410000000422,
+      "p95_ms": 1.261250999999902,
+      "p99_ms": 3.6146229999999377
+    },
+    "delta_mean_ms": 0.5145197833333215,
+    "delta_p95_ms": 0.7690109999999777
+  },
+  "round_trip": {
+    "off": {
+      "n": 600,
+      "mean_ms": 0.703856208333336,
+      "p50_ms": 0.6137799999999061,
+      "p95_ms": 1.0830009999999675,
+      "p99_ms": 3.1725820000001477
+    },
+    "on": {
+      "n": 600,
+      "mean_ms": 1.2577493300000124,
+      "p50_ms": 1.0863709999998719,
+      "p95_ms": 2.022271000000046,
+      "p99_ms": 5.392273999999816
+    }
+  },
+  "retention": {
+    "critical": "600/600",
+    "controlled_failures": "20/20",
+    "linked_error_logs": 20,
+    "safe_cause_chain": true,
+    "raw_sql_error_exported": false
+  },
+  "revision": "73650d0001870282ac28aac3329057a4a70f89fc",
+  "test_script": "scripts/ops/run-trace-benchmark.ts"
+}
