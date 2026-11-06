@@ -110,6 +110,7 @@ test('runtime refresh failures name their actual phase without logging provider 
       let released = false
       const query = async (sql: string) => {
         queries.push(sql)
+        if (sql.startsWith('SELECT t.* FROM factory_tasks')) return { rows: [], rowCount: 0 }
         if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run }], rowCount: 1 }
         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine }], rowCount: 1 }
         if (sql.startsWith('SELECT status,"stopRequestedAt"')) return { rows: [{ status: 'failed', stopRequestedAt: null }], rowCount: 1 }

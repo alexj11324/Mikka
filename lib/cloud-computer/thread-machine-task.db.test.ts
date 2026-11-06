@@ -400,12 +400,12 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
 
     // The retained runtime can outlive a Web/worker release. Keep a real,
     // immutable answer receipt so the upgrade must recheck its current task.
-    const upgradingQuestion = async (stage: 'execute' | 'review' | 'verify' = 'execute') => {
+    const upgradingQuestion = async (stage: 'spec' | 'execute' | 'review' | 'verify' = 'execute', taskBot = botId) => {
       const f = await questionMachine(), originAttemptId = randomUUID(), answerId = randomUUID();
       const { factoryEventId } = await import('../factory/event-id');
       const { questionFingerprint } = await import('../factory/questions/contract');
       const { freezeWorkerDefinition, retryWorkerDefinition } = await import('../agent-kit/worker');
-      const candidateId = stage === 'execute' ? null : randomUUID();
+      const candidateId = stage === 'spec' || stage === 'execute' ? null : randomUUID();
       if (candidateId) await pool.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId")
         VALUES($1,$2,$3,'fixture/repo','fixture','fixture',$4)`, [candidateId, f.taskId, 'd'.repeat(40), f.prior.runId]);
       await pool.query(`UPDATE factory_attempts SET stage=$2,ordinal=2,position=2,"candidateId"=$3 WHERE id=$1`, [f.attemptId, stage, candidateId]);
@@ -415,12 +415,12 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const input = { reference: { questionId: f.q, questionRevision: 1, originRunId: f.prior.runId,
         originSessionId: f.continuation.originSessionId, binding }, answerId, text: 'Continue the original saved task.' };
       const answer = { source: 'human', userId: owner, input }, fingerprint = questionFingerprint(answer);
-      await pool.query(`UPDATE factory_tasks SET stage=$2,"candidateId"=$3,"botId"=$4,revision=2 WHERE id=$1`, [f.taskId, stage, candidateId, botId]);
+      await pool.query(`UPDATE factory_tasks SET stage=$2,"candidateId"=$3,"botId"=$4,revision=2 WHERE id=$1`, [f.taskId, stage, candidateId, taskBot]);
       const current = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.taskId])).rows[0];
       // The real claim service requires the task's owned, same-Bot user request.
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey","issueId",payload)
         VALUES($1::uuid,$2,$3,'user_message',$1::text,$4,'{"text":"Continue the fixture task"}')`,
-      [current.sourceEventId, owner, botId, f.issueId]);
+      [current.sourceEventId, owner, taskBot, f.issueId]);
       const result = { questionId: f.q, continuationRunId: f.next, task: current, replayed: false };
       await pool.query(`UPDATE factory_questions SET stage=$2,"candidateId"=$3,"attemptId"=$4,"waitingBinding"=$5,
         "answerId"=$6,"answerSource"='human',answer=$7,"answerFingerprint"=$8,"answeredAt"=now(),revision=2,result=$9 WHERE id=$1`,
@@ -435,8 +435,296 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.prior.runId, originDefinition]);
       await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.next, definition]);
       await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true}]',"lastSeenAt"=clock_timestamp() WHERE id=$1`, [f.prior.device]);
-      return { ...f, eventId, definition, candidateId };
+      return { ...f, eventId, definition, candidateId, originAttemptId, answerId, taskBot };
     };
+
+    // This matches the real refusal before claim: the answer and immutable
+    // receipt exist, but the failed child has never owned a native session.
+    const unclaimedPlanQuestion = async (state = 'paused', taskBot = botId) => {
+      const f = await upgradingQuestion('spec', taskBot), connectionId = randomUUID(), bindingId = randomUUID();
+      const { freezeWorkerDefinition, retryWorkerDefinition } = await import('../agent-kit/worker');
+      await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject")
+        VALUES($1,$2,$3,'codex','connected',1,$4,$5,$6)`,
+      [connectionId, owner, workspaceId, `fixture-preclaim-${connectionId}`, 'a'.repeat(64), `fixture-${connectionId}`]);
+      await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+        VALUES($1,$2,$3,$4,$5,1,'codex_cli','gpt-6-luna')`, [bindingId, owner, workspaceId, agentId, connectionId]);
+      const originalDefinition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Preserve the original read-only plan',
+        prompt: 'Fixture', parent: null, executionId: null, model: 'gpt-6-luna', readOnly: true,
+        subscription: { id: bindingId, modelId: 'gpt-6-luna', route: 'codex_cli' } });
+      const definition = retryWorkerDefinition(originalDefinition, 'Fixture\nContinue the original saved task.')!;
+      await pool.query(`UPDATE agent_runs SET kind='plan',"agentDefinition"=$2,"startedAt"=now()-interval '1 minute',
+        "finishedAt"=now(),"stopReason"='blocked' WHERE id=$1`, [f.prior.runId, originalDefinition]);
+      await pool.query(`INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)`, [f.prior.runId, bindingId]);
+      await pool.query(`UPDATE agent_runs SET kind='plan',"agentDefinition"=$2,status='failed',"stopReason"='blocked',
+        "finishedAt"=now(),error='Synthetic Profile refusal before claim' WHERE id=$1`, [f.next, definition]);
+      await pool.query(`UPDATE factory_tasks SET status='blocked',revision=3,route='{"flowVersion":2}' WHERE id=$1`, [f.taskId]);
+      await pool.query(`UPDATE factory_attempts SET status='blocked',"finishedAt"=now() WHERE id=$1`, [f.attemptId]);
+      await pool.query(`UPDATE factory_attempts SET output=output || jsonb_build_object('requestEpoch',t."sourceEventId")
+        FROM factory_tasks t WHERE "taskId"=t.id AND t.id=$1`, [f.taskId]);
+      await pool.query(`UPDATE factory_questions SET status='blocked',revision=3 WHERE id=$1`, [f.q]);
+      await pool.query(`UPDATE thread_machines SET state=$2 WHERE "runId"=$1`, [f.next, state]);
+      await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,"deliveredAt")
+        VALUES($1,$2,$3,'Continue the original saved task.',now())`, [f.answerId, f.prior.runId, owner]);
+      const scope = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.taskId])).rows[0];
+      const edge = await (await import('../factory/questions/execution-continuation')).unclaimedPlanQuestionContinuation(pool, scope, f.next);
+      assert.equal(edge?.historyRunId, f.prior.runId, 'the fixture must have an authentic host receipt before runtime admission');
+      assert.equal(edge?.answerId, f.answerId);
+      return { ...f, definition, originalDefinition, connectionId, bindingId };
+    };
+    const unclaimedHistory = async (f: Awaited<ReturnType<typeof unclaimedPlanQuestion>>) => ({
+      ...await questionHistory(f),
+      native: (await pool.query(`SELECT n.* FROM byos_native_runs n JOIN agent_runs r ON r.id=n."runId"
+        WHERE r."issueId"=$1 ORDER BY n."runId"`, [f.issueId])).rows,
+      chunks: (await pool.query(`SELECT c.* FROM run_chunks c JOIN agent_runs r ON r.id=c."runId"
+        WHERE r."issueId"=$1 ORDER BY c.id`, [f.issueId])).rows,
+      credential: (await pool.query('SELECT * FROM byos_bindings WHERE id=$1', [f.bindingId])).rows,
+    });
+    const withQuestionProvider = async (fixture: ReturnType<typeof refreshFake>, check: () => Promise<void>) => {
+      const state = Object.getOwnPropertyDescriptor(threadMachineProvider, 'state');
+      const connect = mock.method(threadMachineProvider, 'connect', fixture.provider.connect);
+      const create = mock.method(threadMachineProvider, 'create', fixture.provider.create);
+      const kill = mock.method(threadMachineProvider, 'kill', fixture.provider.kill);
+      // Replace only the external provider seam. The recovery preparation,
+      // action router and ensureThreadMachine remain their real functions.
+      Object.defineProperty(threadMachineProvider, 'state', { configurable: true, value: fixture.provider.state });
+      try { await check(); } finally {
+        connect.mock.restore(); create.mock.restore(); kill.mock.restore();
+        if (state) Object.defineProperty(threadMachineProvider, 'state', state);
+        else Reflect.deleteProperty(threadMachineProvider, 'state');
+      }
+    };
+
+    for (const state of ['paused', 'running']) {
+      await t.test(`spec preclaim runtime refresh keeps the ${state} original VM, null child SID and immutable answer history`, () => withRefreshWorker(async () => {
+        const f = await unclaimedPlanQuestion(state), fixture = refreshFake(f, state), before = await unclaimedHistory(f);
+        await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider), /Thread unavailable/);
+        assert.deepEqual(fixture.calls, [], 'an ordinary wake has no terminal-run maintenance authority');
+        assert.deepEqual(await ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true), { runId: f.next, state: 'running' });
+        assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
+        assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
+        assert.deepEqual(await unclaimedHistory(f), before, 'maintenance cannot rewrite the failed run, SID, answer, receipt or subscription');
+        assert.deepEqual(await machine(f.next), { state: 'running', sandboxId: f.prior.sandboxId, deviceId: f.prior.device, issueId: f.issueId });
+        assert.equal(before.runs.find(row => row.id === f.next).sessionId, null);
+        assert.equal(before.runs.find(row => row.id === f.next).startedAt, null);
+        assert.equal(before.runs.find(row => row.id === f.next).leaseExpiresAt, null);
+      }));
+    }
+
+    await t.test('spec preclaim recovery with distinct chat and runtime Bots runs real preparation, queue and claim once', () => withRefreshWorker(async () => {
+      const f = await unclaimedPlanQuestion('paused', otherBot), fixture = refreshFake(f, 'paused'), before = await unclaimedHistory(f);
+      assert.notEqual(f.taskBot, botId);
+      assert.equal(before.task[0].botId, f.taskBot); assert.equal(before.runs.find(row => row.id === f.next).botId, botId);
+      const [{ createFactoryQuestions }, { prepareCloudQuestionRecovery, queueCloudQuestionContinuation },
+        { createFactoryStore }, { createFactoryDispatch }, { createFactoryClaim }, { claimCloudRun }, { factoryTestLifecycle }] = await Promise.all([
+        import('../factory/questions/store'), import('../factory/questions/queue-continuation'), import('../factory/store'),
+        import('../factory/dispatch'), import('../factory/claim'), import('../computer/claim'), import('../../tests/helpers/factory-test-authority'),
+      ]);
+      const authorize = async (userId: string, issueId: string) => userId === owner && issueId === f.issueId;
+      const store = createFactoryStore(pool, authorize, f.taskBot, factoryTestLifecycle);
+      const dispatch = createFactoryDispatch(pool, store, async (tx, userId, input, bot, context) => {
+        const result = await queueCloudQuestionContinuation(tx, userId, input, bot, context);
+        assert.ok(result, 'recovery must use the real original-session queue'); return result;
+      });
+      let preparations = 0;
+      const questions = createFactoryQuestions(pool, authorize, store, dispatch, undefined, undefined, undefined, async (userId, scope) => {
+        assert.deepEqual({ userId, ...scope }, { userId: owner, runId: f.next, workspaceId });
+        preparations++;
+        await prepareCloudQuestionRecovery(pool, userId, scope);
+        assert.deepEqual(await unclaimedHistory(f), before, 'the actual runtime preparation leaves native and answer history untouched');
+      });
+      fixture.provider.state = async () => {
+        fixture.calls.push('state');
+        const probe = await pool.connect();
+        try {
+          await probe.query('BEGIN');
+          assert.equal((await probe.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired', [`computer-policy:${workspaceId}`])).rows[0].acquired, true);
+          await probe.query('SELECT id FROM factory_tasks WHERE id=$1 FOR UPDATE NOWAIT', [f.taskId]);
+          await probe.query('SELECT id FROM factory_questions WHERE id=$1 FOR UPDATE NOWAIT', [f.q]);
+          await probe.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [f.next]);
+        } finally { await probe.query('ROLLBACK'); probe.release(); }
+        return 'paused';
+      };
+      const sessionId = randomUUID();
+      await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt")
+        VALUES($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, owner, `fixture-${randomUUID()}`]);
+      const human = { source: 'human' as const, userId: owner, sessionId };
+      const current = await questions.read(owner, f.q); assert.ok(current.recoverReference);
+      const request = { requestId: randomUUID(), ...current.recoverReference };
+      await withQuestionProvider(fixture, async () => {
+        const recovered = await questions.recover(human, request);
+        const replay = await questions.recover(human, request);
+        assert.equal(replay.continuationRunId, recovered.continuationRunId); assert.equal(replay.replayed, true);
+        assert.equal(preparations, 1, 'recovery replay cannot refresh the VM or queue again');
+        const factoryClaim = createFactoryClaim(store, questions), lease = new Date(Date.now() + 60_000);
+        let metadata: Record<string, unknown> = {};
+        const claimed = await claimCloudRun(pool, actor, recovered.continuationRunId, f.prior.device, lease, f.bindingId,
+          async tx => { metadata = await factoryClaim(tx, owner, f.prior.device, recovered.continuationRunId, lease.toISOString()); }, undefined, false);
+        assert.equal(claimed?.ownerId, owner);
+        assert.equal(metadata.resumeSessionId, f.continuation.originSessionId);
+        assert.equal(metadata.continuesRunId, f.prior.runId, 'native resume uses the actual original history');
+        assert.equal(metadata.requireSessionResume, true); assert.equal(metadata.preserveQuestionWorktree, true);
+        assert.match(String(metadata.followUp), /Continue the original saved task\./);
+        assert.ok(String(metadata.followUp).includes(f.answerId), 'the previously unclaimed answer keeps its source ID');
+        const child = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [recovered.continuationRunId])).rows[0];
+        assert.equal(child.status, 'preparing'); assert.ok(child.startedAt);
+        assert.equal(child.continuesRunId, f.next, 'the database preserves the immediate failed-child audit edge');
+        assert.equal(child.agentDefinition.readOnly, true);
+        assert.equal(child.agentDefinition.definitionDigest, f.definition.definitionDigest);
+        assert.deepEqual(child.agentDefinition.subscription, f.definition.subscription);
+        assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[f.prior.runId, f.next]])).rows, before.runs);
+        assert.deepEqual((await pool.query('SELECT * FROM run_messages WHERE "runId"=$1 ORDER BY id', [f.prior.runId])).rows, before.messages);
+        assert.deepEqual((await pool.query(`SELECT * FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='question_resume' ORDER BY "eventId"`, [f.taskId])).rows, before.receipts);
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 3);
+        assert.deepEqual((await pool.query('SELECT "runId","bindingId" FROM byos_native_runs WHERE "runId"=$1', [child.id])).rows, [{ runId: child.id, bindingId: f.bindingId }]);
+        assert.equal((await machine(child.id)).sandboxId, f.prior.sandboxId);
+        assert.equal((await machine(f.next)).sandboxId, null);
+      });
+      assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`], 'the complete recovery path creates no replacement VM');
+      assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
+    }));
+
+    await t.test('spec preclaim runtime refresh waits for real question settlement before locking the failed run', () => withRefreshWorker(async () => {
+      const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused');
+      const [{ createFactoryQuestions }, { createFactoryStore }, { factoryTestLifecycle }] = await Promise.all([
+        import('../factory/questions/store'), import('../factory/store'), import('../../tests/helpers/factory-test-authority'),
+      ]);
+      const authorize = async (userId: string, issueId: string) => userId === owner && issueId === f.issueId;
+      const store = createFactoryStore(pool, authorize, botId, factoryTestLifecycle);
+      const questions = createFactoryQuestions(pool, authorize, store, async () => { throw new Error('Settlement must not dispatch'); });
+      const settlement = await pool.connect();
+      let refresh: Promise<{ result?: { runId: string; state: string }; error?: unknown }> | undefined;
+      let settled: Awaited<ReturnType<typeof unclaimedHistory>> | undefined;
+      try {
+        await settlement.query('BEGIN');
+        await settlement.query(`SET LOCAL lock_timeout='1s'`);
+        const pid = (await settlement.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        // Hold the actual settlement prefix while maintenance starts. It must
+        // wait on this task without already owning the child run's lock.
+        await store.lockTask(settlement, owner, f.taskId);
+        await settlement.query('SELECT id FROM factory_questions WHERE id=$1 FOR UPDATE', [f.q]);
+        refresh = ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true)
+          .then(result => ({ result }), error => ({ error }));
+        let waiting = false;
+        for (let attempt = 0; attempt < 80 && !waiting; attempt++) {
+          waiting = (await pool.query(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+            WHERE $1::int=ANY(pg_blocking_pids(pid))) AS waiting`, [pid])).rows[0].waiting;
+          if (!waiting) await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        assert.equal(waiting, true, 'maintenance must wait for the current settlement transaction');
+        assert.deepEqual(fixture.calls, []);
+        await questions.settle(owner, f.next, settlement);
+        await settlement.query('COMMIT');
+        settled = await unclaimedHistory(f);
+      } finally {
+        await settlement.query('ROLLBACK'); settlement.release();
+        // Observe every started promise even if a lock-order assertion fails.
+        if (refresh) await refresh;
+      }
+      assert.ok(refresh);
+      const outcome = await refresh;
+      if (outcome.error) throw outcome.error;
+      assert.deepEqual(outcome.result, { runId: f.next, state: 'running' });
+      assert.ok(settled); assert.equal(settled.question[0].revision, 4);
+      assert.deepEqual(await unclaimedHistory(f), settled, 'maintenance observes the committed settlement without overwriting it');
+      assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
+      assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
+    }));
+
+    for (const invalid of ['receipt', 'epoch', 'origin-session', 'answer', 'started', 'native-binding', 'chunks', 'lease', 'writable', 'non-plan', 'paused-credential', 'revoked-credential', 'credential-epoch', 'latest'] as const) {
+      await t.test(`spec preclaim runtime refresh rejects ${invalid} before provider I/O`, () => withRefreshWorker(async () => {
+        const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused');
+        if (invalid === 'receipt') await pool.query('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.taskId, f.eventId]);
+        if (invalid === 'epoch') await pool.query('UPDATE factory_tasks SET "sourceEventId"=$2 WHERE id=$1', [f.taskId, randomUUID()]);
+        if (invalid === 'origin-session') await pool.query(`UPDATE agent_runs SET "sessionId"='different-native-session' WHERE id=$1`, [f.prior.runId]);
+        if (invalid === 'answer') await pool.query(`UPDATE factory_questions SET "answerFingerprint"='tampered' WHERE id=$1`, [f.q]);
+        if (invalid === 'started') await pool.query('UPDATE agent_runs SET "startedAt"=now() WHERE id=$1', [f.next]);
+        if (invalid === 'native-binding') await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)', [f.next, f.bindingId]);
+        if (invalid === 'chunks') await pool.query('INSERT INTO run_chunks(id,"runId",seq,chunk) VALUES($1,$2,1,$3)', [randomUUID(), f.next, { type: 'text', text: 'Native output already exists' }]);
+        if (invalid === 'lease') await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [f.next]);
+        if (invalid === 'writable') await pool.query(`UPDATE agent_runs SET "agentDefinition"="agentDefinition"-'readOnly' WHERE id=$1`, [f.next]);
+        if (invalid === 'non-plan') await pool.query(`UPDATE agent_runs SET kind='implement' WHERE id=$1`, [f.next]);
+        if (invalid === 'paused-credential') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connectionId]);
+        if (invalid === 'revoked-credential') await pool.query(`UPDATE byos_connections SET state='disconnected',epoch=epoch+1 WHERE id=$1`, [f.connectionId]);
+        if (invalid === 'credential-epoch') await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [f.connectionId]);
+        if (invalid === 'latest') await pool.query('UPDATE factory_questions SET "continuationRunId"=$2 WHERE id=$1', [f.q, f.prior.runId]);
+        const before = await unclaimedHistory(f);
+        await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true));
+        assert.deepEqual(fixture.calls, []); assert.deepEqual(fixture.steps, []);
+        assert.deepEqual(await unclaimedHistory(f), before);
+        assert.equal((await machine(f.next)).sandboxId, f.prior.sandboxId);
+      }));
+    }
+
+    for (const drift of ['epoch', 'revision', 'receipt', 'attempt', 'claim', 'lease', 'credential'] as const) {
+      await t.test(`spec preclaim runtime refresh fences ${drift} drift after staging before any switch or bootstrap`, () => withRefreshWorker(async () => {
+        const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused'), connect = fixture.provider.connect;
+        const newerLease = randomUUID(); let changed: Awaited<ReturnType<typeof unclaimedHistory>> | undefined;
+        fixture.provider.connect = async (...args) => {
+          const sandbox = await connect(...args), execute = sandbox.commands.run.bind(sandbox.commands);
+          sandbox.commands.run = (async (...commandArgs: Parameters<typeof sandbox.commands.run>) => {
+            const result = await execute(...commandArgs);
+            if (String(commandArgs[0]).includes('MIKKA_OFFICIAL_WORKER_STAGE')) {
+              if (drift === 'epoch') await pool.query('UPDATE factory_tasks SET "sourceEventId"=$2 WHERE id=$1', [f.taskId, randomUUID()]);
+              if (drift === 'revision') await pool.query('UPDATE factory_tasks SET revision=revision+1 WHERE id=$1', [f.taskId]);
+              if (drift === 'receipt') await pool.query(`UPDATE factory_events SET result=result || '{"tampered":true}'::jsonb WHERE "taskId"=$1 AND "eventId"=$2`, [f.taskId, f.eventId]);
+              if (drift === 'attempt') await pool.query('UPDATE factory_tasks SET "attemptId"=$2 WHERE id=$1', [f.taskId, f.originAttemptId]);
+              if (drift === 'claim') await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"sessionId"=$2,"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [f.next, f.continuation.originSessionId]);
+              if (drift === 'lease') await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`, [f.next, newerLease]);
+              if (drift === 'credential') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connectionId]);
+              changed = await unclaimedHistory(f);
+            }
+            return result;
+          }) as typeof sandbox.commands.run;
+          return sandbox;
+        };
+        await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true));
+        assert.ok(changed, 'the real admission must reach provider staging before the competing change');
+        assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
+        assert.deepEqual(fixture.steps, ['stage'], 'a losing refresh cannot switch, bootstrap or roll back a release it never changed');
+        assert.deepEqual(await unclaimedHistory(f), changed);
+        if (drift === 'lease') assert.equal((await pool.query('SELECT "workerLeaseId" FROM thread_machines WHERE "runId"=$1', [f.next])).rows[0].workerLeaseId, newerLease);
+      }));
+    }
+
+    await t.test('spec preclaim runtime refresh rechecks receipt after provider connect and before staging', () => withRefreshWorker(async () => {
+      const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused'), connect = fixture.provider.connect;
+      let changed: Awaited<ReturnType<typeof unclaimedHistory>> | undefined;
+      fixture.provider.connect = async (...args) => {
+        const sandbox = await connect(...args);
+        await pool.query('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.taskId, f.eventId]);
+        changed = await unclaimedHistory(f); return sandbox;
+      };
+      await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true));
+      assert.ok(changed); assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
+      assert.deepEqual(fixture.steps, []); assert.deepEqual(await unclaimedHistory(f), changed);
+    }));
+
+    for (const revoked of ['answer', 'credential', 'device'] as const) {
+      await t.test(`spec preclaim runtime refresh rolls back after switched ${revoked} revocation without publishing credentials`, () => withRefreshWorker(async () => {
+        const f = await unclaimedPlanQuestion(), fixture = refreshFake(f, 'paused'), connect = fixture.provider.connect;
+        let changed: Awaited<ReturnType<typeof unclaimedHistory>> | undefined;
+        fixture.provider.connect = async (...args) => {
+          const sandbox = await connect(...args), read = sandbox.files.read.bind(sandbox.files);
+          sandbox.files.read = (async (...readArgs: Parameters<typeof sandbox.files.read>) => {
+            const result = await read(...readArgs);
+            if (fixture.steps.includes('switch') && !changed) {
+              if (revoked === 'answer') await pool.query('UPDATE factory_questions SET revision=revision+1 WHERE id=$1', [f.q]);
+              if (revoked === 'credential') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connectionId]);
+              if (revoked === 'device') await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [f.prior.device]);
+              changed = await unclaimedHistory(f);
+            }
+            return result;
+          }) as typeof sandbox.files.read;
+          return sandbox;
+        };
+        await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true));
+        assert.ok(changed); assert.deepEqual(fixture.steps, ['stage', 'switch', 'rollback']);
+        assert.deepEqual(await unclaimedHistory(f), changed);
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_tokens WHERE "boundDeviceId"=$1', [f.prior.device])).rows[0].n, 0);
+        const current = (await pool.query('SELECT state,"sandboxId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1', [f.next])).rows[0];
+        assert.deepEqual(current, { state: 'error', sandboxId: f.prior.sandboxId, workerLeaseId: null, workerLeaseUntil: null });
+      }));
+    }
 
     for (const stage of ['execute', 'review', 'verify'] as const) {
       await t.test(`a queued ${stage} question upgrades the old worker on its original VM without changing the answer or native session`, () => withRefreshWorker(async () => {
