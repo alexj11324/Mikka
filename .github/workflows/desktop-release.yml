@@ -75,7 +75,7 @@ jobs:
 
   macos:
     needs: preflight
-    runs-on: macos-15
+    runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
     timeout-minutes: 60
     outputs:
       manifest-sha256: ${{ steps.seal.outputs.manifest-sha256 }}

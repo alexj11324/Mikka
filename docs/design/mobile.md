@@ -329,7 +329,12 @@ mobile tabs.
 - **现状（非决定）:** thread filters 待审阅 and 已归档, and dictation remain outside the implemented first-version flow. Pins are implemented. Appearance follows the system ([decision](decisions/2026-11-02-1410-mobile-follows-system-appearance.md)); changing the native appearance configuration requires a compatible EAS build.
 - **App icon:** the Mikka mark, the same file as the desktop app's
   (`apps/mobile/assets/icon.icon`, Icon Composer; `icon.png` is the opaque
-  1024 fallback). A new icon needs a new build.
+  1024 fallback). Two layers on the dark fill: the lit dots (Liquid Glass,
+  specular) and the unlit dots (white at 14%), so iOS 26 draws the default,
+  dark, tinted and clear looks itself; actool also writes flat icons for
+  earlier iOS. `.github/workflows/app-icon.yml` compiles it for iOS and macOS
+  and renders each look on a pull request. A new icon needs a new build,
+  dispatched by hand (`mobile-native.yml` does not watch `assets/`).
 - **Updates:** `.github/workflows/mobile-update.yml` publishes JavaScript to the production OTA channel on main. Native configuration changes use `.github/workflows/mobile-native.yml`: exact-commit main CI, a completed EAS iOS build, then submission of that exact build id to App Store Connect/TestFlight. The workflow's automatic path filters cover `app.json`, `app.config.ts` and `eas.json`; native dependency or asset changes outside those filters need manual dispatch on main. A different runtime needs a compatible binary. TestFlight processing, installation and device acceptance remain separate from publication; see `apps/mobile/README.md`.
 
 ## Out of scope (first version)
