@@ -250,7 +250,7 @@ Each run uses its own git worktree, so parallel threads stay isolated.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's Mikka Cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync (switched off), Agents on Mikka Cloud and the credential vault are dashed.">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's Mikka Cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync, switched off, is dashed.">
 </picture>
 
 The web app, the desktop and iOS apps, Telegram, Slack and MCP clients all reach
@@ -290,8 +290,7 @@ notification reconciliation and the profile merge
 second Worker that exchanges changes with Postgres through a durable inbox and
 outbox; it is switched off by a PostHog flag.
 
-Dashed boxes and lines are switched off or awaiting end-to-end acceptance:
-Linear sync, Agents on Mikka Cloud and the credential vault.
+The dashed box and lines are Linear sync, which is switched off.
 
 ## Built with
 
