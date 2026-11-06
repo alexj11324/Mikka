@@ -405,3 +405,19 @@ test('cleanup diagnostics refuse unknown stages and never replace the original r
   await assert.rejects(recordNativeCleanup('electron-close', () => Promise.reject(failure), records), error => error === failure)
   assert.deepEqual(records, [{ stage: 'electron-close', result: 'failed', error: { kind: 'other', code: 'other' } }])
 })
+
+test('fixture cleanup retains its exact rejection and exposes only existing ownership guard codes', async () => {
+  const records = []
+  const value = {}
+  assert.equal(await recordNativeCleanup('fixtures', async () => value, records), value)
+  for (const code of ['PARITY_READ_OWNERSHIP_UNPROVEN', 'PARITY_READ_CHANGED',
+    'PARITY_DEFAULT_CLOCK_UNPROVEN', 'PARITY_DEFAULT_OWNERSHIP_UNPROVEN', 'PARITY_DEFAULT_CHANGED']) {
+    const failure = { name: 'TestAccountError', code }
+    for (const key of ['message', 'stack']) Object.defineProperty(failure, key, {
+      get() { assert.fail('fixture diagnostic must not read private row values or SQL details') },
+    })
+    await assert.rejects(recordNativeCleanup('fixtures', async () => { throw failure }, records), error => error === failure)
+    assert.deepEqual(records.at(-1), { stage: 'fixtures', result: 'failed', error: { kind: 'TestAccountError', code } })
+  }
+  assert.deepEqual(records[0], { stage: 'fixtures', result: 'passed' })
+})

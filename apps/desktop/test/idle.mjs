@@ -14,6 +14,9 @@ import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { setNativeViewport } from './native-viewport.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { observeAccountRelease } from './account-release-observer.mjs'
+import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
+import { recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 
@@ -39,6 +42,8 @@ let application
 let browser
 let scope
 let nativeResources
+let releaseObserver
+let generatedWorkspaceName
 let passed = false
 const profile = join(tmpdir(), `mikka-idle-${process.pid}-${Date.now()}`)
 
@@ -59,6 +64,8 @@ function metrics(socketPath, reset = false) {
 
 try {
   scope = await acquireTestAccounts({ runId: `desktop-idle-${Date.now()}`, workerId: 'hour', requestId: `hour-${Date.now()}`, ttlMs: 300_000 })
+  releaseObserver = await observeAccountRelease(scope)
+  generatedWorkspaceName = await captureGeneratedWorkspaceName(scope)
   nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ storageState: scope.owner.storageStatePath, viewport: { width: 1440, height: 900 } })
@@ -198,18 +205,26 @@ try {
   passed = true
 } finally {
   const cleanupErrors = []
+  report.cleanupStages = []
+  const cleanup = (stage, action) => recordNativeCleanup(stage, action, report.cleanupStages)
   const failedCleanup = error => { passed = false; cleanupErrors.push(error) }
-  await browser?.close().catch(failedCleanup)
+  if (browser) await cleanup('browser-close', () => browser.close()).catch(failedCleanup)
   let closed = true
-  await closeElectron(application).catch(error => { closed = false; failedCleanup(error) })
+  await cleanup('electron-close', () => closeElectron(application)).catch(error => { closed = false; failedCleanup(error) })
   let drained = false
   if (closed) {
-    try { drained = (await stopLocalDaemons([profile])).profilesStopped } catch (error) { failedCleanup(error) }
+    try { drained = (await cleanup('daemon-drain', () => stopLocalDaemons([profile]))).profilesStopped } catch (error) { failedCleanup(error) }
   }
   if (drained && nativeResources) {
-    try { report.nativeCleanup = await nativeResources.cleanup({ drained: true }) } catch (error) { failedCleanup(error) }
+    try { report.nativeCleanup = await cleanup('native-resources', () => nativeResources.cleanup({ drained: true })) } catch (error) { failedCleanup(error) }
   }
-  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' }).catch(failedCleanup)
+  if (drained && report.nativeCleanup?.cleaned && !cleanupErrors.length && generatedWorkspaceName) {
+    try { await cleanup('workspace-generated-name', () => generatedWorkspaceName.restore({ drained: true })) } catch (error) { failedCleanup(error) }
+    finally { report.workspaceNameCleanup = generatedWorkspaceName.read() }
+  }
+  if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(failedCleanup)
+  report.accountObservation = releaseObserver?.read() ?? { observed: false }
+  releaseObserver?.restore()
   report.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'idle.json'), `${JSON.stringify(report, null, 2)}\n`)
   await auditEvidence([output], { environment })

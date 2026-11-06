@@ -16,6 +16,9 @@ import { createParityFixtures } from './parity-fixtures.mjs'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { observeAccountRelease } from './account-release-observer.mjs'
+import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
+import { recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { readNativeStartup } from './native-startup.mjs'
@@ -58,7 +61,7 @@ const evidence = {
   },
 }
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
-let scope, browser, fixtures, nativeResources, application, ownerEmail
+let scope, browser, fixtures, nativeResources, application, ownerEmail, releaseObserver, generatedWorkspaceName
 let passed = false
 let cleanupFailure
 const active = new Set()
@@ -275,6 +278,8 @@ async function opaqueFrameBoundary(app, page) {
 try {
   // The lease helper renews this five-minute lease while the process is alive.
   scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 300_000 })
+  releaseObserver = await observeAccountRelease(scope)
+  generatedWorkspaceName = await captureGeneratedWorkspaceName(scope)
   fixtures = await createParityFixtures(scope)
   nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
@@ -414,17 +419,26 @@ try {
   throw error
 } finally {
   const cleanupErrors = []
-  if (application) await close(application).catch(error => cleanupErrors.push(error))
-  for (const app of active) await close(app).catch(error => cleanupErrors.push(error))
-  await browser?.close().catch(() => {})
+  evidence.cleanupStages = []
+  const cleanup = (stage, action) => recordNativeCleanup(stage, action, evidence.cleanupStages)
+  if (application) await cleanup('electron-close', () => close(application)).catch(error => cleanupErrors.push(error))
+  for (const app of active) await cleanup('electron-close', () => close(app)).catch(error => cleanupErrors.push(error))
+  let browserClosed = true
+  if (browser) await cleanup('browser-close', () => browser.close()).catch(() => { browserClosed = false })
   let drained = false
-  try { drained = (await stopLocalDaemons(Object.values(profiles))).profilesStopped } catch (error) { cleanupErrors.push(error) }
+  try { drained = (await cleanup('daemon-drain', () => stopLocalDaemons(Object.values(profiles)))).profilesStopped } catch (error) { cleanupErrors.push(error) }
   if (nativeResources && drained && !cleanupErrors.length) {
-    try { evidence.nativeCleanup = await nativeResources.cleanup({ drained: true }) } catch (error) { cleanupErrors.push(error) }
+    try { evidence.nativeCleanup = await cleanup('native-resources', () => nativeResources.cleanup({ drained: true })) } catch (error) { cleanupErrors.push(error) }
   }
-  if (fixtures) await fixtures.cleanup().catch(error => cleanupErrors.push(error))
+  if (fixtures) await cleanup('fixtures', () => fixtures.cleanup()).catch(error => cleanupErrors.push(error))
+  if (browserClosed && drained && evidence.nativeCleanup?.cleaned && !cleanupErrors.length && generatedWorkspaceName) {
+    try { await cleanup('workspace-generated-name', () => generatedWorkspaceName.restore({ drained: true })) } catch (error) { cleanupErrors.push(error) }
+    finally { evidence.workspaceNameCleanup = generatedWorkspaceName.read() }
+  }
   if (cleanupErrors.length) passed = false
-  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' }).catch(error => { passed = false; cleanupErrors.push(error) })
+  if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(error => { passed = false; cleanupErrors.push(error) })
+  evidence.accountObservation = releaseObserver?.read() ?? { observed: false }
+  releaseObserver?.restore()
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'lifecycle.json'), `${JSON.stringify(evidence, null, 2)}\n`)
