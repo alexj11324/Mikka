@@ -3464,6 +3464,8 @@
         "rateLimited": "Too many requests"
       },
       "failedCount": "{count} failed",
+      "skipped": "failed, skipped",
+      "unknownStep": "Unknown step",
       "more": "and more",
       "separator": " · ",
       "expandAll": "Expand all",
