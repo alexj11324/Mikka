@@ -14,6 +14,8 @@ import type { ActionResult } from '@/lib/action-result'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { deleteTeamData, teamDeletionImpact, type TeamDeletion, type TeamDeletionImpact } from '@/lib/workspace-admin/teams'
 import { workspaceListChanged } from '@/lib/live/lists'
+import { pool } from '@/lib/db'
+import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 
 const fields = z.object({ name: z.string().trim().min(1, 'validationNameRequired').max(100), identifier: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9]{1,11}$/, 'teamIdentifierInvalid'), description: z.string().trim().max(500) })
 async function result<T>(operation: () => Promise<T>) {
@@ -103,7 +105,10 @@ async function changeTeamMemberBody(input: { teamId: string; userId?: string; ac
         if (!owners.length) throw new WorkspaceError(i18nText("FeatureCopy.c_8f627e89"))
       }
       const scope = and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, targetId))
-      if (action === 'leave' || action === 'remove') await tx.delete(teamMembers).where(scope)
+      if (action === 'leave' || action === 'remove') {
+        await stopRunsForPolicyChange(pool, { kind: 'team', scopeId: team.id, ownerId: targetId })
+        await tx.delete(teamMembers).where(scope)
+      }
       else await tx.update(teamMembers).set({ role: action === 'owner' ? 'owner' : 'member' }).where(scope)
       await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
     })

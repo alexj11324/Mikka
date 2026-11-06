@@ -9,6 +9,8 @@ import { withRunSpan } from './tracing/context'
  */
 export interface DispatchTiming {
   msg: 'dispatch_timing'
+  /** Covers dispatchRun from entry, including its initial scope/Profile admission. */
+  boundary: 'dispatch_run_entry'
   workflowRunId: string | null
   stepId: string | null
   attempt: number | null
@@ -42,7 +44,9 @@ export function noteGitHubRequest(ms: number) {
   recording.github.ms += ms
 }
 
-/** Runs one dispatch and logs its timing once it ends. Never throws for logging. */
+/** Wrap dispatchRun before any await. Logs once it ends, including refused
+ * initial admission; never throws for logging. Older logs without boundary
+ * began later in the body and cannot establish the full dispatch duration. */
 export async function withDispatchTiming<T>(run: () => Promise<T>, now: () => number = Date.now, log: (line: DispatchTiming) => void = line => console.info(JSON.stringify(line)), identity = stepIdentity): Promise<T> {
   const recording: Recording = { phases: [], github: { requests: 0, ms: 0 } }
   const started = now()
@@ -56,7 +60,7 @@ export async function withDispatchTiming<T>(run: () => Promise<T>, now: () => nu
     const totalMs = endedAt - started
     try {
       const step = await identity()
-      log({ msg: 'dispatch_timing', workflowRunId: step.workflowRunId ?? null, stepId: step.stepId ?? null, attempt: step.attempt ?? null, startedAt: started, endedAt, totalMs, phases: recording.phases, github: recording.github, failed })
+      log({ msg: 'dispatch_timing', boundary: 'dispatch_run_entry', workflowRunId: step.workflowRunId ?? null, stepId: step.stepId ?? null, attempt: step.attempt ?? null, startedAt: started, endedAt, totalMs, phases: recording.phases, github: recording.github, failed })
     } catch { /* timing never fails the dispatch */ }
   }
 }

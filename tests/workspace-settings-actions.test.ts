@@ -44,7 +44,8 @@ before(async () => {
     deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),
   } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name } }) } } } })
-  mock.module('@/lib/db', { namedExports: { db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
+  mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } }, db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
+  mock.module('@/lib/run-policy-stop', { namedExports: { stopRunsForPolicyChange: respond('stopRunsForPolicyChange', 0) } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
     workspaceBotDefaults: async (workspaceId: string) => { calls.push(['workspaceBotDefaults', workspaceId]); return defaults },
     botDefaultOptions: respond('botDefaultOptions', { defaultModel: 'codex', defaultRepository: null, models: ['mikka', 'codex', 'claude'], repositories: ['acme/app'] }),

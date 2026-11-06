@@ -40,6 +40,7 @@ import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
 import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
+import { stdSerializers } from 'pino'
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
 import { ProviderFailureError, providerFailureSchema, type ProviderFailure } from "@mikka/protocol/provider-failure"
@@ -104,8 +105,10 @@ import {
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
+import type { PreparedRunGitHub } from '../agents/local-github'
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
 import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
+import { runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
 
 export interface SupervisorDeps {
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
@@ -119,16 +122,18 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
-  /** A hosted (cloud) worker's API-key runs: the key stays behind the worker's broker, out of the task container. */
+  /** The task VM prepares its actual API key and starts the official CLI directly. */
   startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
+  /** Once per local run, retained through verification and publication. */
+  prepareRunGitHub?(assignment: RunAssignment, signal: AbortSignal, onCredential: (name: string, value: string) => void): Promise<PreparedRunGitHub | undefined>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
   repository: (assignment: RunAssignment) => DeviceRepo
-  prepareRepository: (assignment: RunAssignment, signal: AbortSignal) => Promise<void>
+  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>) => Promise<void>
   baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
   /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
@@ -154,6 +159,7 @@ export interface SupervisorDeps {
     signal: AbortSignal
     /** A read-only check: verify may not write the worktree (ADR 0046). */
     readOnly: boolean
+    githubEnvironment?: Record<string, string>
   }) => Promise<VerifyResult>
   /**
    * Commits (and, if the repo allows, pushes) a verified hand-in; the
@@ -162,7 +168,7 @@ export interface SupervisorDeps {
    */
   publisher?: {
     /** The worktree's content as a tree id, taken before and after verify. */
-    snapshot(run: { worktree: string; repo: DeviceRepo }): Promise<string>
+    snapshot(run: { worktree: string; repo: DeviceRepo; signal?: AbortSignal }): Promise<string>
     /** Commits `tree`, the content verify passed on. */
     publish(run: {
       runId: string
@@ -171,6 +177,8 @@ export interface SupervisorDeps {
       assignment: RunAssignment
       report: HandoffReport
       tree: string
+      githubEnvironment?: Record<string, string>
+      signal: AbortSignal
     }): Promise<RunPublish>
   }
 }
@@ -195,18 +203,22 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  runtimeTiming?: RunRuntimeObservation
+  github?: PreparedRunGitHub
   toolApproval?: ToolApprovalGate
   /** The run's trace span; its outcome is the stop reason. */
   span?: SpanHandle
   mailbox?: RunMailbox
   mailboxClosing?: Promise<void>
   session: AgentSession | null
+  /** The CLI has exited; its cancellation grace cannot cover host publication. */
+  sessionEnded?: boolean
   cancelRequested: boolean
   /** Set when the watchdog or the lease stopped the run. */
   forcedStop?: StopReason
   lastProgressAt: number
   done: Promise<void>
-  /** Aborted by `stop()`, or when a cancelled session does not exit. */
+  /** Also aborts verification and publication immediately after the CLI exits. */
   abort: AbortController
   cancelTimer?: NodeJS.Timeout
   /** The repo checkout the run's worktree belongs to. */
@@ -342,7 +354,7 @@ export class RunSupervisor {
         run.lastCheckpointAt = now
         return checkpoint ? !checkpoint.unavailableReason : !force
       } catch (error) {
-        this.deps.log.warn({ run_id: runId, err: error }, "checkpoint failed")
+        this.deps.log.warn({ run_id: runId, err: this.logError(runId, error) }, "checkpoint failed")
         return false
       }
     })()
@@ -375,7 +387,7 @@ export class RunSupervisor {
   private forceStop(runId: string, run: ActiveRun, reason: StopReason) {
     this.deps.log.warn({ run_id: runId, stop_reason: reason }, "stopping run")
     run.forcedStop = reason
-    this.requestCancel(run)
+    this.requestCancel(runId, run)
   }
 
   private closeMailbox(run: ActiveRun): Promise<void> {
@@ -388,13 +400,16 @@ export class RunSupervisor {
   }
 
   /** Asks the session to stop; detaches it if it does not within the grace. */
-  private requestCancel(run: ActiveRun): Promise<void> {
+  private requestCancel(runId: string, run: ActiveRun): Promise<void> {
     run.cancelRequested = true
     run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
     // leave a mailbox usable during the CLI's cancellation grace period.
     void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
-    if (!run.cancelTimer) {
+    if (run.sessionEnded) {
+      clearTimeout(run.cancelTimer)
+      run.abort.abort()
+    } else if (!run.cancelTimer) {
       run.cancelTimer = setTimeout(
         () => run.abort.abort(),
         this.deps.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS,
@@ -402,7 +417,7 @@ export class RunSupervisor {
       run.cancelTimer.unref()
     }
     return Promise.resolve(run.session?.cancel()).catch((error: unknown) => {
-      this.deps.log.warn({ err: error }, "session cancel failed")
+      this.deps.log.warn({ run_id: runId, err: this.logError(runId, error) }, "session cancel failed")
     })
   }
 
@@ -485,7 +500,7 @@ export class RunSupervisor {
         )
       return removed
     } catch (err) {
-      this.deps.log.warn({ run_id: logRunId, err }, "could not clean up")
+      this.deps.log.warn({ run_id: logRunId, err: this.logError(logRunId, err) }, "could not clean up")
       return false
     }
   }
@@ -521,7 +536,10 @@ export class RunSupervisor {
     const masker = createRunMasker([...(assignment.taskSecretNames ?? []).flatMap(name => {
       const value = assignment.taskEnv?.[name]
       return typeof value === "string" ? [{ name, value }] : []
-    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : [])])
+    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : []),
+      ...(assignment.subscriptionLease ? [{ name: "SUBSCRIPTION_ACCESS_TOKEN", value: assignment.subscriptionLease.accessToken }] : []),
+      ...(assignment.github?.token ? [{ name: "GITHUB_TOKEN", value: assignment.github.token }] : []),
+    ])
     if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
     try { repo = this.deps.repository(assignment) } catch (error) {
@@ -678,7 +696,7 @@ export class RunSupervisor {
     if (!entry) throw new RunNotFoundError(runId)
     const run = this.active.get(runId)
     if (run) {
-      await this.requestCancel(run)
+      await this.requestCancel(runId, run)
       await run.done
     } else if (!isTerminalRunState(entry.state)) {
       this.finish(runId, "cancelled")
@@ -728,6 +746,7 @@ export class RunSupervisor {
    * it to the run's stream.
    */
   private emit(runId: string, chunk: RunChunk) {
+    this.active.get(runId)?.runtimeTiming?.chunk(chunk)
     if (
       chunk.type.startsWith("data-") &&
       "transient" in chunk &&
@@ -792,10 +811,10 @@ export class RunSupervisor {
   }
 
   /** Closes the run's message in progress, if any. */
-  private endMessage(runId: string) {
+  private endMessage(runId: string, runtimeTiming?: RunRuntimeTiming) {
     this.cutMessages.delete(runId)
     this.openParts.get(runId)?.clear()
-    if (this.openMessages.delete(runId)) this.append(runId, { type: "finish" })
+    if (this.openMessages.delete(runId)) this.append(runId, { type: "finish", ...(runtimeTiming ? { messageMetadata: { mikkaRuntimeTiming: runtimeTiming } } : {}) })
   }
 
   /** Outbox first, then the journal: see `resumeAll` for the reconcile. Masked first when the run has secrets. */
@@ -829,6 +848,34 @@ export class RunSupervisor {
     this.maskers.delete(runId)
   }
 
+  private addCredential(runId: string, name: string, value: string) {
+    const masker = this.maskers.get(runId)
+    if (masker) masker.add([{ name, value }])
+    else {
+      const created = createRunMasker([{ name, value }])
+      if (created) this.maskers.set(runId, created)
+    }
+  }
+
+  /** Serialize Errors before masking so non-enumerable message/stack/cause
+   * fields cannot bypass the same dynamic credential set as run output. */
+  private logError(runId: string, error: unknown) {
+    const masker = this.maskers.get(runId)
+    if (!masker) return error
+    const seen = new WeakSet<object>()
+    const plain = (value: unknown): unknown => {
+      if (!value || typeof value !== 'object') return value
+      if (seen.has(value)) return '[Circular]'
+      seen.add(value)
+      // Pino's serialized Errors have a custom prototype; normalize nested
+      // errors too so the JSON-value masker sees message, stack and causes.
+      const serialized = value instanceof Error ? stdSerializers.err(value) : value
+      return Array.isArray(serialized) ? serialized.map(plain)
+        : Object.fromEntries(Object.entries(serialized).map(([key, item]) => [key, plain(item)]))
+    }
+    return masker.deep(plain(error))
+  }
+
   /**
    * The only way into a terminal state: the terminal patch, then exactly one
    * completion for the server, then the outbox is compacted.
@@ -843,10 +890,11 @@ export class RunSupervisor {
     // Report collection and capture uploads can await after the provider's
     // terminal event. A stop received in that interval still owns completion.
     const active = this.active.get(runId)
-    if ((stopReason === "provider_failure" || stopReason === "quota_exhausted") && (active?.cancelRequested || active?.forcedStop)) {
+    if (active?.cancelRequested || active?.forcedStop) {
       stopReason = active.forcedStop ?? "cancelled"
       error = undefined
     }
+    active?.span?.set("mikka.outcome", stopReason)
     if (stopReason !== "provider_failure" && report.providerFailure) {
       const { providerFailure: _failure, ...rest } = report
       report = rest
@@ -887,7 +935,7 @@ export class RunSupervisor {
     }
     // A planning hand-in leaves its two cards in the conversation (ADR ORV-205).
     this.emitPlanCards(runId, report, planning)
-    this.endMessage(runId)
+    this.endMessage(runId, this.active.get(runId)?.runtimeTiming?.finish())
     this.flushMasker(runId)
     this.openParts.delete(runId)
     if (stopReason === "submitted") this.setState(runId, "finishing")
@@ -950,6 +998,7 @@ export class RunSupervisor {
     try {
       const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
         { onStartupTiming: timing => { startupTiming = timing } })
+      if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
       this.emit(runId, runStageChunk(stage, performance.now() - started, true, startupTiming))
       return value
     } catch (error) {
@@ -968,6 +1017,7 @@ export class RunSupervisor {
       stopReason?: StopReason
     } = {},
   ) {
+    if (extra.error !== undefined) extra = { ...extra, error: this.maskers.get(runId)?.text(extra.error) ?? extra.error }
     const entry = this.deps.journal.update(runId, {
       state,
       ...(extra.sessionId !== undefined ? { sessionId: extra.sessionId } : {}),
@@ -1000,6 +1050,15 @@ export class RunSupervisor {
     ]).finally(() => clearTimeout(timer))
   }
 
+  /** Only the local lease and pushed stop state govern host finishing work. */
+  private assertFinishingRunLive(runId: string, signal: AbortSignal) {
+    const run = this.active.get(runId)
+    const lease = this.leases.get(runId)
+    if (run && !run.forcedStop && lease !== undefined && lease <= Date.now())
+      this.forceStop(runId, run, "device_lost")
+    signal.throwIfAborted()
+  }
+
   /**
    * The handoff report: the agent's own words (summary, questions, next
    * step, blocker) plus what only the daemon may state: changed files and,
@@ -1015,6 +1074,7 @@ export class RunSupervisor {
     stopReason: StopReason,
     error: string | undefined,
     agent: AgentReport | undefined,
+    signal: AbortSignal,
   ): Promise<{ report: HandoffReport; verifyError?: string; tree?: string }> {
     let report: HandoffReport = {
       ...baseReport(error),
@@ -1025,15 +1085,17 @@ export class RunSupervisor {
     ).slice(0, MAX_REPORTED_FILES)
     const inferred = assignment.factoryCheck?.stage === 'verify' && assignment.factoryCheck.inferCommand && !assignment.factoryCheck.reportOnly ? report.verificationCommand : undefined
     const command = assignment.verifyCommand ?? inferred?.command
+    if (stopReason === 'submitted') this.assertFinishingRunLive(runId, signal)
     if (stopReason === 'submitted' && assignment.factoryExecuteKind === 'deliverable') {
-      const deliverableCommit = await retainDeliverable(repo.path, worktree, runId)
+      const deliverableCommit = await retainDeliverable(repo.path, worktree, runId, signal)
+      this.assertFinishingRunLive(runId, signal)
       this.deps.journal.update(runId, { deliverableCommit })
     }
     // An unsubmitted fixed check still records what the daemon actually found.
     // A dirty or unavailable worktree grants no snapshot provenance. Neither
     // outcome turns this stopped run into a verdict or executes verification.
     if (stopReason !== 'submitted' && fixedCandidateCheck(assignment)) {
-      const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch).catch(() => null)
+      const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch, signal).catch(() => null)
       if (fixed) report = { ...report, check: { sha: fixed.sha, readOnly: true } }
     }
     // A `plan` run writes no code: there is nothing for the issue's verify
@@ -1044,12 +1106,14 @@ export class RunSupervisor {
       }
     if (!command) {
       if (fixedCandidateCheck(assignment)) {
-        const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+        const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch, signal)
         report = { ...report, check: { sha: fixed.sha, readOnly: true } }
       }
       // No command was approved for this repository. Snapshot the submitted
       // tree for an explicitly approved push, while retaining not_run.
-      const tree = await this.deps.publisher?.snapshot({ worktree, repo })
+      this.assertFinishingRunLive(runId, signal)
+      const tree = await this.deps.publisher?.snapshot({ worktree, repo, signal })
+      this.assertFinishingRunLive(runId, signal)
       return { report: { ...report, filesChanged, verify: { status: "not_run" } }, tree }
     }
     let execution: Partial<HandoffReport["verify"]> = {}
@@ -1073,24 +1137,29 @@ export class RunSupervisor {
           repo.path,
           worktree,
           assignment.baseBranch,
+          signal,
         )
         report = { ...report, check: { sha: fixed.sha, readOnly: true } }
         before = fixed.tree
       } else {
-        before = await publisher?.snapshot({ worktree, repo })
+        before = await publisher?.snapshot({ worktree, repo, signal })
       }
     } catch (snapshotError) {
+      signal.throwIfAborted()
       return failed("", `Could not read the worktree: ${String(snapshotError)}`)
     }
+    this.assertFinishingRunLive(runId, signal)
     const result = await (this.deps.verify ?? unsandboxedVerify)({
       runId,
       worktree,
       repo,
       command,
       timeoutMs: VERIFY_TIMEOUT_MS,
-      signal: this.stopController.signal,
+      signal,
       readOnly: runPolicy(assignment.policy).readOnly === true,
+      githubEnvironment: this.active.get(runId)?.github?.env,
     })
+    this.assertFinishingRunLive(runId, signal)
     execution = {
       exitCode: result.exitCode,
       signal: result.signal,
@@ -1100,12 +1169,13 @@ export class RunSupervisor {
     if (result.exitCode !== 0 || result.timedOut)
       return failed(output, verifyFailure(command, result))
     const after = fixedCandidateCheck(assignment)
-      ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+      ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch, signal)
           .then((fixed) => fixed.tree)
           .catch(() => null)
       : publisher
-        ? await publisher.snapshot({ worktree, repo }).catch(() => null)
+        ? await publisher.snapshot({ worktree, repo, signal }).catch(() => null)
         : undefined
+    this.assertFinishingRunLive(runId, signal)
     if (after !== before)
       return failed(
         output,
@@ -1158,7 +1228,7 @@ export class RunSupervisor {
           branch,
           runId,
           env,
-        ))
+        ), this.active.get(runId)?.github?.env)
     } catch (error) {
       this.deps.log.info(
         { run_id: runId, branch, err: error },
@@ -1179,12 +1249,14 @@ export class RunSupervisor {
     assignment: RunAssignment,
     report: HandoffReport,
     tree: string,
+    signal: AbortSignal,
   ): Promise<RunPublish> {
     const publisher = this.deps.publisher as NonNullable<
       SupervisorDeps["publisher"]
     >
     let data: RunPublish
     try {
+      this.assertFinishingRunLive(runId, signal)
       data = await publisher.publish({
         runId,
         worktree,
@@ -1192,16 +1264,18 @@ export class RunSupervisor {
         assignment,
         report,
         tree,
+        githubEnvironment: this.active.get(runId)?.github?.env,
+        signal,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.deps.log.error({ run_id: runId, err: error }, "publish failed")
+      if (!signal.aborted) this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "publish failed")
       data = {
         branch: "",
         commit: null,
         pushed: false,
         remote: null,
-        note: `Commit failed: ${message}`.slice(0, 2_000),
+        note: signal.aborted ? "Run stopped before publication completed" : `Commit failed: ${message}`.slice(0, 2_000),
       }
     }
     this.emit(runId, { type: "data-publish", data })
@@ -1220,13 +1294,15 @@ export class RunSupervisor {
     this.active.set(runId, run)
     const assignment = this.deps.journal.get(runId)?.assignment
     const harness = assignment?.harness
+    if (assignment) run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
     run.done = daemonTracer.span("daemon.run", { "mikka.run_id": runId, "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run)
     }, { root: true, traceContext: assignment?.traceContext })
       .catch(async (error: unknown) => {
+        run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
-        this.deps.log.error({ run_id: runId, err: error }, "run failed")
+        this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "run failed")
         if (this.stopping) return
         try {
           const providerFailure = run.cancelRequested ? undefined : startupProviderFailure(error)
@@ -1239,7 +1315,7 @@ export class RunSupervisor {
           )
         } catch (finishError) {
           this.deps.log.error(
-            { run_id: runId, err: finishError },
+            { run_id: runId, err: this.logError(runId, finishError) },
             "could not record the run's end",
           )
         }
@@ -1249,16 +1325,23 @@ export class RunSupervisor {
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
         finally {
-          clearTimeout(run.cancelTimer); this.active.delete(runId)
-          // Start draining all three telemetry queues before an idle cloud VM
-          // can pause; the completed run never waits for the collector.
-          void daemonTracer.flush()
+          try { run.github?.close() }
+          catch { this.deps.log.warn('GitHub credential cleanup failed') }
+          finally {
+            clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId)
+            // Start draining all three telemetry queues before an idle cloud VM
+            // can pause; the completed run never waits for the collector.
+            void daemonTracer.flush()
+          }
         }
       })
   }
 
   private async drive(runId: string, repo: DeviceRepo, run: ActiveRun) {
-    const log = this.deps.log.child({ run_id: runId })
+    const log = this.deps.log.child({ run_id: runId }, { serializers: {
+      err: error => this.logError(runId, error),
+      stderr: value => typeof value === 'string' ? this.maskers.get(runId)?.text(value) ?? value : value,
+    } })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
     if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
@@ -1295,7 +1378,14 @@ export class RunSupervisor {
       entry = this.deps.journal.get(runId) as JournalEntry
     }
 
-    await this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal])))
+    const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
+    run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
+      (name, value) => this.addCredential(runId, name, value))
+    if (this.stopping || run.cancelRequested) {
+      if (!this.stopping) this.finish(runId, run.forcedStop ?? 'cancelled')
+      return
+    }
+    await this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env))
     if (this.stopping || run.cancelRequested) {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
       return
@@ -1382,9 +1472,8 @@ export class RunSupervisor {
     const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
       () => this.deps.prepareRunToolApproval!(assignment, run.abort.signal, checkMailbox, worktree))
     run.toolApproval = toolApproval
-    // Register before an adapter can attach its cancellation callback. The
-    // 1s live gate may learn of a host revocation before the next heartbeat;
-    // preserve that cause before SIGTERM/SDK close races an exit event.
+    // Register before an adapter can attach its cancellation callback. Keep
+    // a known local lease revocation before SIGTERM/SDK close races an exit.
     toolApproval?.onRevoke(() => {
       if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
         && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
@@ -1418,8 +1507,10 @@ export class RunSupervisor {
     const options = {
       traceContext: daemonTracer.capture(),
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
-      github: assignment.github && assignment.mcp
-        ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
+      github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
+        ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
+      githubEnvironment: run.github?.env,
+      onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
       apps: runApps(assignment.mcp),
       mcp: runMcp(assignment.mcp),
       toolApproval,
@@ -1591,7 +1682,7 @@ export class RunSupervisor {
         worktree,
       })
     }
-    if (run.cancelRequested) await this.requestCancel(run)
+    if (run.cancelRequested) await this.requestCancel(runId, run)
 
     const iterator = session.events()[Symbol.asyncIterator]()
     const aborted = abortPromise(run.abort.signal)
@@ -1630,8 +1721,13 @@ export class RunSupervisor {
           this.emit(runId, event.chunk)
           continue
         }
+        run.sessionEnded = true
+        clearTimeout(run.cancelTimer)
+        if (run.cancelRequested) run.abort.abort()
+        const finishingSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
+        run.runtimeTiming?.finishing()
         await this.closeMailbox(run)
-        const stopReason = stopReasonOf(event, run, assignment)
+        let stopReason = stopReasonOf(event, run, assignment)
         const error =
           event.error ??
           (stopReason === "turn_ended"
@@ -1641,21 +1737,20 @@ export class RunSupervisor {
               : stopReason === "device_lost"
                 ? "Run lease expired; the server could not be reached"
                 : undefined)
-        if (assignment.benchmark) {
-          const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.benchmark.sourceCommit)
-          if (createHash('sha256').update(fixed.sha).digest('hex') !== assignment.benchmark.fixtureDigest)
-            throw new Error("Benchmark fixture changed during model execution")
+        let outcome: { report: HandoffReport; verifyError?: string; tree?: string }
+        try {
+          if (assignment.benchmark && !run.cancelRequested) {
+            const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.benchmark.sourceCommit, finishingSignal)
+            if (createHash('sha256').update(fixed.sha).digest('hex') !== assignment.benchmark.fixtureDigest)
+              throw new Error("Benchmark fixture changed during model execution")
+          }
+          outcome = await this.report(runId, worktree, repo, assignment, stopReason, error, event.report, finishingSignal)
+        } catch (error) {
+          if (!finishingSignal.aborted) throw error
+          outcome = { report: { ...baseReport(), ...pickAgentReport(event.report) } }
         }
-        const outcome = await this.report(
-          runId,
-          worktree,
-          repo,
-          assignment,
-          stopReason,
-          error,
-          event.report,
-        )
         if (this.stopping) return
+        stopReason = stopReasonOf(event, run, assignment)
         const { verifyError, tree } = outcome
         let report = stopReason === "quota_exhausted"
           ? { ...outcome.report, resetsAt: event.quota?.resetsAt ?? null }
@@ -1683,11 +1778,14 @@ export class RunSupervisor {
             assignment,
             report,
             tree,
+            finishingSignal,
           )
           report = { ...report, publish }
+          stopReason = stopReasonOf(event, run, assignment)
         }
         // Captures go up before the run reports its end; a stopping daemon does not wait for them.
         if (!this.stopping) await this.flushCaptures(runId)
+        stopReason = stopReasonOf(event, run, assignment)
         if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: await this.saveProviderCheckpoint(runId, run) }
         if (this.stopping) return
         this.finish(runId, stopReason, error ?? verifyError, report)
@@ -1868,6 +1966,7 @@ async function unsandboxedVerify(run: {
     stdin: "ignore",
     timeout: run.timeoutMs,
     cancelSignal: run.signal,
+    killDescendants: true,
   })
   return {
     exitCode: result.exitCode ?? null,

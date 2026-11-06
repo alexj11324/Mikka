@@ -3,7 +3,9 @@
 - **Status:** this is the source of truth for these topics from 2026-10-31
   ([decision](decisions/2026-10-31-2300-orchestration-spec.md)). When another
   document, decision or code comment disagrees, this file wins and the other
-  one gets fixed. `decisions.md` rows stay as frozen history.
+  one gets fixed. The execution and credential sections incorporate Alex's
+  [2026-11-06 machine-authority decision](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)
+  from #1505. `decisions.md` rows stay as frozen history.
 - **Built on:** Alex's rules of 2026-10-31 and his answers to the open
   questions, both relayed by the coordinator. Also
   [personal vs workspace](decisions/2026-10-31-2130-personal-vs-workspace.md)
@@ -117,39 +119,44 @@ one protocol the person picked. Nothing picks an Agent from a model's name
 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过 daemon 把任务派给
 Claude Code 或 Codex。」 (Alex, R-05)
 
-**A user's computer or server is a runner, just like E2B.** Every runner meets
-the same contract: a clean environment for the thread, Agents that Mikka
-installed, and credentials injected at the start of each run and wiped at its
-end.
+**A user's computer or server is a runner, just like E2B.** Each runner
+receives the task's resolved authority and real credentials during preparation.
+The machine executes the assignment directly; lifecycle messages report progress
+and deliver stops, without a permission round trip before each tool or model call
+([1800](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)).
 
 | | Mikka Cloud (E2B) | The person's computer or server |
 | --- | --- | --- |
-| Environment | A machine of its own per task, started from E2B's official `claude` or `codex` template (a Bot's computer: `desktop`), with Mikka's worker added | A worktree plus a temporary Agent config dir (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` style) |
-| Agents | The template's own CLI | The daemon's own copies in a private dir (e.g. `~/.mikka/harness`) |
-| Isolation | The machine itself: one task, one machine | None beyond the worktree and the run's own config dir; the CLI runs directly as the daemon's user |
+| Environment | One VM per task, using a versioned additive derivative of official `claude`, `codex` or `desktop`; normal HOME, environment and Git repository | The daemon's worktree, preserving the person's repository and unrelated files |
+| Agents | The template's original official CLI; a missing CLI may be added privately under `/opt/mikka` | The daemon's managed copies in its private installation directory |
+| Execution boundary | The task's VM; no extra container, shadow repository or isolated HOME inside it | The task's worktree and process group; no extra sandbox or per-call remote authorization |
 
-- **No Mikka image and no sandbox.** Cloud machines start from E2B's official
-  templates with Mikka's worker added. No run uses Docker, `sandbox-runtime`
-  or the CLI's own sandbox, on E2B or on a device
-  ([2335](decisions/2026-11-01-2335-e2b-official-templates.md)).
-  [1430](decisions/2026-11-03-1430-official-e2b-templates-unchanged.md) asks
-  that the official template files stay untouched; until #1131 lands,
-  `scripts/e2b/bootstrap.sh` still replaces the template's Node.
-- **Daemon-managed Agents.** The daemon installs and updates its own copies
-  of Claude Code and Codex on first use. It never uses, touches or detects
-  the person's own Claude Code or Codex installs, logins or config.
-- **Device capability check.** This replaces Agent detection. A device
-  reports its OS, architecture, free disk, whether Docker is available, and
-  its 参与调度 switch (§4). A cloud machine runs only a boot self-check; a
-  failed check marks the runner unhealthy, and its runs are placed again.
-- **Model slots** come from the daemon's own Agent copies, never from the
-  person's CLI settings.
-- **Tools.** Agents ask nothing per tool or destination: Claude Code runs in
-  `bypassPermissions`, Codex with approvals `never` (2335). The daemon's live
-  gate (`packages/daemon/src/agents/tool-approval.ts`) only stops a run whose
-  lease, owner or policy is no longer live. Connected apps reach
-  the run as one MCP entry per toolkit, through Mikka, using the run token
-  ([apps in device runs](decisions/2026-10-31-1937-apps-in-device-runs.md)).
+- **Additive official templates.** Install Mikka's Node, worker, dependencies
+  and `gh` under `/opt/mikka` before task dispatch. Never delete or overwrite
+  original official files. CI checks file conservation and real official
+  Claude Code and Codex subscription execution on the exact candidate before
+  publication; retain the last valid release for rollback
+  ([1430](decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
+- **Direct execution.** No run uses Docker, `sandbox-runtime` or the CLI's own
+  sandbox. Cloud Agents use their machine's ordinary HOME, environment,
+  credential stores and real `.git`; verification uses that same repository.
+  Prepare shallow or partial repository clones in parallel with machine
+  startup. Local worktree safeguards protect the person's unrelated work.
+- **Daemon-managed local Agents.** The local daemon installs and updates its
+  managed copies without replacing the person's existing executables. Any
+  local configuration separation must preserve actual concurrent work or the
+  person's files; it must not recreate the superseded cloud credential proxy.
+- **Device capability check.** A device reports its OS, architecture, free
+  disk, available Agent installations and its 参与调度 switch (§4). Model
+  slots come from the actual Agent installed on that runner. A failed cloud
+  boot self-check marks the runner unhealthy so its runs can be placed again.
+- **Tools and providers.** Claude Code uses `bypassPermissions`; Codex uses
+  approvals `never`. The real selected provider credential goes to the CLI:
+  Claude Code talks to Anthropic and Codex to OpenAI directly. No placeholder,
+  provider proxy or extra permission-preflight request is inserted before a
+  call. Connected apps still make their normal authenticated operation through
+  Mikka's MCP entry; that operation does not acquire another permission gate
+  first. Revocation pushes a stop to the task or reclaims its VM (§6).
 
 ## 4. Machine selection and fallback
 
@@ -259,25 +266,19 @@ can stop cloud work on the member's own E2B key is open.
 
 ## 5. Scheduling and concurrency
 
-```mermaid
-sequenceDiagram
-  participant S as Mikka server
-  participant M as Runner (sandbox or device daemon)
-  S->>S: create run (model + credential + machine frozen), queued
-  M->>S: claim (lease)
-  S-->>M: assignment + run token + the resolved owner's credential
-  loop while running
-    M->>S: heartbeat renews the lease
-  end
-  M->>S: finish
-  S->>S: revoke the run token
-  M->>M: wipe the credential; the environment pauses without it
-```
+The server admits the run and freezes its model, credential, machine and
+payer. During machine preparation or the initial claim it delivers that
+assignment and the credentials the task needs. The runner executes directly,
+renews its scheduling lease through the existing heartbeat, and reports
+completion. A persisted stop is delivered through the control channel; cloud
+reclamation is also available when the task must end.
 
-- **One environment per thread**, reused across the thread's runs. A sandbox
-  pauses between runs, and a worktree stays. Credentials are
-  injected at the start of every run and are absent while the environment is
-  paused or idle. The environment ends when the thread ends.
+- **One environment per thread**, reused across that thread's turns. The
+  owner-bound cloud VM may pause with its ordinary private runtime state;
+  the local worktree stays. Neither is given to another task or owner. A
+  reusable template contains software only. The disposable VM is reclaimed
+  when the task ends; there is no mandatory credential wipe and re-injection
+  at every turn merely to implement the former proxy policy.
 - **Concurrency.** Threads run in parallel. The runs of one thread run one at
   a time. There are no Mikka machine caps: the owner's own E2B account sets
   the limit.
@@ -292,36 +293,38 @@ sequenceDiagram
 
 ## 6. Credentials lifecycle
 
-Environments hold software only: the repository, dependencies and
-preinstalled Agents. No snapshot or paused environment contains a login,
-token or key.
+This section follows Alex's [#1505 decision of 2026-11-06](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md).
+One task, one VM is the cloud execution boundary. The former placeholder,
+provider-forwarding proxy, isolated cloud HOME and repeated remote permission
+checks are superseded.
 
-1. **At rest:**
-   - Subscriptions, API keys and custom providers live in the subscription
-     service's secret bundle, bound to the account.
-   - App connections live in Composio and are reached only through Mikka.
-   - Saved logins live in the credential vault.
-   - The E2B key belongs to the account. Only the server uses it; it is never
-     handed to a sandbox or a model.
-2. **At run start:** the server resolves the run requester's selected credential,
-   or the credential owner's explicit share when §2 step 2 applied. It injects only that
-   credential, plus a run token for Mikka's MCP and apps. The credential lands
-   only inside the run's environment: the E2B machine or the
-   temporary Agent config dir. It never comes from, or goes to, the person's
-   own CLI config.
-   On a device, a subscription run gets only that run's short-lived access
-   token, on a pipe or in memory, never on disk; the refresh grant never
-   leaves the server. A member's own credential used on the member's own
-   device works the same way; it needs no share
-   ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). Each lease request is checked again (run, device, binding,
-   revocation). Codex asks again when the token expires; a Claude Code run
-   ends when its token does.
-   A subscription on a device or a sandbox never leaves the server: the
-   Agent holds a placeholder and sends its model requests to Mikka, which
-   checks the run and adds the token to each one. That holds for a member's
-   own credential on the member's own device too.
-3. **At run end:** the run token is revoked and the injected credential is
-   deleted. The environment pauses or idles without it.
+1. **Reusable images and account storage.** Public templates and other
+   reusable images contain software only, with no login, token, device identity
+   or workspace data. Subscription and API credentials remain associated with
+   their real account; app connections and saved logins keep their account
+   ownership. The E2B account pays for and owns the task's cloud resources.
+2. **Preparation and admission.** Resolve the requester, selected model,
+   credential owner and any explicit share, destination and payer once when
+   admitting or explicitly moving the work. Deliver the task's real subscription
+   login, GitHub credential and model key during preparation, or once on the
+   first request that needs it. Use normal cloud credential files and environment,
+   as on an ordinary development machine. There is no categorical ban on a
+   credential needed by the task being present in its own machine. Never log
+   those values or bake them into a reusable image.
+3. **Execution and renewal.** The assigned machine has the authority to run
+   the task. Official CLIs call their providers directly; no Mikka model proxy
+   or extra server authorization request precedes each model or tool call.
+   Refresh naturally expiring provider tokens in the background before expiry
+   and update the live CLI's normal credential mechanism. A healthy Claude Code
+   run does not end merely because an old access token expires. Routine
+   heartbeat and app operations remain their own requests, not per-call
+   authorization preflights.
+4. **Revocation and completion.** Removing a share, revoking a connection or
+   stopping work persists and pushes a stop to the runner, or stops/reclaims
+   its cloud VM. A local stop ends only that task's processes. Private state
+   can remain with the same paused task; it is never published as a reusable
+   snapshot or reassigned to another task. Reclaim the disposable VM at task
+   completion, and preserve local files unrelated to that task.
 
 When a member leaves a team, their shares, card designation and credit
 shares leave that workspace at once, and their bots there are paused (暂停).
@@ -336,11 +339,13 @@ with each new run. A group reporter Bot is separately recorded by the group's
 host binding; choosing a reporter never transfers that Bot owner's accounts or
 computer. Personal app connections remain the execution requester's connections.
 
-Claim, credential disclosure, run-token authentication, app-tool execution and
-lease renewal recheck current authority. A shared subscription or API key needs
-both members to remain active, the explicit share and the current workspace
-policy. The selected resource and payer cannot change implicitly on retry.
-A host-authorized device handoff rechecks the new device's owner and preserves
+Admission and an explicit device handoff resolve current ownership, membership
+and sharing authority before issuing the machine's assignment. A shared
+subscription or API key requires both members to be active, the explicit share
+and the applicable workspace policy at admission. A later revocation delivers a
+stop rather than imposing a fresh permission round trip on each provider or tool
+call. The selected resource and payer cannot change implicitly on retry.
+A host-authorized device handoff checks the new device's owner and preserves
 the requester's identity; a consented quota fallback records the newly selected
 API key and its actual owner. Cloud continuation freezes its parent placement
 before rebinding to the new thread machine.
@@ -386,9 +391,9 @@ external bill.
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
-| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a worktree plus a temporary config dir, no sandbox; cloud machines on E2B's official templates | — |
+| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, an ordinary worktree, direct provider credentials and no sandbox; cloud machines on additive official E2B templates | — |
 | A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 优先使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
-| One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
+| One environment per thread; leases and heartbeats; credentials prepared once, background renewal and pushed stops | — |
 | Card verification per person; credit and card shares per workspace | — |
 | No Mikka-hosted sandboxes and no free cloud trial | (not planned) |

@@ -1,5 +1,5 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { logCodedError } from '@mikka/protocol/coded-error'
+import { causeFields, logCodedError } from '@mikka/protocol/coded-error'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { runListChanged } from '@/lib/live/lists'
@@ -12,7 +12,8 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import type { NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
 import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
@@ -45,12 +46,14 @@ import { FactoryError } from '@/lib/factory/contract'
 import { blockQuestionRetry } from '@/lib/factory/questions/retry'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { leaseDevice } from '@/lib/subscription-native-device'
 import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
 import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
+import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
@@ -62,6 +65,17 @@ export const dynamic = 'force-dynamic'
  * daemon's `RunNotPinnedHereError`, and it stops asking.
  */
 async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
+  const { runId } = await params
+  const attributes = cloudStartupRunAttributes(runId)
+  return cloudStartupSpan('cloud.worker.claim', attributes, async () => {
+    const timings = cloudStartupPhases(attributes, 'cloud.worker.claim')
+    try { return await claimRun(request, { params }, timings) }
+    finally { timings.end() }
+  })
+}
+
+async function claimRun(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }, timings: ReturnType<typeof cloudStartupPhases>) {
+  timings.next('authorize')
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
@@ -73,6 +87,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, minVersion: MIN_DAEMON_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   }
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
+  timings.next('identity')
   const [run] = await db
     .select()
     .from(agentRuns)
@@ -116,6 +131,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   }
   // Preserve the task-access denial before narrower policy parsing or any
   // claim preparation. Publication and the final response recheck it later.
+  timings.next('admission')
   if (!await issueForUser(caller.userId, run.issueId)) return rejectPublication(new PublicationError('issue_unavailable'))
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
@@ -141,6 +157,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   const supportsTeamSkills = request.headers.get(TEAM_SKILL_HEADER) === '1'
+  const receivesRunCredentials = request.headers.get(RUN_CREDENTIALS_HEADER) === '1'
   try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts, supportsTeamSkills) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
@@ -187,6 +204,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     try { distribution = policyDistributionContext(await requestDevicePolicyIssuer(request,caller,deviceId,runId),caller.userId,deviceId,runId,cliPolicy) }
     catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
   }
+  timings.next('acquire_lease')
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
@@ -200,7 +218,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     catch (error) { if (error instanceof FactoryError) return false; throw error }
   }
   const afterClaim = async (tx: import('pg').PoolClient) => {
-    await tx.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1 AND "userId"=$3', [runId, caller.tokenId, caller.userId])
+    await tx.query('UPDATE agent_runs SET "deviceTokenId"=$2,"machineAuthority"=$4 WHERE id=$1 AND "userId"=$3', [runId, caller.tokenId, caller.userId, receivesRunCredentials])
     if (factoryClaim.preserveQuestionWorktree === true) {
       const { withDatabaseClient } = await import('@/lib/db')
       factoryToken = await withDatabaseClient(tx, () => issueRunToken(run))
@@ -295,6 +313,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
     if (current && (!caller.scopeWorkspaceId || caller.scopeWorkspaceId === current.workspaceId)) localComputer = current
   }
+  timings.next('provenance')
   let skillAssignment
   let benchmarkAssignment
   try {
@@ -308,6 +327,28 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: 409 })
   }
+  // A task machine receives its credentials once during preparation (#1505).
+  // These existing credential lookups overlap the remaining claim setup. The
+  // final claim-response transaction still checks the owner/run/device before
+  // returning any prompt or credential. Older daemons keep their original
+  // response shape until they advertise the capability.
+  timings.next('assignment_context')
+  const startupAttributes = cloudStartupRunAttributes(runId)
+  const githubRepository = /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) && harness !== 'mock'
+  const preparedCredentials = receivesRunCredentials ? Promise.allSettled([
+    cloudStartupSpan('cloud.worker.claim.native_credentials', startupAttributes, async (): Promise<NativeLease | undefined> => {
+      if (!subscription) return undefined
+      if (!leaseDevice(device, deviceId, caller.scopeDeviceId)) throw new Error('Run credential device unavailable')
+      const runtime = subscriptionRuntime(true, false, { exportAccessLease: true })
+      return runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal)
+    }),
+    cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
+      if (!githubRepository || !await linkedGitHubAccountId(caller.userId)) return undefined
+      const { githubTokenForUser } = await import('@/lib/github/user-access')
+      const issued = await githubTokenForUser(caller.userId)
+      return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
+    }),
+  ] as const) : undefined
   // Tool provisioning is best effort, but it never authorizes the response.
   // A retirement during this await must still suppress the prompt below.
   const mcp = await (factoryToken ? Promise.resolve(factoryToken) : issueRunToken(run))
@@ -379,7 +420,28 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: 'Frozen execution policy no longer fits the current owner policy.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
     return NextResponse.json({ error: 'Frozen execution policy is no longer permitted.' }, { status: 409 })
   }
-  const githubConnected = repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
+  let subscriptionLease: NativeLease | undefined
+  let githubCredential: { token: string; expiresAt: string | null } | undefined
+  timings.next('credentials_wait')
+  if (preparedCredentials) {
+    const [native, github] = await preparedCredentials
+    const failures = [native, github].filter(result => result.status === 'rejected')
+    if (failures.length) {
+      // A credential failure must not strand an already claimed run. Complete
+      // only this claim's still-preparing lease, never a concurrent stop/retry.
+      console.warn(JSON.stringify({ msg: 'run_claim_credentials_failed', runId,
+        failures: failures.map(result => causeFields((result as PromiseRejectedResult).reason)) }))
+      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
+      if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId); await afterRunEnded(caller.userId, runId) }
+      return NextResponse.json({ error: 'Run credentials unavailable.' }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+    }
+    if (native.status === 'fulfilled') subscriptionLease = native.value
+    if (github.status === 'fulfilled') githubCredential = github.value
+  }
+  const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
+    : repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
+  timings.next('response_fence')
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
@@ -390,17 +452,18 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
-    // The owner's own GitHub credential for every github.com run (decision
-    // 2026-11-02-1600), any kind, read-only included; the branch is the task
-    // branch a delivering run pushes.
-    ...(mcp && githubConnected && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) && harness !== 'mock'
-      ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length),
+    // The owner's GitHub credential is ready for git and gh, including
+    // read-only runs. The endpoint is retained for natural-expiry refresh.
+    ...((mcp || githubCredential) && githubConnected && githubRepository
+      ? { github: { endpoint: (mcp?.url ?? new URL(withBasePath('/api/mcp'), request.url).toString()).replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length),
+        ...githubCredential,
         ...(publication?.pushBranch && ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly ? { branch: publication.pushBranch } : {}) } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
     ...((run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort)
       ? { effort: run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort } : {}),
     ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
+    ...(subscriptionLease ? { subscriptionLease } : {}),
     ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
     ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
@@ -412,7 +475,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...benchmarkAssignment,
     policy: assignmentPolicy,
     ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
-  }))
+  }, { headers: { 'cache-control': 'private, no-store' } }))
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
 

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { execFileSync, spawn } from "node:child_process"
+import { createHash } from 'node:crypto'
 
 if (process.argv.some(arg => arg.startsWith('model_providers.openai.'))) {
   process.stderr.write('Reserved built-in model provider cannot be overridden\n')
@@ -62,6 +63,7 @@ lines.on("line", async (line) => {
     if (params.accessToken === "fixture-paid-mode")
       return send({ id, result: { type: "apiKey" } })
     login = params
+    writeFileSync(join(process.env.CODEX_HOME, 'fixture-auth.json'), JSON.stringify({ tokenSha: createHash('sha256').update(params.accessToken).digest('hex') }))
     return send({ id, result: { type: "chatgptAuthTokens" } })
   }
   const historyFile = join(process.env.CODEX_HOME, "sessions", "fixture-subscription-thread.json")
@@ -73,6 +75,13 @@ lines.on("line", async (line) => {
     return send({ id, result: { thread: { id: history.resumeSessionId ?? history.sessionId } } })
   }
   if (method === "thread/start") {
+    if (!login && process.env.FIXTURE_MACHINE_AUTH && process.env.MIKKA_MODEL_API_KEY === 'fixture-direct-provider-key') {
+      const prefix = 'model_providers.mikka.base_url='
+      const baseUrl = JSON.parse(process.argv.find(value => value.startsWith(prefix)).slice(prefix.length))
+      if (baseUrl !== 'https://provider.example/v1') process.exit(2)
+      login = { type: 'apiKey' }
+      writeFileSync(join(process.env.CODEX_HOME, 'fixture-auth.json'), JSON.stringify({ tokenSha: createHash('sha256').update(process.env.MIKKA_MODEL_API_KEY).digest('hex'), baseUrl }))
+    }
     // The owned hosted broker uses Codex's documented custom Responses
     // provider, independently of the direct/local ChatGPT login fixture.
     if (!login && process.env.MIKKA_MODEL_API_KEY === "mikka-native-broker-placeholder" &&
@@ -98,9 +107,16 @@ lines.on("line", async (line) => {
     writeFileSync(join(process.env.CODEX_HOME, "fixture-effort.json"), JSON.stringify({ transport: "turn/start", sessionId: params.threadId, effort: params.effort ?? null }))
     const turnId = `fixture-turn-${++turn}`
     const prompt = params.input[0].text
+    writeFileSync(join(process.env.CODEX_HOME, 'fixture-process.json'), JSON.stringify({ pid: process.pid, prompts: turn }))
     const diagnostic = prompt.startsWith('DIAGNOSTIC ') ? JSON.parse(prompt.slice('DIAGNOSTIC '.length)) : null
     if (diagnostic?.rpc) return send({id,error:diagnostic.rpc})
     send({ id, result: { turn: { id: turnId } } })
+    if (prompt === 'HANG') return
+    if (prompt === 'PROBE_MACHINE') {
+      writeFileSync(join(process.env.CODEX_HOME, 'fixture-machine.json'), JSON.stringify({ home: process.env.HOME, cwd: process.cwd(),
+        value: process.env.FIXTURE_MACHINE_VALUE, git: execFileSync('git', ['rev-parse', '--absolute-git-dir'], { encoding: 'utf8' }).trim() }))
+      execFileSync('git', ['config', 'mikka.machineProbe', 'actual-directory'])
+    }
     if (diagnostic) {
       if(diagnostic.rateLimits) send({method:'account/rateLimits/updated',params:{rateLimits:diagnostic.rateLimits}})
       if(diagnostic.notification) send({method:'error',params:{threadId:'fixture-subscription-thread',turnId,error:diagnostic.notification,willRetry:diagnostic.willRetry===true}})

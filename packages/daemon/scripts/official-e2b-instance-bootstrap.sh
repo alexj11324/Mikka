@@ -1,6 +1,6 @@
 #!/bin/bash
-# Add Mikka to a new official E2B instance. Never build/update a template or
-# overwrite/remove official packages, system files or the original CLI tree.
+# Add Mikka to an official E2B base, during a derived template build or instance
+# fallback. Never overwrite/remove official packages, system files or CLI trees.
 set -euo pipefail
 # Fixed, secret-free receipts; no extra process or installation work.
 mikka_phase_started=${EPOCHREALTIME/./}
@@ -33,12 +33,13 @@ mkdir -p /opt/mikka/archives /opt/mikka/runtime /opt/mikka/releases
 mikka_destination=/opt/mikka/releases/$mikka_commit
 mikka_release=$mikka_destination
 if [[ -e "$mikka_release" || -L "$mikka_release" ]]; then
-  [[ "$mikka_mode" = stage && -d "$mikka_release/source" && ! -L "$mikka_release" && ! -L "$mikka_release/source" && -f "$mikka_release/worker-ready.sha" && ! -L "$mikka_release/worker-ready.sha" ]] || exit 3
-  for mikka_owned in "$mikka_release" "$mikka_release/source" "$mikka_release/worker-ready.sha"; do
+  [[ "$mikka_mode" = stage && -d "$mikka_release/source" && ! -L "$mikka_release" && ! -L "$mikka_release/source" && -f "$mikka_release/worker-ready.sha" && ! -L "$mikka_release/worker-ready.sha" && -f "$mikka_release/source/.mikka-original-cli.json" && ! -L "$mikka_release/source/.mikka-original-cli.json" ]] || exit 3
+  for mikka_owned in "$mikka_release" "$mikka_release/source" "$mikka_release/worker-ready.sha" "$mikka_release/source/.mikka-original-cli.json"; do
     [[ "$(stat -c %u "$mikka_owned")" = 0 ]] || exit 3
   done
   [[ "$(cat "$mikka_release/worker-ready.sha")" = "$mikka_sha" ]] || exit 3
   [[ "$(git -C "$mikka_release/source" rev-parse HEAD)" = "$mikka_commit" ]] || exit 3
+  python3 "$mikka_release/source/scripts/e2b/official-files.py" cli-check "$mikka_release/source/.mikka-original-cli.json" --kind "$mikka_kind"
   printf 'mikka-official-instance-staged %s %s\n' "$mikka_commit" "$mikka_sha"
   exit 0
 fi
@@ -58,6 +59,16 @@ git -C "$mikka_release/source" -c core.hooksPath=/dev/null checkout -q --detach 
 [[ "$(git -C "$mikka_release/source" rev-parse HEAD)" = "$mikka_commit" ]] || exit 3
 mikka_actual_sha=$(cd "$mikka_release/source" && python3 scripts/e2b/build-template.py --worker-hash --source-ref HEAD)
 [[ "$mikka_actual_sha" = "$mikka_sha" ]] || exit 3
+mikka_cli_manifest="$mikka_release/source/.mikka-original-cli.json"
+mikka_cli_capture=(cli-capture "$mikka_cli_manifest" --kind "$mikka_kind")
+if [[ -f /opt/mikka/worker/.mikka-original-cli.json ]]; then
+  mikka_cli_capture+=(--inherit /opt/mikka/worker/.mikka-original-cli.json)
+elif [[ -f /opt/mikka/original-cli.json ]]; then
+  mikka_cli_capture+=(--inherit /opt/mikka/original-cli.json)
+fi
+# Legacy instances with no record scan only the original non-/opt PATH before
+# adding anything. The candidate owns this inventory; active releases stay intact.
+python3 "$mikka_release/source/scripts/e2b/official-files.py" "${mikka_cli_capture[@]}"
 mikka_phase_done source
 if [[ "$mikka_mode" = install ]]; then
 mikka_node_archive=/opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz
@@ -68,12 +79,10 @@ ln -s node-v24.19.0-linux-x64 /opt/mikka/runtime/node
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 mkdir -p /opt/mikka/runtime/bootstrap-home /opt/mikka/runtime/harness-bin
 mikka_phase_done node
-if ! command -v gh >/dev/null; then
-  curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
-  echo 'ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e  /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz' | sha256sum --check --strict
-  tar -xzf /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz -C /opt/mikka/runtime
-  ln -s /opt/mikka/runtime/gh_2.83.2_linux_amd64/bin/gh /opt/mikka/runtime/harness-bin/gh
-fi
+curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
+echo 'ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e  /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz' | sha256sum --check --strict
+tar -xzf /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz -C /opt/mikka/runtime
+ln -s /opt/mikka/runtime/gh_2.83.2_linux_amd64/bin/gh /opt/mikka/runtime/harness-bin/gh
 mikka_phase_done gh
 fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH
@@ -82,26 +91,41 @@ env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/core
 mikka_phase_done dependencies
 node packages/daemon/scripts/build-cloud-worker.mjs
 mikka_phase_done build
+# Keep missing CLIs in the existing versioned private package store. Previous
+# versions stay available to a retained release; official executables are untouched.
+mikka_codex=''
+if [[ "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["original"]["codex"] is None)' "$mikka_cli_manifest")" = True ]]; then
+  mikka_codex=$(node packages/daemon/harness/cli.mjs /opt/mikka/harness codex)
+  chmod -R go+rX /opt/mikka/harness
+  if [[ "$mikka_mode" = install ]]; then
+    ln -s "$mikka_codex" /opt/mikka/runtime/harness-bin/codex
+    mikka_codex_root=$(dirname "$(dirname "$mikka_codex")")
+    if [[ -x "$mikka_codex_root/codex-path/rg" ]]; then ln -s "$mikka_codex_root/codex-path/rg" /opt/mikka/runtime/harness-bin/rg; fi
+  fi
+fi
+mikka_added_cli=$(/opt/mikka/runtime/node/bin/node --input-type=module - "$mikka_release/source" "$mikka_codex" <<'MIKKA_ADDED_CLI'
+import { createRequire } from 'node:module'
+import { realpathSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+const require = createRequire(join(process.argv[2], 'packages/daemon/package.json'))
+const sdk = createRequire(require.resolve('@anthropic-ai/claude-agent-sdk'))
+const claude = join(dirname(sdk.resolve('@anthropic-ai/claude-agent-sdk-linux-x64/package.json')), 'claude')
+console.log(JSON.stringify({ claude_code: realpathSync(claude), ...(process.argv[3] ? { codex: realpathSync(process.argv[3]) } : {}) }))
+MIKKA_ADDED_CLI
+)
+# Hash the real staged binaries, recording their final path before the atomic
+# rename. The active worker symlink selects this manifest and rolls it back too.
+python3 scripts/e2b/official-files.py cli-finalize "$mikka_cli_manifest" --kind "$mikka_kind" --added "$mikka_added_cli" --relocate-from "$mikka_release" --relocate-to "$mikka_destination"
 printf '%s\n' "$mikka_sha" > "$mikka_release/worker-ready.sha"
 chmod -R go-w "$mikka_release"
+mikka_phase_done cli
 if [[ "$mikka_mode" = stage ]]; then
   chmod 0755 "$mikka_release"
-  # -T refuses a conflicting destination; never nest/overwrite a prior release.
   mv -T --no-clobber "$mikka_release" "$mikka_destination"
   [[ ! -e "$mikka_release" && ! -L "$mikka_release" ]] || exit 3
   printf 'mikka-official-instance-staged %s %s\n' "$mikka_commit" "$mikka_sha"
   exit 0
 fi
-# Official task CLIs stay in place. Only a desktop without Codex needs the
-# complete pinned package in Mikka's private directory; no global bin is changed.
-if ! command -v codex >/dev/null; then
-  mikka_codex=$(node packages/daemon/harness/cli.mjs /opt/mikka/harness codex)
-  ln -s "$mikka_codex" /opt/mikka/runtime/harness-bin/codex
-  mikka_codex_root=$(dirname "$(dirname "$mikka_codex")")
-  if [[ -x "$mikka_codex_root/codex-path/rg" ]]; then ln -s "$mikka_codex_root/codex-path/rg" /opt/mikka/runtime/harness-bin/rg; fi
-  chmod -R go+rX /opt/mikka/harness
-fi
-mikka_phase_done cli
 # Only the fresh install path reaches here: staging exits above, an installed
 # marker returns above, and an unknown private worker installation is refused.
 # Persist an empty journal before registration/claim. A rejected first claim
