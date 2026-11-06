@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=393, initial-scale=1">
+<title>Mikka iOS redesign</title>
+<!--
+  Mikka iOS redesign frames, drawn at iPhone size (393 × 852 pt).
+  Open as screens.html#<screen>; add ?dark for the dark set. render.mjs turns every
+  screen into a PNG at deviceScaleFactor 2. Colours are the app's own tokens
+  (apps/mobile/lib/tokens.ts, iOS system colours). Nothing here is taken from Comma's code.
+-->
+<style>
+@font-face { font-family: "SC"; font-weight: 400; src: local("Noto Sans SC"), url("fonts/noto-sans-sc-chinese-simplified-400-normal.woff2"); }
+@font-face { font-family: "SC"; font-weight: 500; src: local("Noto Sans SC Medium"), url("fonts/noto-sans-sc-chinese-simplified-500-normal.woff2"); }
+@font-face { font-family: "SC"; font-weight: 600; src: local("Noto Sans SC SemiBold"), url("fonts/noto-sans-sc-chinese-simplified-600-normal.woff2"); }
+@font-face { font-family: "SC"; font-weight: 700; src: local("Noto Sans SC Bold"), url("fonts/noto-sans-sc-chinese-simplified-700-normal.woff2"); }
+
+:root {
+  --page: #FFFFFF; --page-rgb: 255,255,255; --grouped: #F2F2F7; --surface: #FFFFFF; --bubble: #E9E9EB;
+  --chip: rgba(118,118,128,0.12); --ink: #000000; --secondary: rgba(60,60,67,0.70); --tertiary: rgba(60,60,67,0.30);
+  --separator: rgba(60,60,67,0.18); --accent: #007AFF; --accentFill: #0068DA; --objectChip: rgba(0,122,255,0.10);
+  --success: #34C759; --danger: #FF3B30; --orange: #FF9500; --purple: #AF52DE; --pressed: #E5E5EA;
+  --glass: rgba(255,255,255,0.56); --glass-strong: rgba(250,250,252,0.84); --glass-hi: rgba(255,255,255,0.95);
+  --glass-edge: rgba(0,0,0,0.07); --glass-shadow: rgba(0,0,0,0.10); --scrim: rgba(0,0,0,0.22); --kb: #D1D3D9; --key: #FFFFFF; --key2: #ADB1BB;
+  --ink-bloub: #0a0a0c;
+}
+.dark {
+  --page: #000000; --page-rgb: 0,0,0; --grouped: #000000; --surface: #1C1C1E; --bubble: #262628;
+  --chip: rgba(118,118,128,0.24); --ink: #FFFFFF; --secondary: rgba(235,235,245,0.62); --tertiary: rgba(235,235,245,0.30);
+  --separator: rgba(84,84,88,0.55); --accent: #0A84FF; --accentFill: #0068DA; --objectChip: rgba(10,132,255,0.22);
+  --success: #30D158; --danger: #FF453A; --orange: #FF9F0A; --purple: #BF5AF2; --pressed: #2C2C2E;
+  --glass: rgba(40,40,44,0.52); --glass-strong: rgba(36,36,38,0.86); --glass-hi: rgba(255,255,255,0.20);
+  --glass-edge: rgba(255,255,255,0.08); --glass-shadow: rgba(0,0,0,0.50); --scrim: rgba(0,0,0,0.45); --kb: #2B2B2D; --key: #6B6B6E; --key2: #474749;
+  --ink-bloub: #d9d5ca;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 393px; height: 852px; overflow: hidden; background: var(--page); }
+body { font-family: "Inter", "SC", "WenQuanYi Zen Hei", sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; letter-spacing: -0.2px; }
+.phone { position: relative; width: 393px; height: 852px; overflow: hidden; background: var(--page); }
+.phone.grouped { background: var(--grouped); }
+.abs { position: absolute; }
+svg { display: block; }
+.ic { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* status bar and island */
+.status { position: absolute; top: 0; left: 0; right: 0; height: 54px; z-index: 80; font-weight: 600; font-size: 17px; }
+.status .time { position: absolute; left: 50px; top: 17px; letter-spacing: -0.3px; }
+.status .right { position: absolute; right: 30px; top: 19px; display: flex; gap: 6px; align-items: center; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 125px; height: 37px; border-radius: 20px; background: #000; z-index: 81; }
+.homebar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 139px; height: 5px; border-radius: 3px; background: var(--ink); z-index: 90; }
+
+/* Liquid Glass approximation */
+.glass { background: var(--glass); backdrop-filter: blur(10px) saturate(190%); -webkit-backdrop-filter: blur(10px) saturate(190%);
+  box-shadow: 0 6px 20px var(--glass-shadow), inset 0 0.5px 0 var(--glass-hi), inset 0 0 0 0.5px var(--glass-edge); }
+.glass-strong { background: var(--glass-strong); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.16), inset 0 0.5px 0 var(--glass-hi), inset 0 0 0 0.5px var(--glass-edge); }
+.gbtn { position: absolute; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: var(--ink); z-index: 70; }
+.gbtn.prominent { background: var(--accent); color: #fff; box-shadow: 0 6px 18px rgba(0,122,255,0.28); }
+.gcap { position: absolute; height: 44px; border-radius: 22px; display: flex; align-items: center; gap: 8px; padding: 0 14px 0 8px; z-index: 70; font-size: 17px; font-weight: 600; }
+.edge-top { position: absolute; top: 0; left: 0; right: 0; height: 116px; z-index: 60; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(var(--page-rgb),0.92) 0%, rgba(var(--page-rgb),0.72) 55%, rgba(var(--page-rgb),0) 100%);
+  backdrop-filter: blur(3px); -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent); }
+.grouped .edge-top { background: linear-gradient(to bottom, rgba(242,242,247,0.94) 0%, rgba(242,242,247,0.7) 55%, rgba(242,242,247,0) 100%); }
+.dark.grouped .edge-top, .dark .grouped .edge-top { background: linear-gradient(to bottom, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.7) 55%, rgba(0,0,0,0) 100%); }
+.edge-bottom { position: absolute; bottom: 0; left: 0; right: 0; height: 130px; z-index: 60; pointer-events: none;
+  background: linear-gradient(to top, rgba(var(--page-rgb),0.85) 0%, rgba(var(--page-rgb),0) 100%); }
+.inline-title { position: absolute; top: 54px; left: 70px; right: 70px; height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 70; }
+.inline-title b { font-size: 17px; font-weight: 600; }
+.inline-title span { font-size: 12px; color: var(--secondary); margin-top: 1px; }
+.large-title { position: absolute; left: 16px; top: 104px; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.2px; }
+
+/* tab bar */
+.tabbar { position: absolute; left: 21px; bottom: 24px; height: 62px; width: 278px; border-radius: 31px; z-index: 75; display: flex; padding: 4px; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 27px; font-size: 10px; font-weight: 600; color: var(--ink); }
+.tab.on { background: var(--chip); color: var(--accent); }
+.tab .ic { width: 25px; height: 25px; }
+.tab .badge { position: absolute; }
+.searchtab { position: absolute; right: 21px; bottom: 24px; width: 62px; height: 62px; border-radius: 31px; z-index: 75; display: flex; align-items: center; justify-content: center; }
+.searchtab .ic { width: 25px; height: 25px; }
+.tabdot { position: absolute; width: 8px; height: 8px; border-radius: 4px; background: var(--accent); }
+
+/* lists */
+.section { font-size: 15px; font-weight: 600; color: var(--secondary); padding: 0 20px; height: 34px; display: flex; align-items: flex-end; padding-bottom: 6px; gap: 6px; }
+.row { position: relative; display: flex; align-items: center; gap: 12px; margin: 0 10px; padding: 9px 10px; border-radius: 14px; }
+.row.pressed { background: var(--pressed); }
+.row .main { flex: 1; min-width: 0; }
+.row .top { display: flex; align-items: baseline; gap: 8px; }
+.row .name { font-size: 17px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .when { font-size: 13px; color: var(--secondary); }
+.row .sub { font-size: 15px; color: var(--secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; }
+.count { min-width: 20px; height: 20px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+.udot { width: 10px; height: 10px; border-radius: 5px; background: var(--accent); flex: none; }
+.group { margin: 0 16px; background: var(--surface); border-radius: 26px; overflow: hidden; }
+.grow { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; position: relative; font-size: 17px; }
+.grow + .grow::before { content: ""; position: absolute; top: 0; right: 0; left: 52px; border-top: 0.5px solid var(--separator); }
+.grow.noicon + .grow.noicon::before { left: 16px; }
+.grow .val { margin-left: auto; color: var(--secondary); display: flex; align-items: center; gap: 6px; }
+.grow .chev { color: var(--tertiary); width: 14px; height: 14px; stroke-width: 2.4; }
+.gicon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; flex: none; }
+.gicon .ic { width: 18px; height: 18px; stroke-width: 2; }
+.ghead { font-size: 15px; font-weight: 600; color: var(--secondary); padding: 18px 32px 7px; }
+
+/* chat */
+.msgs { position: absolute; left: 0; right: 0; padding: 0 16px; display: flex; flex-direction: column; gap: 6px; }
+.b { max-width: 290px; padding: 9px 14px; border-radius: 20px; font-size: 17px; line-height: 23px; }
+.b.bot { background: var(--bubble); align-self: flex-start; }
+.b.me { background: var(--accentFill); color: #fff; align-self: flex-end; }
+.b.me .quote { opacity: 0.72; border-left: 2px solid rgba(255,255,255,0.6); padding-left: 8px; margin-bottom: 4px; font-size: 15px; line-height: 20px; }
+.mchip { display: inline-flex; align-items: center; gap: 4px; background: var(--objectChip); color: var(--accent); border-radius: 7px; padding: 0 6px; font-size: 15px; line-height: 22px; font-weight: 500; }
+.acts { display: flex; gap: 16px; padding: 2px 6px 4px; color: var(--secondary); }
+.acts .ic { width: 18px; height: 18px; }
+.card { background: var(--surface); border-radius: 22px; padding: 14px 16px; align-self: stretch; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 0.5px var(--separator); }
+.dark .card { box-shadow: none; }
+.pill { height: 36px; border-radius: 18px; padding: 0 16px; display: inline-flex; align-items: center; font-size: 15px; font-weight: 600; }
+.pill.ink { background: var(--ink); color: var(--page); }
+.pill.soft { background: var(--chip); color: var(--ink); }
+.composer { position: absolute; left: 16px; right: 16px; bottom: 34px; height: 48px; z-index: 75; }
+.composer .plus { position: absolute; left: 0; top: 2px; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; }
+.composer .field { position: absolute; left: 52px; right: 0; top: 0; height: 48px; border-radius: 24px; display: flex; align-items: center; padding: 0 6px 0 16px; font-size: 17px; color: var(--secondary); }
+.composer .send { margin-left: auto; width: 36px; height: 36px; border-radius: 18px; background: var(--accentFill); color: #fff; display: flex; align-items: center; justify-content: center; }
+.tcard { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border-radius: 18px; padding: 12px 14px; box-shadow: 0 0 0 0.5px var(--separator); max-width: 300px; }
+.dark .tcard { box-shadow: none; }
+.ochip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 13px; background: var(--chip); font-size: 13px; font-weight: 500; margin-top: 7px; }
+
+/* menus */
+.menu { position: absolute; width: 250px; border-radius: 26px; padding: 8px 0; z-index: 85; }
+.mi { display: flex; align-items: center; height: 44px; padding: 0 18px; font-size: 17px; gap: 12px; }
+.mi .ic { margin-left: auto; width: 20px; height: 20px; }
+.mi.left .ic { margin-left: 0; }
+.mi.red { color: var(--danger); }
+.msep { height: 0.5px; background: var(--separator); margin: 6px 18px; }
+.mhead { font-size: 13px; color: var(--secondary); padding: 4px 18px 6px; }
+.scrimmed > .content { filter: blur(14px) saturate(120%); transform: scale(1.0); }
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 82; }
+
+/* segmented */
+.seg { position: absolute; left: 16px; right: 16px; height: 36px; border-radius: 18px; background: var(--chip); display: flex; padding: 3px; font-size: 15px; font-weight: 600; }
+.seg div { flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 15px; }
+.seg .on { background: var(--surface); box-shadow: 0 2px 8px rgba(0,0,0,0.10); }
+.dark .seg .on { background: #636366; }
+.chips { position: absolute; left: 0; right: 0; display: flex; gap: 8px; padding: 0 16px; }
+.dchip { height: 34px; border-radius: 17px; background: var(--chip); padding: 0 12px; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 500; white-space: nowrap; }
+.dchip.on { background: var(--ink); color: var(--page); }
+.gdot { width: 7px; height: 7px; border-radius: 4px; background: var(--success); }
+
+/* sheet */
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 38px 38px 0 0; background: var(--grouped); z-index: 86; overflow: hidden; }
+.dark .sheet { background: #1C1C1E; }
+.dark .sheet .group { background: #2C2C2E; }
+.grabber { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 36px; height: 5px; border-radius: 3px; background: var(--tertiary); }
+.parent-behind { position: absolute; inset: 0; transform: scale(0.92) translateY(-6px); border-radius: 40px; overflow: hidden; filter: brightness(0.78); z-index: 1; }
+.dark .parent-behind { filter: brightness(0.55); }
+.field { height: 52px; display: flex; align-items: center; padding: 0 16px; font-size: 17px; }
+.field .ph { color: var(--secondary); }
+.caret { display: inline-block; width: 2px; height: 22px; background: var(--accent); margin-left: 1px; vertical-align: middle; }
+
+/* keyboard */
+.kb { position: absolute; left: 0; right: 0; bottom: 0; height: 336px; background: var(--kb); z-index: 84; padding: 8px 3px 0; }
+.kr { display: flex; gap: 6px; justify-content: center; margin-bottom: 11px; }
+.k { height: 43px; width: 33px; border-radius: 8px; background: var(--key); box-shadow: 0 1px 0 rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 400; color: var(--ink); }
+.k.f { background: var(--key2); font-size: 15px; }
+.cand { height: 38px; display: flex; gap: 22px; align-items: center; padding: 0 14px; font-size: 17px; color: var(--ink); margin-bottom: 6px; }
+
+.label { font-size: 12px; color: var(--secondary); }
+.swipe-act { position: absolute; top: 6px; bottom: 6px; border-radius: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #fff; font-size: 13px; font-weight: 500; }
+.swipe-act .ic { width: 20px; height: 20px; stroke-width: 2; }
+.switcher { position: absolute; left: 50%; transform: translateX(-50%); bottom: 98px; height: 48px; border-radius: 24px; z-index: 74; display: flex; align-items: center; padding: 4px; gap: 2px; }
+.switcher .s { white-space: nowrap; height: 40px; min-width: 52px; border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 600; padding: 0 12px; color: var(--secondary); }
+.switcher .s.on { background: var(--chip); color: var(--ink); padding: 0 16px; }
+.pcard { flex: none; width: 168px; height: 76px; border-radius: 20px; background: var(--surface); padding: 12px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 0 0 0.5px var(--separator); }
+.dark .pcard { box-shadow: none; }
+.appic { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700; flex: none; }
+.ttl2 { font-size: 15px; font-weight: 600; }
+.mono { font-family: "JetBrains Mono", monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const dark = location.search.includes('dark')
+if (dark) document.documentElement.classList.add('dark')
+
+// ---------- icons (drawn for these frames, SF-Symbols-like) ----------
+const P = {
+  chat: '<path d="M4.5 5h15A2 2 0 0 1 21.5 7v8.5a2 2 0 0 1-2 2H11l-5 3.6V17.5H4.5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>',
+  chatFill: '<path fill="currentColor" stroke="none" d="M4.5 4.5h15a2.5 2.5 0 0 1 2.5 2.5v8.5a2.5 2.5 0 0 1-2.5 2.5H11.2l-5.4 3.8c-.5.3-.8.1-.8-.4V18H4.5A2.5 2.5 0 0 1 2 15.5V7a2.5 2.5 0 0 1 2.5-2.5z"/>',
+  threads: '<rect x="3.5" y="8" width="17" height="12" rx="3"/><path d="M6.5 5h11M9 2.5h6"/>',
+  threadsFill: '<rect x="3" y="8" width="18" height="12.5" rx="3.2" fill="currentColor" stroke="none"/><path d="M6.5 5h11M9 2.4h6"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.1h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 20.5 20.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  compose: '<path d="M11 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V13"/><path d="M17.6 3.6a1.9 1.9 0 0 1 2.8 2.8L12 14.8l-3.6.8.8-3.6z"/>',
+  dots: '<circle cx="5.5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+  chevL: '<path d="M15 4.5 7.5 12l7.5 7.5"/>',
+  chevR: '<path d="M9 4.5 16.5 12 9 19.5"/>',
+  chevD: '<path d="M5 9l7 7 7-7"/>',
+  star: '<path fill="currentColor" stroke="none" d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/>',
+  pin: '<path d="M9 3.5h6l-.8 5.2 3.3 3.3H6.5l3.3-3.3zM12 12v8.5"/>',
+  pinSlash: '<path d="M9 3.5h6l-.8 5.2 3.3 3.3H6.5l3.3-3.3zM12 12v8.5M4 4l16 16"/>',
+  arrowUp: '<path d="M12 19V5.5M6 11l6-6 6 6"/>',
+  camera: '<path d="M4 8h3l1.6-2.5h6.8L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/><circle cx="12" cy="13" r="3.4"/>',
+  photo: '<rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M3.5 17l5-5 4 4 2.5-2.5 5.5 5"/>',
+  doc: '<path d="M6.5 3h7l4.5 4.5V19a2 2 0 0 1-2 2h-9.5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M13.5 3v4.5H18M8.5 13h7M8.5 16.5h5"/>',
+  cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.6-9 5.5 5.5 0 0 1 10.6 1.4A3.8 3.8 0 0 1 17 18.5z"/>',
+  laptop: '<rect x="4.5" y="5" width="15" height="10.5" rx="1.8"/><path d="M2 19h20"/>',
+  server: '<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2H4.5zM10 21h4"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+  building: '<rect x="4" y="3.5" width="11" height="17" rx="1.5"/><path d="M15 9h4a1 1 0 0 1 1 1v10.5H15M7.5 7.5h4M7.5 11h4M7.5 14.5h4"/>',
+  puzzle: '<path d="M9 4.5a2 2 0 1 1 4 0V6h4a1 1 0 0 1 1 1v4h-1.5a2 2 0 1 0 0 4H18v4a1 1 0 0 1-1 1h-4v-1.5a2 2 0 1 0-4 0V20H5a1 1 0 0 1-1-1v-4h1.5a2 2 0 1 0 0-4H4V7a1 1 0 0 1 1-1h4z"/>',
+  reply: '<path d="M10 7 4.5 12.5 10 18M4.5 12.5h9.5a5.5 5.5 0 0 1 5.5 5.5v1"/>',
+  copy: '<rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/>',
+  textsel: '<path d="M5 6.5h14M5 12h14M5 17.5h8M17 15v6M15.5 15h3M15.5 21h3"/>',
+  eyeSlash: '<path d="M3 12s3.3-6 9-6c1.6 0 3 .5 4.2 1.1M21 12s-3.3 6-9 6c-1.6 0-3-.5-4.2-1.1"/><circle cx="12" cy="12" r="2.8"/><path d="M4 4l16 16"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/>',
+  envOpen: '<path d="M3.5 10 12 4.5l8.5 5.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19z"/><path d="m3.5 10 8.5 5.5 8.5-5.5"/>',
+  check: '<path d="M5 12.5 10 17.5 19.5 7"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  filter: '<path d="M4 7h16M7 12h10M10 17h4"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/>',
+  moon: '<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
+  brain: '<path d="M9 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.3A3 3 0 0 0 7 17.5a2.5 2.5 0 0 0 5 .5V6a2 2 0 0 0-3-1.5zM15 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.3 3 3 0 0 1-2.5 4.7 2.5 2.5 0 0 1-5 .5"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  pr: '<circle cx="6.5" cy="5.5" r="2.2"/><circle cx="6.5" cy="18.5" r="2.2"/><circle cx="17.5" cy="18.5" r="2.2"/><path d="M6.5 7.7v8.6M17.5 16.3V9.5a3 3 0 0 0-3-3H11M13 4.5l-2 2 2 2"/>',
+  circle: '<circle cx="12" cy="12" r="8.5"/>',
+  halfcircle: '<circle cx="12" cy="12" r="8.5"/><path fill="currentColor" stroke="none" d="M12 5.5a6.5 6.5 0 0 1 0 13z"/>',
+  checkCircle: '<circle cx="12" cy="12" r="8.5" fill="currentColor" stroke="none"/><path d="M8 12.3l2.6 2.6L16.2 9.4" stroke="#fff" stroke-width="2"/>',
+  arrowOut: '<path d="M8 16 16.5 7.5M9.5 7.5h7v7"/>',
+  stop: '<rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/>',
+  sparkle: '<path d="M12 3.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2L5 10.5l5.2-1.8z"/>',
+  tray: '<path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/>',
+  hand: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12m0-6.5V4.5a1.5 1.5 0 0 1 3 0V12m0-6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.5a6 6 0 0 1-5-2.7L3.8 14a1.5 1.5 0 0 1 2.4-1.8L8 14"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+  people: '<circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 19.5a6.5 6.5 0 0 1 13 0M16 5.2a3.5 3.5 0 0 1 0 6.6M18 13.5a6.5 6.5 0 0 1 3.5 6"/>',
+  grip: '<path d="M5 9h14M5 15h14"/>',
+  bolt: '<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
+}
+const ic = (n, size = 22, extra = '') => `<svg class="ic" viewBox="0 0 24 24" style="width:${size}px;height:${size}px;${extra}">${P[n]}</svg>`
+
+// ---------- bloub avatars (the app's still bloubs, R-36) ----------
+const BC = { encre: 'var(--ink-bloub)', rouge: '#e8483f', orange: '#f08a24', ambre: '#f0b429', vert: '#3ecf8e', turquoise: '#2fbfa0', bleu: '#3b93f0', violet: '#8b5cf6', rose: '#e152b0', brun: '#8b5e3c', gris: '#a3a3a3' }
+function bloub(color = 'encre', shape = 'circle', size = 44) {
+  const c = BC[color]
+  let body
+  switch (shape) {
+    case 'squircle': body = `<rect x="2.5" y="2.5" width="19" height="19" rx="6.5" fill="${c}"/>`; break
+    case 'flower': body = [0, 72, 144, 216, 288].map(a => { const r = (a - 90) * Math.PI / 180; return `<circle cx="${12 + 5.4 * Math.cos(r)}" cy="${12.4 + 5.4 * Math.sin(r)}" r="5" fill="${c}"/>` }).join('') + `<circle cx="12" cy="12.4" r="6" fill="${c}"/>`; break
+    case 'cloud': body = `<circle cx="8" cy="13" r="6" fill="${c}"/><circle cx="14" cy="9.5" r="6.5" fill="${c}"/><circle cx="17" cy="14" r="5.5" fill="${c}"/><rect x="4" y="13" width="17" height="6.5" rx="3.2" fill="${c}"/>`; break
+    case 'cat': body = `<path d="M3.6 10.5 4.6 3l6 4.3M20.4 10.5 19.4 3l-6 4.3" fill="${c}" stroke="${c}" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="12" cy="13.5" rx="9.4" ry="8" fill="${c}"/>`; break
+    case 'drop': body = `<path d="M12 2.2c3.6 4.4 7.8 8.7 7.8 13a7.8 7.8 0 0 1-15.6 0c0-4.3 4.2-8.6 7.8-13z" fill="${c}"/>`; break
+    default: body = `<circle cx="12" cy="12" r="10" fill="${c}"/>`
+  }
+  const eye = color === 'encre' ? (dark ? '#0a0a0c' : '#fff') : '#fff'
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="flex:none">${body}<ellipse cx="15.6" cy="8.6" rx="1.5" ry="2.3" fill="${eye}"/></svg>`
+}
+function groupAvatar(a, b, size = 44) {
+  const s = Math.round(size * 0.62)
+  return `<div style="position:relative;width:${size}px;height:${size}px;flex:none;border-radius:${size / 2}px;background:var(--chip)">
+    <div style="position:absolute;left:${size * 0.08}px;top:${size * 0.08}px">${bloub(a[0], a[1], s)}</div>
+    <div style="position:absolute;right:${size * 0.06}px;bottom:${size * 0.06}px">${bloub(b[0], b[1], s)}</div></div>`
+}
+const me = (size = 32) => `<div style="width:${size}px;height:${size}px;border-radius:${size / 2}px;background:linear-gradient(135deg,#7fb4ff,#c39bff 60%,#ffb38a);flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${size * 0.42}px">A</div>`
+
+// ---------- chrome ----------
+const status = () => `<div class="island"></div><div class="status"><span class="time">9:41</span><span class="right">
+  <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+  <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.5 5.6 8.9a3.4 3.4 0 0 1 4.8 0zM3.5 6.8a6.4 6.4 0 0 1 9 0l-1.4 1.4a4.4 4.4 0 0 0-6.2 0zM1.2 4.5a9.6 9.6 0 0 1 13.6 0l-1.4 1.4a7.6 7.6 0 0 0-10.8 0z" fill="currentColor"/></svg>
+  <svg width="27" height="13" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity="0.4"/><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"/><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" fill="currentColor" opacity="0.4"/></svg>
+  </span></div>`
+const homebar = () => `<div class="homebar"></div>`
+const TABS = [['chats', '对话', 'chat', 'chatFill'], ['threads', '线程', 'threads', 'threadsFill'], ['suggest', '建议', 'bulb', 'bulb'], ['settings', '设置', 'avatar', 'avatar']]
+function tabbar(on, { dots = {} } = {}) {
+  return `<div class="tabbar glass">${TABS.map(([id, label, i, iOn]) => `<div class="tab ${id === on ? 'on' : ''}" style="position:relative">
+    ${i === 'avatar' ? `<div style="${id === on ? 'box-shadow:0 0 0 2px var(--accent);' : ''}border-radius:14px">${me(26)}</div>` : ic(id === on ? iOn : i, 25)}
+    <span>${label}</span>${dots[id] ? `<div class="tabdot" style="top:9px;right:22px"></div>` : ''}</div>`).join('')}</div>
+    <div class="searchtab glass">${ic('search', 25)}</div>`
+}
+const gbtn = (icon, left, extra = '', cls = 'glass') => `<div class="gbtn ${cls}" style="top:54px;${left}${extra}">${ic(icon, 21)}</div>`
+const glassGroup2 = (a, b) => `<div class="glass" style="position:absolute;top:54px;right:16px;height:44px;width:92px;border-radius:22px;display:flex;align-items:center;justify-content:space-around;z-index:70">${ic(a, 21)}${ic(b, 21)}</div>`
+const edges = () => `<div class="edge-top"></div>`
+function phone(inner, { grouped = false, cls = '' } = {}) { return `<div class="phone ${grouped ? 'grouped' : ''} ${cls}">${inner}${homebar()}</div>` }
+
+// ---------- data ----------
+const BOTS = {
+  coord: ['Coordinator', 'encre', 'circle'], research: ['研究员', 'bleu', 'cloud'], design: ['设计师', 'rose', 'flower'],
+  ops: ['运维', 'vert', 'squircle'], writer: ['写作', 'ambre', 'drop'], money: ['财务', 'violet', 'cat'], front: ['前端', 'orange', 'squircle'],
+}
+const B = k => BOTS[k]
+function chatRow({ k, group, name, sub, when, count, dot, working, pressed = false, style = '' }) {
+  const av = group ? groupAvatar(group[0], group[1]) : bloub(B(k)[1], B(k)[2])
+  const right = count ? `<span class="count">${count}</span>` : dot ? '<span class="udot"></span>' : ''
+  return `<div class="row ${pressed ? 'pressed' : ''}" style="${style}">${av}<div class="main"><div class="top"><span class="name">${name || B(k)[0]}</span><span class="when">${when}</span></div>
+    <div class="sub">${working ? '<span style="width:7px;height:7px;border-radius:4px;background:var(--secondary);flex:none;opacity:.7"></span>' : ''}<span style="flex:1;overflow:hidden;text-overflow:ellipsis">${sub}</span>${right}</div></div></div>`
+}
+function pinTile(k, { count, wait } = {}) {
+  return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px">
+    <div style="position:relative">${bloub(B(k)[1], B(k)[2], 60)}
+      <div style="position:absolute;right:-3px;top:-3px;width:22px;height:22px;border-radius:11px;background:var(--page);display:flex;align-items:center;justify-content:center;color:var(--orange)">${ic('star', 15)}</div>
+      ${count ? `<div class="count" style="position:absolute;right:-6px;bottom:-2px;box-shadow:0 0 0 2.5px var(--page)">${count}</div>` : ''}
+      ${wait ? `<div style="position:absolute;right:-2px;bottom:0;width:16px;height:16px;border-radius:8px;background:var(--orange);box-shadow:0 0 0 2.5px var(--page)"></div>` : ''}
+    </div><span style="font-size:13px;font-weight:500">${B(k)[0]}</span></div>`
+}
+function homeContent({ pressed = -1, swiped = false } = {}) {
+  const rows = [
+    { k: 'research', sub: '竞品报告整理到第 3 节', when: '进行中', working: true },
+    { k: 'front', sub: '修复 iOS 登录回调', when: '进行中', working: true },
+  ]
+  const bots = [
+    { k: 'design', sub: '新导航的两个方案都放进资料库了', when: '9:20', count: 2 },
+    { k: 'ops', sub: 'CI 在 main 上恢复了', when: '8:47' },
+    { k: 'writer', sub: '周报草稿：本周完成了 6 件事', when: '昨天' },
+    { k: 'money', sub: '十月的发票已经归档', when: '周二' },
+  ]
+  const groups = [
+    { group: [['bleu', 'cloud'], ['orange', 'squircle']], name: '发布小组', sub: '前端：1.0.0 (7) 已提交审核', when: '8:12', dot: true },
+    { group: [['rose', 'flower'], ['ambre', 'drop']], name: '设计评审', sub: '设计师：深色模式的对比度我再调一下', when: '周一' },
+  ]
+  let i = 0
+  const r = o => { const idx = i++; return chatRow({ ...o, pressed: idx === pressed }) }
+  return `<div class="content abs" style="top:0;left:0;right:0">
+    <div style="height:160px"></div>
+    <div style="display:flex;padding:0 16px 14px">${pinTile('coord', { wait: true })}${pinTile('research')}${pinTile('design', { count: 2 })}</div>
+    <div class="section">正在工作</div>${rows.map(r).join('')}
+    <div class="section">Bot</div>${bots.map((o, j) => swiped && j === 1 ? swipedRow(o) : r(o)).join('')}
+    <div class="section">群聊</div>${groups.map(r).join('')}
+  </div>`
+}
+function swipedRow(o) {
+  return `<div style="position:relative;height:68px;overflow:hidden">
+    <div class="swipe-act" style="right:92px;width:76px;background:var(--orange)">${ic('pin', 20)}置顶</div>
+    <div class="swipe-act" style="right:12px;width:76px;background:#8E8E93">${ic('eyeSlash', 20)}隐藏</div>
+    ${chatRow({ ...o, style: 'transform:translateX(-172px);background:var(--page)' })}</div>`
+}
+const homeChrome = () => `${edges()}
+  <div class="gcap glass" style="top:54px;left:16px"><div style="width:28px;height:28px;border-radius:8px;background:var(--ink);color:var(--page);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">M</div>Mikka${ic('chevD', 14, 'stroke-width:2.6;margin-left:-2px;opacity:.6')}</div>
+  ${gbtn('compose', 'right:16px;')}
+  <div class="large-title" style="z-index:61">对话</div>`
+
+// ---------- chat ----------
+function chatHeader(title, av, sub) {
+  return `${edges()}${gbtn('chevL', 'left:16px;')}
+    <div class="gcap glass" style="top:54px;left:50%;transform:translateX(-50%);padding:0 16px 0 7px">${av}<div style="display:flex;flex-direction:column;line-height:1.1"><span>${title}</span>${sub ? `<span style="font-size:12px;font-weight:500;color:var(--secondary)">${sub}</span>` : ''}</div></div>
+    ${gbtn('dots', 'right:16px;')}`
+}
+const composer = (ph = '发消息', { text, send } = {}) => `<div class="composer"><div class="plus glass">${ic('plus', 22)}</div>
+  <div class="field glass">${text ? `<span style="color:var(--ink)">${text}</span><span class="caret"></span>` : ph}${send ? `<div class="send">${ic('arrowUp', 20, 'stroke-width:2.4')}</div>` : ''}</div></div>`
+function threadIcon(state, size = 22) {
+  const col = { wait: 'var(--orange)', run: 'var(--secondary)', blocked: 'var(--danger)', idle: 'none', done: 'var(--success)' }[state]
+  return `<div style="position:relative;width:${size}px;height:${size}px;flex:none;color:var(--ink)">${ic('chat', size, 'stroke-width:1.7')}
+    <div style="position:absolute;right:-2px;top:-2px;width:9px;height:9px;border-radius:5px;background:${col};box-shadow:0 0 0 2px var(--page);${state === 'idle' ? 'border:1.5px solid var(--secondary);background:var(--page)' : ''}"></div></div>`
+}
+function coordMessages() {
+  return `<div class="b bot">早上好。今天 3 件事：<br>
+      <span style="display:block;margin-top:6px">回复 <span class="mchip">${ic('envOpen', 14)}王磊的邮件</span></span>
+      <span style="display:block;margin-top:4px">看 <span class="mchip">${ic('bolt', 14)}CI 失败 · main</span></span>
+      <span style="display:block;margin-top:4px">审阅 <span class="mchip">${ic('pr', 14)}PR #1459</span></span></div>
+    <div class="card" style="margin-top:6px">
+      <div style="font-size:17px;line-height:23px">合同明天 18:00 前要签回，不处理会顺延一周。</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--secondary)"><span class="appic" style="width:18px;height:18px;border-radius:5px;background:#EA4335;font-size:10px">M</span>Gmail · 王磊</div>
+      <div style="display:flex;gap:8px;margin-top:12px"><span class="pill ink">起草回复</span><span class="pill soft">晚点再说</span><span class="pill soft">不用了</span></div>
+    </div>
+    <div class="b me" style="margin-top:8px">起草吧，语气正式一点</div>
+    <div class="tcard" style="margin-top:8px">${threadIcon('done')}<div><div style="font-size:17px;font-weight:600">起草给王磊的回复</div><span class="ochip">${ic('doc', 14)}回复草稿.md</span></div></div>
+    <div class="b bot" style="margin-top:4px">草稿好了。现在发出去吗？</div>
+    <div class="acts">${ic('copy', 18)}</div>`
+}
+
+// ---------- screens ----------
+const S = {}
+
+S['01-chats'] = () => phone(`${status()}${homeContent()}${homeChrome()}<div class="edge-bottom"></div>${tabbar('chats', { dots: { suggest: true } })}`)
+
+S['02-chats-longpress'] = () => phone(`${status()}<div class="scrimmed" style="position:absolute;inset:0"><div class="content" style="position:absolute;inset:0">${homeContent()}${homeChrome()}${tabbar('chats')}</div></div>
+  <div class="scrim"></div>
+  <div class="abs" style="left:16px;right:16px;top:150px;height:300px;border-radius:26px;background:var(--page);overflow:hidden;z-index:85;box-shadow:0 20px 50px rgba(0,0,0,0.25)">
+    <div style="height:56px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:17px">${bloub('rose', 'flower', 26)}设计师</div>
+    <div class="msgs" style="top:64px">
+      <div class="b me">两个方案放一起，我晚上看</div>
+      <div class="b bot">好的。方案 A 保留现在的底栏，方案 B 把搜索单独放到右下角。</div>
+      <div class="b bot">新导航的两个方案都放进资料库了</div>
+    </div></div>
+  <div class="menu glass-strong" style="left:16px;top:462px">
+    <div class="mi">标为已读${ic('envOpen')}</div><div class="mi">置顶${ic('pin')}</div><div class="mi">隐藏${ic('eyeSlash')}</div><div class="mi">信息${ic('info')}</div>
+    <div class="msep"></div><div class="mi">更多${ic('chevR', 16)}</div></div>`)
+
+S['03-chats-swipe'] = () => phone(`${status()}${homeContent({ swiped: true })}${homeChrome()}<div class="edge-bottom"></div>${tabbar('chats')}`)
+
+S['04-workspace-menu'] = () => phone(`${status()}${homeContent()}${homeChrome()}<div class="edge-bottom"></div>${tabbar('chats')}
+  <div class="menu glass-strong" style="left:16px;top:104px;width:260px">
+    <div class="mi left">${ic('check', 18, 'stroke-width:2.4;color:var(--accent)')}<span>Mikka</span></div>
+    <div class="mi left"><span style="width:18px"></span><span>个人</span></div>
+    <div class="mi left"><span style="width:18px"></span><span>设计工作室</span></div>
+    <div class="msep"></div>
+    <div class="mi">编辑顺序${ic('grip')}</div><div class="mi">工作区设置${ic('gear')}</div></div>`)
+
+S['05-new-menu'] = () => phone(`${status()}${homeContent()}${homeChrome()}<div class="edge-bottom"></div>${tabbar('chats')}
+  <div class="menu glass-strong" style="right:16px;top:104px;width:220px">
+    <div class="mi">新建 Bot${bloub('bleu', 'cloud', 22)}</div><div class="mi">新建群聊${ic('people')}</div></div>`)
+
+function sheetOver(parent, sheetInner, top = 62) {
+  return phone(`${status()}<div class="parent-behind" style="background:var(--page)">${parent}</div><div class="scrim" style="background:rgba(0,0,0,0.18)"></div>
+    <div class="sheet" style="top:${top}px">${sheetInner}</div>`)
+}
+const sheetBar = (title, confirm = true) => `<div class="gbtn glass" style="top:14px;left:16px;position:absolute">${ic('x', 19)}</div>
+  <div style="position:absolute;top:14px;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600">${title}</div>
+  ${confirm ? `<div class="gbtn prominent" style="top:14px;right:16px;position:absolute">${ic('check', 20, 'stroke-width:2.6')}</div>` : ''}`
+const homeBehind = () => `${homeContent()}${homeChrome()}${tabbar('chats')}`
+
+S['06-new-bot'] = () => sheetOver(homeBehind(), `${sheetBar('新建 Bot')}
+  <div style="position:absolute;top:84px;left:0;right:0;display:flex;justify-content:center">${bloub('vert', 'squircle', 96)}</div>
+  <div style="position:absolute;top:204px;left:0;right:0">
+    <div class="group"><div class="field"><span style="color:var(--ink)">数据分析</span><span class="caret"></span></div></div>
+    <div class="ghead">形状</div>
+    <div class="group" style="display:flex;justify-content:space-around;padding:14px 8px">${['circle', 'squircle', 'cloud', 'drop', 'flower', 'cat'].map(s => `<div style="width:46px;height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;${s === 'squircle' ? 'background:var(--chip);box-shadow:0 0 0 2px var(--accent)' : ''}">${bloub('gris', s, 30)}</div>`).join('')}</div>
+    <div class="ghead">颜色</div>
+    <div class="group" style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px 0;padding:16px 8px;justify-items:center">${['encre', 'brun', 'rouge', 'orange', 'ambre', 'vert', 'turquoise', 'bleu', 'violet', 'rose', 'gris'].map(c => `<div style="width:34px;height:34px;border-radius:17px;background:${BC[c]};${c === 'vert' ? 'box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--accent)' : ''}"></div>`).join('')}<div style="width:34px;height:34px;border-radius:17px;background:#d9d5ca"></div></div>
+  </div>`)
+
+S['07-new-group'] = () => sheetOver(homeBehind(), `${sheetBar('新建群聊')}
+  <div style="position:absolute;top:76px;left:0;right:0">
+    <div class="group"><div class="field"><span class="ph">群聊名称</span></div></div>
+    <div class="ghead">Bot</div>
+    <div class="group">${[['research', 1], ['design', 1], ['ops', 0], ['writer', 0], ['money', 0], ['front', 1]].map(([k, on]) => `<div class="grow">${bloub(B(k)[1], B(k)[2], 30)}<span>${B(k)[0]}</span><span class="val">${on ? `<span style="width:24px;height:24px;border-radius:12px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff">${ic('check', 15, 'stroke-width:3')}</span>` : '<span style="width:24px;height:24px;border-radius:12px;border:1.5px solid var(--tertiary)"></span>'}</span></div>`).join('')}</div>
+  </div>`)
+
+S['08-chat'] = () => phone(`${status()}<div class="msgs" style="top:112px">${coordMessages()}</div>
+  ${chatHeader('Coordinator', bloub('encre', 'circle', 28))}<div class="edge-bottom" style="height:110px"></div>${composer()}`)
+
+S['09-chat-message-menu'] = () => phone(`${status()}<div class="scrimmed" style="position:absolute;inset:0"><div class="content" style="position:absolute;inset:0"><div class="msgs" style="top:112px">${coordMessages()}</div>${chatHeader('Coordinator', bloub('encre', 'circle', 28))}${composer()}</div></div>
+  <div class="scrim"></div>
+  <div class="glass-strong abs" style="left:16px;top:238px;width:300px;border-radius:26px;z-index:85;padding:8px">
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;font-family:'Noto Color Emoji';font-size:26px;text-align:center">${['❤️', '👍', '👎', '😂', '🎉', '🙏'].map((e, i) => `<div style="height:46px;display:flex;align-items:center;justify-content:center;border-radius:23px;${i === 1 ? 'background:var(--chip)' : ''}">${e}</div>`).join('')}</div></div>
+  <div class="msgs" style="top:304px;z-index:85"><div class="b bot" style="box-shadow:0 12px 30px rgba(0,0,0,0.18)">草稿好了。现在发出去吗？</div></div>
+  <div class="menu glass-strong" style="left:16px;top:362px">
+    <div class="mi">回复${ic('reply')}</div><div class="mi">复制${ic('copy')}</div><div class="mi">选择文本${ic('textsel')}</div></div>`)
+
+S['10-chat-attach'] = () => phone(`${status()}<div class="msgs" style="top:112px">${coordMessages()}</div>
+  ${chatHeader('Coordinator', bloub('encre', 'circle', 28))}<div class="edge-bottom" style="height:110px"></div>
+  <div class="glass-strong abs" style="left:16px;right:16px;bottom:92px;border-radius:30px;z-index:80;padding:14px 0 8px">
+    <div style="display:flex;gap:8px;padding:0 14px;overflow:hidden">
+      <div style="flex:none;width:86px;height:86px;border-radius:16px;background:var(--chip);display:flex;align-items:center;justify-content:center">${ic('camera', 28)}</div>
+      ${['#9fc5e8,#3d85c6', '#f6b26b,#e06666', '#b6d7a8,#6aa84f', '#d5a6bd,#8e7cc3'].map(g => `<div style="flex:none;width:86px;height:86px;border-radius:16px;background:linear-gradient(135deg,${g})"></div>`).join('')}
+    </div>
+    <div style="margin-top:10px"><div class="mi left">${ic('photo')}<span>所有照片</span></div><div class="mi left">${ic('doc')}<span>文件</span></div></div>
+  </div>${composer()}`)
+
+S['11-chat-reply-swipe'] = () => phone(`${status()}<div class="msgs" style="top:112px">
+    ${coordMessages().replace('<div class="b bot" style="margin-top:4px">草稿好了。现在发出去吗？</div>', `<div style="position:relative;margin-top:4px;align-self:stretch;height:46px"><div style="position:absolute;left:6px;top:8px;width:30px;height:30px;border-radius:15px;background:var(--chip);display:flex;align-items:center;justify-content:center">${ic('reply', 17)}</div><div class="b bot" style="position:absolute;left:62px;top:0">草稿好了。现在发出去吗？</div></div>`)}</div>
+  ${chatHeader('Coordinator', bloub('encre', 'circle', 28))}<div class="edge-bottom" style="height:110px"></div>${composer()}`)
+
+S['12-group-chat'] = () => phone(`${status()}<div class="msgs" style="top:112px;gap:4px">
+    <div class="b me">今晚能提审吗？</div>
+    ${[['front', '构建好了，1.0.0 (7) 在 TestFlight 里。'], ['research', '我对比了上个版本的崩溃率，没有新增。']].map(([k, t]) => `<div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px">${bloub(B(k)[1], B(k)[2], 28)}<div><div style="font-size:13px;color:var(--secondary);margin:0 0 3px 12px">${B(k)[0]}</div><div class="b bot">${t}</div></div></div>`).join('')}
+    <div class="b me" style="margin-top:8px"><span style="font-weight:600">@前端</span> 提吧</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px">${bloub('orange', 'squircle', 28)}<div><div style="font-size:13px;color:var(--secondary);margin:0 0 3px 12px">前端</div><div class="tcard">${threadIcon('run')}<div><div style="font-size:17px;font-weight:600">提交 1.0.0 (7) 审核</div><span class="ochip" style="color:var(--secondary)">进行中</span></div></div></div></div>
+  </div>
+  ${chatHeader('发布小组', groupAvatar(['bleu', 'cloud'], ['orange', 'squircle'], 28), '3 个 Bot')}<div class="edge-bottom" style="height:110px"></div>${composer()}`)
+
+function threadRow(state, name, bot, machine, { word, unread, pr } = {}) {
+  return `<div class="row">${pr ? `<div style="width:22px;color:${pr}">${ic('pr', 22)}</div>` : threadIcon(state)}<div class="main"><div class="name" style="font-weight:500">${word ? `<span style="color:var(--orange)">${word} · </span>` : ''}${name}</div>
+    <div class="sub">${bot}${ic(machine, 15)}</div></div>${unread ? '<span class="udot"></span>' : ''}</div>`
+}
+S['13-threads'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0">
+    <div style="height:160px"></div>
+    <div class="seg" style="position:relative;left:auto;right:auto;margin:0 16px"><div class="on">线程</div><div>任务</div></div>
+    <div class="chips" style="position:relative;margin:12px 0 6px"><div class="dchip"><span class="gdot"></span>${ic('cloud', 16)}Mikka Cloud</div><div class="dchip"><span class="gdot"></span>${ic('laptop', 16)}MacBook</div><div class="dchip">${ic('server', 16)}构建机</div></div>
+    <div class="section">等待你</div>
+    ${threadRow('wait', '要不要把登录页也换成新导航', '设计师', 'cloud', { word: '等你回复', unread: true })}
+    ${threadRow('wait', '修复 iOS 登录回调', '前端', 'laptop', { word: '待审阅', unread: true, pr: 'var(--success)' })}
+    <div class="section">进行中</div>
+    ${threadRow('run', '整理竞品报告', '研究员', 'cloud')}${threadRow('run', '提交 1.0.0 (7) 审核', '前端', 'laptop')}
+    <div class="section">受阻</div>${threadRow('blocked', '同步十月发票', '财务', 'cloud')}
+    <div class="section">空闲</div>${threadRow('idle', '周报模板', '写作', 'cloud')}
+    <div class="section" style="justify-content:space-between">已解决 · 12 ${ic('chevR', 14, 'stroke-width:2.4;margin-left:auto')}</div>
+  </div>${edges()}${gbtn('compose', 'right:16px;')}<div class="large-title" style="z-index:61">线程</div>
+  <div class="edge-bottom" style="height:180px"></div>
+  <div class="switcher glass"><div class="s on">全部</div><div class="s" style="color:var(--orange)">${ic('hand', 20)}</div><div class="s">${ic('halfcircle', 20)}</div><div class="s" style="color:var(--success)">${ic('check', 20, 'stroke-width:2.4')}</div></div>
+  ${tabbar('threads')}`)
+
+S['14-thread'] = () => phone(`${status()}<div class="msgs" style="top:112px">
+    <div class="b me">iOS 上 Google 登录回来以后停在空白页，修一下</div>
+    <div style="display:flex;flex-direction:column;gap:2px;margin:6px 0 2px;color:var(--secondary);font-size:15px">
+      <div style="display:flex;align-items:center;gap:6px;height:30px">${ic('search', 16)}已探索 4 次搜索${ic('chevR', 12, 'stroke-width:2.4')}</div>
+      <div style="display:flex;align-items:center;gap:6px;height:30px">${ic('doc', 16)}已编辑 2 个文件${ic('chevR', 12, 'stroke-width:2.4')}</div>
+      <div style="display:flex;align-items:center;gap:6px;height:30px">${ic('bolt', 16)}已运行 3 条命令${ic('chevR', 12, 'stroke-width:2.4')}</div>
+    </div>
+    <div style="font-size:17px;line-height:24px">回调地址少了 <span class="mono" style="background:var(--chip);padding:1px 5px;border-radius:5px">mikka://</span> 的信任来源，加上以后在模拟器里登录能回到聊天列表。</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="ochip" style="color:var(--success)">${ic('pr', 14)}<span style="color:var(--ink)">PR #1471</span></span><span class="ochip">${ic('photo', 14)}登录截图.png</span></div>
+    <div class="b me" style="margin-top:10px">真机上也测一下</div>
+    <div style="display:flex;align-items:center;gap:8px;color:var(--secondary);font-size:15px;margin-top:4px"><span style="width:8px;height:8px;border-radius:4px;background:var(--secondary)"></span>正在运行</div>
+  </div>
+  ${edges()}${gbtn('chevL', 'left:16px;')}<div class="inline-title"><b>修复 iOS 登录回调</b><span style="display:flex;align-items:center;gap:4px">前端 · Claude Code ${ic('laptop', 12)}</span></div>${gbtn('dots', 'right:16px;')}
+  <div class="edge-bottom" style="height:110px"></div>
+  <div class="composer"><div class="plus glass">${ic('plus', 22)}</div><div class="field glass">给这个线程发消息<div class="send" style="background:var(--ink);color:var(--page)">${ic('stop', 18)}</div></div></div>`)
+
+function taskRow(state, title, meta) {
+  const icn = state === 'done' ? `<div style="color:var(--success)">${ic('checkCircle', 22)}</div>` : state === 'run' ? `<div style="color:var(--orange)">${ic('halfcircle', 22)}</div>` : `<div style="color:var(--secondary)">${ic('circle', 22)}</div>`
+  return `<div class="row">${icn}<div class="main"><div class="name" style="font-weight:500">${title}</div><div class="sub">${meta}</div></div>${ic('arrowOut', 18, 'color:var(--tertiary);stroke-width:2')}</div>`
+}
+S['15-tasks'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0">
+    <div style="height:160px"></div>
+    <div class="seg" style="position:relative;left:auto;right:auto;margin:0 16px 6px"><div>线程</div><div class="on">任务</div></div>
+    <div class="section">进行中</div>${taskRow('run', 'iOS 按 Comma 的布局重做', '#1408 · 设计师')}${taskRow('run', '登录回调在真机上失效', '#1470 · 前端')}${taskRow('run', '十月发票归档', '#1452 · 财务')}
+    <div class="section">待办</div>${taskRow('todo', '设置页改用原生表单', '#1446 · 前端')}${taskRow('todo', '周报自动发到 Slack', '#1401 · 写作')}
+    <div class="section">已完成</div>${taskRow('done', '聊天列表虚拟化', '#1381 · 前端')}${taskRow('done', '推送权限时机', '#1360 · 前端')}
+  </div>${edges()}${gbtn('compose', 'right:16px;')}<div class="large-title" style="z-index:61">线程</div><div class="edge-bottom"></div>${tabbar('threads')}`)
+
+const appIcon = (c, t, size = 28) => `<span class="appic" style="background:${c};width:${size}px;height:${size}px">${t}</span>`
+function sugRow(app, verb, rest, meta) {
+  return `<div class="row" style="align-items:flex-start">${app}<div class="main"><div style="font-size:17px;line-height:22px"><b style="font-weight:600">${verb}</b> ${rest}</div><div class="sub" style="font-size:13px">${meta}</div></div></div>`
+}
+S['16-suggestions'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0">
+    <div style="height:160px"></div>
+    <div style="display:flex;gap:10px;padding:0 16px 8px;overflow:hidden">
+      <div class="pcard"><div style="display:flex;align-items:center;gap:8px">${appIcon('#EA4335', 'M', 24)}<span class="ttl2">Gmail</span></div><span style="font-size:13px;color:var(--secondary)">3 封等你回复</span></div>
+      <div class="pcard"><div style="display:flex;align-items:center;gap:8px">${appIcon(dark ? '#333' : '#111', ic('pr', 14, 'stroke:#fff'), 24)}<span class="ttl2">GitHub</span></div><span style="font-size:13px;color:var(--secondary)">2 个 PR 待审阅</span></div>
+      <div class="pcard"><div style="display:flex;align-items:center;gap:8px">${appIcon('#4285F4', '6', 24)}<span class="ttl2">日历</span></div><span style="font-size:13px;color:var(--secondary)">下午 2 个会</span></div>
+    </div>
+    <div class="section">今天</div>
+    ${sugRow(appIcon('#EA4335', 'M'), '回复', '王磊：合同明天 18:00 前签回', 'Gmail · 8:02')}
+    ${sugRow(appIcon(dark ? '#333' : '#111', ic('pr', 15, 'stroke:#fff')), '审阅', 'PR #1459 设置页改用原生表单', 'GitHub · 7:40')}
+    ${sugRow(appIcon(dark ? '#333' : '#111', ic('bolt', 15, 'stroke:#fff')), '处理', 'main 上的 CI 失败', 'GitHub · 7:12')}
+    ${sugRow(appIcon('#4285F4', '6'), '确认', '周四 15:00 和设计团队的评审', '日历 · 昨天')}
+    <div class="section" style="justify-content:space-between">已处理 · 4 ${ic('chevR', 14, 'stroke-width:2.4;margin-left:auto')}</div>
+  </div>${edges()}${gbtn('puzzle', 'right:16px;')}<div class="large-title" style="z-index:61">建议</div><div class="edge-bottom"></div>${tabbar('suggest')}`)
+
+S['17-plugins'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0">
+    <div style="height:154px"></div>
+    <div style="margin:0 16px;height:40px;border-radius:20px;background:var(--chip);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--secondary);font-size:17px">${ic('search', 18)}搜索</div>
+    <div class="seg" style="position:relative;left:auto;right:auto;margin:12px 16px 0"><div class="on">应用</div><div>技能</div></div>
+    <div class="ghead">已连接</div>
+    <div class="group">${[['#111', ic('pr', 16, 'stroke:#fff'), 'GitHub'], ['#EA4335', 'M', 'Gmail'], ['#5E6AD2', 'L', 'Linear']].map(([c, t, n]) => `<div class="grow">${appIcon(c, t, 30)}<span>${n}</span><span class="val"><span class="gdot"></span>${ic('chevR', 14, 'stroke-width:2.4;color:var(--tertiary)')}</span></div>`).join('')}</div>
+    <div class="ghead">热门</div>
+    <div class="group">${[['#4A154B', '#', 'Slack'], [dark ? '#444' : '#000', 'N', 'Notion'], ['#4285F4', '6', 'Google 日历'], ['#229ED9', 'T', 'Telegram']].map(([c, t, n]) => `<div class="grow">${appIcon(c, t, 30)}<span>${n}</span><span class="val">${ic('chevR', 14, 'stroke-width:2.4;color:var(--tertiary)')}</span></div>`).join('')}</div>
+  </div>${edges()}${gbtn('chevL', 'left:16px;')}<div class="large-title" style="z-index:61">插件</div>`, { grouped: true })
+
+function settingsGroups() {
+  const chev = ic('chevR', 14, 'stroke-width:2.4;color:var(--tertiary)')
+  const g = (c, i) => `<span class="gicon" style="background:${c}">${ic(i, 18)}</span>`
+  return `<div class="group"><div class="grow" style="min-height:76px">${me(52)}<div><div style="font-size:19px;font-weight:600">Alex</div><div style="font-size:15px;color:var(--secondary)">alex@example.com</div></div><span class="val">${chev}</span></div></div>
+    <div style="height:18px"></div>
+    <div class="group"><div class="grow">${g('#8E8E93', 'building')}<span>工作区</span><span class="val">Mikka ${chev}</span></div></div>
+    <div style="height:18px"></div>
+    <div class="group"><div class="grow">${g('#FF3B30', 'bell')}<span>通知</span><span class="val">开 ${chev}</span></div>
+      <div class="grow">${g('#AF52DE', 'brain')}<span>记忆</span><span class="val">${chev}</span></div>
+      <div class="grow">${g('#34C759', 'puzzle')}<span>已连接的 App</span><span class="val">3 ${chev}</span></div></div>
+    <div style="height:18px"></div>
+    <div class="group"><div class="grow">${g('#007AFF', 'moon')}<span>外观</span><span class="val">跟随系统 ${chev}</span></div>
+      <div class="grow">${g('#5856D6', 'globe')}<span>语言</span><span class="val">简体中文 ${chev}</span></div>
+      <div class="grow">${g('#8E8E93', 'info')}<span>版本</span><span class="val">1.0.0 (7)</span></div></div>
+    <div style="height:18px"></div>
+    <div class="group"><div class="grow noicon" style="color:var(--danger);justify-content:center">退出登录</div></div>`
+}
+S['18-settings'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0"><div style="height:158px"></div>${settingsGroups()}</div>
+  ${edges()}<div class="large-title" style="z-index:61">设置</div><div class="edge-bottom" style="background:linear-gradient(to top, var(--grouped), transparent)"></div>${tabbar('settings')}`, { grouped: true })
+
+S['19-workspaces'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0"><div style="height:158px"></div>
+    <div class="group">${[['M', 'Mikka', 1], ['个', '个人', 0], ['设', '设计工作室', 0]].map(([l, n, on]) => `<div class="grow" style="min-height:58px"><span style="width:32px;height:32px;border-radius:9px;background:var(--ink);color:var(--page);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">${l}</span><span>${n}</span><span class="val">${on ? ic('check', 20, 'stroke-width:2.6;color:var(--accent)') : ''}</span></div>`).join('')}</div>
+  </div>${edges()}${gbtn('chevL', 'left:16px;')}<div class="gcap glass" style="top:54px;right:16px;padding:0 16px">编辑</div><div class="large-title" style="z-index:61">工作区</div>`, { grouped: true })
+
+function keyboard() {
+  const row = (ks, pre = '', post = '') => `<div class="kr">${pre}${ks.split('').map(k => `<div class="k">${k}</div>`).join('')}${post}</div>`
+  return `<div class="kb"><div class="cand"><b style="font-weight:500">设计</b><span>设计师</span><span>设计稿</span><span>社交</span><span>涉及</span></div>
+    ${row('qwertyuiop')}${row('asdfghjkl')}${row('zxcvbnm', '<div class="k f" style="width:44px">⇧</div><div style="width:4px"></div>', '<div style="width:4px"></div><div class="k f" style="width:44px">⌫</div>')}
+    <div class="kr"><div class="k f" style="width:44px">123</div><div class="k f" style="width:44px">😊</div><div class="k" style="width:182px;font-size:15px">拼音</div><div class="k f" style="width:88px;background:var(--accent);color:#fff">搜索</div></div></div>`
+}
+S['20-search'] = () => phone(`${status()}<div class="content abs" style="top:0;left:0;right:0"><div style="height:110px"></div>
+    <div class="section">Bot</div>${chatRow({ k: 'design', sub: '新导航的两个方案都放进资料库了', when: '9:20' })}
+    <div class="section">群聊</div>${chatRow({ group: [['rose', 'flower'], ['ambre', 'drop']], name: '设计评审', sub: '设计师：深色模式的对比度我再调一下', when: '周一' })}
+    <div class="section">线程</div>${threadRow('wait', '要不要把登录页也换成新导航', '设计师', 'cloud', { word: '等你回复' })}${threadRow('done', '设计 iOS 新导航', '设计师', 'cloud')}
+  </div>${edges()}<div class="large-title" style="z-index:61;top:54px;font-size:28px">搜索</div>
+  <div class="abs glass" style="left:16px;right:76px;bottom:346px;height:48px;border-radius:24px;z-index:86;display:flex;align-items:center;gap:8px;padding:0 14px;font-size:17px">${ic('search', 19, 'color:var(--secondary)')}设计<span class="caret"></span></div>
+  <div class="gbtn glass" style="top:auto;bottom:348px;right:16px;z-index:86">${ic('x', 19)}</div>
+  ${keyboard()}`)
+
+// overview of the set, drawn from the rendered PNGs (render.mjs passes ?overview)
+const order = Object.keys(S)
+const NOTES = {
+  '01-chats': '对话', '02-chats-longpress': '长按菜单', '03-chats-swipe': '左滑', '04-workspace-menu': '工作区切换', '05-new-menu': '新建', '06-new-bot': '新建 Bot', '07-new-group': '新建群聊',
+  '08-chat': '聊天', '09-chat-message-menu': '消息长按', '10-chat-attach': '附件', '11-chat-reply-swipe': '右滑引用', '12-group-chat': '群聊', '13-threads': '线程', '14-thread': '线程页',
+  '15-tasks': '任务', '16-suggestions': '建议', '17-plugins': '插件', '18-settings': '设置', '19-workspaces': '工作区', '20-search': '搜索',
+}
+if (location.search.includes('overview')) {
+  const theme = dark ? 'dark' : 'light'
+  document.documentElement.style.cssText = 'width:auto;height:auto'
+  document.body.style.cssText = 'width:2040px;height:auto;overflow:visible;padding:40px;background:var(--grouped)'
+  document.getElementById('root').innerHTML = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:40px 24px">${order.map(id => `<figure><img src="../${theme}/${id}.png" style="width:100%;border-radius:28px;box-shadow:0 0 0 0.5px var(--separator)"><figcaption style="margin-top:10px;font-size:20px;font-weight:600;text-align:center">${id.slice(0, 2)} ${NOTES[id]}</figcaption></figure>`).join('')}</div>`
+} else {
+  const id = decodeURIComponent(location.hash.slice(1)) || order[0]
+  document.getElementById('root').innerHTML = S[id]()
+}
+window.SCREENS = order
+</script>
+</body>
+</html>

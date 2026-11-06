@@ -1,0 +1,170 @@
+# iOS 重新设计：按 Comma 的布局，去掉抽屉
+
+- **状态：** 设计稿，等 Alex 看图（2026-11-06）。图没被接受之前不改应用代码；`main` 上仍是抽屉版。
+- **起因：** Alex 觉得抽屉版（#1408、#1446、#1453）不好看，不要抽屉，参照 Comma 的移动端重做
+  （[决定 2026-11-06-1200](decisions/2026-11-06-1200-ios-drop-drawer-comma-redesign.md)）。
+- **图：** [`mobile-comma/light/`](mobile-comma/light/) 和 [`mobile-comma/dark/`](mobile-comma/dark/)，iPhone
+  393×852 pt，2 倍图；总览见 [`overview-light.png`](mobile-comma/overview-light.png) /
+  [`overview-dark.png`](mobile-comma/overview-dark.png)。源文件是 [`mobile-comma/source/screens.html`](mobile-comma/source/screens.html)，
+  `FONT_DIR=<Noto Sans SC woff2 目录> node docs/design/mobile-comma/source/render.mjs` 重新出图。
+- **Comma 参照：** [AFK-surf/comma](https://github.com/AFK-surf/comma) 的原生 iOS 应用
+  `clients/apps/apple/iOS`（SwiftUI + UIKit），读的是提交
+  [`66ab3dc`](https://github.com/AFK-surf/comma/tree/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS)。
+  只读了源码，没有运行它的任何脚本，没有复制代码、文字或图片；仓库里也没有 Comma 的截图。
+- **HIG：** 以 Apple 官方 Human Interface Guidelines 为准（2026-11-06 读取 Tab bars、Search fields、Toolbars、Sheets、
+  Materials、Color、Typography、Accessibility 各页）。
+
+## 结论先说
+
+Alex 说「Comma 的做法符合 Apple 最新的设计规范」，**大部分成立，但不是全部。** Comma 的骨架是标准的 iOS 26：系统
+tab bar 浮在 Liquid Glass 上、搜索放在 tab bar 末端、导航栏按钮是玻璃圆钮、玻璃只用在控件层、Dynamic Type 全程跟随、
+Reduce Motion 都有退路。有五处它故意偏离 HIG（详见下面的对照表）：
+
+1. 把 tab bar 末端**搜索 tab 的位置**拿来放「打开 Comma 聊天」的圆钮（HIG：那个位置是给搜索的）。
+2. tab **只有图标没有文字**（HIG：「Include tab labels」）。
+3. **不用大标题**，所有页面标题都是 20 pt 的行内标题（HIG：「Use a large title to help people stay oriented」）。
+4. 角标用**小蓝点**代替系统的红色数字 badge（HIG：badge 是红底白字，只留给关键信息）。
+5. sheet 一律用**不透明底**，不用 iOS 26 部分高度 sheet 的玻璃外观。
+
+新设计跟 Comma 的布局和手感走，这五处按 HIG 改：搜索 tab 就是搜索；tab 有文字；tab 根页面用大标题；未读数字用系统
+badge；部分高度的 sheet 用系统默认外观。
+
+## 一、Comma iOS 是怎么做的
+
+| 方面 | Comma 的做法 | 源码 |
+| --- | --- | --- |
+| 导航结构 | 系统 `UITabBarController`，三个 tab：Home、Inbox、Settings（Settings 的图标是本人头像）。Inbox 旁边插了一个「搜索任务」按钮，点它在 tab 上方盖一层搜索，不改变选中的 tab。最右边是 `UISearchTab` 的独立圆钮，但点它打开的是 Comma（总调度）聊天：聊天从圆钮里放大出来，关闭时缩回圆钮。打开的任务放在底部的 dock 里（像 Telegram 小程序：最小化时是底部一条，往上拖成整页）。没有抽屉。 | [`Shell/AppTab.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Shell/AppTab.swift)、[`Shell/ShellTabBarController.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Shell/ShellTabBarController.swift)、[`Shell/AppShellView.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Shell/AppShellView.swift)、[`Shell/Router/RouterZoom.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Shell/Router/RouterZoom.swift) |
+| 首页 | 一行问候（早上/下午/晚上 + 名字），有简报时带小箭头打开简报；下面一排已连接应用的卡片（圆角 20）；再下面是任务列表。任务按状态筛选，筛选器是浮在 tab bar 上方 12 pt 的玻璃胶囊：选中的状态显示文字，其余只显示图标，手指可以在上面滑动连续切换。 | [`Home/HomeView.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Home/HomeView.swift)、[`Home/HomeHeader.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Home/HomeHeader.swift)、[`Tasks/List/TaskStatusSwitcher.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Tasks/List/TaskStatusSwitcher.swift) |
+| 列表行 | 没有分隔线、没有系统行背景；行的按压面离两侧 10 pt、圆角 10，按下即显示、抬起才执行。任务行 = 状态图标 + 最多两行标题；未读点放在图标前面。左滑是带图标和文字的胶囊动作（已读、清除、归档）。 | [`Tasks/List/TaskListRow.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Tasks/List/TaskListRow.swift)、[`Design/Lists/ListRows.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Design/Lists/ListRows.swift)、[`Inbox/InboxView.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Inbox/InboxView.swift) |
+| 聊天页 | 消息正文 17 pt（`.body`）；气泡圆角 20，内边距 10/13；助手气泡浅灰（#F1F1F1 / #343538），自己的是品牌蓝。输入框浮在聊天底部：左边单独一个 44 pt 的玻璃「+」，右边是逐行长高的玻璃输入框，发送按钮在框内；键盘升起时输入框展开成卡片。「+」长按/点按长出一张玻璃卡片（最近照片一排 + 选项）。右滑消息引用回复（有阻尼、到位有反馈），左边缘留给系统返回。 | [`Chat/ConversationComposer.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Chat/ConversationComposer.swift)、[`Chat/ReplySwipe.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Chat/ReplySwipe.swift)、[`Chat/Composer/AttachmentTray.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Chat/Composer/AttachmentTray.swift) |
+| 任务页 | 底部 dock：最小化时是一条（关闭、标题、状态），App 收成卡片露出黑色缝隙；上拖变成整页 sheet。 | [`Tasks/Dock/TaskDockViewController.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Tasks/Dock/TaskDockViewController.swift) |
+| 设置 | 一个 tab（头像）。最上面是账号行（头像、名字、邮箱 → 个人资料），然后工作区（多个时进入选择页，选中即返回）、通知、标签、设备、语言、版本、退出登录。分组卡片圆角 24、行高 50、组距 8。 | [`Settings/SettingsView.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Settings/SettingsView.swift)、[`Settings/Pages/WorkspacePickerView.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Settings/Pages/WorkspacePickerView.swift)、[`Design/Surfaces/GroupedSurface.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Design/Surfaces/GroupedSurface.swift) |
+| 搜索 | iOS 26 上搜索框和关闭按钮出现在键盘正上方（系统的搜索位置）；停顿 300 ms 后搜索；关闭后回到原来的 tab。 | [`Home/TaskSearchView.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Home/TaskSearchView.swift) |
+| 字号 | 只用 Dynamic Type：`.title3` 20 semibold 做所有标题（明确不用大标题），`.body` 17、`.subheadline` 15、`.footnote` 13、`.caption` 12。 | [`Shared/Design/CommaTheme.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/Shared/Design/CommaTheme.swift)、[`Design/Bars/PageTitle.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Design/Bars/PageTitle.swift) |
+| 颜色 | 自己的一套十六进制 token（品牌蓝 #205BFF / #3B7CFF，深色页面 #0F0F10），不是系统色。 | 同上 |
+| 玻璃 | iOS 26 用系统 `glassEffect`（regular，可交互），之前的系统退回 `regularMaterial` + 发丝线 + 轻阴影；相邻玻璃放进 `GlassEffectContainer` 互相融合；玻璃只用在控件上（tab bar、输入框、浮动筛选器、菜单卡片）。sheet 用不透明的卡片底。 | [`Shared/Design/CommaGlass.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/Shared/Design/CommaGlass.swift)、[`Design/Surfaces/Sheet.swift`](https://github.com/AFK-surf/comma/blob/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS/Design/Surfaces/Sheet.swift) |
+| 动效 | 选择类都用临界阻尼弹簧（response 0.32，不回弹）；发送气泡位置 0.44/0.99、宽度 0.34/0.86；助手消息 160 ms 从 2 pt 下方淡入；回复线程 0.42/0.86；每个动画都有 Reduce Motion 分支（改成 0.15 s 淡入淡出）。 | `CommaTheme.swift` 的 `CommaMotion` |
+
+## 二、和 HIG 对照
+
+✅ 符合 · ⚠️ 部分符合 · ❌ 不符合。「Mikka 新设计」一栏说明这里怎么做。
+
+| HIG 要求（原文出处） | Comma | Mikka 新设计 |
+| --- | --- | --- |
+| Tab bar 浮在内容上方、Liquid Glass 底（Tab bars › iOS） | ✅ 系统 tab bar | ✅ `NativeTabs`，系统画 |
+| 「Use a tab bar to support navigation, not to provide actions」（Tab bars） | ⚠️ 搜索按钮和 Comma 圆钮都是动作（打开一层），不切换 tab | ✅ 四个 tab 都是页面；新建、筛选放在各页工具栏 |
+| 「A tab bar can include a dedicated search tab at the trailing end」（Tab bars › iOS）；搜索 tab 两种样式：标准 tab 或按钮外观（Search fields › Search as a tab） | ❌ 末端位置放的是 Comma 聊天；真正的搜索按钮插在 Inbox 旁边 | ✅ 末端就是搜索 tab，用「按钮外观」：点开键盘直接升起，搜索框在键盘上方 |
+| 「Include tab labels… Use single words whenever possible」（Tab bars） | ❌ 只有图标 | ✅ 对话 · 线程 · 建议 · 设置 |
+| 「Prefer filled symbols」（Tab bars） | ✅ 选中时用 `-fill` | ✅ 选中用填充版 SF Symbol |
+| Badge：红底白字，只留给关键信息（Tab bars） | ⚠️ 用 8 pt 小蓝点 | ✅ 「建议」有新简报时用系统 badge；不滥用 |
+| 「Don’t disable or hide tab bar buttons」「Make sure the tab bar is visible…」（Tab bars） | ✅ | ⚠️ 进入聊天/线程页时 tab bar 收起（push 的详情页底部是输入框）。返回按钮保留位置感，这是 Messages 之外常见聊天应用的做法；列为待 Alex 确认的取舍 |
+| 「Use a large title to help people stay oriented」（Toolbars） | ❌ 全部 20 pt 行内标题 | ✅ 四个 tab 根页和插件、工作区用大标题，滚动后收成行内标题；聊天、线程页用行内标题 |
+| 标题短于 15 个字符、不用 App 名做标题（Toolbars） | ✅ | ✅ |
+| 工具栏分组不超过三组；关键动作单独一组（Toolbars） | ✅ | ✅ 每个导航栏最多左右两组 |
+| Liquid Glass 只用于控件/导航层，不用于内容层；少用（Materials） | ✅ | ✅ 只有 tab bar、导航栏按钮、输入框、「+」、线程状态切换器、菜单是玻璃；消息、卡片、列表都是普通背景 |
+| regular 与 clear：文字多的控件用 regular（Materials） | ✅ regular | ✅ 全用 regular |
+| Liquid Glass 上少用颜色；主操作把颜色放在背景（Color › Liquid Glass color） | ✅ | ✅ 只有 sheet 的确认钮是填充的强调色 |
+| Sheet：单视图的 Cancel 在左上、Done 在右上；可调高度的 sheet 带 grabber；iPhone 上考虑 medium detent（Sheets） | ⚠️ 关闭叉在左；sheet 用不透明底 | ✅ 左上 ✕、右上 ✓（强调色）；新建 Bot / 群聊是 large；附件用菜单卡片不用 sheet |
+| 一次只显示一个 sheet（Sheets） | ✅ | ✅ |
+| Dynamic Type，可放大到 200%（Accessibility、Typography） | ✅ 全部用文本样式 | ✅ 全部用文本样式（大标题 34、正文 17、副文 15、脚注 13） |
+| 对比度达到 WCAG AA，或在「增强对比度」下达到（Accessibility） | ✅ 专门调深了浅色的次要文字 | ✅ 沿用 `lib/tokens.ts`：系统色 + `accentFill` 深蓝承载白字（5.3:1） |
+| 控件足够大（Accessibility） | ✅ 44 pt | ✅ 所有可点控件 ≥ 44 pt |
+| Reduce Transparency / Increase Contrast 下玻璃要保持可读（Materials） | ✅ 系统玻璃自动处理 | ✅ 用系统玻璃（`expo-glass-effect`）；自绘的状态切换器在 `isLiquidGlassAvailable()` 为假时退回不透明底 |
+| Reduce Motion | ✅ 每个动画都有分支 | ✅ 沿用 `lib/springs.ts` 和现有分支 |
+
+## 三、新的导航结构
+
+```
+NativeTabs（系统 tab bar，Liquid Glass）
+├─ 对话   (chats)     Stack：对话 → 聊天 / 群聊 → Bot 资料 → 线程
+├─ 线程   (threads)   Stack：线程 | 任务（分段） → 线程页
+├─ 建议   (suggest)   Stack：建议 → 插件
+├─ 设置   (settings)  Stack：设置 → 个人资料 / 工作区 / 通知 / 记忆 / 已连接的 App(=插件) / 外观
+└─ 搜索   (search, role="search")  按钮外观：键盘 + 键盘上方的搜索框
+新建 Bot / 新建群聊：formSheet（large），从「对话」右上角的新建菜单打开
+```
+
+- 「设置」tab 的图标是本人头像（跟 Comma 一样），文字是「设置」。
+- 工作区切换有两个入口：「对话」左上角的工作区按钮（系统菜单，一步切换），和「设置 › 工作区」（选中即返回，Comma 的做法）。
+- **Coordinator 不另开入口。** Comma 把总调度放在搜索位的圆钮里；这违反上面的 HIG 条目，也违反 R-06（Coordinator 除置顶星标外没有特殊 UI）。Coordinator 在「对话」顶部的置顶格里，和其它置顶 Bot 一样。
+- **线程页是 push，不是底部 dock。** Comma 的任务 dock 好看，但 `mobile.md` 已定「线程卡片推开线程页，没有底部 sheet，没有最小化条」（R-15）。如果 Alex 想要 dock，这是一个单独的决定。
+
+## 四、每一屏
+
+文件名在 `light/` 和 `dark/` 下相同。
+
+| # | 图 | 结构和取舍 | 对应 Comma |
+| --- | --- | --- | --- |
+| 01 | [对话](mobile-comma/light/01-chats.png) | 左上工作区按钮（玻璃胶囊：工作区字母 + 名字 + ⌄），右上新建（玻璃圆钮）。大标题「对话」。置顶格（Coordinator、研究员、设计师；星标是置顶，橙点是等你，蓝色数字是未读）。分区：正在工作（灰色脉动点 + 进行中）、Bot、群聊；每行头像 44、名字 17 semibold、最后一句 15、时间 13。没有分隔线，按压面离两侧 10 pt。 | Home 的列表行样式、无分隔线；问候行没有采用（R-40：不加没信息的话） |
+| 02 | [长按菜单](mobile-comma/light/02-chats-longpress.png) | 系统 context menu：上面是那个聊天的实时预览，下面：标为已读、置顶、隐藏、信息、更多 › 复制 ID（与现在 `chat-menu.tsx` 一致）。 | Comma 的任务行菜单 |
+| 03 | [左滑](mobile-comma/light/03-chats-swipe.png) | 左滑出两个胶囊动作：置顶（橙）、隐藏（灰），图标 + 文字。 | Inbox 的胶囊滑动动作 |
+| 04 | [工作区切换](mobile-comma/light/04-workspace-menu.png) | 工作区按钮弹系统菜单：当前工作区打勾，其它一点即切；编辑顺序、工作区设置。 | Settings › Workspace 选择页（另有入口见 19） |
+| 05 | [新建](mobile-comma/light/05-new-menu.png) | 新建钮弹菜单：新建 Bot、新建群聊。 | Comma 的新建入口在聊天里；Mikka 的新建对象是 Bot 和群聊，所以放在对话页 |
+| 06 | [新建 Bot](mobile-comma/light/06-new-bot.png) | sheet 打开状态。左上 ✕，右上 ✓（强调色填充），标题「新建 Bot」，无副标题。大头像预览、名字、形状 6 选 1、颜色 12 选 1。 | Comma 的 sheet 关闭位置；外观按 HIG |
+| 07 | [新建群聊](mobile-comma/light/07-new-group.png) | 群聊名称、选择 Bot（勾选圆圈）。 | 同上 |
+| 08 | [聊天](mobile-comma/light/08-chat.png) | 导航栏：返回圆钮、中间头像 + 名字的玻璃胶囊（点开 Bot 资料）、更多。简报是一个气泡，每项一个对象芯片（R-41）；主动消息卡片（结果和截止时间、来源、三个按钮）；我的蓝气泡；线程卡片（状态图标 + 名字 + 产出芯片，R-15/R-66）；Bot 回复下面一个复制钮。底部：独立玻璃「+」+ 玻璃输入框。一对一聊天不显示头像和名字（R-13）。 | 输入框形态、气泡尺寸、浮动输入框 |
+| 09 | [消息长按](mobile-comma/light/09-chat-message-menu.png) | 背景模糊，气泡被托起；上方六个反应（一人一个，再点取消），下方：回复、复制、选择文本。 | Comma 的消息菜单；反应放法沿用 Mikka 已有决定 |
+| 10 | [附件](mobile-comma/light/10-chat-attach.png) | 「+」长出一张玻璃卡片：相机 + 最近照片一排，下面「所有照片」「文件」。替换现在的底部 sheet。 | 「+」卡片 |
+| 11 | [右滑引用](mobile-comma/light/11-chat-reply-swipe.png) | 气泡被拖向右边，左侧露出回复箭头；过线松手引用到输入框。左边缘仍是系统返回。 | ReplySwipe |
+| 12 | [群聊](mobile-comma/light/12-group-chat.png) | 标题胶囊是群头像 + 群名 + 「3 个 Bot」。Bot 消息在左边带小头像和名字，我的在右边；`@前端` 指定谁回答。 | — |
+| 13 | [线程](mobile-comma/light/13-threads.png) | 大标题「线程」，右上新线程。分段控件「线程 / 任务」；设备芯片（在线绿点）。分组：等待你、进行中、受阻、空闲、已解决（折叠，R-52）。底部浮着玻璃状态切换器：全部（文字）、等待你、进行中、已解决（图标），手指可滑动连续切换——替换现在的筛选菜单。 | 浮动状态切换器 |
+| 14 | [线程页](mobile-comma/light/14-thread.png) | 行内标题：线程名 + 「Bot · 执行器 · 机器图标」。工具调用折叠成「已探索 4 次搜索」等行；产出芯片（PR、图片）；运行中时输入框的发送键变成停止键。 | 任务 dock 的内容区；外层仍是 push |
+| 15 | [任务](mobile-comma/light/15-tasks.png) | 「任务」分段：进行中、待办、已完成；行 = 圆形状态 + 标题 + 「#编号 · Bot」，右边 ↗ 表示在网页打开。 | Home 的任务行 |
+| 16 | [建议](mobile-comma/light/16-suggestions.png) | 大标题「建议」，右上插件钮。一排已连接应用卡片（应用、要你处理的数量）；「今天」的条目一行一个、动词开头（R-41）；已处理折叠。点条目进 Coordinator 聊天。 | Home 的应用卡片和简报 |
+| 17 | [插件](mobile-comma/light/17-plugins.png) | 系统搜索栏、分段「应用 / 技能」、已连接（绿点）、热门。行打开网页上的连接流程（已有实现）。 | — |
+| 18 | [设置](mobile-comma/light/18-settings.png) | 大标题「设置」。账号行（头像、名字、邮箱 → 个人资料）；工作区；通知、记忆、已连接的 App；外观、语言、版本；退出登录。行带彩色系统图标方块。 | Settings 页的顺序和账号行 |
+| 19 | [工作区](mobile-comma/light/19-workspaces.png) | 工作区列表，当前打勾，选中即返回；右上「编辑」排序。 | WorkspacePickerView |
+| 20 | [搜索](mobile-comma/light/20-search.png) | 搜索 tab 的按钮外观：键盘直接升起，搜索框和关闭钮在键盘上方；结果按 Bot、群聊、线程分组。 | TaskSearchView（范围扩大到 Bot 和群聊） |
+
+深色版颜色全是系统深色（页面纯黑、分组卡 #1C1C1E），不是 Comma 的 #0F0F10。
+
+## 五、和现在的抽屉版有什么不同
+
+| 现在（抽屉版，`main`） | 新设计 |
+| --- | --- |
+| 一个 Stack，装在推开式抽屉里；左上工作区按钮或右滑打开抽屉 | 系统 tab bar，四个 tab + 搜索 tab；没有抽屉，没有边缘右滑手势冲突 |
+| 线程、建议、任务、插件、设置都在抽屉里 | 线程（含任务）、建议、设置各是一个 tab；插件从设置和建议进入 |
+| 工作区在抽屉顶部 | 对话页左上的系统菜单 + 设置 › 工作区 |
+| 搜索是对话页导航栏下的系统搜索框，只搜 Bot 和群聊 | 搜索 tab，搜 Bot、群聊、线程 |
+| 对话页没有标题 | 大标题「对话」 |
+| 线程筛选是右上的菜单 | 浮动玻璃状态切换器 |
+| 附件是底部 sheet（相机/照片/文件三块） | 「+」长出的玻璃卡片，带最近照片 |
+| 账号在抽屉底部 | 设置 tab（头像图标）顶部的账号行 |
+
+## 六、实现时用什么
+
+| 部分 | 组件 |
+| --- | --- |
+| Tab bar | Expo Router `NativeTabs`（`expo-router/unstable-native-tabs`），`NativeTabs.Trigger` + `.Icon sf={{ default, selected }}` + `.Label` + `.Badge`；搜索 tab 是 `role="search"`。设置 tab 的头像用 `.Icon src` 渲染本人头像。`minimizeBehavior` 不开（和 Comma 一样常驻）。 |
+| 每个 tab 的页面 | 各自一个 `Stack`（`app/(tabs)/(chats)/_layout.tsx` 等），根页 `headerLargeTitle: true`，`headerTransparent` + iOS 26 的 `scrollEdgeEffects`（现有 `screenOptions` 已有）。聊天、线程页 push 时用 `NativeTabs` 的 `hidden` 收起 tab bar。 |
+| 导航栏按钮和菜单 | `Stack.Toolbar`（`Stack.Toolbar.Button`、`Stack.Toolbar.Menu` / `MenuAction`）：工作区菜单、新建菜单、聊天的更多。系统自动给玻璃。 |
+| 搜索 | 搜索 tab 里的 `Stack.SearchBar`（`placement` 由系统放到键盘上方）；插件页同样用 `Stack.SearchBar`。 |
+| 长按菜单 | 对话行沿用 `Link` + `Link.Preview` + `Link.Menu`（`chat-menu.tsx`）；消息沿用 `MessageMenu.ios.tsx`（`@expo/ui` `ContextMenu` + `ControlGroup` 放反应）。 |
+| 左滑动作 | 沿用 `pin-swipe.ts` 的逻辑，动作画成胶囊。 |
+| 分段控件 | `@expo/ui` `Picker`（segmented），沿用 `Segmented.ios.tsx`。 |
+| 设置、工作区、新建 Bot / 群聊的表单 | `@expo/ui` `Form` / `Section` / `FieldGroup`（`components/settings.tsx` 的 `Row` 迁过去，`mobile.md` 已列为待办）。 |
+| Sheet | 路由 `presentation: 'formSheet'`，`sheetAllowedDetents: [1]`、`sheetGrabberVisible`；左上 ✕ / 右上 ✓ 用 `Stack.Toolbar`。 |
+| 输入框、「+」、附件卡片、线程状态切换器 | `expo-glass-effect` 的 `GlassView`（`isInteractive`）和 `GlassContainer` 让「+」与输入框融合；`isLiquidGlassAvailable()` 为假时退回不透明 `surface`。状态切换器放在 `NativeTabs.BottomAccessory`（iOS 26，`usePlacement()` 处理收起时的 inline 形态）。 |
+| 图标 | SF Symbols（`expo-symbols`，现有 `Symbol.ios.tsx`）。 |
+
+## 七、可以原样保留的部分
+
+- **聊天列表虚拟化：** `features/chat/components/chat-message-list.tsx`（`@legendapp/list`）。
+- **发送动效和新消息上浮：** `lib/springs.ts`（`ENTER`、`SNAP_BACK`）及其 Reduce Motion 分支。
+- **气泡手势：** `components/chat.tsx` 的 `TimedRow`（右滑引用）和 `useTimeReveal`（左滑看时间）。
+- **首页行交互的后端：** `features/home/model/use-home-chats.ts`（置顶、隐藏、已读/未读、复制 ID、置顶上限）、`home-list.ts`、`pin-swipe.ts`、`chat-drag.tsx`（置顶区拖动排序），以及 `chat-menu.tsx` 的菜单项。
+- 消息菜单 `MessageMenu.ios.tsx`、OpenUI 卡片 `components/OpenUI.tsx`、`cards.tsx`、输入框里的模型菜单 `ModelMenu.ios.tsx`、所有 `app/api/mobile/*` 接口。
+- 要删的只有抽屉：`features/shell/components/app-drawer.tsx`、`drawer-content.tsx` 和 `drawerDim` / `drawerLift` / `drawer` / `drawerRow` token。
+
+## 八、请 Alex 定的几件事
+
+1. 四个 tab 叫「对话 · 线程 · 建议 · 设置」，任务放在「线程」里的分段，可以吗？
+2. 进入聊天和线程页时收起 tab bar（图 08、14），还是保留？
+3. 要不要 Comma 的底部任务 dock 代替 push 线程页（要改 R-15 那条）？
+4. 线程筛选用浮动状态切换器（图 13）替换右上筛选菜单，可以吗？
+
+## 没有复制 Comma 的内容
+
+本 PR 只有文档和自绘的设计图。图用 HTML/CSS 按尺寸画、Playwright 出图，颜色是 Mikka 自己的 token（`apps/mobile/lib/tokens.ts`），
+头像是 Mikka 的 bloub，图标是为这些图重画的。没有复制 Comma（AGPL-3.0）的代码、文字、图标或截图；上面的数值和行为是读源码后的
+描述，链接指向它的仓库。

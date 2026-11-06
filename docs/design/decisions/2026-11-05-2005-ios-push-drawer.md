@@ -7,6 +7,7 @@
 - Rule: —
 - Replaces: [2026-11-05-1300](2026-11-05-1300-ios-no-drawer.md) (the tab bar and the account sheet).
 - Refined by: [2026-11-05-2205](2026-11-05-2205-drawer-native-surface.md) (the open surface's material).
+- Superseded by: [2026-11-06-1200](2026-11-06-1200-ios-drop-drawer-comma-redesign.md) (no drawer; redesign after Comma).
 
 - No tab bar and no floating search button. The app is one Expo Router Stack on a surface that lies over a drawer.
 - **Push drawer.** The drawer sits at the left edge under the app. Opening it slides the whole surface right by the

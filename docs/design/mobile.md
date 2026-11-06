@@ -1,5 +1,6 @@
 # Mobile app
 
+- **Redesign pending:** Alex dropped the push drawer on 2026-11-06 ([decision](decisions/2026-11-06-1200-ios-drop-drawer-comma-redesign.md)). The proposed tab-bar design after Comma is [`mobile-comma-redesign.md`](mobile-comma-redesign.md); until Alex accepts its frames, the drawer sections below describe `main` as it is.
 - **Status:** implemented baseline; UI/UX acceptance tracked in [#1296](https://github.com/alexj11324/Mikka/issues/1296) (2026-11-05)
 - **GitHub:** #1296
 - **Figma:** `zPe5LKycb2XuT1ivCLRw07`; page `268:4750` is archived per #1296 and is not a design authority. Page `358:9186` is a reference to verify. Current main and accepted decisions govern; do not redesign from archived or unaccepted frames.
