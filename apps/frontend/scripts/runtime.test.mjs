@@ -102,9 +102,8 @@ test('web auth routing preserves real PKCE, refused handoff, account addition an
   location.search = new URLSearchParams({ desktop: '1', desktop_state: 'abcdefghijklmnop', desktop_callback: 'http://localhost:4567/auth/callback', desktop_next: '/settings?section=devices' })
   const auth = webAuthentication(location)
   assert.deepEqual(auth.desktopFlow, { state: 'abcdefghijklmnop', callback: 'http://127.0.0.1:4567/auth/callback', next: '/settings?section=devices' })
-  const returned = new URL(authenticatedReturn(location), location)
-  assert.equal(returned.pathname, '/mikka/api/desktop/return')
-  assert.equal(returned.searchParams.get('callback'), 'http://127.0.0.1:4567/auth/callback')
+  // A signed-in browser stays on the page and shows the account before the app gets it.
+  assert.equal(authenticatedReturn(location), null)
   location.searchParams.set('oauth', 'failed')
   assert.equal(authenticatedReturn(location), null)
   location.searchParams.delete('oauth')

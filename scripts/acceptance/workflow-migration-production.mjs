@@ -11,6 +11,7 @@ import { decode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 import { attestProductionReadCache, mergeReadChat, productionGuard, responseCookieJar } from './read-cache-production.mjs'
 import { api as vercelRead, activeAlias, PROJECT, PRODUCTION_ALIAS, TEAM } from '../ops/deployment-regression.mjs'
 import { DeployedTargetError, assertDeployedTarget, publicTargetFailure } from './deployed-target.mjs'
+import { TeamWorkspaceError, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure, selectTeamWorkspace } from './team-workspace.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const CHAT = '/mikka/api/coordinator/messages'
@@ -27,8 +28,9 @@ export class ProofError extends Error {
   constructor(code) { super(CODES.has(code) ? code : 'proof_failed'); this.code = this.message }
 }
 const time = value => value instanceof Date ? value.getTime() : Date.parse(value)
-const workflow = (value, file, name) => value === 'workflow//' + file + '//' + name || value === 'workflow//./' + file + '//' + name
-const stepName = value => value === 'step//workflows/due-timer/steps.ts//runDue' || value === 'step//./workflows/due-timer/steps.ts//runDue'
+// Root-project identifiers produced by the locked Workflow SWC transform omit the source extension.
+const workflow = (value, file, name) => value === 'workflow//./' + file + '//' + name
+const stepName = value => value === 'step//./workflows/due-timer/steps//runDue'
 const tools = item => item.activity?.tools ?? []
 const freshItems = (chat, after) => (chat.items ?? []).filter(item => !item.pending && item.position > after)
 const runId = item => typeof item.streamId === 'string' ? item.streamId.replace(/:\d+$/, '') : null
@@ -80,8 +82,8 @@ export function occurrenceEvidence(chat, after, marker, scheduleId) {
 
 export function managedEvidence({ coordinator, timer, events, deploymentId, dueAt, occurrenceAt, startedAt }) {
   if (!coordinator || !timer || coordinator.status !== 'completed' || coordinator.deploymentId !== deploymentId
-    || timer.deploymentId !== deploymentId || !workflow(coordinator.workflowName, 'workflows/coordinator/workflow.ts', 'coordinatorTurn')
-    || !workflow(timer.workflowName, 'workflows/due-timer/workflow.ts', 'dueTimer')
+    || timer.deploymentId !== deploymentId || !workflow(coordinator.workflowName, 'workflows/coordinator/workflow', 'coordinatorTurn')
+    || !workflow(timer.workflowName, 'workflows/due-timer/workflow', 'dueTimer')
     || time(coordinator.createdAt) < startedAt - 1000) return null
   const due = time(dueAt)
   if (![due, occurrenceAt, startedAt].every(Number.isFinite) || occurrenceAt < due || occurrenceAt > due + 120_000) return null
@@ -195,9 +197,10 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
     check(path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
       '/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out', '/mikka/api/workspace', '/mikka/api/rpc'].includes(path), 'http_failed')
     check(body === undefined || path === CHAT || path.endsWith('/sign-in/email') || path.endsWith('/sign-out')
-      || path === '/mikka/api/rpc' && body.version === DESKTOP_RPC_VERSION && body.action === 'coordinator.coordinatorHistory'
-      && Array.isArray(body.args) && body.args.length === 3 && body.args[0] === chat?.botId
-      && Number.isSafeInteger(body.args[1]) && body.args[1] >= baseline && body.args[2] === 1, 'http_failed')
+      || path === '/mikka/api/rpc' && (isTeamWorkspaceSwitchRequest(body)
+        || body.version === DESKTOP_RPC_VERSION && body.action === 'coordinator.coordinatorHistory'
+        && Array.isArray(body.args) && body.args.length === 3 && body.args[0] === chat?.botId
+        && Number.isSafeInteger(body.args[1]) && body.args[1] >= baseline && body.args[2] === 1), 'http_failed')
     const url = new URL(path, ORIGIN), headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store' })
     const cookie = cookies.header(url); if (cookie) headers.set('cookie', cookie)
     if (body !== undefined) headers.set('content-type', 'application/json')
@@ -287,9 +290,8 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
     closeSession = true
     await json('/mikka/api/auth/sign-in/email', { email, password })
     await session(); report.normalSessionObserved = true
-    const workspace = (await json('/mikka/api/workspace')).value
-    check(workspace.currentUserId === owner && workspace.workspace?.kind === 'personal' && workspace.role === 'admin', 'session_identity')
-    report.personalWorkspaceConfirmed = true
+    Object.assign(report, await selectTeamWorkspace({ ownerId: owner,
+      json: async (path, body) => (await json(path, body)).value }))
     await poll()
     check(chat.enabled === true, 'coordinator_disabled'); check(chat.working === false, 'coordinator_busy')
     baseline = chat.cursor
@@ -311,7 +313,7 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
             // A normal deployment handoff may briefly expose the old hook.
             // The application owns replacement; this driver only observes.
             if (holder.deploymentId === deploymentId
-              && workflow(holder.workflowName, 'workflows/due-timer/workflow.ts', 'dueTimer')
+              && workflow(holder.workflowName, 'workflows/due-timer/workflow', 'dueTimer')
               && ['pending', 'running'].includes(holder.status)) timerId = hook.runId
           }
         }
@@ -345,6 +347,7 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
     check(report.status === 'pass', schedule ? occurrence ? 'managed_evidence_missing' : 'reminder_not_observed' : 'schedule_not_observed')
   } catch (error) {
     if (deployed && error instanceof DeployedTargetError) Object.assign(report, publicTargetFailure(error))
+    else if (error instanceof TeamWorkspaceError) Object.assign(report, { status: 'fail' }, publicTeamWorkspaceFailure(error))
     else { report.status = 'fail'; report.code = error instanceof ProofError ? error.code : 'proof_failed' }
   } finally {
     if (report.submissionCount && !report.futureScheduleConfirmedAbsent && closeSession) {
@@ -645,32 +648,30 @@ async function inspectSDKHistory(report, env, fetchImpl, createStorageImpl) {
   const begin = time(INSPECTION_SOURCE.startedAt) - 1000, end = time(INSPECTION_SOURCE.finishedAt)
   const timerBegin = begin - 6 * 60 * 60_000 // The product's DUE_TIMER_LIFETIME_MS.
   const selected = new Map()
-  report.listing = { pages: 0, rows: 0, canonicalFilters: 4, complete: false,
+  report.listing = { pages: 0, rows: 0, canonicalFilters: 2, complete: false,
     timerCreatedNotBefore: new Date(timerBegin).toISOString(), olderTimersInspected: false }
   report.eventReads = { pages: 0, rows: 0 }
   report.candidates = []
   for (const [nameClass, file, name] of [
-    ['coordinatorTurn', 'workflows/coordinator/workflow.ts', 'coordinatorTurn'],
-    ['dueTimer', 'workflows/due-timer/workflow.ts', 'dueTimer'],
+    ['coordinatorTurn', 'workflows/coordinator/workflow', 'coordinatorTurn'],
+    ['dueTimer', 'workflows/due-timer/workflow', 'dueTimer'],
   ]) {
-    for (const prefix of ['', './']) {
-      const expectedName = 'workflow//' + prefix + file + '//' + name
-      const rows = await inspectionPages(options => storage.runs.list(options), { workflowName: expectedName },
-        page => page.some(row => time(row.createdAt) < (nameClass === 'coordinatorTurn' ? begin : timerBegin)), report.listing)
-      for (const row of rows) {
-        inspectionRun(row, expectedName)
-        const inWindow = nameClass === 'coordinatorTurn'
-          ? time(row.createdAt) >= begin && time(row.createdAt) <= end && row.deploymentId === INSPECTION_SOURCE.deploymentId
-          : time(row.createdAt) >= timerBegin && time(row.createdAt) <= end
-            && (row.completedAt === undefined || time(row.completedAt) >= begin)
-        if (!inWindow) continue
-        if (selected.has(row.runId)) {
-          const earlier = selected.get(row.runId).row
-          inspectionCheck(earlier.workflowName === row.workflowName && earlier.deploymentId === row.deploymentId
-            && time(earlier.createdAt) === time(row.createdAt), 'inspection_metadata', 'candidate')
-        } else selected.set(row.runId, { row, nameClass })
-        inspectionCheck(selected.size <= 40, 'inspection_limit', 'candidate')
-      }
+    const expectedName = 'workflow//./' + file + '//' + name
+    const rows = await inspectionPages(options => storage.runs.list(options), { workflowName: expectedName },
+      page => page.some(row => time(row.createdAt) < (nameClass === 'coordinatorTurn' ? begin : timerBegin)), report.listing)
+    for (const row of rows) {
+      inspectionRun(row, expectedName)
+      const inWindow = nameClass === 'coordinatorTurn'
+        ? time(row.createdAt) >= begin && time(row.createdAt) <= end && row.deploymentId === INSPECTION_SOURCE.deploymentId
+        : time(row.createdAt) >= timerBegin && time(row.createdAt) <= end
+          && (row.completedAt === undefined || time(row.completedAt) >= begin)
+      if (!inWindow) continue
+      if (selected.has(row.runId)) {
+        const earlier = selected.get(row.runId).row
+        inspectionCheck(earlier.workflowName === row.workflowName && earlier.deploymentId === row.deploymentId
+          && time(earlier.createdAt) === time(row.createdAt), 'inspection_metadata', 'candidate')
+      } else selected.set(row.runId, { row, nameClass })
+      inspectionCheck(selected.size <= 40, 'inspection_limit', 'candidate')
     }
   }
   report.listing.complete = true
