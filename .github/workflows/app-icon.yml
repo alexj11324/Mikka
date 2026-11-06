@@ -66,6 +66,7 @@ jobs:
             then echo "RESULT $i ok"; else echo "RESULT $i CRASH"; fi
           done
           sw_vers
+      - name: Compile for macOS as electron-builder does
         run: |
           out="$RUNNER_TEMP/out/mac"
           mkdir -p "$out"
