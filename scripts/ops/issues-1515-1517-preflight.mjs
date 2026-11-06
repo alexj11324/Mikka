@@ -44,6 +44,27 @@ try {
       (SELECT count(*)::int FROM coordinator_messages prev WHERE prev."userId"=m."userId" AND prev."botId" IS NOT DISTINCT FROM m."botId" AND prev.position<m.position AND prev.message->>'role'='user') AS "precedingUserMessages"
       FROM coordinator_messages m CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(m.message->'content')='array' THEN m.message->'content' ELSE '[]'::jsonb END) p
       WHERE m."createdAt">now()-interval '3 days' AND ((p->>'type' IN ('tool-call','tool-result') AND coalesce(p->>'toolName','') IN ('none','')) OR p::text LIKE '%NoSuchToolError%') ORDER BY m."createdAt" DESC LIMIT 30`)
+    await query('invalidToolExecution', `WITH affected AS (
+      SELECT DISTINCT m."userId",m."botId",m."createdAt",m.message->>'mikkaStreamId' AS stream
+      FROM coordinator_messages m CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(m.message->'content')='array' THEN m.message->'content' ELSE '[]'::jsonb END) p
+      WHERE m."createdAt">now()-interval '3 days' AND p->>'type'='tool-call' AND coalesce(p->>'toolName','') IN ('none','')
+    ) SELECT a."createdAt",a.stream,e.execution_key,e.status,e.started_at,e.finished_at,
+      e.snapshot->'runtime'->>'model' AS model,e.snapshot->'runtime'->>'harness' AS harness,
+      e.snapshot->'runtime'->'modelSelection'->>'type' AS "sourceType",e.snapshot->'runtime'->'modelSelection'->>'route' AS route,
+      e.snapshot->'runtime'->'modelSelection'->>'provider' AS provider,e.snapshot->'effectiveTools' AS "effectiveTools"
+      FROM affected a LEFT JOIN LATERAL (SELECT * FROM agent_kit_executions e WHERE e.owner_id=a."userId" AND e.bot_key=a."botId"::text
+        AND (e.execution_key=a.stream OR e.started_at<=a."createdAt" AND e.started_at>a."createdAt"-interval '10 minutes')
+        ORDER BY (e.execution_key=a.stream) DESC NULLS LAST,e.started_at DESC LIMIT 1) e ON true ORDER BY a."createdAt" DESC LIMIT 10`)
+    await query('invalidToolChronology', `WITH affected AS (
+      SELECT DISTINCT m."userId",m."botId" FROM coordinator_messages m CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(m.message->'content')='array' THEN m.message->'content' ELSE '[]'::jsonb END) p
+      WHERE m."createdAt">now()-interval '3 days' AND p->>'type'='tool-call' AND coalesce(p->>'toolName','') IN ('none','')
+    ) SELECT m."createdAt",m.position,m.message->>'role' AS role,
+      m.message::text LIKE '%[Welcome]%' AS "containsWelcomeMarker",m.message::text LIKE '%NoSuchToolError%' AS "containsNoSuchToolError",
+      m.message->>'mikkaStreamId' AS stream,
+      (SELECT coalesce(jsonb_agg(jsonb_build_object('type',p->>'type','toolName',p->>'toolName','inputKeys',CASE WHEN jsonb_typeof(p->'input')='object' THEN (SELECT jsonb_agg(k) FROM jsonb_object_keys(p->'input') k) ELSE NULL END)),'[]'::jsonb)
+        FROM jsonb_array_elements(CASE WHEN jsonb_typeof(m.message->'content')='array' THEN m.message->'content' ELSE '[]'::jsonb END) p WHERE p->>'type' IN ('tool-call','tool-result')) AS "toolParts"
+      FROM coordinator_messages m JOIN affected a ON a."userId"=m."userId" AND a."botId" IS NOT DISTINCT FROM m."botId"
+      WHERE m.position<=15 ORDER BY m."createdAt",m.position LIMIT 30`)
     await db.query('ROLLBACK')
   } finally { db.release() }
   const email=process.env.ACME_DEMO_EMAIL,password=process.env.ACME_DEMO_PASSWORD
