@@ -7,16 +7,20 @@ import type { listIssues } from '@/app/actions/issues'
 import { displayTaskTitle } from '@/lib/short-title'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import type { CardProperty, RunOwner } from '@/components/blocks/kanban-board-1/components/data'
+import { BLOCKED_COLUMN, BOARD_COLUMNS, boardColumnOf, type CardProperty, type RunOwner } from '@/components/blocks/kanban-board-1/components/data'
+import type { TaskBlock } from '@/lib/task-blocked'
 import { assigneeGroupOf } from '@/components/blocks/kanban-board-1/components/kanban-board'
-import { ISSUE_STATUSES } from './issue-properties'
+
 import { PriorityIcon } from './priority-icon'
+import { blockLabel } from './block-label'
 
 const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
 
 /** The board's list view: one row per task, its columns the same 显示 properties as the cards. */
-export function IssueList({ issues, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate }: {
+export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate }: {
   issues: Awaited<ReturnType<typeof listIssues>>
+  /** 受阻 tasks group under 受阻, as on the board, each row naming why (lib/task-blocked.ts). */
+  blocks?: ReadonlyMap<string, TaskBlock>
   properties?: ReadonlySet<CardProperty>
   /** The Bot and coding agents working each task, as on the cards. */
   owners?: ReadonlyMap<string, RunOwner>
@@ -25,6 +29,7 @@ export function IssueList({ issues, properties = LIST_COLUMNS, owners, searching
   onCreate: () => void
 }) {
   const t = useTranslations('Issue.list')
+  const tCard = useTranslations('Shell.board.card')
   const tIssue = useTranslations('Issue')
   const format = useFormatter()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
@@ -40,11 +45,12 @@ export function IssueList({ issues, properties = LIST_COLUMNS, owners, searching
   </Empty>
 
   return <div aria-label={t('label')} className="flex flex-col">
-    {ISSUE_STATUSES.map(status => {
-      const group = issues.filter(issue => issue.status === status.value)
+    {BOARD_COLUMNS.map(column => {
+      const group = issues.filter(issue => boardColumnOf(issue.status, blocks?.has(issue.id)) === column.value)
       if (!group.length) return null
-      // R-34: the same colours as ISSUE_STATUSES (board, ⌘K): review is info, done is success.
-      const indicatorClassName = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
+      // R-34: the same colours as ISSUE_STATUSES (board, ⌘K): review is info, done is success, 受阻 destructive.
+      const status = column
+      const indicatorClassName = column.value === BLOCKED_COLUMN ? 'text-destructive-foreground' : status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
       return <section key={status.value} aria-label={statusLabel(status.value)}>
         <header className="flex h-10 items-center gap-2 bg-muted/40 px-4 text-xs sm:px-6">
           <status.icon className={cn('size-3.5', indicatorClassName)} />
@@ -60,6 +66,7 @@ export function IssueList({ issues, properties = LIST_COLUMNS, owners, searching
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
                 {showIdentifier && <span className="hidden w-20 shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{issue.identifier}</span>}
                 <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{displayTaskTitle(issue)}</span>
+                {column.value === BLOCKED_COLUMN && blocks?.get(issue.id) && <span className="hidden shrink-0 text-xs text-destructive-foreground sm:block">{blockLabel(tCard, blocks.get(issue.id)!)}</span>}
                 {/* The card's avatar group (R-25): the Bot on top, then the person; empty when nobody owns the task. The rings take the row's colour instead of the card's. */}
                 {properties.has('assignee') && <span data-slot="list-assignee" className="flex min-w-[18px] shrink-0 justify-end [&_[data-avatar]]:ring-background" title={issue.metadata.assignee?.name}>{assigneeGroupOf({ assignee: issue.metadata.assignee, owner: owners?.get(issue.id) })}{issue.metadata.assignee && <span className="sr-only">{issue.metadata.assignee.name}</span>}</span>}
                 <time suppressHydrationWarning dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric' })}</time>

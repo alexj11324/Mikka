@@ -526,7 +526,7 @@
         "GET"
       ],
       "maxDuration": 300,
-      "sourceHash": "82d01824fdcd927f9726be9746f5786cc29d21296a7297c93f76b1d49586928d"
+      "sourceHash": "9b8e54f90ddb2f25986c5004ed1f4e6cd0dab736461052abfd898dca76eafbda"
     },
     {
       "path": "/mikka/api/credentials",
@@ -1306,7 +1306,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "6dd46b08d408e061db9d22b2b4b909106a85ebc54b2e7f3ec6c8ef81c7accf2a"
+      "sourceHash": "f70c1813cd999755d4b8b3201de2d5910fa9e18d56bf871c42bed8a3cb9c6234"
     },
     {
       "path": "/mikka/api/mobile/threads",

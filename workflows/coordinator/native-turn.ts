@@ -12,7 +12,7 @@ const NATIVE_TURN_MS = 180_000
 export const NATIVE_TURN_FALLBACK_MS = 15_000
 
 /** A durable transport relay, not an additional LLM/agent loop. Native harness chooses tools. */
-export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string, snapshot?: DefinitionSnapshot, signal?: AbortSignal) {
+export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string, snapshot?: DefinitionSnapshot, signal?: AbortSignal, finished: ModelMessage[] = []) {
   const tools = createTools()
   const definitions: NativeCoordinatorJob['tools'] = []
   for (const [name, definition] of Object.entries(tools)) {
@@ -22,7 +22,8 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
   const turnId = snapshot
     ? await native.enqueue(userId,holder,round,runtime,definitions,botId,snapshot)
     : await native.enqueue(userId,holder,round,runtime,definitions,botId)
-  const responseMessages: ModelMessage[] = []
+  // Each finished tool call lands here as it finishes, so 停止 keeps it without waiting for the device (workflow.ts).
+  const responseMessages = finished
   const completed = new Map<string, unknown>()
   const deadline = Date.now() + NATIVE_TURN_MS
   // Woken by the device's writes (app/v1/devices/[deviceId]/coordinator), not a 1 s re-read (#1212).

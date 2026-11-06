@@ -1,20 +1,25 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { REQUIRED, buildEnvironment } from './web-deploy.mjs'
+import { REQUIRED, buildEnvironment, buildEnvironmentValues } from './web-deploy.mjs'
 import { directDatabaseURL } from '../postgres-connection.mjs'
 import { productionBuildEnvironment } from './build-vercel.mjs'
 
 const sourceSha = 'a'.repeat(40)
 const env = { GITHUB_SHA: sourceSha, VERCEL_GIT_COMMIT_SHA: sourceSha, MIKKA_DEPLOYMENT_ID: 'aaaaaaaaaaaa-123-1' }
-const text = ['VERCEL_ENV="production"', ...REQUIRED.map(key => `${key}="fixture-${key}"`)].join('\n')
+const databases = { MIKKA_DATABASE_URL: 'postgresql://localhost/application_e2e', DATABASE_URL: 'postgresql://localhost/workspace_e2e' }
+const text = ['VERCEL_ENV="production"', ...REQUIRED.map(key => `${key}=${JSON.stringify(databases[key] ?? `fixture-${key}`)}`)].join('\n')
 
 test('production build binds the exact source and deployment without acceptance credentials', () => {
   const result = productionBuildEnvironment({ text, sourceSha, nodeVersion: 'v24.22.1', env: { ...env,
+    VERCEL_GIT_PROVIDER: 'conflicting-provider', VERCEL_GIT_REPO_OWNER: 'conflicting-owner', VERCEL_GIT_REPO_SLUG: 'conflicting-repo',
     MIKKA_TEST_DEPLOYMENT_SHA: sourceSha, MIKKA_LOCAL_TEST_ACCOUNTS: '1', MIKKA_TEST_ENVIRONMENT_FILE: 'fixture-only' } })
   assert.equal(result.NITRO_PRESET, 'vercel')
   assert.equal(result.NEXT_PUBLIC_MIKKA_BUILD, sourceSha)
   assert.equal(result.MIKKA_DEPLOYMENT_ID, env.MIKKA_DEPLOYMENT_ID)
-  assert.equal(result.MIKKA_DATABASE_URL, 'fixture-MIKKA_DATABASE_URL')
+  assert.equal(result.VERCEL_GIT_PROVIDER, 'github')
+  assert.equal(result.VERCEL_GIT_REPO_OWNER, 'alexj11324')
+  assert.equal(result.VERCEL_GIT_REPO_SLUG, 'Mikka')
+  assert.equal(result.MIKKA_DATABASE_URL, databases.MIKKA_DATABASE_URL)
   for (const key of ['MIKKA_TEST_DEPLOYMENT_SHA', 'MIKKA_LOCAL_TEST_ACCOUNTS', 'MIKKA_TEST_ENVIRONMENT_FILE']) assert.equal(result[key], undefined)
 })
 
@@ -41,15 +46,15 @@ test('the filled build file preserves JSON-escaped connection and auth values by
     ['literal backslash n', plain.replace('plain', 'literal\\npassword')],
   ]
   const authSecret = 'fixture\r\n"quoted"\\literal\\$cash'
-  const withheld = text.replace('fixture-MIKKA_DATABASE_URL', '')
-    .replace('fixture-DATABASE_URL', '').replace('fixture-BETTER_AUTH_SECRET', '')
+  const withheld = text.replace(databases.MIKKA_DATABASE_URL, '')
+    .replace(databases.DATABASE_URL, '').replace('fixture-BETTER_AUTH_SECRET', '')
   const observed = cases.map(([name, connection]) => {
     const values = { ...env, MIKKA_DATABASE_URL: connection,
       DATABASE_URL: connection.replace('/app?', '/workspace?'), BETTER_AUTH_SECRET: authSecret }
     // The production workflow first fills the file, then the direct builder
     // reads that already-filled file. Neither pass may reinterpret credentials.
     const filled = buildEnvironment(withheld, values)
-    const result = productionBuildEnvironment({ text: filled, sourceSha, env: values, nodeVersion: 'v24.22.1' })
+    const result = productionBuildEnvironment({ text: filled, sourceSha, env, nodeVersion: 'v24.22.1' })
     let directUsable = false
     try {
       directUsable = ['MIKKA_DATABASE_URL', 'DATABASE_URL'].every(key =>
@@ -65,10 +70,45 @@ test('the filled build file preserves JSON-escaped connection and auth values by
 
 test('the codec does not repair or dequote an originally invalid database value', () => {
   const invalid = '"postgresql://fixture:password@database.invalid/app"'
-  const withheld = text.replace('fixture-MIKKA_DATABASE_URL', '')
+  const withheld = text.replace(databases.MIKKA_DATABASE_URL, '')
   const values = { ...env, MIKKA_DATABASE_URL: invalid }
   const filled = buildEnvironment(withheld, values)
-  const result = productionBuildEnvironment({ text: filled, sourceSha, env: values, nodeVersion: 'v24.22.1' })
-  assert.equal(result.MIKKA_DATABASE_URL === invalid, true)
-  assert.throws(() => directDatabaseURL(result.MIKKA_DATABASE_URL), /DATABASE_CONNECTION_URL_INVALID/)
+  assert.equal(buildEnvironmentValues(filled, values).MIKKA_DATABASE_URL === invalid, true)
+  assert.throws(() => productionBuildEnvironment({ text: filled, sourceSha, env: values, nodeVersion: 'v24.22.1' }),
+    { message: 'webDeploy:databaseConnectionUrlInvalid:MIKKA_DATABASE_URL' })
+  assert.throws(() => directDatabaseURL(invalid), /DATABASE_CONNECTION_URL_INVALID/)
+})
+
+test('non-empty job values retain the legacy Vercel precedence over the filled file', () => {
+  const job = { ...env, MIKKA_DATABASE_URL: 'postgresql://localhost/job_application_e2e',
+    DATABASE_URL: 'postgresql://localhost/job_workspace_e2e', BETTER_AUTH_SECRET: 'fixture"\r\n\\$literal' }
+  const filled = buildEnvironment(text, job)
+  const result = productionBuildEnvironment({ text: filled, sourceSha, env: job })
+  for (const key of ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'BETTER_AUTH_SECRET']) {
+    assert.equal(result[key] === job[key], true)
+  }
+  assert.equal(result.VERCEL_GIT_COMMIT_SHA, sourceSha)
+  assert.equal(result.VERCEL_ENV, 'production')
+})
+
+test('empty or absent job values fall back to the decoded file without URL normalization', () => {
+  const application = 'postgresql://ep-fixture-pooler.us-east-2.aws.neon.tech/app?sslmode=require'
+  const file = text.replace(databases.MIKKA_DATABASE_URL, application)
+  for (const value of [undefined, '']) {
+    const result = productionBuildEnvironment({ text: buildEnvironment(file, env), sourceSha,
+      env: { ...env, MIKKA_DATABASE_URL: value, DATABASE_URL: value, BETTER_AUTH_SECRET: value } })
+    assert.equal(result.MIKKA_DATABASE_URL === application, true)
+    assert.equal(result.DATABASE_URL === databases.DATABASE_URL, true)
+    assert.equal(result.BETTER_AUTH_SECRET, 'fixture-BETTER_AUTH_SECRET')
+    assert.notEqual(directDatabaseURL(result.MIKKA_DATABASE_URL), result.MIKKA_DATABASE_URL)
+  }
+})
+
+test('both selected migration targets fail early with only a key and fixed code', () => {
+  for (const key of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
+    for (const invalid of ['not-a-url', '"postgresql://localhost/fixture_e2e"', 'https://localhost/fixture_e2e']) {
+      assert.throws(() => productionBuildEnvironment({ text, sourceSha, env: { ...env, [key]: invalid } }),
+        { message: 'webDeploy:databaseConnectionUrlInvalid:' + key })
+    }
+  }
 })

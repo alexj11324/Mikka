@@ -68,7 +68,8 @@
       "review": "In Review",
       "done": "Done",
       "canceled": "Canceled",
-      "duplicate": "Duplicate"
+      "duplicate": "Duplicate",
+      "blocked": "Blocked"
     },
     "priority": {
       "urgent": "Urgent",
@@ -4257,7 +4258,18 @@
           "running": "Running",
           "waiting": "Waiting for you",
           "blocked": "Blocked"
-        }
+        },
+        "block": {
+          "question": "Needs your answer",
+          "quota": "Out of quota",
+          "run": "Run blocked",
+          "failed": "Run failed",
+          "dependency": "Waiting on a task",
+          "dependencyOn": "Waiting on {id}",
+          "flagged": "Flagged"
+        },
+        "markBlocked": "Mark as blocked",
+        "unblock": "Move out of Blocked"
       },
       "title": "Board",
       "synced": "Synced with Linear",

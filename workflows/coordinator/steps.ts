@@ -147,9 +147,15 @@ export async function appendMessages(userId: string, holder: string, messages: M
   return store.appendMessages(userId, holder, messages, warning, botId, streamId, stopped)
 }
 
-/** What the model call cut short by 停止 had streamed in turn `streamId`, read back from this run's own stream (lib/coordinator/stop.ts). */
-export async function stoppedStepText(holder: string, streamId: string) {
+/**
+ * 停止 for turn `streamId`, in one step: marks it stopped on the stream (the chat
+ * shows 已停止 at once), then reads back what the model call it cut short had
+ * streamed from this run's own stream (lib/coordinator/stop.ts).
+ */
+export async function markStopped(writable: WritableStream<CoordinatorWorkflowStreamPart>, holder: string, streamId: string) {
   'use step'
+  const writer = writable.getWriter()
+  try { await writer.write({ type: 'coordinator-turn-stopped', id: streamId }) } finally { writer.releaseLock() }
   const { getRun } = await import('workflow/api')
   const { stoppedStepText: read } = await import('@/lib/coordinator/stop')
   return read(getRun(holder).getReadable<CoordinatorWorkflowStreamPart>(), streamId)

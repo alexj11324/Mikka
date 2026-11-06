@@ -89,3 +89,39 @@ test('hook keeps one reader, rebuilds reconnects, reconciles history, and cancel
   }
   assert.equal(streams.at(-1)?.cancelled, true)
 })
+
+test('a sent message opens the stream at once; the run it finds carries on when the chat read names it', async () => {
+  const originalFetch = globalThis.fetch
+  const streams: { controller: ReadableStreamDefaultController<Uint8Array>; url: string; signal: AbortSignal }[] = []
+  globalThis.fetch = async (input, options) => {
+    const stream = { url: String(input), signal: options!.signal as AbortSignal } as typeof streams[number]
+    const body = new ReadableStream<Uint8Array>({ start(controller) { stream.controller = controller } })
+    streams.push(stream)
+    return new Response(body, { headers: { 'x-mikka-stream-key': 'key', 'x-mikka-stream-run': 'wrun_1' } })
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLElement
+  document.body.append(container)
+  const root = createRoot(container)
+  let output!: ReturnType<typeof useCoordinatorStream>
+  let props: Parameters<typeof useCoordinatorStream>[0] = { botId: null, waiting: true, cursor: 0, revalidate: async () => undefined }
+  function Probe() { output = useCoordinatorStream(props); return null }
+  const render = () => act(async () => { root.render(<Probe />) })
+  try {
+    await render()
+    assert.equal(streams.length, 1)
+    assert.match(streams[0].url, /wait=1/)
+    assert.doesNotMatch(streams[0].url, /runId=/)
+    await act(async () => { streams[0].controller.enqueue(new TextEncoder().encode(JSON.stringify({ type: 'start', id: 'wrun_1:0', sequence: 1 }) + '\n' + JSON.stringify({ type: 'text', id: 'wrun_1:0', delta: 'On it', sequence: 2 }) + '\n')) })
+    assert.equal(output.replies.map(reply => reply.text).join(''), 'On it', 'the first words show before any chat read names the run')
+    // The chat's read now names the run the stream found: the same reader carries on.
+    props = { ...props, waiting: false, runId: 'wrun_1' }
+    await render()
+    assert.equal(streams.length, 1)
+    assert.equal(streams[0].signal.aborted, false)
+    assert.equal(output.replies.map(reply => reply.text).join(''), 'On it')
+  } finally {
+    await act(async () => { root.unmount() })
+    globalThis.fetch = originalFetch
+    container.remove()
+  }
+})
