@@ -88,8 +88,61 @@ export function readPeerFailures(directory) {
   finally { if (fd !== undefined) closeSync(fd) }
 }
 
+const rpcMethods = new Set(['initialize', 'notifications/initialized', 'tools/list', 'tools/call'])
+const rpcCodes = new Set([-32700, -32600, -32601, -32602, -32603, -32000, -32001])
+const rpcErrors = new Map([
+  ['Parse error: Invalid JSON', 'json_parse'],
+  ['Parse error: Invalid JSON-RPC message', 'jsonrpc_shape'],
+  ['Bad Request: Server not initialized', 'not_initialized'],
+  ['Bad Request: Mcp-Session-Id header is required', 'session_missing'],
+  ['Session not found', 'session_unknown'],
+  ['Invalid Request: Server already initialized', 'already_initialized'],
+  ['Invalid Request: Only one initialization request is allowed', 'multiple_initialize'],
+  ['Not Acceptable: Client must accept both application/json and text/event-stream', 'not_acceptable'],
+  ['Unsupported Media Type: Content-Type must be application/json', 'content_type'],
+])
+
+/** Inspect only the host's already-constructed small JSON string, never consume
+ * a Request stream or retain tool arguments. */
+function rpcMethodOf(options) {
+  if (typeof options?.body !== 'string' || Buffer.byteLength(options.body) > 4096) return 'OTHER'
+  try { const method = JSON.parse(options.body)?.method; return rpcMethods.has(method) ? method : 'OTHER' }
+  catch { return 'OTHER' }
+}
+
+/** A failed response's clone is bounded in bytes and time. Cancellation of a
+ * tee can wait for its other branch, so never await that diagnostic cleanup. */
+async function rpcFailureOf(response) {
+  let reader, timer
+  try {
+    reader = response.clone().body?.getReader()
+    if (!reader) return { rpcErrorClass: 'body_unavailable' }
+    const read = async () => {
+      const chunks = []; let size = 0
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        size += value.byteLength
+        if (size > 4096) return { rpcErrorClass: 'body_limit' }
+        chunks.push(value)
+      }
+      let packet
+      try { packet = JSON.parse(Buffer.concat(chunks).toString('utf8')) }
+      catch { return { rpcErrorClass: 'invalid_json' } }
+      const error = packet?.jsonrpc === '2.0' && packet.error && typeof packet.error === 'object' ? packet.error : undefined
+      const category = rpcErrors.get(error?.message)
+        ?? (typeof error?.message === 'string' && error.message.startsWith('Bad Request: Unsupported protocol version: ') ? 'protocol_version' : 'other')
+      return { ...(rpcCodes.has(error?.code) ? { rpcErrorCode: error.code } : {}), rpcErrorClass: category }
+    }
+    return await Promise.race([read(), new Promise(resolve => { timer = setTimeout(() => resolve({ rpcErrorClass: 'body_deadline' }), 250) })])
+  } catch { return { rpcErrorClass: 'body_unavailable' } }
+  finally { clearTimeout(timer); void reader?.cancel().catch(() => undefined) }
+}
+
 /** Observe the exact real mailbox transport without consuming or changing its
- * request/response, signal, timeout or error. Output only closed HTTP metadata. */
+ * request/response, signal, timeout or error. Successful bodies are untouched;
+ * a failed JSON response is inspected on a bounded clone without awaiting it
+ * before returning. Output contains closed metadata, never message/body text. */
 export function observeTraceMcpFetch(fetcher, sink = value => console.info(JSON.stringify({ traceFixtureHttp: value }))) {
   let remaining = 64
   const names = new Set(['Error', 'TypeError', 'AbortError', 'TimeoutError', 'DOMException'])
@@ -102,11 +155,17 @@ export function observeTraceMcpFetch(fetcher, sink = value => console.info(JSON.
     remaining--
     const requested = options?.method ?? (input instanceof Request ? input.method : 'GET')
     const method = ['GET', 'POST', 'DELETE'].includes(requested) ? requested : 'OTHER'
+    const rpcMethod = rpcMethodOf(options)
     const started = Date.now()
-    const report = fields => { try { sink({ route: 'mcp', method, durationMs: Date.now() - started, ...fields }) } catch { /* Preserve transport behavior. */ } }
+    const report = (fields, durationMs = Date.now() - started) => { try { sink({ route: 'mcp', method, rpcMethod, durationMs, ...fields }) } catch { /* Preserve transport behavior. */ } }
     try {
       const response = await fetcher(input, options)
-      report({ status: response.status })
+      const type = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase()
+      const responseType = ['application/json', 'text/event-stream', 'text/plain', 'text/html'].includes(type) ? type : type ? 'OTHER' : 'NONE'
+      const fields = { status: response.status, responseType }, durationMs = Date.now() - started
+      if (!response.ok && responseType === 'application/json') {
+        void rpcFailureOf(response).then(failure => report({ ...fields, ...failure }, durationMs), () => report(fields, durationMs))
+      } else report(fields, durationMs)
       return response
     } catch (error) {
       report({ errorName: names.has(error?.name) ? error.name : 'Error', ...(errors.has(error?.code) ? { code: error.code } : {}) })

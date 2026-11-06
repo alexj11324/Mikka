@@ -102,9 +102,14 @@ The peer also retains only closed command-stage/code/source diagnostics in its
 owned mode-0600 `trace-peer-failures.jsonl`; the report revalidates these fields
 before including `peerFailures`. The daemon's fixture-only fetch wrapper writes
 at most 64 mailbox HTTP records to its private stdout log: fixed route/method,
-status, time until fetch resolves, or a whitelisted error name/code. It never
-reads request/response bodies or credentials and preserves the real signal,
-timeout, response and error. No mailbox authorization or retry policy changes.
+an enumerated RPC method from the host's already-constructed JSON, content type,
+status, time until fetch resolves, or a whitelisted error name/code. Only failed
+JSON responses are inspected on a clone, capped at 4 KiB and 250 ms, to retain a
+standard numeric JSON-RPC code and fixed error category. Successful bodies and
+credentials are never inspected; no body or error message is retained. The
+wrapper returns the original response without waiting for the failed clone
+and preserves the real signal, timeout, response and error. No mailbox
+authorization or retry policy changes.
 Child stdout/stderr, authentication files, source prompts, responses and raw OTLP
 bodies are not copied into that report. Bounded child diagnostics are retained as
 mode-0600 files under `private-logs/`; they must never be published or printed

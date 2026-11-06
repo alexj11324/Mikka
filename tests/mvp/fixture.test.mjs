@@ -84,6 +84,54 @@ test('diagnostics observe only the real loopback MCP headers response and preser
   assert.equal(await observeTraceMcpFetch(async () => response, () => { throw new Error('sink unavailable') })(request, options), response)
 })
 
+test('MCP failure diagnostics project only an enumerated method, protocol code and fixed category from a clone', async () => {
+  const evidence = Promise.withResolvers()
+  const packet = { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Bad Request: Mcp-Session-Id header is required', data: { token: 'private-token' } } }
+  const response = Response.json(packet, { status: 400 })
+  const options = { method: 'POST', signal: new AbortController().signal, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: { private: 'private-body' } }) }
+  const wrapped = observeTraceMcpFetch(async (_input, actual) => { assert.equal(actual, options); return response }, evidence.resolve)
+  assert.equal(await wrapped('http://localhost:3100/mikka/api/mcp?private=private-query', options), response)
+  const value = await evidence.promise
+  assert.equal(value.rpcMethod, 'notifications/initialized')
+  assert.equal(value.responseType, 'application/json'); assert.equal(value.rpcErrorCode, -32000); assert.equal(value.rpcErrorClass, 'session_missing')
+  assert.ok(!JSON.stringify(value).includes('private') && !JSON.stringify(value).includes(packet.error.message))
+  assert.equal(response.bodyUsed, false)
+  assert.deepEqual(await response.json(), packet)
+
+  const unknown = Promise.withResolvers(), arbitrary = Response.json({ jsonrpc: '2.0', error: { code: 'private-code', message: 'private-message' } }, { status: 400 })
+  const observeUnknown = observeTraceMcpFetch(async () => arbitrary, unknown.resolve)
+  await observeUnknown('http://localhost:3100/mikka/api/mcp', { method: 'POST', body: JSON.stringify({ method: 'private-method' }) })
+  const closed = await unknown.promise
+  assert.equal(closed.rpcMethod, 'OTHER'); assert.equal(closed.rpcErrorClass, 'other'); assert.ok(!Object.hasOwn(closed, 'rpcErrorCode'))
+  assert.ok(!JSON.stringify(closed).includes('private'))
+  await arbitrary.body.cancel()
+})
+
+test('MCP diagnostics bound failed JSON reads and cancel a stalled clone without delaying the original response', { timeout: 5000 }, async () => {
+  const large = Promise.withResolvers(), largeResponse = Response.json({ private: 'private-body'.repeat(1000) }, { status: 400 })
+  assert.equal(await observeTraceMcpFetch(async () => largeResponse, large.resolve)('http://localhost:3100/mikka/api/mcp'), largeResponse)
+  assert.equal((await large.promise).rpcErrorClass, 'body_limit')
+  assert.equal(largeResponse.bodyUsed, false)
+  await largeResponse.body.cancel()
+
+  let cancelled = false
+  const stalled = Promise.withResolvers(), response = new Response(new ReadableStream({ cancel() { cancelled = true } }), { status: 400, headers: { 'content-type': 'application/json' } })
+  const returned = await observeTraceMcpFetch(async () => response, stalled.resolve)('http://localhost:3100/mikka/api/mcp')
+  assert.equal(returned, response); assert.equal(response.bodyUsed, false)
+  assert.equal((await stalled.promise).rpcErrorClass, 'body_deadline')
+  await response.body.cancel()
+  assert.equal(cancelled, true)
+})
+
+test('MCP success diagnostics never clone or consume the response body', async () => {
+  const observed = [], response = Response.json({ private: 'private-success' })
+  response.clone = () => { throw new Error('Success response must not be inspected') }
+  assert.equal(await observeTraceMcpFetch(async () => response, value => observed.push(value))('http://localhost:3100/mikka/api/mcp', { method: 'POST', body: JSON.stringify({ method: 'initialize' }) }), response)
+  assert.equal(response.bodyUsed, false)
+  assert.equal(observed[0].rpcMethod, 'initialize'); assert.ok(!Object.hasOwn(observed[0], 'rpcErrorClass'))
+  assert.ok(!JSON.stringify(observed).includes('private'))
+})
+
 test('GitHub fixture human merge preserves exact Git bytes and rejects unauthorized or stale heads', async () => {
   const services = await startMvpServices(0)
   const userToken = 'mikka-local-synthetic-user-token'
