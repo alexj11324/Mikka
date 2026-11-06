@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Sandbox } from 'e2b'
 import { runtimeRefreshRefusal } from './runtime-refresh-refusal'
+import { recordCloudBootstrapPhases } from './startup-tracing'
 
 export const OFFICIAL_E2B_TEMPLATES = ['desktop', 'claude', 'codex'] as const
 export type OfficialE2BTemplate = typeof OFFICIAL_E2B_TEMPLATES[number]
@@ -42,7 +43,9 @@ export async function bootstrapOfficialInstance(sandbox: Pick<Sandbox, 'commands
   const commit = env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, sha = env.MIKKA_CLOUD_WORKER_SHA
   if (!isOfficialE2BTemplate(template) || !commit || !/^[a-f0-9]{40}$/.test(commit) || !sha || !/^[a-f0-9]{40}$/.test(sha)) throw new Error('Official worker release is not configured')
   const source = await script()
+  const startedAt = Date.now()
   const result = await sandbox.commands.run(`bash -s -- ${commit} ${sha} ${template} <<'MIKKA_OFFICIAL_INSTANCE_BOOTSTRAP'\n${source}\nMIKKA_OFFICIAL_INSTANCE_BOOTSTRAP`, { user: 'root', timeoutMs: 300_000 })
+  recordCloudBootstrapPhases(result.stdout, startedAt, Date.now())
   if (!result.stdout.includes(`mikka-official-instance-ready ${commit} ${sha}`)) {
     // Idempotent creation can return an already-installed instance. Verify its
     // receipt rather than treating command exit alone as successful startup.

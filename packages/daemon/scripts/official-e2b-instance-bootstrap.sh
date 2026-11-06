@@ -2,6 +2,13 @@
 # Add Mikka to a new official E2B instance. Never build/update a template or
 # overwrite/remove official packages, system files or the original CLI tree.
 set -euo pipefail
+# Fixed, secret-free receipts; no extra process or installation work.
+mikka_phase_started=${EPOCHREALTIME/./}
+mikka_phase_done() {
+  local mikka_phase_now=${EPOCHREALTIME/./}
+  printf 'mikka-bootstrap-phase %s %s\n' "$1" "$(( (mikka_phase_now - mikka_phase_started) / 1000 ))"
+  mikka_phase_started=$mikka_phase_now
+}
 mikka_commit=${1:?source commit required}
 mikka_sha=${2:?worker digest required}
 mikka_kind=${3:?official template kind required}
@@ -43,6 +50,7 @@ if [[ "$mikka_mode" = stage ]]; then
 else
   mkdir "$mikka_release"
 fi
+mikka_phase_done validation
 git -c core.hooksPath=/dev/null init -q "$mikka_release/source"
 git -C "$mikka_release/source" -c core.hooksPath=/dev/null remote add origin https://github.com/alexj11324/Mikka.git
 git -C "$mikka_release/source" -c core.hooksPath=/dev/null fetch -q --depth=1 origin "$mikka_commit"
@@ -50,6 +58,7 @@ git -C "$mikka_release/source" -c core.hooksPath=/dev/null checkout -q --detach 
 [[ "$(git -C "$mikka_release/source" rev-parse HEAD)" = "$mikka_commit" ]] || exit 3
 mikka_actual_sha=$(cd "$mikka_release/source" && python3 scripts/e2b/build-template.py --worker-hash --source-ref HEAD)
 [[ "$mikka_actual_sha" = "$mikka_sha" ]] || exit 3
+mikka_phase_done source
 if [[ "$mikka_mode" = install ]]; then
 mikka_node_archive=/opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz
 curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz -o "$mikka_node_archive"
@@ -58,17 +67,21 @@ tar -xJf "$mikka_node_archive" -C /opt/mikka/runtime
 ln -s node-v24.19.0-linux-x64 /opt/mikka/runtime/node
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 mkdir -p /opt/mikka/runtime/bootstrap-home /opt/mikka/runtime/harness-bin
+mikka_phase_done node
 if ! command -v gh >/dev/null; then
   curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
   echo 'ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e  /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz' | sha256sum --check --strict
   tar -xzf /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz -C /opt/mikka/runtime
   ln -s /opt/mikka/runtime/gh_2.83.2_linux_amd64/bin/gh /opt/mikka/runtime/harness-bin/gh
 fi
+mikka_phase_done gh
 fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 cd "$mikka_release/source"
 env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
+mikka_phase_done dependencies
 node packages/daemon/scripts/build-cloud-worker.mjs
+mikka_phase_done build
 printf '%s\n' "$mikka_sha" > "$mikka_release/worker-ready.sha"
 chmod -R go-w "$mikka_release"
 if [[ "$mikka_mode" = stage ]]; then
@@ -88,6 +101,7 @@ if ! command -v codex >/dev/null; then
   if [[ -x "$mikka_codex_root/codex-path/rg" ]]; then ln -s "$mikka_codex_root/codex-path/rg" /opt/mikka/runtime/harness-bin/rg; fi
   chmod -R go+rX /opt/mikka/harness
 fi
+mikka_phase_done cli
 # Only the fresh install path reaches here: staging exits above, an installed
 # marker returns above, and an unknown private worker installation is refused.
 # Persist an empty journal before registration/claim. A rejected first claim
@@ -123,6 +137,7 @@ except Exception:
     raise SystemExit('runtime_initial_journal_refused')
 MIKKA_INITIAL_WORKER_JOURNAL
 ln -s "$mikka_release/source" /opt/mikka/worker
+mikka_phase_done journal
 if [[ "$mikka_kind" = desktop ]]; then
   mkdir -p /opt/mikka/computer/desktop-config/xfce4/xfconf/xfce-perchannel-xml /opt/mikka/computer/desktop-config/autostart
   env HOME=/opt/mikka/runtime/bootstrap-home PIP_CACHE_DIR=/opt/mikka/runtime/pip-cache python3 -m pip install --target /opt/mikka/computer 'aiohttp==3.13.3'
@@ -134,8 +149,10 @@ if [[ "$mikka_kind" = desktop ]]; then
   tar -xzf /opt/mikka/archives/cua-driver.tar.gz -C /opt/mikka/computer
   chmod 0755 /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/lease-driver.py
 fi
+mikka_phase_done desktop
 install -d -m 710 -o root -g user /run/mikka-viewer
 chmod -R go-w "$mikka_release"
 printf '%s\n' "$mikka_sha" > /opt/mikka/worker-source-sha
 chmod 0444 /opt/mikka/worker-source-sha
+mikka_phase_done finalize
 printf 'mikka-official-instance-ready %s %s\n' "$mikka_commit" "$mikka_sha"
