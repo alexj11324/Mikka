@@ -35,7 +35,7 @@ async function fixture(harness: 'codex' | 'claude_code' = 'claude_code') {
   }
   const gate = new ToolApprovalGate(runId, { isLive: () => true })
   const options = { runId, toolApproval: gate, cwd, prompt: 'hello', model: 'fixture-model',
-    env: { PATH: process.env.PATH!, HOME: home }, log: createLogger({ level: 'silent' }) }
+    env: { PATH: process.env.PATH!, HOME: home, XDG_CONFIG_HOME: join(home, '.config'), GH_CONFIG_DIR: join(home, '.config', 'gh') }, log: createLogger({ level: 'silent' }) }
   const config = join(home, harness === 'codex' ? '.codex' : '.claude')
   const runner = await createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary } })
   return { root, stateDir, home, cwd, config, link, never, binary, assignment, options, gate, runner }
@@ -80,6 +80,17 @@ it.each(['codex', 'claude_code'] as const)('%s uses a delivered GitHub credentia
   expect(native).toContain('synthetic-actual-github-token')
   expect(native).toContain('keep-enterprise')
   expect(existsSync(join(f.stateDir, 'runs', f.assignment.runId, 'github', 'bin', 'gh'))).toBe(false)
+})
+
+it.each(['codex', 'claude_code'] as const)('%s passes the actual model key and provider address directly to its CLI', async harness => {
+  const f = await fixture(harness), key = 'fixture-direct-provider-key'
+  delete f.assignment.subscriptionBinding; delete f.assignment.subscriptionLease
+  f.assignment.modelCredential = { kind: 'provider', protocol: harness === 'codex' ? 'openai' : 'anthropic', baseUrl: 'https://provider.example/v1', key }
+  expect((await collect(await f.runner.start(f.assignment, f.options))).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(JSON.parse(readFileSync(join(f.config, 'fixture-auth.json'), 'utf8')))
+    .toEqual({ tokenSha: createHash('sha256').update(key).digest('hex'), baseUrl: 'https://provider.example/v1' })
+  expect(existsSync(join(f.stateDir, 'native-brokers'))).toBe(false)
+  expect(f.never).not.toHaveBeenCalled()
 })
 
 it.each(['codex', 'claude_code'] as const)('%s stops its actual CLI immediately after a local pushed stop', async harness => {

@@ -13,16 +13,17 @@ const flag = (key) => {
   const at = args.indexOf(key)
   return at < 0 ? undefined : args[at + 1]
 }
-if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3") process.exit(2)
-const token = readFileSync(3, "utf8")
-closeSync(3)
+const apiKey = process.env.FIXTURE_MACHINE_AUTH && process.env.ANTHROPIC_API_KEY === 'fixture-direct-provider-key'
+if (!apiKey && (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3")) process.exit(2)
+const token = apiKey ? process.env.ANTHROPIC_API_KEY : readFileSync(3, "utf8")
+if (!apiKey) closeSync(3)
 const config = process.env.CLAUDE_CONFIG_DIR ?? join(process.env.HOME, '.claude')
 if (
   !token ||
   !config ||
   config !== join(process.env.HOME, ".claude") ||
   (!process.env.FIXTURE_MACHINE_AUTH && existsSync(join(config, ".credentials.json"))) ||
-  process.env.ANTHROPIC_API_KEY ||
+  (!apiKey && process.env.ANTHROPIC_API_KEY) ||
   process.env.ANTHROPIC_AUTH_TOKEN ||
   (!process.env.FIXTURE_MACHINE_AUTH && (process.env.E2B_API_KEY || Object.keys(process.env).some((key) => /REFRESH_TOKEN|INFISICAL/.test(key))))
 )
@@ -40,7 +41,8 @@ if (flag('--resume') !== undefined) {
 }
 const sessionId = history.resumeSessionId ?? requestedSession
 writeFileSync(historyFile, JSON.stringify(history))
-writeFileSync(join(config, 'fixture-auth.json'), JSON.stringify({ tokenSha: createHash('sha256').update(token).digest('hex') }))
+writeFileSync(join(config, 'fixture-auth.json'), JSON.stringify({ tokenSha: createHash('sha256').update(token).digest('hex'),
+  ...(apiKey ? { baseUrl: process.env.ANTHROPIC_BASE_URL } : {}) }))
 // Capture only the official effort flag and session identity, never auth argv/env.
 writeFileSync(join(config, 'fixture-effort.json'), JSON.stringify({ transport: 'cli', sessionId, effort: flag('--effort') ?? null, resumed: flag('--resume') !== undefined }))
 const processReceipt = join(config, 'fixture-process.json')
