@@ -139,7 +139,7 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-zh-dark.svg">
-  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web、桌面和 iOS 应用，Telegram、Slack，通知来源和 MCP 客户端接入 Vercel 上的 Next.js 应用，应用状态存储在 Postgres，支付通过 Stripe。每分钟 Worker 和应用事件唤醒 Coordinator，Coordinator 将运行派发给你的 Mac、Linux 主机或 SSH 主机上的 daemon，并唤醒每个 bot 的 Mikka Cloud 电脑。Agent 通过 MCP 回报。Factory 阶段由监控驱动，位于 Coordinator 之上，审批后写入回到已连接应用。Linear 同步（已关闭）、在 Mikka Cloud 上运行的 Agent 和凭据保管库以虚线表示。">
+  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web、桌面和 iOS 应用，Telegram、Slack，通知来源和 MCP 客户端接入 Vercel 上的 Next.js 应用，应用状态存储在 Postgres，支付通过 Stripe。每分钟 Worker 和应用事件唤醒 Coordinator，Coordinator 将运行派发给你的 Mac、Linux 主机或 SSH 主机上的 daemon，并唤醒每个 bot 的 Mikka Cloud 电脑。Agent 通过 MCP 回报。Factory 阶段由监控驱动，位于 Coordinator 之上，审批后写入回到已连接应用。已关闭的 Linear 同步以虚线表示。">
 </picture>
 
 Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
@@ -152,7 +152,7 @@ Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox
 
 一个 Cloudflare Worker 每分钟触发一次，调用应用的 cron 路由：每分钟处理到期的 Coordinator 唤醒、定时任务、运行恢复、账号删除、审计保留和运行监控，每 15 分钟写简报，每小时做通知对账和个人画像合并（[建议定时任务](docs/suggestions-cron.md)）。Linear 同步运行在另一个 Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更；它由 PostHog flag 关闭。
 
-虚线框和虚线表示已关闭或仍待端到端验收的部分：Linear 同步、在 Mikka Cloud 上运行的 Agent 和凭据保管库。
+虚线框和虚线表示已关闭的 Linear 同步。
 
 ## 技术栈
 
