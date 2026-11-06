@@ -40,7 +40,7 @@ export function welcomeOptions(text) {
 
 export function requestAllowed(path, method, body) {
   if (method === 'GET') return ['/api/version', '/api/auth/get-session', '/api/bots', '/renderer-manifest.json'].includes(path)
-    || /^\/api\/coordinator\/stream\?botId=[a-f0-9-]{36}&wait=1$/.test(path)
+    || /^\/api\/coordinator\/stream\?botId=[a-f0-9-]{36}&wait=1&after=\d{1,7}$/.test(path)
   if (method !== 'POST') return false
   if (['/api/auth/sign-in/email', '/api/auth/sign-out'].includes(path)) return true
   return path === '/api/rpc' && body?.version === 1 && ACTIONS.has(body.action) && Array.isArray(body.args)
@@ -61,13 +61,14 @@ export async function runAcceptance() {
     transport: 'published_web_rpc_and_real_ndjson_stream', status: 'running', ordinaryAccountSession: false }
   const jar = new Map()
   let published, ownerId, originalWorkspace
-  const request = async (path, body, timeout = 30000) => {
+  const request = async (path, body, timeout = 30000, streamKey) => {
     const method = body === undefined ? 'GET' : 'POST'
     check(requestAllowed(path, method, body), 'acceptance_request_denied')
     const response = await fetch(ORIGIN + '/mikka' + path, { method, redirect: 'error', signal: AbortSignal.timeout(timeout),
       headers: { origin: ORIGIN, 'cache-control': 'no-store', accept: 'application/json',
         ...(jar.size ? { cookie: [...jar].map(([key, value]) => key + '=' + value).join('; ') } : {}),
-        ...(body ? { 'content-type': 'application/json' } : {}), ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) },
+        ...(body ? { 'content-type': 'application/json' } : {}), ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}),
+        ...(streamKey ? { 'x-mikka-stream-key': streamKey } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) })
     for (const cookie of response.headers.getSetCookie()) {
       const pair = cookie.split(';', 1)[0], at = pair.indexOf('=')
@@ -97,14 +98,20 @@ export async function runAcceptance() {
       return (await db.query(sql, args)).rows
     } finally { await db.query('ROLLBACK'); db.release() }
   }
+  const streamCursors = new Map()
   const streamTurn = async botId => {
-    const start = Date.now(), response = await request('/api/coordinator/stream?botId=' + botId + '&wait=1', undefined, 180000)
+    const cursor = streamCursors.get(botId)
+    const start = Date.now(), response = await request('/api/coordinator/stream?botId=' + botId + '&wait=1&after=' + (cursor?.after ?? 0), undefined, 180000, cursor?.key)
     check(response.status === 200 && response.headers.get('content-type')?.includes('application/x-ndjson'), 'turn_stream_unavailable')
+    const streamKey = response.headers.get('x-mikka-stream-key')
+    check(/^[a-f0-9]{64}$/.test(streamKey ?? ''), 'turn_stream_key_missing')
     const state = { committed: false, badTool: false, error: false, text: '', tools: new Set(), parts: 0, workflowRunId: response.headers.get('x-mikka-stream-run') }
     let buffer = '', bytes = 0
     const accept = line => {
       if (!line.trim()) return
       const part = JSON.parse(line); state.parts++
+      check(Number.isInteger(part.sequence) && part.sequence > 0 && part.sequence <= 1000000, 'turn_stream_sequence_invalid')
+      streamCursors.set(botId, { key: streamKey, after: part.sequence })
       if (part.type === 'text') state.text += part.delta ?? ''
       if (part.type === 'reset') state.text = part.text ?? ''
       if (part.type === 'committed') state.committed = true
@@ -121,7 +128,7 @@ export async function runAcceptance() {
       // committed event, not transport EOF, is this turn's completion boundary.
       if (state.committed) break
     }
-    buffer += decoder.decode(); accept(buffer)
+    if (!state.committed) { buffer += decoder.decode(); accept(buffer) }
     const chat = (await rpc('coordinator.syncCoordinatorChat', [botId])).chat
     check(chat && Array.isArray(chat.items), 'chat_response_invalid')
     const storedBad = chat.items.some(item => item.tools?.some(tool => !tool || tool.toLowerCase() === 'none') || /NoSuchToolError|AI_NoSuchToolError/.test(JSON.stringify(item)))
