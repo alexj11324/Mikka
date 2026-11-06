@@ -65,6 +65,28 @@ const profilePath = (workspaceId, id = '') => '/api/factory/agent-profiles' + (i
 const profileDefinition = value => Object.fromEntries(['name', 'description', 'roles', 'enabled', 'harness', 'model', 'effort', 'instructions', 'skills']
   .filter(key => value[key] !== undefined).map(key => [key, structuredClone(value[key])]))
 
+async function selectOwnPersonalWorkspace(read, rpc, ownerId) {
+  const current = await read('/api/workspace')
+  const choices = Array.isArray(current.choices) ? current.choices.filter(value => value.kind === 'personal') : []
+  check(current.currentUserId === ownerId && choices.length === 1 && uuid(choices[0].id), 'workspace_missing')
+  const workspaceId = choices[0].id
+  const owned = value => value.workspace?.id === workspaceId && value.workspace.kind === 'personal'
+    && value.currentUserId === ownerId && value.role === 'admin' && Array.isArray(value.members) && value.members.length === 1
+    && value.members[0]?.userId === ownerId && value.members[0].role === 'admin' && value.members[0].status === 'active'
+  if (current.workspace?.id === workspaceId) {
+    check(owned(current), 'workspace_missing')
+    return { workspaceId, workspaceSelection: 'current_personal' }
+  }
+  check(uuid(current.workspace?.id) && current.workspace.kind === 'team', 'workspace_missing')
+  check(owned(await read('/api/workspace?workspace=' + workspaceId)), 'workspace_missing')
+  // Use the normal switch action on this new login session. An explicit GET
+  // alone does not change the implicit workspace used by Coordinator routes.
+  const changed = await rpc('workspace.switchWorkspace', [{ workspaceId, accountId: ownerId }])
+  check(changed.ok === true && changed.data?.workspaceId === workspaceId, 'workspace_missing')
+  check(owned(await read('/api/workspace')), 'workspace_missing')
+  return { workspaceId, workspaceSelection: 'switched_personal' }
+}
+
 /** The relation picker is the existing uncapped, authorized cursor API. Follow
  * server cursors exactly; a bounded page scan is not periodic data polling. */
 export async function issueInventory(read, workspaceId) {
@@ -312,7 +334,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   }
   async function rpc(action, args, options = {}) {
     check(['coordinator.sendCoordinatorMessage', 'issues.getIssue', 'agents.getIssueThread', 'task-runs.pollThreads',
-      'task-runs.pollTaskRuns', 'model-api-keys.updateApiKeyAfterQuota'].includes(action), 'configuration_required')
+      'task-runs.pollTaskRuns', 'model-api-keys.updateApiKeyAfterQuota', 'workspace.switchWorkspace'].includes(action), 'configuration_required')
     const value = await read('/api/rpc', { ...options, body: { version: DESKTOP_RPC_VERSION, action, args: encode(args) },
       headers: { 'x-mikka-rpc': '1', ...options.headers } })
     check(value.ok === true, 'response_invalid')
@@ -699,12 +721,11 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     const session = await read('/api/auth/get-session')
     check(session.user?.email?.toLowerCase() === email.toLowerCase() && typeof session.user.id === 'string', 'session_identity')
     ownerId = session.user.id
-    const workspace = await read('/api/workspace')
-    check(uuid(workspace.workspace?.id) && workspace.currentUserId === ownerId && workspace.workspace.kind === 'personal' && workspace.role === 'admin', 'workspace_missing')
-    workspaceId = workspace.workspace.id
+    Object.assign(report, await selectOwnPersonalWorkspace(read, rpc, ownerId))
+    workspaceId = report.workspaceId
     const chat = await read('/api/coordinator/messages')
     check(uuid(chat.botId), 'response_invalid'); botId = chat.botId
-    report.botId = botId; report.workspaceId = workspaceId
+    report.botId = botId
     if (prepare) await prepareSettings()
     for (const item of cases) {
       const result = await runCase(item); report.cases.push(result)

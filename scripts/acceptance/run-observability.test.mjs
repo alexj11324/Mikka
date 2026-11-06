@@ -4,7 +4,7 @@ import { decode, encode } from '../../lib/desktop-rpc/wire.ts'
 import { CASES, ORIGIN, AcceptanceError, assertAttemptBudget, browserSubmissionText, fixtureIdentity, fixtureTask, issueInventory, openLive, preflightCase, publicFailure, runObservabilityAcceptance } from './run-observability.mjs'
 
 const id = value => '10000000-0000-4000-8000-' + String(value).padStart(12, '0')
-const revision = 'a'.repeat(40), ownerId = 'ordinary-owner', workspaceId = id(1), botId = id(2)
+const revision = 'a'.repeat(40), ownerId = 'ordinary-owner', workspaceId = id(1), botId = id(2), teamId = id(3)
 const env = { ACME_DEMO_EMAIL: 'private-account@example.test', ACME_DEMO_PASSWORD: 'PRIVATE_PASSWORD',
   MIKKA_EXPECTED_DEPLOYMENT_SHA: revision, MIKKA_OBSERVABILITY_MODEL_CASE: 'claude' }
 const original = { id: id(9), modelId: '', provider: 'mikka', kind: 'hosted', chosen: true, available: true }
@@ -21,7 +21,7 @@ function inventory() {
 const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archivedAt: null, name: 'PRIVATE_PROFILE_NAME',
   description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
   skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
-function fixture({ failure, profileBusy = false, paidFallback = false, flowVersion = 2 } = {}) {
+function fixture({ failure, profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value } = {}) {
   const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set()
   const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
   if (profileBusy) profiles.set(existingProfile.id, structuredClone(existingProfile))
@@ -54,7 +54,7 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
     assert.equal(url.origin, ORIGIN)
     assert.equal(init.redirect, 'error')
     assert.ok(init.signal instanceof AbortSignal)
-    calls.push({ path: url.pathname, method, body, headers: Object.fromEntries(init.headers ?? []) })
+    calls.push({ path: url.pathname, search: url.search, method, body, headers: Object.fromEntries(init.headers ?? []) })
     const path = url.pathname.replace(/^\/mikka/, '')
     if (path === '/api/version') return response({ build: failure === 'build' ? 'b'.repeat(40) : revision })
     if (path === '/api/auth/sign-in/email') {
@@ -64,7 +64,15 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
     if (path === '/api/auth/sign-out') { closed++; return response({ ok: true }) }
     assert.match(new Headers(init.headers).get('cookie'), /PRIVATE_COOKIE/)
     if (path === '/api/auth/get-session') return response({ user: { id: ownerId, email: env.ACME_DEMO_EMAIL }, session: { id: 'PRIVATE_AUTH_SESSION' } })
-    if (path === '/api/workspace') return response({ workspace: { id: workspaceId, kind: 'personal' }, currentUserId: ownerId, role: 'admin' })
+    if (path === '/api/workspace') {
+      const saved = new Headers(init.headers).get('cookie').includes('mikka-workspace=' + workspaceId)
+      if (failure === 'workspace_readback_failed' && saved && !url.search) return response({ error: 'PRIVATE_WORKSPACE_FAILURE' }, 503)
+      const selected = url.searchParams.get('workspace') ?? (saved || !teamDefault ? workspaceId : teamId)
+      const personal = { id: workspaceId, kind: 'personal', name: 'PRIVATE_PERSONAL_NAME' }
+      const team = { id: teamId, kind: 'team', name: 'PRIVATE_TEAM_NAME' }
+      return response(workspaceView({ workspace: selected === workspaceId ? personal : team, choices: [team, personal],
+        currentUserId: ownerId, role: 'admin', members: [{ userId: ownerId, role: 'admin', status: 'active', email: env.ACME_DEMO_EMAIL }] }))
+    }
     if (path === '/api/coordinator/messages') return response(chat())
     if (path === '/api/settings/workspace-bots') return response({ bots: [{ status: 'idle', runningThreads: failure === 'busy' ? 1 : 0 }] })
     if (path === '/api/mobile/threads') return response({ threads: submissions.flatMap(value => value.runs.map(runId => ({ id: runId, status: 'done' }))) })
@@ -123,6 +131,11 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
     }
     if (path === '/api/rpc') {
       const args = decode(body.args)
+      if (body.action === 'workspace.switchWorkspace') {
+        assert.deepEqual(args, [{ workspaceId, accountId: ownerId }])
+        return response({ ok: true, result: encode({ ok: true, data: { workspaceId: failure === 'workspace_switch_mismatch' ? teamId : workspaceId } }) }, 200,
+          failure === 'workspace_cookie_missing' ? undefined : { 'set-cookie': 'mikka-workspace=' + workspaceId + '; Path=/; Secure; HttpOnly; SameSite=Lax' })
+      }
       if (body.action === 'task-runs.pollThreads' || body.action === 'task-runs.pollTaskRuns') {
         const busy = failure === 'owner_busy' || failure === 'owner_busy_restore' && submissions.length
         return response({ ok: true, result: encode({ items: busy ? [{ id: id(909), status: 'running', prompt: 'PRIVATE_OTHER_WORKSPACE' }] : [] }) })
@@ -201,9 +214,51 @@ const safe = report => assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|pri
 test('preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks', async () => {
   const data = fixture(), report = await run(data, false, { MIKKA_OBSERVABILITY_MODEL_CASE: 'all' })
   assert.equal(report.status, 'ready'); assert.equal(report.cases.length, 2)
+  assert.equal(report.workspaceId, workspaceId); assert.equal(report.workspaceSelection, 'current_personal')
   assert.deepEqual(data.calls.filter(value => value.method !== 'GET').map(value => value.path), ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out'])
   assert.equal(data.submissions.length, 0); assert.equal(data.profiles.size, 0); assert.equal(data.state.closed, 1)
   safe(report)
+})
+test('a default team switches only this login session to its verified personal workspace before reading Coordinator', async () => {
+  const data = fixture({ teamDefault: true }), report = await run(data)
+  assert.equal(report.status, 'ready', JSON.stringify(report))
+  assert.equal(report.workspaceId, workspaceId); assert.equal(report.workspaceSelection, 'switched_personal')
+  const reads = data.calls.filter(value => value.path === '/mikka/api/workspace')
+  assert.deepEqual(reads.map(value => value.search), ['', '?workspace=' + workspaceId, ''])
+  assert.match(reads[2].headers.cookie, /better-auth\.session_token=PRIVATE_COOKIE/)
+  assert.ok(reads[2].headers.cookie.includes('mikka-workspace=' + workspaceId))
+  assert.ok(data.calls.findIndex(value => value.path === '/mikka/api/coordinator/messages') > data.calls.indexOf(reads[2]))
+  assert.deepEqual(data.calls.filter(value => value.method !== 'GET').map(value => value.body?.action ?? value.path),
+    ['/mikka/api/auth/sign-in/email', 'workspace.switchWorkspace', '/mikka/api/auth/sign-out'])
+  assert.equal(data.submissions.length, 0); assert.equal(data.profiles.size, 0); assert.equal(data.state.closed, 1); safe(report)
+})
+test('workspace selection rejects ambiguous choices, teams and another account personal membership before switching', async () => {
+  const guards = [
+    value => ({ ...value, choices: value.choices.filter(choice => choice.kind !== 'personal') }),
+    value => ({ ...value, choices: [...value.choices, { id: id(4), kind: 'personal' }] }),
+    value => ({ ...value, workspace: { ...value.workspace, kind: 'team' } }),
+    value => ({ ...value, currentUserId: 'PRIVATE_OTHER_OWNER' }),
+    value => ({ ...value, role: 'member' }),
+    value => ({ ...value, members: [{ userId: 'PRIVATE_OTHER_OWNER', role: 'admin', status: 'active' }] }),
+    value => ({ ...value, members: [{ ...value.members[0], role: 'member' }] }),
+    value => ({ ...value, members: [{ ...value.members[0], status: 'inactive' }] }),
+    value => ({ ...value, members: [...value.members, { userId: 'PRIVATE_OTHER_OWNER', role: 'member', status: 'inactive' }] }),
+  ]
+  for (const teamDefault of [false, true]) for (const workspaceView of guards) {
+    const data = fixture({ teamDefault, workspaceView }), report = await run(data, true)
+    assert.equal(report.code, 'workspace_missing', JSON.stringify(report))
+    assert.equal(data.calls.some(value => value.path === '/mikka/api/rpc' || value.path === '/mikka/api/coordinator/messages'), false)
+    assert.equal(data.submissions.length, 0); assert.equal(data.profiles.size, 0); assert.equal(data.state.closed, 1); safe(report)
+  }
+})
+test('workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session', async () => {
+  for (const failure of ['workspace_switch_mismatch', 'workspace_cookie_missing', 'workspace_readback_failed']) {
+    const data = fixture({ teamDefault: true, failure }), report = await run(data, true)
+    assert.equal(report.code, failure === 'workspace_readback_failed' ? 'http_refused' : 'workspace_missing', JSON.stringify(report))
+    assert.equal(data.calls.filter(value => value.body?.action === 'workspace.switchWorkspace').length, 1)
+    assert.equal(data.calls.some(value => value.path === '/mikka/api/coordinator/messages'), false)
+    assert.equal(data.submissions.length, 0); assert.equal(data.profiles.size, 0); assert.equal(data.state.closed, 1); safe(report)
+  }
 })
 test('unsafe configuration blocks before any model call and reports only closed failure codes', async () => {
   for (const [failure, code] of [['busy', 'workspace_busy'], ['paid_fallback', 'paid_fallback_enabled'], ['build', 'build_mismatch']]) {

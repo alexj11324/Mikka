@@ -40,6 +40,19 @@ All HTTP redirects are refused.
 
 The report gives closed failure codes, never upstream error text.
 
+Before reading Coordinator, the driver uses the workspace response's choices to
+identify exactly one personal workspace. It verifies that the signed-in account
+is its admin and sole member, with active admin membership. If the default is a
+team, an explicit workspace GET verifies the personal candidate first; the normal
+workspace.switchWorkspace action then changes only this new login session's
+cookie. A GET without a workspace query must confirm that selection before any
+Coordinator reads or preparation. Missing or ambiguous choices, mismatched members
+and a failed switch/readback block the run. The driver calls no workspace creation
+API, never selects a team and leaves the independent browser's cookies untouched.
+Normal sign-out cleans up this session. The report records only workspaceId and the closed
+workspaceSelection value (current_personal or switched_personal), never names or
+email addresses. In browser mode, select the reported workspace separately.
+
 | Code | Required state |
 | --- | --- |
 | build_mismatch | Production must serve the supplied immutable SHA before and throughout the case |
