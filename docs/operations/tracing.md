@@ -560,8 +560,12 @@ multiplier to AI-event or Replay pricing.
 The manual `Run trace production acceptance` workflow runs only on `main`
 and requires its exact 40-character deployment SHA. Before executing it, verify
 the immutable Vercel deployment is READY, the production domain serves that SHA,
-and the entire matching `E2B official instance runtime` workflow has finished,
-including any runtime-refresh web deployment. The driver checks the public
+and the entire matching `E2B additive runtime release` workflow has finished,
+including official-file conservation, real Claude Code and Codex subscription
+gates on the exact candidates, and the runtime-refresh web deployment. The
+versioned templates add Mikka under `/opt/mikka`; their original official files
+remain intact, and the previous accepted release remains available for rollback.
+The driver checks the public
 version during its run; that check alone does not prove the worker release.
 
 Start with `mode=preflight`. For an actual task, `mode=execute` uses the existing
