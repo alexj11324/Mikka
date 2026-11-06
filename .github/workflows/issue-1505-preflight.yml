@@ -40,6 +40,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import { randomBytes, createCipheriv, publicEncrypt, constants } from 'node:crypto';
+          import { writeFileSync } from 'node:fs';
           const origin='https://app.aspectlylabs.com'; let cookie=''; let sealed=false;
           async function call(path,body,rpc=false) {
             const r=await fetch(origin+'/mikka'+path,{method:body===undefined?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(60000),headers:{origin,...(cookie?{cookie}:{}),...(body!==undefined?{'content-type':'application/json'}:{}),...(rpc?{'x-mikka-rpc':'1'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
@@ -59,8 +60,15 @@ jobs:
             const ciphertext=Buffer.concat([cipher.update(JSON.stringify({cookie})),cipher.final()]);
             const recipient="-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzx0NgTPcxpjLfRWGeH/G\nVgrh5dPi5yNRkT1U4fQIG8DGc50NT24kB1u04aZlE+kKGh+va47YBTjW3gUETgco\nyFTTNIBdsCremenbyxTdQx9far2O8DRfewpkGupBLUCvw14HsrcDULugnMfx16Un\nvjMsN5+CF6sga7HYY9YCe3+FEEEYE6jGv8bOnOuposnAy77Ii9x/bnDLbJyYhd5Q\n8jm6wlvsm23zQQrTpg0QsFwpaKZT07sHJOH+jdge3vkMGCc13kAfH21DA1l4KXWp\nGdJxzO82D73ObC7vXPVJ1j9G69sX8oUtv0IKT7iLY86K78ZwroLWQhHS5er4RZOg\naQIDAQAB\n-----END PUBLIC KEY-----\n";
             const encrypted=publicEncrypt({key:recipient,oaepHash:'sha256',padding:constants.RSA_PKCS1_OAEP_PADDING},aes);
-            console.log('SEALED_SESSION_1505 '+JSON.stringify({key:encrypted.toString('base64'),iv:iv.toString('base64'),data:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}));
+            writeFileSync(process.env.RUNNER_TEMP+'/smoke-session.sealed.json',JSON.stringify({key:encrypted.toString('base64'),iv:iv.toString('base64'),data:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}),{mode:0o600});
+            console.log('Temporary session encrypted for the acceptance runner');
             sealed=true;
           }catch(error){console.log(JSON.stringify({phase:'failed',code:['smoke_sign_in_refused','smoke_identity_mismatch','e2b_key_unavailable','e2b_configure_failed'].includes(error.message)?error.message:'transport_failed'}));process.exitCode=1}
           finally{if(cookie&&!sealed)await call('/api/auth/sign-out',{}).catch(()=>{});cookie=''}
           JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: smoke-session-sealed
+          path: ${{ runner.temp }}/smoke-session.sealed.json
+          retention-days: 1
+          if-no-files-found: error
