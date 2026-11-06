@@ -57,3 +57,32 @@ export function stoppedMessages(responseMessages: readonly ModelMessage[], said:
   else if (messages.at(-1)?.role !== 'assistant') messages.push({ role: 'assistant', content: '' })
   return messages
 }
+
+/** The text of the last assistant message: what a turn's last finished model call said. */
+export function lastAssistantText(messages: readonly ModelMessage[]): string {
+  const last = messages.findLast(message => message.role === 'assistant')
+  if (!last) return ''
+  if (typeof last.content === 'string') return last.content
+  return last.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('')
+}
+
+type StopSignal = { readonly aborted: boolean; addEventListener(type: 'abort', listener: () => void): void }
+
+/**
+ * A turn, or 停止, whichever comes first. A stopped turn is not waited for: a
+ * tool call already running finishes on its own and its result is dropped,
+ * while the model call in flight sees the same signal and ends. A turn that
+ * fails because it was aborted counts as stopped. Runs in the Workflow body,
+ * where the order of a stop and a step result replays the same every time.
+ */
+export async function untilStopped<T>(turn: Promise<T>, signal: StopSignal): Promise<{ stopped: true } | { stopped: false; result: T }> {
+  const stopped = new Promise<{ stopped: true }>(resolve => {
+    if (signal.aborted) resolve({ stopped: true })
+    else signal.addEventListener('abort', () => resolve({ stopped: true }))
+  })
+  const ended = turn.then(result => ({ stopped: false as const, result }), (error: unknown) => {
+    if (signal.aborted) return { stopped: true as const }
+    throw error
+  })
+  return Promise.race([ended, stopped])
+}

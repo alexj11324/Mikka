@@ -16,6 +16,8 @@ const writable=new WritableStream()
 // 停止 reaches the workflow through its hook; `stopNow` delivers one stop to it.
 let stopNow=()=>{}
 let stopDuringTurn=false
+// 停止 while a tool call runs: the agent never returns (the tool step is still running) after one finished model call.
+let stopDuringTool=false
 // A tool's finish record the model call started and the round has not awaited yet: 'slow' settles after the model, 'fail' rejects.
 let pendingAudit:'slow'|'fail'|null=null
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable,
@@ -30,8 +32,15 @@ stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unk
     const record_=new Promise((resolve,reject)=>setTimeout(()=>{record('audit')();if(failing)reject(new Error('agentExecutionClosed'));else resolve(undefined)},5))
     record_.catch(()=>{});audits.push(record_)
   }
+  const options=args[2] as {abortSignal?:AbortSignal;onStepEnd?:(step:{response:{messages:unknown[]}})=>void}
+  if(stopDuringTool){
+    options.onStepEnd?.({response:{messages:[{role:'assistant',content:[{type:'text',text:'Creating it.'}]},{role:'tool',content:[]}]}})
+    stopNow()
+    return new Promise(()=>{})
+  }
   if(!stopDuringTurn)return {text:'grounded reply',finishReason:'stop',responseMessages:[]}
   // The person presses 停止 while the second model call streams; the agent ends with the first call only.
+  options.onStepEnd?.({response:{messages:[{role:'assistant',content:'Looking it up.'}]}})
   stopNow();await new Promise(resolve=>setImmediate(resolve))
   assert.equal((args[2] as {abortSignal?:AbortSignal}).abortSignal?.aborted,true)
   return {text:'Looking it up.',finishReason:'tool-calls',responseMessages:[{role:'assistant',content:'Looking it up.'}]}
@@ -70,7 +79,7 @@ stub('../../workflows/coordinator/steps.ts',{
   noteQuotaSwitch,
   writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
   logTurnTiming:async(...args:unknown[])=>{record('timing')(...args)},
-  stoppedStepText:async(...args:unknown[])=>{record('stoppedText')(...args);return 'The task is'},
+  markStopped:async(...args:unknown[])=>{record('stream')(args[0],{type:'coordinator-turn-stopped',id:args[2]});record('stoppedText')(...args.slice(1));return stopDuringTool ? 'Creating it.' : 'The task is'},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
@@ -79,7 +88,7 @@ stub('../../workflows/coordinator/steps.ts',{
 let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
 function reset(harness?:string){
-  calls.length=0;stopDuringTurn=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
+  calls.length=0;stopDuringTurn=false;stopDuringTool=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
 }
 test('real workflow entry uses the returned execution snapshot for model, prompt and tool registry',async()=>{
@@ -138,6 +147,15 @@ test('停止 aborts the model call in flight and keeps what the reply had said, 
   assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>(c.args[1] as {type:string}).type),['coordinator-turn-start','coordinator-turn-stopped','coordinator-turn-committed'])
   assert.deepEqual(calls.find(c=>c.name==='finish')?.args,[owner,bot,execution!.id])
   assert.equal(calls.filter(c=>c.name==='failed').length,0,'a stop is not a failed turn')
+})
+
+test('停止 while a tool call runs ends the turn at once: the finished call is kept and nothing waits for the tool',async()=>{
+  reset('ai_sdk');stopDuringTool=true
+  await coordinatorTurn(owner,bot)
+  // The words of the finished call are already in its messages: they are not stored a second time.
+  assert.deepEqual(calls.find(c=>c.name==='append')?.args,[owner,'synthetic-workflow',[{role:'assistant',content:[{type:'text',text:'Creating it.'}]},{role:'tool',content:[]},{role:'assistant',content:''}],null,bot,'synthetic-workflow:0',true])
+  assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>(c.args[1] as {type:string}).type),['coordinator-turn-start','coordinator-turn-stopped','coordinator-turn-committed'])
+  assert.equal(calls.filter(c=>c.name==='failed').length,0)
 })
 
 test('a tool finish record does not hold up the model; the round stores its reply only after every record, and a failed record fails the turn',async()=>{

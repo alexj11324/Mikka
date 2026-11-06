@@ -195,3 +195,18 @@ test('cancelling the HTTP reader cancels its durable stream reader', { timeout: 
   await reader.cancel('page closed')
   assert.equal(await cancellation, 'page closed')
 })
+
+test('a stream opened at send with no turn yet answers 204 without a stream when nothing waits in the inbox', async () => {
+  chats = chats.filter(chat => !(chat.userId === 'owner' && chat.botId === coordinatorOf.owner))
+  mock.module(new URL('../../../../lib/coordinator/store.ts', import.meta.url).href, { namedExports: { hasPendingEvents: async () => false } })
+  const response = await call({ wait: '1' })
+  assert.equal(response.status, 204)
+  noStream()
+})
+
+test('a stream opened at send joins a turn that already holds the chat and names its run', async () => {
+  const response = await call({ wait: '1' })
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('x-mikka-stream-run'), 'wrun_owner')
+  assert.deepEqual(getRun.mock.calls.map(c => c.arguments[0]), ['wrun_owner'])
+})
