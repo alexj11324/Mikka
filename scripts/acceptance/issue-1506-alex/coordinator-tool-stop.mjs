@@ -1,0 +1,213 @@
+// Observe a real, read-only web_search tool boundary for #1490 / #1506.
+// Public "running" is a model tool-call, not proof of execute-enter. Runtime
+// ordering must be verified separately from real server logs/audit records.
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
+import { alexSession } from '../issue-1506-readonly/alex-session.mjs'
+import { FIXTURE_ERRORS, openAcceptanceFixture } from './coordinator-fixtures.mjs'
+import { PROTOCOL_SOURCE_SHA, openLiveObserver, parseStreamLine, readJson,
+  requireExactSha, rpc, validateChat } from '../issue-1504-1506/coordinator-baseline.mjs'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const RUN = /^wrun_[a-zA-Z0-9_-]{1,160}$/
+const reference = value => createHash('sha256').update(value).digest('hex').slice(0, 12)
+const ms = value => Math.round(value * 10) / 10
+const number = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+const fail = name => { throw new Error(name) }
+const ERRORS = new Set([...FIXTURE_ERRORS,
+  'acceptance_sha_required', 'acceptance_version_mismatch', 'acceptance_version_changed',
+  'alex_credentials_missing', 'acceptance_identity_mismatch', 'acceptance_deadline_exceeded',
+  'acceptance_http_failed', 'acceptance_rpc_failed', 'acceptance_signout_failed',
+  'workspace_inventory_invalid', 'workspace_target_missing', 'workspace_switch_failed',
+  'chat_invalid', 'chat_not_idle', 'chat_live_scope_invalid', 'model_not_shared_haiku',
+  'live_ticket_invalid', 'live_ready_timeout', 'live_connection_failed', 'live_not_supported',
+  'send_not_queued', 'stream_status_invalid', 'stream_headers_invalid', 'stream_event_invalid',
+  'stream_sequence_invalid', 'stream_turn_mismatch', 'stream_error', 'stream_deadline',
+  'unexpected_tool', 'tool_boundary_not_observed', 'stop_not_acknowledged', 'stop_not_quiescent',
+  'post_stop_chat_failed', 'live_close_failed', 'case_invalid', 'timeout_invalid',
+])
+const code = error => ERRORS.has(error?.message) ? error.message : 'acceptance_unexpected_failure'
+
+export function parseToolStopLine(line) {
+  const event = parseStreamLine(line)
+  if (event.type !== 'tool') return event
+  // The shared protocol parser validates call/name/state; keep only a closed tool
+  // enum and the hashed correlation handle. Inputs/results are never retained.
+  const raw = JSON.parse(line)
+  return { ...event, tool: raw.name === 'web_search' ? 'web_search' : 'unexpected', callRef: reference(raw.call) }
+}
+
+export async function readToolStopStream(body, onEvent, signal) {
+  const reader = body.getReader(), decoder = new TextDecoder()
+  let buffered = '', sequence = 0
+  const cancel = () => { void reader.cancel().catch(() => {}) }
+  signal?.addEventListener('abort', cancel, { once: true })
+  const emit = line => {
+    const event = parseToolStopLine(line)
+    if (event.type === 'error') fail('stream_error')
+    if (event.sequence !== sequence + 1) fail('stream_sequence_invalid')
+    sequence = event.sequence; onEvent(event)
+  }
+  try {
+    while (!signal?.aborted) {
+      const { done, value } = await reader.read()
+      if (signal?.aborted) return 'timeout'
+      buffered += done ? decoder.decode() : decoder.decode(value, { stream: true })
+      let newline
+      while ((newline = buffered.indexOf('\n')) !== -1) {
+        const line = buffered.slice(0, newline).trim(); buffered = buffered.slice(newline + 1)
+        if (line) emit(line)
+      }
+      if (done) { if (buffered.trim()) emit(buffered); return 'eof' }
+    }
+    return 'timeout'
+  } finally {
+    signal?.removeEventListener('abort', cancel)
+    await reader.cancel().catch(() => {}); reader.releaseLock()
+  }
+}
+
+
+export async function runToolStop({ env = process.env, sessionProvider = alexSession, openLive = openLiveObserver,
+  fixtureReceipt = null, streamTimeoutMs = 60_000, stopTimeoutMs = 20_000, checkpoint = true } = {}) {
+  const report = { schemaVersion: 1, issue: 1506, case: 'real-web-search-tool-call-stop', status: 'failed',
+    protocolSourceSha: PROTOCOL_SOURCE_SHA, applicationSha: null, startedAt: new Date().toISOString(),
+    messageSendAttempts: 0, taskCreationRequests: 0, modelSelectionWrites: 0, postStopChatReads: 0,
+    metrics: {}, tools: [], stop: { requested: false, acknowledged: false },
+    runtimeBoundary: { classification: 'unverified', executeEntered: 'not_observed',
+      required: 'same_build_workflowRunId_callRef_real_tool_start_finish_and_stop_ordering' },
+    cleanup: { status: 'not_started', liveClosed: false } }
+  let requests = []
+  const save = () => {
+    if (!checkpoint) return
+    mkdirSync('issue-1506-alex-report', { recursive: true })
+    writeFileSync(`issue-1506-alex-report/coordinator-tool-stop-${report.fixture?.key === 'luna' ? 'luna' : 'haiku'}.json`, JSON.stringify(report, null, 2) + '\n')
+  }
+  try {
+    const expectedSha = requireExactSha(env.MIKKA_ACCEPTANCE_SHA)
+    const requestedCase = env.MIKKA_STOP_CASE ?? 'observe'
+    if (!['observe', 'before_tool', 'during_tool'].includes(requestedCase)) fail('case_invalid')
+    if (!(streamTimeoutMs > 0 && streamTimeoutMs <= 60_000 && stopTimeoutMs > 0 && stopTimeoutMs <= 20_000)) fail('timeout_invalid')
+    report.applicationSha = expectedSha; report.requestedCase = requestedCase
+    await sessionProvider(async session => {
+      requests = session.requests
+      if (session.version?.build !== expectedSha) fail('acceptance_version_mismatch')
+      const fixture = await openAcceptanceFixture(session, env, fixtureReceipt)
+      report.fixture = { key: fixture.fixtureKey, runKey: fixture.fixtureRunKey, botId: fixture.botId }
+      report.workspace = { ref: fixture.workspace.ref, kind: 'team', switchedThroughProductAction: true }
+      const initial = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [fixture.botId]))
+      if (initial.botId !== fixture.botId) fail('fixture_scope_mismatch')
+      if (!initial.enabled || initial.working || initial.streamRunId) fail('chat_not_idle')
+      const botId = fixture.botId
+      report.botRef = fixture.botRef
+      report.menu = fixture.menu
+      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, started = null
+      const since = () => started === null ? null : ms(performance.now() - started)
+      const stop = trigger => {
+        if (stopPromise) return stopPromise
+        report.stop.requested = true; report.stop.trigger = trigger; report.metrics.stopRequestedMs = since()
+        stopPromise = rpc(session, 'coordinator.stopCoordinatorTurn', [botId], { timeoutMs: stopTimeoutMs })
+          .then(value => { report.stop.acknowledged = value?.stopped === true; report.metrics.stopAcknowledgedMs = since(); return report.stop.acknowledged })
+          .catch(error => { report.stop.error = code(error); return false })
+        save()
+        return stopPromise
+      }
+      try {
+        live = await openLive(session, initial)
+        if ((await readJson(session, '/api/version')).build !== expectedSha) fail('acceptance_version_changed')
+        started = performance.now(); report.sentAt = new Date().toISOString(); live.begin(started)
+        const prompt = '测试验收：请只调用一次 web_search，查询 Node.js 官网当前推荐的 LTS 大版本，搜索 limit=1。只读公开网页，不用其他工具，不创建任务、不写文件、不联系任何人。搜索返回后只用一句话和官方链接回答。'
+        sent = true; report.messageSendAttempts++; save()
+        const queued = await rpc(session, 'coordinator.sendCoordinatorMessage', [prompt, null, botId, randomUUID()])
+        report.metrics.sendAcknowledgedMs = since()
+        if (queued?.queued !== true) fail('send_not_queued')
+        controller = new AbortController()
+        let deadline = setTimeout(() => controller.abort('stream_deadline'), streamTimeoutMs)
+        try {
+          report.metrics.streamRequestedMs = since()
+          const response = await session.request('/api/coordinator/stream?wait=1&botId=' + botId, { signal: controller.signal })
+          report.metrics.streamHeadersMs = since(); report.streamStatus = response.status
+          if (response.status !== 200) { await response.body?.cancel(); fail('stream_status_invalid') }
+          const runId = response.headers.get('x-mikka-stream-run')
+          if (!RUN.test(runId ?? '') || !response.headers.get('content-type')?.startsWith('application/x-ndjson') ||
+            !response.headers.get('x-mikka-stream-key') || !response.body) { await response.body?.cancel(); fail('stream_headers_invalid') }
+          report.workflowRunId = runId; save()
+          report.termination = await readToolStopStream(response.body, event => {
+            if (!event.id.startsWith(runId + ':')) fail('stream_turn_mismatch')
+            if (event.type === 'start') {
+              if (streamId) fail('stream_turn_mismatch')
+              streamId = event.id; report.metrics.streamStartedMs = since()
+            }
+            if (!streamId || event.id !== streamId) fail('stream_turn_mismatch')
+            if ((event.type === 'text' || event.type === 'reset') && event.text.length) report.metrics.firstTextMs ??= since()
+            if (event.type === 'tool') {
+              const observation = { tool: event.tool, callRef: event.callRef, state: event.state,
+                sequence: event.sequence, observedMs: since(), afterStopRequest: report.stop.requested }
+              report.tools.push(observation)
+              if (event.tool !== 'web_search') { void stop('unexpected_tool'); fail('unexpected_tool') }
+              if (event.state === 'running' && !report.stop.requested) {
+                report.triggerCallRef = event.callRef; report.metrics.toolCallObservedMs = observation.observedMs
+                void stop('public_web_search_running')
+                clearTimeout(deadline); deadline = setTimeout(() => controller.abort('stop_deadline'), stopTimeoutMs)
+              }
+            }
+            if (event.type === 'committed') { report.committedObserved = true; report.metrics.committedMs = since() }
+          }, controller.signal)
+          report.metrics.streamClosedMs = since()
+          if (report.termination !== 'eof') fail('stream_deadline')
+          if (!report.triggerCallRef) fail('tool_boundary_not_observed')
+          if (!await stopPromise) fail('stop_not_acknowledged')
+        } catch (error) { if (controller.signal.aborted) fail('stream_deadline'); throw error }
+        finally { clearTimeout(deadline); controller.abort(); report.streamClosed = true }
+      } catch (error) { failure = error }
+      finally {
+        report.cleanup.status = 'running'
+        if (sent) {
+          if (!stopPromise) void stop('error_cleanup')
+          await stopPromise; controller?.abort()
+          report.postStopChatReads++
+          try {
+            const after = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId]))
+            if (after.botId !== botId) fail('chat_invalid')
+            const own = streamId ? after.items.filter(item => item.streamId === streamId) : []
+            report.afterStop = { working: after.working, activeStream: Boolean(after.streamRunId),
+              ownPersistedItems: own.length, stoppedMarker: own.some(item => item.stopped === true) }
+            if (after.working || after.streamRunId) { failure ??= new Error('stop_not_quiescent'); report.cleanup.status = 'needs_followup' }
+          } catch (error) { failure ??= new Error('post_stop_chat_failed'); report.cleanup.status = 'needs_followup' }
+        }
+        if (live) {
+          try { report.cleanup.liveClosed = await live.close() }
+          catch { report.cleanup.liveClosed = false }
+          report.live = { ready: live.summary.ready === true, matchingPushes: number(live.summary.matchingPushes),
+            versionedPushes: number(live.summary.versionedPushes), newerPushes: number(live.summary.newerPushes),
+            firstPushMs: number(live.summary.firstPushMs), unexpectedDisconnect: live.summary.unexpectedDisconnect === true }
+          if (!report.cleanup.liveClosed) { failure ??= new Error('live_close_failed'); report.cleanup.status = 'needs_followup' }
+        }
+        if (report.cleanup.status === 'running') report.cleanup.status = 'complete'
+        save()
+      }
+      if (failure) throw failure
+      if ((await readJson(session, '/api/version')).build !== expectedSha) fail('acceptance_version_changed')
+      report.applicationVersionStable = true; report.status = 'observed'
+    }, { expectedSha, deadlineAt: Date.now() + 180_000 })
+    if (!requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)) fail('acceptance_signout_failed')
+  } catch (error) { report.status = 'failed'; report.error = code(error) }
+  const routes = new Set(['/mikka/api/auth/sign-in/email', '/mikka/api/auth/get-session', '/mikka/api/auth/sign-out',
+    '/mikka/api/version', '/mikka/api/workspace/switcher', '/mikka/api/rpc', '/mikka/api/live/ticket', '/mikka/api/coordinator/stream'])
+  report.requests = requests.filter(row => routes.has(row.path)).map(({ path, method, status, headersMs }) => ({
+    path, method: method === 'POST' ? 'POST' : 'GET', status: Number.isInteger(status) ? status : null, headersMs: number(headersMs),
+  }))
+  report.signedOut = requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)
+  report.finishedAt = new Date().toISOString(); save(); return report
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv[2] === 'tool-call-stop') {
+    const report = await runToolStop(); console.log(JSON.stringify(report))
+    if (report.status !== 'observed') process.exitCode = 1
+  } else {
+    console.log('Usage: node coordinator-tool-stop.mjs tool-call-stop')
+    console.log('Requires exact MIKKA_ACCEPTANCE_SHA and normal ACME credentials plus a ready fixture receipt and MIKKA_FIXTURE_KIND; optional MIKKA_STOP_CASE=observe|before_tool|during_tool labels intent only.')
+  }
+}

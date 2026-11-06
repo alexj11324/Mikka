@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "phase": "setup-and-1490-baseline",
+  "state": "frozen-for-parent-review",
+  "productionCallsByAuthor": 0,
+  "expectedApplicationSha": "2960d783f0196fed5375593d910a43430a101747",
+  "fixtureRunKey": "acme-1506-20261106",
+  "triggers": [
+    ".github/workflows/issue-1506-alex.yml",
+    "scripts/acceptance/issue-1506-alex/control/invocation.json"
+  ],
+  "files": {
+    ".github/workflows/issue-1506-alex.yml": "661e51bff6f3359a3050cec817b396da6ef38cce666ecba8746ce05d69358c7b",
+    "scripts/acceptance/issue-1506-alex/acceptance.test.mjs": "c62ccf03b3e03dac5e1b82fc666516e8b4e3679b0ad76c5d30d465eb8b64a1e0",
+    "scripts/acceptance/issue-1506-alex/control/invocation.json": "b9656115937c0d07fb810720b5aacb260704775a60dfa878acd4a5dcaf5a2eb6",
+    "scripts/acceptance/issue-1506-alex/coordinator-baseline.mjs": "a96f37944e50060eed9511cfdf83e6c2eafa7952021a7262a29d9e5525a1328b",
+    "scripts/acceptance/issue-1506-alex/coordinator-cache-turns.mjs": "a480414e297a34da8121be3f041fc1792a11324833cebe5ed5719009f9abfce1",
+    "scripts/acceptance/issue-1506-alex/coordinator-fixtures.mjs": "019d815f7f4168c80c2a132dfd90cc1dbeb90c9c3b4a3dc7cb73b2582b486b4f",
+    "scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs": "11c2d9b7546500b5a6bd7cd3539624e30c90d9abb3da75a645cfcf4e85a36e5f",
+    "scripts/acceptance/issue-1506-alex/fixture-support.mjs": "48daa4d39853fb8b8ad0879f48ec27518e1797fa69d0992b6f5bc49b6b901348",
+    "scripts/acceptance/issue-1506-alex/phase1.mjs": "d08aab7fa4dc56ed99f19311816084e8107a046c1323f842000eb35c7bac8787",
+    "scripts/acceptance/issue-1506-alex/phase1.test.mjs": "9d89883a6c0be14d7ad623f6f4877b90808d0b28d45260572b8dc809ba148cf1",
+    "scripts/acceptance/issue-1506-alex/workspace-setup.mjs": "bc0ade39138ad897d88e1108305d7c37266ea791c38238971a357d1671f52faa"
+  },
+  "existingDependencies": {
+    "scripts/acceptance/issue-1504-1506/coordinator-baseline.mjs": "b74010d8f8800d7935e362c16bdf42a653d9db67531476a474e78ed9028ea3a7",
+    "scripts/acceptance/issue-1504-1506/production-session.mjs": "874f8a2b20a958078f5db1e5732a917229695cc5671c1973bb910da3d5388916",
+    "scripts/acceptance/issue-1506-readonly/alex-session.mjs": "ca7ef08df7c5090808459a13da789c3b9efc35896f68c81473d0cba11dc34345"
+  },
+  "verification": {
+    "nodeSyntax": "passed all nine first-batch mjs files",
+    "offlineCommand": "node --test scripts/acceptance/issue-1506-alex/acceptance.test.mjs scripts/acceptance/issue-1506-alex/phase1.test.mjs",
+    "tests": 15,
+    "passed": 15,
+    "globalFetch": "disabled; injected mocks only"
+  },
+  "retention": "Workspace and two Bot receipts retained; no automatic workspace delete. Stop errors remain failures and the other model runs independently.",
+  "parentReview": "Log all existing sanitized phase outcomes so UUID receipts are recoverable without artifact credentials; no driver behavior changes. Remote legacy tool-stop helper was absent; embed its two unchanged pure protocol helpers in the new tool-stop file instead of touching the old auto-trigger directory. Other three remote helper files compared byte-for-byte."
+}

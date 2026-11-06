@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "phase": "setup-and-1490-baseline",
+  "expectedSha": "2960d783f0196fed5375593d910a43430a101747",
+  "fixtureRunKey": "acme-1506-20261106"
+}
