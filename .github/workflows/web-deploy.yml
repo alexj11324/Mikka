@@ -39,8 +39,6 @@ jobs:
       VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
       VERCEL_CLI: vercel@65.4.0
       NEXT_TELEMETRY_DISABLED: '1'
-      # Same as vercel.json build.env.
-      NEXT_ENABLE_ADAPTER: '0'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -119,7 +117,7 @@ jobs:
       - name: Fill build-time values
         if: steps.skip.outputs.skip != 'true'
         run: node scripts/release/web-deploy.mjs env .vercel/.env.production.local
-      # Skew Protection: a unique Next.js deploymentId per run attempt
+      # Skew Protection: a unique prebuilt deploymentId per run attempt
       # (lib/deployment-id.mjs), so a re-run of a commit is a new deployment.
       - name: Choose the deployment id
         if: steps.skip.outputs.skip != 'true'
@@ -127,9 +125,14 @@ jobs:
           id="$(node lib/deployment-id.mjs)"
           echo "Deployment id $id"
           echo "MIKKA_DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
+      - name: Install the pinned workspace dependencies
+        if: steps.skip.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Build (runs migrations last, as the Vercel build did)
         if: steps.skip.outputs.skip != 'true'
-        run: npx --yes "$VERCEL_CLI" build --prod --token "$VERCEL_TOKEN"
+        run: node scripts/release/build-vercel.mjs
         env:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
           VERCEL_GIT_COMMIT_REF: main

@@ -9,6 +9,8 @@ on:
   pull_request:
     paths:
       - 'apps/desktop/**'
+      - 'apps/frontend/**'
+      - 'apps/api/**'
       - 'packages/protocol/**'
       - 'lib/platform/**'
       - 'lib/swr/**'
@@ -21,6 +23,8 @@ on:
       - 'app/fonts/**'
       - 'app/globals.css'
       - 'lib/desktop-rpc/**'
+      - 'lib/browser-rpc/**'
+      - 'scripts/start-app*'
       - 'lib/live/**'
       - 'lib/auth*.ts'
       - 'lib/fresh-session.ts'
@@ -146,15 +150,15 @@ jobs:
       - name: Prepare the isolated E2E schema
         run: pnpm test:e2e:setup
       - name: Build the production web backend
-        run: pnpm generate:agent-ui && pnpm exec next build
+        run: pnpm generate:agent-ui && pnpm build:app
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-      - name: Archive the compiled backend for native ARM acceptance
-        run: tar --exclude='.next/cache' -czf /tmp/desktop-next-build.tar.gz .next
+      - name: Archive the compiled Linux backend
+        run: tar -czf /tmp/desktop-api-build.tar.gz .output
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: desktop-next-build-${{ github.sha }}
-          path: /tmp/desktop-next-build.tar.gz
+          name: desktop-api-build-${{ github.sha }}
+          path: /tmp/desktop-api-build.tar.gz
           retention-days: 2
       - name: Build the dev Electron shell
         run: pnpm --filter @mikka/desktop build
@@ -213,11 +217,6 @@ jobs:
       - run: test "$(uname -m)" = arm64
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install chromium
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: desktop-next-build-${{ github.sha }}
-          path: ${{ runner.temp }}
-      - run: tar -xzf "$RUNNER_TEMP/desktop-next-build.tar.gz"
       - name: Start an independent local PostgreSQL
         run: |
           brew install postgresql@17
@@ -240,6 +239,12 @@ jobs:
       - run: pnpm migrate && pnpm test:e2e:setup
         env:
           MIGRATE: '1'
+      - name: Build the production API for the native ARM64 runtime
+        # Traced runtime dependencies may contain platform-specific binaries.
+        # Compile on the Mac; the Linux artifact is a separate auditable build.
+        run: pnpm generate:agent-ui && pnpm build:app
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
       - name: Select Xcode 26
         run: |
           xcode=$(ls -d /Applications/Xcode_26*.app | grep -vi beta | sort -V | tail -1)
@@ -268,7 +273,7 @@ jobs:
         env:
           # Issue #1415 expressly requests this disposable sandbox endpoint.
           # Other branches default to loopback; no artifact contacts production.
-          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || (github.head_ref == 'desktop/bundled-renderer' && 'https://3000-001m6p8qt9pcng01mwgkmshdz6m.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
+          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || ((github.head_ref == 'desktop/bundled-renderer' || github.head_ref == 'desktop/runtime-phase2') && 'https://3000-001m6p8qt9pcng01mwgkmshdz6m.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
       - name: Keep final package integrity evidence
         if: always()
         run: |

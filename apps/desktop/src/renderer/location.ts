@@ -82,11 +82,25 @@ export function isOwnURL(url: URL) {
   return url.protocol === window.location.protocol && url.host === window.location.host
 }
 
+/** HTTP API/auth callbacks and machine endpoints must reach the server rather
+ * than becoming an in-memory SPA route. Keep the actual page set explicit. */
+export function isClientRoute(url: URL) {
+  if (!isOwnURL(url)) return false
+  const path = withoutLocale(url.pathname)
+  return ['/', '/dashboard', '/devices', '/device', '/settings', '/settings/teams', '/settings/members', '/workspaces/new', '/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email', '/oauth/consent'].includes(path)
+    || /^\/(?:invite|a|w)\/[^/]+$/.test(path)
+}
+
 export function navigate(href: Href, replace = false, options?: { scroll?: boolean; locale?: string }, localized = false) {
   const value = localized ? localeHref(href, options?.locale ?? localeOf(window.location.pathname)) : hrefString(href)
   const url = new URL(withBasePath(value), window.location.href)
   if (!isOwnURL(url)) {
-    void window.mikka?.app.openExternal(url.href)
+    if (window.location.protocol === 'mikka:') void window.mikka?.app.openExternal(url.href)
+    else window.location.assign(url.href)
+    return
+  }
+  if (!isClientRoute(url)) {
+    window.location[replace ? 'replace' : 'assign'](url.href)
     return
   }
   const previous = window.location.pathname

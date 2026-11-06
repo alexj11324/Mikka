@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { lstat, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
+import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
 
 // The build publishes the exact action name beside its ID. Observe that real
 // transport only for reads whose successful empty state has no DOM of its own.
 // No requests, React internals, application state or response routes are added.
 export async function readActionIds(applicationDirectory) {
+  const nitro = await lstat(join(applicationDirectory, '.output/mikka-build.json')).then(() => true, error => {
+    if (error.code === 'ENOENT') return false
+    throw error
+  })
+  if (nitro) {
+    const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
+    return new Map([...publishedActions(manifest)].map(name => [name, name]))
+  }
   const manifest = JSON.parse(await readFile(join(applicationDirectory, '.next/server/server-reference-manifest.json'), 'utf8'))
   const names = new Map()
   for (const [id, action] of Object.entries(manifest.node ?? {})) {
@@ -25,16 +34,12 @@ export function observeReads(page, requirements, actionIds, basePath) {
       const request = response.request()
       const pathname = new URL(response.url()).pathname
       if (requirement.path) return request.method() === 'GET' && pathname === `${basePath}${requirement.path}`
-      if (request.method() !== 'POST') return false
-      if (pathname === `${basePath}/api/desktop/rpc`) {
-        try { return request.postDataJSON()?.action === requirement.action } catch { return false }
-      }
-      return actionIds.get(request.headers()['next-action']) === requirement.action
+      return observedAction(request, pathname, basePath, actionIds)?.action === requirement.action
     }, { timeout: 45_000 }).then(async response => {
       assert.equal(response.ok(), true, `Read must succeed: ${requirement.path ?? requirement.action}`)
       const headers = response.headers()
-      const serverAction = requirement.action && actionIds.get(response.request().headers()['next-action']) === requirement.action
-      if (serverAction) {
+      const action = observedAction(response.request(), new URL(response.url()).pathname, basePath, actionIds)
+      if (requirement.action && action?.kind === 'flight') {
         // Next awaits the action before generating its Flight response, whose
         // page stream can remain open after the action result is consumed.
         // Combine that completed invocation with the caller's positive DOM
@@ -50,6 +55,10 @@ export function observeReads(page, requirements, actionIds, basePath) {
       phase = 'json'
       const data = await response.json()
       assert.ok(!data?.error && data?.ok !== false, 'Successful transport must contain successful application data')
+      if (requirement.action && action?.kind === 'rpc') {
+        const result = rpcReadResult(data)
+        assert.ok(!result?.error, 'The required RPC read must contain successful application data')
+      }
       // Preserve the isolated environment's explicit unavailable status and its
       // visible error. This does not permit ignoring any other failed reads.
       return { linearUnavailable: requirement.path === '/api/integrations/linear/status' && response.status() === 200 && data?.enabled === false && data?.state === 'unavailable' }

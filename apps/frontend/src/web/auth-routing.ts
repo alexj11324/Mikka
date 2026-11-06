@@ -1,0 +1,43 @@
+import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
+import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
+import { withBasePath } from '@/lib/base-path'
+import { desktopAuthCallbackPath, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { localeHref, localeOf, withoutLocale } from '../../../desktop/src/renderer/location'
+
+/** Preserve the original sign-in/up page's validated handoff and OAuth query
+ * contract. Duplicate values remain arrays rather than becoming a first value. */
+export function webAuthentication(location: URL) {
+  const query: Record<string, string | string[]> = {}
+  for (const key of new Set(location.searchParams.keys())) {
+    const values = location.searchParams.getAll(key)
+    query[key] = values.length === 1 ? values[0] : values
+  }
+  const mode = withoutLocale(location.pathname) === '/sign-up' ? 'sign-up' as const : 'sign-in' as const
+  const next = safeAuthReturn(typeof query.next === 'string' ? query.next : undefined)
+  const state = desktopAuthState(query.desktop_state)
+  const callback = desktopLoopbackCallback(query.desktop_callback)
+  const desktopFlow = query.desktop === '1' && state && callback
+    ? { state, callback, next: safeAuthReturn(typeof query.desktop_next === 'string' ? query.desktop_next : undefined) } : null
+  const oauthResume = mode === 'sign-in' ? oauthResumePath(query) : null
+  const composioResume = next === COMPOSIO_AUTH_CALLBACK_PATH ? withBasePath(next) : undefined
+  return {
+    mode, next, addAccount: query.addAccount === '1', desktopFlow, oauthResume, composioResume,
+    desktopRefused: Boolean(desktopFlow && query.oauth),
+    oauthFailed: query.oauth === 'failed' || Boolean(query.error),
+    oauthAccountNotLinked: oauthAccountNotLinkedProvider(query.error, query.provider),
+    continueGoogle: mode === 'sign-in' && query.continue === 'google',
+    continueGitHub: mode === 'sign-in' && query.continue === 'github',
+    continueComposio: Boolean(composioResume),
+    continueURL: oauthResume ? withBasePath(oauthResume) : composioResume,
+  }
+}
+
+/** A machine callback leaves the SPA through its original HTTP endpoint. */
+export function authenticatedReturn(location: URL): string | null {
+  const value = webAuthentication(location)
+  if (value.addAccount || value.desktopRefused) return null
+  if (value.oauthResume) return withBasePath(value.oauthResume)
+  if (value.composioResume) return value.composioResume
+  if (value.desktopFlow) return withBasePath(desktopAuthCallbackPath(value.desktopFlow.state, value.desktopFlow.next, value.desktopFlow.callback))
+  return withBasePath(localeHref(value.next, localeOf(location.pathname)))
+}

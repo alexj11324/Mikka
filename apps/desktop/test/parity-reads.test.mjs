@@ -41,12 +41,12 @@ test('foreign messages, changed positions and unproven message owners fail befor
   }
 })
 
-function observedResponse({ action = 'agents.listDevices', path, flight = false, status = 200, headers = {}, finished = async () => null, json = async () => ({ ok: true }) } = {}) {
+function observedResponse({ action = 'agents.listDevices', path, flight = false, browser = false, status = 200, headers = {}, finished = async () => null, json = async () => ({ version: 1, ok: true, result: [] }) } = {}) {
   const calls = { body: 0, json: 0 }
   const requirement = path ? { path } : { action }
-  const request = { method: () => path ? 'GET' : 'POST', headers: () => flight ? { 'next-action': 'actual-action-id' } : {}, postDataJSON: () => ({ action }) }
+  const request = { method: () => path ? 'GET' : 'POST', headers: () => flight ? { 'next-action': 'actual-action-id' } : browser ? { 'x-mikka-rpc': '1' } : {}, postDataJSON: () => ({ version: 1, action, args: [] }) }
   const response = {
-    request: () => request, url: () => `http://localhost:3004/mikka${path ?? (flight ? '/en' : '/api/desktop/rpc')}`,
+    request: () => request, url: () => `http://localhost:3004/mikka${path ?? (flight ? '/en' : browser ? '/api/rpc' : '/api/desktop/rpc')}`,
     ok: () => status >= 200 && status < 300, status: () => status,
     headers: () => ({ 'content-type': flight ? 'text/x-component' : 'application/json', ...headers }),
     finished: () => { calls.body++; return finished() },
@@ -66,20 +66,30 @@ test('a completed Next action does not wait for its ongoing page Flight stream',
 })
 
 test('ordinary RPC waits for both the body and parsed JSON', { timeout: 1000 }, async () => {
-  const body = Promise.withResolvers()
-  const data = Promise.withResolvers()
-  const { finish, calls } = observedResponse({ finished: () => body.promise, json: () => data.promise })
-  let completed = false
-  const result = finish().then(value => { completed = true; return value })
-  await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(calls, { body: 1, json: 0 })
-  assert.equal(completed, false)
-  body.resolve(null)
-  await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(calls, { body: 1, json: 1 })
-  assert.equal(completed, false)
-  data.resolve({ version: 1, ok: true, result: [] })
-  assert.deepEqual(await result, { linearUnavailable: false })
+  for (const browser of [false, true]) {
+    const body = Promise.withResolvers()
+    const data = Promise.withResolvers()
+    const { finish, calls } = observedResponse({ browser, finished: () => body.promise, json: () => data.promise })
+    let completed = false
+    const result = finish().then(value => { completed = true; return value })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(calls, { body: 1, json: 0 })
+    assert.equal(completed, false)
+    body.resolve(null)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(calls, { body: 1, json: 1 })
+    assert.equal(completed, false)
+    data.resolve({ version: 1, ok: true, result: [] })
+    assert.deepEqual(await result, { linearUnavailable: false })
+  }
+})
+
+test('browser RPC refuses missing protocol results and business failures after real JSON completion', async () => {
+  for (const data of [{ ok: true, result: [] }, { version: 1, ok: true },
+    { version: 1, ok: false, error: { code: 'denied' } },
+    { version: 1, ok: true, result: { error: 'denied' } }]) {
+    await assert.rejects(observedResponse({ browser: true, json: async () => data }).finish(), assert.AssertionError)
+  }
 })
 
 test('HTTP success does not hide API/RPC error data or a non-JSON redirect page', async () => {

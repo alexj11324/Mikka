@@ -4,6 +4,7 @@ import { Pool } from 'pg'
 import { assertDatabaseIdentity, EnvironmentError, loadEnvironment } from '../test-accounts/environment.mjs'
 import { TestAccountError } from '../test-accounts/pool.mjs'
 import { withTestAccounts } from '../test-accounts/session.mjs'
+import { publishedReadActions, readRpcActions, rpcReadAllowed, rpcReadRequest, rpcReadResult } from './read-action-transport.mjs'
 
 export const READ_ACTIONS = Object.freeze(['syncCoordinatorChat', 'syncIssueList', 'syncThreadList', 'pollIssue', 'pollIssueVersionSummaries'])
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)
@@ -78,6 +79,15 @@ function chunkPath(value, environment) {
   } catch { return null }
 }
 
+function viteAssetPath(value, environment) {
+  try {
+    if (typeof value !== 'string' || value.includes('\\')) return null
+    const url = new URL(value, environment.origin)
+    if (url.origin !== environment.origin || url.username || url.password || url.hash || url.search) return null
+    return new RegExp(`^${environment.basePath}/assets/[A-Za-z0-9_-]+\\.js$`).test(url.pathname) ? url.pathname : null
+  } catch { return null }
+}
+
 /** The business driver can only GET published read surfaces/assets, or POST a
  * named read action discovered from this same attested application's chunks. */
 export function requestAllowed(path, init, environment, refs = {}) {
@@ -88,14 +98,16 @@ export function requestAllowed(path, init, environment, refs = {}) {
     const headers = new Headers(init?.headers)
     if (['authorization', 'cookie', 'host'].some(name => headers.has(name))) return false
     const base = environment.basePath, page = base
+    if (method === 'POST' && url.pathname === `${base}/api/rpc`) return !url.search && rpcReadAllowed(init, environment, refs)
     if (method === 'POST') return url.pathname === page && !url.search
       && READ_ACTIONS.some(name => referenceId(refs[name]) && headers.get('next-action') === refs[name])
       && headers.get('content-type') === 'application/json' && headers.get('accept') === 'text/x-component'
-    if (method !== 'GET' || init?.body !== undefined || headers.has('next-action')) return false
+    if (method !== 'GET' || init?.body !== undefined || headers.has('next-action') || headers.has('x-mikka-rpc')) return false
     if ([`${base}/api/version`, `${base}/api/auth/get-session`, `${base}/api/workspace/switcher`, `${base}/api/settings/issue-prefix`].includes(url.pathname)) return !url.search
     if (url.pathname === page) return [...url.searchParams].every(([key, value]) => ['issue', 'workspace'].includes(key) && uuid(value))
     if (url.pathname === `${page}/settings`) return [...url.searchParams].every(([key, value]) => key === 'section' && value === 'preferences' || key === 'workspace' && uuid(value))
-    return chunkPath(url.href, environment) !== null
+    return url.pathname === `${base}/renderer-manifest.json` && !url.search
+      || chunkPath(url.href, environment) !== null || viteAssetPath(url.href, environment) !== null
   } catch { return false }
 }
 
@@ -108,6 +120,7 @@ const referenceCall = new RegExp(String.raw`(?:\bcreateServerReference|\[\s*(?:"
  * inspecting private server manifests. A finite scan is not a polling loop. */
 export async function discoverReadActions(request, environment, issueId) {
   const queue = [], queued = new Set(), seen = new Set(), refs = {}
+  let viteEntry = false
   const diagnostics = { pagesRead: 0, chunksRead: 0, found: [] }
   const add = raw => {
     const path = chunkPath(raw, environment)
@@ -116,7 +129,11 @@ export async function discoverReadActions(request, environment, issueId) {
   const scan = source => {
     check(Buffer.byteLength(source) <= 8_000_000, 'public_asset_too_large')
     for (const match of source.matchAll(referenceCall)) if (READ_ACTIONS.includes(match[4])) refs[match[4]] = match[2]
-    for (const match of source.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g)) add(match[2].replaceAll('&amp;', '&'))
+    for (const match of source.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g)) {
+      const path = match[2].replaceAll('&amp;', '&')
+      if (viteAssetPath(path, environment)) viteEntry = true
+      add(path)
+    }
     for (const match of source.matchAll(/(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g)) add(match[2])
   }
   // Match normal account initialization and API reads. Switching to another
@@ -124,6 +141,16 @@ export async function discoverReadActions(request, environment, issueId) {
   for (const page of [environment.basePath, ...(issueId ? [`${environment.basePath}?issue=${issueId}`] : []), `${environment.basePath}/settings?section=preferences`]) {
     const response = await request(page)
     check(response.ok, 'read_page_unavailable'); scan(await response.text()); diagnostics.pagesRead++
+  }
+  if (viteEntry) {
+    const response = await request(`${environment.basePath}/renderer-manifest.json`)
+    check(response.ok && response.headers.get('content-type')?.includes('application/json'), 'public_action_manifest_unavailable')
+    const source = await response.text()
+    check(Buffer.byteLength(source) <= 8_000_000, 'public_asset_too_large')
+    let published
+    try { published = publishedReadActions(JSON.parse(source)) }
+    catch (error) { throw new ReadCacheAcceptanceError('read_action_reference_missing', { cause: error }) }
+    return { refs: published, diagnostics: { ...diagnostics, transport: 'rpc', manifestsRead: 1, found: [...READ_ACTIONS] } }
   }
   while (queue.length && seen.size < 200 && READ_ACTIONS.some(name => !refs[name])) {
     const batch = queue.splice(0, Math.min(12, 200 - seen.size))
@@ -195,6 +222,7 @@ export function createReadClient(account, environment, actor, reads, refs = {}) 
     const traceId = randomBytes(16).toString('hex'), spanId = randomBytes(8).toString('hex')
     const response = await request(path, { ...init, headers: { ...init?.headers, traceparent: `00-${traceId}-${spanId}-01` } })
     check(response.ok, 'business_read_failed')
+    if (init?.headers?.['x-mikka-rpc']) check(response.headers.get('content-type')?.includes('application/json'), 'read_action_response_invalid')
     const text = await response.text()
     check(Buffer.byteLength(text) <= 8_000_000, 'business_response_too_large')
     const value = decode(text)
@@ -204,7 +232,14 @@ export function createReadClient(account, environment, actor, reads, refs = {}) 
   return {
     request,
     action(name, args, surface, scenario) {
-      check(READ_ACTIONS.includes(name) && referenceId(refs[name]), 'read_action_forbidden')
+      check(READ_ACTIONS.includes(name) && (referenceId(refs[name]) || refs[name] === readRpcActions[name]), 'read_action_forbidden')
+      if (refs[name] === readRpcActions[name]) {
+        const { path, init } = rpcReadRequest(name, args, environment, refs)
+        return read(surface, scenario, name, path, init, text => {
+          try { return rpcReadResult(JSON.parse(text)) }
+          catch (error) { throw new ReadCacheAcceptanceError('read_action_response_invalid', { cause: error }) }
+        })
+      }
       return read(surface, scenario, name, environment.basePath, {
         method: 'POST', headers: { 'content-type': 'application/json', accept: 'text/x-component', 'next-action': refs[name] }, body: JSON.stringify(args),
       }, actionResult)

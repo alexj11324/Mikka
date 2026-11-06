@@ -1,6 +1,6 @@
 import { forwardRef, type AnchorHTMLAttributes, type MouseEvent } from 'react'
 import { withBasePath } from '@/lib/base-path'
-import { hrefString, isOwnURL, navigate, type Href } from './location'
+import { hrefString, isClientRoute, navigate, type Href } from './location'
 
 export type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
   href: Href
@@ -18,7 +18,7 @@ const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link({ href, repl
     onClick?.(event)
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || props.target === '_blank' || props.download !== undefined) return
     const url = new URL(value, window.location.href)
-    if (!isOwnURL(url)) return
+    if (!isClientRoute(url)) return
     let prevented = false
     onNavigate?.({ preventDefault() { prevented = true } })
     event.preventDefault()

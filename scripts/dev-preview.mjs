@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process'
-import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { stripVTControlCharacters } from 'node:util'
 import { basePath as appBasePath } from '../lib/base-path-config.mjs'
 
@@ -24,8 +23,7 @@ export async function warmPreview(origin, { basePath = appBasePath, fetcher = fe
 }
 
 export function startPreview() {
-  const require = createRequire(import.meta.url)
-  const child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'dev', '--webpack', ...process.argv.slice(2)], {
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../apps/api/scripts/dev.mjs', import.meta.url)), ...process.argv.slice(2)], {
     stdio: ['inherit', 'pipe', 'pipe'], env: { ...process.env },
   })
   let output = ''

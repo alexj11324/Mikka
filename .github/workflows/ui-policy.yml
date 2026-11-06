@@ -273,7 +273,11 @@ jobs:
       - uses: ./.github/actions/pnpm-install
       - run: pnpm lint:code
         if: always()
-      - run: pnpm exec next typegen
+      - run: node apps/api/scripts/generate-routes.mjs --check
+        if: always()
+      - run: pnpm test:api
+        if: always()
+      - run: pnpm --filter @mikka/frontend test
         if: always()
       - run: pnpm typecheck
         if: always()

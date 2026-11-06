@@ -18,16 +18,13 @@ import { DeviceAuthorization } from '@/components/device-authorization'
 import NotFound from '@/app/[locale]/not-found'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
-import { setSession } from './auth-client'
-import { AuthForm } from './auth-form'
 import { readBootstrap, type DesktopBootstrap } from './bootstrap'
-import { rendererHost } from './host'
 import { Link } from './i18n-navigation'
 import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
-import { openCurrentPageInBrowser } from './open-settings'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
 import { Offline } from './offline'
 import { setClientConfiguration } from './client-configuration'
+import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, PlatformExtras, requireUpdate } from 'mikka:platform'
 
 const Workspace = lazy(() => import('./workspace'))
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
@@ -40,7 +37,7 @@ export function App() {
   const locale = localeOf(location.pathname)
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   return <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
-    <ThemeProvider><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></ThemeProvider>
+    <ThemeProvider><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></ThemeProvider>
   </NextIntlClientProvider>
 }
 
@@ -91,7 +88,7 @@ function SessionApplication() {
     const changed = () => { void reload() }
     const sessionChanged = () => { void reload(true) }
     const offline = () => setTransportState('offline')
-    const stop = rendererHost().onSessionChanged(sessionChanged)
+    const stop = onSessionChanged(sessionChanged)
     window.addEventListener(REFRESH_EVENT, changed)
     window.addEventListener('online', changed)
     window.addEventListener('offline', offline)
@@ -144,13 +141,16 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   useEffect(() => {
     if (path === '/dashboard') navigate(`/${location.search}`, true, { locale }, true)
     else if (path === '/devices') navigate('/settings?section=devices', true, { locale }, true)
-    else if (user && authentication && query.get('addAccount') !== '1') navigate(safeAuthReturn(query.get('next') ?? undefined), true, { locale }, true)
+    else if (user && authentication) {
+      const destination = authenticatedReturn(location)
+      if (destination !== null) navigate(destination, true)
+    }
     else if (!user && !authentication && !invitation && !browserRoute && !sharedArtifact) {
       const next = safeAuthReturn(`${path}${location.search}`)
       navigate(`/sign-in${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`, true, { locale }, true)
     }
   }, [location.href, user?.id])
-  if (browserRoute || path === '/sign-up') return <BrowserRoute signUp={path === '/sign-up'} />
+  if (browserRoute || (platform === 'desktop' && path === '/sign-up')) return <BrowserRoute signUp={path === '/sign-up'} account={user?.email ?? null} />
   if (sharedArtifact) return <Suspense fallback={<WorkspaceLoading />}><SharedArtifactRoute key={sharedArtifact[1]} token={sharedArtifact[1]} /></Suspense>
   if (invitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><InvitationCard token={/^[a-f0-9]{64}$/.test(invitation[1]) ? invitation[1] : ''} email={user?.email ?? null} /></main>
   if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.googleEnabled} githubEnabled={bootstrap.githubEnabled} emailEnabled={bootstrap.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} />
@@ -186,25 +186,10 @@ function ConnectionStatus({ offline, retry }: { offline: boolean; retry: () => v
   return null
 }
 
-function BrowserRoute({ signUp = false }: { signUp?: boolean }) {
-  const t = useTranslations('DesktopRenderer')
-  const [failed, setFailed] = useState(false)
-  const location = useLocation()
-  const open = useCallback(() => {
-    setFailed(false)
-    if (signUp) void rendererHost().signIn({ mode: 'sign-up', next: safeAuthReturn(location.searchParams.get('next') ?? undefined), locale: localeOf(location.pathname), addAccount: location.searchParams.get('addAccount') === '1' }).catch(() => setFailed(true))
-    else void openCurrentPageInBrowser().then(result => setFailed(result !== 'desktop')).catch(() => setFailed(true))
-  }, [signUp, location.href])
-  useEffect(open, [open])
-  return <Auth><AuthCard title={t('browserTitle')} description={t(failed ? 'browserFailed' : 'browserOpened')}>
-    <Button onClick={open}>{t('openBrowser')}</Button><Link href="/" className={buttonVariants({ variant: 'ghost' })}>{t('back')}</Link>
-  </AuthCard></Auth>
-}
-
 function UpdateRequired() {
   const t = useTranslations('DesktopRenderer')
   return <Auth><AuthCard title={t('updateTitle')} description={t('updateHint')}>
-    <Button onClick={() => void window.mikka?.app.requireUpdate?.()}>{t('checkUpdate')}</Button>
+    <Button onClick={requireUpdate}>{t('checkUpdate')}</Button>
   </AuthCard></Auth>
 }
 

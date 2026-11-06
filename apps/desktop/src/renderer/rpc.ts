@@ -14,15 +14,19 @@ export class DesktopTransportError extends Error {
 
 /** The renderer has no auth headers. Electron's scheme handler supplies them in
  * main, so even a compromised page cannot read or export its session credential. */
-export async function callAction<T = unknown>(action: string, args: unknown[]): Promise<T> {
+export function callAction<T = unknown>(action: string, args: unknown[]): Promise<T> {
+  return callRemoteAction(action, args, { endpoint: '/api/desktop/rpc', credentials: 'omit', header: 'x-mikka-desktop-protocol' })
+}
+
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc' }): Promise<T> {
   const encoded = await encodeArgs(args)
   let response: Response
   try {
-    response = await fetch(withBasePath('/api/desktop/rpc'), {
+    response = await fetch(withBasePath(transport.endpoint), {
       method: 'POST',
       cache: 'no-store',
-      credentials: 'omit',
-      headers: { 'content-type': 'application/json', 'x-mikka-desktop-protocol': String(DESKTOP_RPC_VERSION), 'x-mikka-locale': localeOf(window.location.pathname) },
+      credentials: transport.credentials,
+      headers: { 'content-type': 'application/json', [transport.header]: String(DESKTOP_RPC_VERSION), 'x-mikka-locale': localeOf(window.location.pathname) },
       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
     })
   } catch (cause) {

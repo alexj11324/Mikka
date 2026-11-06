@@ -5,11 +5,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { availableParallelism, cpus, totalmem } from 'node:os'
 import { resolve } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify, stripVTControlCharacters } from 'node:util'
 import { loadEnvironment, assertDeploymentIdentity, EnvironmentError } from '../test-accounts/environment.mjs'
 import { runReadCacheAcceptance, publicFailure, ReadCacheAcceptanceError } from './read-cache.mjs'
+import { productionApplication } from '../../apps/desktop/test/production-application.mjs'
 
 const ownedFailures = new WeakMap()
 const networkErrors = new Set(['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'UND_ERR_ABORTED', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'ABORT_ERR', 'AbortError', 'TimeoutError'])
@@ -38,7 +39,7 @@ export async function loadOwnedDiagnosticSources({ cwd = process.cwd(), execFile
     const { stdout } = await execFileImpl('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 2 * 1024 ** 2 })
     const tracked = stdout.split('\0').filter(path => /^[a-zA-Z\d_./@()[\]-]+$/u.test(path) && !path.startsWith('/') && !path.split('/').includes('..'))
     files.push(...tracked.filter(path => /\.(?:[cm]?[jt]sx?|css|scss)$/u.test(path)))
-    for (const path of tracked.filter(path => path === 'package.json' || /^packages\/[^/]+\/package\.json$/u.test(path))) {
+    for (const path of tracked.filter(path => path === 'package.json' || /^(?:packages|apps)\/[^/]+\/package\.json$/u.test(path))) {
       try {
         const manifest = JSON.parse(await readFileImpl(resolve(root, path), 'utf8'))
         for (const name of [manifest.name, ...['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].flatMap(key => Object.keys(manifest[key] ?? {}))]) {
@@ -308,7 +309,9 @@ async function stop(child) {
   if (child.exitCode !== null || child.signalCode !== null) { signal('SIGTERM'); return }
   const exited = new Promise(resolve => child.once('exit', resolve))
   signal('SIGTERM')
-  if (!await Promise.race([exited.then(() => true), delay(5000).then(() => false)])) {
+  // Nitro drains in-flight requests and the local Workflow runtime on SIGTERM.
+  // Give that documented lifecycle time to finish before the owned-group fallback.
+  if (!await Promise.race([exited.then(() => true), delay(35_000, undefined, { ref: false }).then(() => false)])) {
     signal('SIGKILL'); await exited
   }
 }
@@ -324,8 +327,9 @@ export async function runOwnedReadCacheAcceptance() {
   process.once('SIGINT', cancel)
   process.once('SIGTERM', cancel)
   try {
-    const next = fileURLToPath(import.meta.resolve('next/dist/bin/next'))
-    server = spawn(process.execPath, [next, 'start', '--hostname', origin.hostname.replaceAll(/[[\]]/g, ''), '--port', origin.port || '80'], {
+    const application = await productionApplication(process.cwd(), { expectedRevision: environment.deploymentSha,
+      hostname: origin.hostname.replaceAll(/[[\]]/g, ''), port: Number(origin.port || '80') })
+    server = spawn(process.execPath, application.args, {
       env: { ...process.env, NODE_ENV: 'production' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     })
     await new Promise((resolve, reject) => {
@@ -357,7 +361,7 @@ export async function runOwnedReadCacheAcceptance() {
     const result = await runReadCacheAcceptance()
     runtime.phase('evidence')
     const ownedRuntime = await runtime.finish(server)
-    const summary = { ...result, serverMode: 'production', attestationProbeMs, landingProbeMs, serverStdoutBytes, serverStderrBytes, ownedRuntime }
+    const summary = { ...result, serverMode: 'production', serverRuntime: application.kind, attestationProbeMs, landingProbeMs, serverStdoutBytes, serverStderrBytes, ownedRuntime }
     await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })
     await writeFile('.cache/e2e/http-acceptance-summary.json', `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 })
     return summary

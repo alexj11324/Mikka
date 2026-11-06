@@ -3,6 +3,7 @@ import test from 'node:test'
 import { EnvironmentError } from '../test-accounts/environment.mjs'
 import { TestAccountError } from '../test-accounts/pool.mjs'
 import { READ_ACTIONS, ReadCacheAcceptanceError, ReadCacheDiagnosticError, actionResult, createReadClient, discoverReadActions, exerciseReadCases, publicFailure, requestAllowed } from './read-cache.mjs'
+import { observedAction, publishedReadActions, readRpcActions, rpcReadRequest } from './read-action-transport.mjs'
 
 const environment = { origin: 'http://127.0.0.1:3110', basePath: '/mikka' }
 const id = number => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`
@@ -80,6 +81,80 @@ test('action discovery handles Next dev bracket imports, minified calls and lazy
 
 test('missing named references fail closed instead of guessing action IDs', async () => {
   await assert.rejects(discoverReadActions(async () => new Response('<html></html>'), environment, id(1)), { code: 'read_action_reference_missing' })
+})
+
+test('Vite discovery uses the actual published used-actions manifest and never widens the five-read boundary', async () => {
+  const manifest = { version: 1, target: 'web', usedActions: [...Object.values(readRpcActions), 'coordinator.sendCoordinatorMessage'] }
+  const calls = []
+  const discovered = await discoverReadActions(async path => {
+    calls.push(path)
+    assert.equal(requestAllowed(path, {}, environment), true)
+    return path.endsWith('/renderer-manifest.json')
+      ? Response.json(manifest)
+      : new Response('<script type="module" src="/mikka/assets/index-realbuild.js"></script>')
+  }, environment, id(1))
+  assert.deepEqual(discovered.refs, readRpcActions)
+  assert.equal(discovered.diagnostics.transport, 'rpc')
+  assert.equal(discovered.diagnostics.manifestsRead, 1)
+  assert.deepEqual(calls, ['/mikka', `/mikka?issue=${id(1)}`, '/mikka/settings?section=preferences', '/mikka/renderer-manifest.json'])
+  for (const invalid of [{ ...manifest, target: 'desktop' }, { ...manifest, version: 2 },
+    { ...manifest, usedActions: manifest.usedActions.slice(1) },
+    { ...manifest, usedActions: [...manifest.usedActions, manifest.usedActions[0]] },
+    { ...manifest, usedActions: undefined, exports: manifest.usedActions }]) assert.throws(() => publishedReadActions(invalid))
+  for (const path of ['/mikka/assets/../private.js', '/mikka/assets/a%2fb.js', 'https://foreign.example/mikka/assets/app.js', '/mikka/renderer-manifest.json?override=1']) {
+    assert.equal(requestAllowed(path, {}, environment), false)
+  }
+})
+
+test('only the exact published RPC read with the real same-origin protocol is allowed', () => {
+  const { path, init } = rpcReadRequest('pollIssue', [id(1)], environment, readRpcActions)
+  assert.equal(requestAllowed(path, init, environment, readRpcActions), true)
+  assert.equal(requestAllowed(path, init, environment, {}), false)
+  for (const changed of [
+    { ...init, body: JSON.stringify({ version: 1, action: 'issues.deleteIssue', args: [id(1)] }) },
+    { ...init, body: JSON.stringify({ version: 1, action: 'issues.pollIssue', args: [], owner: id(1) }) },
+    { ...init, body: JSON.stringify({ version: 1, action: 'issues.pollIssue', args: {} }) },
+    ...['origin', 'x-mikka-rpc', 'content-type', 'accept'].map(name => ({ ...init, headers: { ...init.headers, [name]: 'wrong' } })),
+    ...['authorization', 'cookie', 'host', 'x-mikka-session-cache', 'x-mikka-session-token', 'next-action'].map(name => ({ ...init, headers: { ...init.headers, [name]: 'private' } })),
+  ]) assert.equal(requestAllowed(path, changed, environment, readRpcActions), false)
+  assert.equal(requestAllowed(path + '?override=1', init, environment, readRpcActions), false)
+  assert.throws(() => rpcReadRequest('sendCoordinatorMessage', [], environment, readRpcActions))
+})
+
+test('RPC read accounting waits for actual JSON and rejects protocol errors without retaining private content', async () => {
+  const complete = Promise.withResolvers(), records = []
+  let payload = { version: 1, ok: true, result: { issue: { text: 'private fixture content', at: { $mikka: 'date', value: '2026-11-05T00:00:00.000Z' } } } }
+  let calls = 0
+  const client = createReadClient({ request: async (path, init) => {
+    calls++
+    assert.equal(path, '/mikka/api/rpc')
+    assert.equal(init.headers.origin, environment.origin)
+    assert.deepEqual(JSON.parse(init.body), { version: 1, action: 'issues.pollIssue', args: [id(1)] })
+    await complete.promise
+    return Response.json(payload)
+  } }, environment, 'owner', records, readRpcActions)
+  const reading = client.action('pollIssue', [id(1)], 'task-detail', 'cold')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(records.length, 0)
+  complete.resolve()
+  const result = await reading
+  assert.equal(result.issue.at.toISOString(), '2026-11-05T00:00:00.000Z')
+  assert.equal(records[0].httpBytes, Buffer.byteLength(JSON.stringify(payload)))
+  assert.equal(records[0].jsonBytes, Buffer.byteLength(JSON.stringify(result)))
+  assert.doesNotMatch(JSON.stringify(records), /private fixture/)
+  for (payload of [{ ok: true, result: [] }, { version: 1, ok: true }, { version: 1, ok: false, error: { code: 'private' } }]) {
+    await assert.rejects(client.action('pollIssue', [id(1)], 'task-detail', 'cold'), { code: 'read_action_response_invalid' })
+  }
+  assert.equal(records.length, 1)
+  assert.equal(calls, 4)
+})
+
+test('response observation identifies browser RPC only by its actual request envelope', () => {
+  const request = { method: () => 'POST', headers: () => ({ 'x-mikka-rpc': '1' }), postDataJSON: () => ({ version: 1, action: 'issues.pollIssue', args: [] }) }
+  assert.deepEqual(observedAction(request, '/mikka/api/rpc', '/mikka', new Map()), { kind: 'rpc', action: 'issues.pollIssue' })
+  assert.equal(observedAction({ ...request, headers: () => ({}) }, '/mikka/api/rpc', '/mikka', new Map()), null)
+  assert.equal(observedAction({ ...request, postDataJSON: () => ({ action: 'issues.pollIssue' }) }, '/mikka/api/rpc', '/mikka', new Map()), null)
+  assert.equal(observedAction(request, '/mikka/api/rpc?other', '/mikka', new Map()), null)
 })
 
 test('discovery before selecting an existing task uses only the main and settings pages and still requires every read action', async () => {

@@ -4,7 +4,7 @@
 import { spawn, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
-import { lstat, mkdir, open, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { resolve } from 'node:path'
@@ -15,6 +15,7 @@ import { Pool } from 'pg'
 import { assertDatabaseIdentity, loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { recordRunnerEvidenceSecrets } from '../../../scripts/test-accounts/bootstrap.mjs'
 import { localDatabaseTarget } from '../../../scripts/test-accounts/database-target.mjs'
+import { productionApplication } from './production-application.mjs'
 
 const harnessRoot = fileURLToPath(new URL('../../..', import.meta.url))
 const root = process.env.MIKKA_TEST_APP_DIR ? resolve(process.env.MIKKA_TEST_APP_DIR) : harnessRoot
@@ -87,7 +88,9 @@ async function start(directory, serverPort, label, metrics) {
   const env = { ...process.env, ...(metrics ? { MIKKA_DESKTOP_METRICS_SOCKET: `/tmp/mikka-${label}-${process.pid}.sock` } : {}) }
   // Next reconstructs request.url from its listen hostname. Keep it identical
   // to the attested loopback origin, including localhost versus 127.0.0.1.
-  const args = [...(metrics ? ['--require', resolve(harnessRoot, 'apps/desktop/test/db-metrics.cjs')] : []), resolve(directory, 'node_modules/next/dist/bin/next'), 'start', '--hostname', hostname, '--port', String(serverPort)]
+  const application = await productionApplication(directory, { expectedRevision: sha, hostname, port: serverPort,
+    ...(metrics ? { preload: resolve(harnessRoot, 'apps/desktop/test/db-metrics.cjs') } : {}) })
+  const args = application.args
   const child = spawn(process.execPath, args, { cwd: directory, env, detached: process.platform !== 'win32', stdio: ['ignore', log.fd, log.fd] })
   children.push(child)
   child.once('error', () => rejectServerExit(new Error(`DESKTOP_TEST_${label}_SERVER_FAILED`)))
@@ -99,7 +102,7 @@ async function start(directory, serverPort, label, metrics) {
       const endpoint = new URL('/mikka/api/version', origin)
       endpoint.port = String(serverPort)
       const response = await fetch(endpoint, { signal: AbortSignal.timeout(1500) })
-      if (response.ok && child.exitCode === null) return { pid: child.pid, port: serverPort, socket: env.MIKKA_DESKTOP_METRICS_SOCKET, log: logPath }
+      if (response.ok && child.exitCode === null) return { pid: child.pid, port: serverPort, socket: env.MIKKA_DESKTOP_METRICS_SOCKET, log: logPath, runtime: application.kind }
     } catch { /* bounded startup readiness, never application polling */ }
     await delay(500)
   }
@@ -107,8 +110,7 @@ async function start(directory, serverPort, label, metrics) {
 }
 
 try {
-  const built = JSON.parse(await readFile(resolve('.next/required-server-files.json'), 'utf8'))
-  if (built.config?.env?.MIKKA_TEST_BUILD_SHA !== sha) throw new Error('DESKTOP_TEST_COMPILED_REVISION_MISMATCH')
+  await productionApplication(root, { expectedRevision: sha, hostname, port })
   await requireFreePort(port, '0.0.0.0')
   await requireFreePort(port + 1, '127.0.0.1')
   const compiled = await build({ entryPoints: [resolve('cloudflare/device-gateway/src/index.ts')], bundle: true, format: 'esm', platform: 'neutral', external: ['cloudflare:workers', 'node:crypto'], write: false })

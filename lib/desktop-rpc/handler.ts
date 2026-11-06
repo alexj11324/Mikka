@@ -7,9 +7,10 @@ const requestSchema = z.object({ version: z.number().int(), action: z.string().m
 const noStore = { 'Cache-Control': 'no-store', 'Content-Type': 'application/json', Vary: 'Authorization' }
 const maxBytes = 4 * 1024 * 1024
 
-function failure(status: number, code: string, version: number = DESKTOP_RPC_VERSION) {
-  return Response.json({ version, ok: false, error: { code } }, { status, headers: noStore })
+export function rpcFailure(status: number, code: string, version: number = DESKTOP_RPC_VERSION, vary = 'Authorization') {
+  return Response.json({ version, ok: false, error: { code } }, { status, headers: { ...noStore, Vary: vary } })
 }
+const failure = rpcFailure
 
 /** Authentication never sees ambient cookies. The separate native cache header
  * must still pass Better Auth's signature, bearer-binding and expiry checks. */
@@ -51,18 +52,16 @@ async function body(request: Request): Promise<unknown> {
 
 /** The transport calls only this closed registry; it never imports a caller
  * supplied module or uses Next's deploy-specific Server Action identifiers. */
-export function createDesktopRpc<Session>(options: {
-  authenticate: (headers: Headers) => Promise<Session | null>
+export type RpcDispatchOptions<Session> = {
   scope: (session: Session, work: () => Promise<Response>, request: Request) => Promise<Response>
   actions: DesktopActions
   error?: (error: unknown) => { status: number; code: string }
-}) {
-  return async (request: Request): Promise<Response> => {
-    const headers = desktopBearerHeaders(request)
-    if (!headers) return failure(401, 'desktop_session_expired')
-    let session: Session | null
-    try { session = await options.authenticate(headers) } catch { return failure(503, 'desktop_rpc_failed') }
-    if (!session) return failure(401, 'desktop_session_expired')
+}
+
+/** The browser and native transports share parameter/return validation, not
+ * credentials. Each transport authenticates and installs its own scope first. */
+export async function dispatchRpc<Session>(options: RpcDispatchOptions<Session>, request: Request, session: Session, vary = 'Authorization'): Promise<Response> {
+    const failure = (status: number, code: string, version?: number) => rpcFailure(status, code, version, vary)
     if (request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') return failure(415, 'desktop_rpc_request_invalid')
     const parsed = requestSchema.safeParse(await body(request))
     if (!parsed.success) return failure(400, 'desktop_rpc_request_invalid')
@@ -79,11 +78,23 @@ export function createDesktopRpc<Session>(options: {
     return options.scope(session, async () => {
       try {
         const result = await action.invoke(validated.data as never[])
-        return Response.json({ version: input.version, ok: true, result: encode(result) }, { headers: noStore })
+        return Response.json({ version: input.version, ok: true, result: encode(result) }, { headers: { ...noStore, Vary: vary } })
       } catch (error) {
         const response = options.error?.(error) ?? { status: 500, code: 'desktop_rpc_failed' }
         return failure(response.status, response.code, input.version)
       }
     }, request)
+}
+
+export function createDesktopRpc<Session>(options: RpcDispatchOptions<Session> & {
+  authenticate: (headers: Headers) => Promise<Session | null>
+}) {
+  return async (request: Request): Promise<Response> => {
+    const headers = desktopBearerHeaders(request)
+    if (!headers) return failure(401, 'desktop_session_expired')
+    let session: Session | null
+    try { session = await options.authenticate(headers) } catch { return failure(503, 'desktop_rpc_failed') }
+    if (!session) return failure(401, 'desktop_session_expired')
+    return dispatchRpc(options, request, session)
   }
 }

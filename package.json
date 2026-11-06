@@ -16,13 +16,13 @@
     "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/bot-runtime.db.test.ts lib/computer/task-runtime.db.test.ts lib/computer/provision.db.test.ts lib/computer/local-reviews.db.test.ts lib/computer/reconcile.db.test.ts tests/device-computer-migration.test.mjs tests/computer-policy-default-allow-migration.test.mjs",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
-    "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && next build && pnpm typecheck && node scripts/migrate.mjs",
+    "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm build:app && pnpm typecheck && node scripts/migrate.mjs",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:factory": "node scripts/check-factory.mjs",
     "test:factory-config": "node --test scripts/factory-config.test.mjs",
     "test:migrations": "node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs",
-    "dev": "node scripts/dev-preview.mjs",
+    "dev": "node apps/api/scripts/dev.mjs",
     "dev:local": "node scripts/dev-local.mjs",
     "test:dev-local": "node --test scripts/acceptance/model-provider-fallback.test.mjs scripts/test-model-policy.test.mjs scripts/dev-local/acceptance-check.test.mjs scripts/dev-local/transport.test.mjs scripts/dev-local/services.test.mjs scripts/dev-local/gh.test.mjs scripts/dev-local/reviewed-local-evidence.test.mjs scripts/dev-local/daemon-fault.test.mjs scripts/dev-local/factory-handoff-acceptance.test.mjs scripts/dev-local/factory-watchdog-acceptance.test.mjs && node --import tsx --test scripts/dev-local/seed-model-keys.test.ts scripts/dev-local/factory-handoff-daemon-status.test.ts",
     "test:local-loop": "node --import ./tests/support/server-only.mjs --import tsx scripts/dev-local/acceptance.mjs",
@@ -77,8 +77,8 @@
     "test:captures": "node --import ./tests/support/server-only.mjs --import tsx --test lib/captures/captures.test.ts lib/device-token-scope.test.ts && node --test packages/daemon/src/computer/broker.test.mjs packages/daemon/src/computer/driver.test.mjs packages/daemon/test/capture-copy.node-test.mjs && pnpm --filter @mikka/protocol exec vitest run src/capture.test.ts",
     "test:captures-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/captures/store.db.test.ts",
     "test:telegram": "node --import tsx --test lib/telegram/commands.test.ts lib/telegram/logger.test.ts lib/telegram/messages.test.ts lib/telegram/unique-violation.test.ts",
-    "start": "next start",
-    "typecheck": "tsrs --noEmit",
+    "start": "node scripts/start-app.mjs",
+    "typecheck": "tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
     "desktop:dev": "pnpm --filter @mikka/desktop dev",
@@ -194,7 +194,7 @@
     "test:hosted-usage": "node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts lib/subscription-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-wait.test.tsx",
     "test:model-admission": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/contract.test.ts lib/model-admission/http.test.ts lib/model-admission/gateway-transport.test.ts lib/model-admission/decision.test.ts",
     "test:model-admission-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/store.db.test.ts lib/model-admission/subscription.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/revocation-postpay.db.test.ts",
-    "test:release-security": "node --test scripts/release/mobile-native.test.mjs scripts/release/security.test.mjs scripts/release/web-deploy.test.mjs lib/deployment-id.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs scripts/ops/deployment-regression.test.mjs scripts/ops/runtime-outcomes.test.mjs scripts/ops/production-smoke.test.mjs",
+    "test:release-security": "node --test scripts/release/mobile-native.test.mjs scripts/release/security.test.mjs scripts/release/web-deploy.test.mjs scripts/release/build-vercel.test.mjs lib/deployment-id.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs scripts/ops/deployment-regression.test.mjs scripts/ops/runtime-outcomes.test.mjs scripts/ops/production-smoke.test.mjs",
     "test:ops-db": "node --test-concurrency=1 --import ./scripts/server-test.mjs --import tsx --test lib/ops/monitor.db.test.ts lib/db/transport-sample.db.test.ts lib/ops/egress-fallback.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test app/api/cron/ops-monitor/route.test.ts",
     "test:plugins": "node --import tsx --test lib/plugins/plugins.test.ts lib/plugins/store-state.test.ts lib/plugins/app-detail.test.ts lib/plugins/connect-kind.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/routes.test.ts",
     "test:plugins-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/store.db.test.ts lib/plugins/workspace-mcp.db.test.ts",
@@ -210,7 +210,9 @@
     "test:project-decisions-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/decisions.db.test.ts lib/project-map/http.db.test.ts lib/project-map/sources.db.test.ts lib/project-map/read.db.test.ts lib/secrets/project-map-mask.db.test.ts",
     "test:project-decisions": "node --test scripts/acceptance/project-decisions.test.mjs && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/sources.test.ts lib/project-map/graph.test.ts lib/project-map/cursor.test.ts lib/project-map/read-performance.test.ts lib/project-map/read-transport.test.ts lib/project-map/scope-transport.test.ts lib/secrets/project-map-mask.test.ts",
     "test:pending-actions-live": "node --import tsx --test lib/live/pending-action-cache.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/pending-actions.live.test.tsx app/api/pending-actions/route.test.ts",
-    "test:read-cache": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/*.test.ts lib/swr/*.test.tsx lib/coordinator/chat-read-client.test.ts lib/settings-read.test.ts && node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs"
+    "test:read-cache": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/*.test.ts lib/swr/*.test.tsx lib/coordinator/chat-read-client.test.ts lib/settings-read.test.ts && node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs",
+    "build:app": "node apps/frontend/scripts/build.mjs web && node apps/api/scripts/build.mjs",
+    "test:api": "node --import tsx --test apps/api/test/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/agent-image-cache.test.ts && node --test apps/api/build-contract.test.mjs apps/api/public-assets.test.mjs apps/api/runtime/*.test.mjs apps/api/scripts/*.test.mjs scripts/start-app.test.mjs scripts/test-subscription-enrollment-app.test.mjs && node --test scripts/release/build-vercel.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/mcp": "2.0.81",
@@ -327,7 +329,15 @@
     "workflow": "5.2.3",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "hono": "4.13.13",
+    "h3": "2.0.8",
+    "srvx": "1.0.8",
+    "use-intl": "4.14.9",
+    "cookie": "1.1.1",
+    "@formatjs/intl-localematcher": "0.8.14",
+    "negotiator": "1.1.0",
+    "unstorage": "2.0.0-beta.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
@@ -351,6 +361,8 @@
     "tsx": "4.23.15",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.9.3",
-    "wrangler": "^4.151.3"
+    "wrangler": "^4.151.3",
+    "nitro": "3.0.261103-rc",
+    "rolldown": "1.3.0"
   }
 }

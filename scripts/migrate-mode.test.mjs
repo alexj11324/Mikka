@@ -93,11 +93,11 @@ test('the build runs migrations only after compilation and type checking succeed
   const dir = mkdtempSync(join(tmpdir(), 'code-only-build-'))
   try {
     const trace = join(dir, 'trace')
-    for (const name of ['node', 'pnpm', 'next']) {
+    for (const name of ['node', 'pnpm']) {
       const executable = join(dir, name)
       writeFileSync(executable, `#!/bin/sh
 case "${name} $*" in
-  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"next build"|"pnpm typecheck"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
+  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm build:app"|"pnpm typecheck"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
   *) echo UNEXPECTED_BUILD_SIDE_EFFECT >&2; exit 91 ;;
 esac
 if [ "${name} $*" = "$BUILD_TEST_FAIL" ]; then exit 1; fi
@@ -108,8 +108,8 @@ if [ "${name} $*" = "$BUILD_TEST_FAIL" ]; then exit 1; fi
       cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'next build', 'pnpm typecheck', 'node scripts/migrate.mjs'])
-    for (const failure of ['next build', 'pnpm typecheck']) {
+    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm build:app', 'pnpm typecheck', 'node scripts/migrate.mjs'])
+    for (const failure of ['pnpm build:app', 'pnpm typecheck']) {
       writeFileSync(trace, '')
       const failed = spawnSync('/bin/sh', ['-c', manifest.scripts.build], {
         cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace, BUILD_TEST_FAIL: failure }, encoding: 'utf8',

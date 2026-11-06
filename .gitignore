@@ -5,6 +5,9 @@ node_modules/
 
 # next.js
 /.next/
+/.output/
+/apps/frontend/dist/
+/apps/api/generated/spa.ts
 /out/
 
 # production
@@ -27,6 +30,7 @@ yarn-error.log*
 /.cache/e2e/
 /.cache/mvp-retained/
 /.cache/dev-local/
+/.cache/dev-runtime/
 /playwright-mvp-report/
 /mvp-test-results/
 

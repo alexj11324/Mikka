@@ -4,6 +4,8 @@ import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
 import { LiveProvider } from '@/hooks/use-live-key'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { publicAppOrigin } from '@/lib/platform/public-origin'
+import { APP_BUILD } from '@/lib/app-build'
+import { platform } from 'mikka:platform'
 import type { DesktopBootstrap } from './bootstrap'
 import type { DesktopSession } from './host'
 import { useLocation } from './location'
@@ -11,7 +13,7 @@ import { useLocation } from './location'
 export default function Workspace({ user, bootstrap }: { user: DesktopSession['user']; bootstrap: DesktopBootstrap }) {
   // The installed UI and validated backend origin version this namespace. The
   // shared cache retains its exact hydration, field allowlist and invalidation.
-  return <AuthenticatedReadCache ownerId={user.id} workspace={bootstrap.cacheWorkspace} build={`desktop:${rendererBuild}:${publicAppOrigin()}`}>
+  return <AuthenticatedReadCache ownerId={user.id} workspace={bootstrap.cacheWorkspace} build={platform === 'desktop' ? `desktop:${rendererBuild}:${publicAppOrigin()}` : APP_BUILD}>
     <WorkspaceScope user={user} bootstrap={bootstrap} />
   </AuthenticatedReadCache>
 }

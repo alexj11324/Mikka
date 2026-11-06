@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readDesktopSession } from '@/lib/desktop-rpc/session'
 import { nativeSessionHeaders } from '@/lib/desktop-rpc/session-cache'
+import { readBrowserSession } from '@/lib/browser-rpc/session'
 
 /**
  * The session is cached in a signed cookie for 5 minutes (lib/auth.ts
@@ -46,6 +47,8 @@ export function readFreshSessionsInScope(api: { getSession: (context: any) => Pr
         return read({ ...context, headers, query: { ...context.query, disableCookieCache: mustBeFresh || !native } })
       })()
     }
+    const browser = readBrowserSession(context, mustBeFresh)
+    if (browser) return browser
     return read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
   }
 }

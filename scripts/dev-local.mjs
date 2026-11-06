@@ -1,6 +1,6 @@
 // pnpm dev:local (docs/local-runtime.md): the whole loop on this machine with no
 // GitHub. Starts the local fake services (tests/mvp/services.mjs, with the
-// substitutes in scripts/dev-local/services.mjs), `next dev` (hot reload) with a
+// substitutes in scripts/dev-local/services.mjs), Vite + the API (hot reload) with a
 // preload that sends GitHub's API to the fake, and the daemon from source with
 // tsx. A workspace's own model key stays real; without a real AI_GATEWAY_API_KEY
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
@@ -81,7 +81,7 @@ if (daemonUser) execFileSync('chown', ['-R', daemonUser, dirname(dirname(scenari
 log(`fake GitHub on ${MVP_SERVICES}; repository ${REPOSITORY} → ${scenario.barePath} (branch ${scenario.baseBranch})`)
 
 const cronSecret = process.env.CRON_SECRET || LOCAL_CRON_SECRET
-// One value for next dev and the model key seeder: what one seals, the other opens.
+// One value for the API and the model key seeder: what one seals, the other opens.
 const secretsKey = process.env.WORKSPACE_SECRETS_KEY || localSecretsKey(join(root, '.cache/dev-local'))
 // The workspace model key (DeepSeek preset): from the environment, else by name from Infisical
 // (MIKKA_DEV_INFISICAL_PROJECT). Held in memory for the seeder only; never written or printed.
@@ -112,7 +112,7 @@ async function infisicalSecret(name) {
 }
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
-watch(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--port', String(port)], {
+watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
   cwd: root, stdio: 'inherit',
   env: { ...childEnv, NODE_ENV: 'development', NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${preload}`.trim(),
     // A real key keeps the real service; without one the preload uses the local substitute.
@@ -122,7 +122,7 @@ watch(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--port
     // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
     WORKSPACE_SECRETS_KEY: secretsKey,
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() },
-}), 'next dev')
+}), 'Vite + API')
 mkdirSync(dataDir, { recursive: true, mode: 0o700 })
 if (daemonUser) execFileSync('chown', [daemonUser, dataDir])
 // Download only through the existing official pins and integrity validator.

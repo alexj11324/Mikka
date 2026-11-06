@@ -79,25 +79,10 @@ jobs:
       - name: Apply tracked SQL only to the disposable CI database
         run: MIGRATE=1 node scripts/migrate.mjs
       - run: pnpm build
-      - name: Verify task runtime maintenance files are traced
-        run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict'
-          import { readFileSync } from 'node:fs'
-          import { dirname, resolve } from 'node:path'
-          const trace = '.next/server/app/api/threads/[runId]/machine/route.js.nft.json'
-          const files = JSON.parse(readFileSync(trace, 'utf8')).files.map(file => resolve(dirname(trace), file))
-          for (const path of ['packages/daemon/scripts/official-e2b-instance-bootstrap.sh', 'packages/daemon/scripts/refresh-cloud-worker.py']) {
-            assert.ok(files.includes(resolve(path)), 'Task runtime file missing from deployment trace: ' + path)
-            console.log('Traced task runtime file: ' + path)
-          }
-          const factoryTrace = '.next/server/app/api/factory/tasks/[taskId]/route.js.nft.json'
-          const factoryFiles = JSON.parse(readFileSync(factoryTrace, 'utf8')).files.map(file => resolve(dirname(factoryTrace), file))
-          const probe = 'scripts/e2b/inspect-retained-deliverable.mjs'
-          assert.ok(factoryFiles.includes(resolve(probe)), 'Retained delivery probe missing from deployment trace')
-          console.log('Traced retained delivery probe: ' + probe)
-          JS
-      - name: Render real Next HTTP pages with analytics enabled
+      - name: Verify compiled runtime resources and browser analytics assets
+        run: node scripts/check-analytics-ssr.mjs --check-build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Render real compiled HTTP pages with browser analytics enabled
         run: node scripts/check-analytics-ssr.mjs
 
   analytics-ssr:
