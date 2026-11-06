@@ -4,6 +4,7 @@ import type { ComponentType, ReactNode, SVGProps } from 'react'
 import { Box, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { modelProvider, type ModelProvider } from '@/lib/execution-settings-view'
+import { modelDisplayName } from '@/lib/model-display-name'
 
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { ClaudeCodeMark, ClaudeMark, CodexMark, CursorMark, OpenAIMark } from './brand-marks'
@@ -59,7 +60,7 @@ export function ProviderMark({ provider, small }: { provider: ModelProvider; sma
   return <Icon aria-hidden="true" className={cn('size-4 shrink-0', small && 'size-3.5')} />
 }
 
-/** A model: its provider's mark, read from the id or the account it came through, then the id. */
+/** A model: its provider's mark, read from the id or the account it came through, then its display name; the raw id on hover. */
 /** Mikka's hosted model (Mikka 默认), marked with the small Mikka mark in the model icon's box. */
 export function HostedModelLabel({ name }: { name: string }) {
   return <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -69,5 +70,5 @@ export function HostedModelLabel({ name }: { name: string }) {
 }
 
 export function ModelLabel({ model, source }: { model: string; source?: string | null }) {
-  return <EntityLabel icon={PROVIDER_MARKS[modelProvider(model, source)]}><span className="truncate">{model}</span></EntityLabel>
+  return <EntityLabel icon={PROVIDER_MARKS[modelProvider(model, source)]}><span className="truncate" title={model}>{modelDisplayName(model).name}</span></EntityLabel>
 }
