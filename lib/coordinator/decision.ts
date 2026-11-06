@@ -5,9 +5,13 @@ export const DECISIONS_URL = 'https://ai-gateway.vercel.sh/v1/decisions'
 export type DecisionQuestion =
   | { type: 'predicate'; name: string; instructions: string }
   | { type: 'choice'; name: string; instructions: string; choices: { value: string; description?: string }[] }
+  /** Ordered levels, lowest first (2–10). Use for ordered scales instead of choice. */
+  | { type: 'score'; name: string; instructions: string; levels: { label: string; description?: string }[] }
 export type DecisionAnswer =
   | { type: 'predicate'; name: string; probability: number }
   | { type: 'choice'; name: string; choice: string; confidence?: number; probabilities?: { value: string; probability: number }[] }
+  /** score is the probability-weighted mean level index, so it can fall between levels. */
+  | { type: 'score'; name: string; score: number; confidence?: number; probabilities?: { value: number; label?: string; probability: number }[] }
   | { type: 'refusal'; name: string }
 export interface DecisionResponse { answers?: DecisionAnswer[] }
 export interface DecisionImage { dataUrl: string; detail?: 'low' | 'high' | 'auto' | 'original' }
@@ -58,6 +62,12 @@ export function validatedAnswers(body: unknown, questions: readonly DecisionQues
       if (!allowed.has(raw.choice) || (raw.confidence !== undefined && !probability(raw.confidence))) return null
       if (raw.probabilities !== undefined) {
         if (!Array.isArray(raw.probabilities) || new Set(raw.probabilities.map(p => p?.value)).size !== raw.probabilities.length || raw.probabilities.some(p => !p || !allowed.has(p.value) || !probability(p.probability))) return null
+      }
+    } else if (raw.type === 'score' && question.type === 'score') {
+      const top = question.levels.length - 1
+      if (typeof raw.score !== 'number' || !Number.isFinite(raw.score) || raw.score < 0 || raw.score > top || (raw.confidence !== undefined && !probability(raw.confidence))) return null
+      if (raw.probabilities !== undefined) {
+        if (!Array.isArray(raw.probabilities) || new Set(raw.probabilities.map(p => p?.value)).size !== raw.probabilities.length || raw.probabilities.some(p => !p || !Number.isInteger(p.value) || p.value < 0 || p.value > top || !probability(p.probability))) return null
       }
     } else return null
     valid.push(raw)
