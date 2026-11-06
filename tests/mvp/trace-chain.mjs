@@ -36,7 +36,7 @@ await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 })
 const privateLogDirectory = join(evidenceDirectory, 'private-logs')
 await mkdir(privateLogDirectory, { recursive: true, mode: 0o700 })
 const children = [], results = [], collectors = []
-let accounts, services, collector, phase = 'starting', failure
+let accounts, services, collector, phase = 'starting', failure, workflowHealth
 const checkpoint = value => { phase = value; console.info(`trace-acceptance ${value}`) }
 const child = (label, args, env) => {
   const job = spawn(process.execPath, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -103,8 +103,11 @@ try {
   }, 240_000)
   checkpoint('workflow-ready')
   const health = await fetch(`${MVP_ORIGIN}/.well-known/workflow/v1/flow?__health`, { signal: AbortSignal.timeout(10_000) })
+  const contentType = health.headers.get('content-type')?.split(';', 1)[0]
+  workflowHealth = { status: health.status, contentType: ['application/json', 'text/plain', 'text/html'].includes(contentType) ? contentType : 'other', healthy: false }
   assert.equal(health.status, 200, 'WORKFLOW_ROUTE_UNAVAILABLE')
-  assert.equal((await health.json()).healthy, true, 'WORKFLOW_ROUTE_UNAVAILABLE')
+  workflowHealth.healthy = (await health.json()).healthy === true
+  assert.equal(workflowHealth.healthy, true, 'WORKFLOW_ROUTE_UNAVAILABLE')
   checkpoint('account-lease')
   accounts = await acquireTestAccounts({ database: pool, environment, runId: randomUUID(), workerId: 'trace-1512', requestId: randomUUID() })
   const ownerId = accounts.owner.userId
@@ -211,7 +214,7 @@ try {
   await services?.close()
   for (const current of collectors) await current.close()
   await pool.end()
-  const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, cases: results,
+  const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, workflowHealth, cases: results,
     processes: children.map(job => ({ label: job.label, exitCode: job.exitCode, signal: job.signalCode,
       privateLogRetained: !job.logFailed, privateLogBytes: job.logBytes })),
     counts: collector ? { spans: collector.evidence.spans.length, logs: collector.evidence.logs.length,
