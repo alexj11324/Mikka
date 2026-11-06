@@ -25,7 +25,7 @@ export function GroupAvatar({ title, members, size = 'pill' }: { title: string; 
   const bots = (members ?? []).filter(member => member.memberType === 'bot').slice(0, STACKED)
   if (!bots.length) return <LetterAvatar name={title} size={size} />
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center', size === 'pill' ? '-space-x-1.5' : '-space-x-4')}>
-    {bots.map(bot => <BotAvatar key={bot.id} color={bot.color} shape={bot.shape} size={size === 'pill' ? 'row' : 'cell'} still />)}
+    {bots.map(bot => <BotAvatar key={bot.id} id={bot.id} color={bot.color} shape={bot.shape} size={size === 'pill' ? 'row' : 'cell'} still />)}
   </span>
 }
 

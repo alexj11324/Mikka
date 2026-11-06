@@ -131,7 +131,7 @@ const buildJob = overrides => ({ name: 'deploy', head_sha: SHA, status: 'complet
   steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
     'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })), ...overrides })
 
-function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(), version = () => SHA, budget = 500 } = {}) {
+function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(), version = () => SHA, overlay = () => undefined, budget = 500 } = {}) {
   let elapsed = 0
   const calls = []
   const fetchImpl = async (input, init = {}) => {
@@ -152,7 +152,7 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(
     assert.equal(input, PRODUCTION_VERSION_URL)
     assert.equal(init.headers.authorization, undefined)
     assert.equal(init.cache, 'no-store')
-    return Response.json({ build: version(elapsed, value => { elapsed = value }) })
+    return Response.json({ build: version(elapsed, value => { elapsed = value }), overlaySha: overlay(elapsed) })
   }
   return { calls, run: extra => waitForWebDeployment({ expectedBuild: SHA, token: 'read-only-fixture', fetchImpl,
     now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: budget, ...extra }), elapsed: () => elapsed }
@@ -283,7 +283,7 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(checkJob, /RUNTIME_REFRESH: \$\{\{ steps\.control\.outputs\.refresh \}\}/)
   for (const path of RUNTIME_RELEASE_PATHS) assert.ok(e2b.includes(`      - '${path}'`), `main push filter must include ${path}`)
   assert.match(web, /workflow_call:/)
-  assert.match(web, /RUNTIME_REFRESH: \$\{\{ inputs\.runtime-refresh \}\}/)
+  assert.match(web, /RUNTIME_REFRESH: \$\{\{ inputs\.runtime-refresh \|\| inputs\.overlay-refresh \|\| github\.event_name == 'push' \}\}/)
   // queue:max is GitHub's documented queue contract, not a locally simulated
   // scheduler. Stale jobs still need the main fences regardless of queue order.
 })
@@ -370,7 +370,7 @@ test('real Git and the production CLI compare the entire push, preserve docs-onl
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
-function desktopWebFixture({ version = () => OTHER, main = () => OTHER, budget = 500,
+function desktopWebFixture({ version = () => OTHER, overlay = () => undefined, main = () => OTHER, budget = 500,
   comparison = (base, head) => ({ url: `https://api.github.com/repos/alexj11324/Mikka/compare/${base}...${head}`,
     base_commit: { sha: base }, merge_base_commit: { sha: base }, status: 'ahead', ahead_by: 1, behind_by: 0 }),
   runs = build => [webRun({ head_sha: build })], job = build => buildJob({ head_sha: build }),
@@ -386,7 +386,7 @@ function desktopWebFixture({ version = () => OTHER, main = () => OTHER, budget =
       assert.equal(init.headers.authorization, undefined)
       assert.equal(init.cache, 'no-store')
       activeBuild = version(elapsed, value => { elapsed = value })
-      return Response.json({ build: activeBuild })
+      return Response.json({ build: activeBuild, overlaySha: overlay(elapsed) })
     }
     assert.equal(url.origin, 'https://api.github.com')
     assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
@@ -540,4 +540,18 @@ test('desktop verification cannot succeed after its deadline or start without a 
   const missing = desktopWebFixture()
   await assert.rejects(missing.run({ token: undefined }), /githubTokenRequired/)
   assert.equal(missing.calls.length, 0)
+})
+
+test('private-push dispatch waits through an older overlay on an otherwise valid desktop descendant', async () => {
+  const fixture = desktopWebFixture({ overlay: elapsed => elapsed < 200 ? OTHER : SHA })
+  const result = await fixture.run({ expectedOverlay: SHA })
+  assert.equal(result.publicBuild, OTHER)
+  assert.equal(fixture.elapsed(), 200)
+  const mismatch = desktopWebFixture({ overlay: () => OTHER, budget: 250 })
+  await assert.rejects(mismatch.run({ expectedOverlay: SHA }), /matchingWebDeploymentTimedOut/)
+})
+test('private-push exact-source wait keeps matching overlay behavior', async () => {
+  const fixture = webFixture({ overlay: elapsed => elapsed < 200 ? OTHER : SHA })
+  assert.equal((await fixture.run({ expectedOverlay: SHA })).publicBuild, SHA)
+  assert.equal(fixture.elapsed(), 200)
 })

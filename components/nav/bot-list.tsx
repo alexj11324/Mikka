@@ -198,7 +198,7 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
           const chat = chats[bot.id]
           const mood: BotMood = botAttention(threads, bot.id, chat?.working ?? false, id => issues.find(issue => issue.id === id))
           return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
-            avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />}
+            avatar={<BotAvatar id={bot.id} color={bot.color} shape={bot.shape} mood={mood} />}
             preview={previewOf(chat?.line)} />
         })}
       </SidebarMenu></SidebarGroup>

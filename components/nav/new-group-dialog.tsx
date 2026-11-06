@@ -91,7 +91,7 @@ export function NewGroupDialog({ open, onOpenChange, workspaceId, bots, onCreate
             {choices.map(bot => <Field key={bot.id} orientation="horizontal" className="min-w-0 rounded-lg p-2 hover:bg-control has-data-checked:bg-control">
               <Checkbox id={`new-group-bot-${bot.id}`} checked={selected.includes(bot.id)} onCheckedChange={checked => setPicked(current => checked ? [...new Set([...current, bot.id])] : current.filter(id => id !== bot.id))} disabled={saving || error === 'unconfirmed' || (!selected.includes(bot.id) && selected.length >= 100)} />
               <FieldLabel htmlFor={`new-group-bot-${bot.id}`} className="min-w-0 cursor-pointer">
-                <BotAvatar color={bot.color} shape={bot.shape} size="row" still />
+                <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" still />
                 <span className="min-w-0 flex-1 truncate">{bot.name}</span>
               </FieldLabel>
             </Field>)}
