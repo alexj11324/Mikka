@@ -5,7 +5,7 @@ import { displayTaskTitle } from '@/lib/short-title'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -26,7 +26,9 @@ import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
 import { PriorityIcon } from '@/components/workspace/priority-icon'
-import { BOARD_COLUMNS, type AgentState, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
+import { BOARD_COLUMNS, type AgentState, type BoardColumn, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
+import type { TaskBlock } from '@/lib/task-blocked'
+import { blockLabel } from '@/components/workspace/block-label'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
   return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
@@ -72,6 +74,8 @@ export type CardHandlers = {
   onMetadataBusy: (busy: boolean) => void
   onDelete: (task: BoardTask) => void
   onDiscuss: (task: BoardTask) => void
+  /** Into 受阻 by hand, or out of it (lib/task-blocked.ts). */
+  onBlockChange?: (task: BoardTask, blocked: boolean) => void
 }
 
 /** What the board knows about a card beyond the task row itself. */
@@ -81,11 +85,13 @@ export type CardContext = {
   subtasks: ReadonlyMap<string, { done: number; total: number }>
   /** The Bot and coding agents working each task, from its threads. */
   owners?: ReadonlyMap<string, RunOwner>
+  /** Why each 受阻 task is blocked; its card names the reason. */
+  blocks?: ReadonlyMap<string, TaskBlock>
   /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
   motion?: ReadonlyMap<string, 'enter' | 'leave'>
 }
 
-function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }: CardHandlers & {
+function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: CardHandlers & {
   task: BoardTask
   disabled: boolean
   isOverlay?: boolean
@@ -102,7 +108,9 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const [request, setRequest] = useState<MetadataRequest | null>(null)
   const ask = (target: MetadataRequest['target']) => setRequest(current => ({ target, sequence: (current?.sequence ?? 0) + 1 }))
   const show = (property: CardProperty) => context.properties.has(property)
-  const agentState = context.agentStates.get(task.id)
+  const block = context.blocks?.get(task.id)
+  // A blocked card names why; the thread's own 受阻 badge would say less of the same.
+  const agentState = block && block.reason !== 'flagged' && block.reason !== 'dependency' ? undefined : context.agentStates.get(task.id)
   const subtasks = context.subtasks.get(task.id)
   const metadata = task.metadata
   const format = useFormatter()
@@ -124,6 +132,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     show('project') && metadata.project && <span key="project" className={cn(meta, 'min-w-0')}><Box /><span className="max-w-28 truncate">{metadata.project}</span></span>,
     pullRequest && <span key="pr" className="flex items-center gap-1"><CardControlBoundary><IssuePullRequestLink issueId={task.id} pr={pullRequest} compact /></CardControlBoundary>{metadata.pullRequests.length > 1 && <span className="text-xs text-muted-foreground/70 tabular-nums">+{metadata.pullRequests.length - 1}</span>}</span>,
     show('subtasks') && subtasks && subtasks.total > 0 && <span key="subtasks" className={meta} title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</span>,
+    block && <Badge key="block" variant="destructive-light" size="lg"><CircleStop aria-hidden="true" className="size-3" />{blockLabel(tCard, block)}</Badge>,
     show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg">{/* The thread's state is a dot, the same colours as on its bubble (R-52). */}<span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
     show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive-foreground')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
@@ -184,6 +193,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
         <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
+        {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
         <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
@@ -200,22 +210,22 @@ function RememberedColumn({ stateKey, ...props }: ComponentProps<typeof KanbanCo
 type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children' | 'getItemValue'> & {
   stateKey?: string;
   value: BoardColumns
-  columns: IssueStatus[]
-  hiddenColumns: { status: IssueStatus; count: number }[]
+  columns: BoardColumn[]
+  hiddenColumns: { status: BoardColumn; count: number }[]
   context: CardContext
   pending?: boolean
   viewportRef: Ref<HTMLDivElement>
   viewportId: string
   instructionsId: string
   onViewportKeyDown: ComponentProps<'div'>['onKeyDown']
-  onHideColumn: (status: IssueStatus) => void
-  onShowColumn: (status: IssueStatus) => void
+  onHideColumn: (status: BoardColumn) => void
+  onShowColumn: (status: BoardColumn) => void
   /** The Coordinator sidebar is beside the board: the hidden lane is left out. Columns keep their width either way. */
   sidebarOpen?: boolean
 } & CardHandlers
 
-export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden, sidebarOpen = false, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
-  const handlers = { onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }
+export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden, sidebarOpen = false, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange, ...props }: KanbanBoardProps) {
+  const handlers = { onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }
   const t = useTranslations('Board')
   const tBoard = useTranslations('Shell.board')
   const tIssue = useTranslations('Issue')
