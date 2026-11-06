@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { agentRuns } from '@/lib/db/schema'
-import { runBotName } from '@/lib/run-bot-name'
+import { runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 
 // The same whitespace set as JavaScript trim/\s, including NBSP and BOM.
 // PostgreSQL's default btrim and locale-dependent \s are not that contract.
@@ -13,7 +13,7 @@ const markdownMarks = '(\\*\\*|__|' + String.fromCharCode(96) + '|~~)'
  * A character count in UTF-8 PostgreSQL is the code-point count used by Array.from. */
 const title = sql<string | null>`(
   select case when char_length(clean.line)>60 then left(clean.line,59)||'…' else clean.line end
-  from string_to_table(${agentRuns.prompt}, E'\\n') with ordinality as raw(line, position)
+  from string_to_table(${runTaskPrompt}, E'\\n') with ordinality as raw(line, position)
   cross join lateral (select btrim(regexp_replace(
     regexp_replace(btrim(raw.line, ${whitespace}), ${markdownPrefix}, ''),
     ${markdownMarks}, '', 'g'), ${whitespace}) as line) clean
