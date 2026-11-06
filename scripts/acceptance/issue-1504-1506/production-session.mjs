@@ -12,7 +12,7 @@ export function decode(value) {
   }
   return value
 }
-export async function productionSession(work) {
+export async function productionSession(work, { deadlineAt = null, expectedSha = process.env.MIKKA_ACCEPTANCE_SHA } = {}) {
   const email = process.env.SMOKE_OWNER_EMAIL
   const password = process.env.SMOKE_OWNER_PASSWORD
   if (!/^[^@\s]+\+mikka-smoke(?:-[a-z0-9]+)*@[^@\s]+$/i.test(email ?? '') || !password) throw new Error('smoke_credentials_missing')
@@ -22,9 +22,12 @@ export async function productionSession(work) {
     if (!path.startsWith('/') || path.startsWith('//')) throw new Error('invalid_acceptance_path')
     const url = new URL(BASE + path)
     if (url.origin !== ORIGIN || !url.pathname.startsWith('/mikka/')) throw new Error('invalid_acceptance_origin')
+    const remaining = deadlineAt === null ? 180_000 : Math.min(180_000, deadlineAt - Date.now())
+    if (remaining <= 0) throw new Error('acceptance_deadline_exceeded')
+    const timeout = AbortSignal.timeout(Math.ceil(remaining))
     const started = performance.now()
     const response = await fetch(url, {
-      method, redirect: 'error', signal: signal ?? AbortSignal.timeout(180_000),
+      method, redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       headers: { origin: ORIGIN, 'cache-control': 'no-store',
         ...(cookies.size ? { cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join('; ') } : {}),
         ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...extra },
@@ -65,7 +68,7 @@ export async function productionSession(work) {
     const identity = await json('/api/auth/get-session')
     if (identity?.user?.email?.toLowerCase() !== email.toLowerCase()) throw new Error('acceptance_identity_mismatch')
     const version = await json('/api/version')
-    if (process.env.MIKKA_ACCEPTANCE_SHA && version.build !== process.env.MIKKA_ACCEPTANCE_SHA) throw new Error('acceptance_version_mismatch')
+    if (expectedSha && version.build !== expectedSha) throw new Error('acceptance_version_mismatch')
     return await work({ request, json, rpc, requests, identity: { userId: identity.user.id }, version })
   } finally {
     if (cookies.size) await json('/api/auth/sign-out', {}).catch(() => {})
