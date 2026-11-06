@@ -16,7 +16,7 @@ import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
-import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
+import { AGENT_STATES, BLOCKED_COLUMN, BOARD_COLUMNS, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, boardBlocks, type AgentState, type BoardColumn, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -35,7 +35,7 @@ import { IssueBoard } from './issue-board'
 import { IssueList } from './issue-list'
 import { AgentSphere } from './issue-assignee-menu'
 import { LabelDot } from './issue-metadata-controls'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from './issue-properties'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -44,7 +44,7 @@ type FilterField = 'status' | 'priority' | 'assignee' | 'creator' | 'labels' | '
 type Filters = Partial<Record<FilterField, string[]>>
 type Sort = 'priority' | 'updated' | 'created'
 type Completed = 'all' | 'week' | 'month'
-type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: IssueStatus[] }
+type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: BoardColumn[] }
 
 const SETTINGS_KEY = 'mikka:board-v2'
 const SIDEBAR_KEY = 'mikka:board-coordinator-open'
@@ -96,7 +96,7 @@ function useStoredFlag(key: string, fallback: boolean) {
 /**
  * The board page, v2 (Figma 77:2): scope segment, filters, Linear sync, board
  * or list, 显示 options and 新建任务 (described in a sentence, created by the
- * Coordinator) over five status columns, with the
+ * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
 export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string; workspaceId?: string;
@@ -156,6 +156,9 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
+  // 受阻 is worked out here from the task and its newest thread; the task keeps its own status (lib/task-blocked.ts).
+  const blocks = useMemo(() => boardBlocks(issues, runs), [issues, runs])
+  const newestRuns = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, run.runId] as const)), [runs])
   const subtasks = useMemo(() => {
     const result = new Map<string, { done: number; total: number }>()
     for (const issue of issues) {
@@ -168,7 +171,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
 
   const valuesOf = (issue: Issue, field: FilterField): string[] => {
     switch (field) {
-      case 'status': return [issue.status]
+      case 'status': return [issue.status, ...(blocks.has(issue.id) ? [BLOCKED_COLUMN] : [])]
       case 'priority': return [issue.priority]
       // listTaskRuns names a run's bot only when it is the person's own.
       case 'assignee': return [...(personFilters(issue, userId, { agents: myAgents, heldByMyBot: !!owners.get(issue.id)?.bot }).assignee ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
@@ -185,8 +188,8 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
     .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000)
     .toSorted((a, b) => display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
       : +new Date(display.sort === 'created' ? b.createdAt : b.updatedAt) - +new Date(display.sort === 'created' ? a.createdAt : a.updatedAt))
-  const count = (status: IssueStatus) => shown.filter(issue => issue.status === status).length
-  const columns = ISSUE_STATUSES.map(status => status.value).filter(status => !display.hidden.includes(status) && (display.showEmpty || count(status) > 0))
+  const count = (column: BoardColumn) => shown.filter(issue => column === BLOCKED_COLUMN ? blocks.has(issue.id) : issue.status === column && !blocks.has(issue.id)).length
+  const columns = BOARD_COLUMNS.map(column => column.value).filter(column => !display.hidden.includes(column) && (display.showEmpty || count(column) > 0))
   const hidden = display.hidden.map(status => ({ status, count: count(status) }))
 
   // Every value a filter can take, from the tasks on the board.
@@ -194,7 +197,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   const labels = [...new Map(issues.flatMap(issue => issue.metadata.labels.map(label => [label.name, label] as const))).values()]
   const projects = [...new Set(issues.flatMap(issue => issue.metadata.project ? [issue.metadata.project] : []))]
   const options: Record<FilterField, { value: string; label: string; mark?: React.ReactNode }[]> = {
-    status: ISSUE_STATUSES.map(status => ({ value: status.value, label: statusLabel(status.value), mark: <status.icon className={cn(statusIconTints[status.tone])} /> })),
+    status: BOARD_COLUMNS.map(column => { const status = ISSUE_STATUSES.find(item => item.value === column.value); return { value: column.value, label: statusLabel(column.value), mark: <column.icon className={cn(status ? statusIconTints[status.tone] : 'text-destructive-foreground')} /> } }),
     priority: ISSUE_PRIORITIES.map(priority => ({ value: priority.value, label: priorityLabel(priority.value), mark: <priority.icon {...priority.iconProps} /> })),
     assignee: [{ value: ME, label: t('me') }, ...assignees.filter(assignee => assignee.id !== userId).map(assignee => ({ value: assignee.id, label: assignee.name, mark: assignee.kind === 'agent' ? <AgentSphere name={assignee.name} compact /> : <PersonAvatar name={assignee.name} image={assignee.image} size="row" /> })), { value: NONE, label: t('unassigned'), mark: <CircleUserRound /> }],
     creator: [{ value: ME, label: t('me') }],
@@ -266,7 +269,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
               {/* Both groups read the same way: checked and tinted means shown (R-30). */}
               <p className="pt-2 text-xs text-muted-foreground">{t('columns')}</p>
               <div className="flex flex-wrap gap-1.5">
-                {ISSUE_STATUSES.map(status => { const isShown = !display.hidden.includes(status.value); return <Toggle key={status.value} size="sm" variant="outline" pressed={isShown} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ hidden: pressed ? display.hidden.filter(item => item !== status.value) : [...display.hidden, status.value] })}>{isShown && <Check data-icon="inline-start" />}{statusLabel(status.value)}</Toggle> })}
+                {BOARD_COLUMNS.map(column => { const isShown = !display.hidden.includes(column.value); return <Toggle key={column.value} size="sm" variant="outline" pressed={isShown} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ hidden: pressed ? display.hidden.filter(item => item !== column.value) : [...display.hidden, column.value] })}>{isShown && <Check data-icon="inline-start" />}{statusLabel(column.value)}</Toggle> })}
               </div>
             </PopoverContent>
           </Popover>
@@ -275,8 +278,8 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}

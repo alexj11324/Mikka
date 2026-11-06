@@ -1,14 +1,35 @@
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun } from '@/app/actions/task-runs'
 import { threadGroup, type GroupIssue } from '@/lib/thread-groups'
+import { CircleStop } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
+import { taskBlock, type BlockRun, type TaskBlock } from '@/lib/task-blocked'
 
 export type BoardTask = Awaited<ReturnType<typeof listIssues>>[number]
 export type BoardColumns = Record<string, BoardTask[]>
-/** Every status is a column (Figma 714:5283); 已取消 and 重复 start hidden in the 已隐藏 lane. */
-export const BOARD_COLUMNS = ISSUE_STATUSES
-export const DEFAULT_HIDDEN_COLUMNS: IssueStatus[] = ['canceled', 'duplicate']
-export const boardColumnOf = (status: string) => BOARD_COLUMNS.some(column => column.value === status) ? status : null
+/** 受阻 is a column but not a status (lib/task-blocked.ts): a task in it keeps its own status. */
+export const BLOCKED_COLUMN = 'blocked'
+export type BoardColumn = IssueStatus | typeof BLOCKED_COLUMN
+const BLOCKED = { value: BLOCKED_COLUMN, label: 'Blocked', icon: CircleStop, indicatorClassName: 'text-destructive-foreground' } as const
+/**
+ * Every status is a column (Figma 714:5283), with 受阻 after 进行中 (Linear's custom
+ * "Blocked" sits in its Started group); 已取消 and 重复 start hidden in the 已隐藏 lane.
+ */
+export const BOARD_COLUMNS: readonly { value: BoardColumn; icon: typeof CircleStop; indicatorClassName: string }[] = ISSUE_STATUSES.flatMap((status): { value: BoardColumn; icon: typeof CircleStop; indicatorClassName: string }[] => status.value === 'doing' ? [status, BLOCKED] : [status])
+export const DEFAULT_HIDDEN_COLUMNS: BoardColumn[] = ['canceled', 'duplicate']
+/** The column a task is in: 受阻 while something stops it, else its status. */
+export const boardColumnOf = (status: string, blocked = false): BoardColumn | null => blocked ? BLOCKED_COLUMN : BOARD_COLUMNS.some(column => column.value === status) ? status as BoardColumn : null
+
+/** Each task's 受阻, from its newest thread (listTaskRuns) and the tasks it is blocked by. */
+export function boardBlocks(issues: readonly BoardTask[], runs: readonly (BlockRun & { issueId: string })[] | undefined): Map<string, TaskBlock> {
+  const runOf = new Map((runs ?? []).map(run => [run.issueId, run] as const))
+  const byId = new Map(issues.map(issue => [issue.id, issue] as const))
+  const isOpen = (id: string) => { const blocker = byId.get(id); return !!blocker && !['done', 'canceled', 'duplicate'].includes(blocker.status) }
+  return new Map(issues.flatMap(issue => {
+    const block = taskBlock(issue, runOf.get(issue.id), isOpen)
+    return block ? [[issue.id, block.blockerId ? { ...block, blockerIdentifier: byId.get(block.blockerId)?.identifier ?? null } : block] as const] : []
+  }))
+}
 
 /** What a card shows; the 显示 popover toggles these (Figma 86:2). */
 export const CARD_PROPERTIES = ['identifier', 'priority', 'assignee', 'labels', 'pullRequests', 'subtasks', 'agentState', 'project', 'dueDate', 'createdAt'] as const

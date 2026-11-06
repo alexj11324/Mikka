@@ -6,33 +6,39 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { changeIssuePriority, moveIssue, type listIssues } from '@/app/actions/issues'
 import { setIssueDeleted } from '@/app/actions/issue-operations'
+import { updateIssueMetadata } from '@/app/actions/issue-metadata'
+import { clearedBlock, FLAGGED_BLOCK, type BlockFlag, type TaskBlock } from '@/lib/task-blocked'
 import { useActionError } from '@/lib/use-action-error'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
-import { BOARD_COLUMNS, boardColumnOf } from '@/components/blocks/kanban-board-1/components/data'
+import { BLOCKED_COLUMN, BOARD_COLUMNS, boardColumnOf, type BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
 import type { IssueStatus } from './issue-properties'
 import { boardScrollTo, boardStartColumn } from '@/lib/board-start-column'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Columns = Record<string, Issue[]>
 
-function groupIssues(issues: Issue[]): Columns {
-  return Object.fromEntries(BOARD_COLUMNS.map(column => [column.value, issues.filter(issue => boardColumnOf(issue.status) === column.value)]))
+function groupIssues(issues: Issue[], blocks: ReadonlyMap<string, TaskBlock>): Columns {
+  return Object.fromEntries(BOARD_COLUMNS.map(column => [column.value, issues.filter(issue => boardColumnOf(issue.status, blocks.has(issue.id)) === column.value)]))
 }
 
 /** The card fade's length, matching `duration-150` on the card. */
 const CARD_MOTION_MS = 150
 
-export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpen, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
+export function IssueBoard({ issues, blocks = new Map(), newestRuns = new Map(), columns: visibleColumns, hidden, sidebarOpen, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
   issues: Issue[]
-  columns: IssueStatus[]
-  hidden: { status: IssueStatus; count: number }[]
+  /** Each 受阻 task's reason (lib/task-blocked.ts); its card is in the 受阻 column. */
+  blocks?: ReadonlyMap<string, TaskBlock>
+  /** Each task's newest thread: moving a card out of 受阻 sets that thread's reason aside. */
+  newestRuns?: ReadonlyMap<string, string>
+  columns: BoardColumn[]
+  hidden: { status: BoardColumn; count: number }[]
   sidebarOpen?: boolean
   context: CardContext
   onOpen: (id: string) => void
   onDiscuss: (issue: Issue) => void
-  onHideColumn: (status: IssueStatus) => void
-  onShowColumn: (status: IssueStatus) => void
+  onHideColumn: (status: BoardColumn) => void
+  onShowColumn: (status: BoardColumn) => void
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
@@ -40,14 +46,14 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
   const tIssue = useTranslations('Issue')
   const translateError = useActionError()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  const [columns, setColumns] = useState<Columns>(() => groupIssues(issues))
+  const [columns, setColumns] = useState<Columns>(() => groupIssues(issues, blocks))
   const [pending, setPending] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const issuesKey = JSON.stringify(issues)
+  const issuesKey = JSON.stringify([issues, [...blocks.keys()]])
   const [sourceKey, setSourceKey] = useState(issuesKey)
   if (issuesKey !== sourceKey && !dragging && !pending) {
     setSourceKey(issuesKey)
-    setColumns(groupIssues(issues))
+    setColumns(groupIssues(issues, blocks))
   }
   const [message, setMessage] = useState('')
   // Only the person's own moves animate (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md): a card moved with the status menu fades in at its
@@ -103,14 +109,18 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
     viewport.scrollBy({ left: direction * Math.min(viewport.clientWidth * 0.8, 340), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   }
 
-  async function persist(issue: Issue, patch: { status?: string; priority?: string }, rollback: Columns) {
+  async function persist(issue: Issue, patch: { status?: string; priority?: string; block?: BlockFlag }, rollback: Columns) {
     if (saving.current) return
     saving.current = true
     setPending(true)
     onBusyChange(true)
     setMessage(t('savingProperties'))
     try {
-      const result = patch.status ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision }) : await changeIssuePriority({ id: issue.id, priority: patch.priority!, revision: issue.revision })
+      const moved = patch.status && patch.status !== issue.status ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision })
+        : patch.priority ? await changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision }) : null
+      // 受阻 by hand is the task's flag, saved after its status so one move is one card change.
+      const result = !patch.block ? moved! : moved && !('issue' in moved && moved.issue) ? moved
+        : await updateIssueMetadata({ id: issue.id, revision: moved && 'issue' in moved && moved.issue ? moved.issue.revision : issue.revision, patch: { block: patch.block } })
       if (!('issue' in result) || !result.issue) {
         setColumns(rollback)
         const errorMessage = translateError(result.error)
@@ -119,8 +129,8 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
         return
       }
       const savedIssue = result.issue
-      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status: savedIssue.status, priority: savedIssue.priority, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
-      setMessage(patch.status ? t('moved', { status: statusLabel(patch.status) }) : t('prioritySaved'))
+      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status: savedIssue.status, priority: savedIssue.priority, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
+      setMessage(patch.block?.blocked ? t('moved', { status: statusLabel(BLOCKED_COLUMN) }) : patch.status ? t('moved', { status: statusLabel(patch.status) }) : t('prioritySaved'))
     } catch {
       setColumns(rollback)
       const errorMessage = t('moveRollback')
@@ -136,13 +146,25 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
 
   function changeStatus(issue: Issue, status: IssueStatus) {
     if (saving.current || dragging || issue.status === status) return
-    const target = boardColumnOf(status)
+    const target = boardColumnOf(status, blocks.has(issue.id))
     const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === target ? [{ ...issue, status }, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)]))
     setColumns(next)
     setMotion(issue.id, 'enter')
     window.setTimeout(() => setMotion(issue.id, null), CARD_MOTION_MS * 2)
     void persist(issue, { status }, columns)
   }
+
+  /** 受阻 by hand, from the card's menu: in, or out to its own status column. */
+  function changeBlock(issue: Issue, blocked: boolean) {
+    if (saving.current || dragging) return
+    const target = blocked ? BLOCKED_COLUMN : boardColumnOf(issue.status)
+    const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === target ? [issue, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)]))
+    setColumns(next)
+    setMotion(issue.id, 'enter')
+    window.setTimeout(() => setMotion(issue.id, null), CARD_MOTION_MS * 2)
+    void persist(issue, { block: blocked ? FLAGGED_BLOCK : clearedBlock(runOf(issue)) }, columns)
+  }
+  const runOf = (issue: Issue) => { const runId = newestRuns.get(issue.id); return runId ? { runId } : undefined }
 
   function changePriority(issue: Issue, priority: string) {
     if (saving.current || dragging || issue.priority === priority) return
@@ -175,13 +197,16 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
     const issue = meta.previousValue[meta.activeContainer]?.find(item => item.id === String(meta.event.active.id))
     if (!issue) { setColumns(meta.previousValue); return }
     setColumns(next)
-    void persist(issue, { status: meta.overContainer }, meta.previousValue)
+    // Into 受阻: the task keeps its status and is flagged. Out of it: its new status, and what blocked it is set aside.
+    if (meta.overContainer === BLOCKED_COLUMN) void persist(issue, { block: FLAGGED_BLOCK }, meta.previousValue)
+    else if (meta.activeContainer === BLOCKED_COLUMN) void persist(issue, { status: meta.overContainer, block: clearedBlock(runOf(issue)) }, meta.previousValue)
+    else void persist(issue, { status: meta.overContainer }, meta.previousValue)
   }
 
   return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col">
     <p role="status" aria-live="polite" className="sr-only">{message}</p>
     <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
-    <KanbanBoard stateKey={stateKey} value={columns} columns={visibleColumns} hiddenColumns={hidden} sidebarOpen={sidebarOpen} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
+    <KanbanBoard stateKey={stateKey} value={columns} columns={visibleColumns} hiddenColumns={hidden} sidebarOpen={sidebarOpen} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onBlockChange={changeBlock} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage(t('propertiesSaved'))
       void onUpdated().catch(() => {})

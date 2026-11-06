@@ -165,6 +165,9 @@ A unit of work to be done, with a status and an assignee who is always a
 person (`MIK-xx`). A thread works on it; it is not a thread.
 _Owner_: the workspace; in a shared workspace, its team (Task aggregate).
 _Avoid_: issue in the UI, ticket, 工单, thread.
+_Note_: 受阻 (Blocked) is a board column a task falls into while its newest
+thread, a task it is blocked by or the person's flag stops it; it is not one of
+the task's statuses ([2026-11-06-1600](decisions/2026-11-06-1600-blocked-board-column.md)).
 
 ### Resources
 
