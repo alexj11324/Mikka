@@ -182,13 +182,13 @@ export async function collectProductionTimings(report, { token, deploymentId, fe
     const start = Date.parse(report.startedAt) - 5000, end = now()
     if (!Number.isFinite(start) || start >= end || end - start > 3_600_000) fail('window_invalid')
     collection.windowStart = new Date(start).toISOString(); collection.windowEnd = new Date(end).toISOString()
-    const matching = [...hashes, ...workflows].map(value => `"${value}"`).join(' OR ')
+    const matching = [...hashes, ...workflows].map(value => value).join(' OR ')
     let cursor
     const cursors = new Set()
     for (let page = 0; page < 10; page++) {
       const response = await read('/v1/observability/events', { event: 'vercel.log', scope: { ownerId: TEAM, projectIds: [PROJECT] },
         timeRange: { start: collection.windowStart, end: collection.windowEnd }, select: ['deploymentId', 'environment', 'message', 'truncated'],
-        order: 'asc', limit: 1000, filter: `deploymentId:"${deploymentId}" AND environment:production AND (${matching}) AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`,
+        order: 'desc', limit: 1000, filter: `deploymentId:"${deploymentId}" AND environment:production AND (${matching}) AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`,
         ...(cursor ? { cursor } : {}) })
       if (!Array.isArray(response.events) || typeof response.pagination?.hasMore !== 'boolean') fail('response_invalid')
       if (response.meta?.excludedIntervals?.length) fail('intervals_excluded')
