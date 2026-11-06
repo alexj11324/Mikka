@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 8
     env:
-      APPLICATION_SHA: 857061bbab7dced2285fd8bb4a47b71a48d865fa
+      APPLICATION_SHA: c39ee94916b712d31ec98c71e58c7bbe3f335094
       ENV_SHAPE_DEPENDENCIES: /tmp/issue1415-env-shape-deps-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -67,18 +67,6 @@ jobs:
           env-slug: prod
           secret-path: /vercel
           secret-name: MIKKA_DATABASE_URL
-          recursive: false
-          include-imports: false
-      - name: Read the exact workspace database source value only
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: DATABASE_URL
           recursive: false
           include-imports: false
       - name: Observe only production value shapes through the real decoding paths

@@ -11,7 +11,7 @@ import { buildEnvironment, buildEnvironmentValues, REQUIRED } from '../release/w
 import { productionBuildEnvironment } from '../release/build-vercel.mjs'
 import { directDatabaseURL } from '../postgres-connection.mjs'
 
-const APPLICATION = '857061bbab7dced2285fd8bb4a47b71a48d865fa'
+const APPLICATION = 'c39ee94916b712d31ec98c71e58c7bbe3f335094'
 const OLD_APPLICATION = '62281b1995cb8fef16e7604dc1ea9a29c4dbbe32'
 const REPOSITORY = 'alexj11324/Mikka'
 const REF = 'refs/heads/ops/issue1415-production-env-shape'
@@ -209,7 +209,7 @@ async function preflight(env) {
 async function run(env) {
   await preflight(env)
   parserModules(env)
-  if (!env.VERCEL_DEPLOY_TOKEN || TARGETS.some(key => typeof env[key] !== 'string')) fail('secret_missing')
+  if (!env.VERCEL_DEPLOY_TOKEN || typeof env.MIKKA_DATABASE_URL !== 'string') fail('secret_missing')
   const privateRoot = mkdtempSync(join(env.RUNNER_TEMP || tmpdir(), 'mikka-env-shape-'))
   try {
     const pulled = spawnSync('npx', ['--yes', 'vercel@65.4.0', 'pull', '--yes',
@@ -229,10 +229,13 @@ async function run(env) {
     return { version: 1, status: 'observed', applicationSource: APPLICATION,
       originalNextSource: OLD_APPLICATION, diagnosticSource: env.GITHUB_SHA,
       versions: { vercel: '65.4.0', dotenv: '4.0.0', nextEnv: '16.4.1', node: process.versions.node },
-      method: 'real-production-pull-and-two-Infisical-values; pure-decoder-and-isolated-legacy-parser-comparison',
+      method: 'real-production-pull-and-available-Infisical-sources; pure-decoder-and-isolated-legacy-parser-comparison',
       legacyScope: { migrationParent: 'legacyVercel is the CLI dotenv4 result inherited by the later independent migrate process',
         nextChild: 'legacyNext is a separate projection with no root dotenv files; Next cannot write back to the migration parent',
         buildPerformed: false },
+      infisicalSourceEvidence: { MIKKA_DATABASE_URL: 'read-this-run',
+        DATABASE_URL: { readThisRun: false, previousLookup: 'not-found', evidenceRun: 42245835347,
+          evidenceJob: 127987689482, path: '/vercel', environment: 'prod' } },
       otherRequiredValues: 'explicit-synthetic', ...observation,
       builds: 0, migrations: 0, databaseConnections: 0, deployments: 0, runtimeVerified: false }
   } finally { rmSync(privateRoot, { recursive: true, force: true }) }
@@ -261,6 +264,11 @@ export async function selfTest(env = process.env) {
     const emptyFile = diagnose(text(''), inherited, options)
     assert.equal(emptyFile.targets.DATABASE_URL.equalities.fillEqualsInfisical, true)
     assert.equal(emptyFile.targets.DATABASE_URL.equalities.legacyCliEqualsCurrentBuilder, true); passed++
+    const absentJob = diagnose(text(urlB), { MIKKA_DATABASE_URL: urlA }, options)
+    assert.equal(absentJob.targets.DATABASE_URL.infisical.present, false)
+    assert.equal(absentJob.targets.DATABASE_URL.directBuilder.directAccepted, true)
+    assert.equal(absentJob.targets.DATABASE_URL.legacyVercel.directAccepted, true)
+    assert.equal(absentJob.targets.DATABASE_URL.equalities.legacyCliEqualsCurrentBuilder, true); passed++
     const canary = '"shape-canary\\$reference\r\n' + String.fromCharCode(0)
     const privateShape = shape(canary)
     assert.equal(privateShape.hasLF, true); assert.equal(privateShape.hasCR, true)
