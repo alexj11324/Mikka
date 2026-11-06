@@ -19,6 +19,7 @@ import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
+import { daemonTracer, runIdHash } from "../tracing"
 import type { Readable, Writable } from "node:stream"
 
 import {
@@ -773,6 +774,7 @@ export class ClaudeAdapter implements AgentAdapter {
     authTimer?.unref()
     if (externalAuth) {
       let timer: NodeJS.Timeout | undefined
+      const traceAttributes = { "mikka.harness": "claude_code", "mikka.run.id_hash": runIdHash(options.runId) }
       let offRevoke: (() => void) | undefined
       let authPhase: 'initialization' | 'account_info' | 'external_verify' = 'initialization'
       let authReason: 'initialization_failed' | 'timeout' | 'revoked' | 'session_closed' | 'provider_refused' | 'source_refused' | 'verify_refused' = 'initialization_failed'
@@ -780,7 +782,7 @@ export class ClaudeAdapter implements AgentAdapter {
         // accountInfo waits for this same SDK initialization promise. Give the
         // cold CLI an explicit bounded startup budget before checking its
         // account; no prompt is released until all checks below pass.
-        await Promise.race([
+        await daemonTracer.span("daemon.adapter.cli_init", traceAttributes, () => Promise.race([
           session.initializationResult(),
           new Promise<never>((_, reject) => {
             timer = setTimeout(
@@ -794,10 +796,10 @@ export class ClaudeAdapter implements AgentAdapter {
               reject(new ClaudeInitializationError(false))
             })
           }),
-        ])
+        ]))
         clearTimeout(timer)
         authPhase = 'account_info'
-        const account = await session.accountInfo()
+        const account = await daemonTracer.span("daemon.adapter.account_check.account_info", traceAttributes, () => session.accountInfo())
         authReason = ending ? 'session_closed' : account.apiProvider !== 'firstParty' ? 'provider_refused' : 'source_refused'
         if (
           ending ||
@@ -811,7 +813,7 @@ export class ClaudeAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_ERROR)
         authPhase = 'external_verify'
         authReason = 'verify_refused'
-        await externalAuth.verify?.()
+        await daemonTracer.span("daemon.adapter.account_check", traceAttributes, async () => { await externalAuth.verify?.() })
         if (ending || approval.revoked) throw new Error(SUBSCRIPTION_ERROR)
       } catch (error) {
         // Cleanup revokes the gate too; detach before preserving the failure.

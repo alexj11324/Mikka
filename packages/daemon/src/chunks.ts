@@ -4,6 +4,7 @@
 import type { RunPublish, RunState, StopReason } from "@mikka/protocol"
 import type { PlanSection } from "@mikka/protocol/plan"
 import type { UIMessage, UIMessageChunk } from "ai"
+import type { DaemonStartupTiming } from "./tracing"
 
 /** The stages a run goes through before its agent works, in order. */
 export type RunStage = "repository" | "worktree" | "agent_start"
@@ -23,7 +24,7 @@ export type MikkaDataTypes = {
   /** Run state transitions written by the daemon. */
   "run-state": { state: RunState; error?: string; stopReason?: StopReason }
   /** One start-up stage of a run and how long it took; stored, so a failed run shows where it stopped. */
-  "run-stage": { stage: RunStage; ms: number; ok: boolean }
+  "run-stage": { stage: RunStage; ms: number; ok: boolean; startupTiming?: DaemonStartupTiming }
   /** A real task is attached to this Bot's desktop, not to an agent identity. */
   computer: { botId: string; runId: string; task: string; state: 'working' }
   /**
@@ -57,8 +58,9 @@ export type MikkaDataTypes = {
 export type RunChunk = UIMessageChunk<unknown, MikkaDataTypes>
 
 /** A start-up stage's outcome (stored, unlike `run-state`). */
-export function runStageChunk(stage: RunStage, ms: number, ok: boolean): RunChunk {
-  return { type: "data-run-stage", data: { stage, ms: Math.max(0, Math.round(ms)), ok } }
+export function runStageChunk(stage: RunStage, ms: number, ok: boolean, startupTiming?: DaemonStartupTiming): RunChunk {
+  return { type: "data-run-stage", data: { stage, ms: Math.max(0, Math.round(ms)), ok,
+    ...(stage === "agent_start" && startupTiming ? { startupTiming } : {}) } }
 }
 export type RunMessage = UIMessage<unknown, MikkaDataTypes>
 
