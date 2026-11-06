@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
+import { isValidDeploymentId } from '../../lib/deployment-id.mjs'
 import { assertDatabaseIdentity, EnvironmentError, loadEnvironment } from '../test-accounts/environment.mjs'
 import { TestAccountError } from '../test-accounts/pool.mjs'
 import { withTestAccounts } from '../test-accounts/session.mjs'
@@ -79,12 +80,19 @@ function chunkPath(value, environment) {
   } catch { return null }
 }
 
+/** Only the public production skew pin is accepted, never arbitrary query data. */
+function webDeploymentPin(url) {
+  if (!url.search) return ''
+  const entries = [...url.searchParams]
+  return entries.length === 1 && entries[0][0] === 'dpl' && isValidDeploymentId(entries[0][1]) ? entries[0][1] : null
+}
+
 function viteAssetPath(value, environment) {
   try {
     if (typeof value !== 'string' || value.includes('\\')) return null
     const url = new URL(value, environment.origin)
-    if (url.origin !== environment.origin || url.username || url.password || url.hash || url.search) return null
-    return new RegExp(`^${environment.basePath}/assets/[A-Za-z0-9_-]+\\.js$`).test(url.pathname) ? url.pathname : null
+    if (url.origin !== environment.origin || url.username || url.password || url.hash || webDeploymentPin(url) === null) return null
+    return new RegExp(`^${environment.basePath}/assets/[A-Za-z0-9_-]+\\.js$`).test(url.pathname) ? url.pathname + url.search : null
   } catch { return null }
 }
 
@@ -106,7 +114,7 @@ export function requestAllowed(path, init, environment, refs = {}) {
     if ([`${base}/api/version`, `${base}/api/auth/get-session`, `${base}/api/workspace/switcher`, `${base}/api/settings/issue-prefix`].includes(url.pathname)) return !url.search
     if (url.pathname === page) return [...url.searchParams].every(([key, value]) => ['issue', 'workspace'].includes(key) && uuid(value))
     if (url.pathname === `${page}/settings`) return [...url.searchParams].every(([key, value]) => key === 'section' && value === 'preferences' || key === 'workspace' && uuid(value))
-    return url.pathname === `${base}/renderer-manifest.json` && !url.search
+    return url.pathname === `${base}/renderer-manifest.json` && webDeploymentPin(url) !== null
       || chunkPath(url.href, environment) !== null || viteAssetPath(url.href, environment) !== null
   } catch { return false }
 }
@@ -120,7 +128,7 @@ const referenceCall = new RegExp(String.raw`(?:\bcreateServerReference|\[\s*(?:"
  * inspecting private server manifests. A finite scan is not a polling loop. */
 export async function discoverReadActions(request, environment, issueId) {
   const queue = [], queued = new Set(), seen = new Set(), refs = {}
-  let viteEntry = false
+  const vitePins = new Set()
   const diagnostics = { pagesRead: 0, chunksRead: 0, found: [] }
   const add = raw => {
     const path = chunkPath(raw, environment)
@@ -131,7 +139,8 @@ export async function discoverReadActions(request, environment, issueId) {
     for (const match of source.matchAll(referenceCall)) if (READ_ACTIONS.includes(match[4])) refs[match[4]] = match[2]
     for (const match of source.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g)) {
       const path = match[2].replaceAll('&amp;', '&')
-      if (viteAssetPath(path, environment)) viteEntry = true
+      const entry = viteAssetPath(path, environment)
+      if (entry) vitePins.add(webDeploymentPin(new URL(entry, environment.origin)))
       add(path)
     }
     for (const match of source.matchAll(/(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g)) add(match[2])
@@ -142,8 +151,10 @@ export async function discoverReadActions(request, environment, issueId) {
     const response = await request(page)
     check(response.ok, 'read_page_unavailable'); scan(await response.text()); diagnostics.pagesRead++
   }
-  if (viteEntry) {
-    const response = await request(`${environment.basePath}/renderer-manifest.json`)
+  if (vitePins.size) {
+    check(vitePins.size === 1, 'read_action_reference_missing')
+    const [pin] = vitePins
+    const response = await request(`${environment.basePath}/renderer-manifest.json` + (pin ? '?dpl=' + encodeURIComponent(pin) : ''))
     check(response.ok && response.headers.get('content-type')?.includes('application/json'), 'public_action_manifest_unavailable')
     const source = await response.text()
     check(Buffer.byteLength(source) <= 8_000_000, 'public_asset_too_large')

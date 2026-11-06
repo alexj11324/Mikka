@@ -112,6 +112,61 @@ test('Vite discovery uses the actual published used-actions manifest and never w
   }
 })
 
+test('Vite discovery follows the production deployment pin to the same published read manifest', async () => {
+  const pin = '370cc898-local-prebuilt-1'
+  const manifestPath = '/mikka/renderer-manifest.json?dpl=' + pin
+  const manifest = { version: 1, target: 'web', usedActions: [...Object.values(readRpcActions), 'coordinator.sendCoordinatorMessage'] }
+  const calls = []
+  const discovered = await discoverReadActions(async path => {
+    calls.push(path)
+    assert.equal(requestAllowed(path, {}, environment), true, path)
+    return path === manifestPath ? Response.json(manifest)
+      : new Response('<script type="module" crossorigin src="/mikka/assets/renderer-realbuild.js?dpl=' + pin + '"></script>')
+  }, environment, id(1))
+  assert.deepEqual(discovered.refs, readRpcActions)
+  assert.equal(discovered.diagnostics.transport, 'rpc')
+  assert.equal(discovered.diagnostics.manifestsRead, 1)
+  assert.deepEqual(calls, ['/mikka', '/mikka?issue=' + id(1), '/mikka/settings?section=preferences', manifestPath])
+  assert.equal(Object.hasOwn(discovered.refs, 'sendCoordinatorMessage'), false)
+})
+
+test('Vite asset and manifest queries accept only one valid public deployment pin', () => {
+  for (const path of ['/mikka/assets/renderer-realbuild.js', '/mikka/renderer-manifest.json']) {
+    for (const query of ['', '?dpl=370cc898-local-prebuilt-1'])
+      assert.equal(requestAllowed(path + query, {}, environment), true, path + query)
+    for (const query of ['?other=1', '?dpl=', '?dpl=dpl_reserved', '?dpl=' + 'a'.repeat(33),
+      '?dpl=first&dpl=second', '?dpl=valid&other=1', '?dpl=bad%2Fpath', '?dpl=bad%20value', '?dpl=valid#fragment'])
+      assert.equal(requestAllowed(path + query, {}, environment), false, path + query)
+    assert.equal(requestAllowed('https://foreign.example' + path + '?dpl=valid', {}, environment), false)
+    assert.equal(requestAllowed(path + '?dpl=valid', { method: 'POST' }, environment), false)
+  }
+  const { path, init } = rpcReadRequest('pollIssue', [id(1)], environment, readRpcActions)
+  assert.equal(requestAllowed(path + '?dpl=valid', init, environment, readRpcActions), false)
+})
+
+test('Vite discovery rejects invalid or conflicting pins before fetching an action manifest', async () => {
+  const script = query => '<script type="module" src="/mikka/assets/renderer-realbuild.js' + query + '"></script>'
+  for (const html of [
+    script('?dpl='), script('?dpl=dpl_reserved'), script('?dpl=first&amp;dpl=second'),
+    script('?dpl=valid&amp;other=1'), script('?dpl=' + 'a'.repeat(33)),
+    script('?dpl=first') + script('?dpl=second'), script('') + script('?dpl=valid'),
+  ]) {
+    const calls = []
+    await assert.rejects(discoverReadActions(async path => {
+      calls.push(path)
+      assert.ok(!path.includes('renderer-manifest.json'))
+      return new Response(html)
+    }, environment), { code: 'read_action_reference_missing' })
+    assert.deepEqual(calls, ['/mikka', '/mikka/settings?section=preferences'])
+  }
+  let pages = 0
+  await assert.rejects(discoverReadActions(async path => {
+    assert.ok(!path.includes('renderer-manifest.json'))
+    return new Response(script('?dpl=page' + ++pages))
+  }, environment), { code: 'read_action_reference_missing' })
+  assert.equal(pages, 2)
+})
+
 test('only the exact published RPC read with the real same-origin protocol is allowed', () => {
   const { path, init } = rpcReadRequest('pollIssue', [id(1)], environment, readRpcActions)
   assert.equal(requestAllowed(path, init, environment, readRpcActions), true)

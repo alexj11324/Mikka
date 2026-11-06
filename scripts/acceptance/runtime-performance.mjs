@@ -62,7 +62,7 @@ async function ownedPath(root, path, { file = false } = {}) {
   return resolved
 }
 
-async function cacheDirectory(root, path) {
+export async function cacheDirectory(root, path) {
   const absolute = resolve(root, path)
   assert.ok(inside(root, absolute), 'Cache must be inside its snapshot')
   let existing = absolute
@@ -77,7 +77,7 @@ async function cacheDirectory(root, path) {
   const actual = await realpath(existing)
   assert.ok(actual === root || inside(root, actual), 'A dependency symlink must not redirect the cache into another checkout')
   assert.equal(git(root, ['ls-files', '--', path]), '', 'Cache must not contain tracked files')
-  assert.ok(git(root, ['check-ignore', '--', path]), 'Only ignored build caches may be removed')
+  assert.ok(git(root, ['check-ignore', '--', path + sep]), 'Only ignored build caches may be removed')
   return absolute
 }
 

@@ -26,6 +26,12 @@ export async function nativeDeviceSnapshot() {
     if (/Failed to connect to (?:user scope )?bus/.test(value)) return 'service-manager-unavailable'
     return 'other'
   }
+  const bootstrapErrorCode = value => {
+    if (typeof value !== 'string' || !value.includes('Bootstrap failed:')) return null
+    const match = /(?:^|\n)Bootstrap failed: (0|[1-9][0-9]{0,2}):/.exec(value)
+    const code = match ? Number(match[1]) : -1
+    return code >= 0 && code <= 255 ? code : 'other'
+  }
   const present = { device: typeof bridge?.device?.status === 'function', installer: typeof bridge?.ssh?.state === 'function' }
   const results = await Promise.allSettled([
     present.device ? bridge.device.status() : Promise.resolve(null),
@@ -42,7 +48,7 @@ export async function nativeDeviceSnapshot() {
       status: install === null ? 'absent' : select(install?.status, ['fingerprint', 'running', 'online', 'failed']),
       step: install === null ? 'absent' : select(install?.step, ['login', 'check', 'install', 'service', 'connect']),
       target: install === null ? 'absent' : select(install?.target, ['this-computer', 'this-computer-reconnect']),
-      reason: reason(install?.reason), retryable: install?.retryable === true },
+      reason: reason(install?.reason), bootstrapErrorCode: bootstrapErrorCode(install?.reason), retryable: install?.retryable === true },
   }
 }
 

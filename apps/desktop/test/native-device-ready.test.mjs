@@ -113,3 +113,20 @@ test('main profile inspection rejects other profiles and reports only fixed serv
   for (const secret of ['/private', '/owned', 'mikka.js', 'private manifest secret']) assert.equal(JSON.stringify(result).includes(secret), false)
   assert.equal(reads, 2)
 })
+
+test('launchd bootstrap diagnostics retain only a bounded numeric code', async () => {
+  for (const [reason, expected] of [
+    ['Bootstrap failed: 5: Input/output error /private/path', 5],
+    ['Command failed with private arguments\nBootstrap failed: 13: Permission denied', 13],
+    ['Bootstrap failed: 255: private detail', 255],
+    ['Bootstrap failed: 999: private detail', 'other'],
+    ['Bootstrap failed: 1234567890: private detail', 'other'],
+    ['Bootstrap failed: 05: private detail', 'other'],
+    ['Bootstrap failed: private credential', 'other'],
+    ['private credential without an OS error', null],
+  ]) {
+    const value = await snapshot({ ...raw, install: { ...raw.install, status: 'failed', reason } })
+    assert.equal(value.installer.bootstrapErrorCode, expected)
+    for (const text of ['private', 'credential', 'arguments', 'Input/output', 'Permission']) assert.equal(JSON.stringify(value).includes(text), false)
+  }
+})

@@ -6,6 +6,9 @@ import { join } from 'node:path'
  * the early bootstrap instruments both API and Workflow step queries. */
 export const nodeRuntimePackages = [
   'pg', 'ai', 'drizzle-orm', 'officeparser', '@e965/xlsx', 'music-metadata', 'sharp',
+  // Local World reads its adjacent package.json during real startup. Bundling
+  // it loses that metadata and makes initDataDir reject the fallback 'bundled'.
+  '@workflow/world-local',
   '@opentelemetry/api', '@opentelemetry/core', '@opentelemetry/exporter-trace-otlp-proto',
   '@opentelemetry/instrumentation', '@opentelemetry/instrumentation-pg', '@opentelemetry/resources',
   '@opentelemetry/sdk-trace-base', '@opentelemetry/sdk-trace-node', '@opentelemetry/semantic-conventions',

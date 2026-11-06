@@ -256,25 +256,32 @@ export class SshInstaller {
       await this.remote(this.installCommand ?? commands.install, undefined, 300_000)
       this.report({ step: 'service' })
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type ${deviceType}${this.flags()}`)
-      this.report({ step: 'connect' })
-      const token = await this.mintToken()
-      this.controller.signal.throwIfAborted()
-      // Token travels only on stdin (encrypted over SSH), never argv, logs or shell text.
-      await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin${this.flags()}`, `${token}\n`)
-      await this.waitOnline()
+      await this.connect()
     } catch (error) { this.fail(error) }
+  }
+  private async connect() {
+    this.report({ step: 'connect' })
+    const token = await this.mintToken()
+    this.controller.signal.throwIfAborted()
+    // Token travels only on stdin (encrypted over SSH), never argv, logs or shell text.
+    await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin${this.flags()}`, `${token}\n`)
+    await this.waitOnline()
   }
   private async repair() {
     try {
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
-      await this.waitOnline()
-      return
+      if (await this.waitOnline(true) === 'online') return
     } catch (error) {
       if (this.controller.signal.aborted) return
       if (error instanceof LocalAccountUnconfirmed) { this.fail(error); return }
+      this.report({ step: 'check' })
+      await this.install('laptop')
+      return
     }
-    this.report({ step: 'check' })
-    await this.install('laptop')
+    // The installed daemon answered and explicitly has no credential. Sign it
+    // in through the same enrollment flow; reinstalling would stop a working
+    // service and needlessly bootstrap it a second time.
+    try { await this.connect() } catch (error) { this.fail(error) }
   }
   /** Rewrites and restarts the service (`service install` restarts it), then waits until it is online. */
   private async restart() {
@@ -284,12 +291,13 @@ export class SshInstaller {
       await this.waitOnline()
     } catch (error) { this.fail(error) }
   }
-  private async waitOnline() {
+  private async waitOnline(allowUnregistered = false): Promise<'online' | 'unregistered'> {
     for (let attempt = 0; attempt < 30; attempt++) {
       this.controller.signal.throwIfAborted()
       const status = await this.remote(`mikka daemon status${this.flags()}`).catch(() => '')
-      let remote: { server?: string; deviceId?: string }
+      let remote: { server?: string; deviceId?: string; signedIn?: boolean }
       try { const parsed = JSON.parse(status); remote = parsed && typeof parsed === 'object' ? parsed : {} } catch { remote = {} }
+      if (allowUnregistered && remote.server === 'unregistered' && remote.signedIn === false) return 'unregistered'
       if (remote.server === 'online') {
         if (this.local) {
           if (typeof remote.deviceId !== 'string' || !remote.deviceId) throw new Error('Device does not belong to the signed-in account')
@@ -300,7 +308,7 @@ export class SshInstaller {
         }
         this.controller.signal.throwIfAborted()
         this.report({ status: 'online', ...(typeof remote.deviceId === 'string' ? { deviceId: remote.deviceId } : {}) })
-        return
+        return 'online'
       }
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
