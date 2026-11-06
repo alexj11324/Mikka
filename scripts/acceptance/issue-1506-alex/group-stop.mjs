@@ -21,6 +21,13 @@ const ERRORS = new Set([...FIXTURE_ERRORS, 'group_receipt_invalid', 'group_scope
 const safeError = error => ERRORS.has(error?.message) ? error.message : 'group_acceptance_failed'
 export const groupName = report => `测试 Issue1506 group-stop ${report.scenario ?? 'public'} ${report.fixtureRunKey} ${report.fixtureKey} ${report.boundary} ${report.applicationSha.slice(0, 8)}`
 
+// This response header is a candidate correlation key, not a proven Vercel
+// runtime requestId. Never retain headers, request bodies or arbitrary text.
+export function groupRequestMetadata({ path, method, status, headersMs, requestId }) {
+  return { path, method, status, headersMs, requestId: typeof requestId === 'string' && requestId.length <= 200 &&
+    /^(?:[a-z0-9]{3,12}::){1,5}[A-Za-z0-9_-]{5,160}$/.test(requestId) ? requestId : null }
+}
+
 export function validateGroupReceipt(value, fixtures) {
   if (value?.schemaVersion !== 1 || value.issue !== 1506 || value.phase !== 'alex-group-stop' ||
     value.ownerRef !== ref(ALEX_OWNER_ID) || value.workspaceId !== fixtures.workspace.id ||
@@ -115,7 +122,7 @@ export async function runGroupStop({ env = process.env, mode = 'observe', groupR
     : PROMPT
   let requests = []
   const save = () => {
-    report.requests = requests.map(({ path, method, status, headersMs }) => ({ path, method, status, headersMs }))
+    report.requests = requests.map(groupRequestMetadata)
     if (!checkpoint) return
     mkdirSync(OUTPUT_DIR, { recursive: true }); writeFileSync(output + '.tmp', JSON.stringify(report, null, 2) + '\n'); renameSync(output + '.tmp', output)
   }

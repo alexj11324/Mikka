@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "issue": 1212,
+  "case": "owner-device-presence",
+  "mode": "baseline",
+  "status": "baseline_captured",
+  "applicationSha": "1a70bb79d7dc4ab31418e9fa674dd39c0a1cae01",
+  "runnerSha": "8d8fb36b0abbf5e13e4f24721bb8faac457279d9",
+  "runKey": "acme-1212-20261106-b",
+  "fixture": {
+    "marker": "presence-1212-acme-1212-20261106-b",
+    "deviceId": "4a76c988-41d3-4e6c-b400-c8a4331f2a10",
+    "tokenId": "92ea31be-cc03-48f0-b42a-5c6d26fdbc8c"
+  },
+  "checks": {
+    "exactOwnerAndBuild": true,
+    "fixtureDispatchDisabled": true,
+    "singleEmptyHeartbeat": true,
+    "threeOldClients": true,
+    "baselineMeasured": true,
+    "finalBuildMatched": true
+  },
+  "cleanup": {
+    "observersClosed": true,
+    "deviceSocketClosed": true,
+    "credentialRevoked": true,
+    "oldCredentialRejected": true,
+    "deviceRetained": true,
+    "originalDevicesPreserved": true,
+    "originalCredentialsPreserved": true,
+    "verified": true,
+    "signOut200": true
+  },
+  "errors": [],
+  "requests": {
+    "owner": 29,
+    "device": 5
+  },
+  "startedAt": "2026-11-06T21:38:42.666Z",
+  "source": {
+    "base": "2f84230d24f28c6b5d1ef78669f7d6cbaf438bfc",
+    "clientPatchSha256": null,
+    "hashes": {
+      "lib/live/channel.ts": "48e528f513b7058a3973aa39c69996fa2e11f696dec6812a32cd7518a49c929b",
+      "lib/live/channels.ts": "962b23278dd4aa360dc1d39458614bf80c61aebb192d7a7897882d2944d26f60",
+      "lib/live/revisions.ts": "934d10dcd483a9ffccec8a9689076f6beaaa1133f84af0d3fc0ca436bc3bc708",
+      "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+      "hooks/use-live-key.tsx": "d38a32357df1b3126efa7727171ca8b8395c5582d37a3dc9d7ddf9a49a21baf6",
+      "components/devices/devices-settings.tsx": "8985f51ee7409eaa36c9718509b8cbc488de8d45319392d7bb82c17a84f65ca3",
+      "lib/live/browser-runtime.ts": "f702483426421445ff00fafe245a743ed9e16840146620952752513aa1b56219",
+      "lib/live/list-read.ts": "4e0e35529b7421b42b7e13dfb443b6d7e567b18046302c39622076a99c0a2fb7",
+      "packages/protocol/src/device.ts": "6c63072e7ff69371d1547673927f0af9e3ba204b48e850d287e4f84212b30aa6",
+      "packages/protocol/src/daemon.ts": "8fa7015227c26b46c871166b6bacbc45f37fd1a0e031c514efa258a1115afaff"
+    }
+  },
+  "client": {
+    "version": "0.0.1",
+    "protocolVersion": 3,
+    "installedDaemon": false
+  },
+  "existingCounts": {
+    "devices": 4,
+    "credentials": 23
+  },
+  "live": {
+    "schemaVersion": 1,
+    "case": "old-device-client-three-native-workers",
+    "applicationSha": "1a70bb79d7dc4ab31418e9fa674dd39c0a1cae01",
+    "sourceCommit": "2f84230d24f28c6b5d1ef78669f7d6cbaf438bfc",
+    "sourceHashes": {
+      "lib/live/channel.ts": "48e528f513b7058a3973aa39c69996fa2e11f696dec6812a32cd7518a49c929b",
+      "lib/live/channels.ts": "962b23278dd4aa360dc1d39458614bf80c61aebb192d7a7897882d2944d26f60",
+      "lib/live/revisions.ts": "934d10dcd483a9ffccec8a9689076f6beaaa1133f84af0d3fc0ca436bc3bc708",
+      "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+      "hooks/use-live-key.tsx": "d38a32357df1b3126efa7727171ca8b8395c5582d37a3dc9d7ddf9a49a21baf6",
+      "components/devices/devices-settings.tsx": "8985f51ee7409eaa36c9718509b8cbc488de8d45319392d7bb82c17a84f65ca3",
+      "lib/live/browser-runtime.ts": "f702483426421445ff00fafe245a743ed9e16840146620952752513aa1b56219",
+      "lib/live/list-read.ts": "4e0e35529b7421b42b7e13dfb443b6d7e567b18046302c39622076a99c0a2fb7",
+      "packages/protocol/src/device.ts": "6c63072e7ff69371d1547673927f0af9e3ba204b48e850d287e4f84212b30aa6",
+      "packages/protocol/src/daemon.ts": "8fa7015227c26b46c871166b6bacbc45f37fd1a0e031c514efa258a1115afaff"
+    },
+    "tabCount": 3,
+    "network": [
+      {
+        "tabId": 2,
+        "method": "ticket",
+        "phase": "initial",
+        "startedAtMs": 3036,
+        "status": "completed",
+        "finishedAtMs": 3110
+      },
+      {
+        "tabId": 1,
+        "method": "ticket",
+        "phase": "initial",
+        "startedAtMs": 3047,
+        "status": "completed",
+        "finishedAtMs": 3165
+      },
+      {
+        "tabId": 3,
+        "method": "ticket",
+        "phase": "initial",
+        "startedAtMs": 3049,
+        "status": "completed",
+        "finishedAtMs": 3295
+      },
+      {
+        "tabId": 2,
+        "method": "devices",
+        "phase": "initial",
+        "startedAtMs": 3400,
+        "online": true,
+        "presenceFallback": false,
+        "status": "completed",
+        "finishedAtMs": 3537
+      },
+      {
+        "tabId": 1,
+        "method": "devices",
+        "phase": "initial",
+        "startedAtMs": 3410,
+        "online": true,
+        "presenceFallback": false,
+        "status": "completed",
+        "finishedAtMs": 3635
+      },
+      {
+        "tabId": 3,
+        "method": "devices",
+        "phase": "initial",
+        "startedAtMs": 3549,
+        "online": true,
+        "presenceFallback": false,
+        "status": "completed",
+        "finishedAtMs": 3742
+      },
+      {
+        "tabId": 2,
+        "method": "devices",
+        "phase": "initial",
+        "startedAtMs": 62565,
+        "online": true,
+        "presenceFallback": true,
+        "status": "completed",
+        "finishedAtMs": 62997
+      },
+      {
+        "tabId": 3,
+        "method": "devices",
+        "phase": "initial",
+        "startedAtMs": 62574,
+        "online": true,
+        "presenceFallback": true,
+        "status": "completed",
+        "finishedAtMs": 63364
+      },
+      {
+        "tabId": 1,
+        "method": "devices",
+        "phase": "initial",
+        "startedAtMs": 62576,
+        "online": true,
+        "presenceFallback": true,
+        "status": "completed",
+        "finishedAtMs": 63009
+      },
+      {
+        "tabId": 2,
+        "method": "devices",
+        "phase": "healthy-idle",
+        "startedAtMs": 123103,
+        "online": true,
+        "presenceFallback": true,
+        "status": "completed",
+        "finishedAtMs": 123454
+      },
+      {
+        "tabId": 1,
+        "method": "devices",
+        "phase": "healthy-idle",
+        "startedAtMs": 123112,
+        "online": true,
+        "presenceFallback": true,
+        "status": "completed",
+        "finishedAtMs": 123469
+      },
+      {
+        "tabId": 3,
+        "method": "devices",
+        "phase": "healthy-idle",
+        "startedAtMs": 123467,
+        "online": true,
+        "presenceFallback": true,
+        "status": "completed",
+        "finishedAtMs": 123706
+      }
+    ],
+    "tabs": [
+      {
+        "tabId": 2,
+        "closed": true,
+        "online": true,
+        "ready": true,
+        "fallbackActive": true,
+        "transport": {
+          "createdAtMs": 113,
+          "openedAtMs": 265,
+          "lastPingAtMs": 150276,
+          "lastPongAtMs": 150313,
+          "coreCloseAtMs": null,
+          "cleanupCloseAtMs": 156787,
+          "closedAtMs": null,
+          "errorAtMs": null,
+          "ticketLifetimeMs": 299246,
+          "ticketRemainingAtCloseMs": 142572,
+          "pings": 5,
+          "pongs": 5,
+          "closeCode": null,
+          "closeWasClean": null,
+          "readyState": 1
+        },
+        "refreshCalls": 3,
+        "networkReads": 3,
+        "devicePushes": 0,
+        "threadPushes": 0,
+        "socketCount": 1,
+        "nullTicketAttempts": 2,
+        "activeRefreshes": 0
+      },
+      {
+        "tabId": 1,
+        "closed": true,
+        "online": true,
+        "ready": true,
+        "fallbackActive": true,
+        "transport": {
+          "createdAtMs": 158,
+          "openedAtMs": 265,
+          "lastPingAtMs": 150279,
+          "lastPongAtMs": 150311,
+          "coreCloseAtMs": null,
+          "cleanupCloseAtMs": 156777,
+          "closedAtMs": null,
+          "errorAtMs": null,
+          "ticketLifetimeMs": 299190,
+          "ticketRemainingAtCloseMs": 142571,
+          "pings": 5,
+          "pongs": 5,
+          "closeCode": null,
+          "closeWasClean": null,
+          "readyState": 1
+        },
+        "refreshCalls": 3,
+        "networkReads": 3,
+        "devicePushes": 0,
+        "threadPushes": 0,
+        "socketCount": 1,
+        "nullTicketAttempts": 2,
+        "activeRefreshes": 0
+      },
+      {
+        "tabId": 3,
+        "closed": true,
+        "online": true,
+        "ready": true,
+        "fallbackActive": true,
+        "transport": {
+          "createdAtMs": 291,
+          "openedAtMs": 404,
+          "lastPingAtMs": 150418,
+          "lastPongAtMs": 150470,
+          "coreCloseAtMs": null,
+          "cleanupCloseAtMs": 156776,
+          "closedAtMs": null,
+          "errorAtMs": null,
+          "ticketLifetimeMs": 299057,
+          "ticketRemainingAtCloseMs": 142572,
+          "pings": 5,
+          "pongs": 5,
+          "closeCode": null,
+          "closeWasClean": null,
+          "readyState": 1
+        },
+        "refreshCalls": 3,
+        "networkReads": 3,
+        "devicePushes": 0,
+        "threadPushes": 0,
+        "socketCount": 1,
+        "nullTicketAttempts": 2,
+        "activeRefreshes": 0
+      }
+    ],
+    "phases": [
+      {
+        "name": "healthy-idle",
+        "elapsedMs": 65006,
+        "actualReads": 3,
+        "byTab": {
+          "1": 1,
+          "2": 1,
+          "3": 1
+        },
+        "allOldFallbacksActive": true,
+        "allReadsSucceeded": true,
+        "adopted": 0,
+        "healthVerified": true,
+        "completed": true
+      }
+    ],
+    "failures": [],
+    "adaptation": {
+      "nativeWebSocket": true,
+      "independentHeaps": true,
+      "cookieInParentOnly": true,
+      "actualOldLiveChannels": true,
+      "oldHomeAndNullSubscriptions": true,
+      "tabShare": false,
+      "reactSWRRendered": false,
+      "installedDaemon": false
+    },
+    "closed": true,
+    "fault": null
+  },
+  "idleStartsAfterHeartbeatMs": 92502,
+  "idle": {
+    "name": "healthy-idle",
+    "elapsedMs": 65006,
+    "actualReads": 3,
+    "byTab": {
+      "1": 1,
+      "2": 1,
+      "3": 1
+    },
+    "allOldFallbacksActive": true,
+    "allReadsSucceeded": true,
+    "adopted": 0,
+    "healthVerified": true,
+    "completed": true
+  },
+  "finishedAt": "2026-11-06T21:41:23.854Z"
+}

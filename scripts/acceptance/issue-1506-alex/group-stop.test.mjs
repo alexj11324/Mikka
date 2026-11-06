@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ALEX_OWNER_ID } from '../issue-1506-readonly/alex-session.mjs'
-import { privateGenerationReceipt, runGroupStop, validateGroupMembers } from './group-stop.mjs'
+import { groupRequestMetadata, privateGenerationReceipt, runGroupStop, validateGroupMembers } from './group-stop.mjs'
 import { openGroupLive } from './group-live.mjs'
 import { fakeSession, fixtureReceipt, PRIVATE, WORKSPACE_ID, BOT_IDS } from './fixture-support.mjs'
 
@@ -9,6 +9,14 @@ globalThis.fetch = () => { throw new Error('network_forbidden') }
 const GROUP_ID = '55555555-5555-4555-8555-555555555555'
 const MESSAGE_ID = '66666666-6666-4666-8666-666666666666'
 const LINK_ID = '77777777-7777-4777-8777-777777777777'
+const REQUEST_ID = 'iad1::sfo1::synthetic-1700000000000-abcdef123456'
+
+test('group request metadata retains only a bounded Vercel response correlation candidate', () => {
+  const row = { path: '/mikka/api/conversations', method: 'POST', status: 200, headersMs: 3 }
+  assert.deepEqual(groupRequestMetadata({ ...row, requestId: REQUEST_ID, cookie: PRIVATE, body: PRIVATE }), { ...row, requestId: REQUEST_ID })
+  for (const requestId of [undefined, null, PRIVATE, 'iad1::abc\n', 'https://private.invalid', 'iad1::' + 'a'.repeat(201)])
+    assert.deepEqual(groupRequestMetadata({ ...row, requestId }), { ...row, requestId: null })
+})
 
 function fixture({ lostSend = false, boundaryTimeout = false, extraMember = false, liveFailure = false, afterActive = false,
   allowCleanup = false, privateScenario = false, missingPrivateGenerate = false, targetKey = 'haiku' } = {}) {
@@ -68,7 +76,8 @@ function fixture({ lostSend = false, boundaryTimeout = false, extraMember = fals
       }
       else if (route === `/api/mobile/groups/${GROUP_ID}`) { assert.equal(input.method, 'PATCH'); assert.deepEqual(input.body, { hidden: true }); state.hidden = true; value = { ok: true } }
       else return session.request(path, input)
-      session.requests.push({ path: '/mikka' + route, method: input.method ?? (input.body ? 'POST' : 'GET'), status: 200, headersMs: 0 })
+      session.requests.push({ path: '/mikka' + route, method: input.method ?? (input.body ? 'POST' : 'GET'), status: 200, headersMs: 0,
+        requestId: REQUEST_ID, body: PRIVATE, cookie: PRIVATE })
       return Response.json(value)
     } }), options)
   const openLive = async () => {
@@ -93,6 +102,9 @@ test('new group has only this owner and the two test bots; a real revision cause
   assert.equal(report.cleanup.status, 'retained_for_provider_audit'); assert.equal(report.cleanup.retainedForProviderAudit, true)
   assert.deepEqual(report.cleanup.retainedBotIds, BOT_IDS)
   assert.equal(report.lateSideEffects, 'pending_provider_terminal_and_one_database_audit')
+  const send = report.requests.find(row => row.method === 'POST' && row.path.endsWith('/messages'))
+  assert.equal(send.requestId, REQUEST_ID)
+  assert.deepEqual(Object.keys(send).sort(), ['headersMs', 'method', 'path', 'requestId', 'status'])
   assert.equal(JSON.stringify(report).includes(PRIVATE), false)
 })
 
