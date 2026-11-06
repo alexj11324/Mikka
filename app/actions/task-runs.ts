@@ -11,7 +11,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
-import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
+import { runAgentName, runBotId, runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
@@ -136,7 +136,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
        ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
     const snapshot = db.select({
-      id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`.as('prompt'),
+      id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${runTaskPrompt}, 200)`.as('prompt'),
       status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
       lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
       deviceId: sql<string | null>`case when ${waitingForDevice} then ${devices.id} end`.as('deviceId'),

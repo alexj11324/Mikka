@@ -28,7 +28,9 @@
       "settingsList": "调整设置列表宽度",
       "groupPanel": "调整右栏宽度",
       "browser": "调整浏览器宽度"
-    }
+    },
+    "showMore": "显示更多",
+    "showLess": "收起"
   },
   "Issue": {
     "scope": {
@@ -3928,7 +3930,9 @@
         "escalated": "原模型未能完成任务，已升级重试"
       }
     },
-    "errorDetails": "详情"
+    "errorDetails": "详情",
+    "fullInstructions": "查看完整指令",
+    "hideInstructions": "隐藏完整指令"
   },
   "Computer": {
     "status": {

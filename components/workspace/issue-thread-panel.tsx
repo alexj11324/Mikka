@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
-import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadChanges, getThreadInstructions, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
@@ -24,6 +24,7 @@ import { QUOTE_SOURCE_ATTR, SelectionQuote } from '@/components/chat/selection-q
 import { splitReplyQuote, withReplyQuote } from '@/lib/chat-quote'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
+import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -59,9 +60,34 @@ function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
   const { quote, text: words } = splitReplyQuote(text)
   const attached = splitChatFiles(words)
   return <>
-    <div className={cn(BUBBLE, 'flex flex-col gap-1.5', mine ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></div>
+    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></CollapsibleMessage></div>
     <MessageActions className={cn(HOVER_ACTIONS, mine ? 'self-end' : 'self-start')}><CopyAction text={words} /></MessageActions>
   </>
+}
+
+/**
+ * 查看完整指令: what the Agent was sent around the task (Factory guidance, repository
+ * checks, standing instructions), read only when asked, as Codex cloud and Devin keep
+ * the system prompt out of the conversation.
+ */
+function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; runId: string; mine: boolean }) {
+  const t = useTranslations('IssueThreads')
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const toggle = async () => {
+    if (open) { setOpen(false); return }
+    setOpen(true)
+    if (text !== null) return
+    setFailed(false)
+    try { setText(await getThreadInstructions(issueId, runId)) } catch { setFailed(true) }
+  }
+  return <div className={cn('flex max-w-[85%] flex-col gap-1', mine ? 'self-end items-end' : 'self-start')}>
+    <Button type="button" variant="link" size="xs" aria-expanded={open} className="h-auto px-0 text-muted-foreground" onClick={() => { void toggle() }}>{open ? t('hideInstructions') : t('fullInstructions')}</Button>
+    {open && (failed ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { setOpen(false); void toggle() }} />
+      : text === null ? <Skeleton className="h-12 w-64" />
+      : <div data-slot="thread-instructions" className="w-full rounded-xl border border-border px-3 py-2 text-xs/5 whitespace-pre-wrap break-words text-muted-foreground"><CollapsibleMessage>{text}</CollapsibleMessage></div>)}
+  </div>
 }
 
 /**
@@ -246,7 +272,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
             {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
             {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
           </div>
-          {data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} /></div>}
+          {data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>
