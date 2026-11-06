@@ -364,3 +364,391 @@ test('new managed repeated deployment read rejects conflicting project scopes be
   assert.equal(report.submissionCount, 0)
   assert.equal(f.requests.some(row => row.path.endsWith('/sign-in/email')), false)
 })
+
+const HISTORY_SOURCE_REPORT = {
+  "version": 1,
+  "purpose": "workflow-migration-production",
+  "issue": 1415,
+  "applicationSha": "2960d783f0196fed5375593d910a43430a101747",
+  "driverRevision": "c0c98baa3020a085652ee5f773310b6dfa412c5d",
+  "webDeployRunId": 42276537062,
+  "status": "fail",
+  "normalSessionObserved": true,
+  "sessionClosed": true,
+  "submissionCount": 1,
+  "cleanupSubmissionCount": 0,
+  "sdkMutations": 0,
+  "cronRequests": 0,
+  "databaseWritesByDriver": 0,
+  "providerLoginTested": false,
+  "startedAt": "2026-11-06T20:06:04.595Z",
+  "futureScheduleConfirmedAbsent": true,
+  "targetMode": "deployed-target",
+  "driverRunId": 42285115630,
+  "driverRunAttempt": 1,
+  "deploymentId": "dpl_9dfpxYacqybW7U2PcpviMu83ruSg",
+  "targetBefore": {
+    "purpose": "production-deployed-target",
+    "repository": "alexj11324/Mikka",
+    "targetMode": "deployed-target",
+    "trigger": "workflow_dispatch",
+    "mode": "readonly",
+    "applicationSha": "2960d783f0196fed5375593d910a43430a101747",
+    "driverRevision": "c0c98baa3020a085652ee5f773310b6dfa412c5d",
+    "driverRunId": 42285115630,
+    "driverRunAttempt": 1,
+    "webDeployRunId": 42276537062,
+    "deploymentId": "dpl_9dfpxYacqybW7U2PcpviMu83ruSg",
+    "webAttempt": 1,
+    "webDeployJobId": 128094181225,
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "issueNumber": 1415,
+    "issueState": "open",
+    "status": "ready",
+    "metadataReadAuthorized": true,
+    "readable": true,
+    "executionReady": false,
+    "checkedAt": "2026-11-06T20:06:06.529Z"
+  },
+  "webAttempt": 1,
+  "webDeployJobId": 128094181225,
+  "personalWorkspaceConfirmed": true,
+  "code": "http_failed",
+  "futureScheduleEvidence": "observed-once-definition-and-committed-operation",
+  "targetAfter": {
+    "purpose": "production-deployed-target",
+    "repository": "alexj11324/Mikka",
+    "targetMode": "deployed-target",
+    "trigger": "workflow_dispatch",
+    "mode": "readonly",
+    "applicationSha": "2960d783f0196fed5375593d910a43430a101747",
+    "driverRevision": "c0c98baa3020a085652ee5f773310b6dfa412c5d",
+    "driverRunId": 42285115630,
+    "driverRunAttempt": 1,
+    "webDeployRunId": 42276537062,
+    "deploymentId": "dpl_9dfpxYacqybW7U2PcpviMu83ruSg",
+    "webAttempt": 1,
+    "webDeployJobId": 128094181225,
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "issueNumber": 1415,
+    "issueState": "open",
+    "status": "ready",
+    "metadataReadAuthorized": true,
+    "readable": true,
+    "executionReady": false,
+    "checkedAt": "2026-11-06T20:13:08.828Z"
+  },
+  "finishedAt": "2026-11-06T20:13:08.828Z"
+}
+const HISTORY_WORKFLOW = '.github/workflows/issue1415-managed-inspection.yml'
+const HISTORY_RUN_ID = 42285115630, HISTORY_JOB_ID = 128123815664
+const HISTORY_SOURCE_SHA = 'c0c98baa3020a085652ee5f773310b6dfa412c5d'
+const HISTORY_DEPLOYMENT = 'dpl_9dfpxYacqybW7U2PcpviMu83ruSg'
+const HISTORY_APP = '2960d783f0196fed5375593d910a43430a101747'
+const HISTORY_API = 'https://api.github.com/repos/alexj11324/Mikka'
+
+function historyFixture() {
+  const repo = { full_name: REPOSITORY, owner: { login: 'alexj11324', id: 183887963 } }
+  const driver = { id: 991, run_attempt: 1, repository: repo, head_repository: repo,
+    url: HISTORY_API + '/actions/runs/991', path: HISTORY_WORKFLOW,
+    event: 'workflow_dispatch', head_branch: 'main', head_sha: OTHER,
+    status: 'in_progress', conclusion: null }
+  const original = { id: HISTORY_RUN_ID, run_attempt: 1, repository: repo, head_repository: repo,
+    url: HISTORY_API + '/actions/runs/' + HISTORY_RUN_ID,
+    path: '.github/workflows/issue1415-deployed-production.yml', workflow_id: 409730660,
+    event: 'workflow_dispatch', head_branch: 'main', head_sha: HISTORY_SOURCE_SHA,
+    status: 'completed', conclusion: 'failure' }
+  const job = { id: HISTORY_JOB_ID, run_id: HISTORY_RUN_ID, run_attempt: 1, head_sha: HISTORY_SOURCE_SHA,
+    name: 'acceptance', status: 'completed', conclusion: 'failure', steps: [
+      { name: 'Verify the normal owner browser and close only its own session', status: 'completed', conclusion: 'success' },
+      { name: 'Prove one normal Coordinator turn and its managed due reminder', status: 'completed', conclusion: 'failure' },
+    ] }
+  const fixtureEnv = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: REPOSITORY, GITHUB_REPOSITORY_OWNER: 'alexj11324',
+    GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main',
+    GITHUB_WORKFLOW_REF: REPOSITORY + '/' + HISTORY_WORKFLOW + '@refs/heads/main', GITHUB_SHA: OTHER,
+    GITHUB_RUN_ID: '991', GITHUB_RUN_ATTEMPT: '1', GH_TOKEN: 'SYNTHETIC_GH_TOKEN', SOURCE_RUN_ID: String(HISTORY_RUN_ID) }
+  const fixtureEvent = { repository: repo, inputs: { source_run_id: String(HISTORY_RUN_ID) } }
+  const rows = {
+    [HISTORY_API + '/actions/runs/991']: driver,
+    [HISTORY_API + '/issues/1415']: { number: 1415, state: 'open', url: HISTORY_API + '/issues/1415', repository_url: HISTORY_API },
+    [HISTORY_API + '/actions/runs/' + HISTORY_RUN_ID]: original,
+    [HISTORY_API + '/actions/runs/' + HISTORY_RUN_ID + '/attempts/1']: original,
+    [HISTORY_API + '/actions/runs/' + HISTORY_RUN_ID + '/attempts/1/jobs?per_page=100']: { total_count: 1, jobs: [job] },
+    [HISTORY_API + '/actions/jobs/' + HISTORY_JOB_ID + '/logs']:
+      '2026-11-06T20:13:08.8310948Z ' + JSON.stringify(HISTORY_SOURCE_REPORT) + '\n',
+  }
+  const requests = []
+  const fetchImpl = async (url, init) => {
+    requests.push({ url: String(url), method: init?.method })
+    assert.equal(init?.method, 'GET')
+    const value = rows[String(url)]
+    assert.notEqual(value, undefined, 'only the named GitHub read endpoints are authorized')
+    return typeof value === 'string' ? new Response(value) : json(value)
+  }
+  return { env: fixtureEnv, event: fixtureEvent, rows, requests, fetchImpl }
+}
+
+test('historical source CLI verifies the completed failed report without owner or platform credentials', async () => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const dir = await mkdtemp(join(tmpdir(), 'mikka-managed-history-'))
+  try {
+    const f = historyFixture()
+    const fixturePath = join(dir, 'github-fixture.json'), eventPath = join(dir, 'event.json'), preload = join(dir, 'fetch.mjs')
+    await writeFile(fixturePath, JSON.stringify(f.rows))
+    await writeFile(eventPath, JSON.stringify(f.event))
+    await writeFile(preload, `import { readFileSync } from 'node:fs'; const rows=JSON.parse(readFileSync(process.env.HISTORY_FIXTURE,'utf8'));
+globalThis.fetch=async(url,init)=>{if(init?.method!=='GET'||!Object.hasOwn(rows,String(url)))throw new Error('SYNTHETIC_UNEXPECTED_IO');
+const value=rows[String(url)];return typeof value==='string'?new Response(value):Response.json(value)};`)
+    const result = spawnSync(process.execPath, ['--import', import.meta.resolve('tsx'), '--import', pathToFileURL(preload).href,
+      fileURLToPath(new URL('./workflow-migration-production.mjs', import.meta.url)), '--inspect-source'],
+    { cwd: dir, env: { PATH: process.env.PATH, ...f.env, GITHUB_EVENT_PATH: eventPath,
+      HISTORY_FIXTURE: fixturePath, TSX_TSCONFIG_PATH: fileURLToPath(new URL('../../tsconfig.json', import.meta.url)) },
+    encoding: 'utf8', timeout: 20_000 })
+    assert.equal(result.status, 0, 'an authorized read-only inspection must not enter the owner business gate: ' + result.stdout)
+    const value = JSON.parse(await readFile(join(dir, 'production-managed-inspection-report/source.json'), 'utf8'))
+    assert.equal(value.status, 'inspected')
+    assert.equal(value.inspectionStage, 'source')
+    assert.equal(value.sourceReportCanonicalSha256, 'e261780128a5ed77baf1de32267272f168c134b9ab8d240bb55c231b158d0a8e')
+    assert.equal(value.businessExecutionVerified, false)
+    assert.equal(value.ownerRequests, 0); assert.equal(value.modelCalls, 0); assert.equal(value.sdkMutations, 0)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+async function historyMetadataFixture() {
+  const f = historyFixture()
+  f.env.VERCEL_TEAM_TOKEN = TOKEN
+  const calls = [], begin = Date.parse(HISTORY_SOURCE_REPORT.startedAt), finish = Date.parse(HISTORY_SOURCE_REPORT.finishedAt)
+  const oldDeployment = 'dpl_SyntheticPreviousDeployment'
+  const runRows = [
+    { runId: COORDINATOR, deploymentId: HISTORY_DEPLOYMENT, status: 'completed',
+      workflowName: 'workflow//workflows/coordinator/workflow.ts//coordinatorTurn', createdAt: stamp(begin + 1000), completedAt: stamp(begin + 20_000) },
+    { runId: TIMER, deploymentId: oldDeployment, status: 'completed',
+      workflowName: 'workflow//./workflows/due-timer/workflow.ts//dueTimer', createdAt: stamp(begin - 120_000), completedAt: stamp(finish - 1000) },
+  ]
+  const expectedEvents = [
+    { runId: TIMER, eventType: 'run_completed', createdAt: stamp(finish - 1000) },
+    { runId: TIMER, eventType: 'step_completed', correlationId: 'synthetic-step-correlation', createdAt: stamp(begin + 181_000) },
+    { runId: TIMER, eventType: 'step_started', correlationId: 'synthetic-step-correlation', createdAt: stamp(begin + 180_100) },
+    { runId: TIMER, eventType: 'step_created', correlationId: 'synthetic-step-correlation', createdAt: stamp(begin + 180_050),
+      eventData: { stepName: 'step//./workflows/due-timer/steps.ts//runDue' } },
+    { runId: TIMER, eventType: 'wait_completed', correlationId: 'synthetic-wait-correlation', createdAt: stamp(begin + 180_000) },
+    { runId: TIMER, eventType: 'wait_created', correlationId: 'synthetic-wait-correlation', createdAt: stamp(begin - 2000),
+      eventData: { resumeAt: new Date(begin + 180_000) } },
+  ]
+  for (const row of [...runRows, ...expectedEvents]) {
+    for (const key of ['input', 'output', 'payload', 'error'])
+      Object.defineProperty(row, key, { get() { return assert.fail('private SDK data must not be read') } })
+  }
+  const storage = {
+    runs: {
+      async list(options) {
+        calls.push({ operation: 'list', options }); assert.equal(options.resolveData, 'none')
+        assert.match(options.workflowName, /^workflow\/\/(?:\.\/)?workflows\/(?:coordinator|due-timer)\/workflow\.ts\/\/(?:coordinatorTurn|dueTimer)$/)
+        return { data: runRows.filter(row => row.workflowName === options.workflowName), hasMore: false, cursor: null }
+      },
+      async get(runId, options) {
+        calls.push({ operation: 'get', options }); assert.equal(options.resolveData, 'none')
+        return runRows.find(row => row.runId === runId)
+      },
+    },
+    events: { async list(options) {
+      calls.push({ operation: 'events', options }); assert.equal(options.resolveData, 'none')
+      return { data: options.runId === TIMER ? expectedEvents : [], hasMore: false, cursor: null }
+    } },
+  }
+  const factory = async config => {
+    assert.deepEqual(config, { token: TOKEN, projectConfig: { projectId: PROJECT, teamId: TEAM, environment: 'production' } })
+    return storage
+  }
+  const github = f.fetchImpl
+  f.fetchImpl = async (url, init) => {
+    const parsed = new URL(url)
+    if (parsed.origin !== 'https://api.vercel.com') return github(url, init)
+    f.requests.push({ url: String(url), method: init?.method })
+    assert.equal(init?.method, 'GET'); assert.equal(parsed.searchParams.get('teamId'), TEAM)
+    const deploymentId = parsed.pathname.slice('/v13/deployments/'.length)
+    assert.ok([HISTORY_DEPLOYMENT, oldDeployment].includes(deploymentId))
+    return json({ id: deploymentId, project: { id: PROJECT }, ownerId: TEAM,
+      target: 'production', readyState: 'READY', meta: { githubCommitSha: HISTORY_APP } })
+  }
+  return { ...f, calls, storage, factory, runRows, expectedEvents }
+}
+
+test('historical metadata inspection includes completed and previous-deployment timer candidates without claiming attribution', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  const f = await historyMetadataFixture()
+  const report = await inspectManagedHistory({ env: f.env, event: f.event, fetchImpl: f.fetchImpl,
+    metadata: true, createStorageImpl: f.factory })
+  assert.equal(report.status, 'inspected')
+  assert.equal(report.businessExecutionVerified, false)
+  assert.equal(report.ownerRequests, 0); assert.equal(report.modelCalls, 0); assert.equal(report.sdkMutations, 0)
+  assert.equal(report.candidates.length, 2)
+  const previous = report.candidates.find(row => row.nameClass === 'dueTimer')
+  assert.equal(previous.status, 'completed')
+  assert.equal(previous.sourceMatches, true); assert.equal(previous.deploymentMatches, false)
+  assert.equal(previous.sourceAttribution, 'candidate-only')
+  assert.ok(previous.rejectReasons.includes('deployment_mismatch'))
+  assert.ok(previous.events.some(row => row.eventType === 'wait_created' && row.inSourceWindow === false))
+  assert.ok(previous.events.some(row => row.stepNameClass === 'runDue'))
+  assert.ok(previous.events.some(row => row.eventType === 'run_completed'))
+  assert.equal(f.calls.filter(row => row.operation === 'list').length, 4, 'both exact canonical forms are read for each workflow')
+  const output = JSON.stringify(report)
+  for (const privateValue of [TOKEN, COORDINATOR, TIMER, 'synthetic-step-correlation', 'synthetic-wait-correlation'])
+    assert.equal(output.includes(privateValue), false)
+})
+
+test('historical source identity and changed report are rejected before any platform read', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  const changes = [
+    f => { f.env.GITHUB_REF = 'refs/heads/other' },
+    f => { f.env.GITHUB_WORKFLOW_REF = REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main' },
+    f => { f.rows[HISTORY_API + '/actions/runs/991'].head_sha = SHA },
+    f => { f.rows[HISTORY_API + '/issues/1415'].state = 'closed' },
+    f => { f.rows[HISTORY_API + '/actions/runs/' + HISTORY_RUN_ID].run_attempt = 2 },
+    f => { f.rows[HISTORY_API + '/actions/runs/' + HISTORY_RUN_ID + '/attempts/1/jobs?per_page=100'].jobs[0].id++ },
+    f => { f.rows[HISTORY_API + '/actions/jobs/' + HISTORY_JOB_ID + '/logs'] =
+      JSON.stringify({ ...HISTORY_SOURCE_REPORT, targetAfter: { ...HISTORY_SOURCE_REPORT.targetAfter, checkedAt: '2026-11-06T20:13:08.829Z' } }) },
+  ]
+  for (const change of changes) {
+    const f = historyFixture(); change(f)
+    const report = await inspectManagedHistory({ env: { ...f.env, VERCEL_TEAM_TOKEN: TOKEN }, event: f.event, fetchImpl: f.fetchImpl,
+      metadata: true, createStorageImpl: () => assert.fail('source rejection must precede SDK creation') })
+    assert.equal(report.status, 'blocked')
+    assert.equal(report.businessExecutionVerified, false)
+    assert.equal(f.requests.every(row => row.method === 'GET' && new URL(row.url).origin === 'https://api.github.com'), true)
+  }
+})
+
+test('metadata phase re-reads the completed source rather than trusting the first source inspection', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  const f = historyFixture()
+  assert.equal((await inspectManagedHistory({ env: f.env, event: f.event, fetchImpl: f.fetchImpl })).status, 'inspected')
+  f.rows[HISTORY_API + '/actions/jobs/' + HISTORY_JOB_ID + '/logs'] +=
+    JSON.stringify(HISTORY_SOURCE_REPORT) + '\n'
+  const report = await inspectManagedHistory({ env: { ...f.env, VERCEL_TEAM_TOKEN: TOKEN }, event: f.event,
+    fetchImpl: f.fetchImpl, metadata: true, createStorageImpl: () => assert.fail('duplicate proof cannot authorize the SDK') })
+  assert.equal(report.status, 'blocked'); assert.equal(report.code, 'inspection_source'); assert.equal(report.detail, 'report')
+})
+
+test('GitHub signed log redirect receives no authorization and unrelated redirect origins are rejected', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  for (const allowed of [true, false]) {
+    const f = historyFixture(), calls = []
+    const signed = allowed ? 'https://productionresults123.blob.core.windows.net/logs/read?sig=synthetic'
+      : 'https://unrelated.example.invalid/read'
+    const original = f.fetchImpl
+    const fetchImpl = async (url, init) => {
+      if (String(url).endsWith('/actions/jobs/' + HISTORY_JOB_ID + '/logs'))
+        return new Response(null, { status: 302, headers: { location: signed } })
+      if (String(url) === signed) {
+        calls.push(init)
+        assert.equal(init.headers.authorization, undefined); assert.equal(init.method, 'GET')
+        return new Response(f.rows[HISTORY_API + '/actions/jobs/' + HISTORY_JOB_ID + '/logs'])
+      }
+      return original(url, init)
+    }
+    const report = await inspectManagedHistory({ env: f.env, event: f.event, fetchImpl })
+    assert.equal(report.status, allowed ? 'inspected' : 'blocked')
+    assert.equal(calls.length, allowed ? 1 : 0)
+    assert.equal(JSON.stringify(report).includes('sig=synthetic'), false)
+  }
+})
+
+test('bounded SDK history rejects repeated cursors and never falls back to mutation or unrestricted names', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  const f = await historyMetadataFixture(); let pages = 0
+  f.storage.runs.list = async options => {
+    pages++; assert.equal(options.resolveData, 'none'); assert.ok(options.workflowName.startsWith('workflow//'))
+    return { data: [], hasMore: true, cursor: 'SYNTHETIC_SAME_CURSOR' }
+  }
+  const report = await inspectManagedHistory({ env: f.env, event: f.event, fetchImpl: f.fetchImpl,
+    metadata: true, createStorageImpl: f.factory })
+  assert.equal(report.status, 'blocked'); assert.equal(report.code, 'inspection_metadata'); assert.equal(report.detail, 'page')
+  assert.equal(pages, 2); assert.equal(report.sdkMutations, 0)
+})
+
+test('historical metadata scopes and SDK failures remain closed and do not expose error or event payloads', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  for (const kind of ['scope', 'event', 'error']) {
+    const f = await historyMetadataFixture()
+    let fetchImpl = f.fetchImpl
+    if (kind === 'scope') {
+      const original = fetchImpl
+      fetchImpl = async (url, init) => new URL(url).origin === 'https://api.vercel.com'
+        ? json({ id: HISTORY_DEPLOYMENT, projectId: PROJECT, project: { id: 'prj_OTHER' },
+          ownerId: TEAM, target: 'production', meta: { githubCommitSha: HISTORY_APP } }) : original(url, init)
+    } else if (kind === 'event') {
+      f.storage.events.list = async () => ({ data: [{ runId: 'wrun_UNRELATED_PRIVATE', eventType: 'wait_created',
+        createdAt: HISTORY_SOURCE_REPORT.startedAt, eventData: { input: 'SYNTHETIC_PRIVATE_TEXT' } }], hasMore: false })
+    } else f.storage.runs.list = async () => { throw new Error('SYNTHETIC_PRIVATE_TEXT') }
+    const report = await inspectManagedHistory({ env: f.env, event: f.event, fetchImpl,
+      metadata: true, createStorageImpl: f.factory })
+    assert.equal(report.status, 'blocked')
+    for (const value of ['SYNTHETIC_PRIVATE_TEXT', 'wrun_UNRELATED_PRIVATE', TOKEN])
+      assert.equal(JSON.stringify(report).includes(value), false)
+  }
+})
+
+test('historical workflow loads only the existing platform credential after its real source gate', async () => {
+  const text = await readFile(new URL('../../.github/workflows/issue1415-managed-inspection.yml', import.meta.url), 'utf8')
+  assert.match(text, /workflow_dispatch:/)
+  assert.match(text, /source_run_id:/)
+  assert.match(text, /github\.ref == 'refs\/heads\/main'/)
+  assert.equal((text.match(/secret-name:/g) ?? []).length, 1)
+  assert.match(text, /secret-name: VERCEL_TEAM_TOKEN/)
+  assert.doesNotMatch(text, /SMOKE_OWNER|workflow-migration-production\.mjs\s*\n/)
+  assert.ok(text.indexOf('--inspect-source') < text.indexOf('secret-name: VERCEL_TEAM_TOKEN'))
+  assert.ok(text.indexOf('secret-name: VERCEL_TEAM_TOKEN') < text.indexOf('--inspect-managed'))
+  assert.match(text, /production-managed-inspection-report\/source\.json/)
+  assert.match(text, /production-managed-inspection-report\/report\.json/)
+})
+
+test('timer candidate listing stops at the explicit six-hour creation window and reports that limit', async () => {
+  const { inspectManagedHistory } = await import('./workflow-migration-production.mjs')
+  const f = await historyMetadataFixture()
+  const ancient = { runId: 'wrun_SYNTHETIC_OLDER_TIMER', deploymentId: HISTORY_DEPLOYMENT, status: 'running',
+    workflowName: 'workflow//workflows/due-timer/workflow.ts//dueTimer',
+    createdAt: stamp(Date.parse(HISTORY_SOURCE_REPORT.startedAt) - 6 * 60 * 60_000 - 2000) }
+  f.runRows.push(ancient)
+  const list = f.storage.runs.list
+  f.storage.runs.list = async options => {
+    const value = await list(options)
+    return options.workflowName === ancient.workflowName ? { ...value, hasMore: true, cursor: 'SYNTHETIC_OLDER_HISTORY' } : value
+  }
+  const report = await inspectManagedHistory({ env: f.env, event: f.event, fetchImpl: f.fetchImpl,
+    metadata: true, createStorageImpl: f.factory })
+  assert.equal(report.status, 'inspected'); assert.equal(report.candidates.length, 2)
+  assert.equal(report.listing.olderTimersInspected, false)
+  assert.equal(report.listing.timerCreatedNotBefore, '2026-11-06T14:06:03.595Z')
+  assert.equal(f.calls.filter(row => row.operation === 'list').length, 4)
+})
+
+test('invalid or additional inspection CLI arguments cannot enter owner business code', async () => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  for (const args of [['--inspect-unknown'], ['--inspect-managed', '--unexpected']]) {
+    const dir = await mkdtemp(join(tmpdir(), 'mikka-managed-invalid-'))
+    try {
+      const preload = join(dir, 'deny.mjs')
+      await writeFile(preload, "globalThis.fetch=()=>{throw new Error('SYNTHETIC_NO_IO_ALLOWED')}")
+      const result = spawnSync(process.execPath, ['--import', import.meta.resolve('tsx'), '--import', pathToFileURL(preload).href,
+        fileURLToPath(new URL('./workflow-migration-production.mjs', import.meta.url)), ...args],
+      { cwd: dir, env: { PATH: process.env.PATH,
+        TSX_TSCONFIG_PATH: fileURLToPath(new URL('../../tsconfig.json', import.meta.url)) }, encoding: 'utf8', timeout: 20_000 })
+      assert.equal(result.status, 1)
+      const report = JSON.parse(result.stdout.trim())
+      assert.equal(report.purpose, 'workflow-migration-history-inspection')
+      assert.equal(report.status, 'blocked'); assert.equal(report.code, 'inspection_configuration')
+      assert.equal(report.detail, 'inputs'); assert.equal(report.ownerRequests, 0)
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  }
+})
