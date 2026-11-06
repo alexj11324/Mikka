@@ -9,6 +9,44 @@ const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
 if (process.env.REQUIRE_DB === '1' && !disposable) throw new Error('Subscription selection tests require an isolated local database')
 
+test('a frozen binding and its owner-scoped connection use one fresh query without custody fields', { skip: !disposable }, async () => {
+  const admin = new Pool({ connectionString: databaseURL })
+  const schema = `subscription_authority_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  try {
+    await pool.query(`CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,provider text,state text,epoch bigint,quota jsonb,"accountLabel" text,paused boolean,"custodyAccessRef" text);
+      CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,route text,"modelId" text)`)
+    const workspace = randomUUID(), custodyWorkspace = randomUUID(), consumer = randomUUID(), bindingId = randomUUID(), connectionId = randomUUID()
+    await pool.query(`INSERT INTO byos_connections VALUES ($1,'alice',$2,'claude','connected',7,'{}','Fixture',false,'private-fixture-reference')`, [connectionId, custodyWorkspace])
+    await pool.query(`INSERT INTO byos_bindings VALUES ($1,'alice',$2,$3,$4,7,'claude_cpa','fixture-model')`, [bindingId, workspace, consumer, connectionId])
+    let reads = 0
+    const query = ((text: string, values?: unknown[]) => { reads++; return pool.query(text, values) }) as Pool['query']
+    const repository = new SubscriptionRepository({ query })
+    const first = await repository.bindingConnection('alice', bindingId)
+    assert.equal(reads, 1)
+    assert.deepEqual(first.binding, { id: bindingId, ownerId: 'alice', workspaceId: workspace, consumerId: consumer, connectionId, connectionRevision: 7, route: 'claude_cpa', modelId: 'fixture-model' })
+    assert.deepEqual(first.connection, { id: connectionId, ownerId: 'alice', workspaceId: custodyWorkspace, provider: 'claude', state: 'connected', epoch: '7', quota: {}, accountLabel: 'Fixture', paused: false })
+
+    await pool.query(`UPDATE byos_connections SET state='disconnected',epoch=8,paused=true WHERE id=$1`, [connectionId])
+    const revoked = await repository.bindingConnection('alice', bindingId)
+    assert.equal(reads, 2)
+    assert.equal(revoked.connection?.state, 'disconnected')
+    assert.equal(revoked.connection?.epoch, '8')
+    assert.equal(revoked.connection?.paused, true)
+    assert.equal(revoked.binding.connectionRevision, 7)
+
+    await pool.query(`UPDATE byos_connections SET "ownerId"='bob' WHERE id=$1`, [connectionId])
+    assert.deepEqual(await repository.bindingConnection('alice', bindingId), { binding: first.binding, connection: null }, 'a foreign connection is not exposed through an owned binding')
+    await assert.rejects(repository.bindingConnection('bob', bindingId), { code: 'binding_required' })
+    await assert.rejects(repository.bindingConnection('alice', randomUUID()), { code: 'binding_required' })
+  } finally {
+    await pool.end()
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
+    await admin.end()
+  }
+})
+
 test('concurrent Connect reserves one bounded owner/workspace/provider acquisition', { skip: !disposable }, async () => {
   const admin = new Pool({ connectionString: databaseURL })
   const schema = `subscription_acquire_${randomUUID().replaceAll('-', '')}`

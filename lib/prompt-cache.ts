@@ -4,17 +4,16 @@ import type { LanguageModel, SystemModelMessage } from 'ai'
  * Prompt caching for the Coordinator's model calls.
  *
  * A provider caches a request's prefix: tools, then system, then messages. The
- * system prompt starts with what is the same on every turn (rules, the card
- * catalog, the person's own instructions) and ends with what changes (memory,
- * GitHub lines, which computers are online). So the system prompt is sent as
- * two system messages, and a cache breakpoint goes on the first one and on the
- * last message. The second and third model calls of a turn then read the
- * whole earlier prompt from the cache, and the next turn reads tools, the
- * stable rules and the history it shares.
+ * system prompt separates rules (including the card catalog and personal
+ * instructions), repository/model context, and the changing memory/live tail.
+ * The first two have their own breakpoints, so changes to the repository list
+ * do not invalidate the earlier tools and rules. The last conversation message
+ * also has a breakpoint for calls that share the same history.
  *
  * Claude needs explicit breakpoints (OpenAI and DeepSeek cache prefixes on
  * their own); a breakpoint is an `ephemeral` cache_control, at most four per
- * request, and this uses two.
+ * request, and the layered prompt uses three. Old persisted prompts with a
+ * single stable boundary retain their two-breakpoint layout.
  */
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
@@ -22,18 +21,28 @@ type Prompt = Parameters<V4Model['doStream']>[0]['prompt']
 type Message = Prompt[number]
 
 /** The system prompt as one message, or split where its stable prefix ends. Pure: runs in the Workflow body. */
-export function cacheableInstructions(text: string, stable?: number): string | SystemModelMessage[] {
+export function cacheableInstructions(text: string, stable?: number, stableRules?: number): string | SystemModelMessage[] {
+  if (typeof stableRules === 'number' && typeof stable === 'number' && Number.isInteger(stableRules) && Number.isInteger(stable) && stableRules > 0 && stableRules <= stable && stable <= text.length) {
+    const messages: SystemModelMessage[] = []
+    let start = 0
+    for (const end of new Set([stableRules, stable])) {
+      messages.push({ role: 'system', content: text.slice(start, end), providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } })
+      start = end
+    }
+    if (start < text.length) messages.push({ role: 'system', content: text.slice(start) })
+    return messages
+  }
   if (!stable || stable <= 0 || stable >= text.length) return text
   return [{ role: 'system', content: text.slice(0, stable) }, { role: 'system', content: text.slice(stable) }]
 }
 
-/** preparePrompt's result as WorkflowAgent options: `stable` becomes the split, never an option of its own. */
-export function promptOptions<T extends { instructions?: string; stable?: number }>({ instructions, stable, ...rest }: T): Omit<T, 'instructions' | 'stable'> & { instructions?: string | SystemModelMessage[] } {
-  return instructions === undefined ? rest : { ...rest, instructions: cacheableInstructions(instructions, stable) }
+/** Boundaries become system messages, never options of WorkflowAgent itself. */
+export function promptOptions<T extends { instructions?: string; stable?: number; stableRules?: number }>({ instructions, stable, stableRules, ...rest }: T): Omit<T, 'instructions' | 'stable' | 'stableRules'> & { instructions?: string | SystemModelMessage[] } {
+  return instructions === undefined ? rest : { ...rest, instructions: cacheableInstructions(instructions, stable, stableRules) }
 }
 
 /**
- * Marks the first system message and the last message as cache breakpoints.
+ * Marks the first system, explicitly cacheable system layers, and last message.
  * `openaiCompatible` is the key Mikka's Claude subscription transport reads
  * (the broker turns it into Anthropic cache_control); `anthropic` is the AI
  * SDK's own Anthropic option. The last message is also marked on its last
@@ -48,7 +57,8 @@ export function withCacheBreakpoints(prompt: Prompt, key: 'openaiCompatible' | '
   while (last >= 0 && prompt[last].role === 'system') last--
   return prompt.map((message, index) => {
     let next: Message = message
-    if (index === system) next = mark(next)
+    const hint = message.providerOptions?.anthropic?.cacheControl
+    if (index === system || (message.role === 'system' && hint && typeof hint === 'object' && !Array.isArray(hint) && 'type' in hint && hint.type === 'ephemeral')) next = mark(next)
     if (index === last) {
       next = mark(next)
       if (Array.isArray(next.content) && next.content.length) {

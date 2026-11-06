@@ -3,6 +3,32 @@ import { test } from 'node:test'
 import { SubscriptionService } from './subscription-service'
 import { subscriptionFixture } from '../tests/fixtures/subscription'
 
+for (const route of ['claude_cpa', 'codex_cpa'] as const) {
+  test(`${route}: model construction reuses its checked connection scope without weakening later access`, async () => {
+    const { use, access } = subscriptionFixture(route)
+    access.connection!.quota.observedAt = new Date().toISOString()
+    const provider = route === 'claude_cpa' ? 'claude' as const : 'codex' as const
+    const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: 'custody-workspace', provider, state: 'connected', epoch: '1', quota: access.connection!.quota }
+    let bindings = 0, connections = 0, memberships = 0, admissions = 0, streams = 0
+    const scopes: Array<Parameters<SubscriptionService['worker']>[0]> = []
+    const repository = {
+      binding: async () => { bindings++; return { ...access.binding!, modelId: 'fixture-model' } },
+      connection: async () => { connections++; return structuredClone(row) },
+      scope: (connection: typeof row) => ({ ownerId: connection.ownerId, workspaceId: connection.workspaceId, connectionId: connection.id, provider: connection.provider }),
+    } as unknown as SubscriptionService['repository']
+    const worker = { forUse() { return this }, stream() { streams++; throw new Error('revoked model reached provider') } }
+    const service = new SubscriptionService(repository, scope => { scopes.push(scope); return worker as never },
+      { ready: () => true, nativeIsolation: 'none' }, undefined, async () => { memberships++ }, async () => { admissions++ })
+    const model = await service.model(use)
+    assert.deepEqual({ bindings, connections, memberships, admissions }, { bindings: 2, connections: 2, memberships: 1, admissions: 1 })
+    assert.deepEqual(scopes, [{ ownerId: use.ownerId, workspaceId: 'custody-workspace', connectionId: row.id, provider }])
+
+    row.state = 'disconnected'
+    await assert.rejects(async () => model.doStream({ prompt: [] }), { code: 'disconnected' })
+    assert.deepEqual({ bindings, connections, memberships, admissions, streams }, { bindings: 3, connections: 4, memberships: 2, admissions: 1, streams: 0 })
+  })
+}
+
 test('the trusted actual native model checks its own allowance instead of the saved binding model', async () => {
   const { use, access } = subscriptionFixture('claude_code_cli')
   access.connection!.quota.observedAt = new Date().toISOString()

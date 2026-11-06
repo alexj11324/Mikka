@@ -139,14 +139,22 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     await text(fixture.htmlTitle)
   } else if (name === 'artifact-html') {
     await page.getByRole('dialog').frameLocator('iframe').getByRole('heading', { name: 'Desktop review', exact: true }).waitFor()
-  } else if (name === 'task') {
-    const task = page.getByRole('region', { name: fixture.issueTitle, exact: true })
+  } else if (name === 'task' || name === 'task-thread') {
+    // The nested thread has the same accessible name. Only the task region
+    // contains the editable title, so its independent reads gate this capture.
+    const task = page.getByRole('region', { name: fixture.issueTitle, exact: true }).filter({ has: page.locator('#task-title') })
     await expect(task).toHaveAttribute('aria-busy', 'false', { timeout: 45_000 })
     await task.locator('#task-title:not([readonly])').waitFor()
-    await text('Review conversations, task details, artifacts and workspace settings in the desktop app.')
+    await task.getByText('Review conversations, task details, artifacts and workspace settings in the desktop app.', { exact: true }).waitFor()
     // Activity versions are a separate read from the task's editable fields.
     // The fixture's creation event must finish rendering before comparison.
     await task.getByText(messages.Workspace.detail.createdTask, { exact: true }).waitFor()
+    if (name === 'task-thread') {
+      // The task's thread list has no loading placeholder. The selected row
+      // proves that read is rendered; the scoped reply proves the right pane.
+      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.issueTitle), exact: true, pressed: true }).waitFor()
+      await task.getByRole('list', { name: messages.IssueThreads.conversation, exact: true }).getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
+    }
   } else if (name === 'new-task') {
     const dialog = page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true })
     await expect(dialog.getByRole('combobox', { name: messages.Shell.newTaskDialog.device, exact: true })).toContainText(`${messages.Shell.newTaskDialog.workspaceDefault} ·`, { timeout: 45_000 })

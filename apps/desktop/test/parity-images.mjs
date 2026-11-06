@@ -62,7 +62,7 @@ export async function compareImages(before, after, differencePath, { maximumRati
   await sharp(diff, { raw: { width: a.info.width, height: a.info.height, channels: 4 } }).png().toFile(differencePath)
   const geometryMatches = JSON.stringify(before.masks.filter(mask => mask.kind !== 'identity')) === JSON.stringify(after.masks.filter(mask => mask.kind !== 'identity'))
   const comparedPixels = pixels - excludedIdentityPixels
-  return { width: a.info.width, height: a.info.height, changedPixels: changed, totalPixels: pixels, comparedPixels, excludedIdentityPixels, changedRatio: changed / comparedPixels, maximumRatio, masks: before.masks, maskGeometryMatches: geometryMatches, passed: geometryMatches && changed / comparedPixels <= maximumRatio }
+  return { width: a.info.width, height: a.info.height, changedPixels: changed, totalPixels: pixels, comparedPixels, excludedIdentityPixels, changedRatio: changed / comparedPixels, maximumRatio, masks: before.masks, afterMasks: after.masks, maskGeometryMatches: geometryMatches, passed: geometryMatches && changed / comparedPixels <= maximumRatio }
 }
 
 export async function writeImageReport(path, report) {

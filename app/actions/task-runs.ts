@@ -3,7 +3,7 @@
 import { singleFlight } from '@/lib/single-flight'
 
 import { createHash } from 'node:crypto'
-import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates } from '@/lib/device-presence'
@@ -16,6 +16,8 @@ import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { withDevicePresence } from '@/lib/live/presence-read'
+import type { PresenceDevice } from '@/lib/live/presence'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
@@ -127,7 +129,9 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
           sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       : []
-    const presence = await deviceOnlineStates(queuedDevices)
+    const presence = await deviceOnlineStates(queuedDevices, observedAt)
+    const presenceDevices = queuedDevices.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false,
+      device.lastSeenAt && isDeviceOnline(device.lastSeenAt, observedAt) ? device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS : 0])
     const onlineIds = [...presence].filter(([, online]) => online).map(([id]) => id)
     const gatewayOffline = onlineIds.length ? sql`not (${inArray(devices.id, onlineIds)})` : sql`true`
     // Hash the visible waiting state, not a raw heartbeat clock: an ordinary
@@ -152,7 +156,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
-    const live = await ownerListRead(session.user.id, [expiry?.at], observedAt, begun)
+    const live = withDevicePresence(await ownerListRead(session.user.id, [expiry?.at], observedAt, begun), presenceDevices, process.env, observedAt)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0

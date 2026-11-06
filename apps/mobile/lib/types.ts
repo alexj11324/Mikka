@@ -1,5 +1,6 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
 import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
+import type { PresenceProof } from '../../../lib/live/presence'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
 export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' | 'stopped'
@@ -151,7 +152,7 @@ export interface BotPage {
 /** A bot's cloud computer (GET /api/bots/<id>/computer), as far as the app shows it. */
 export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | 'error'; control: 'agent' | 'user' | 'idle'; /** Its live key's channel and next silent change (lib/computer/state-deadline.ts). */ live?: { workspaceId: string; deadline?: { at: string; afterMs: number } } }
 
-export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }
+export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live?: LiveScope & { presence?: PresenceProof | null } }
 
 export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }

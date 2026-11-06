@@ -19,6 +19,32 @@ test('the system prompt splits where its stable prefix ends, and stays one strin
   assert.deepEqual(promptOptions({ prompt: 'synthetic' } as { prompt: string; instructions?: string }), { prompt: 'synthetic' })
 })
 
+test('rules and context have distinct nonempty cache boundaries without changing any prompt bytes', () => {
+  const hint = { anthropic: { cacheControl: { type: 'ephemeral' } } }
+  const text = '规则\n仓库和模型\n动态记忆'
+  const rules = '规则'.length, stable = '规则\n仓库和模型'.length
+  const instructions = cacheableInstructions(text, stable, rules)
+  assert.deepEqual(instructions, [
+    { role: 'system', content: '规则', providerOptions: hint },
+    { role: 'system', content: '\n仓库和模型', providerOptions: hint },
+    { role: 'system', content: '\n动态记忆' },
+  ])
+  assert.equal((instructions as { content: string }[]).map(message => message.content).join(''), text)
+  assert.deepEqual(promptOptions({ instructions: text, stable, stableRules: rules, messages: [] }), { instructions, messages: [] })
+  assert.deepEqual(promptOptions({ stable, stableRules: rules, messages: [] }), { messages: [] }, 'offsets never reach WorkflowAgent')
+  assert.deepEqual(cacheableInstructions('RULEScontext', 12, 5), [
+    { role: 'system', content: 'RULES', providerOptions: hint },
+    { role: 'system', content: 'context', providerOptions: hint },
+  ], 'an absent dynamic tail does not drop the second stable breakpoint')
+  assert.deepEqual(cacheableInstructions('RULEStail', 5, 5), [
+    { role: 'system', content: 'RULES', providerOptions: hint }, { role: 'system', content: 'tail' },
+  ], 'an absent repository context does not create an empty block')
+  for (const invalid of [0, -1, 6, 1.5, Number.NaN]) {
+    assert.deepEqual(cacheableInstructions('RULEStail', 5, invalid), cacheableInstructions('RULEStail', 5), 'invalid extra boundaries keep the legacy contract')
+  }
+  assert.equal(cacheableInstructions('', 0, 0), '')
+})
+
 test('breakpoints go on the first system message and on the last message and its last part, keeping other options', () => {
   const marked = withCacheBreakpoints([{ ...prompt[0], providerOptions: { openaiCompatible: { other: 1 } } }, ...prompt.slice(1)], 'openaiCompatible')
   const cc = { type: 'ephemeral' }
@@ -44,4 +70,30 @@ test('the OpenAI-compatible request the Claude subscription broker receives carr
   assert.deepEqual(body!.messages.map(message => [message.role, message.cache_control ?? null]), [
     ['system', cc], ['system', null], ['user', null], ['assistant', null], ['tool', cc],
   ])
+})
+
+test('the actual compatible serializer retains both stable layers and the final message marker', async () => {
+  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
+  for (const last of [prompt[2], prompt[3], prompt[4]]) {
+    let body: { messages: Record<string, unknown>[] } | undefined
+    const model = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'placeholder', fetch: async (_url, init) => {
+      body = JSON.parse(String(init?.body))
+      return new Response('data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+    } })('claude-haiku-5-5')
+    const input = [...system, last] as Prompt
+    const original = structuredClone(input)
+    const result = await model.doStream({ prompt: withCacheBreakpoints(input, 'openaiCompatible') })
+    await result.stream.pipeTo(new WritableStream())
+    const cc = { type: 'ephemeral' }
+    assert.deepEqual(body!.messages.map(message => [message.role, message.cache_control ?? null]), [
+      ['system', cc], ['system', cc], ['system', null], [last.role, cc],
+    ])
+    // An assistant tool-call part also retains its metadata in this intermediate
+    // format. The worker tests count actual Anthropic blocks after CPA conversion.
+    assert.equal(body!.messages.filter(message => message.cache_control !== undefined).length, 3, 'three message-level markers')
+    assert.deepEqual(input, original, 'the source prompt and its options stay untouched')
+    const codex = await model.doStream({ prompt: input })
+    await codex.stream.pipeTo(new WritableStream())
+    assert.equal(JSON.stringify(body).includes('cache_control'), false, 'without the Claude route mapping, a compatible model receives no Anthropic hints')
+  }
 })

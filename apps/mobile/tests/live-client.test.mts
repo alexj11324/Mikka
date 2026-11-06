@@ -197,10 +197,12 @@ test('screens listen to the keys the web uses, on the right channel', () => {
   // 受阻 follows the person's runs too, on their home channel (lib/task-blocked.ts).
   assert.deepEqual(tasksLive(home, team).refs.map(ref => `${ref.kind}:${ref.id}`), [`issue_list:${team}`, `issue_list:${home}`, `task_run_list:${home}`])
   assert.deepEqual(tasksLive(home, home).refs.map(ref => `${ref.kind}:${ref.id}`), [`issue_list:${home}`, `task_run_list:${home}`], 'one issue key when the open workspace is the home')
-  const offline = threadsLive({ threads: [], devices: [{ id: bot, name: 'Mac', kind: 'mac', online: false }] }, home)
+  const offline = threadsLive({ threads: [], devices: [{ id: bot, name: 'Mac', kind: 'laptop', online: false }] }, home)
   assert.deepEqual(offline.refs.map(ref => `${ref.kind}:${ref.scope}`), [`thread_list:${home}`, `device_list:${home}`])
-  const online = threadsLive({ threads: [], devices: [{ id: bot, name: 'Mac', kind: 'mac', online: true }] }, home)
-  assert.ok(online.refs.some(ref => ref.kind === 'device_list' && ref.scope === null), 'an online machine keeps the minute presence fallback')
+  assert.equal(offline.presence, undefined)
+  const online = threadsLive({ threads: [], devices: [{ id: bot, name: 'Mac', kind: 'laptop', online: true }] }, home)
+  assert.deepEqual(online.refs, offline.refs, 'presence metadata does not replace the home subscription')
+  assert.equal(online.presence, null, 'an online machine keeps the channel\'s existing minute fallback until covered')
   assert.deepEqual(botPageLive(null, bot, home, team).refs, [
     { kind: 'thread_list', id: home, scope: home }, { kind: 'bot_chat', id: bot, scope: home }, { kind: 'bot_list', id: team, scope: team },
   ])
@@ -218,4 +220,15 @@ test('a short-lived proposal reads again when it expires', () => {
     { action: 'browser_operation', createdAt: '2026-11-05T09:58:00Z' },
   ], now)
   assert.deepEqual(deadline, { at: '2026-11-05T10:03:00.000Z', afterMs: 180_000 })
+})
+
+test('new thread responses negotiate presence on the home refs rather than a permanent minute ref', () => {
+  const proof = { token: `fixture.${'a'.repeat(64)}`, expiresAt: 1_800_000_300_000 }
+  const read = { threads: [], devices: [{ id: bot, name: 'Fixture', kind: 'laptop', online: true }], live: { ownerId: 'owner', workspaceId: home, presence: proof } }
+  const current = threadsLive(read as never, home, 'owner')
+  assert.deepEqual(current.refs, [listRef('thread_list', home), listRef('device_list', home)])
+  assert.deepEqual(current.presence, proof)
+  assert.equal(threadsLive({ ...read, live: { ...read.live, presence: null } } as never, home, 'owner').presence, null)
+  assert.equal(threadsLive(read as never, home, 'another-owner').presence, null)
+  assert.equal(threadsLive(read as never, team, 'owner').presence, null)
 })
