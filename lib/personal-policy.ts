@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
+import { armDueTimerAfterCommit } from './due-timer'
 
 /**
  * Decision 2026-11-01-2240: a person's own subscriptions and API keys always run
@@ -56,7 +57,8 @@ export async function setSubscriptionShare(query: Query, ownerId: string, worksp
  * only other members' runs (`othersOnly`). It goes through the usual
  * stop request and lease cut: the device's daemon ends the run and deletes the
  * short-lived credential it was given, and every credential access or renewal
- * already refuses a run with a stop request. Model calls re-check on their own.
+ * already refuses a run with a stop request. The running CLI is stopped through
+ * its control channel; provider and tool calls add no authorization round trip.
  * At least a workspace or a connection, so it can never stop everything.
  * Returns how many runs it newly stopped.
  */
@@ -65,12 +67,13 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
   const { rowCount, rows } = await query.query<{ id: string }>(`UPDATE agent_runs r SET "stopRequestedAt"=clock_timestamp(),
       "leaseExpiresAt"=LEAST(r."leaseExpiresAt",clock_timestamp()),"updatedAt"=clock_timestamp()
     FROM byos_native_runs n JOIN byos_bindings b ON b.id=n."bindingId" JOIN byos_connections c ON c.id=b."connectionId"
-    WHERE n."runId"=r.id AND r."stopRequestedAt" IS NULL AND r.status IN ('queued','preparing','running','waiting_input','finishing')
+    WHERE n."runId"=r.id AND r."stopRequestedAt" IS NULL AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')
       AND ($1::text IS NULL OR c."ownerId"=$1) AND ($2::text IS NULL OR b."workspaceId"::text=$2)
       AND ($3::uuid IS NULL OR c.id=$3) AND (NOT $4::boolean OR r."userId"<>c."ownerId") RETURNING r.id`,
     [scope.ownerId ?? null, scope.workspaceId ?? null, scope.connectionId ?? null, scope.othersOnly ?? false])
   for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
   runControlChanged(query, { runIds: rows.map(row => row.id) })
+  if (rows.length) armDueTimerAfterCommit(query, 'run-recovery')
   return rowCount ?? 0
 }
 

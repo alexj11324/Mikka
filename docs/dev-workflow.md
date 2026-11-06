@@ -184,17 +184,43 @@ of order, whoever merges the later one renames it.
 
 ## 7. E2B templates
 
-Cloud machines start from new instances of E2B's official `desktop`, `claude`
-and `codex` templates. The Mikka worker is added in its own directory on the
-instance; the official templates are never changed or deleted
-([decision 2026-11-03-1430](design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
+Build versioned Mikka templates on top of E2B's official `desktop`, `claude`
+and `codex` templates. All preinstalled Mikka software lives under `/opt/mikka`.
+The official CLI packages, Node/npm, system files and their layout remain
+intact: adding files is allowed; deleting or overwriting originals is not
+([Alex's #1505 clarification](design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
 
-A push to `main` that changes the worker paths runs
-[`e2b-official-runtime.yml`](../.github/workflows/README.md#cloud-worker-template-release).
-It validates the official instances and publishes only the application
-configuration. The older `e2b-template.yml` (derived templates) is paused; do
-not resume it. Never change the production templates or Vercel's production
-environment by hand.
+A worker change on `main` runs `e2b-official-runtime.yml`, using the reusable
+`e2b-template.yml` candidate builder. The build checks every protected original
+file's hash, type, mode, owner and link before and after installation. Both
+Claude Code and Codex must complete real subscription executions on those
+candidates before public publication and production selection. Credentials
+arrive through normal device enrollment and owner/run-bound subscription
+leases; templates contain no identity or credential.
+The final E2B boot has a separate, recorded check for only the provider-owned
+runtime fields established by the official-only control experiment; see the
+decision's exact-path policy. A fresh verification VM is destroyed before
+creating any timed sample, so the file scan cannot warm the measured VM.
+Production, model probes and subscription acceptance share the release's CLI
+manifest and resolver. A retained VM receives that manifest with its staged
+worker release; activating or rolling back the worker selects the matching
+manifest without rebuilding its repository or session.
+
+The publication uses Web deploy's production queue and exact-source checks.
+Each build gets a unique name; retain old templates and save the previous
+paired configuration in `MIKKA_CLOUD_RUNTIME_PREVIOUS`. For rollback, use the
+normal rollback PR and release gates to restore matching application and worker
+code, using that retained configuration as the previous known-good target;
+the old source receipt cannot bypass the exact-main check. Do not change
+template aliases or Vercel production variables by hand. A failed candidate
+gate leaves production on its existing templates. The single configuration
+upsert is checked by per-variable readback; a partial write requires repair
+and revalidation and never replaces a valid previous configuration. See the
+[release workflow](../.github/workflows/README.md#cloud-worker-template-release).
+An always-run finalizer kills this attempt's labelled test instances and deletes
+its exact private candidates after any failure, with readback and cleanup
+receipts. Public and previous images remain. Rerun the full workflow after a
+failed release so the removed candidates are rebuilt.
 
 ## 8. Reaching a local service from outside
 

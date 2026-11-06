@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
@@ -8,7 +8,8 @@ import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthCallbackURL, desktopAuthReturnPath } from '@/lib/desktop-auth'
+import { SELECT_ACCOUNT_PARAMS, desktopAuthCallbackURL, desktopAuthReturnPath, desktopBrowserStep } from '@/lib/desktop-auth'
+import { DesktopAccountChoice, type SignedInAccount } from '@/components/auth/desktop-account-choice'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
@@ -45,8 +46,28 @@ function rememberDesktopState(state: string, verifier: string): void {
   }
 }
 
-export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, testWorkspaceEnabled = false, emailEnabled = true, next, continueURL, desktopFlow = null }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; testWorkspaceEnabled?: boolean; emailEnabled?: boolean; next?: string; continueURL?: string; desktopFlow?: DesktopFlow | null }) {
+const DESKTOP_AUTO_START_KEY = 'mikka:desktop-oauth-started'
+
+/** True when this tab already started the provider for this handoff; marks it otherwise. */
+function desktopAutoStarted(state: string): boolean {
+  try {
+    if (sessionStorage.getItem(DESKTOP_AUTO_START_KEY) === state) return true
+    sessionStorage.setItem(DESKTOP_AUTO_START_KEY, state)
+  } catch {
+    // Without sessionStorage the provider still starts; Back may start it again.
+  }
+  return false
+}
+
+export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, testWorkspaceEnabled = false, emailEnabled = true, next, continueURL, desktopFlow = null, signedInAs = null }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; testWorkspaceEnabled?: boolean; emailEnabled?: boolean; next?: string; continueURL?: string; desktopFlow?: DesktopFlow | null; signedInAs?: SignedInAccount | null }) {
   const t = useTranslations('Auth')
+  // A desktop handoff: start the provider the app asked for, or show the
+  // browser's signed-in account before it goes to the app (lib/desktop-auth.ts).
+  const [switchingAccount, setSwitchingAccount] = useState(false)
+  const desktopProvider = continueGoogle && googleEnabled ? 'google' as const : continueGitHub && githubEnabled ? 'github' as const : null
+  const desktopStep = desktopBrowserStep({ desktop: Boolean(desktopFlow), signedIn: Boolean(signedInAs), addAccount, switchAccount: switchingAccount, refused: oauthFailed || Boolean(oauthAccountNotLinked), provider: desktopProvider })
+  // With a web session in this browser, the provider shows its account picker.
+  const providerParams = desktopFlow && signedInAs ? { additionalParams: SELECT_ACCOUNT_PARAMS } : {}
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
   // Used for full-page navigations and OAuth callbacks, so they carry the base path.
@@ -78,7 +99,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   }
   const [unverified, setUnverified] = useState(false)
   const [error, setError] = useState(oauthAccountNotLinked === 'google' ? t('googleAccountNotLinked') : oauthAccountNotLinked === 'github' ? t('githubAccountNotLinked') : oauthFailed ? t('oauthFailed') : '')
-  const [notice, setNotice] = useState(desktopFlow || continueGoogle || continueGitHub || continueComposio ? t('continueNotice') : '')
+  const [notice, setNotice] = useState(desktopStep.kind === 'form' && (desktopFlow || continueGoogle || continueGitHub || continueComposio) ? t('continueNotice') : '')
   function oauthErrorCallbackURL(provider: 'google' | 'github') {
     const url = new URL(window.location.href)
     url.searchParams.delete('error')
@@ -135,7 +156,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     if (!beginSubmit()) return
     try {
       const callbackURL = desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
-      const result = await authClient.signIn.social({ provider: 'google', callbackURL, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'google', callbackURL, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true, ...providerParams })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
@@ -173,7 +194,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     if (!beginSubmit()) return
     try {
       const callbackURL = desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
-      const result = await authClient.signIn.social({ provider: 'github', callbackURL, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'github', callbackURL, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true, ...providerParams })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
@@ -237,6 +258,23 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
       endSubmit()
     }
   }
+  // Started once per handoff: the click in the app already chose the provider.
+  // Back from the provider finds the handoff marked and shows the card instead.
+  const autoStarted = useRef(false)
+  useEffect(() => {
+    if (desktopStep.kind !== 'oauth' || !desktopFlow || autoStarted.current) return
+    autoStarted.current = true
+    if (desktopAutoStarted(desktopFlow.state)) return
+    void (desktopStep.provider === 'google' ? signInWithGoogle() : signInWithGitHub())
+  }, [desktopStep.kind])
+  function switchAccount() {
+    if (desktopProvider === 'google') void signInWithGoogle()
+    else if (desktopProvider === 'github') void signInWithGitHub()
+    else setSwitchingAccount(true)
+  }
+  if (desktopStep.kind === 'choose-account' && desktopFlow && signedInAs) return <Auth registering={registering} next={returnPath}>
+    <DesktopAccountChoice account={signedInAs} continueHref={desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback)} pending={pending} error={error} onSwitch={switchAccount} />
+  </Auth>
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
     <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">

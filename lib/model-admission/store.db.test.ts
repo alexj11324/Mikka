@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { GATEWAY_MODEL_ENDPOINT, modelAdmissionRevision, ModelAdmissionError } from './contract'
 
 test('model admission: real workspace policy, membership, revision and audit', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
+  observePoolCommits(pool)
   const { ModelAdmissionStore } = await import('./store')
   const store = new ModelAdmissionStore(pool)
   t.after(async () => {

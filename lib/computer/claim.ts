@@ -45,10 +45,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
   try {
     await client.query('BEGIN')
     // Bot binding takes policy -> run locks. Acquire that same policy lock
-    // before either Factory authorization check can lock its task/run.
+    // before Factory authorization can lock its task/run.
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
-    await executionIdentityForRun(client, runId)
-    if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
     // The workspace computer policy governs computer use only: a machine without a desktop takes
     // repository tasks under any policy, and its claim never carries a computer grant.

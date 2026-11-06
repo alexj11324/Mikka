@@ -6,19 +6,24 @@ machine from `claude`, a Codex task machine from `codex`. Everything runs as the
 template's default user `user`; there is no sandbox inside the machine.
 
 Run from the repository root with the E2B Python SDK installed.
-Never copy the repository, .env files, credentials or a whole home directory.
+Fetch only the pinned public source commit; never copy a local checkout, .env
+files, credentials or a whole home directory into the image.
 The key is sent only to the E2B API (by the SDK, and in the X-API-Key header of
 the publish call); it is never printed, logged or written to disk.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
+import math
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
+from urllib.error import HTTPError
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,9 +33,11 @@ WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
                 'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
 # What else decides the template's contents: its bootstrap and the build steps below.
 COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
-BOOTSTRAP_FILES = ('bootstrap.sh', 'bootstrap-desktop.sh')
-RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES), 'scripts/e2b/build-template.py',
-                'scripts/e2b/template-capabilities.json',
+BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'e2b-certificate-relinks.json', 'start-prebuilt.sh')
+INSTANCE_BOOTSTRAP = 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
+RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES),
+                'scripts/e2b/build-template.py', 'scripts/e2b/template-capabilities.json',
+                'scripts/e2b/acceptance-daemon.mts',
                 *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
 # Each kind of machine: the official E2B template it starts from, and the
 # CLIs installed on it (packages/daemon/harness/pins.json). The `claude` and
@@ -41,76 +48,34 @@ KINDS = {
     'claude': {'base': 'claude', 'harnesses': ()},
     'codex': {'base': 'codex', 'harnesses': ()},
 }
+ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
+                          "read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && "
+                          "kill -0 \"$mikka_preloaded_pid\" && "
+                          "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
 
-NPM_RUNTIME_CHECK = r'''node --input-type=module <<'JS'
+NPM_RUNTIME_CHECK = r'''export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
+node --input-type=module <<'JS'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-createRequire(realpathSync('/usr/local/bin/npm'))('pacote')
+const npm = '/opt/mikka/runtime/node/bin/npm'
+createRequire(realpathSync(npm))('pacote')
 const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
 try {
   const home = join(directory, 'home'), temp = join(directory, 'tmp')
   mkdirSync(home); mkdirSync(temp)
   writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
-  const output = execFileSync('/usr/local/bin/npm', ['test'], {
+  const output = execFileSync(npm, ['test'], {
     cwd: directory, encoding: 'utf8', timeout: 30_000,
-    env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'true' },
+    env: { PATH: '/opt/mikka/runtime/node/bin:/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'false' },
   })
   assert.match(output, /^Mikka npm runtime verified\r?$/m)
-  console.log('npm dependency graph and first fresh-HOME command verified')
+  console.log('Private npm runtime verified')
 } finally { rmSync(directory, { recursive: true, force: true }) }
 JS'''
-
-# Filesystem snapshots reboot without template memory. Start the anonymous
-# runtime beside E2B's boot services; only capability cleanup precedes envd.
-# Scrubbing is a separate once-per-boot job: a later worker restart must keep
-# a fresh control-plane handoff, and a memory resume must keep its identity.
-BOOT_SERVICES = {
-    'mikka-boot-scrub.service': '''[Unit]
-Description=Remove copied Mikka worker capabilities before cold boot
-DefaultDependencies=no
-After=local-fs.target
-Before=mikka-preload.service mikka-viewer.service envd.service shutdown.target
-Conflicts=shutdown.target
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/bin/sh -ec 'rm -rf /home/user/.mikka/worker /run/mikka-viewer /run/mikka-subagents; install -d -m 700 -o user -g user /home/user/.mikka; rm -f /home/user/.mikka/bootstrap.json /home/user/.mikka/bootstrap.next /home/user/.mikka/preloaded.pid; install -m 600 -o user -g user /dev/null /home/user/.mikka/worker-preload.log; install -d -m 710 -o root -g user /run/mikka-viewer'
-''',
-    'mikka-preload.service': '''[Unit]
-Description=Preload the anonymous Mikka worker
-DefaultDependencies=no
-Requires=mikka-boot-scrub.service
-After=mikka-boot-scrub.service
-Before=shutdown.target
-Conflicts=shutdown.target
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-TimeoutStartSec=45
-ExecStart=/bin/sh -ec 'runuser -u user -- /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/user LANG=C.UTF-8 node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --wait-bootstrap >>/home/user/.mikka/worker-preload.log 2>&1 & for i in $(seq 1 600); do test -s /home/user/.mikka/preloaded.pid && exit 0; sleep .05; done; exit 1'
-[Install]
-WantedBy=multi-user.target
-''',
-    'mikka-viewer.service': '''[Unit]
-Description=Start the Mikka viewer without a signing key
-DefaultDependencies=no
-Requires=mikka-boot-scrub.service
-After=mikka-boot-scrub.service
-Before=shutdown.target
-Conflicts=shutdown.target
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-TimeoutStartSec=45
-ExecStart=/bin/sh -ec 'flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py >>/run/mikka-viewer/gateway.log 2>&1 & for i in $(seq 1 600); do test "$(curl -s -o /dev/null -w "%%{http_code}" http://127.0.0.1:6080/vnc)" = 401 && exit 0; sleep .05; done; exit 1'
-[Install]
-WantedBy=multi-user.target
-''',
-}
 
 def commit(ref):
     sha = subprocess.check_output(['git', 'rev-parse', '--verify', f'{ref}^{{commit}}'], cwd=ROOT, text=True).strip()
@@ -125,6 +90,12 @@ PACKAGE_KEYS = ('name', 'version', 'private', 'type', 'packageManager', 'engines
                 'dependenciesMeta', 'peerDependenciesMeta')
 ROOT_PACKAGE_KEYS = ('packageManager', 'engines', 'pnpm')
 DAEMON_IMPORTERS = ('packages/daemon', 'packages/protocol', 'packages/config')
+
+def official_files_guard():
+    spec = importlib.util.spec_from_file_location('official_files', ROOT / 'scripts/e2b/official-files.py')
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+    return guard
 
 def package_projection(path, raw):
     """Bytes that affect the daemon install. Invalid JSON is hashed whole so a
@@ -296,76 +267,53 @@ def worker_hash(ref):
     return hashlib.sha1('\n'.join(parts).encode()).hexdigest()
 
 def source_context(directory, ref):
-    """Copy only selected files from an immutable Git commit, never the worktree."""
+    """Take the recipe only from an immutable commit; bootstrap fetches that commit.
+
+    Source, Node and all dependencies are downloaded during the template build,
+    never on the dispatch path. No local environment or home enters the image.
+    """
     sha = commit(ref)
-    files = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', sha, '--', *WORKER_PATHS], cwd=ROOT, text=True).splitlines()
-    if any(re.search(r'(^|/)(\.env(?:\.|$)|\.npmrc$|\.git-credentials$)', path) for path in files):
-        raise ValueError('Worker archive contains a credential configuration file')
-    subprocess.run(['git', 'archive', '--format=tar', f'--output={directory / "worker.tar"}', sha, '--', *WORKER_PATHS], cwd=ROOT, check=True)
-    for name in (*BOOTSTRAP_FILES, *COMPUTER_FILES):
+    for name in BOOTSTRAP_FILES:
         content = subprocess.check_output(['git', 'show', f'{sha}:scripts/e2b/{name}'], cwd=ROOT)
         (directory / name).write_bytes(content)
-    for name, unit in BOOT_SERVICES.items():
-        (directory / name).write_text(unit)
-    # The worker checks this against MIKKA_CLOUD_WORKER_SHA before it starts.
+    (directory / 'instance-bootstrap.sh').write_bytes(
+        subprocess.check_output(['git', 'show', f'{sha}:{INSTANCE_BOOTSTRAP}'], cwd=ROOT))
     (directory / 'source-sha').write_text(worker_hash(sha) + '\n')
     return sha
 
-CLI_COMMANDS = {'claude_code': 'claude', 'codex': 'codex'}
 
-def harness_command(harnesses):
-    """Install the pinned CLIs and put them on PATH; nothing for a template that needs none."""
-    if not harnesses:
-        return None
-    names = ' '.join(harnesses)
-    return ('node /opt/mikka/worker/packages/daemon/harness/cli.mjs /opt/mikka/harness ' + names + ' > /tmp/mikka-harnesses && '
-            'while read -r binary; do ln -sf "$binary" "/usr/local/bin/$(basename "$binary")"; done < /tmp/mikka-harnesses && '
-            'rm /tmp/mikka-harnesses && chmod -R go+rX,go-w /opt/mikka/harness && '
-            + ' && '.join(f'{CLI_COMMANDS[harness]} --version' for harness in harnesses))
-
-def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop'):
+def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cpu_count=2, memory_mb=4096):
     from e2b import Template
+    assert_new_template(name, api_key)
     recipe = KINDS[kind]
-    desktop = kind == 'desktop'
     with tempfile.TemporaryDirectory(prefix='mikka-e2b-template-') as temp:
         context = Path(temp)
         sha = source_context(context, ref)
+        worker_sha = (context / 'source-sha').read_text().strip()
         template = (Template(file_context_path=str(context)).from_template(recipe['base'])
-                    # Build checks and envd runtime commands start outside any home.
                     .set_workdir('/')
-                    .copy('bootstrap.sh', '/tmp/mikka-bootstrap.sh')
-                    .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root'))
-        if desktop:
-            template = (template.copy('bootstrap-desktop.sh', '/tmp/mikka-bootstrap-desktop.sh')
-                        .run_cmd('bash /tmp/mikka-bootstrap-desktop.sh', user='root'))
-        template = (template.run_cmd(NPM_RUNTIME_CHECK, user='user')
-                    .copy('worker.tar', '/tmp/mikka-worker.tar')
-                    .copy('source-sha', '/opt/mikka/worker-source-sha')
-                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && node packages/daemon/scripts/build-cloud-worker.mjs && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root'))
-        # Authentication for any CLI arrives later from the owner-bound broker.
-        install = harness_command(recipe['harnesses'])
-        if install:
-            template = template.run_cmd(install, user='root')
-        services = ['mikka-preload.service']
-        ready = ('test -s /home/user/.mikka/preloaded.pid && '
-                 'test ! -e /home/user/.mikka/bootstrap.json')
-        if desktop:
-            for runtime_file in COMPUTER_FILES:
-                template = template.copy(runtime_file, f'/opt/mikka/computer/{runtime_file}')
-            template = template.run_cmd('chown root:root /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/viewer-gateway.py /opt/mikka/computer/lease-driver.py && chmod 0755 /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/viewer-gateway.py /opt/mikka/computer/lease-driver.py', user='root')
-            services.append('mikka-viewer.service')
+                    .run_cmd('test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka', user='root'))
+        for runtime_file in (*BOOTSTRAP_FILES, 'instance-bootstrap.sh'):
+            template = template.copy(runtime_file, f'/opt/mikka/{runtime_file}')
+        template = (template
+                    .run_cmd(f'python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind {kind} --cli-manifest /opt/mikka/original-cli.json', user='root')
+                    .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
+                    .run_cmd(NPM_RUNTIME_CHECK, user='user')
+                    .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
+        ready = (ANONYMOUS_WORKER_READY + ' && '
+                 'test ! -e /home/user/.mikka/bootstrap.json && '
+                 'test ! -e /home/user/.mikka/worker/device.json')
+        if kind == 'desktop':
             ready += (' && test ! -e /run/mikka-viewer/key && '
                       'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')
-        for service in ('mikka-boot-scrub.service', *services):
-            template = template.copy(service, f'/etc/systemd/system/{service}')
-        template = template.run_cmd('systemctl daemon-reload && systemctl enable ' + ' '.join(services), user='root')
-        # Freeze imported modules (and on the desktop the unauthenticated viewer)
-        # into the template's ready state. No identity or signing key exists at
-        # build time: the control plane hands those to each instance afterwards.
-        template = template.set_user('root').set_start_cmd(
-            'systemctl start ' + ' '.join(services) + ' && exec sleep infinity', ready)
-        return sha, Template.build(template, name=name, cpu_count=2, memory_mb=4096,
+        ready += (f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}'
+                  ' > /opt/mikka/official-files-ready.json')
+        # E2B's template builder freezes the initialized process. New instances
+        # resume the already imported worker and receive a fresh normal handoff.
+        template = template.set_user('root').set_start_cmd('bash /opt/mikka/start-prebuilt.sh', ready)
+        return sha, Template.build(template, name=name, cpu_count=cpu_count, memory_mb=memory_mb,
                                    min_free_disk_mb=16384, skip_cache=True, api_key=api_key, on_build_logs=on_build_logs)
+
 
 def _request(method, path, api_key, body=None, opener=urllib.request.urlopen):
     data = None if body is None else json.dumps(body).encode()
@@ -376,15 +324,82 @@ def _request(method, path, api_key, body=None, opener=urllib.request.urlopen):
         raw = response.read()
         return json.loads(raw) if raw else None
 
+
+def assert_new_template(name, api_key):
+    """A versioned build must never update an existing official or Mikka alias."""
+    if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
+        raise ValueError('template_name_invalid')
+    try:
+        _request('GET', f'/templates/{name}', api_key)
+    except HTTPError as error:
+        if error.code == 404:
+            return
+        raise
+    raise ValueError('template_name_already_exists')
+
+def release_metadata(environ=os.environ):
+    """Attach only public workflow identity so a cancelled job is recoverable."""
+    identity = {'application': 'mikka-template-release'}
+    if (environ.get('GITHUB_REPOSITORY') == 'alexj11324/Mikka'
+            and re.fullmatch(r'[a-f0-9]{40}', environ.get('GITHUB_SHA', ''))
+            and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ID', ''))
+            and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ATTEMPT', ''))):
+        identity.update(sourceCommit=environ['GITHUB_SHA'], runId=environ['GITHUB_RUN_ID'], runAttempt=environ['GITHUB_RUN_ATTEMPT'])
+    return identity
+
+
+def cleanup_templates(candidates, api_key, request=None):
+    """Remove exact private candidates, retaining public and previous images."""
+    request = request or _request
+    receipts = []
+    for candidate in candidates:
+        name = candidate['name']
+        row = {'name': name, 'kind': candidate['kind']}
+        try:
+            if not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
+                raise ValueError('cleanup_name_invalid')
+            try:
+                info = request('GET', '/templates/' + name, api_key)
+            except HTTPError as error:
+                if error.code == 404:
+                    receipts.append({**row, 'status': 'absent'})
+                    continue
+                raise
+            names = (info.get('names') or []) + (info.get('aliases') or [])
+            template_id = info.get('templateID')
+            if (name not in names or info.get('isDefault') is True or not isinstance(template_id, str)
+                    or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id)
+                    or (candidate.get('templateId') and template_id != candidate['templateId'])):
+                raise ValueError('cleanup_candidate_identity_mismatch')
+            row['templateId'] = template_id
+            if info.get('public') is True:
+                receipts.append({**row, 'status': 'retained_public'})
+                continue
+            if info.get('public') is not False:
+                raise ValueError('cleanup_candidate_visibility_unknown')
+            request('DELETE', '/templates/' + template_id, api_key)
+            try:
+                request('GET', '/templates/' + template_id, api_key)
+            except HTTPError as error:
+                if error.code != 404:
+                    raise
+            else:
+                raise RuntimeError('cleanup_candidate_still_exists')
+            receipts.append({**row, 'status': 'deleted'})
+        except Exception as error:
+            receipts.append({**row, 'status': 'failed', 'error': type(error).__name__})
+    return receipts
+
+
 def probe_models(template_id, kind, api_key, sandbox_factory=None):
     """Read the built image's actual CLI catalogues, never a handwritten model list."""
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
     required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
-    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60)
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
     try:
-        result = sandbox.commands.run('node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
+        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
         if result.exit_code != 0:
             raise RuntimeError('model_probe_failed')
         reports = json.loads(result.stdout)
@@ -398,6 +413,81 @@ def probe_models(template_id, kind, api_key, sandbox_factory=None):
     finally:
         # This probe created this disposable sandbox; no existing worker is touched.
         sandbox.kill()
+
+
+def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
+    """Check the final image on a disposable instance, never a timed instance.
+
+    E2B also performs provider setup after its start/ready command. Keep the
+    preloaded receipt and independently verify the image a fresh create sees.
+    """
+    if sandbox_factory is None:
+        from e2b import Sandbox
+        sandbox_factory = Sandbox.create
+    began = time.perf_counter()
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=600, metadata=release_metadata())
+    def stage(name):
+        nonlocal began
+        now = time.perf_counter()
+        print('mikka-conservation-stage ' + json.dumps({'kind': kind, 'phase': name, 'elapsedMs': round((now - began) * 1000)}, separators=(',', ':')), file=sys.stderr, flush=True)
+        began = now
+    stage('create')
+    try:
+        conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
+        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
+        stage('preload_receipts')
+        guard = official_files_guard()
+        guard.validate_receipt(conservation, kind)
+        result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+                                      user='root', timeout=300, request_timeout=310)
+        if result.exit_code != 0:
+            raise RuntimeError('official_conservation_missing')
+        stage('fresh_scan')
+        conservation['preloadFinalization'] = conservation['finalization']
+        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
+        stage('fresh_receipt')
+        return guard.validate_receipt(conservation, kind)
+    finally:
+        sandbox.kill()
+
+
+def verify_release_evidence(report):
+    """Publishing cannot substitute a model-list probe for subscription execution."""
+    if not re.fullmatch(r'[a-f0-9]{40}', report.get('sourceCommit', '')) or not re.fullmatch(r'[a-f0-9]{40}', report.get('workerSha', '')):
+        raise ValueError('release_source_invalid')
+    for kind in KINDS:
+        template = report.get('templates', {}).get(kind, {})
+        if (template.get('baseTemplate') != kind or template.get('preinstalled') is not True
+                or not re.fullmatch(r'[A-Za-z0-9_-]+', template.get('templateId', ''))
+                or not template.get('buildId')):
+            raise ValueError(f'release_template_invalid {kind}')
+        proof = template.get('conservation', {})
+        try:
+            official_files_guard().validate_receipt(proof, kind)
+        except (ValueError, KeyError, TypeError):
+            raise ValueError(f'release_conservation_invalid {kind}') from None
+    subscriptions = report.get('subscriptionAcceptance', {})
+    for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]:
+        row = subscriptions.get(kind, {})
+        ack, authorization, tool = row.get('agentAcceptance', {}), row.get('runtimeAuthorization', {}), row.get('toolEvidence')
+        if (row.get('status') != 'passed' or row.get('templateId') != report['templates'][kind]['templateId']
+                or row.get('sourceCommit') != report['sourceCommit'] or row.get('workerSha') != report['workerSha']
+                or row.get('harness') != harness or row.get('model') != model
+                or row.get('credentialRoute') != 'subscription' or row.get('replyVerified') is not True
+                or row.get('replyVerifiedAfterTool') is not True or not isinstance(tool, dict)
+                or set(tool) != {'toolCallHash', 'outcome'} or tool.get('outcome') != 'ok'
+                or not isinstance(tool.get('toolCallHash'), str) or not re.fullmatch(r'[a-f0-9]{16}', tool['toolCallHash'])
+                or not re.fullmatch(r'[a-f0-9]{64}', row.get('officialBinarySha256', ''))
+                or not isinstance(row.get('officialCliVersion'), str) or not row['officialCliVersion']
+                or not row.get('runId') or not row.get('deviceId')
+                or ack.get('harness') != harness or ack.get('runIdHash') != hashlib.sha256(row['runId'].encode()).hexdigest()[:16]
+                or ack.get('kind') != ('claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack')
+                or type(ack.get('at')) is not int or ack['at'] <= 0
+                or type(ack.get('ms')) not in (int, float) or not math.isfinite(ack['ms']) or ack['ms'] < 0
+                or authorization.get('source') != 'http_server_link' or authorization.get('complete') is not True
+                or authorization.get('truncated') is not False or authorization.get('extraRemoteCalls') != 0):
+            raise ValueError(f'release_subscription_acceptance_missing {kind}')
+    return report
 
 def publish(template_id, build_id, api_key, opener=urllib.request.urlopen):
     """Make the template public, then read it back: it must be public and this build ready."""
@@ -418,35 +508,51 @@ def main(argv=None):
     parser.add_argument('--name', help='Prefix for the new versioned template names (<prefix>-<kind>); do not reuse a production alias')
     parser.add_argument('--kind', action='append', choices=sorted(KINDS), help='Template to build; repeat for several (default: all)')
     parser.add_argument('--source-ref', default='HEAD', help='Git commit to package; defaults to HEAD')
-    parser.add_argument('--public', action='store_true', help='Make each built template public and verify it is public and ready')
+    parser.add_argument('--publish-verified', type=Path, help='Publish only a release report that includes conservation and both real subscription passes')
     parser.add_argument('--json', action='store_true', help='Print one JSON object on stdout; build logs go to stderr')
     parser.add_argument('--worker-hash', action='store_true', help='Only print the worker hash of --source-ref; builds nothing')
     args = parser.parse_args(argv)
     if args.worker_hash:
         print(worker_hash(args.source_ref))
         return
-    if not args.name:
-        parser.error('--name is required to build')
     api_key = os.environ.get('E2B_API_KEY')
     if not api_key:
         raise SystemExit('E2B_API_KEY is not set')
-    kinds = args.kind or list(KINDS)
+    if args.publish_verified:
+        report = verify_release_evidence(json.loads(args.publish_verified.read_text()))
+        for template in report['templates'].values():
+            template.update(publish(template['templateId'], template['buildId'], api_key))
+        print(json.dumps(report))
+        return
+    if not args.name:
+        parser.error('--name is required to build')
+    kinds = list(dict.fromkeys(args.kind or KINDS))
     sha = commit(args.source_ref)
+    # Confirm absence before claiming cleanup ownership. A manual collision
+    # must never turn into deletion of a previous candidate.
+    candidates = [{'kind': kind, 'name': f'{args.name}-{kind}'} for kind in kinds]
+    for candidate in candidates:
+        assert_new_template(candidate['name'], api_key)
 
     def one(kind):
         name = f'{args.name}-{kind}'
         logs = (lambda entry: print(f'[{kind}] {entry}', file=sys.stderr, flush=True)) if args.json else None
         _, result = build(name, sha, api_key=api_key, on_build_logs=logs, kind=kind)
-        entry = {'templateId': result.template_id, 'buildId': result.build_id, 'name': name}
+        entry = {'templateId': result.template_id, 'buildId': result.build_id, 'name': name,
+                 'baseTemplate': kind, 'preinstalled': True}
         entry['models'] = probe_models(result.template_id, kind, api_key)
-        if args.public:
-            entry.update(publish(result.template_id, result.build_id, api_key))
+        entry['conservation'] = probe_conservation(result.template_id, api_key, kind)
         return kind, entry
 
     # The templates share nothing at build time; build them side by side.
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=len(kinds)) as pool:
-        templates = dict(pool.map(one, kinds))
+    try:
+        with ThreadPoolExecutor(max_workers=len(kinds)) as pool:
+            templates = dict(pool.map(one, kinds))
+    except BaseException:
+        cleanup = cleanup_templates(candidates, api_key)
+        print('mikka-template-cleanup ' + json.dumps(cleanup, separators=(',', ':')), file=sys.stderr, flush=True)
+        raise
     out = {'sourceCommit': sha, 'workerSha': worker_hash(sha), 'templates': templates}
     if args.json:
         print(json.dumps(out))

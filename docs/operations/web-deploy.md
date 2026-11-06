@@ -19,10 +19,12 @@ See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/w
    through the existing GitHub OIDC identity. This is a dedicated Mikka-team
    token, so it can be rotated without touching `VERCEL_TOKEN` or
    `VERCEL_TEAM_TOKEN`.
-2. **Skip.** Applies the same documentation-only rule the old Vercel Ignored
-   Build Step used (`scripts/vercel-ignore-build.mjs`). The comparison is
-   against the commit production serves now, not the previous push, so a
-   failed deploy is never skipped over.
+2. **Build selection.** Every main push builds public main plus private main,
+   including documentation changes, so the private/public compatibility check
+   covers every main update. Manual overlay/runtime refreshes also always
+   build. Ordinary manual dispatch retains the documentation-only rule
+   (`scripts/vercel-ignore-build.mjs`), comparing with the source production
+   serves now rather than the previous push.
 3. **Environment.**
    - `vercel pull` fetches project settings and the production environment.
      Vercel returns sensitive values empty.
@@ -165,3 +167,73 @@ Fix forward in a new PR, or revert through a PR. The resulting `main` commit
 uses the same GitHub build, prebuilt upload and public-version verification.
 Do not restore Vercel source builds, delete deployments or revoke shared tokens
 as a recovery step.
+
+## Official private UI overlay
+
+Open-source builds, including every public/fork PR check, leave
+`MIKKA_UI_OVERLAY_DIR` unset and use the public slot implementations. Only the
+trusted `main` official release jobs check out `alexj11324/mikka-hosted-ui`.
+They read `HOSTED_UI_READ_KEY` from Infisical `prod:/platform` with the existing
+GitHub OIDC identity. This is a GitHub
+**read-only deploy key**, registered on **mikka-hosted-ui only** (`read_only:
+true` verified through the repository API); it is not a public-repository
+secret. The existing native-runner administration identity used for one-off
+registration is never delivered to public build jobs.
+Checkout uses SSH without persisting credentials in Git configuration. The
+record step clears the key from subsequent job steps before any build runs.
+
+Web checks out private `main` into ignored `.hosted-ui/`, records the exact
+commit in `MIKKA_UI_OVERLAY_SHA`, then exports `MIKKA_UI_OVERLAY_DIR` before
+building. Private runtime dependencies are installed with `--ignore-workspace
+--prod --ignore-scripts --frozen-lockfile`: the library remains standalone and
+its license-writing postinstall never runs. Install diagnostics stay on the
+ephemeral runner. Nitro inlines that SHA into `/mikka/api/version` as `overlaySha`;
+Vercel deployment metadata also records `mikkaUiOverlaySha`. An open-source
+server reports `overlaySha: null`. Runtime Vercel environment changes cannot
+mislabel a previously built overlay. After upload, the public route must match
+both the public source and the overlay before the Web queue is released.
+The existing runtime-refresh caller follows the same official build path.
+
+Private `main` pushes trigger its `official-mikka.yml`. Through the same
+Infisical identity (bound to the private repository's numeric ID and immutable
+main subject) it reads the existing dispatch identity at `dev:/github/GH_TOKEN`
+and dispatches Web with `overlay-refresh: true`, bypassing the documentation
+skip. No scheduled polling is used. Every public main build and private push
+therefore validates the combination of public main and private main; external
+PRs need no private access. The private workflow also dispatches the normal
+official desktop release when bundled UI or release inputs change. Private
+documentation-only pushes refresh Web without publishing an installer; manual
+private workflow dispatches release both, following the existing desktop rule.
+During the initial rollout it detects an unmerged public pipeline and makes no
+production change.
+
+Desktop preflight waits for the successful production Web build using the
+existing source-compatibility gate, then reads its overlay SHA. macOS checks
+out that exact private commit rather than moving private main. A private-push
+dispatch also requires Web to serve that push's overlay before selection.
+Before release, the source gate and overlay equality run again. The signed
+installers, SBOM, checksums and `mikka-ui-overlay.json` are sealed, verified and
+published in the **same macOS job**; no Actions artifact transports a paid
+bundle between jobs. The latter JSON is covered by the existing release
+manifest digest and is also embedded in the signed app’s `dist/` for inspection
+after installation. Existing signing, notarization and skip-notarization draft
+rules still apply. New desktop runs cancel obsolete ones.
+
+### Public output boundary
+
+- No official workflow uploads private source, build logs, renderer graphs,
+  Web output or desktop bundles as GitHub Actions artifacts. Only the intended
+  compiled Web assets go to Vercel; signed installers go to GitHub Releases.
+- Official compiler diagnostics are captured on the ephemeral runner, because
+  errors may quote private source. They are neither printed nor uploaded.
+- The live Web builder is Vite + Nitro, both with `sourcemap: false`;
+  `next.config.mjs` is a legacy path, not the production compiler. Before
+  upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
+  source, `.map`, inline source-map directives and `sourcesContent`.
+- The desktop production renderer and main/preload emit no source maps.
+  After signing, the complete actual ASAR is extracted and audited
+  before publication. The private checkout remains outside the package.
+- Do not print environment files, credentials or private source while debugging.
+  Rotate a checkout key through Infisical and the same repository’s read-only
+  deploy-key registration; never broaden its repository or permission scope
+  to get a build through.

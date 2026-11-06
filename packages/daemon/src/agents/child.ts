@@ -159,10 +159,18 @@ export async function spawnCli(
     pidFile: string
     /** Text only this run's CLI command carries (its run dir). */
     marker: string
+    /** Refuse a launch cancelled while its wrapper was being prepared. */
+    signal?: AbortSignal
   }
 ): Promise<CliChild> {
+  options.signal?.throwIfAborted()
   await reapStale(options.pidFile, options.marker)
+  options.signal?.throwIfAborted()
   const wrapped = await sandbox.wrap(argv, options.policy)
+  if (options.signal?.aborted) {
+    wrapped.release()
+    options.signal.throwIfAborted()
+  }
   const child = spawn("/bin/sh", ["-c", wrapped.command], {
     cwd: options.cwd,
     env: options.env,

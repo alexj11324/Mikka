@@ -226,6 +226,7 @@ export class CursorAdapter implements AgentAdapter {
     const configDir = prepareCursorHome(join(paths.runDir, "cursor-home"))
     const ctx = new RunContext({
       github: options.github,
+      githubEnvironment: options.githubEnvironment,
       mcp: options.mcp,
       childPath: options.env.PATH,
       harness: "cursor",

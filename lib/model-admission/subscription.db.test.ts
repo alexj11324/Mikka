@@ -5,6 +5,7 @@ import { Readable } from 'node:stream'
 import test from 'node:test'
 import { streamText } from 'ai'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { dbUrl, seedBot, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { SubscriptionRepository } from '../subscription-repository'
 import { SubscriptionService } from '../subscription-service'
@@ -16,6 +17,7 @@ import { modelAdmissionRevision, subscriptionModelRoute } from './contract'
 // private worker boundary is a fixture; this does not claim live SaaS or Go execution.
 test('managed subscription routes authorize the existing service and native HTTP boundaries', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 6 })
+  observePoolCommits(pool)
   const { ModelAdmissionStore } = await import('./store')
   const store = new ModelAdmissionStore(pool)
   const ownerId = await seedUser(pool, 'subscription-admission')

@@ -363,6 +363,7 @@ export const agentRuns = pgTable('agent_runs', {
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   /** Authenticated daemon token that claimed this run; unknown for old runs. */
   deviceTokenId: uuid('deviceTokenId'),
+  machineAuthority: boolean('machineAuthority').notNull().default(false),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   pauseReason: text('pauseReason').$type<'human_control' | 'quota_exhausted' | null>(),
   /** A run paused on `quota_exhausted`: when the CLI said the subscription's quota resets; null when it gave no time. */

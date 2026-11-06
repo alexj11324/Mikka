@@ -551,6 +551,9 @@ func TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides(t *testing.T)
 	if err != nil || auth.Type != "chatgptAuthTokens" || auth.ChatGPTAccountID != "fixture-account" {
 		t.Fatal("native Codex shape unavailable", err)
 	}
+	if auth.ExpiresAt.IsZero() || !auth.ExpiresAt.After(time.Now()) {
+		t.Fatal("native Codex handoff must include its natural expiry")
+	}
 	if strings.Contains(fmt.Sprintf("%v %#v", auth, auth), "fixture-codex-access") {
 		t.Fatal("native handoff exposed token in diagnostics")
 	}

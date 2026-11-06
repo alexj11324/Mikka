@@ -13,6 +13,7 @@
 import { spawn } from "node:child_process"
 import { mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
+import { stopGroup } from "./process-group"
 
 import type { HarnessInfo } from "@mikka/protocol"
 
@@ -99,24 +100,29 @@ function exchange(harness: ProbedHarness, binary: string, home: string, options:
   // Only what the CLI needs to start: no credentials, no person's config.
   const env = { PATH: process.env.PATH ?? "", HOME: home, CODEX_HOME: home, CLAUDE_CONFIG_DIR: join(home, ".claude"), LANG: process.env.LANG ?? "C.UTF-8" }
   return new Promise(resolve => {
-    const child = (options.spawnImpl ?? spawn)(binary, args, { env, cwd: home, stdio: ["pipe", "pipe", "ignore"] })
+    const child = (options.spawnImpl ?? spawn)(binary, args, { env, cwd: home, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "ignore"] })
     let result: ModelReport | null | undefined
-    let exited = false
-    // The answer is handed back only once the CLI has exited, so the caller
-    // never removes the home while the CLI can still write into it.
+    let stopping: Promise<void> | undefined
+    const stop = () => stopping ??= Promise.resolve().then(() => stopGroup(child, 0))
+    // Wait for close, including inherited stdio, after killing the isolated
+    // group. A JS launcher can have a native app-server descendant; neither
+    // may survive into the template snapshot or write into a removed HOME.
     const done = () => { clearTimeout(timer); resolve(result ?? null) }
     const finish = (value: ModelReport | null) => {
       if (result !== undefined) return
       result = value
       child.stdout?.removeAllListeners("data")
-      if (exited) return done()
-      child.kill("SIGKILL")
+      void stop()
     }
     const timer = setTimeout(() => finish(null), options.timeoutMs ?? 20_000)
     const send = (message: unknown) => { try { child.stdin?.write(`${JSON.stringify(message)}\n`) } catch { finish(null) } }
     // A spawn error has no process to wait for.
-    child.on("error", () => { exited = true; finish(null); done() })
-    child.on("exit", () => { exited = true; if (result === undefined) result = null; done() })
+    child.on("error", () => { finish(null); if (child.pid === undefined) done() })
+    child.on("exit", () => {
+      if (result === undefined) result = null
+      void stop().then(() => { if (child.pid === undefined) done() })
+    })
+    child.on("close", () => { void stop().then(done) })
     let buffer = ""
     child.stdout?.on("data", (chunk: Buffer) => {
       buffer += chunk.toString("utf8")

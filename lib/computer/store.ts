@@ -10,6 +10,7 @@ import { computerPermission, type ComputerPermission } from './permission'
 import { computerChanged, computerWorkspaceChanged, machineChanged } from '@/lib/live/computer-state'
 import { computerLiveState } from './state-deadline'
 import { wakeTokens, wakeWorkflowSoon, workflowWakesEnabled } from '@/lib/workflow-wake'
+import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -57,6 +58,9 @@ export class ComputerStore {
         await client.query('UPDATE computer_run_bindings SET "approvedForRun"=false WHERE "workspaceId"=$1', [workspaceId])
         await client.query(`UPDATE local_computer_reviews v SET decision=false FROM computer_run_bindings b
           WHERE v."runId"=b."runId" AND b."workspaceId"=$1 AND v.decision IS NULL`, [workspaceId])
+        // Local and cloud direct runners use the authority admitted at claim.
+        // Revoke that generation through a durable stop, never a per-call read.
+        await stopRunsForPolicyChange(client, { kind: 'workspace', workspaceId })
       }
       if (permission === 'deny') {
         // Previously delivered approvals cannot be rebound to a later policy
