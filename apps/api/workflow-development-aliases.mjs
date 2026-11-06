@@ -1,14 +1,19 @@
 import { createHash } from 'node:crypto'
 import { readFile, rename, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { build } from 'esbuild'
 import { apiAliases } from './compat-aliases.mjs'
 import { nodeRuntimePackages } from './build-contract.mjs'
 
+const require = createRequire(import.meta.url)
+const protocolRequire = createRequire(require.resolve('@mikka/protocol'))
+
 /**
  * Workflow's dev LocalBuilder is loaded directly by Node, outside Nitro's
  * alias-aware bundle. Complete that same API compilation contract before its
- * lazy handler imports steps.mjs. Packages stay external, including pg, OTel
+ * lazy handler imports steps.mjs. The source-only workspace protocol is
+ * compiled like other application code. Third-party packages stay external, including pg, OTel
  * and the Workflow SDK's generated runtime imports; their singletons must not
  * be copied into the step bundle.
  */
@@ -27,10 +32,15 @@ export function developmentWorkflowAliases({ buildDir, replace = {} }) {
       keepNames: true, treeShaking: false, sourcemap: false, logLevel: 'silent',
       define: Object.fromEntries(Object.entries(replace).filter(([key, value]) => /^process\.env\.[A-Z0-9_]+$/.test(key) && typeof value === 'string')),
       plugins: [{ name: 'mikka-workflow-api-aliases', setup(builder) {
+        // Protocol owns semver; pnpm does not expose that private dependency
+        // beside the generated application bundle. Keep its native instance.
+        builder.onResolve({ filter: /^semver$/ }, () => ({ path: protocolRequire.resolve('semver'), external: true }))
         // Exact framework aliases must not rewrite unrelated subpaths such as
         // react/jsx-runtime. Only the application's @/ prefix is a prefix map.
-        builder.onResolve({ filter: /^(?:@\/|next(?:\/|$)|next-intl\/|react$|mikka-real-react$|server-only$)/ }, async args => {
-          const target = apiAliases[args.path] ?? (args.path.startsWith('@/') ? join(apiAliases['@'], args.path.slice(2)) : undefined)
+        builder.onResolve({ filter: /^(?:@\/|@mikka\/protocol(?:\/|$)|next(?:\/|$)|next-intl\/|react$|mikka-real-react$|server-only$)/ }, async args => {
+          const target = args.path === '@mikka/protocol' || args.path.startsWith('@mikka/protocol/')
+            ? require.resolve(args.path)
+            : apiAliases[args.path] ?? (args.path.startsWith('@/') ? join(apiAliases['@'], args.path.slice(2)) : undefined)
           if (!target) return
           if (args.path === 'mikka-real-react') return { path: target, external: true }
           return builder.resolve(target, { importer: args.importer, resolveDir: args.resolveDir, kind: args.kind })

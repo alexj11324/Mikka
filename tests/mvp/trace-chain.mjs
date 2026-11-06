@@ -159,28 +159,60 @@ try {
       assert.equal(envelope.ok, true, 'RPC_DISPATCH_FAILED')
       assert.deepEqual(decode(envelope.result), { queued: true })
       checkpoint(`${kind}-run-completion`)
+      let execution
       const run = await until(async () => {
-        const row = (await pool.query('SELECT id,"issueId",status,"stopReason","agentDefinition"->\'traceContext\' AS carrier FROM agent_runs WHERE "userId"=$1 AND "deviceId"=$2 ORDER BY "createdAt" DESC LIMIT 1', [ownerId, device.id])).rows[0]
+        // Factory starts an independent review after execution. Pin this
+        // scenario's execute attempt once; a later run on the device is not it.
+        if (!execution) {
+          const { rows } = await pool.query(`SELECT r.id,a.id AS "attemptId",t.id AS "factoryTaskId" FROM agent_runs r
+            JOIN factory_attempts a ON a."runId"=r.id AND a.stage='execute'
+            JOIN factory_tasks t ON t.id=a."taskId" AND t."userId"=r."userId" AND t."issueId"=r."issueId"
+            JOIN issues i ON i.id=r."issueId"
+            WHERE r."userId"=$1 AND r."deviceId"=$2 AND position($3 in i.content::text)>0 LIMIT 2`, [ownerId, device.id, marker])
+          assert.ok(rows.length <= 1, 'MULTIPLE_FIXTURE_EXECUTION_RUNS')
+          execution = rows[0]
+          if (!execution) return null
+        }
+        const row = (await pool.query('SELECT id,"issueId",status,"stopReason","agentDefinition"->\'traceContext\' AS carrier FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3', [execution.id, ownerId, device.id])).rows[0]
         return row && ['succeeded', 'failed', 'stopped', 'cancelled'].includes(row.status) ? row : null
       }, 180_000)
       assert.equal(run.status, kind === 'success' ? 'succeeded' : 'failed', 'UNEXPECTED_RUN_OUTCOME')
       assert.equal(run.carrier?.traceparent?.slice(3, 35), traceId, 'DURABLE_RUN_LOST_TRACE')
-      if (kind === 'success') await until(async () => (await pool.query('SELECT 1 FROM run_publications WHERE "runId"=$1 AND status=\'published\'', [run.id])).rowCount, 60_000)
+      if (kind === 'success') {
+        checkpoint(`${kind}-publication`)
+        await until(async () => {
+          const row = (await pool.query('SELECT status FROM run_publications WHERE "runId"=$1 AND "userId"=$2', [run.id, ownerId])).rows[0]
+          if (row && ['blocked', 'skipped'].includes(row.status)) assert.fail('EXECUTION_PUBLICATION_FAILED')
+          return row?.status === 'published'
+        }, 60_000)
+      }
       checkpoint(`${kind}-telemetry`)
-      await until(() => collector.evidence.spans.some(span => span.name === 'daemon.run' && span.attributes['mikka.run_id'] === run.id)
-        && collector.evidence.logs.some(log => log.attributes['mikka.stage'] === 'daemon.run' && log.attributes['mikka.run_id'] === run.id), 30_000)
+      // The daemon flushes at run end; web spans/logs use their normal batch.
+      // Wait for both services before checking the completed cross-service tree.
+      const requiredStages = ['daemon.registration', 'daemon.run.repository', 'daemon.run.worktree', 'daemon.adapter.start']
+      const postgresSpan = span => /(?:pg\.|postgresql)/i.test(span.name) || span.attributes['db.system'] === 'postgresql' || span.attributes['db.system.name'] === 'postgresql'
+      await until(() => {
+        const current = collector.evidence.spans.filter(span => span.traceId === traceId)
+        const ids = new Set(current.map(span => span.spanId))
+        const daemonRun = current.find(span => span.service === 'mikka-daemon' && span.name === 'daemon.run' && span.attributes['mikka.run_id'] === run.id)
+        return daemonRun && requiredStages.every(name => current.some(span => span.name === name))
+          && current.some(span => /workflow[.:]/.test(span.name))
+          && current.some(span => span.service === 'mikka-web' && span.name.endsWith('/complete') && ids.has(span.parentSpanId))
+          && current.some(postgresSpan)
+          && collector.evidence.logs.some(log => log.spanId === daemonRun.spanId && log.traceId === traceId)
+      }, 30_000)
       const spans = collector.evidence.spans.filter(span => span.traceId === traceId), ids = new Set(spans.map(span => span.spanId))
       const daemonRun = spans.find(span => span.service === 'mikka-daemon' && span.name === 'daemon.run' && span.attributes['mikka.run_id'] === run.id)
       assert.ok(daemonRun, 'DAEMON_TRACE_SPLIT')
-      for (const name of ['daemon.registration', 'daemon.run.repository', 'daemon.run.worktree', 'daemon.adapter.start']) assert.ok(spans.some(span => span.name === name), `MISSING_${name}`)
+      for (const name of requiredStages) assert.ok(spans.some(span => span.name === name), `MISSING_${name}`)
       assert.ok(spans.some(span => /workflow[.:]/.test(span.name)), 'MISSING_WORKFLOW_SPAN')
       assert.ok(spans.some(span => span.service === 'mikka-web' && span.name.endsWith('/complete') && ids.has(span.parentSpanId)), 'COMPLETION_HTTP_PARENT_MISSING')
-      assert.ok(spans.some(span => /(?:pg\.|postgresql)/i.test(span.name) || span.attributes['db.system'] === 'postgresql' || span.attributes['db.system.name'] === 'postgresql'), 'MISSING_POSTGRES_SPAN')
+      assert.ok(spans.some(postgresSpan), 'MISSING_POSTGRES_SPAN')
       const runLog = collector.evidence.logs.find(log => log.spanId === daemonRun.spanId && log.traceId === traceId)
       assert.ok(runLog, 'RUN_LOG_TRACE_LINK_MISSING')
       if (kind === 'failure') { assert.equal(daemonRun.status, 2, 'FAILED_RUN_SPAN_STATUS'); assert.equal(runLog.body, 'mikka.stage.failed'); assert.equal(runLog.severity, 17) }
       const generations = collector.evidence.generations.filter(event => event.properties.$ai_trace_id === traceId)
-      results.push({ kind, runId: run.id, traceId, sessionId, status: run.status, spanCount: spans.length,
+      results.push({ kind, runId: run.id, factoryTaskId: execution.factoryTaskId, attemptId: execution.attemptId, stage: 'execute', traceId, sessionId, status: run.status, spanCount: spans.length,
         syntheticGenerations: generations.length, realProviderGenerations: 0,
         spans, logs: collector.evidence.logs.filter(log => log.traceId === traceId), generations })
     } finally {

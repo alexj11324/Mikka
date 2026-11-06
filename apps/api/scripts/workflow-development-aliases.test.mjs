@@ -16,7 +16,7 @@ async function directory() {
   return mkdtemp(join(root, '.cache/workflow-dev-alias-'))
 }
 
-test('native step imports use API adapters and the original pg/OTel instances across rebuilds', async () => {
+test('native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds', async () => {
   const temporary = await directory(), buildDir = join(temporary, 'build')
   try {
     await mkdir(join(buildDir, 'workflow'), { recursive: true })
@@ -28,8 +28,10 @@ test('native step imports use API adapters and the original pg/OTel instances ac
       import { createRequestScope, runRequestScope } from '@/apps/api/src/context';
       import { trace } from '@opentelemetry/api';
       import { nextCookies } from 'better-auth/next-js';
+      import { ACCOUNT_ROUTES, connectedAccount } from '@mikka/protocol';
+      import { telemetryId } from '@mikka/protocol/trace-context';
       import pg from 'pg';
-      export { trace, pg, createElement, nextCookies };
+      export { trace, pg, createElement, nextCookies, ACCOUNT_ROUTES, connectedAccount, telemetryId };
       export async function check() {
         let calls = 0; const memo = cache(() => ++calls);
         return runRequestScope(createRequestScope(new Request('http://localhost/fixture', { headers: { 'x-fixture': 'adapter' } })), async () => {
@@ -47,9 +49,10 @@ test('native step imports use API adapters and the original pg/OTel instances ac
       assert.deepEqual(await readFile(filename), completed, 'initial dev reload must not recompile an already completed artifact')
       const probe = join(temporary, `probe-${version}.mjs`)
       await writeFile(probe, `
-        import assert from 'node:assert/strict'; import {trace} from '@opentelemetry/api'; import pg from 'pg'; import {createElement} from 'react'; import {nextCookies} from 'better-auth/next-js';
+        import assert from 'node:assert/strict'; import {trace} from '@opentelemetry/api'; import pg from 'pg'; import {createElement} from 'react'; import {nextCookies} from 'better-auth/next-js'; import {z} from 'zod';
         const step = await import(${JSON.stringify(pathToFileURL(filename).href)});
         assert.equal(step.trace, trace); assert.equal(step.pg, pg); assert.equal(step.createElement, createElement); assert.equal(step.nextCookies, nextCookies);
+        assert.equal(step.ACCOUNT_ROUTES.list, '/v1/me/accounts'); assert.equal(step.telemetryId('run_1512'), true); assert.ok(step.connectedAccount instanceof z.ZodObject);
         assert.deepEqual(await step.check(), {version:${version}, value:'adapter', memo:[1,1], basePath:'/mikka'});
         console.log('native-aliases-ok');
       `)
@@ -65,9 +68,10 @@ test('the actual Workflow LocalBuilder output loads natively and answers GET/HEA
     await writeFile(join(temporary, 'package.json'), JSON.stringify({ name: 'mikka-workflow-dev-alias-fixture', type: 'module' }))
     await writeFile(join(temporary, 'fixture.ts'), `
       import { NextResponse } from 'next/server';
+      import { ACCOUNT_ROUTES } from '@mikka/protocol';
       export async function aliasStep() {
         'use step';
-        return NextResponse.json({ok:true}).status;
+        return NextResponse.json({route:ACCOUNT_ROUTES.list}).status;
       }
       export async function aliasWorkflow() {
         'use workflow';
