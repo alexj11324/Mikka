@@ -16,6 +16,7 @@ import { checkFactoryRepairBudget } from '../check-recovery-evidence'
 import { appendFactoryCheckContinuationContext, producerCommandObservations } from '../checks'
 import { questionExecutionObservations, questionExecutionObservationPrompt } from '../question-execution-observations'
 import { freezeWorkerDefinition } from '../../agent-kit/worker'
+import { digest } from '../evidence'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -468,6 +469,7 @@ test('real PG: question receipts preserve one execution without opening a repair
         [inputId, f.originRunId, JSON.stringify({ type: 'tool-input-available', toolName: harness === 'codex' ? 'shell' : 'Bash', toolCallId: 'source-command', input: { command: 'wc -c REPORT.md && sha256sum REPORT.md' } }), at(10), outputId,
           JSON.stringify({ type: 'tool-output-available', toolCallId: 'source-command', output: { exitCode: 0, output: '85 REPORT.md; secret=fixture-value' } }), at(20)])
       const exactQuestion = 'Submit the exact checked artifact for independent review?'
+      const exactSummary = 'Pre-question recap:\nRead the original task and checked REPORT.md.\nThe artifact is ready; the next step is independent review after your answer.\n'
       const sourceEventId = factoryEventId('execution-question', f.questionId), waitEventId = factoryEventId('question-wait', f.questionId)
       const handoff = { questionId: f.questionId, kind: 'decision', question: exactQuestion, context: '', options: [] }
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId","runId",kind,"dedupeKey",payload,"createdAt") VALUES($1::uuid,'owner',$2,$3,$4,'run_question',$1::text,$5,$6)`,
@@ -483,7 +485,7 @@ test('real PG: question receipts preserve one execution without opening a repair
         return id
       }
       await addChunk(f.originRunId, 1, { type: 'start' }, 1)
-      await addChunk(f.originRunId, 4, { type: 'tool-input-available', toolCallId: 'real-question', toolName: 'mcp__mikka__ask_human', input: { kind: 'decision', question: exactQuestion } }, 80, askInputId)
+      await addChunk(f.originRunId, 4, { type: 'tool-input-available', toolCallId: 'real-question', toolName: 'mcp__mikka__ask_human', input: { kind: 'decision', question: exactQuestion, summary: exactSummary } }, 80, askInputId)
       await addChunk(f.originRunId, 5, { type: 'tool-output-available', toolCallId: 'real-question',
         output: harness === 'codex' ? [{ type: 'text', text: 'Recorded. End your turn now.' }] : 'Recorded. End your turn now.' }, 90, askOutputId)
       await addChunk(f.originRunId, 6, { type: 'finish' }, 115)
@@ -524,6 +526,9 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.equal(execution.data.question.text, exactQuestion)
       assert.equal(execution.data.question.nativeQuestion?.inputChunkId, askInputId)
       assert.equal(execution.data.question.nativeQuestion?.outputChunkId, askOutputId)
+      assert.equal(execution.data.schemaVersion, 2)
+      assert.equal(execution.data.question.nativeQuestion?.summary, exactSummary, 'the exact paired ask_human input preserves every newline')
+      assert.equal(execution.data.question.nativeQuestion?.summaryStatus, 'complete')
       assert.equal(execution.data.question.waitEventId, waitEventId)
       assert.deepEqual([execution.data.answer.id, execution.data.answer.source, execution.data.answer.text], [f.answerId, 'human', f.answer.input.text])
       assert.deepEqual([execution.data.resume.kind, execution.data.resume.eventId], ['question_resume', child.eventId])
@@ -531,6 +536,48 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.deepEqual(execution.data.producerToolActivity.tools.map(tool => tool.toolName), ['ToolSearch', 'mcp__mikka__submit'])
       assert.doesNotMatch(JSON.stringify(execution), /untrusted summary|fixture-value/)
       assert.deepEqual(await snapshot(), before)
+      const legacy = await questionExecutionObservations(pool, task, candidate, undefined, undefined, 1)
+      assert.ok(legacy.data && 'question' in legacy.data)
+      const expectedLegacy = { ...execution.data, schemaVersion: 1, question: { ...execution.data.question, nativeQuestion: {
+        ...execution.data.sourceToolActivity.tools.find(tool => tool.inputChunkId === askInputId),
+        kind: 'decision', question: exactQuestion, output: harness === 'codex' ? [{ type: 'text', text: 'Recorded. End your turn now.' }] : 'Recorded. End your turn now.',
+      } } }
+      assert.equal(JSON.stringify(legacy.data), JSON.stringify(expectedLegacy), 'v1 must preserve the exact pre-summary projection, without new keys')
+      assert.equal(legacy.digest, digest(expectedLegacy))
+      assert.notEqual(execution.digest, legacy.digest, 'the new projection must not reuse a v1 digest')
+      for (const [version, recorded] of [[1, legacy], [2, execution]] as const) {
+        const replay = await questionExecutionObservations(pool, task, candidate, recorded.watermark ?? undefined, undefined, version)
+        assert.deepEqual(replay, recorded, 'each version reproduces its own frozen data, watermark and digest')
+      }
+      const summaryCases: [string, unknown, string][] = [
+        ['missing optional summary', undefined, 'missing'],
+        ['empty summary', '', 'missing'],
+        ['blank summary', ' \n ', 'missing'],
+        ['non-string summary', { text: 'Not a native summary string.' }, 'missing'],
+        ['exact length bound', 'x'.repeat(4000), 'complete'],
+        ['overlong summary', 'A plausible recap must not survive as a sliced proof.\n' + 'x'.repeat(4000), 'truncated'],
+        ['redacted summary', 'Checked the artifact; secret=synthetic-summary-secret; waiting for the owner.', 'redacted'],
+        ['already redacted summary', 'Checked [REDACTED] before asking.', 'redacted'],
+        ['secret reference summary', 'Checked [secret:fixture-summary] before asking.', 'redacted'],
+      ]
+      for (const [label, summary, status] of summaryCases) await transaction(async tx => {
+        if (summary === undefined) await tx.query("UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input}',(chunk->'input')-'summary') WHERE id=$1", [askInputId])
+        else await tx.query("UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,summary}',$2::jsonb) WHERE id=$1", [askInputId, JSON.stringify(summary)])
+        const actual = await questionExecutionObservations(tx, task, candidate, execution.watermark ?? undefined)
+        assert.ok(actual.data && 'question' in actual.data, label)
+        assert.equal(actual.data.question.nativeQuestion?.summaryStatus, status, label)
+        assert.equal(actual.data.question.nativeQuestion?.summary, status === 'complete' ? summary : null, label)
+        assert.equal(actual.data.lifecycleComplete, true, 'an optional summary cannot invalidate the independently verified question lifecycle: ' + label)
+        assert.deepEqual(actual.data.lifecycleIncompleteReasons, [], label)
+        assert.notEqual(actual.digest, execution.digest, 'v2 binds the summary observation: ' + label)
+        assert.equal((await questionExecutionObservations(tx, task, candidate, legacy.watermark ?? undefined, undefined, 1)).digest, legacy.digest,
+          'v1 does not acquire summary fields after dispatch: ' + label)
+        assert.doesNotMatch(JSON.stringify(actual), /synthetic-summary-secret|untrusted summary|Synthetic complete report|plausible recap/, label)
+      }, true)
+      const summaryPrompt = questionExecutionObservationPrompt(execution.data)
+      assert.match(summaryPrompt, /summaryStatus=complete/)
+      assert.match(summaryPrompt, /summary is optional/)
+      assert.match(summaryPrompt, /original criterion requires/)
       const omitted = await questionExecutionObservations(pool, task, candidate, undefined, 0)
       assert.ok(omitted.data)
       assert.equal(omitted.data.lifecycleComplete, false)
@@ -714,6 +761,7 @@ test('real PG: question receipts preserve one execution without opening a repair
         assert.match(first, /stream_not_closed/, 'an incomplete stream does not prevent an ordinary artifact check')
         const frozen = (await tx.query('SELECT output FROM factory_attempts WHERE id=$1', [incomplete.task.attemptId])).rows[0].output.check.questionExecutionObservation
         assert.deepEqual(frozen.watermark, { source: 7, producer: 4 })
+        assert.equal(frozen.projectionVersion, 2)
         for (const chunk of tail) await tx.query('INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,$3,$4,$5)',
           [chunk.id, chunk.runId, chunk.seq, JSON.stringify(chunk.chunk), chunk.createdAt])
         assert.equal(await appendFactoryCheckContinuationContext(tx, incomplete.task, incomplete.runId, 'Continue the same check.'), first,
@@ -737,11 +785,28 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.match(followUp, /empty command whitelist is not an empty activity stream/)
       assert.doesNotMatch(followUp, /fixture-value|Original issue and standing instructions/)
       assert.deepEqual(await snapshot(), beforeFollowUp, 'building the native message cannot rewrite frozen evidence or verdicts')
+      const currentDescriptor = (await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [checking.task.attemptId])).rows[0].output.check.questionExecutionObservation
+      assert.equal(currentDescriptor.projectionVersion, 2)
+      await transaction(async tx => {
+        // An actual pre-upgrade descriptor carries the v1 digest and has no
+        // version key. Merely removing the key from a v2 descriptor is invalid.
+        const descriptor = { watermark: legacy.watermark, digest: legacy.digest }
+        await tx.query("UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionExecutionObservation}',$2::jsonb) WHERE id=$1",
+          [checking.task.attemptId, JSON.stringify(descriptor)])
+        const resumed = await appendFactoryCheckContinuationContext(tx, checking.task, checking.runId, originalFollowUp)
+        assert.ok(resumed.includes(JSON.stringify(legacy.data)), 'an existing waiting check receives its exact admitted v1 evidence')
+        assert.ok(!resumed.includes(JSON.stringify(execution.data)), 'legacy continuation cannot silently adopt the new projection')
+        await tx.query("UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,summary}',to_jsonb($2::text)) WHERE id=$1", [askInputId, 'Summary changed after an old v1 check.'])
+        assert.equal(await appendFactoryCheckContinuationContext(tx, checking.task, checking.runId, originalFollowUp), resumed,
+          'a field absent from v1 cannot invalidate that version’s historical digest')
+      }, true)
       for (const [label, sql, args] of [
         ['missing immutable receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, child.eventId]],
         ['different original SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [f.originRunId, 'different-native-session']],
         ['changed fixed candidate', `UPDATE agent_runs SET report=jsonb_set(report,'{deliverableCommit}',to_jsonb($2::text)) WHERE id=$1`, [child.runId, 'c'.repeat(40)]],
         ['changed admitted question', `UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,question}','"Changed after dispatch"') WHERE id=$1`, [askInputId]],
+        ['changed admitted summary', "UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,summary}',to_jsonb($2::text)) WHERE id=$1", [askInputId, 'Changed after dispatch']],
+        ['unknown projection version', "UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionExecutionObservation,projectionVersion}','3'::jsonb) WHERE id=$1", [checking.task.attemptId]],
         ['changed frozen digest', `UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionExecutionObservation,digest}',to_jsonb($2::text)) WHERE id=$1`, [checking.task.attemptId, '0'.repeat(64)]],
         ['records after a closed snapshot', `INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,8,'{"type":"text-delta","delta":"Late activity"}',$3)`, [randomUUID(), child.runId, at(539)]],
       ] as [string, string, unknown[]][]) await transaction(async tx => {
