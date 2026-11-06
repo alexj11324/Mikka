@@ -72,13 +72,14 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
   revisions.current = entities
   const revisionKey = JSON.stringify([options?.revisions ?? null, entities.map(entity => entity.revisions ?? null)])
   const minIntervalMs = options?.minIntervalMs ?? 0
-  const timing = useRef<LiveSubscriptionOptions>({ minIntervalMs, deadline: options?.deadline, revisions: options?.revisions })
-  timing.current = { minIntervalMs, deadline: options?.deadline, revisions: options?.revisions }
+  const timing = useRef<LiveSubscriptionOptions>({ minIntervalMs, deadline: options?.deadline, revisions: options?.revisions, presence: options?.presence })
+  timing.current = { minIntervalMs, deadline: options?.deadline, revisions: options?.revisions, presence: options?.presence }
   const optionsFor = (index: number): LiveSubscriptionOptions => ({ ...timing.current, revisions: { ...timing.current.revisions, ...revisions.current[index]?.revisions } })
   // Renders do not reanchor an expiry. A newer HTTP observation can arrange a
   // final check if the conservative timer fired before the server's deadline.
   const deadlineKey = options?.deadline?.at ?? null
   const deadlineObservation = options?.deadline?.observation
+  const presenceKey = JSON.stringify(options?.presence)
   const active = useRef<LiveSubscription[]>([])
   useEffect(() => {
     if (!channels) return
@@ -114,5 +115,5 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
   useEffect(() => {
     active.current.forEach((subscription, index) => subscription.update(optionsFor(index)))
     // optionsFor reads the refs set above.
-  }, [minIntervalMs, deadlineKey, deadlineObservation, revisionKey])
+  }, [minIntervalMs, deadlineKey, deadlineObservation, revisionKey, presenceKey])
 }

@@ -15,6 +15,12 @@ export type ListLiveRead = {
 }
 export type ObservedList = { live?: ListLiveRead; requestedAt?: number }
 
+/** Old servers keep their existing fallback flag. A new proof is only a
+ * prerequisite: LiveChannel still requires the matching Worker acknowledgement. */
+export function listReadPresence(read: (ObservedList & { presenceFallback?: boolean }) | undefined) {
+  return read?.live?.presence !== undefined ? read.live.presence : read?.presenceFallback ? null : undefined
+}
+
 export class ListReadScopeError extends Error {
   constructor(readonly kind: 'owner' | 'workspace') { super('List read scope changed'); this.name = 'ListReadScopeError' }
 }
