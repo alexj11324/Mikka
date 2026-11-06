@@ -1,0 +1,1036 @@
+{
+  "schemaVersion": 1,
+  "issue": 1504,
+  "phase": "routing-production",
+  "mode": "dispatch",
+  "status": "failed",
+  "applicationSha": "2cba2a841ab770692559f1e5e18a0a57cff99952",
+  "driverSha": "5f516e7cdd9df99eb7e0ab53c4aa11bbddbf275e",
+  "runKey": "gha-42275141431",
+  "workspaceRef": "e917cd887945",
+  "startedAt": "2026-11-06T18:56:11.032Z",
+  "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+  "botCreateAttempted": true,
+  "ownerRef": "b823ba1c5729",
+  "explicitModel": false,
+  "globalOrderWrites": 0,
+  "sourceGrantWrites": 0,
+  "retainedFixtures": false,
+  "routingLogEvidence": "pending_server_logs",
+  "taskCompletionEvidence": "not_observed",
+  "cases": [
+    {
+      "key": "text-normalization",
+      "expectedHarness": "claude_code",
+      "expectedTier": "light",
+      "issueId": "7947840e-599b-4de4-9a41-375defc48af9",
+      "runId": "faf9bcb6-b85b-4593-8e5a-1d333b1c5e58",
+      "runIds": [
+        "faf9bcb6-b85b-4593-8e5a-1d333b1c5e58"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "status": "failed",
+      "dispatchStartedAt": "2026-11-06T18:56:14.858Z",
+      "dispatchDurationMs": 64656,
+      "dispatchFinishedAt": "2026-11-06T18:57:19.514Z",
+      "frozenRouting": {
+        "version": 2,
+        "required": "unknown",
+        "tier": "strongest",
+        "harness": "claude_code",
+        "model": "claude-opus-5-5",
+        "effort": null,
+        "reason": "decision_unavailable"
+      },
+      "observedStatus": "queued",
+      "observedModel": "claude-opus-5-5",
+      "executionIdentityVerified": true,
+      "credentialType": "subscription",
+      "sourceConnectionEvidence": "candidate_allowlist_and_frozen_owner;exact_binding_join_pending",
+      "error": "routing_evidence_mismatch",
+      "deleted": true
+    },
+    {
+      "key": "event-rollup",
+      "expectedHarness": "codex",
+      "expectedTier": "standard",
+      "issueId": "080be0ee-77be-4375-936e-424dce81c416",
+      "runId": "73ae2b53-6fd4-4c11-80bf-1bcbfae6d340",
+      "runIds": [
+        "73ae2b53-6fd4-4c11-80bf-1bcbfae6d340"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "status": "failed",
+      "dispatchStartedAt": "2026-11-06T18:57:21.001Z",
+      "dispatchDurationMs": 40529,
+      "dispatchFinishedAt": "2026-11-06T18:58:01.530Z",
+      "frozenRouting": {
+        "version": 2,
+        "required": "unknown",
+        "tier": "strongest",
+        "harness": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": null,
+        "reason": "decision_unavailable"
+      },
+      "observedStatus": "queued",
+      "observedModel": "gpt-6.1-sol",
+      "executionIdentityVerified": true,
+      "credentialType": "subscription",
+      "sourceConnectionEvidence": "candidate_allowlist_and_frozen_owner;exact_binding_join_pending",
+      "error": "routing_evidence_mismatch",
+      "deleted": true
+    },
+    {
+      "key": "leased-job-queue",
+      "expectedHarness": "claude_code",
+      "expectedTier": "strongest",
+      "issueId": "fc448fd2-179a-48e1-addf-8f3b248c8508",
+      "runId": "2d344c8a-3e6d-45d3-86de-533fb7c2bdf1",
+      "runIds": [
+        "2d344c8a-3e6d-45d3-86de-533fb7c2bdf1"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "status": "failed",
+      "dispatchStartedAt": "2026-11-06T18:58:02.546Z",
+      "dispatchDurationMs": 37662,
+      "dispatchFinishedAt": "2026-11-06T18:58:40.209Z",
+      "frozenRouting": {
+        "version": 2,
+        "required": "unknown",
+        "tier": "strongest",
+        "harness": "claude_code",
+        "model": "claude-opus-5-5",
+        "effort": null,
+        "reason": "decision_unavailable"
+      },
+      "observedStatus": "queued",
+      "observedModel": "claude-opus-5-5",
+      "executionIdentityVerified": true,
+      "credentialType": "subscription",
+      "sourceConnectionEvidence": "candidate_allowlist_and_frozen_owner;exact_binding_join_pending",
+      "error": "routing_evidence_mismatch",
+      "deleted": true
+    }
+  ],
+  "operations": [
+    {
+      "name": "workspace.discover",
+      "startedAt": "2026-11-06T18:56:12.131Z",
+      "status": "ok",
+      "durationMs": 126
+    },
+    {
+      "name": "workspace.switch_session",
+      "startedAt": "2026-11-06T18:56:12.258Z",
+      "status": "ok",
+      "durationMs": 138
+    },
+    {
+      "name": "workspace.verify_session",
+      "startedAt": "2026-11-06T18:56:12.396Z",
+      "status": "ok",
+      "durationMs": 467
+    },
+    {
+      "name": "routing.preflight",
+      "startedAt": "2026-11-06T18:56:12.863Z",
+      "status": "ok",
+      "durationMs": 448
+    },
+    {
+      "name": "bot.discover",
+      "startedAt": "2026-11-06T18:56:13.311Z",
+      "status": "ok",
+      "durationMs": 199
+    },
+    {
+      "name": "bot.create",
+      "startedAt": "2026-11-06T18:56:13.511Z",
+      "status": "ok",
+      "durationMs": 71
+    },
+    {
+      "name": "text-normalization.configuration_check",
+      "startedAt": "2026-11-06T18:56:13.583Z",
+      "status": "ok",
+      "durationMs": 892
+    },
+    {
+      "name": "text-normalization.create",
+      "startedAt": "2026-11-06T18:56:14.476Z",
+      "status": "ok",
+      "durationMs": 141
+    },
+    {
+      "name": "text-normalization.scope",
+      "startedAt": "2026-11-06T18:56:14.618Z",
+      "status": "ok",
+      "durationMs": 239
+    },
+    {
+      "name": "text-normalization.dispatch",
+      "startedAt": "2026-11-06T18:56:14.858Z",
+      "status": "ok",
+      "durationMs": 64656
+    },
+    {
+      "name": "text-normalization.frozen_evidence",
+      "startedAt": "2026-11-06T18:57:19.515Z",
+      "status": "ok",
+      "durationMs": 282
+    },
+    {
+      "name": "event-rollup.configuration_check",
+      "startedAt": "2026-11-06T18:57:19.802Z",
+      "status": "ok",
+      "durationMs": 498
+    },
+    {
+      "name": "event-rollup.create",
+      "startedAt": "2026-11-06T18:57:20.301Z",
+      "status": "ok",
+      "durationMs": 116
+    },
+    {
+      "name": "event-rollup.scope",
+      "startedAt": "2026-11-06T18:57:20.418Z",
+      "status": "ok",
+      "durationMs": 582
+    },
+    {
+      "name": "event-rollup.dispatch",
+      "startedAt": "2026-11-06T18:57:21.001Z",
+      "status": "ok",
+      "durationMs": 40528
+    },
+    {
+      "name": "event-rollup.frozen_evidence",
+      "startedAt": "2026-11-06T18:58:01.530Z",
+      "status": "ok",
+      "durationMs": 138
+    },
+    {
+      "name": "leased-job-queue.configuration_check",
+      "startedAt": "2026-11-06T18:58:01.669Z",
+      "status": "ok",
+      "durationMs": 473
+    },
+    {
+      "name": "leased-job-queue.create",
+      "startedAt": "2026-11-06T18:58:02.143Z",
+      "status": "ok",
+      "durationMs": 182
+    },
+    {
+      "name": "leased-job-queue.scope",
+      "startedAt": "2026-11-06T18:58:02.338Z",
+      "status": "ok",
+      "durationMs": 207
+    },
+    {
+      "name": "leased-job-queue.dispatch",
+      "startedAt": "2026-11-06T18:58:02.547Z",
+      "status": "ok",
+      "durationMs": 37661
+    },
+    {
+      "name": "leased-job-queue.frozen_evidence",
+      "startedAt": "2026-11-06T18:58:40.209Z",
+      "status": "ok",
+      "durationMs": 303
+    },
+    {
+      "name": "routing.final_configuration_check",
+      "startedAt": "2026-11-06T18:58:40.513Z",
+      "status": "ok",
+      "durationMs": 1523
+    },
+    {
+      "name": "text-normalization.cleanup_tasks",
+      "startedAt": "2026-11-06T18:58:42.185Z",
+      "status": "ok",
+      "durationMs": 260
+    },
+    {
+      "name": "text-normalization.cleanup_cancel",
+      "startedAt": "2026-11-06T18:58:42.794Z",
+      "status": "ok",
+      "durationMs": 477
+    },
+    {
+      "name": "text-normalization.cleanup_threads_once",
+      "startedAt": "2026-11-06T18:58:43.272Z",
+      "status": "ok",
+      "durationMs": 234
+    },
+    {
+      "name": "text-normalization.cleanup_stop",
+      "startedAt": "2026-11-06T18:58:43.595Z",
+      "status": "ok",
+      "durationMs": 117
+    },
+    {
+      "name": "text-normalization.cleanup_end_machine",
+      "startedAt": "2026-11-06T18:58:43.712Z",
+      "status": "ok",
+      "durationMs": 1057
+    },
+    {
+      "name": "text-normalization.cleanup_delete",
+      "startedAt": "2026-11-06T18:58:45.185Z",
+      "status": "ok",
+      "durationMs": 242
+    },
+    {
+      "name": "event-rollup.cleanup_tasks",
+      "startedAt": "2026-11-06T18:58:46.016Z",
+      "status": "ok",
+      "durationMs": 233
+    },
+    {
+      "name": "event-rollup.cleanup_cancel",
+      "startedAt": "2026-11-06T18:58:46.563Z",
+      "status": "ok",
+      "durationMs": 553
+    },
+    {
+      "name": "event-rollup.cleanup_threads_once",
+      "startedAt": "2026-11-06T18:58:47.117Z",
+      "status": "ok",
+      "durationMs": 197
+    },
+    {
+      "name": "event-rollup.cleanup_stop",
+      "startedAt": "2026-11-06T18:58:47.535Z",
+      "status": "ok",
+      "durationMs": 118
+    },
+    {
+      "name": "event-rollup.cleanup_end_machine",
+      "startedAt": "2026-11-06T18:58:47.654Z",
+      "status": "ok",
+      "durationMs": 688
+    },
+    {
+      "name": "event-rollup.cleanup_delete",
+      "startedAt": "2026-11-06T18:58:48.633Z",
+      "status": "ok",
+      "durationMs": 264
+    },
+    {
+      "name": "leased-job-queue.cleanup_tasks",
+      "startedAt": "2026-11-06T18:58:49.240Z",
+      "status": "ok",
+      "durationMs": 237
+    },
+    {
+      "name": "leased-job-queue.cleanup_cancel",
+      "startedAt": "2026-11-06T18:58:49.810Z",
+      "status": "ok",
+      "durationMs": 501
+    },
+    {
+      "name": "leased-job-queue.cleanup_threads_once",
+      "startedAt": "2026-11-06T18:58:50.311Z",
+      "status": "ok",
+      "durationMs": 187
+    },
+    {
+      "name": "leased-job-queue.cleanup_stop",
+      "startedAt": "2026-11-06T18:58:50.589Z",
+      "status": "ok",
+      "durationMs": 120
+    },
+    {
+      "name": "leased-job-queue.cleanup_end_machine",
+      "startedAt": "2026-11-06T18:58:50.710Z",
+      "status": "ok",
+      "durationMs": 969
+    },
+    {
+      "name": "leased-job-queue.cleanup_delete",
+      "startedAt": "2026-11-06T18:58:51.947Z",
+      "status": "ok",
+      "durationMs": 164
+    },
+    {
+      "name": "bot.cleanup_hide",
+      "startedAt": "2026-11-06T18:58:52.259Z",
+      "status": "ok",
+      "durationMs": 343
+    }
+  ],
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 897,
+      "requestId": "iad1::iad1::thcb6-1793991371174-e721ea3de8f8"
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 85,
+      "requestId": "iad1::iad1::hjw7t-1793991371955-74d7400b7baf"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 99,
+      "requestId": "iad1::iad1::c8kjw-1793991372035-419899495fa1"
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 125,
+      "requestId": "iad1::iad1::nkqdv-1793991372136-6dbf66f5a76c"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 137,
+      "requestId": "iad1::iad1::hjw7t-1793991372274-d4e388b9726e"
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 462,
+      "requestId": "iad1::iad1::hjw7t-1793991372401-c88e4c8a00bd"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 29,
+      "requestId": "iad1::iad1::thcb6-1793991372870-53c3dda1f488"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 416,
+      "requestId": "iad1::iad1::fkphz-1793991372897-d297b7de6157"
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 198,
+      "requestId": "iad1::iad1::fkphz-1793991373317-f9d03a0537be"
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "POST",
+      "status": 201,
+      "headersMs": 70,
+      "requestId": "iad1::iad1::btqx5-1793991373516-e2816d49f120"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 51,
+      "requestId": "iad1::iad1::lfsrr-1793991373614-2f3e4031d065"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 838,
+      "requestId": "iad1::iad1::sm6fv-1793991373641-b334bc2de0b2"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 129,
+      "requestId": "iad1::iad1::thcb6-1793991374481-319f926070ea"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 235,
+      "requestId": "iad1::iad1::thcb6-1793991374623-0205c2f3c2d8"
+    },
+    {
+      "path": "/mikka/api/bots/feed1f0f-86b5-4143-9131-e0824fc2c137/computer/runs",
+      "method": "POST",
+      "status": 202,
+      "headersMs": 64639,
+      "requestId": "iad1::iad1::hjw7t-1793991374863-937bf8f93199"
+    },
+    {
+      "path": "/mikka/api/runs/faf9bcb6-b85b-4593-8e5a-1d333b1c5e58/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 281,
+      "requestId": "iad1::iad1::6h4tb-1793991439585-e0aeb96f3482"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 24,
+      "requestId": "iad1::iad1::zb2nd-1793991439807-cc79ee5ddf5e"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 396,
+      "requestId": "iad1::iad1::zb2nd-1793991439832-064ef142fab3"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 116,
+      "requestId": "iad1::iad1::zb2nd-1793991440312-f339a7e56bca"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 581,
+      "requestId": "iad1::iad1::zb2nd-1793991440422-3c5b6dfd47a9"
+    },
+    {
+      "path": "/mikka/api/bots/feed1f0f-86b5-4143-9131-e0824fc2c137/computer/runs",
+      "method": "POST",
+      "status": 202,
+      "headersMs": 40511,
+      "requestId": "iad1::iad1::lrfn6-1793991441006-a522bd224178"
+    },
+    {
+      "path": "/mikka/api/runs/73ae2b53-6fd4-4c11-80bf-1bcbfae6d340/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 137,
+      "requestId": "iad1::iad1::g8j9k-1793991481558-e18fb111607f"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 35,
+      "requestId": "iad1::iad1::rm9rn-1793991481677-8d4287d919b2"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 436,
+      "requestId": "iad1::iad1::thcb6-1793991481711-0f43c2fb07bd"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 173,
+      "requestId": "iad1::iad1::l44xk-1793991482147-0d19cf37de04"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 205,
+      "requestId": "iad1::iad1::9kg5f-1793991482342-40eea92efeea"
+    },
+    {
+      "path": "/mikka/api/bots/feed1f0f-86b5-4143-9131-e0824fc2c137/computer/runs",
+      "method": "POST",
+      "status": 202,
+      "headersMs": 37657,
+      "requestId": "iad1::iad1::9kg5f-1793991482551-157e77c96155"
+    },
+    {
+      "path": "/mikka/api/runs/2d344c8a-3e6d-45d3-86de-533fb7c2bdf1/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 301,
+      "requestId": "iad1::iad1::r66j7-1793991520235-ee64957bd133"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 50,
+      "requestId": "iad1::iad1::hmz6z-1793991520517-e9a061345f34"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 1471,
+      "requestId": "iad1::iad1::ktcvg-1793991520569-289755c80e26"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 147,
+      "requestId": "iad1::iad1::426tw-1793991522042-81b192a01ba2"
+    },
+    {
+      "path": "/mikka/api/factory/tasks",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 259,
+      "requestId": "iad1::iad1::426tw-1793991522190-e10cb425a8fd"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/331e5b72-593f-46a7-bb48-6437de8ff950",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 347,
+      "requestId": "iad1::iad1::hrb78-1793991522450-cec1c5d535a8"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/331e5b72-593f-46a7-bb48-6437de8ff950",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 476,
+      "requestId": "iad1::iad1::kr674-1793991522798-de04012c7c97"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 233,
+      "requestId": "iad1::iad1::7xl8w-1793991523285-17373a149ae8"
+    },
+    {
+      "path": "/mikka/api/runs/faf9bcb6-b85b-4593-8e5a-1d333b1c5e58/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 88,
+      "requestId": "iad1::iad1::7xl8w-1793991523511-914edb6bff87"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 117,
+      "requestId": "iad1::iad1::426tw-1793991523599-17eac0b9c227"
+    },
+    {
+      "path": "/mikka/api/threads/faf9bcb6-b85b-4593-8e5a-1d333b1c5e58/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 1054,
+      "requestId": "iad1::iad1::hmz6z-1793991523717-a43f2ae50619"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 413,
+      "requestId": "iad1::iad1::bg9qb-1793991524774-43c652e7ce4b"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 241,
+      "requestId": "iad1::iad1::pdrsl-1793991525190-d66baac27ef5"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 81,
+      "requestId": "iad1::iad1::kr674-1793991525432-9f5351239ed5"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 505,
+      "requestId": "iad1::iad1::lpwlm-1793991525514-4c765e963923"
+    },
+    {
+      "path": "/mikka/api/factory/tasks",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 232,
+      "requestId": "iad1::iad1::lpwlm-1793991526020-c1d75ac46a7f"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/f3837db0-9320-423e-a569-392632286153",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 312,
+      "requestId": "iad1::iad1::lpwlm-1793991526254-192bb91a0182"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/f3837db0-9320-423e-a569-392632286153",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 552,
+      "requestId": "iad1::iad1::lpwlm-1793991526569-fd9ee68a63b3"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 196,
+      "requestId": "iad1::iad1::pdrsl-1793991527121-7f4d6ae06bcb"
+    },
+    {
+      "path": "/mikka/api/runs/73ae2b53-6fd4-4c11-80bf-1bcbfae6d340/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 219,
+      "requestId": "iad1::iad1::hrb78-1793991527319-817ebfe79fa2"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 118,
+      "requestId": "iad1::iad1::lwgdh-1793991527539-7549138ac6ce"
+    },
+    {
+      "path": "/mikka/api/threads/73ae2b53-6fd4-4c11-80bf-1bcbfae6d340/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 687,
+      "requestId": "iad1::iad1::4mxmg-1793991527658-944e17f0991d"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 289,
+      "requestId": "iad1::iad1::4mxmg-1793991528347-e69f7b51f341"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 262,
+      "requestId": "iad1::iad1::bvvbf-1793991528638-85c4ae0226a1"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 140,
+      "requestId": "iad1::iad1::lwgdh-1793991528952-d4e76dbba4c6"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 150,
+      "requestId": "iad1::iad1::sm6fv-1793991529093-beb516839cf6"
+    },
+    {
+      "path": "/mikka/api/factory/tasks",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 236,
+      "requestId": "iad1::iad1::bg9qb-1793991529245-0cbf594daabd"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/4c3f4908-2b07-4737-a750-0110733f0ebe",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 331,
+      "requestId": "iad1::iad1::bg9qb-1793991529482-504ca7b16b22"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/4c3f4908-2b07-4737-a750-0110733f0ebe",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 500,
+      "requestId": "iad1::iad1::5kf7s-1793991529814-ec71f7140561"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 185,
+      "requestId": "iad1::iad1::5kf7s-1793991530316-2a4f0fef3f5b"
+    },
+    {
+      "path": "/mikka/api/runs/2d344c8a-3e6d-45d3-86de-533fb7c2bdf1/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 90,
+      "requestId": "iad1::iad1::wlsmq-1793991530503-6336748f2fac"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 120,
+      "requestId": "iad1::iad1::vqxl6-1793991530593-7744a20b94f8"
+    },
+    {
+      "path": "/mikka/api/threads/2d344c8a-3e6d-45d3-86de-533fb7c2bdf1/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 967,
+      "requestId": "iad1::iad1::9kg5f-1793991530714-cc2ee059ddcf"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 267,
+      "requestId": "iad1::iad1::cbft2-1793991531684-8b152279eac0"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 163,
+      "requestId": "iad1::iad1::cbft2-1793991531951-c1cfd22a15e8"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 147,
+      "requestId": "iad1::iad1::bvvbf-1793991532116-3d722622cced"
+    },
+    {
+      "path": "/mikka/api/mobile/bots/feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "method": "PATCH",
+      "status": 200,
+      "headersMs": 337,
+      "requestId": "iad1::iad1::bvvbf-1793991532264-4a69e80e3cef"
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 626,
+      "requestId": "iad1::iad1::bvvbf-1793991532608-1e02bc220939"
+    }
+  ],
+  "cleanup": {
+    "status": "complete",
+    "cases": [
+      {
+        "key": "text-normalization",
+        "status": "complete",
+        "runs": [
+          {
+            "runId": "faf9bcb6-b85b-4593-8e5a-1d333b1c5e58",
+            "stopped": true,
+            "machineEnded": true
+          }
+        ],
+        "tasks": [
+          {
+            "taskId": "331e5b72-593f-46a7-bb48-6437de8ff950",
+            "status": "cancelled"
+          }
+        ],
+        "deleted": true
+      },
+      {
+        "key": "event-rollup",
+        "status": "complete",
+        "runs": [
+          {
+            "runId": "73ae2b53-6fd4-4c11-80bf-1bcbfae6d340",
+            "stopped": true,
+            "machineEnded": true
+          }
+        ],
+        "tasks": [
+          {
+            "taskId": "f3837db0-9320-423e-a569-392632286153",
+            "status": "cancelled"
+          }
+        ],
+        "deleted": true
+      },
+      {
+        "key": "leased-job-queue",
+        "status": "complete",
+        "runs": [
+          {
+            "runId": "2d344c8a-3e6d-45d3-86de-533fb7c2bdf1",
+            "stopped": true,
+            "machineEnded": true
+          }
+        ],
+        "tasks": [
+          {
+            "taskId": "4c3f4908-2b07-4737-a750-0110733f0ebe",
+            "status": "cancelled"
+          }
+        ],
+        "deleted": true
+      }
+    ],
+    "botHidden": true
+  },
+  "observedApplicationSha": "2cba2a841ab770692559f1e5e18a0a57cff99952",
+  "orderObservation": {
+    "autoModelRouting": true,
+    "cloudReady": true,
+    "candidates": 22,
+    "entries": [
+      {
+        "harness": "claude_code",
+        "model": "claude-opus-5-5",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6.1-sol",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-sonnet-5-5",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "claude_code",
+        "model": "claude-fable-5-1",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "claude_code",
+        "model": "unknown",
+        "block": "noDevice",
+        "cloudModel": "cloudModelNotReported"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-astra",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "unknown",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-sol",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-sol",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-terra",
+        "block": null,
+        "cloudModel": "ready"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-luna",
+        "block": null,
+        "cloudModel": "ready"
+      }
+    ]
+  },
+  "configuration": {
+    "autoRouting": true,
+    "cloudReady": true,
+    "authorizedSourcesOnly": true,
+    "candidateCount": 22,
+    "entryCount": 22,
+    "orderFingerprint": "495564f8d47678604f6a0241a1eaaab440aa0814d281c800f8a80ec60a1e3dbc"
+  },
+  "configurationUnchanged": true,
+  "signedOut": true,
+  "finishedAt": "2026-11-06T18:58:53.230Z",
+  "durationMs": 162198
+}

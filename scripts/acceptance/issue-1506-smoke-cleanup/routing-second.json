@@ -1,0 +1,461 @@
+{
+  "schemaVersion": 1,
+  "issue": 1504,
+  "phase": "routing-production",
+  "mode": "cleanup",
+  "status": "cleanup_passed",
+  "applicationSha": "2cba2a841ab770692559f1e5e18a0a57cff99952",
+  "driverSha": "0de39d326d9913bf464deed68573c97ae6946111",
+  "runKey": "gha-42275714635",
+  "workspaceRef": "e917cd887945",
+  "startedAt": "2026-11-06T19:06:10.454Z",
+  "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+  "botCreateAttempted": true,
+  "ownerRef": "b823ba1c5729",
+  "explicitModel": false,
+  "globalOrderWrites": 0,
+  "sourceGrantWrites": 0,
+  "retainedFixtures": false,
+  "routingLogEvidence": "pending_server_logs",
+  "taskCompletionEvidence": "not_observed",
+  "cases": [
+    {
+      "key": "text-normalization",
+      "expectedHarness": "claude_code",
+      "expectedTier": "light",
+      "issueId": "dbb35e04-de5f-420a-b4aa-153146268259",
+      "runId": "d042af8b-5bf7-4b5e-876b-13e0639a3254",
+      "runIds": [
+        "d042af8b-5bf7-4b5e-876b-13e0639a3254",
+        "f815b8ef-002f-48f1-8be1-cd39781e0c5d"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "status": "pending",
+      "deleted": true
+    },
+    {
+      "key": "event-rollup",
+      "expectedHarness": "codex",
+      "expectedTier": "standard",
+      "issueId": "ea3afbd4-b328-4aca-8a2e-d9efe2f7af3e",
+      "runId": "a9d61f74-7b5f-421b-853e-4d6c69acfb3f",
+      "runIds": [
+        "a9d61f74-7b5f-421b-853e-4d6c69acfb3f"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "status": "pending",
+      "deleted": true
+    },
+    {
+      "key": "leased-job-queue",
+      "expectedHarness": "claude_code",
+      "expectedTier": "strongest",
+      "issueId": "3e413472-6bdd-46a0-a775-d4814bf60b40",
+      "runId": "500cecbe-4f32-432b-8054-104b8eb07623",
+      "runIds": [
+        "500cecbe-4f32-432b-8054-104b8eb07623"
+      ],
+      "createAttempted": true,
+      "dispatchAttempted": true,
+      "status": "pending",
+      "deleted": true
+    }
+  ],
+  "operations": [
+    {
+      "name": "workspace.discover",
+      "startedAt": "2026-11-06T19:06:11.446Z",
+      "status": "ok",
+      "durationMs": 185
+    },
+    {
+      "name": "workspace.switch_session",
+      "startedAt": "2026-11-06T19:06:11.632Z",
+      "status": "ok",
+      "durationMs": 168
+    },
+    {
+      "name": "workspace.verify_session",
+      "startedAt": "2026-11-06T19:06:11.800Z",
+      "status": "ok",
+      "durationMs": 179
+    },
+    {
+      "name": "bot.discover",
+      "startedAt": "2026-11-06T19:06:11.979Z",
+      "status": "ok",
+      "durationMs": 154
+    },
+    {
+      "name": "text-normalization.cleanup_tasks",
+      "startedAt": "2026-11-06T19:06:12.373Z",
+      "status": "ok",
+      "durationMs": 326
+    },
+    {
+      "name": "text-normalization.cleanup_threads_once",
+      "startedAt": "2026-11-06T19:06:13.264Z",
+      "status": "ok",
+      "durationMs": 258
+    },
+    {
+      "name": "text-normalization.cleanup_stop",
+      "startedAt": "2026-11-06T19:06:13.695Z",
+      "status": "failed",
+      "error": "acceptance_rpc_failed",
+      "code": "runChainEnded",
+      "httpStatus": 400,
+      "durationMs": 112
+    },
+    {
+      "name": "text-normalization.cleanup_end_machine",
+      "startedAt": "2026-11-06T19:06:13.807Z",
+      "status": "ok",
+      "durationMs": 930
+    },
+    {
+      "name": "text-normalization.cleanup_stop",
+      "startedAt": "2026-11-06T19:06:14.898Z",
+      "status": "failed",
+      "error": "acceptance_rpc_failed",
+      "code": "runChainEnded",
+      "httpStatus": 400,
+      "durationMs": 116
+    },
+    {
+      "name": "text-normalization.cleanup_end_machine",
+      "startedAt": "2026-11-06T19:06:15.014Z",
+      "status": "ok",
+      "durationMs": 703
+    },
+    {
+      "name": "text-normalization.cleanup_delete",
+      "startedAt": "2026-11-06T19:06:15.961Z",
+      "status": "ok",
+      "durationMs": 240
+    },
+    {
+      "name": "event-rollup.cleanup_stop",
+      "startedAt": "2026-11-06T19:06:16.983Z",
+      "status": "failed",
+      "error": "acceptance_rpc_failed",
+      "code": "runChainEnded",
+      "httpStatus": 400,
+      "durationMs": 121
+    },
+    {
+      "name": "event-rollup.cleanup_end_machine",
+      "startedAt": "2026-11-06T19:06:17.105Z",
+      "status": "ok",
+      "durationMs": 614
+    },
+    {
+      "name": "leased-job-queue.cleanup_stop",
+      "startedAt": "2026-11-06T19:06:18.199Z",
+      "status": "failed",
+      "error": "acceptance_rpc_failed",
+      "code": "runChainEnded",
+      "httpStatus": 400,
+      "durationMs": 217
+    },
+    {
+      "name": "leased-job-queue.cleanup_end_machine",
+      "startedAt": "2026-11-06T19:06:18.417Z",
+      "status": "ok",
+      "durationMs": 632
+    },
+    {
+      "name": "bot.cleanup_hide",
+      "startedAt": "2026-11-06T19:06:19.049Z",
+      "status": "ok",
+      "durationMs": 159
+    }
+  ],
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 642,
+      "requestId": "sfo1::iad1::99mg4-1793991970661-dd8a59fd9ddc"
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 244,
+      "requestId": "sfo1::iad1::99mg4-1793991971116-092acef40c79"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 95,
+      "requestId": "sfo1::iad1::99mg4-1793991971360-691d3387015e"
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 181,
+      "requestId": "sfo1::iad1::n62xc-1793991971457-1b5c6d8ebc3a"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 167,
+      "requestId": "sfo1::iad1::x29vg-1793991971653-65b59063168d"
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 177,
+      "requestId": "sfo1::iad1::kxw9s-1793991971811-5318c2b40941"
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 153,
+      "requestId": "sfo1::iad1::68875-1793991971991-61d4edc6343a"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 237,
+      "requestId": "sfo1::iad1::68875-1793991972145-dffadc372bb8"
+    },
+    {
+      "path": "/mikka/api/factory/tasks",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 325,
+      "requestId": "sfo1::iad1::99mg4-1793991972387-5bac741f61b4"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/b8d4589b-ab62-4067-8720-3d41d1762faa",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 551,
+      "requestId": "sfo1::iad1::x29vg-1793991972710-91a91a53c48c"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 257,
+      "requestId": "sfo1::iad1::68875-1793991973274-ddfb246ae0b5"
+    },
+    {
+      "path": "/mikka/api/runs/d042af8b-5bf7-4b5e-876b-13e0639a3254/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 172,
+      "requestId": "sfo1::iad1::68875-1793991973533-e94523fc192a"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 400,
+      "headersMs": 111,
+      "requestId": "sfo1::iad1::99mg4-1793991973706-663e5b596f6e"
+    },
+    {
+      "path": "/mikka/api/threads/d042af8b-5bf7-4b5e-876b-13e0639a3254/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 924,
+      "requestId": "sfo1::iad1::nk2dv-1793991973880-66c7e4db1c9d"
+    },
+    {
+      "path": "/mikka/api/runs/f815b8ef-002f-48f1-8be1-cd39781e0c5d/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 160,
+      "requestId": "sfo1::iad1::zph7m-1793991974747-0deedbabd1fa"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 400,
+      "headersMs": 115,
+      "requestId": "sfo1::iad1::99mg4-1793991974909-8b81a09222c9"
+    },
+    {
+      "path": "/mikka/api/threads/f815b8ef-002f-48f1-8be1-cd39781e0c5d/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 702,
+      "requestId": "sfo1::iad1::zrwbg-1793991975026-1dfa526b0ffe"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 243,
+      "requestId": "sfo1::iad1::p9xvr-1793991975728-4767843c55d5"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 237,
+      "requestId": "sfo1::iad1::h87s9-1793991975972-b5fdc783095a"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 252,
+      "requestId": "sfo1::iad1::h87s9-1793991976211-d8a7ea067663"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 163,
+      "requestId": "sfo1::iad1::7rgbw-1793991976464-b546de314c18"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 179,
+      "requestId": "sfo1::iad1::cw7sx-1793991976629-8a0859c1a0f5"
+    },
+    {
+      "path": "/mikka/api/runs/a9d61f74-7b5f-421b-853e-4d6c69acfb3f/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 185,
+      "requestId": "sfo1::iad1::p9xvr-1793991976807-9b05b3acba92"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 400,
+      "headersMs": 121,
+      "requestId": "sfo1::iad1::cw7sx-1793991976994-f544a5791899"
+    },
+    {
+      "path": "/mikka/api/threads/a9d61f74-7b5f-421b-853e-4d6c69acfb3f/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 609,
+      "requestId": "sfo1::iad1::99mg4-1793991977115-c180b495186f"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 158,
+      "requestId": "sfo1::iad1::gkt56-1793991977730-ca3ed9769734"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 164,
+      "requestId": "sfo1::iad1::d2fcz-1793991977891-eabe865e7711"
+    },
+    {
+      "path": "/mikka/api/runs/500cecbe-4f32-432b-8054-104b8eb07623/evidence",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 153,
+      "requestId": "sfo1::iad1::d2fcz-1793991978055-898d2ae77b47"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 400,
+      "headersMs": 217,
+      "requestId": "sfo1::iad1::99mg4-1793991978209-0405fbe5b291"
+    },
+    {
+      "path": "/mikka/api/threads/500cecbe-4f32-432b-8054-104b8eb07623/machine",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 631,
+      "requestId": "sfo1::iad1::pz95m-1793991978427-f438dc09b246"
+    },
+    {
+      "path": "/mikka/api/mobile/bots/3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "method": "PATCH",
+      "status": 200,
+      "headersMs": 158,
+      "requestId": "sfo1::iad1::phdmn-1793991979060-16a41045da73"
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 282,
+      "requestId": "sfo1::iad1::7rgbw-1793991979223-a7e206ddd900"
+    }
+  ],
+  "cleanup": {
+    "status": "complete",
+    "cases": [
+      {
+        "key": "text-normalization",
+        "status": "complete",
+        "runs": [
+          {
+            "runId": "d042af8b-5bf7-4b5e-876b-13e0639a3254",
+            "stopped": true,
+            "machineEnded": true
+          },
+          {
+            "runId": "f815b8ef-002f-48f1-8be1-cd39781e0c5d",
+            "stopped": true,
+            "machineEnded": true
+          }
+        ],
+        "tasks": [
+          {
+            "taskId": "b8d4589b-ab62-4067-8720-3d41d1762faa",
+            "status": "cancelled"
+          }
+        ],
+        "deleted": true
+      },
+      {
+        "key": "event-rollup",
+        "status": "complete",
+        "runs": [
+          {
+            "runId": "a9d61f74-7b5f-421b-853e-4d6c69acfb3f",
+            "stopped": true,
+            "machineEnded": true
+          }
+        ],
+        "tasks": [],
+        "alreadyDeleted": true
+      },
+      {
+        "key": "leased-job-queue",
+        "status": "complete",
+        "runs": [
+          {
+            "runId": "500cecbe-4f32-432b-8054-104b8eb07623",
+            "stopped": true,
+            "machineEnded": true
+          }
+        ],
+        "tasks": [],
+        "alreadyDeleted": true
+      }
+    ],
+    "botHidden": true
+  },
+  "observedApplicationSha": "2cba2a841ab770692559f1e5e18a0a57cff99952",
+  "signedOut": true,
+  "finishedAt": "2026-11-06T19:06:19.492Z",
+  "durationMs": 9038
+}

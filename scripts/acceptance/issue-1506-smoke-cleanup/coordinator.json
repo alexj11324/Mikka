@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "phase": "coordinator-setup",
+  "status": "ready",
+  "workspace": {
+    "id": "d32ed7ad-4253-47dd-a94a-66b24dd07d35",
+    "ref": "e917cd887945",
+    "kind": "team"
+  },
+  "applicationSha": "2cba2a841ab770692559f1e5e18a0a57cff99952",
+  "botId": "3bc88a86-2a0a-44f3-8418-7a9253200103",
+  "botRef": "87b186df9c42",
+  "modelSelectionWrites": 0,
+  "modelMessages": 0,
+  "taskCreationRequests": 0,
+  "sourceEvidence": "only_authorized_subscription_candidates_and_unlisted_pooled_haiku;exact_binding_runtime_join_pending",
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 658
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 141
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 114
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 177
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 134
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 248
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 178
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 175
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 749
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 122
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 379
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 498
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 99
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 248
+    }
+  ],
+  "menu": {
+    "model": "claude-haiku-5-5",
+    "provider": "claude",
+    "kind": "subscription",
+    "available": true,
+    "chosen": false,
+    "groups": [
+      {
+        "kind": "hosted",
+        "options": 1
+      }
+    ]
+  },
+  "choice": "automatic_shared_haiku_already_effective",
+  "signedOut": true,
+  "durationMs": 3940
+}

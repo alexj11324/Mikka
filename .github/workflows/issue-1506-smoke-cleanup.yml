@@ -1,0 +1,68 @@
+name: Issue 1506 old smoke workspace cleanup
+
+# Deletes only the audited disposable smoke-owned workspace through normal product APIs.
+on:
+  push:
+    branches: [acceptance/issues-1504-1506]
+    paths:
+      - '.github/workflows/issue-1506-smoke-cleanup.yml'
+      - 'scripts/acceptance/issue-1506-smoke-cleanup/**'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Check the exact cleanup client
+        run: |
+          node --check scripts/acceptance/issue-1506-smoke-cleanup/cleanup-workspace.mjs
+      - name: Read the existing smoke owner's email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing smoke owner's password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Delete the exact audited inactive smoke workspace once
+        run: node scripts/acceptance/issue-1506-smoke-cleanup/cleanup-workspace.mjs delete scripts/acceptance/issue-1506-smoke-cleanup/audit.json scripts/acceptance/issue-1506-smoke-cleanup/routing-first.json scripts/acceptance/issue-1506-smoke-cleanup/routing-second.json scripts/acceptance/issue-1506-smoke-cleanup/coordinator.json
+      - name: Retain the sanitized deletion evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue-1506-smoke-cleanup-${{ github.run_id }}
+          path: issue-1504-1506-report/workspace-cleanup.json
+          if-no-files-found: ignore
+          retention-days: 7

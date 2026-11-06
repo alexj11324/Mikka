@@ -1,0 +1,116 @@
+{
+  "name": "Issues 1504-1506 production acceptance",
+  "slug": "acceptance-1504-1506-42274865746",
+  "phase": "workspace-scope-audit",
+  "teams": 0,
+  "projects": 0,
+  "checkedAt": "2026-11-06T19:45:41.047489+00:00",
+  "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e",
+  "teamIssues": 0,
+  "workspaceId": "d32ed7ad-4253-47dd-a94a-66b24dd07d35",
+  "workspaceRef": "e917cd887945",
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "id": "2d344c8a-3e6d-45d3-86de-533fb7c2bdf1",
+      "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "status": "stopped",
+      "issueId": "fc448fd2-179a-48e1-addf-8f3b248c8508",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "500cecbe-4f32-432b-8054-104b8eb07623",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "stopped",
+      "issueId": "3e413472-6bdd-46a0-a775-d4814bf60b40",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "73ae2b53-6fd4-4c11-80bf-1bcbfae6d340",
+      "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "status": "stopped",
+      "issueId": "080be0ee-77be-4375-936e-424dce81c416",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "a9d61f74-7b5f-421b-853e-4d6c69acfb3f",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "stopped",
+      "issueId": "ea3afbd4-b328-4aca-8a2e-d9efe2f7af3e",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "d042af8b-5bf7-4b5e-876b-13e0639a3254",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "failed",
+      "issueId": "dbb35e04-de5f-420a-b4aa-153146268259",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "f815b8ef-002f-48f1-8be1-cd39781e0c5d",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "stopped",
+      "issueId": "dbb35e04-de5f-420a-b4aa-153146268259",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "faf9bcb6-b85b-4593-8e5a-1d333b1c5e58",
+      "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "status": "stopped",
+      "issueId": "7947840e-599b-4de4-9a41-375defc48af9",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    }
+  ],
+  "botIds": [
+    "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+    "3bc88a86-2a0a-44f3-8418-7a9253200103",
+    "feed1f0f-86b5-4143-9131-e0824fc2c137"
+  ],
+  "subagents": 0,
+  "appCheckedAt": "2026-11-06T19:45:39.107512+00:00",
+  "factoryTasks": [
+    {
+      "id": "10eb2df4-cc5d-4ea8-83ff-ad8b98fd151e",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "cancelled",
+      "issueId": "3e413472-6bdd-46a0-a775-d4814bf60b40",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "331e5b72-593f-46a7-bb48-6437de8ff950",
+      "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "status": "cancelled",
+      "issueId": "7947840e-599b-4de4-9a41-375defc48af9",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "4c3f4908-2b07-4737-a750-0110733f0ebe",
+      "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "status": "cancelled",
+      "issueId": "fc448fd2-179a-48e1-addf-8f3b248c8508",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "7adaffe4-4818-4df3-83d7-d26748de15f8",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "cancelled",
+      "issueId": "ea3afbd4-b328-4aca-8a2e-d9efe2f7af3e",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "b8d4589b-ab62-4067-8720-3d41d1762faa",
+      "botId": "3339ca15-c5ee-4de0-ba3a-24f3489e7706",
+      "status": "cancelled",
+      "issueId": "dbb35e04-de5f-420a-b4aa-153146268259",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    },
+    {
+      "id": "f3837db0-9320-423e-a569-392632286153",
+      "botId": "feed1f0f-86b5-4143-9131-e0824fc2c137",
+      "status": "cancelled",
+      "issueId": "080be0ee-77be-4375-936e-424dce81c416",
+      "ownerHash": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e"
+    }
+  ],
+  "conversations": 0
+}
