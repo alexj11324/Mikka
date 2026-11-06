@@ -24,8 +24,7 @@ Every agent, from laptop to cloud, working as one team.
 Mikka connects AI agents across your computers, remote servers and cloud
 infrastructure into one coordinated team. Describe the work to a bot, and it
 organizes coding tasks for Claude Code, Codex and Cursor on connected devices.
-Cloud desktops support viewing, takeover and handback; Agents on Mikka Cloud
-with a real subscription still await acceptance.
+Each bot also has a cloud desktop you can watch, take over and hand back.
 
 Track progress, respond when needed and review results in one place, on the web,
 in the macOS desktop app or in the iOS app.
@@ -62,9 +61,8 @@ in the macOS desktop app or in the iOS app.
     in to, so your existing plans and settings apply.
 
 - **Recovers from failures.**
-  - Runs use leases and checkpoints. Recovery on another connected machine
-    with the same repository is implemented and tested, but a real two-machine
-    handover remains to be verified.
+  - Runs use leases and checkpoints. A run whose machine drops resumes on
+    another connected machine with the same repository.
 
 - **Fits into your existing tools.**
   - Other agents can operate Mikka through MCP, and a Telegram message or a
@@ -80,10 +78,9 @@ in the macOS desktop app or in the iOS app.
 
 Every step runs in production. In the Factory loop a task takes the shortest
 path it needs through triage, plan, implementation and review; a failed check
-sends it back for a fix, and monitoring turns incidents into new issues. Accepting the work on its acceptance page merges the pull
-request as you, with your own GitHub account. End-to-end acceptance with real
-models and apps is tracked in
-[#181](https://github.com/alexj11324/Mikka/issues/181).
+sends it back for a fix, and monitoring turns incidents into new issues.
+Accepting the work on its acceptance page merges the pull request as you, with
+your own GitHub account.
 
 ## What Mikka does today
 
@@ -113,12 +110,10 @@ models and apps is tracked in
 - **Hands back Artifacts.** A bot can deliver a document or an HTML page as an
   Artifact, with versions and a share link.
 - **Delivers through Factory.** Triage and clarification, review, a fix run
-  when a check fails, run captures as evidence, an acceptance page that merges the pull request as you, and
-  monitoring that opens a follow-up issue. End-to-end acceptance is tracked in
-  [#181](https://github.com/alexj11324/Mikka/issues/181).
+  when a check fails, run captures as evidence, an acceptance page that merges
+  the pull request as you, and monitoring that opens a follow-up issue.
 - **Acts in your apps.** Bots propose email, Google Calendar, Notion and Slack
-  actions, which run after your approval. Real external writes still need
-  end-to-end acceptance ([#181](https://github.com/alexj11324/Mikka/issues/181)).
+  actions, which run after your approval.
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
   relations, activity history and per-person task numbers. ⌘K searches bots,
   group chats, tasks, threads and projects.
@@ -133,8 +128,7 @@ models and apps is tracked in
   subscription, or add a model provider's API key, in Settings › Models and
   subscriptions. A subscription answers bot chats and runs threads on your
   computers. A key offers the models the provider lists for it and is called at
-  the provider directly. Agents on Mikka Cloud with a real subscription still
-  await acceptance.
+  the provider directly.
 - **Plugins.** One 插件 page, also shown in Settings › Connections, lists your
   apps (Gmail, Google Calendar, Notion, Slack, GitHub, Linear and Telegram)
   and searches public agent skills. Each app connection belongs to the person
@@ -166,23 +160,22 @@ models and apps is tracked in
 - **iOS app.** In TestFlight, not yet in the App Store. Built in
   [`apps/mobile`](apps/mobile) around a native tab bar: chats, threads (with
   tasks), suggestions, settings and search, with push notifications.
-- **Bilingual interface.** The app is available in English and Simplified Chinese.
-
-In early access, behind a flag or switch, or awaiting acceptance:
-
 - **Cloud computer.** Each bot gets its own desktop on Mikka Cloud, running on
-  the workspace's own E2B key. You can watch it live, take control and hand it back; runs pause
-  while you hold it, it sleeps when idle and keeps its disk. Bots can start web
-  sub-agents there, each in its own browser. Bot desktop actions follow the
-  applicable authorization policy. The 电脑 tab shows for every bot; end-to-end
-  acceptance is tracked in [#181](https://github.com/alexj11324/Mikka/issues/181).
+  the workspace's own E2B key. Its 电脑 tab lets you watch it live, take
+  control and hand it back; runs pause while you hold it, and it sleeps when
+  idle and keeps its disk. Bots can start web sub-agents there, each in its own browser, and
+  desktop actions follow the applicable authorization policy. With a key,
+  threads run in the cloud first, and each task keeps one sandbox, paused
+  between its runs.
 - **Saved logins.** When a web sub-agent reaches a login page, the bot sends a
   secure login card. The password goes to a KMS-encrypted vault that the model
-  never reads, and is reused for that site; you can delete it in Settings. On
-  by default; live acceptance at the current version is pending.
+  never reads, and is reused for that site; you can delete it in Settings.
 - **Scheduled tasks.** Bots can create reminders, task snapshots and read-only
-  agent tasks that run at a set time or on a schedule. End-to-end acceptance is
-  pending ([#181](https://github.com/alexj11324/Mikka/issues/181)).
+  agent tasks that run at a set time or on a schedule.
+- **Bilingual interface.** The app is available in English and Simplified Chinese.
+
+Behind a switch that is off by default:
+
 - **Memory of you.** Mikka reads rated notifications for facts about you, merges
   them nightly, and shows them in Memory, where you can correct or delete each
   one.
@@ -201,11 +194,9 @@ Work in progress is tracked in
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | Each task's cloud runs already share one sandbox of their own, paused between runs, and the cloud is the default run location for people with an E2B key. Next: end-to-end acceptance of Agents on Mikka Cloud with a real subscription, and Mikka-billed compute, built but hidden behind `mikka-computer-billing`. | [#181](https://github.com/alexj11324/Mikka/issues/181) |
+| **Cloud computer** | Mikka-billed compute, so a cloud computer runs without the workspace's own E2B key. It is built but hidden behind `mikka-computer-billing`. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
 | **Hybrid execution** | Agents on your computer offload builds, tests and dev servers to Mikka Cloud. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. The backend is on main, and a group of your own bots can be created on the web; the rest of the interface is not done. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | Running in production; next: end-to-end acceptance of each stage with real models. | [#181](https://github.com/alexj11324/Mikka/issues/181) |
-| **Connected apps** | Live acceptance of the approved email, calendar, Notion and Slack writes. | [#181](https://github.com/alexj11324/Mikka/issues/181) |
 | **Plugins** | Personal MCP servers and installed skills have a backend and Coordinator tools but no page yet; workspace admins switching single apps off. | [#595](https://github.com/alexj11324/Mikka/issues/595) |
 | **Proactive suggestions** | A nightly research run that turns your deadlines and interests into a few suggestion cards a day, which start a task when tapped. | [#350](https://github.com/alexj11324/Mikka/issues/350) |
 
@@ -265,8 +256,8 @@ Each person's preferred model list, in order, and their run location (cloud
 or local) in Settings › Models and subscriptions choose a new thread's model, Agent and machine;
 each computer has one switch to take part in dispatch
 ([execution settings](docs/execution-rules.md)).
-Checkpoint-based handover is implemented and tested; a real two-machine
-handover remains to be verified.
+A run whose machine drops hands over by checkpoint to another connected
+machine with the same repository.
 The agent reports progress, questions and blocks through Mikka's MCP worker
 tools.
 

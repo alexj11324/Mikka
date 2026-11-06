@@ -21,7 +21,7 @@
 
 </div>
 
-Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。云端桌面支持查看、接管和交还；使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
+Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。每个 bot 还有一台云端桌面，你可以查看、接管和交还。
 
 在网页、macOS 桌面应用或 iOS 应用中，于同一个地方跟进进展、回应问题并审阅结果。
 
@@ -46,7 +46,7 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
   - Daemon 通过你已安装并登录的 Agent 执行线程，因此沿用你现有的订阅与配置。
 
 - **故障后自动恢复。**
-  - 运行使用租约和 checkpoint。交接到拥有同一仓库的在线设备已有实现与测试，真实双机交接仍待验证。
+  - 运行使用租约和 checkpoint。设备掉线时，运行会在拥有同一仓库的另一台在线设备上继续。
 
 - **融入现有工具。**
   - 其他 agent 可通过 MCP 操作 Mikka；在 Telegram 中发消息或在 Slack 中 @ 提及，即可联系 Coordinator。与 Linear 的双向同步已经完成，但处于关闭状态。
@@ -58,7 +58,7 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
   <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：来自对话、Telegram、Slack 或 MCP 的请求经过分诊；不清楚的请求交回给人补充细节，清楚的请求派发给 Agent。Agent 可以请求澄清，并收到送回运行的答案。运行完成后交给审查与验证 Agent，检查未通过时回到修复运行，通过后进入验收与发布，监控会把故障转为新 issue。">
 </picture>
 
-每一步都已在生产环境中运行。在 Factory 流程中，任务按需要走最短的路径，经过分诊、方案、实现和审阅；检查未通过时回到修复，监控会把故障转为新 issue。在验收页上验收，会以你自己的 GitHub 账号合并 pull request。使用真实模型和应用的端到端验收在 [#181](https://github.com/alexj11324/Mikka/issues/181) 中跟踪。
+每一步都已在生产环境中运行。在 Factory 流程中，任务按需要走最短的路径，经过分诊、方案、实现和审阅；检查未通过时回到修复，监控会把故障转为新 issue。在验收页上验收，会以你自己的 GitHub 账号合并 pull request。
 
 ## 当前功能
 
@@ -70,12 +70,12 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 - **线程内容仅自己可见。** 在工作区任务上，同事只能看到线程的归属人、状态和时间，看不到指令、对话记录或结果。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。需要最新信息时，bot 可以搜索网页。
 - **交付「Artifact」。** Bot 可以将文档或 HTML 页面作为「Artifact」交付，支持版本记录和分享链接。
-- **通过 Factory 交付。** 分诊与澄清、审阅、检查未通过时的修复运行、以运行截图作为证据、以你的身份合并 pull request 的验收页，以及开出后续 issue 的监控。端到端验收在 [#181](https://github.com/alexj11324/Mikka/issues/181) 中跟踪。
-- **在已连接应用中操作。** Bot 可以提出邮件、Google 日历、Notion 和 Slack 操作，经你批准后执行。真实外部写入仍待端到端验收（[#181](https://github.com/alexj11324/Mikka/issues/181)）。
+- **通过 Factory 交付。** 分诊与澄清、审阅、检查未通过时的修复运行、以运行截图作为证据、以你的身份合并 pull request 的验收页，以及开出后续 issue 的监控。
+- **在已连接应用中操作。** Bot 可以提出邮件、Google 日历、Notion 和 Slack 操作，经你批准后执行。
 - **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号。⌘K 可搜索 bot、群聊、任务、线程和项目。
 - **判断哪些事需要你。** Mikka 按「置之不理的代价」为来自 GitHub、Linear、Notion 和 Gmail 的通知评级。紧急事项交给 Coordinator，它每天最多打扰你五次；其余事项留在「建议」中。每日简报会在你所在时区 08:00 之后发送到 Coordinator 对话中。
 - **新手引导。** 首次打开时引导你创建第一个 bot 并连接订阅，可以在 设置 › 偏好设置 中重新播放。
-- **使用自己的订阅和 key。** 在 设置 › 模型与订阅 中连接 ChatGPT（Codex）或 Claude 订阅，或添加模型服务商的 API key。订阅可以回复 bot 对话，并在你的电脑上运行线程。key 提供服务商为它列出的模型，并直接调用服务商。使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
+- **使用自己的订阅和 key。** 在 设置 › 模型与订阅 中连接 ChatGPT（Codex）或 Claude 订阅，或添加模型服务商的 API key。订阅可以回复 bot 对话，并在你的电脑上运行线程。key 提供服务商为它列出的模型，并直接调用服务商。
 - **插件。** 一个「插件」页面（也显示在 设置 › 连接 中）列出你的应用（Gmail、Google 日历、Notion、Slack、GitHub、Linear 和 Telegram），并可搜索公开的 agent 技能。每个应用连接属于建立它的人。
 - **应用内设置。** 设置在应用窗口内打开，包含账户、安全、偏好、通知、记忆、连接、模型、已保存的登录、隐私和设备等分区；工作区管理员另有通用、成员、团队、权限、密钥（包括工作区自己的 E2B API key）、审计日志、用量和计费。
 - **计费。** 托管模型（Mikka 默认）需要先验证银行卡。验卡通过 Stripe Checkout 完成，首个使用该卡的工作区获得一次性 1 美元免费额度。预付点数通过 Stripe Checkout 充值到余额。使用自己的订阅、设备和 E2B key 无需银行卡。
@@ -84,13 +84,13 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 - **支持团队协作。** 提供工作区、成员、邀请和团队管理，支持邮箱、Google 和 GitHub 登录。邮箱登录有 kill switch；Google 和 GitHub 登录始终开启。
 - **桌面应用。** 适用于 Apple Silicon 的 macOS 应用，在半透明窗口中渲染同一套界面，通过系统浏览器登录，在 Dock 和系统通知中提示等待中的运行，并从 GitHub Releases 自动更新。它还可以通过 SSH 添加 `~/.ssh/config` 中的服务器。应用图标是分层的 Liquid Glass 图标，在 macOS 26 上有默认、深色、着色和透明四种外观。
 - **iOS 应用。** 已在 TestFlight 上，尚未上架 App Store。位于 [`apps/mobile`](apps/mobile)，使用原生标签栏：对话、线程（含任务）、建议、设置和搜索，支持推送通知。
+- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，使用工作区自己的 E2B key。在「电脑」标签中可以实时查看、接管和交还控制权；你接管期间运行会暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器，桌面操作遵守适用的授权策略。有 key 时线程优先在云端运行，每个任务使用一台 sandbox，两次运行之间暂停。
+- **已保存的登录。** 网页分身遇到登录页时，bot 会发送安全登录卡片。密码存入 KMS 加密的保管库，模型无法读取，之后同一网站可复用；你可以在设置中删除。
+- **定时任务。** Bot 可以创建提醒、任务快照和只读 agent 任务，在指定时间或按周期运行。
 - **双语界面。** 应用提供英文和简体中文界面。
 
-以下功能处于早期体验阶段，需开启 flag 或开关，或仍待验收：
+以下功能由默认关闭的开关控制：
 
-- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，使用工作区自己的 E2B key。支持实时查看、接管和交还控制权；你接管期间运行会暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器。桌面操作遵守适用的授权策略。每个 bot 都显示「电脑」标签；端到端验收在 [#181](https://github.com/alexj11324/Mikka/issues/181) 中跟踪。
-- **已保存的登录。** 网页分身遇到登录页时，bot 会发送安全登录卡片。密码存入 KMS 加密的保管库，模型无法读取，之后同一网站可复用；你可以在设置中删除。默认开启；当前版本的真实环境验收仍待完成。
-- **定时任务。** Bot 可以创建提醒、任务快照和只读 agent 任务，在指定时间或按周期运行。端到端验收仍待完成（[#181](https://github.com/alexj11324/Mikka/issues/181)）。
 - **关于你的记忆。** Mikka 从已评级的通知中提取关于你的信息，每晚合并，并在「记忆」中展示，每一条都可以修改或删除。
 
 ## 开发路线
@@ -101,11 +101,9 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **云端电脑** | 同一个任务的云端运行已共用一台独立的 sandbox，两次运行之间暂停；有 E2B key 的人默认在云端运行。下一步：使用真实订阅在 Mikka Cloud 上运行的 Agent 完成端到端验收，以及由 Mikka 计费的算力（已完成，但由 `mikka-computer-billing` 隐藏）。 | [#181](https://github.com/alexj11324/Mikka/issues/181) |
+| **云端电脑** | 由 Mikka 计费的算力，不用工作区自己的 E2B key 也能使用云端电脑。已完成，但由 `mikka-computer-billing` 隐藏。 | [#172](https://github.com/alexj11324/Mikka/issues/172) |
 | **混合执行** | 你电脑上的 Agent 将构建、测试和开发服务器交给 Mikka Cloud 运行。 | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。后端已合入 main，网页上已能用自己的 bot 创建群聊；其余界面尚未完成。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | 已在生产环境运行；下一步：使用真实模型逐阶段完成端到端验收。 | [#181](https://github.com/alexj11324/Mikka/issues/181) |
-| **Connected apps** | 邮件、日历、Notion 和 Slack 审批后写入的真实环境验收。 | [#181](https://github.com/alexj11324/Mikka/issues/181) |
 | **插件** | 个人 MCP server 和已安装技能已有后端和 Coordinator 工具，但还没有页面；工作区管理员可单独停用应用。 | [#595](https://github.com/alexj11324/Mikka/issues/595) |
 | **主动建议** | 每晚的后台调研，根据你的截止日期和兴趣每天生成少量建议卡片，点击即可开始任务。 | [#350](https://github.com/alexj11324/Mikka/issues/350) |
 
@@ -146,7 +144,7 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
 
-运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 Agent CLI。新线程的模型、Agent 和机器由每个人在 设置 › 模型与订阅 中的「优先使用的模型」列表（按顺序）和 运行位置（云端 / 本地）决定；每台电脑在 设置 › 设备 中有一个 参与调度 开关（[执行设置](docs/execution-rules.md)）。基于检查点的交接已有实现和测试；真实双机交接仍待验收。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
+运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 Agent CLI。新线程的模型、Agent 和机器由每个人在 设置 › 模型与订阅 中的「优先使用的模型」列表（按顺序）和 运行位置（云端 / 本地）决定；每台电脑在 设置 › 设备 中有一个 参与调度 开关（[执行设置](docs/execution-rules.md)）。设备掉线时，运行会按检查点交接到拥有同一仓库的另一台在线设备。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
 
 Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox，运行同一个 daemon，并提供可通过 noVNC 查看的桌面。[`packages/subscription-worker`](packages/subscription-worker) 中的 Go 订阅 worker 保管你所连接订阅的登录凭据，密钥存放在 Infisical 中。[`services/credential-broker`](services/credential-broker) 中独立的凭据 broker 是唯一能解密已保存登录的组件，使用 AWS KMS。
 
