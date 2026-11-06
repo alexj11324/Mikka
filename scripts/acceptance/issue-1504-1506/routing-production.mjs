@@ -163,6 +163,14 @@ export async function runRoutingAcceptance({ mode = 'dispatch', receiptPath = nu
       const verifyOrder = async () => {
         if ((await api('/api/version')).build !== ACCEPTANCE_SHA) fail('acceptance_version_changed')
         const order = await rpc('model-order.getModelOrder', [workspaceId])
+        // Diagnose the current product view before any fixture exists, without credentials or source IDs.
+        report.orderObservation = { autoModelRouting: order?.autoModelRouting === true, cloudReady: order?.cloudReady === true,
+          candidates: Array.isArray(order?.candidates) ? order.candidates.length : null,
+          entries: Array.isArray(order?.entries) ? order.entries.map(entry => ({
+            harness: fixed(entry.harness, ['claude_code', 'codex']),
+            model: Object.hasOwn(KNOWN_MODELS, entry.model) ? entry.model : 'unknown',
+            block: entry.block ? fixed(entry.block.reason, ['checking', 'quota', 'expired', 'paused', 'missing', 'removed', 'modelGone', 'keyRefused', 'balance', 'providerUnavailable', 'noDevice']) : null,
+          })) : null }; save()
         if (order.autoModelRouting !== true || order.cloudReady !== true || !Array.isArray(order.candidates) || !order.candidates.length || !Array.isArray(order.entries)) fail('routing_unavailable')
         for (const entry of [...order.candidates, ...order.entries]) {
           if (entry.source?.kind !== 'subscription' || typeof entry.source.connectionId !== 'string' ||
