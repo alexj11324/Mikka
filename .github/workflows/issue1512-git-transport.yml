@@ -2,12 +2,14 @@ name: Issue 1512 branch transport
 on:
   push:
     branches: [ops/1512-git-transport]
-    paths: ['.github/workflows/issue1512-git-transport.yml', '.github/issue1512-source.json']
+    paths: ['.github/workflows/issue1512-git-transport.yml', '.github/issue1512-source.json', '.github/issue1512-dispatch.json']
 permissions:
-  contents: write
+  contents: read
 jobs:
   import:
-    if: github.repository == 'alexj11324/Mikka'
+    if: github.repository == 'alexj11324/Mikka' && !startsWith(github.event.head_commit.message, 'issue1512:dispatch ') && !startsWith(github.event.head_commit.message, 'issue1512:cleanup ')
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -36,4 +38,67 @@ jobs:
           git('push', 'origin', manifest.revision + ':refs/heads/feat/1512-run-observability')
           console.log('Imported issue #1512 revision ' + manifest.revision + ' without force-push')
           fs.rmSync(file)
+          JS
+
+  dispatch:
+    if: github.repository == 'alexj11324/Mikka' && startsWith(github.event.head_commit.message, 'issue1512:dispatch ')
+    permissions:
+      contents: read
+      actions: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Dispatch the explicitly requested production verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          import assert from 'node:assert/strict'
+          const operation = JSON.parse(fs.readFileSync('.github/issue1512-dispatch.json', 'utf8'))
+          assert.match(operation.requestId, /^[0-9a-f-]{36}$/)
+          const input = operation.inputs
+          assert.ok(input && Object.keys(input).every(key => ['mode','expected-deployment-sha','model-case','prepare','browser-submit','export-target','export-id'].includes(key)))
+          assert.ok(['preflight','execute','export'].includes(input.mode))
+          assert.ok(['all','claude','codex'].includes(input['model-case']))
+          assert.match(input['expected-deployment-sha'], /^[0-9a-f]{40}$/)
+          for (const key of ['prepare','browser-submit']) assert.ok(['true','false'].includes(input[key]))
+          assert.ok(input.mode === 'execute' || input.prepare === 'false' && input['browser-submit'] === 'false')
+          assert.ok(input['browser-submit'] === 'false' || input['model-case'] !== 'all')
+          if (input.mode === 'export') {
+            assert.ok(['dashboard','insight'].includes(input['export-target']))
+            assert.match(input['export-id'], /^[1-9][0-9]{0,14}$/)
+          }
+          const api = 'https://api.github.com/repos/alexj11324/Mikka'
+          const headers = { authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28' }
+          const head = await fetch(api + '/git/ref/heads/main', { headers, redirect: 'error', signal: AbortSignal.timeout(15000) })
+          assert.equal(head.status, 200)
+          assert.equal((await head.json()).object.sha, input['expected-deployment-sha'])
+          const served = await fetch('https://app.aspectlylabs.com/mikka/api/version', { headers: { 'cache-control': 'no-store' }, redirect: 'error', signal: AbortSignal.timeout(15000) })
+          assert.equal(served.status, 200)
+          assert.equal((await served.json()).build, input['expected-deployment-sha'])
+          const response = await fetch(api + '/actions/workflows/run-trace-acceptance.yml/dispatches', { method: 'POST', headers, redirect: 'error', signal: AbortSignal.timeout(15000), body: JSON.stringify({ ref: 'main', inputs: input }) })
+          await response.body?.cancel()
+          assert.equal(response.status, 204)
+          console.log(JSON.stringify({ dispatched: true, requestId: operation.requestId, mode: input.mode, modelCase: input['model-case'], revision: input['expected-deployment-sha'] }))
+          JS
+  cleanup:
+    if: github.repository == 'alexj11324/Mikka' && startsWith(github.event.head_commit.message, 'issue1512:cleanup ')
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Remove only this task's temporary transport branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-git-transport', { method: 'DELETE', headers: { authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' }, redirect: 'error', signal: AbortSignal.timeout(15000) })
+          await response.body?.cancel()
+          if (response.status !== 204) throw new Error('TASK_BRANCH_CLEANUP_FAILED')
+          console.log('Removed the issue 1512 temporary transport branch')
           JS
