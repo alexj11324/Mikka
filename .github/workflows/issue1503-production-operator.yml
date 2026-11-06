@@ -41,7 +41,7 @@ jobs:
         run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 3fbb10efeddb57656284d561e814b8f8d41e76fe
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 2960d783f0196fed5375593d910a43430a101747
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

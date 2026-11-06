@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { smokeSession, fail, SMOKE_ID } from './http.ts'
 import { encode, decode } from '../../../lib/desktop-rpc/wire.ts'
+import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
@@ -24,6 +25,28 @@ const nonempty = value => typeof value === 'string' && value.trim().length > 0
 const verificationPath = '/api/integrations/github/repositories/verification'
 const criteriaPassed = criteria => Array.isArray(criteria) && criteria.length > 0 && criteria.every(item => item.passed === true
   && (item.status ?? 'passed') === 'passed' && nonempty(item.evidence))
+const rpcErrorCodes = new Set([...ACTION_ERROR_CODES, 'desktop_rpc_request_invalid', 'desktop_rpc_action_unknown',
+  'desktop_client_update_required', 'desktop_session_expired', 'desktop_rpc_failed'])
+
+export function rpcFailureMetadata(action, result, fallback) {
+  const code = typeof result?.error === 'string' ? result.error : result?.error?.code
+  return { action, code: rpcErrorCodes.has(code) ? code : fallback }
+}
+
+/** The first edit materializes default:* IDs as UUIDs. Consume every mutation's
+ * returned view; at most the initial row count may be removed. */
+export async function removeModelOrderEntries(view, change) {
+  check(Array.isArray(view?.entries), 'model_order_view_invalid')
+  const limit = view.entries.length
+  for (let removed = 0; removed < limit; removed++) {
+    const before = view.entries.length
+    check(before > 0 && nonempty(view.entries[0]?.id), 'model_order_removal_invalid')
+    view = await change({ kind: 'remove', id: view.entries[0].id })
+    check(Array.isArray(view?.entries) && view.entries.length === before - 1, 'model_order_removal_no_progress')
+  }
+  check(view.entries.length === 0, 'model_order_removal_incomplete')
+  return view
+}
 
 export function fileSpecification(marker, harness) {
   const initial = `Factory delivery acceptance #1503\nCase: ${marker}-${harness}\nState: initial\n`
@@ -52,8 +75,8 @@ export function matchedCheckEvidence(state, passed) {
     check(candidate && sha(candidate.sha) && uuid(attempt.runId) && item.status === 'passed' && item.stage === attempt.stage
       && item.runId === attempt.runId && item.candidateId === attempt.candidateId && item.candidateSha === candidate.sha, 'verification_check_binding_mismatch')
     check(criteriaPassed(item.criteria) && item.criteria.every(criterion => criterion.status === 'passed'), 'verification_criteria_missing')
-    // The accepted V2 flow has a report-only review. It intentionally has no
-    // daemon command; actual artifact observations are checked separately.
+    // V2 review permits report-only evidence. A configured repository command
+    // may also run; actual artifact observations remain independently required.
     if (!(state.task.route?.flowVersion === 2 && item.stage === 'review')) check(item.verify?.status === 'passed'
       && nonempty(item.verify.command) && item.verify.exitCode === 0, 'independent_command_verification_missing')
     return item
@@ -254,11 +277,24 @@ export async function runDeliveryAcceptance(env = process.env) {
       check(value !== null, 'http_json_invalid'); return value
     }
     rpc = async (action, args) => {
-      const result = await json('/api/desktop/rpc', session.post({ version: 1, action, args: encode(args) }))
-      check(result.ok === true, 'rpc_failed')
-      const value = decode(result.result)
-      check(value?.ok !== false && !value?.error, 'rpc_action_failed')
-      return value?.ok === true && Object.hasOwn(value, 'data') ? value.data : value
+      let recorded = false
+      const record = (result, code) => {
+        const failure = rpcFailureMetadata(action, result, code)
+        report.firstRpcFailure ??= failure; report.lastRpcFailure = failure; recorded = true
+        console.log(JSON.stringify({ phase: 'rpc_failure', ...failure }))
+      }
+      try {
+        const response = await request('/api/desktop/rpc', session.post({ version: 1, action, args: encode(args) }))
+        const result = await response.json().catch(() => null)
+        if (!response.ok || result?.ok !== true) { record(result, 'rpc_failed'); fail('rpc_failed') }
+        let value
+        try { value = decode(result.result) } catch { record(null, 'rpc_decode_failed'); fail('rpc_decode_failed') }
+        if (value?.ok === false || value?.error) { record(value, 'rpc_action_failed'); fail('rpc_action_failed') }
+        return value?.ok === true && Object.hasOwn(value, 'data') ? value.data : value
+      } catch (error) {
+        if (!recorded) record(null, 'rpc_transport_failed')
+        throw error
+      }
     }
     const pin = async () => check((await json('/api/version')).build === expectedSha, 'deployment_changed')
     const order = async () => rpc('model-order.getModelOrder', [workspaceId])
@@ -302,7 +338,7 @@ export async function runDeliveryAcceptance(env = process.env) {
         'repository_verification_configuration_mismatch')
       report.repositoryVerification.installed.push({ harness: definition.harness, requiredPath: specification.path, commandSha256: digest(verifyCommand) })
       await stage('configure_small_official_model'); await pin()
-      for (const entry of [...currentOrder.entries]) await changeOrder({ kind: 'remove', id: entry.id })
+      currentOrder = await removeModelOrderEntries(currentOrder, changeOrder)
       await changeOrder({ kind: 'add', entries: [definition] })
       await changeOrder({ kind: 'location', location: 'cloud' })
       await changeOrder({ kind: 'autoRouting', enabled: false })
@@ -517,10 +553,12 @@ export async function runDeliveryAcceptance(env = process.env) {
     if (originalOrder && rpc) {
       try {
         currentOrder = await rpc('model-order.getModelOrder', [workspaceId])
-        for (const entry of currentOrder.entries) await rpc('model-order.changeModelOrder', [{ kind: 'remove', id: entry.id }, workspaceId])
-        if (originalOrder.entries.length) await rpc('model-order.changeModelOrder', [{ kind: 'add', entries: briefOrder(originalOrder).entries }, workspaceId])
-        for (const change of [{ kind: 'location', location: originalOrder.location }, { kind: 'autoRouting', enabled: originalOrder.autoModelRouting }, { kind: 'preferred', harness: originalOrder.preferredHarness }])
-          await rpc('model-order.changeModelOrder', [change, workspaceId])
+        if (JSON.stringify(briefOrder(currentOrder)) !== JSON.stringify(briefOrder(originalOrder))) {
+          currentOrder = await removeModelOrderEntries(currentOrder, change => rpc('model-order.changeModelOrder', [change, workspaceId]))
+          if (originalOrder.entries.length) await rpc('model-order.changeModelOrder', [{ kind: 'add', entries: briefOrder(originalOrder).entries }, workspaceId])
+          for (const change of [{ kind: 'location', location: originalOrder.location }, { kind: 'autoRouting', enabled: originalOrder.autoModelRouting }, { kind: 'preferred', harness: originalOrder.preferredHarness }])
+            await rpc('model-order.changeModelOrder', [change, workspaceId])
+        }
         const restored = briefOrder(await rpc('model-order.getModelOrder', [workspaceId]))
         check(JSON.stringify({ ...restored, customized: undefined }) === JSON.stringify({ ...briefOrder(originalOrder), customized: undefined }), 'settings_restore_mismatch')
         report.restoredOrder = restored
