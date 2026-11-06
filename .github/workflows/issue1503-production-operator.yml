@@ -9,10 +9,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: issue1503-codex-context-reply
+  group: issue1503-codex-round-cleanup
   cancel-in-progress: false
 jobs:
-  resume_codex:
+  cancel_codex:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,14 +37,13 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Answer the exact Codex question through the normal Factory API
-        run: node --import tsx scripts/ops/issue1503/resume-codex.mjs
+      - name: Cancel the exact failed Codex acceptance round through the normal Factory API
+        run: node --import tsx scripts/ops/issue1503/cancel-codex.mjs
         env:
           NODE_ENV: production
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: c0c98baa3020a085652ee5f773310b6dfa412c5d
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-codex-reply
+          name: issue1503-codex-round-cleanup
           path: issue1503-report
           retention-days: 3
