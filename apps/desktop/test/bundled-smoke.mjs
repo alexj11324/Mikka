@@ -133,12 +133,15 @@ try {
   assert.equal(probed.status, 'ok')
   assert.equal(probed.server.url, selfHosted.url)
   assert.equal(probed.server.name, 'Acceptance self-hosted')
-  await Promise.all([page.waitForEvent('framenavigated'), page.evaluate(url => window.mikka.bundled.server.select(url), selfHosted.url)])
+  // Main reloads the page as soon as the server changes, which can come before
+  // the call's own reply: start it without awaiting it in the page.
+  await page.evaluate(url => { void window.mikka.bundled.server.select(url).catch(() => {}) }, selfHosted.url)
   await page.waitForFunction(url => window.mikka?.app.serverUrl === url, selfHosted.url)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
+  for (let attempt = 0; attempt < 100 && selfHosted.configReads() === 0; attempt++) await new Promise(done => setTimeout(done, 100))
   assert.ok(selfHosted.configReads() > 0, 'the signed-out page must read the chosen server')
   await page.screenshot({ path: join(output, 'bundled-sign-in-self-hosted.png'), animations: 'disabled' })
-  await Promise.all([page.waitForEvent('framenavigated'), page.evaluate(() => window.mikka.bundled.server.select(null))])
+  await page.evaluate(() => { void window.mikka.bundled.server.select(null).catch(() => {}) })
   await page.waitForFunction(url => window.mikka?.app.serverUrl === url, builtIn)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   check('server choice: probe states, probed-only selection, the page follows the chosen server and returns')
