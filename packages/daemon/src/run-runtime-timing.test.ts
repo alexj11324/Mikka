@@ -7,6 +7,21 @@ import { runIdHash } from "./tracing"
 const runId = "private-run", deviceId = "private-device"
 const runPath = `/v1/devices/${deviceId}/runs/${runId}`
 
+it("does not turn malformed diagnostic identity into an execution error or a zero-call receipt", async () => {
+  const timings = new RunRuntimeTimings()
+  const valid = timings.begin(runId, deviceId, "claude_code")
+  const unavailable = [timings.begin(runId, undefined as never, "claude_code"),
+    timings.begin("", deviceId, "claude_code"), timings.begin(runId, deviceId, "unknown" as never)]
+  for (const observation of unavailable) {
+    observation.executing(); observation.finishing()
+    expect(observation.finish()).toBeUndefined()
+  }
+  timings.agentAccepted(undefined as never, "claude_user_ack")
+  expect(await timings.backgroundCredentialRefresh(undefined as never, async () => 42)).toBe(42)
+  timings.request("POST", `/v1/runs/${runId}/events`, {})(200)
+  expect(valid.finish()?.requests).toHaveLength(1)
+})
+
 it("attributes GitHub credential renewal by its actual query-bound run and records only real CLI acceptance", async () => {
   let now = 0
   const timings = new RunRuntimeTimings(() => now, () => 1000 + now)

@@ -108,6 +108,9 @@ it("gives the daemon's own clone and fetch the run's repository token, and nothi
   const fill = (env: Record<string, string>, path: string) => execa('git', ['credential', 'fill'], {
     env: { PATH: f.path, HOME: f.root, GIT_CONFIG_NOSYSTEM: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1', ...env }, extendEnv: false,
     input: `protocol=https\nhost=github.com\npath=${path}\n\n`, cwd: f.worktree, reject: false })
+  // The legacy path discovers native gh before making its Git helper.
+  // Exercise the fixture CLI even on a development machine without gh.
+  vi.stubEnv('PATH', f.path)
   try {
     await withRunGitCredentials(assignment, privateDir, async env => {
       expect(Object.keys(env).every(key => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')).toBe(true)
@@ -121,7 +124,10 @@ it("gives the daemon's own clone and fetch the run's repository token, and nothi
     expect(readdirSync(privateDir)).toEqual([])
     // Without GitHub delivery the machine's own git credentials apply, as before.
     expect(await withRunGitCredentials({ issueId: github.issueId }, privateDir, async env => env)).toEqual({})
-  } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
+  } finally {
+    vi.unstubAllEnvs()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
 })
 
 it('supplies a private run-local helper to each real harness without modifying the repository', async () => {

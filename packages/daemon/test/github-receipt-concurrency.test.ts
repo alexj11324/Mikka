@@ -32,7 +32,7 @@ afterEach(async () => {
   vi.resetAllMocks()
 })
 
-function fixture(hosted = true, local: { head?: string; headTree?: string; snapshot?: string; gitFailure?: Error } = {}) {
+function fixture(hosted = true, local: { head?: string; headTree?: string; snapshot?: string; gitFailure?: Error; preparedGitHub?: boolean } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'mikka-receipt-concurrency-'))
   const bin = join(root, 'bin'), worktree = join(root, 'worktree')
   mkdirSync(bin); mkdirSync(worktree)
@@ -45,6 +45,8 @@ function fixture(hosted = true, local: { head?: string; headTree?: string; snaps
   const remote = deferred<Output>(), remoteRequested = deferred<void>()
   const started: Read[] = []
   const privateDir = join(root, 'private')
+  const githubDirectory = join(root, 'native-gh')
+  if (local.preparedGitHub) { mkdirSync(githubDirectory); writeFileSync(join(githubDirectory, 'hosts.yml'), 'prepared-login') }
   const directory = () => join(privateDir, readdirSync(privateDir).find(name => name.startsWith('github-receipt-')) ?? 'removed')
   mocks.pinnedGit.mockResolvedValue(mocks.git)
   mocks.snapshotTree.mockResolvedValue(local.snapshot ?? tree)
@@ -53,15 +55,17 @@ function fixture(hosted = true, local: { head?: string; headTree?: string; snaps
     if (args[0] === 'rev-parse') return { stdout: args[1] === 'HEAD^{tree}' ? local.headTree ?? tree : local.head ?? commit }
     return { stdout: '' }
   })
-  mocks.execa.mockImplementation((binary: string, args: string[]) => {
-    expect(binary).toBe(hosted ? 'gh' : join(directory(), 'github', 'bin', 'gh'))
+  mocks.execa.mockImplementation((binary: string, args: string[], options: { env: Record<string, string> }) => {
+    expect(binary).toBe(hosted || local.preparedGitHub ? 'gh' : join(directory(), 'github', 'bin', 'gh'))
+    if (local.preparedGitHub) expect(options.env.GH_CONFIG_DIR).toBe(githubDirectory)
     const kind: Read = args[0] === 'pr' ? 'pr' : 'ci'
     if (kind === 'ci') expect(args).toContain(`commit=${commit}`)
     started.push(kind)
     return reads[kind].promise
   })
   const receipt = agentPublishedReceipt({ runId: 'receipt-test', repoPath: join(root, 'repo'), worktree,
-    tree, github, privateDir, hosted, env: { NODE_ENV: 'test', PATH: bin } })
+    tree, github, privateDir, hosted, env: { NODE_ENV: 'test', PATH: bin },
+    ...(local.preparedGitHub ? { githubEnvironment: { GH_CONFIG_DIR: githubDirectory } } : {}) })
   void receipt.catch(() => undefined)
   const release = (kind: Read, value = valid[kind]) => reads[kind].resolve({ stdout: value })
   const mutations = () => mocks.git.mock.calls.map(([args]) => args as string[])
@@ -72,7 +76,7 @@ function fixture(hosted = true, local: { head?: string; headTree?: string; snaps
     await receipt.catch(() => undefined)
     rmSync(root, { recursive: true, force: true })
   })
-  return { hosted, reads, remote, remoteRequested, started, receipt, release, mutations, directory }
+  return { hosted, reads, remote, remoteRequested, started, receipt, release, mutations, directory, githubDirectory }
 }
 
 async function beginReads(f: ReturnType<typeof fixture>) {
@@ -95,6 +99,15 @@ it.each([true, false])('reads PR and CI together against the actual worktree wit
   await expect(f.receipt).resolves.toEqual({ branch: github.branch, commit, pushed: true, remote: 'origin' })
   expect(f.mutations()).toEqual([])
   expect(existsSync(directory)).toBe(false)
+})
+
+it('reuses the held local native credential for receipts without generating an exchange helper or deleting the login', async () => {
+  const f = fixture(false, { preparedGitHub: true })
+  await beginReads(f)
+  expect(existsSync(join(f.directory(), 'github'))).toBe(false)
+  f.release('pr'); f.release('ci')
+  await expect(f.receipt).resolves.toMatchObject({ commit, pushed: true })
+  expect(existsSync(join(f.githubDirectory, 'hosts.yml'))).toBe(true)
 })
 
 it.each([

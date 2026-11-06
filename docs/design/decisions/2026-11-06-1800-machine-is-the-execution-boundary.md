@@ -102,3 +102,8 @@ to three seconds. Use the account and repository named in the issue, record
 the exact application/source versions and run IDs, and clean up the test's
 own resources. Neither an image checksum nor one successful CLI invocation
 stands in for the end-to-end timing.
+The start is the first line of `dispatchRun`, before its initial Profile/model
+validation, with an explicit `dispatch_run_entry` boundary in the receipt. The
+end is the later of the server execution stage and the official CLI's exact
+task acknowledgement. Legacy measurements that start inside the dispatch body
+are lower bounds and useful phase evidence, not complete-entry acceptance.

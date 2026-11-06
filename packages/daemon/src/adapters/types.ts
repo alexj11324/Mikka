@@ -70,6 +70,8 @@ export interface SessionOptions {
   /** Trusted server-issued delivery binding, never model-selected. */
   /** The run owner's own GitHub credential for git and gh; `branch` is the task branch a delivering run pushes. */
   github?: { endpoint: string; repository: string; branch?: string; runToken?: string; issueId: string; token?: string; expiresAt?: string | null }
+  /** Host-prepared native gh config; credentials renew in the background. */
+  githubEnvironment?: Record<string, string>
   /** Trusted cloud runner: use the task machine's ordinary HOME and environment. */
   machineEnvironment?: true
   /** Add a refreshed credential to the existing in-memory output masker before use. */

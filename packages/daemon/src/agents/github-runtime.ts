@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { delimiter, join, resolve } from 'node:path'
 import { execa } from 'execa'
+import { findOnPath } from '../path-search'
 import type { SessionOptions } from '../adapters/types'
 import { pinnedGit, snapshotTree } from './publish'
 import type { RunPublish } from '@mikka/protocol'
@@ -78,17 +79,20 @@ export async function withRunGitCredentials<T>(
   assignment: { github?: { endpoint: string; repository: string; branch?: string; token?: string; expiresAt?: string | null }; mcp?: { token: string }; issueId: string },
   privateDir: string,
   work: (env: Record<string, string>, github: { defaultBranch(): Promise<string | undefined> }) => Promise<T>,
+  preparedEnvironment?: Record<string, string>,
 ): Promise<T> {
   const none = { defaultBranch: async () => undefined }
-  if (!assignment.github || (!assignment.github.token && !assignment.mcp)) return work({}, none)
-  if (assignment.github.token) {
-    const env = {
-      GH_TOKEN: assignment.github.token, GIT_TERMINAL_PROMPT: '0',
+  if (!assignment.github || (!assignment.github.token && !assignment.mcp && !preparedEnvironment)) return work({}, none)
+  if (preparedEnvironment || assignment.github.token) {
+    const env = preparedEnvironment ?? {
+      GH_TOKEN: assignment.github.token!, GIT_TERMINAL_PROMPT: '0',
       GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
       GIT_CONFIG_KEY_1: 'credential.https://github.com.helper', GIT_CONFIG_VALUE_1: '!gh auth git-credential',
     }
     return work(env, { defaultBranch: async () => {
-      const result = await execa('gh', ['api', `repos/${assignment.github!.repository}`, '--jq', '.default_branch'], {
+      const binary = findOnPath('gh', env.PATH ?? process.env.PATH)
+      if (!binary) return undefined
+      const result = await execa(binary, ['api', `repos/${assignment.github!.repository}`, '--jq', '.default_branch'], {
         env: { ...process.env, ...env }, stdin: 'ignore', timeout: 30_000, reject: false,
       })
       return result.exitCode === 0 ? result.stdout.trim() || undefined : undefined
@@ -118,31 +122,36 @@ export async function withRunGitCredentials<T>(
 
 /** Verify the exact already-pushed commit. Never create a commit or push after CI. */
 export async function agentPublishedReceipt(input: {
-  runId: string; repoPath: string; worktree: string; tree: string; github: RunGitHub; privateDir: string; hosted?: boolean; env?: NodeJS.ProcessEnv
+  runId: string; repoPath: string; worktree: string; tree: string; github: RunGitHub; privateDir: string; hosted?: boolean; env?: NodeJS.ProcessEnv; githubEnvironment?: Record<string, string>; signal?: AbortSignal
 }): Promise<RunPublish> {
+  input.signal?.throwIfAborted()
   // The cloud CLI committed in this exact working directory. Local runs keep
   // their repository binding; neither path imports a second shadow history.
   if (!input.github.branch) throw new Error('No task branch to read back')
   const branch = input.github.branch
   mkdirSync(input.privateDir, { recursive: true, mode: 0o700 })
   const receiptDir = mkdtempSync(join(input.privateDir, 'github-receipt-'))
+  const nativeGitHub = input.hosted || Boolean(input.githubEnvironment)
   try {
     const env: NodeJS.ProcessEnv = { NODE_ENV: input.env?.NODE_ENV ?? process.env.NODE_ENV ?? 'production', ...input.env,
-      ...(input.hosted ? {
+      ...(nativeGitHub ? {
         GH_HOST: 'github.com', GH_TOKEN: '', GITHUB_TOKEN: '', GIT_TERMINAL_PROMPT: '0',
         GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
         GIT_CONFIG_KEY_1: 'credential.https://github.com.helper', GIT_CONFIG_VALUE_1: '!gh auth git-credential',
-      } : prepareGitHubEnvironment(receiptDir, input.github, input.env?.PATH ?? process.env.PATH ?? '')) }
-    const git = await pinnedGit(input.repoPath, input.worktree, env)
+      } : prepareGitHubEnvironment(receiptDir, input.github, input.env?.PATH ?? process.env.PATH ?? '')), ...input.githubEnvironment }
+    const git = await pinnedGit(input.repoPath, input.worktree, env, input.signal)
     const originalHead = String((await git(['rev-parse', 'HEAD'])).stdout).trim()
-    if (await snapshotTree(input.repoPath, input.worktree, env) !== input.tree) throw new Error('Agent must commit and verify every change before submitting')
+    if (await snapshotTree(input.repoPath, input.worktree, env, input.signal) !== input.tree) throw new Error('Agent must commit and verify every change before submitting')
     const url = `https://github.com/${input.github.repository}.git`
     const commit = String((await git(['ls-remote', '--exit-code', url, `refs/heads/${branch}`])).stdout).trim().split(/\s+/)[0]
     if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Invalid pushed commit')
     const headTree = String((await git(['rev-parse', 'HEAD^{tree}'])).stdout).trim()
     if (originalHead !== commit || headTree !== input.tree) throw new Error('Agent must commit and verify every change before submitting')
     try {
-      const gh = (args: string[]) => execa(input.hosted ? 'gh' : join(receiptDir, 'github', 'bin', 'gh'), args, { cwd: input.worktree, env, extendEnv: false, stdin: 'ignore' })
+      const gh = (args: string[]) => {
+        input.signal?.throwIfAborted()
+        return execa(nativeGitHub ? 'gh' : join(receiptDir, 'github', 'bin', 'gh'), args, { cwd: input.worktree, env, extendEnv: false, stdin: 'ignore', cancelSignal: input.signal, killDescendants: true })
+      }
       const [owner, repository] = input.github.repository.split('/')
       const query = 'query($owner:String!,$repository:String!,$commit:GitObjectID!){repository(owner:$owner,name:$repository){object(oid:$commit){... on Commit {oid statusCheckRollup{state}}}}}'
       // These reads share the fixed remote SHA. Settle every child before
@@ -155,7 +164,11 @@ export async function agentPublishedReceipt(input: {
       if (pr.value.headRefOid !== commit || typeof pr.value.body !== 'string' || !pr.value.body.trimEnd().endsWith(`<!-- mikka-issue:${input.github.issueId} -->`)) throw new Error('Unbound pull request')
       const checked = checks.value.data?.repository?.object
       if (checked?.oid !== commit || checked.statusCheckRollup?.state !== 'SUCCESS') throw new Error('Incomplete CI')
-    } catch { throw new Error('The task pull request and successful CI must match the submitted commit') }
+    } catch {
+      input.signal?.throwIfAborted()
+      throw new Error('The task pull request and successful CI must match the submitted commit')
+    }
+    input.signal?.throwIfAborted()
     return { branch, commit, pushed: true, remote: 'origin' }
   } finally { rmSync(receiptDir, { recursive: true, force: true }) }
 }

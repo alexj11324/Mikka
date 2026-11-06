@@ -52,6 +52,7 @@ export async function runVerify(
   sandbox: AgentSandbox,
   options: VerifyOptions
 ): Promise<VerifyResult> {
+  options.signal?.throwIfAborted()
   // Somewhere the agent could never write: nothing in it was planted.
   mkdirSync(options.tmpRoot, { recursive: true, mode: 0o700 })
   const tmpDir = mkdtempSync(join(realpathSync(options.tmpRoot), "verify-"))
@@ -104,6 +105,7 @@ async function attemptVerify(
       pidFile: options.pidFile,
       // Every verify of this run carries the temp root in its profile.
       marker: realpathSync(options.tmpRoot),
+      signal: options.signal,
     }
   )
   child.process.stdin.end()
@@ -121,6 +123,8 @@ async function attemptVerify(
   }, Math.max(0, timeoutMs))
   const abort = () => void child.kill()
   options.signal?.addEventListener("abort", abort, { once: true })
+  // Cancellation can win between the async launch and this listener.
+  if (options.signal?.aborted) abort()
   try {
     const { code, signal } = await child.exited
     // Sandbox denials explain most surprising failures; stderrTail has them.

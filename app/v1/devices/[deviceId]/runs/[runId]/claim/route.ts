@@ -53,6 +53,7 @@ import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
+import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
@@ -64,6 +65,17 @@ export const dynamic = 'force-dynamic'
  * daemon's `RunNotPinnedHereError`, and it stops asking.
  */
 async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
+  const { runId } = await params
+  const attributes = cloudStartupRunAttributes(runId)
+  return cloudStartupSpan('cloud.worker.claim', attributes, async () => {
+    const timings = cloudStartupPhases(attributes, 'cloud.worker.claim')
+    try { return await claimRun(request, { params }, timings) }
+    finally { timings.end() }
+  })
+}
+
+async function claimRun(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }, timings: ReturnType<typeof cloudStartupPhases>) {
+  timings.next('authorize')
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
@@ -75,6 +87,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, minVersion: MIN_DAEMON_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   }
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
+  timings.next('identity')
   const [run] = await db
     .select()
     .from(agentRuns)
@@ -118,6 +131,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   }
   // Preserve the task-access denial before narrower policy parsing or any
   // claim preparation. Publication and the final response recheck it later.
+  timings.next('admission')
   if (!await issueForUser(caller.userId, run.issueId)) return rejectPublication(new PublicationError('issue_unavailable'))
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
@@ -190,6 +204,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     try { distribution = policyDistributionContext(await requestDevicePolicyIssuer(request,caller,deviceId,runId),caller.userId,deviceId,runId,cliPolicy) }
     catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
   }
+  timings.next('acquire_lease')
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
@@ -298,6 +313,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
     if (current && (!caller.scopeWorkspaceId || caller.scopeWorkspaceId === current.workspaceId)) localComputer = current
   }
+  timings.next('provenance')
   let skillAssignment
   let benchmarkAssignment
   try {
@@ -316,20 +332,22 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // final claim-response transaction still checks the owner/run/device before
   // returning any prompt or credential. Older daemons keep their original
   // response shape until they advertise the capability.
+  timings.next('assignment_context')
+  const startupAttributes = cloudStartupRunAttributes(runId)
   const githubRepository = /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) && harness !== 'mock'
   const preparedCredentials = receivesRunCredentials ? Promise.allSettled([
-    (async (): Promise<NativeLease | undefined> => {
+    cloudStartupSpan('cloud.worker.claim.native_credentials', startupAttributes, async (): Promise<NativeLease | undefined> => {
       if (!subscription) return undefined
       if (!leaseDevice(device, deviceId, caller.scopeDeviceId)) throw new Error('Run credential device unavailable')
       const runtime = subscriptionRuntime(true, false, { exportAccessLease: true })
       return runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal)
-    })(),
-    (async () => {
+    }),
+    cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
       if (!githubRepository || !await linkedGitHubAccountId(caller.userId)) return undefined
       const { githubTokenForUser } = await import('@/lib/github/user-access')
       const issued = await githubTokenForUser(caller.userId)
       return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
-    })(),
+    }),
   ] as const) : undefined
   // Tool provisioning is best effort, but it never authorizes the response.
   // A retirement during this await must still suppress the prompt below.
@@ -404,6 +422,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   }
   let subscriptionLease: NativeLease | undefined
   let githubCredential: { token: string; expiresAt: string | null } | undefined
+  timings.next('credentials_wait')
   if (preparedCredentials) {
     const [native, github] = await preparedCredentials
     const failures = [native, github].filter(result => result.status === 'rejected')
@@ -422,6 +441,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   }
   const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
     : repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
+  timings.next('response_fence')
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,

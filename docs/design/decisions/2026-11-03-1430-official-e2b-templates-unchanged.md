@@ -59,6 +59,10 @@ Codex (`gpt-6-luna`) 的一次执行，使用正常的设备注册、任务绑�
 只探测 CLI 版本、模型列表或启动进程不足以通过验收。两个结果和文件保全收据
 都必须绑定同一候选模板、source commit 和 worker digest。没有完整收据就不能
 公开候选模板或更新生产模板 ID。
+任务开始证据须由官方 CLI 给出：Claude 使用同 session、同首条 prompt UUID 的
+user 回显，Codex 使用本次 `turn/start` 的 ACK；`system/init` 或进程启动不能代替。
+候选执行还必须有完整、未截断、绑定该 run 的 HTTP 收据，证明执行期间没有额外的
+Mikka 授权或 provider proxy 往返。真实回复和任务/模型/订阅绑定仍分别核对。
 
 worker 升级重新构建带唯一版本名的三个模板，不覆盖旧模板或别名；上一版有效配置
 保存在 `MIKKA_CLOUD_RUNTIME_PREVIOUS`，旧模板继续保留以便回滚。三模板 ID、
@@ -74,6 +78,11 @@ source/run/attempt 标记关闭全部探测实例，再按唯一名称和 ID 删
 
 [#1505](https://github.com/alexj11324/Mikka/issues/1505) 的生产验收仍是派发到 agent
 开始执行至少三次均不超过 5 秒，目标 2–3 秒；建机本身的时间不能代替端到端时间。
+正式起点必须是 `dispatchRun` 第一行，日志标记 `boundary: 'dispatch_run_entry'`，
+包含最初的 Profile/模型等前置校验；终点取服务端执行 stage 和本任务官方 CLI
+exact ACK 两者较晚的时间。没有入口标记或确切 ACK 的样本不能通过。
+旧流程的 92/77 秒基线从 legacy dispatch body 起算，只是完整入口延迟的下界，
+可用于分析真实分段，不得冒充完整起点或用于证明 ≤5 秒。
 先测原流程分段基线，再测派生模板。只有仍不能达标时才按实测选择预热池或组合。
 运行费用由任务所有者自己的 E2B key 承担，空闲机器自动暂停或回收，不新增数据库轮询。
 

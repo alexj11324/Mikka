@@ -56,6 +56,12 @@ export interface FactoryDelivery {
    * receipt without a Vercel provider, or no receipt gives null. Never inferred from branch names.
    */
   deploymentEnvironment: "preview" | "production" | null;
+  /** The PR's head and base branch, as the publication recorded them; null before there is one. */
+  branch: { head: string; base: string | null } | null;
+  /** The owner's connected GitHub login: the account 批准并合并 merges as. null when none is connected. */
+  mergeAs: string | null;
+  /** The candidate run's own one-paragraph summary of its change, redacted and bounded. */
+  summary: string | null;
 }
 export interface FactoryTaskDetail { checks: FactoryCheckResult[]; delivery: FactoryDelivery; decisionWarnings: ProjectDecisionWarning[] }
 type Task = { id: string; issueId: string; candidateId: string | null; userId: string };
@@ -121,13 +127,16 @@ export async function factoryTaskDetail(
       verify: verifyOf(row.report),
     });
   }
-  const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; previewDatabaseBranch: string | null; machineName: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null; deploymentEnvironment: string | null }>(
+  const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; previewDatabaseBranch: string | null; machineName: string | null; pullRequest: FactoryDelivery["pullRequest"]; head: string | null; base: string | null; mergeAs: string | null; summary: string | null; previewUrl: string | null; deploymentEnvironment: string | null }>(
     `SELECT c.sha,c.repository,c.environment,c."previewDatabaseBranch",c."machineName",
-       (SELECT p."pullRequest" FROM run_publications p WHERE p."runId"=c."runId" AND p."userId"=$3) AS "pullRequest",
+       p."pullRequest",p.branch AS head,p."baseBranch" AS base,left(r.report->>'summary',2000) AS summary,
+       (SELECT g."githubLogin" FROM github_connections g WHERE g."userId"=$3) AS "mergeAs",
        f.receipt->'verifiedTarget'->>'reference' AS "previewUrl",
        CASE WHEN f.receipt->'verifiedTarget'->'provider'->>'name'='vercel'
             THEN f.receipt->'verifiedTarget'->'provider'->>'environment' END AS "deploymentEnvironment"
      FROM factory_candidates c
+     LEFT JOIN run_publications p ON p."runId"=c."runId" AND p."userId"=$3
+     LEFT JOIN agent_runs r ON r.id=c."runId" AND r."userId"=$3
      LEFT JOIN LATERAL (SELECT receipt FROM factory_publications f
          WHERE f."taskId"=$1 AND f."candidateId"=c.id AND f.status='succeeded'
          ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) f ON true
@@ -147,6 +156,9 @@ export async function factoryTaskDetail(
       pullRequest: d?.pullRequest ?? null,
       previewUrl: url,
       deploymentEnvironment: d?.deploymentEnvironment === "preview" || d?.deploymentEnvironment === "production" ? d.deploymentEnvironment : null,
+      branch: d?.head ? { head: d.head, base: d.base ?? null } : null,
+      mergeAs: d?.mergeAs ?? null,
+      summary: text(d?.summary),
     },
   };
 }

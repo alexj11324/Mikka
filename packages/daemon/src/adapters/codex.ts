@@ -389,6 +389,7 @@ export class CodexAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
+      githubEnvironment: options.githubEnvironment,
       mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,

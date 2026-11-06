@@ -59,6 +59,10 @@ not subscription acceptance. Candidate tests use normal device enrollment,
 owner-bound runs and subscription leases. Each release records original CLI
 paths and hashes in its own manifest; production, probing and acceptance use
 the same resolver, without an acceptance-only binary override.
+The gate also requires the official CLI to acknowledge this exact task
+(Claude's matching first-prompt UUID echo or Codex's `turn/start` ACK), plus a
+complete run-bound HTTP receipt with no extra execution-time authorization or
+provider-proxy calls. Process startup and `system/init` cannot satisfy it.
 Installation preserves every original persistent entry exactly. E2B's final
 boot and a disposable fresh instance are checked separately against the
 recorded exact-path provider-runtime policy; original CLI/software bytes and

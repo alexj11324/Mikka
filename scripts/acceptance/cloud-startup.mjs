@@ -526,7 +526,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     origin: options.origin, workspaceId: options.workspace, repository: REPOSITORY, requestedStrategy: options.strategy,
     strategyEvidence: 'operator_label_requires_template_or_pool_log_evidence', revision: options.revision ?? null,
     target: options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
-    timingMethod: 'dispatch_timing.startedAt to agent_start chunk database insertion; first provider chunk separate',
+    timingMethod: 'dispatch_run_entry to later of agent_start database receipt and actual official task acceptance; missing entry boundary is legacy lower-bound evidence only',
     executionGate: options.runtimeEvidence === 'required' ? 'later_of_agent_start_and_actual_official_cli_acceptance' : 'legacy_agent_start_actual_ack_unavailable',
     samples: [], cleanup: { errors: [] }, status: 'running' }
   const profiles = new Map()
@@ -659,17 +659,21 @@ export function alignServerTimings(report, timings) {
     // later CLI event's same-process monotonic offset. Never subtract clocks
     // on different machines to manufacture a faster execution time.
     const runtime = sample.runtimeTiming
-    const acceptanceOffset = runtime?.agentAccepted && runtime.executionStartMs !== null
+    const acceptedKind = runtime?.harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'
+    const acceptanceOffset = runtime?.agentAccepted?.kind === acceptedKind && Number.isFinite(runtime.executionStartMs)
       ? Math.max(0, runtime.agentAccepted.ms - runtime.executionStartMs) : null
     const executionEnd = acceptanceOffset === null ? end : end + acceptanceOffset
+    const dispatchBoundary = log.boundary === 'dispatch_run_entry' ? 'dispatch_run_entry' : 'legacy_dispatch_body'
     sample.timing = { status: 'aligned', source: 'server_dispatch_log_to_database_receipt', stepId: log.stepId ?? null,
+      dispatchBoundary, dispatchBoundaryVerified: dispatchBoundary === 'dispatch_run_entry',
       dispatchStartedAt: iso(log.startedAt), dispatchEndedAt: iso(log.endedAt), dispatchCallMs: log.totalMs,
       dispatchToAgentStartMs: end - log.startedAt, dispatchToFirstProviderChunkMs: provider - log.startedAt,
       actualAgentAcceptance: acceptanceOffset === null ? 'unavailable_on_legacy_worker' : 'official_event_observed',
       ...(acceptanceOffset === null ? {} : { agentAcceptanceAfterStageMs: acceptanceOffset,
         dispatchToExecutionStartMs: executionEnd - log.startedAt, executionTimeSource: 'stage_database_receipt_plus_monotonic_offset_upper_bound' }),
       phases: Array.isArray(log.phases) ? log.phases.filter(phase => /^[A-Za-z0-9_.]+$/.test(phase.phase ?? '') && Number.isFinite(phase.ms))
-        .map(({ phase, ms }) => ({ phase, ms })) : [], withinTarget: executionEnd - log.startedAt <= report.maxStartupMs }
+        .map(({ phase, ms }) => ({ phase, ms })) : [], withinTarget: dispatchBoundary === 'dispatch_run_entry'
+          && acceptanceOffset !== null && executionEnd - log.startedAt <= report.maxStartupMs }
   }
   const complete = !report.error && !report.cleanup.errors.length && report.samples.length > 0
     && report.samples.every(sample => sample.status !== 'failed' && sample.execution?.credentialType === 'subscription' && sample.agentStart

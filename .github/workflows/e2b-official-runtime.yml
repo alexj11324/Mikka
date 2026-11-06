@@ -23,6 +23,7 @@ on:
       - 'scripts/e2b/validate-template-subscriptions.mjs'
       - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/acceptance/cloud-startup.mjs'
+      - 'scripts/acceptance/cloud-startup-evidence.mjs'
       - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
       - 'scripts/release/build-vercel.mjs'

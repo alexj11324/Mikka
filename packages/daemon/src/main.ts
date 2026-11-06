@@ -48,6 +48,7 @@ import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
 import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials } from './agents/github-runtime'
+import { prepareLocalGitHub } from './agents/local-github'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
@@ -473,6 +474,10 @@ export class Daemon {
       startCredential: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
+      prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
+        stateDir: join(this.paths.adapterState, 'github'), link: this.options.link, signal, onCredential,
+        onRefreshError: () => this.log.warn({ event: 'github_refresh_deferred' }, 'GitHub renewal will retry in the background'),
+      }),
       verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
         // resumeAll runs before the first sync; establish the existing device
         // session before fetching the independent signing context.
@@ -508,7 +513,7 @@ export class Daemon {
           }
         : undefined,
       repository: assignment => this.repository(assignment),
-      prepareRepository: async (assignment, signal) => {
+      prepareRepository: async (assignment, signal, githubEnvironment) => {
         const remoteUrl = assignment.remoteUrl
         if (!remoteUrl) return
         await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir, async (env, github) => {
@@ -523,7 +528,7 @@ export class Daemon {
             await this.repositories.seedEmpty(remoteUrl, branch, signal, env)
             await this.repositories.prepare(remoteUrl, signal, env)
           }
-        })
+        }, githubEnvironment)
       },
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
@@ -548,14 +553,16 @@ export class Daemon {
             )
         : this.verifier(),
       publisher: {
-        snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
-        publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
-          assignment.github?.branch && (assignment.github.token || assignment.mcp) ? agentPublishedReceipt({
+        snapshot: ({ worktree, repo, signal }) => snapshotTree(repo.path, worktree, undefined, signal),
+        publish: async ({ runId, worktree, repo, assignment, report, tree, githubEnvironment, signal }) =>
+          assignment.github?.branch && (assignment.github.token || assignment.mcp || githubEnvironment) ? agentPublishedReceipt({
             runId, repoPath: repo.path, worktree, tree,
             github: { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId },
             privateDir: join(paths.adapterState, 'pids'),
             ...(hosted ? { hosted: true } : {}),
             env: hosted ? process.env : githubReceiptEnvironment(),
+            githubEnvironment,
+            signal,
           }) : publishRun({
             runId,
             repoPath: repo.path,
@@ -563,6 +570,7 @@ export class Daemon {
             tree,
             issueId: assignment.issueId,
             summary: report.summary,
+            signal,
             pushBranch: assignment.pushBranch,
             baseBranch: assignment.remoteUrl ? await this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch) : assignment.baseBranch,
             push: (() => {
@@ -1163,6 +1171,7 @@ export class Daemon {
       timeoutMs,
       signal,
       readOnly,
+      githubEnvironment,
     }) => {
       const paths = runPaths(this.paths.adapterState, runId)
       return runVerify(sandbox, {
@@ -1172,7 +1181,7 @@ export class Daemon {
         privateDir: paths.privateDir,
         pidFile: paths.pidFile.replace(/\.pgid$/, ".verify.pgid"),
         networkAllow: repo.networkAllow,
-        env: { ...buildChildEnv(), MIKKA_HANDOFF_FILE: join(paths.runDir, "handoff.json") },
+        env: { ...buildChildEnv(), ...githubEnvironment, MIKKA_HANDOFF_FILE: join(paths.runDir, "handoff.json") },
         timeoutMs,
         signal,
         readOnly,

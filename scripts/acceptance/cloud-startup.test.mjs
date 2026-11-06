@@ -335,3 +335,37 @@ test('Claude initialization is retained as history but never proves current task
   value.agentAccepted.kind = 'claude_user_ack'
   assert.equal(runtimeEvidence(readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})).status,'passed')
 })
+
+test('a fast legacy dispatch body cannot pass the full dispatch-entry acceptance gate', () => {
+  const make = () => ({ mode: 'acceptance', target: 'cloud', maxStartupMs: 5000, cleanup: { errors: [] },
+    samples: [0, 1, 2].map(n => ({ workflowRunId: `wrun_${n}`, execution: { credentialType: 'subscription' }, cleanup: { status: 'passed' },
+      runtimeTiming: runtimeTiming({ runId: id(800 + n), harness: 'claude_code' }),
+      agentStart: { storedAt: new Date(epoch + 3500).toISOString() }, firstProviderChunk: { storedAt: new Date(epoch + 4000).toISOString() } })) })
+  const logs = [0, 1, 2].map(n => ({ msg: 'dispatch_timing', workflowRunId: `wrun_${n}`, startedAt: epoch, endedAt: epoch + 2000,
+    totalMs: 2000, failed: false }))
+  const legacy = alignServerTimings(make(), logs)
+  assert.equal(legacy.status, 'failed')
+  assert.equal(legacy.samples[0].timing.dispatchBoundary, 'legacy_dispatch_body')
+  assert.equal(legacy.samples[0].timing.dispatchToAgentStartMs, 3500)
+  assert.equal(legacy.samples[0].timing.withinTarget, false)
+  const entryLogs = logs.map(log => ({ ...log, boundary: 'dispatch_run_entry' }))
+  assert.equal(alignServerTimings(make(), entryLogs).status, 'passed')
+  const unaccepted = make()
+  unaccepted.samples[0].runtimeTiming.agentAccepted.kind = 'claude_system_init'
+  assert.equal(alignServerTimings(unaccepted, entryLogs).status, 'failed')
+})
+
+test('remote authorization after the actual task ACK cannot hide in the preparing phase', () => {
+  const value = runtimeTiming({ runId: id(900), harness: 'claude_code' })
+  value.executionStartMs = 3500
+  value.agentAccepted.ms = 2500
+  value.requests[0].endpoint = 'permission_check'
+  value.requests[0].phase = 'preparing'
+  value.counts[0].endpoint = 'permission_check'
+  value.counts[0].phase = 'preparing'
+  const result = runtimeEvidence(readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness }))
+  assert.equal(result.status, 'failed')
+  assert.equal(result.extraRemoteCalls, 1)
+  value.agentAccepted.ms = 3200
+  assert.equal(runtimeEvidence(readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness })).status, 'passed')
+})

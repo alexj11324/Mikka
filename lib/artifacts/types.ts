@@ -7,6 +7,8 @@ export interface ArtifactSummary {
   kind: ArtifactKind
   title: string
   latestVersion: number
+  /** Set on a Factory acceptance report: the task whose PR it reviews, so its card can say the PR's state. */
+  acceptanceTaskId?: string | null
 }
 
 export interface ArtifactVersionInfo {

@@ -104,6 +104,8 @@ export type ComputerSpecProvider = (runId: string, policy?: RunPolicy) => McpSer
 
 export interface RunContextOptions {
   github?: RunGitHub
+  /** Local daemon-owned native gh config, never supplied by an assignment. */
+  githubEnvironment?: Record<string, string>
   /** The run's app entries; their Mikka server host joins the sandbox's reachable hosts. */
   apps?: RunApps
   mcp?: RunMcp
@@ -268,7 +270,7 @@ export class RunContext {
     this.writeSkills()
     // The owner's own GitHub credential reaches every run that has one, read-only and plan runs included.
     if (options.github && !options.machineEnvironment) {
-      this.githubEnv = prepareGitHubEnvironment(this.runDir, options.github, options.childPath ?? process.env.PATH ?? '', options.githubRuntime)
+      this.githubEnv = options.githubEnvironment ?? prepareGitHubEnvironment(this.runDir, options.github, options.childPath ?? process.env.PATH ?? '', options.githubRuntime)
     }
   }
 

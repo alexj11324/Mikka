@@ -87,8 +87,17 @@ export function runtimeEvidence(receipt, { requireOfficial = false } = {}) {
   if (!receipt.agentAccepted || (receipt.harness === 'claude_code' && receipt.agentAccepted.kind !== 'claude_user_ack')) return { status: 'unavailable', reason: 'official_agent_acceptance_missing' }
   const forbidden = new Set(['policy_snapshot', 'permission_check', 'permission_request', 'server_decision', 'computer_authority',
     'subscription_context', 'provider_proxy', 'credential_lease', 'github_credential_lease', 'other_run_request'])
+  // An official task ACK can arrive just before the existing UI stage returns.
+  // Include sends after that real ACK, even while the phase still says preparing.
   const extras = receipt.counts.filter(item => item.started > 0 && ((item.phase === 'executing' && forbidden.has(item.endpoint))
     || item.endpoint === 'provider_proxy'))
+  const earlyRequests = receipt.requests.filter(item => item.phase === 'preparing' && item.startMs >= receipt.agentAccepted.ms
+    && forbidden.has(item.endpoint) && item.endpoint !== 'provider_proxy')
+  extras.push(...receipt.counts.flatMap(item => {
+    const matching = earlyRequests.filter(request => request.phase === item.phase && request.endpoint === item.endpoint && request.shared === item.shared)
+    return matching.length ? [{ ...item, started: matching.length, completed: matching.filter(request => request.outcome !== 'pending').length,
+      errors: matching.filter(request => request.outcome === 'error').length, ms: matching.reduce((sum, request) => sum + (request.ms ?? 0), 0) }] : []
+  }))
   const refresh = receipt.counts.filter(item => ['credential_refresh', 'github_credential_refresh'].includes(item.endpoint))
   const official = receipt.officialCliTiming
   const providerEvents = official?.events.filter(event => event.kind === 'provider') ?? []

@@ -173,8 +173,14 @@ export class RunRuntimeTimings {
   constructor(private readonly clock: () => number = () => performance.now(), private readonly wallClock: () => number = Date.now) {}
 
   begin(runId: string, deviceId: string, harness: Harness): RunRuntimeObservation {
+    if (typeof runId !== "string" || !runId || typeof deviceId !== "string" || !deviceId || !HARNESSES.includes(harness)) {
+      // Diagnostic setup must not replace the assignment's normal error path.
+      // A closed observation emits no receipt, so missing coverage cannot pass.
+      const unavailable = new RunRuntimeObservation("", "", HARNESSES[0], NOOP, this.clock, this.wallClock)
+      unavailable.close()
+      return unavailable
+    }
     const hash = runIdHash(runId)
-    if (!HARNESSES.includes(harness)) throw new TypeError("Invalid timing harness")
     this.runs.get(hash)?.close()
     const observation = new RunRuntimeObservation(hash, runIdHash(deviceId), harness, () => {
       if (this.runs.get(hash) === observation) this.runs.delete(hash)
@@ -185,14 +191,17 @@ export class RunRuntimeTimings {
 
   /** Only wrap the actual token-expiry background renewal, never a tool call. */
   backgroundCredentialRefresh<T>(runId: string, work: () => Promise<T>): Promise<T> {
+    if (typeof runId !== "string" || !runId) return work()
     return this.refresh.run(runIdHash(runId), work)
   }
 
   attachOfficialCliTiming(runId: string, timing: OfficialCliTiming) {
+    if (typeof runId !== "string" || !runId) return
     this.runs.get(runIdHash(runId))?.attachOfficialCliTiming(timing)
   }
 
   agentAccepted(runId: string, kind: AgentAcceptedKind) {
+    if (typeof runId !== "string" || !runId) return
     this.runs.get(runIdHash(runId))?.accepted(kind)
   }
 
