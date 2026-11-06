@@ -3,17 +3,21 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
 import { SshInstaller, runProcess, quote, type SshInstallState } from '../../apps/desktop/src/main/ssh-install'
-import { nodeDiscoveryScript } from '../../apps/desktop/src/main/local-install'
+import { InstallProcessError, nodeDiscoveryScript, redactInstallLog } from '../../apps/desktop/src/main/local-install'
 
 assert.equal(process.platform, 'darwin')
 assert.equal(process.arch, 'arm64')
 const major = Number(process.versions.node.split('.')[0])
 assert.ok(major === 18 || major === 22)
-const home = await mkdtemp(join(tmpdir(), 'mikka-node22-installer-'))
+// macOS TMPDIR is a long /var/folders path. A normal daemon Unix socket under
+// that synthetic HOME exceeds macOS's 103-byte IPC path limit.
+const home = await mkdtemp('/tmp/mikka-i-')
+const dataDir = join(home, 'Library/Application Support/Mikka')
+const socketPathBytes = Buffer.byteLength(join(dataDir, 'local-computer.sock'))
+assert.ok(socketPathBytes <= 103)
 const originalHome = process.env.HOME, originalPath = process.env.PATH
 const selectedBin = dirname(process.execPath)
 const deviceId = randomUUID(), workspaceId = randomUUID()
@@ -51,6 +55,11 @@ let finish!: () => void
 let done = new Promise<void>(resolve => { finish = resolve })
 const tarball = process.env.MIKKA_DAEMON_TARBALL ? resolve(process.env.MIKKA_DAEMON_TARBALL) : ''
 let npmStarted = false
+let lastStatus = ''
+const sanitized = (value: string) => redactInstallLog(value).replaceAll(home, '[fixture-home]').replaceAll(deviceId, '[fixture-device]').replaceAll(workspaceId, '[fixture-workspace]')
+const evidence = () => ({ platform: process.platform, arch: process.arch, node: process.versions.node,
+  npmStarted, registrations, heartbeats, enrollments, socketPathBytes,
+  states: states.map(({ step, status, error }) => ({ step, status, cause: error?.cause })) })
 try {
   process.env.HOME = home
   if (major === 22) {
@@ -72,7 +81,14 @@ try {
       script = `/bin/sh -c ${quote(nodeDiscoveryScript(22, home, []))}`
     }
     if (script.includes('npm install')) { npmStarted = true; script = script.replace('@aspectlylabs/mikka', quote(tarball)) }
-    return runProcess(command, [...args.slice(0, -1), script], input, timeout, signal)
+    try {
+      const result = await runProcess(command, [...args.slice(0, -1), script], input, timeout, signal)
+      if (script.includes('mikka daemon status')) lastStatus = sanitized(result)
+      return result
+    } catch (error) {
+      if (script.includes('mikka daemon status')) lastStatus = sanitized(error instanceof InstallProcessError ? error.stderr : error instanceof Error ? error.message : String(error))
+      throw error
+    }
   }
   const installer = new SshInstaller(`http://127.0.0.1:${address.port}/mikka`, async () => registrationToken, state => {
     states.push(state)
@@ -88,12 +104,14 @@ try {
     assert.equal(state.error?.remedy, 'install_node_22')
     assert.equal(npmStarted, false)
   } else {
-    if (state.status !== 'online' && state.error?.logPath) process.stderr.write(await readFile(state.error.logPath, 'utf8'))
+    if (state.status !== 'online' && state.error?.logPath) process.stderr.write(sanitized(await readFile(state.error.logPath, 'utf8')))
     assert.equal(state.status, 'online')
     assert.ok(registrations >= 1 && heartbeats >= 1 && enrollments === 1)
-    const plist = await readFile(join(home, 'Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist'), 'utf8')
-    assert.ok(plist.includes('.mikka/npm/lib/node_modules/@aspectlylabs/mikka/mikka.js'))
-    assert.ok(plist.includes('node'))
+    const plist = JSON.parse(await runProcess('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(home, 'Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist')]))
+    const serviceArgs = plist.ProgramArguments as string[]
+    assert.equal(await realpath(serviceArgs[0]), await realpath(process.execPath), 'LaunchAgent must use the selected Node 22 binary')
+    assert.equal(await realpath(serviceArgs[1]), await realpath(join(home, '.mikka/npm/lib/node_modules/@aspectlylabs/mikka/mikka.js')), 'npm bin symlink must resolve to the tested private package')
+    assert.equal(serviceArgs[serviceArgs.indexOf('--data-dir') + 1], dataDir, 'LaunchAgent and login must share the isolated data directory')
     const manifest = JSON.parse(await readFile(join(home, '.mikka/npm/lib/node_modules/@aspectlylabs/mikka/package.json'), 'utf8'))
     assert.equal(manifest.engines.node, '>=22')
     done = new Promise<void>(resolve => { finish = resolve })
@@ -102,11 +120,22 @@ try {
     assert.equal(installer.state()?.status, 'online')
     assert.equal(enrollments, 1, 'reconnect must not re-enroll')
   }
-  const evidence = { platform: process.platform, arch: process.arch, node: process.versions.node, result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect',
-    npmStarted, registrations, heartbeats, states: states.map(({ step, status, error }) => ({ step, status, cause: error?.cause })) }
+  const result = { ...evidence(), result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect' }
   await mkdir('artifacts/local-installer', { recursive: true })
-  await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(evidence, null, 2) + '\n')
-  console.log(JSON.stringify(evidence))
+  await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
+  console.log(JSON.stringify(result))
+} catch (error) {
+  // Capture only this isolated fixture, before bootout/removal; no credential
+  // files or ambient runner configuration are read or uploaded.
+  const logs = Object.fromEntries(await Promise.all([
+    ['service', join(home, 'Library/Logs/mikka-daemon.log')],
+    ['daemon', join(dataDir, 'logs/daemon.log')],
+  ].map(async ([name, path]) => [name, sanitized(await readFile(path, 'utf8').catch(() => 'unavailable'))])))
+  const result = { ...evidence(), result: 'failed', lastStatus, logs }
+  await mkdir('artifacts/local-installer', { recursive: true })
+  await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
+  process.stderr.write(JSON.stringify(result, null, 2) + '\n')
+  throw error
 } finally {
   if (major === 22) await runProcess('launchctl', ['bootout', `gui/${process.getuid!()}/com.aspectlylabs.mikka.daemon`]).catch(() => undefined)
   server.closeAllConnections()
