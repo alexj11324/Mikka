@@ -46,14 +46,16 @@ class Publish(unittest.TestCase):
         self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
 
     def test_build_name_must_be_absent_and_never_an_official_alias(self):
-        with patch.object(bt, '_request', return_value={'templateID': 'previous-version'}):
+        with patch.object(bt, '_request', return_value={'templateID': 'previous-version', 'public': False}) as request:
             with self.assertRaisesRegex(ValueError, 'template_name_already_exists'):
                 bt.assert_new_template('mikka-old-claude', 'fixture-key')
+            request.assert_called_once_with('GET', '/templates/aliases/mikka-old-claude', 'fixture-key')
         for name in ('claude', 'codex', 'desktop', '../other'):
             with self.assertRaisesRegex(ValueError, 'template_name_invalid'):
                 bt.assert_new_template(name, 'fixture-key')
-        with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/new', 404, 'Not found', {}, None)):
+        with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/aliases/new', 404, 'Not found', {}, None)) as request:
             bt.assert_new_template('mikka-new-claude', 'fixture-key')
+            request.assert_called_once_with('GET', '/templates/aliases/mikka-new-claude', 'fixture-key')
         with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/new', 503, 'Unavailable', {}, None)):
             with self.assertRaises(HTTPError):
                 bt.assert_new_template('mikka-new-claude', 'fixture-key')

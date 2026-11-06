@@ -330,7 +330,9 @@ def assert_new_template(name, api_key):
     if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
         raise ValueError('template_name_invalid')
     try:
-        _request('GET', f'/templates/{name}', api_key)
+        # Template names are aliases, not template IDs. The ID endpoint can
+        # return 404 for an existing alias and must not prove it is unused.
+        _request('GET', f'/templates/aliases/{name}', api_key)
     except HTTPError as error:
         if error.code == 404:
             return
@@ -358,20 +360,36 @@ def cleanup_templates(candidates, api_key, request=None):
         try:
             if not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
                 raise ValueError('cleanup_name_invalid')
+            template_id = candidate.get('templateId')
+            if template_id is not None and (not isinstance(template_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id)):
+                raise ValueError('cleanup_candidate_identity_mismatch')
             try:
-                info = request('GET', '/templates/' + name, api_key)
+                alias = request('GET', '/templates/aliases/' + name, api_key)
             except HTTPError as error:
-                if error.code == 404:
+                if error.code != 404:
+                    raise
+                if template_id is None:
                     receipts.append({**row, 'status': 'absent'})
                     continue
-                raise
-            names = (info.get('names') or []) + (info.get('aliases') or [])
-            template_id = info.get('templateID')
-            if (name not in names or info.get('isDefault') is True or not isinstance(template_id, str)
-                    or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id)
-                    or (candidate.get('templateId') and template_id != candidate['templateId'])):
-                raise ValueError('cleanup_candidate_identity_mismatch')
+                # A report already knows this build's ID. A missing alias
+                # alone does not establish that the recorded image is gone.
+            else:
+                resolved = alias.get('templateID')
+                if (not isinstance(resolved, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', resolved)
+                        or (template_id is not None and resolved != template_id)):
+                    raise ValueError('cleanup_candidate_identity_mismatch')
+                template_id = resolved
             row['templateId'] = template_id
+            try:
+                info = request('GET', '/templates/' + template_id, api_key)
+            except HTTPError as error:
+                if error.code != 404:
+                    raise
+                receipts.append({**row, 'status': 'absent'})
+                continue
+            names = (info.get('names') or []) + (info.get('aliases') or [])
+            if name not in names or info.get('isDefault') is True or info.get('templateID') != template_id:
+                raise ValueError('cleanup_candidate_identity_mismatch')
             if info.get('public') is True:
                 receipts.append({**row, 'status': 'retained_public'})
                 continue

@@ -34,12 +34,54 @@ class Cleanup(unittest.TestCase):
             def request(method, path, api_key):
                 calls.append((method, path))
                 if method == 'DELETE': return None
-                if len(calls) == 3: raise HTTPError(path, 404, 'gone', {}, None)
-                return info
+                if path == '/templates/aliases/' + candidate['name']:
+                    return {'templateID': 'owned-id', 'public': info['public']}
+                if path == '/templates/owned-id' and not any(call[0] == 'DELETE' for call in calls):
+                    return info
+                # The real API does not resolve aliases at the ID endpoint.
+                raise HTTPError(path, 404, 'gone', {}, None)
             result = cleanup.builder.cleanup_templates([candidate], 'fixture', request)
             self.assertEqual(result[0]['status'], expected)
             self.assertEqual(sum(method == 'DELETE' for method, _ in calls), int(expected == 'deleted'))
             if expected == 'deleted': self.assertEqual(calls[-1], ('GET', '/templates/owned-id'))
+
+    def test_name_only_cleanup_resolves_the_alias_before_reading_and_deleting_the_id(self):
+        candidate = {'kind': 'desktop', 'name': 'mikka-own-desktop'}
+        calls = []
+        def request(method, path, _):
+            calls.append((method, path))
+            if method == 'DELETE': return None
+            if path == '/templates/aliases/mikka-own-desktop': return {'templateID': 'owned-id', 'public': False}
+            if path == '/templates/owned-id' and len(calls) == 2:
+                return {'templateID': 'owned-id', 'names': [candidate['name']], 'public': False}
+            raise HTTPError(path, 404, 'gone', {}, None)
+        result = cleanup.builder.cleanup_templates([candidate], 'fixture', request)
+        self.assertEqual(result, [{**candidate, 'templateId': 'owned-id', 'status': 'deleted'}])
+        self.assertEqual(calls, [('GET', '/templates/aliases/mikka-own-desktop'), ('GET', '/templates/owned-id'),
+                                 ('DELETE', '/templates/owned-id'), ('GET', '/templates/owned-id')])
+
+    def test_missing_alias_does_not_hide_a_recorded_template_id(self):
+        candidate = {'kind': 'claude', 'name': 'mikka-own-claude', 'templateId': 'owned-id'}
+        calls = []
+        def request(method, path, _):
+            calls.append((method, path))
+            if method == 'DELETE': return None
+            if path == '/templates/owned-id' and not any(call[0] == 'DELETE' for call in calls):
+                return {'templateID': 'owned-id', 'names': [candidate['name']], 'public': False}
+            raise HTTPError(path, 404, 'gone', {}, None)
+        result = cleanup.builder.cleanup_templates([candidate], 'fixture', request)
+        self.assertEqual(result[0]['status'], 'deleted')
+        self.assertIn(('DELETE', '/templates/owned-id'), calls)
+
+    def test_alias_repointing_cannot_delete_a_different_image(self):
+        candidate = {'kind': 'codex', 'name': 'mikka-own-codex', 'templateId': 'recorded-id'}
+        calls = []
+        def request(method, path, _):
+            calls.append((method, path))
+            return {'templateID': 'foreign-id', 'public': False}
+        result = cleanup.builder.cleanup_templates([candidate], 'fixture', request)
+        self.assertEqual(result[0]['status'], 'failed')
+        self.assertEqual(calls, [('GET', '/templates/aliases/mikka-own-codex')])
 
     def test_cleanup_refuses_a_mismatched_list_result_and_continues_after_a_kill_error(self):
         metadata, _ = cleanup.identities(ENV)
