@@ -1,0 +1,104 @@
+name: Issue 1506 Alex explicit retained-fixture continuation
+
+# Only an explicit invocation/control change starts production acceptance.
+# This flow never invokes workspace setup or repeats an already attempted model choice.
+on:
+  push:
+    branches: [acceptance/issues-1504-1506]
+    paths:
+      - '.github/workflows/issue-1506-alex-continue.yml'
+      - 'scripts/acceptance/issue-1506-alex/control/continue.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Validate the explicit continuation control and immutable receipt
+        id: control
+        run: node scripts/acceptance/issue-1506-alex/continuation.mjs control
+      - name: Check out the exact reviewed live consumer source
+        if: steps.control.outputs.enabled == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 7cd5a2c0836ee5ee1e0b91213e0a9fcee35c2032
+          path: live-source
+          persist-credentials: false
+      - name: Verify the continuation and actual-source live harness offline
+        if: steps.control.outputs.enabled == 'true'
+        env:
+          MIKKA_LIVE_SOURCE_ROOT: live-source
+        run: |
+          node --test scripts/acceptance/issue-1506-alex/acceptance.test.mjs scripts/acceptance/issue-1506-alex/selection-canonical.test.mjs scripts/acceptance/issue-1506-alex/continuation.test.mjs scripts/acceptance/issue-1506-alex/live-consumer.test.mjs
+      - name: Read Alex's existing email only
+        if: steps.control.outputs.enabled == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read Alex's existing password only
+        if: steps.control.outputs.enabled == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Observe the selected phase with the retained Haiku fixture
+        id: haiku
+        if: steps.control.outputs.enabled == 'true'
+        continue-on-error: true
+        env:
+          MIKKA_LIVE_SOURCE_ROOT: live-source
+        run: node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku
+      - name: Observe the selected phase with the retained Luna fixture
+        id: luna
+        if: always() && !cancelled() && steps.control.outputs.enabled == 'true' && steps.haiku.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          MIKKA_LIVE_SOURCE_ROOT: live-source
+        run: node scripts/acceptance/issue-1506-alex/continuation.mjs run luna
+      - name: Preserve all failed observations
+        if: always() && !cancelled() && steps.control.outputs.enabled == 'true' && steps.haiku.outcome != 'skipped'
+        env:
+          HAIKU_OUTCOME: ${{ steps.haiku.outcome }}
+          LUNA_OUTCOME: ${{ steps.luna.outcome }}
+        run: |
+          test "$HAIKU_OUTCOME" = success
+          test "$LUNA_OUTCOME" = success
+      - name: Retain sanitized observations and reusable fixture receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue-1506-alex-continue-${{ github.run_id }}
+          path: issue-1506-alex-report/*.json
+          if-no-files-found: ignore
+          retention-days: 7
