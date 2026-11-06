@@ -62,7 +62,7 @@ jobs:
         run: node scripts/acceptance/issue-1506-docker/control.mjs verify
       - name: Ensure the same owned sandbox is stopped
         if: always() && env.DOCKER_ID != '' && env.DOCKER_PAT != ''
-        timeout-minutes: 2
+        timeout-minutes: 3
         run: node scripts/acceptance/issue-1506-docker/control.mjs stop
       - name: Retain complete sanitized verification results
         if: always()

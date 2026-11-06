@@ -48,6 +48,7 @@ function fixture() {
       const path = new URL(url).searchParams.get('path')
       assert.match(path, /^\/tmp\/mikka-1506-1234567-1-/)
       if (options.method === 'PUT') {
+        assert.equal(new URL(url).searchParams.get('mode'), '384', 'the API uses decimal Unix bits, not an octal string')
         if (data.failUpload) return json({ message: 'never copy ' + PAT }, 403)
         writes.set(path, options.body); return new Response(null, { status: 204 })
       }
@@ -62,6 +63,7 @@ function fixture() {
       const body = JSON.parse(options.body)
       assert.deepEqual(body.cmd.slice(0, 7), ['timeout','--signal=TERM','--kill-after=15s','840s','env','-i','PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/node24/bin'])
       assert.equal(body.workingDir, '/workspace'); assert.equal(body.env, undefined)
+      assert.equal(body.user, 'root')
       assert.equal(body.cmd.some(arg => arg.includes(PAT) || arg.includes(DOCKER_ID) || arg.includes(TOKEN)), false)
       assert.equal(writes.size, 5)
       return json({ exitCode: data.execCode, incomplete: false,

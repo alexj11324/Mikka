@@ -70,7 +70,11 @@ export async function control({ mode = 'verify', env = process.env, directory = 
       try { response = await fetcher(url, { method, redirect: 'error', signal: AbortSignal.timeout(remaining), headers,
         ...(body !== undefined ? { body: raw ? body : JSON.stringify(body) } : {}) }) } catch { fail('docker_network_failed') }
       row.status = response.status
-      if (!response.ok) { await response.body?.cancel(); const error = new Error('docker_http_failed'); error.httpStatus = response.status; throw error }
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        if (/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(body?.code ?? '')) row.errorCode = body.code
+        const error = new Error('docker_http_failed'); error.httpStatus = response.status; throw error
+      }
       if (raw) return Buffer.from(await response.arrayBuffer())
       try { return await response.json() } catch { fail('docker_response_invalid') }
     } finally { row.durationMs = Date.now() - at; save() }
@@ -97,10 +101,10 @@ export async function control({ mode = 'verify', env = process.env, directory = 
   // mutation retry. 202 explicitly requires observing this external resource.
   const transition = async (value, wanted, cleanup = false) => {
     let current = state(value)
-    const until = Date.now() + 45_000
-    for (let index = 0; current.core.status !== wanted && index < 30 && Date.now() < until; index++) {
+    const until = Date.now() + 120_000
+    for (let index = 0; current.core.status !== wanted && index < 60 && Date.now() < until; index++) {
       if (!['starting', 'stopping'].includes(current.core.status)) fail('sandbox_state_unusable')
-      await wait(1000)
+      await wait(2000)
       current = state(await management('sandbox.observe_transition', '', { cleanup, timeoutMs: Math.max(1, Math.min(10_000, until - Date.now())) }))
     }
     if (current.core.status !== wanted) fail('sandbox_transition_timeout')
@@ -154,7 +158,7 @@ export async function control({ mode = 'verify', env = process.env, directory = 
     report.worktree = `/workspace/Mikka-1506-verify-${runKey}`
     const uploadToken = await endpointToken(['sandboxesFilesWrite'])
     for (const [name, bytes] of candidate.assets) {
-      await http('sandbox.upload_' + name, endpointBase + 'files/content?' + new URLSearchParams({ path: prefix + name, mode: '0600' }), {
+      await http('sandbox.upload_' + name, endpointBase + 'files/content?' + new URLSearchParams({ path: prefix + name, mode: String(0o600) }), {
         method: 'PUT', body: bytes, raw: true, headers: { authorization: 'Bearer ' + uploadToken, 'content-type': 'application/octet-stream' } })
     }
     const executionToken = await endpointToken(['sandboxesExec'])
@@ -163,7 +167,7 @@ export async function control({ mode = 'verify', env = process.env, directory = 
         cmd: ['timeout', '--signal=TERM', '--kill-after=15s', '840s', 'env', '-i',
           'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/node24/bin', 'LANG=C.UTF-8',
           'bash', '--noprofile', '--norc', prefix + 'remote-verify.sh', prefix + 'candidate-manifest.json', prefix + 'stop.patch',
-          prefix + 'live.patch', prefix + 'remote-verify.mjs', prefix + 'report.json', report.worktree], workingDir: '/workspace',
+          prefix + 'live.patch', prefix + 'remote-verify.mjs', prefix + 'report.json', report.worktree], workingDir: '/workspace', user: 'root',
       } })
     report.exec = { exitCode: Number.isInteger(executed.exitCode) ? executed.exitCode : null, incomplete: executed.incomplete === true,
       stdout: redact(Buffer.from(executed.stdout ?? '', 'base64').toString('utf8'), secrets),

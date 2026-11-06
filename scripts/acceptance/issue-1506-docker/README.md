@@ -19,7 +19,9 @@ The existing Notion credential record explicitly locates `DOCKER_ID` and `DOCKER
 
 Only the runner receives Docker credentials. `control.mjs` exchanges them at `https://hub.docker.com/v2/auth/token`, keeps the resulting management token in memory, and uses `https://connect.docker.com/sandboxes/v1/<fixed-name>`. Each endpoint token grants one operation class: files write, exec, or files read. Endpoint credentials are not sent to the sandbox process, written to files, printed, or uploaded as artifacts. A fresh endpoint token is obtained after long execution before reading its result.
 
-A denial or transport failure produces a closed error and HTTP status. No command or failed HTTP operation is retried, and no proxy, alternate host, alternate identity, or permission change is attempted. The only repeated reads observe an accepted external Docker lifecycle transition (`starting`/`stopping`), bounded by 30 reads and 45 seconds; this is external API status observation, not application polling.
+A denial or transport failure produces a closed error and HTTP status. No command or failed HTTP operation is retried, and no proxy, alternate host, alternate identity, or permission change is attempted. The only repeated reads observe an accepted external Docker lifecycle transition (`starting`/`stopping`), bounded by 60 reads and 120 seconds; this is external API status observation, not application polling.
+
+The initial real run 42278883160 failed before execution: its first file PUT returned 400. The corrected request follows the [official WriteFile contract](https://docs.docker.com/reference/api/sandboxes/latest/operations/writeFile/): Unix mode is integer 384 (0600), not the string `0600`. The normal exec explicitly uses the existing development sandbox's root user, needed to create its `/workspace` worktree. Docker accepted stop with 202; the initial 30-second observation ended before convergence, so it was correctly not reported as stopped. The next run first observes the same sandbox and never repeats an uncertain command.
 
 ## Work performed
 
