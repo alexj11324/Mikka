@@ -100,6 +100,7 @@ export const desktopActionSchemas = {
   'agents.findThreadIssue': oneId,
   'agents.getIssueThread': tuple(uuid.nullable(), uuid, object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }).nullish()),
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
+  'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.sendIssueThreadReply': tuple(object({ issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,
