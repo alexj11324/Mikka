@@ -13,6 +13,7 @@ import { callMcpTool } from '../../packages/daemon/test/fakes/mcp-call.mjs'
 import { REPOSITORY } from './isolated-env.mjs'
 import { recordPeerFailure } from './diagnostics.mjs'
 import { MVP_NATIVE_ACCOUNT, MVP_NATIVE_TOKEN, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
+import { resolvePinnedPnpm } from './pinned-pnpm.mjs'
 
 const execute = promisify(execFile)
 const ghScript = fileURLToPath(new URL('../../scripts/dev-local/gh.mjs', import.meta.url))
@@ -72,8 +73,7 @@ export function checkTracePrerequisites(directory) {
     catch { throw new Error(code) }
   }
   if (!command('git', ['--version'], 'MISSING_GIT_CLI').startsWith('git version ')) throw new Error('MISSING_GIT_CLI')
-  const pinned = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).packageManager.split('@')[1].split('+')[0]
-  if (command('corepack', ['pnpm', '--version'], 'MISSING_PINNED_PNPM') !== pinned) throw new Error('MISSING_PINNED_PNPM')
+  resolvePinnedPnpm()
   const binary = createTraceGitHubBinary(directory)
   if (command(binary, ['--version'], 'MISSING_SYNTHETIC_GITHUB_CLI', { GH_TOKEN: 'mvp-synthetic-installation-run' }) !==
     'gh version local-fixture (synthetic GitHub transport)') throw new Error('MISSING_SYNTHETIC_GITHUB_CLI')
