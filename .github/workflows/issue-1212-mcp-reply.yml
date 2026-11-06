@@ -1,0 +1,73 @@
+name: Issue 1212 ACME MCP bounded read acceptance
+
+# Offline draft only. Root enables this exact workflow after verifying the final
+# application deployment, normal migrations and the reader's runtime evidence.
+on:
+  push:
+    branches: [acceptance/issues-1504-1506]
+    paths:
+      - '.github/workflows/issue-1212-mcp-reply.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: ${{ false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
+    runs-on: ubuntu-latest
+    # The business deadline is 240s; bounded cleanup remains outside that
+    # deadline and must have time to finish after a transport failure.
+    timeout-minutes: 12
+    env:
+      MIKKA_ACCEPTANCE_SHA: '' # Only the verified final production application SHA.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify the exact input and offline request cleanup boundaries
+        run: |
+          node scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs --check-config
+          node --test scripts/acceptance/issue-1212-mcp/mcp-reply-production.test.mjs
+      - name: Read the issue-bound ACME email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the issue-bound ACME password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Observe bounded reads and cancel only this client's HTTP wait
+        run: node scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs observe
+      - name: Retain the sanitized observations and exact cleanup status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue-1212-mcp-reply-${{ github.run_id }}
+          path: issue-1212-mcp-report/*.json
+          if-no-files-found: ignore
+          retention-days: 7
