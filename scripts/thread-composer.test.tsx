@@ -20,6 +20,8 @@ let acceptance: FactoryTask | null = null
 mock.module('swr', {
   defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
+    // Where the thread runs is its own read (thread-run-place.tsx); none here.
+    : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
     : { data: [], mutate: () => {} },
   namedExports: { useSWRConfig: () => ({ mutate: () => {}, cache: new Map() }), unstable_serialize: (key: unknown) => JSON.stringify(key) },
 })
@@ -29,7 +31,7 @@ mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
 } })
 mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return true } } })
-mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
+mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
