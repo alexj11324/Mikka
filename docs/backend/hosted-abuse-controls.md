@@ -110,7 +110,9 @@ Production. Its fallback is the same id on Vercel AI Gateway, used when ZeroCat
 is unconfigured (or set to another base URL), when its admission rule refuses
 it, or when the call fails before the first token: a network error, a timeout
 (20 s to the first streamed token, 60 s for a whole call), 429, 402 (quota),
-5xx, any other HTTP refusal, or a stream error. Once a token has reached the
+5xx, a redirect (the transport refuses them), any other HTTP refusal, or a stream
+error. After such a failure an instance skips ZeroCat for 60 s (`paused`), so
+later calls do not each wait on a failing route. Once a token has reached the
 caller the call stays on ZeroCat, and a stopped call never moves. A caller may
 hand in only the trusted Gateway transport for this model, and only as its
 fallback. Gateway routing options (`providerOptions.gateway`) are dropped from

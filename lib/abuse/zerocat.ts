@@ -63,7 +63,22 @@ export function zeroCatCost(usage: Usage | undefined): number | null {
 }
 
 /** Why a default-model call went to Gateway instead of ZeroCat (a closed set, for traces). */
-export type ZeroCatFallbackReason = 'unconfigured' | 'endpoint_unexpected' | 'route_denied' | 'timeout' | 'rate_limited' | 'quota' | 'server_error' | 'network' | 'request_rejected' | 'stream_error'
+export type ZeroCatFallbackReason = 'unconfigured' | 'endpoint_unexpected' | 'route_denied' | 'paused' | 'timeout' | 'rate_limited' | 'quota' | 'server_error' | 'redirect' | 'network' | 'request_rejected' | 'stream_error'
+
+/** How long one instance skips ZeroCat after it failed, so calls do not each wait on a failing route. */
+export const ZEROCAT_PAUSE_MS = 60_000
+let pausedUntil = 0
+export function pauseZeroCat(now = Date.now()) { pausedUntil = now + ZEROCAT_PAUSE_MS }
+export function zeroCatPaused(now = Date.now()) { return now < pausedUntil }
+/** For tests: forget an earlier pause. */
+export function resumeZeroCat() { pausedUntil = 0 }
+
+/** The errors in a failure's cause chain, outermost first. */
+function causes(error: unknown, depth = 4): Error[] {
+  const chain: Error[] = []
+  for (let value = error; value instanceof Error && chain.length < depth; value = value.cause) chain.push(value)
+  return chain
+}
 
 /** The fallback reason for a ZeroCat failure before its first token. */
 export function zeroCatFailureReason(error: unknown, firstTokenTimedOut = false): ZeroCatFallbackReason {
@@ -73,6 +88,8 @@ export function zeroCatFailureReason(error: unknown, firstTokenTimedOut = false)
   if (status === 402) return 'quota'
   if (status !== undefined && status >= 500) return 'server_error'
   if (status !== undefined) return 'request_rejected'
+  // undici refuses a redirect (the transport sets redirect: 'error') with this fixed cause.
+  if (causes(error).some(item => item.message === 'unexpected redirect')) return 'redirect'
   // An AI SDK call error without a status never got an HTTP answer.
   return (error instanceof Error && error.name === 'AI_APICallError') || error instanceof TypeError ? 'network' : 'stream_error'
 }
@@ -90,18 +107,36 @@ export function gatewayCredential(metadata: unknown): 'system' | 'byok' | undefi
   return attempt?.credentialType === 'system' || attempt?.credentialType === 'byok' ? attempt.credentialType : undefined
 }
 
+const SAFE_NAME = /^[A-Za-z][A-Za-z0-9_]{0,39}$/
+const SAFE_CODE = /^[A-Z][A-Z0-9_]{0,39}$/
+/**
+ * What a ZeroCat failure was, by error names and system codes only (never a
+ * message, which can carry URLs or headers): `AI_APICallError>TypeError>Error`
+ * and, say, `ECONNRESET` or `UND_ERR_CONNECT_TIMEOUT`.
+ */
+export function zeroCatFailureDetail(error: unknown): { error?: string; code?: string } {
+  const chain = causes(error)
+  const names = chain.map(item => SAFE_NAME.test(item.name) ? item.name : 'Error')
+  const code = chain.map(item => (item as Error & { code?: unknown }).code).find((value): value is string => typeof value === 'string' && SAFE_CODE.test(value))
+  return { ...(names.length ? { error: names.join('>') } : {}), ...(code ? { code } : {}) }
+}
+
 /**
  * One span and one log line per default-model call, naming the route that
  * served it, so PostHog (`mikka.model.route`) and Vercel logs count fallbacks.
  * Only closed-set values: no prompt, key or account data.
  */
-export function recordModelRoute(value: { model: string; route: 'zerocat' | 'gateway'; reason?: ZeroCatFallbackReason; status?: number; credential?: 'system' | 'byok' }) {
+export function recordModelRoute(value: { model: string; route: 'zerocat' | 'gateway'; reason?: ZeroCatFallbackReason; status?: number; credential?: 'system' | 'byok'; error?: unknown; attemptMs?: number }) {
+  const detail = value.error === undefined ? {} : zeroCatFailureDetail(value.error)
   const attributes = {
     'mikka.model.id': value.model,
     'mikka.model.route': value.route,
     ...(value.reason ? { 'mikka.model.fallback_reason': value.reason } : {}),
     ...(value.status !== undefined ? { 'mikka.model.zerocat_status': value.status } : {}),
     ...(value.credential ? { 'mikka.model.gateway_credential': value.credential } : {}),
+    ...(detail.error ? { 'mikka.model.zerocat_error': detail.error } : {}),
+    ...(detail.code ? { 'mikka.model.zerocat_error_code': detail.code } : {}),
+    ...(value.attemptMs !== undefined ? { 'mikka.model.zerocat_ms': value.attemptMs } : {}),
   }
   trace.getTracer('mikka.model').startSpan('model.route', { attributes }).end()
   console.info(JSON.stringify({ event: 'default_model_route', ...attributes }))

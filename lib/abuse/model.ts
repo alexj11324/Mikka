@@ -8,7 +8,7 @@ import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
 import { withSharedCredits } from '@/lib/credit-shares'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
-import { createZeroCatModel, gatewayCredential, recordModelRoute, zeroCatConfig, zeroCatCost, zeroCatErrorStatus, zeroCatFailureReason, ZEROCAT_FIRST_TOKEN_TIMEOUT_MS, type ZeroCatFallbackReason } from './zerocat'
+import { createZeroCatModel, gatewayCredential, pauseZeroCat, recordModelRoute, zeroCatConfig, zeroCatCost, zeroCatErrorStatus, zeroCatFailureReason, zeroCatPaused, ZEROCAT_FIRST_TOKEN_TIMEOUT_MS, type ZeroCatFallbackReason } from './zerocat'
 import {
   gatewayCost,
   gatewayGenerationId,
@@ -122,11 +122,16 @@ export async function hostedModel(
   const fallbackFrom = (args: CallArgs, error: unknown, firstTokenTimedOut = false): ZeroCatFallbackReason => {
     // A person's stop or the caller's own deadline ends the call; it is not a ZeroCat failure.
     cancelled(args)
+    // Later calls in this instance skip a failing ZeroCat for a while instead of each waiting on it.
+    pauseZeroCat()
     return zeroCatFailureReason(error, firstTokenTimedOut)
   }
+  let attemptMs: number | undefined
   const route = (served: 'zerocat' | 'gateway', reason?: ZeroCatFallbackReason, error?: unknown, metadata?: unknown) => {
-    if (zeroCat) recordModelRoute({ model: modelId, route: served, reason, status: zeroCatErrorStatus(error), credential: served === 'gateway' ? gatewayCredential(metadata) : undefined })
+    if (zeroCat) recordModelRoute({ model: modelId, route: served, reason, error, attemptMs, status: zeroCatErrorStatus(error), credential: served === 'gateway' ? gatewayCredential(metadata) : undefined })
   }
+  /** Why ZeroCat is skipped before trying it, or undefined to try it. */
+  const skipZeroCat = () => unavailable ?? (zeroCatPaused() ? 'paused' as const : undefined)
   return new Proxy(model, {
     get(target, key) {
       if (key === 'doGenerate')
@@ -136,15 +141,17 @@ export async function hostedModel(
           let requestStarted = false
           try {
             await checkAbuseAlerts()
-            let reason = unavailable, failure: unknown
+            let reason = skipZeroCat(), failure: unknown
             let result: Awaited<ReturnType<Model['doGenerate']>> | undefined
             if (zeroCat && !reason) {
               if (await admitZeroCat(args.abortSignal)) {
                 const prepared = zeroCatOptions(args)
                 if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
                 requestStarted = true
+                const started = Date.now()
                 try { result = await primary!.doGenerate(prepared) }
                 catch (error) { reason = fallbackFrom(args, error); failure = error }
+                finally { attemptMs = Date.now() - started }
               } else reason = 'route_denied'
             }
             const served = result ? 'zerocat' : 'gateway'
@@ -181,7 +188,7 @@ export async function hostedModel(
           let requestStarted = false
           try {
             await checkAbuseAlerts()
-            let reason = unavailable, failure: unknown
+            let reason = skipZeroCat(), failure: unknown
             let opened: { result: Awaited<ReturnType<Model['doStream']>>; reader: ReadableStreamDefaultReader<StreamPart>; buffered: StreamPart[] } | undefined
             if (zeroCat && !reason) {
               if (await admitZeroCat(args.abortSignal)) {
@@ -191,6 +198,7 @@ export async function hostedModel(
                 if (prepared.abortSignal.aborted) { clearTimeout(timer); throw new DOMException('Model request cancelled', 'AbortError') }
                 requestStarted = true
                 let reader: ReadableStreamDefaultReader<StreamPart> | undefined
+                const started = Date.now()
                 try {
                   const result = await primary!.doStream(prepared)
                   reader = result.stream.getReader()
@@ -209,7 +217,7 @@ export async function hostedModel(
                   void reader?.cancel(error).catch(() => {})
                   reason = fallbackFrom(args, error, firstToken.signal.aborted)
                   failure = error
-                } finally { clearTimeout(timer) }
+                } finally { clearTimeout(timer); attemptMs = Date.now() - started }
               } else reason = 'route_denied'
             }
             const served = opened ? 'zerocat' : 'gateway'
