@@ -47,10 +47,10 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Diagnose official-only final-stage file changes
+      - name: Compare derived templates and the actual pool claim SQL
         env:
           BENCHMARK_DATABASE_URL: postgresql://benchmark:benchmark@127.0.0.1:5432/mikka_1505_components
-        run: '"$RUNNER_TEMP/e2b-benchmark/bin/python" scripts/e2b/diagnose-template-conservation.py'
+        run: '"$RUNNER_TEMP/e2b-benchmark/bin/python" scripts/e2b/benchmark-template-pool.py'
       - name: Preserve safe measurements
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

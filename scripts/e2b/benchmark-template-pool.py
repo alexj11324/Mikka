@@ -108,7 +108,8 @@ def run():
                                       cpu_count=allocation['cpuCount'], memory_mb=allocation['memoryMB'],
                                       on_build_logs=lambda entry: print(f'[{kind}] {entry}', file=sys.stderr, flush=True))
             templates[kind] = result.template_id
-            proof = builder.probe_conservation(result.template_id, key)
+            proof = builder.probe_conservation(result.template_id, key, kind)
+            print('mikka-component-conservation ' + json.dumps({'kind': kind, 'conservation': proof}, separators=(',', ':')), flush=True)
             models = builder.probe_models(result.template_id, kind, key)
             return kind, {'templateId': result.template_id, 'buildId': result.build_id,
                           'baseTemplate': kind, 'preinstalled': True, 'resources': allocation,

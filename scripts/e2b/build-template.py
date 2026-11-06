@@ -13,6 +13,7 @@ the publish call); it is never printed, logged or written to disk.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -29,10 +30,11 @@ WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
                 'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
 # What else decides the template's contents: its bootstrap and the build steps below.
 COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
-BOOTSTRAP_FILES = ('official-files.py', 'start-prebuilt.sh')
+BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'start-prebuilt.sh')
 INSTANCE_BOOTSTRAP = 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
 RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES),
                 'scripts/e2b/build-template.py', 'scripts/e2b/template-capabilities.json',
+                'scripts/e2b/acceptance-daemon.mts',
                 *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
 # Each kind of machine: the official E2B template it starts from, and the
 # CLIs installed on it (packages/daemon/harness/pins.json). The `claude` and
@@ -81,6 +83,12 @@ PACKAGE_KEYS = ('name', 'version', 'private', 'type', 'packageManager', 'engines
                 'dependenciesMeta', 'peerDependenciesMeta')
 ROOT_PACKAGE_KEYS = ('packageManager', 'engines', 'pnpm')
 DAEMON_IMPORTERS = ('packages/daemon', 'packages/protocol', 'packages/config')
+
+def official_files_guard():
+    spec = importlib.util.spec_from_file_location('official_files', ROOT / 'scripts/e2b/official-files.py')
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+    return guard
 
 def package_projection(path, raw):
     """Bytes that affect the daemon install. Invalid JSON is hashed whole so a
@@ -290,7 +298,7 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
         if kind == 'desktop':
             ready += (' && test ! -e /run/mikka-viewer/key && '
                       'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')
-        ready += (' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json'
+        ready += (f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}'
                   ' > /opt/mikka/official-files-ready.json')
         # E2B's template builder freezes the initialized process. New instances
         # resume the already imported worker and receive a fresh normal handoff.
@@ -332,22 +340,18 @@ def probe_models(template_id, kind, api_key, sandbox_factory=None):
         sandbox.kill()
 
 
-def probe_conservation(template_id, api_key, sandbox_factory=None):
+def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
     """Read the mandatory build receipt from a disposable candidate instance."""
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60)
     try:
-        result = sandbox.commands.run('cat /opt/mikka/official-files-ready.json', user='root', timeout=15)
+        result = sandbox.commands.run("python3 - <<'PY'\nimport json\nfrom pathlib import Path\nproof=json.loads(Path('/opt/mikka/official-files-conservation.json').read_text())\nproof['finalization']=json.loads(Path('/opt/mikka/official-files-ready.json').read_text())\nprint(json.dumps(proof))\nPY", user='root', timeout=15)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
         conservation = json.loads(result.stdout)
-        before, after = conservation.get('before', {}), conservation.get('after', {})
-        if (before != after or not isinstance(before.get('entries'), int) or before['entries'] < 1
-                or not re.fullmatch(r'[a-f0-9]{64}', before.get('sha256', ''))):
-            raise RuntimeError('official_conservation_invalid')
-        return conservation
+        return official_files_guard().validate_receipt(conservation, kind)
     finally:
         sandbox.kill()
 
@@ -363,10 +367,10 @@ def verify_release_evidence(report):
                 or not template.get('buildId')):
             raise ValueError(f'release_template_invalid {kind}')
         proof = template.get('conservation', {})
-        before, after = proof.get('before', {}), proof.get('after', {})
-        if (before != after or not isinstance(before.get('entries'), int) or before['entries'] < 1
-                or not re.fullmatch(r'[a-f0-9]{64}', before.get('sha256', ''))):
-            raise ValueError(f'release_conservation_invalid {kind}')
+        try:
+            official_files_guard().validate_receipt(proof, kind)
+        except (ValueError, KeyError, TypeError):
+            raise ValueError(f'release_conservation_invalid {kind}') from None
     subscriptions = report.get('subscriptionAcceptance', {})
     for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]:
         row = subscriptions.get(kind, {})
@@ -427,7 +431,7 @@ def main(argv=None):
         entry = {'templateId': result.template_id, 'buildId': result.build_id, 'name': name,
                  'baseTemplate': kind, 'preinstalled': True}
         entry['models'] = probe_models(result.template_id, kind, api_key)
-        entry['conservation'] = probe_conservation(result.template_id, api_key)
+        entry['conservation'] = probe_conservation(result.template_id, api_key, kind)
         return kind, entry
 
     # The templates share nothing at build time; build them side by side.
