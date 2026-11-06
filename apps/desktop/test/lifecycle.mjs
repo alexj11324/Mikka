@@ -203,9 +203,11 @@ async function opaqueFrameBoundary(app, page) {
       frame.addEventListener('load', () => resolve(), { once: true })
       document.body.append(frame)
     }))
-    const frame = page.frame({ name: 'mikka-lifecycle-opaque-frame' })
-    assert.ok(frame, 'the browser created the sandboxed frame')
-    const result = await frame.evaluate(async marker => {
+    // The DOM load event can precede Playwright's cached frame name update.
+    // Resolve the actual iframe element and wait for its srcdoc content instead.
+    const frame = page.frameLocator('#mikka-lifecycle-opaque-frame').locator('p')
+    assert.equal(await frame.textContent(), 'Boundary probe', 'the browser created the sandboxed frame')
+    const result = await frame.evaluate(async (_element, marker) => {
       let parentDenied = false
       try { void parent.document.body } catch { parentDenied = true }
       let fetchDenied = false
