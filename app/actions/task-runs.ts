@@ -3,7 +3,7 @@
 import { singleFlight } from '@/lib/single-flight'
 
 import { createHash } from 'node:crypto'
-import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { DEVICE_CLOCK_SKEW_MS, DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates } from '@/lib/device-presence'
@@ -134,7 +134,8 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     // heartbeat must not invalidate every historic thread on that machine.
     const waitingForDevice = sql<boolean>`${devices.kind}='local' and ${agentRuns.status}='queued' and
       (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
-       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
+       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond') or
+       ${devices.lastSeenAt}>statement_timestamp()+(${DEVICE_CLOCK_SKEW_MS} * interval '1 millisecond'))))`
     const snapshot = db.select({
       id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${runTaskPrompt}, 200)`.as('prompt'),
       status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,

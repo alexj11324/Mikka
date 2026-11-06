@@ -146,7 +146,8 @@ function DeviceRow({ device, models, onChanged, onReconnect }: { device: DeviceV
 
   const status = device.online
     ? t('online')
-    : device.lastSeenAt ? t('offlineSince', { time: format.relativeTime(new Date(device.lastSeenAt), now) }) : t('neverOnline')
+    // A lastSeenAt after now is bad data (see isDeviceOnline), not a time to show.
+    : device.lastSeenAt && new Date(device.lastSeenAt).getTime() <= now.getTime() ? t('offlineSince', { time: format.relativeTime(new Date(device.lastSeenAt), now) }) : t('neverOnline')
 
   // On a phone the two switches move to their own line under the name, keeping their labels (D1).
   return <Item role="listitem" className="flex-wrap gap-3 rounded-none px-3.5 py-3">

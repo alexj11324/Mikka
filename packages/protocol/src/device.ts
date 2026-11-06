@@ -34,6 +34,13 @@ const isoTime = z.iso.datetime({ offset: true })
  */
 export const DEVICE_ONLINE_WINDOW_MS = 60_000
 
+/**
+ * How far ahead of the server clock a heartbeat may be and still count. The
+ * server writes lastSeenAt itself, so a later time is bad data (a demo seed
+ * once wrote 2036): such a device is neither online nor dispatchable.
+ */
+export const DEVICE_CLOCK_SKEW_MS = 5_000
+
 /** Lease a claim or heartbeat grants a run (ADR 0012). */
 export const RUN_LEASE_MS = 90_000
 
@@ -48,7 +55,7 @@ export function isDeviceOnline(
       : typeof lastSeenAt === "number"
         ? lastSeenAt
         : Date.parse(lastSeenAt)
-  return Number.isFinite(seen) && now - seen <= DEVICE_ONLINE_WINDOW_MS
+  return Number.isFinite(seen) && seen <= now + DEVICE_CLOCK_SKEW_MS && now - seen <= DEVICE_ONLINE_WINDOW_MS
 }
 
 /** "设备 n/m 在线": how many of the user's devices are online. */

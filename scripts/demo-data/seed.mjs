@@ -90,7 +90,7 @@ function plan(owner) {
   })
 
   const devices = DEVICES.map(device => ({ ...device, id: id(`device:${device.key}`),
-    lastSeenAt: device.online ? new Date(now + 10 * 365 * 86_400_000) : new Date(now - device.lastSeenMinutes * 60_000) }))
+    lastSeenAt: device.online ? new Date(now) : new Date(now - device.lastSeenMinutes * 60_000) }))
   const agents = AGENTS.map(agent => ({ ...agent, id: id(`agent:${agent.key}`), deviceId: id(`device:${agent.device}`) }))
   const runs = withIssues([...RUNS, ...threads]).map(run => {
     const createdAt = ago(run.minutesAgo)

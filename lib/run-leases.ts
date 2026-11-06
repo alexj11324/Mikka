@@ -8,8 +8,8 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { afterJob } from '@/lib/background'
-import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
-import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { DEVICE_CLOCK_SKEW_MS, DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, issues } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -45,7 +45,7 @@ export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners:
     .where(or(
       and(inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)),
       and(eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
-        or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)))),
+        or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)), gt(devices.lastSeenAt, new Date(now.getTime() + DEVICE_CLOCK_SKEW_MS)))),
     ))
     .orderBy(agentRuns.userId).limit(100)
   let failed = 0
@@ -108,7 +108,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(
       eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
-      or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))),
+      or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)), gt(devices.lastSeenAt, new Date(now.getTime() + DEVICE_CLOCK_SKEW_MS))),
     ))
     .limit(20)
   const presence = await deviceOnlineStates(stranded.flatMap(({ run, lastSeenAt }) => run.deviceId ? [{ id: run.deviceId, lastSeenAt }] : []), now.getTime())

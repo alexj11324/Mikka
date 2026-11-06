@@ -1,4 +1,4 @@
-import { isDeviceOnline } from '@mikka/protocol/device'
+import { DEVICE_CLOCK_SKEW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { deviceGatewayEndpoint } from './device-gateway-client'
 
 type DevicePresence = { id: string; lastSeenAt: string | number | Date | null }
@@ -25,7 +25,7 @@ export async function deviceIsOnline(device: DevicePresence, now = Date.now()): 
       || !('lastSeenAt' in status) || typeof status.lastSeenAt !== 'string') return false
     const seen = Date.parse(status.lastSeenAt)
     // Tolerate a small clock difference, but not an unbounded future timestamp.
-    return Number.isFinite(seen) && seen <= now + 5_000 && now - seen <= GATEWAY_ONLINE_WINDOW_MS
+    return Number.isFinite(seen) && seen <= now + DEVICE_CLOCK_SKEW_MS && now - seen <= GATEWAY_ONLINE_WINDOW_MS
   } catch { return false }
 }
 

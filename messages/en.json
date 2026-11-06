@@ -951,7 +951,9 @@
       "adding": "Adding this computer",
       "online": "This computer is online",
       "failed": "Couldn't add this computer",
-      "retry": "Retry"
+      "retry": "Retry",
+      "details": "Details",
+      "copyLog": "Copy log"
     },
     "loading": "Loading devices"
   },
@@ -4992,6 +4994,7 @@
     "desktop_rpc_request_rejected": { "default": "Mikka could not accept this request" },
     "desktop_rpc_response_invalid": { "default": "Mikka returned an unreadable response" },
     "desktop_rpc_value_invalid": { "default": "This content could not be sent" },
+    "desktop_local_setup_failed": { "default": "Couldn't add this computer", "cancelled": "Cancelled", "timeout": "This step timed out. Try again", "online_timeout": "The daemon is installed but didn't reach Mikka within 30 seconds", "owner_mismatch": "This computer's daemon is signed in to another Mikka account", "owner_unconfirmed": "Couldn't confirm which account this computer belongs to. Try again shortly", "unsupported_os": "Only macOS and Linux are supported", "node_missing": "Needs Node {required}, but your login shell has no node. Install Node {required}, then try again", "node_too_old": "Needs Node {required}; your login shell has Node {found} ({path}). Upgrade that Node or put Node {required} first in PATH, then try again", "npm_directory_not_empty": "A previous install left a directory behind: {path}. Delete it, then try again", "npm_permission": "npm can't write to {path}. Make npm's global directory yours, or use Node from Homebrew or nvm, then try again", "npm_package_not_found": "The Mikka daemon package isn't on npm", "network": "Can't reach npm ({code}). Check your network or proxy, then try again", "command_missing": "Installed, but mikka isn't on your login shell's PATH. Add npm's global bin directory to PATH, then try again", "service_failed": "Couldn't start the background service", "other": "Couldn't add this computer" },
     "subscription_local_runtime_unavailable": {
       "default": "The subscription run could not start on this computer",
       "assignment_invalid": "This thread's subscription setting is no longer valid. Please choose the model again.",

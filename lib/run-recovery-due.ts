@@ -1,5 +1,5 @@
 import type { Pool } from 'pg'
-import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { DEVICE_CLOCK_SKEW_MS, DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { ENDED_RUN_STATUSES } from './run-outcome'
 import { LEASED_RUN_STATUSES } from './run-retry'
 import { pendingTaskReportsSql } from './coordinator/group-factory'
@@ -30,7 +30,7 @@ export const RUN_RECOVERY_DUE_SQL = `
     -- sweepExpiredRunLeases: a lease is lost once leaseExpiresAt < now.
     SELECT min("leaseExpiresAt") + interval '1 millisecond' AS at, 'leases' AS sweep FROM agent_runs WHERE status = ANY($1::text[]) AND "leaseExpiresAt" IS NOT NULL
     -- ... and a queued retry whose device stopped being seen (the gateway is asked again each minute).
-    UNION ALL SELECT min(CASE WHEN d."lastSeenAt" + $2::interval > now() THEN d."lastSeenAt" + $2::interval + interval '1 millisecond' ELSE now() + interval '${RECHECK}' END), 'leases'
+    UNION ALL SELECT min(CASE WHEN d."lastSeenAt" + $2::interval > now() AND d."lastSeenAt" <= now() + interval '${DEVICE_CLOCK_SKEW_MS} milliseconds' THEN d."lastSeenAt" + $2::interval + interval '1 millisecond' ELSE now() + interval '${RECHECK}' END), 'leases'
       FROM agent_runs r LEFT JOIN devices d ON d.id = r."deviceId" WHERE r.status = 'queued' AND r."retryOf" IS NOT NULL
     -- reconcileCloudMachines: a running machine is checked with E2B once idle for an hour, then every MACHINE_RECHECK.
     UNION ALL SELECT min(CASE WHEN greatest("lastActiveAt" + interval '1 hour', "provisionLeaseUntil") > now()

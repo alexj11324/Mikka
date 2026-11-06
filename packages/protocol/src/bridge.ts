@@ -199,9 +199,21 @@ export const LOCAL_TARGET = "this-computer"
 /** The `target` while 重新连接 restarts this computer's daemon. */
 export const LOCAL_RECONNECT = "this-computer-reconnect"
 
+/** Why adding a computer failed: RunErrors.desktop_local_setup_failed.<detail> in messages/*.json. */
+export const LOCAL_SETUP_FAILURE_DETAILS = [
+  'cancelled', 'timeout', 'online_timeout', 'owner_mismatch', 'owner_unconfirmed', 'unsupported_os',
+  'node_missing', 'node_too_old', 'npm_directory_not_empty', 'npm_permission', 'npm_package_not_found',
+  'network', 'command_missing', 'service_failed', 'other',
+] as const
+export type LocalSetupFailureDetail = typeof LOCAL_SETUP_FAILURE_DETAILS[number]
+
 export interface SshInstallState {
   id: string; target: string; step: 'login' | 'check' | 'install' | 'service' | 'connect'
-  status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; keyType?: string; reason?: string; retryable?: boolean
+  status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; keyType?: string
+  /** The real error line(s), without npm warnings; older desktops send the raw stderr tail. */
+  reason?: string; retryable?: boolean
+  /** Set with a failure by newer desktops: which copy to show, the values it names, and the whole output. */
+  detail?: LocalSetupFailureDetail; values?: Record<string, string>; log?: string
 }
 
 /** Main reads this through the authenticated browser session, never IPC input. */
