@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -16,7 +16,7 @@ import { SubscriptionWorkerClient } from '../../packages/daemon/src/subscription
 import { startMvpServices } from './services.mjs'
 import { MVP_SERVICES,REPOSITORY } from './isolated-env.mjs'
 import { MVP_NATIVE_ACCOUNT, MVP_NATIVE_TOKEN, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
-import { createTraceCodexBinary } from './trace-codex.mjs'
+import { createTraceCodexBinary, createTraceGitHubBinary, checkTracePrerequisites, traceGitCommand } from './trace-codex.mjs'
 import { preflightLocalSubscription } from '../../packages/daemon/src/subscription-preflight'
 import { HARNESS_PINS } from '../../packages/daemon/src/harness-install'
 import { answerModel, tracePublicationReady } from './model.mjs'
@@ -85,7 +85,19 @@ test('trace synthetic Codex peer passes real version/model probes and requires s
   const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-peer-'))
   const fixture = join(directory, 'fixture.jsonl'), home = join(directory, 'home'), cwd = join(directory, 'worktree')
   const mcp = join(directory, 'synthetic-submit.mjs'), submitted = join(directory, 'submitted.json')
+  const services = await startMvpServices(3191)
+  const scenario = await (await fetch(`${services.origin}/scenario`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'Synthetic native delivery', harness: 'synthetic-codex' }) })).json()
   await mkdir(home); await mkdir(cwd)
+  const git = (args: string[]) => traceGitCommand(scenario.barePath, cwd, args)
+  await traceGitCommand(scenario.barePath, directory, ['clone', REPOSITORY, cwd])
+  const originalBranch = await git(['branch', '--show-current'])
+  const github = createTraceGitHubBinary(directory), bridge = join(directory, 'test-credential-bin')
+  await mkdir(bridge)
+  // This protocol test supplies a labelled synthetic credential wrapper. The
+  // full chain uses the real authorized run-token exchange and run-local gh.
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+  await writeFile(join(bridge, 'gh'), `#!/bin/sh\nGH_TOKEN=mvp-synthetic-installation-run exec ${quote(github)} "$@"\n`, { mode: 0o700 })
   await writeFile(fixture, JSON.stringify({ t: 0, exit: { outcome: 'failed', error: 'private-fixture-error' } }) + '\n')
   // This unit test has only a stdio peer. Full HTTP acceptance uses the real
   // Mikka MCP process, current run authority and durable handoff.
@@ -97,7 +109,7 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (request.method === 'tools/call') writeFileSync(${JSON.stringify(submitted)}, JSON.stringify(request.params))
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { content: [], isError: false } }) + '\\n')
 }`)
-  const binary = createTraceCodexBinary(directory, fixture)
+  const binary = createTraceCodexBinary(directory, fixture, scenario.barePath)
   try {
     const ready = await preflightLocalSubscription('codex', { store: { root: directory }, scratchDir: directory, binary })
     assert.deepEqual(ready, { ready: true, version: HARNESS_PINS.harnesses.codex.version })
@@ -108,7 +120,7 @@ for await (const line of createInterface({ input: process.stdin })) {
     const report = await probeHarnessModels('codex', binary, { scratchDir: directory, timeoutMs: 5_000 })
     assert.deepEqual(report?.models, [MVP_SUBSCRIPTION_MODEL])
     const child = spawn(binary, ['app-server', '-c', `mcp_servers.mikka.command=${JSON.stringify(process.execPath)}`, '-c', `mcp_servers.mikka.args=${JSON.stringify([mcp])}`],
-      { cwd, env: { PATH: process.env.PATH, HOME: home, CODEX_HOME: home, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
+      { cwd, env: { PATH: `${bridge}${delimiter}${process.env.PATH ?? ''}`, HOME: home, CODEX_HOME: home, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
     const output: Record<string, any>[] = []
     const lines = createInterface({ input: child.stdout })
     lines.on('line', line => output.push(JSON.parse(line)))
@@ -128,7 +140,9 @@ for await (const line of createInterface({ input: process.stdin })) {
       assert.equal((await request('thread/start', { model: MVP_SUBSCRIPTION_MODEL, cwd })).error.code, -32603)
       assert.equal((await request('account/login/start', { type: 'chatgptAuthTokens', accessToken: 'incorrect', chatgptAccountId: MVP_NATIVE_ACCOUNT })).error.code, -32603)
       assert.equal((await request('account/login/start', { type: 'chatgptAuthTokens', accessToken: MVP_NATIVE_TOKEN, chatgptAccountId: MVP_NATIVE_ACCOUNT })).result.type, 'chatgptAuthTokens')
-      const started = (await request('thread/start', { model: MVP_SUBSCRIPTION_MODEL, cwd })).result
+      const issueId = randomUUID(), branch = 'mikka/trace-fixture-1'
+      const developerInstructions = `- You own delivery to https://github.com/mikka-e2e/core-loop. Keep the current local branch. Commit your tested work and push HEAD to ${branch} using the HTTPS repository URL. Never force-push.\n- Open or update the task pull request with gh, using head ${branch}. Its body must end with <!-- mikka-issue:${issueId} --> so Mikka can attach the result.`
+      const started = (await request('thread/start', { model: MVP_SUBSCRIPTION_MODEL, cwd, developerInstructions })).result
       assert.equal(started.model, MVP_SUBSCRIPTION_MODEL)
       const turn = (await request('turn/start', { threadId: started.thread.id, input: [{ type: 'text', text: 'private prompt must not be read by fixture' }] })).result.turn.id
       const ended = await awaitMessage(message => message.method === 'turn/completed' && message.params.turn.id === turn)
@@ -144,7 +158,28 @@ for await (const line of createInterface({ input: process.stdin })) {
       assert.equal((await awaitMessage(message => message.method === 'turn/completed' && message.params.turn.id === next)).params.turn.status, 'completed')
       assert.equal(await readFile(join(cwd, 'MIKKA_MOCK.md'), 'utf8'), 'synthetic change\n')
       assert.deepEqual(JSON.parse(await readFile(submitted, 'utf8')), { name: 'submit', arguments: submission })
+      const commit = await git(['rev-parse', 'HEAD'])
+      assert.equal((await git(['ls-remote', REPOSITORY, `refs/heads/${branch}`])).split(/\s+/)[0], commit)
+      assert.equal(await git(['config', '--get', 'remote.origin.url']), REPOSITORY)
+      assert.equal(await git(['branch', '--show-current']), originalBranch)
+      assert.equal(await git(['status', '--porcelain']), '')
+      const observed = await (await fetch(`${services.origin}/observations`)).json()
+      assert.equal(observed.errors.length, 0)
+      assert.ok(observed.observations.some((value: Record<string, unknown>) => value.kind === 'pull-request-created' && value.issueId === issueId && value.commit === commit))
+      assert.ok(observed.observations.some((value: Record<string, unknown>) => value.kind === 'synthetic-ci-checked' && value.commit === commit))
+      await assert.rejects(git(['ls-remote', 'https://github.com/not-fixture/forbidden.git']), /transport 'https' not allowed/)
     } finally { child.kill(); lines.close(); await new Promise(resolve => child.once('close', resolve)) }
+  } finally { await services.close(); await rm(directory, { recursive: true, force: true }) }
+})
+
+test('trace prerequisites verify local commands and the owned synthetic GitHub shim without service requests', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-prerequisites-'))
+  try {
+    checkTracePrerequisites(directory)
+    const script = await readFile(join(directory, 'fixture-bin', 'gh'), 'utf8')
+    assert.ok(script.includes(fileURLToPath(new URL('../../scripts/dev-local/gh.mjs', import.meta.url))))
+    assert.ok(!script.includes('gh auth') && !script.includes('github.com'))
+    assert.throws(() => createTraceCodexBinary(directory, join(directory, 'fixture.jsonl'), join(dirname(directory), 'foreign', 'origin.git')), /SYNTHETIC_GIT_ORIGIN_REQUIRED/)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 

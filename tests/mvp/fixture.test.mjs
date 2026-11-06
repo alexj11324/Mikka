@@ -3,11 +3,13 @@ import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createGateway, generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
 import { assertMvpEnvironment, REPOSITORY } from './isolated-env.mjs'
 import { answerModel } from './model.mjs'
+import { fixtureFailure, fixtureModelError } from './diagnostics.mjs'
 import { startMvpServices } from './services.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
 import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
@@ -15,6 +17,32 @@ import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
+
+test('diagnostics retain closed source provenance without messages, private paths or assertion values', () => {
+  const own = fileURLToPath(new URL('./model.mjs', import.meta.url))
+  const error = Object.assign(new Error('private-response-token'), { name: 'AssertionError', code: 'ERR_ASSERTION',
+    actual: 'private-token', expected: 'private-cookie', cause: new Error('private-cause') })
+  error.stack = `AssertionError: private-response-token\n    at privateFunction (${own}:21:3)\n    at unsafe (/other/tests/mvp/model.mjs:4:2)\n    at leak (${own}?token=private-token:2:3)`
+  assert.deepEqual(fixtureFailure(error, 'subscription_answer', 'POST'), {
+    handler: 'subscription_answer', method: 'POST', name: 'AssertionError', code: 'ERR_ASSERTION',
+    source: [{ file: 'tests/mvp/model.mjs', line: 21, column: 3 }],
+  })
+  const unknown = Object.assign(new Error('private-message'), { name: 'private-name', code: 'private-code' })
+  const projected = fixtureFailure(unknown, 'private-handler', 'private-method')
+  assert.equal(projected.handler, 'route'); assert.equal(projected.method, 'OTHER'); assert.equal(projected.name, 'Error')
+  assert.ok(!JSON.stringify(projected).includes('private'))
+})
+
+test('diagnostics preserve enumerated model tool refusals and discard arbitrary tool arguments', () => {
+  const failed = fixtureModelError('MODEL_RESULT_REFUSED', 'dispatch_run', { error: 'executionAccountUnavailable', reason: 'noModels', token: 'private-token', args: { prompt: 'private prompt' } })
+  const safe = fixtureFailure(failed, 'subscription_answer', 'POST')
+  assert.equal(safe.code, 'MODEL_RESULT_REFUSED'); assert.equal(safe.operation, 'dispatch_run')
+  assert.equal(safe.sourceCode, 'executionAccountUnavailable'); assert.equal(safe.sourceReason, 'noModels')
+  assert.ok(!JSON.stringify(safe).includes('private'))
+  const unexpected = fixtureFailure(fixtureModelError('private-code', 'private-operation', { error: 'private-result', reason: 'private-reason' }))
+  assert.equal(unexpected.code, 'MODEL_RESULT_REFUSED')
+  assert.ok(!Object.hasOwn(unexpected, 'sourceCode') && !Object.hasOwn(unexpected, 'sourceReason') && !Object.hasOwn(unexpected, 'operation'))
+})
 
 test('GitHub fixture human merge preserves exact Git bytes and rejects unauthorized or stale heads', async () => {
   const services = await startMvpServices(0)
@@ -139,7 +167,7 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
 
 test('scripted model fails when the UI destination was not carried into trusted model context', () => {
   const scenario = { marker: `mvp-${randomUUID()}`, deviceId: randomUUID(), title: 'task', repo: REPOSITORY }
-  assert.throws(() => answerModel({ prompt: [{ role: 'user', content: [{ type: 'text', text: scenario.marker }] }] }, scenario), /task destination/)
+  assert.throws(() => answerModel({ prompt: [{ role: 'user', content: [{ type: 'text', text: scenario.marker }] }] }, scenario), { code: 'MODEL_DESTINATION_MISMATCH' })
 })
 
 test('scripted model uses only the real tool results for dispatch, including exact device and issue IDs', async () => {

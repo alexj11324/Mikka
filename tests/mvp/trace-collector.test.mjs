@@ -6,7 +6,7 @@ import { ROOT_CONTEXT, SpanStatusCode, trace } from '@opentelemetry/api'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { AlwaysOnSampler, BasicTracerProvider, SimpleSpanProcessor, InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { LoggerProvider, SimpleLogRecordProcessor, InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
-import { decodeOtlp } from './trace-collector.mjs'
+import { decodeOtlp, summarizeAiSpans } from './trace-collector.mjs'
 
 // Test the small collector reader against the installed official exporter
 // serializers, including binary IDs, typed attributes and log span context.
@@ -14,6 +14,24 @@ const require = createRequire(import.meta.url)
 const { ProtobufTraceSerializer, ProtobufLogsSerializer } = require(require.resolve('@opentelemetry/otlp-transformer', {
   paths: [dirname(require.resolve('@opentelemetry/exporter-trace-otlp-proto'))],
 }))
+test('AI failure summary distinguishes both service span names and exports only closed categories', () => {
+  const spans = [
+    { name: 'mikka.ai.generation', service: 'mikka-web', status: 2, traceId: 'private-trace', attributes: { 'mikka.ai.operation': 'coordinator', 'error.type': 'AI_APICallError', prompt: 'private prompt' } },
+    { name: 'mikka.ai.generation', service: 'mikka-web', status: 2, attributes: { 'mikka.ai.operation': 'coordinator', 'error.type': 'AI_APICallError' } },
+    { name: 'daemon.ai.generation', service: 'mikka-daemon', status: 0, attributes: { 'mikka.ai.operation': 'agent' } },
+    { name: 'mikka.ai.generation', service: 'private-service', status: 2, attributes: { 'mikka.ai.operation': 'private-operation', 'error.type': 'private-code' } },
+    { name: 'daemon.run', service: 'mikka-daemon', attributes: {} },
+  ]
+  const summary = summarizeAiSpans(spans)
+  assert.equal(summary.total, 4)
+  assert.equal(summary.errors, 3)
+  assert.deepEqual(summary.byService, { web: 2, daemon: 1, other: 1 })
+  assert.deepEqual(summary.bySpanName, { 'mikka.ai.generation': 3, 'daemon.ai.generation': 1 })
+  assert.deepEqual(summary.groups[0], { span: 'mikka.ai.generation', service: 'web', operation: 'coordinator', errorType: 'AI_APICallError', count: 2 })
+  assert.ok(!JSON.stringify(summary).includes('private'))
+  assert.equal(summarizeAiSpans([]).total, 0)
+})
+
 test('decodes the exact production OTLP wire format and retains only explicit metadata', async () => {
   const resource = resourceFromAttributes({ 'service.name': 'mikka-daemon' })
   const traces = new InMemorySpanExporter(), logs = new InMemoryLogRecordExporter()

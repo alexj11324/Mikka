@@ -7,6 +7,7 @@ import { createWriteStream } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { checkTracePrerequisites } from './trace-codex.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const database = new URL(process.env.E2E_DATABASE_URL ?? '')
@@ -15,6 +16,7 @@ assert.ok(['postgres:', 'postgresql:'].includes(database.protocol) && ['localhos
 assert.ok(!process.env.VERCEL && !process.env.VERCEL_ENV, 'DEPLOYED_ENVIRONMENT_FORBIDDEN')
 assert.ok(!['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'DEEPSEEK_API_KEY', 'E2B_API_KEY', 'COMPOSIO_API_KEY', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY', 'ZEROCAT_API_KEY']
   .some(key => Boolean(process.env[key])), 'LIVE_SERVICE_CREDENTIALS_FORBIDDEN')
+assert.ok(!['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'].some(key => Boolean(process.env[key])), 'HOST_GITHUB_CREDENTIALS_FORBIDDEN')
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 const directory = resolve(root, '.cache/trace-acceptance', `${revision.slice(0, 12)}-${randomUUID()}`)
 await mkdir(directory, { recursive: true, mode: 0o700 })
@@ -47,6 +49,8 @@ async function run(label, args, additions = {}) {
   assert.equal(code, 0, `TRACE_${label.toUpperCase()}_FAILED`)
 }
 try {
+  console.info('trace-acceptance prerequisites')
+  checkTracePrerequisites(directory)
   await run('schema', ['--import', 'tsx', 'scripts/setup-e2e-db.mjs'])
   await run('bootstrap', ['--import', 'tsx', 'scripts/test-accounts/bootstrap.mjs', '--output', env.MIKKA_TEST_ENVIRONMENT_FILE])
   await run('chain', ['--import', 'tsx', '--import', pathToFileURL(join(root, 'tests/mvp/trace-preload.mjs')).href, 'tests/mvp/trace-chain.mjs'],

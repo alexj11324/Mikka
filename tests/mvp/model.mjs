@@ -1,5 +1,6 @@
 // A scripted model, not a replacement for the Coordinator. WorkflowAgent still
 // executes the real registered tools, durable steps and authorization checks.
+import { fixtureModelError } from './diagnostics.mjs'
 function result(content, reason = 'stop') {
   return { content, finishReason: { unified: reason, raw: reason }, warnings: [], usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } } }
 }
@@ -17,7 +18,7 @@ export function tracePublicationReady(row) {
 function output(messages, toolName) {
   const part = messages.flatMap(message => Array.isArray(message.content) ? message.content : []).findLast(part => part.type === 'tool-result' && part.toolName === toolName)
   if (!part) return undefined
-  if (part.output?.type !== 'json' || part.output.value?.error) throw new Error(`Real ${toolName} returned a failed or non-JSON result`)
+  if (part.output?.type !== 'json' || part.output.value?.error) throw fixtureModelError('MODEL_RESULT_REFUSED', toolName, part.output?.value)
   return part.output.value
 }
 
@@ -27,10 +28,10 @@ export function answerModel(request, scenario, observe = () => {}) {
   if (start < 0) return text('你想先做哪件事？')
   const messages = prompt.slice(start)
   const selected = body(prompt[start]).match(/The person selected device ([a-f0-9-]{36}) in the task dialog\./)?.[1]
-  if (!scenario.deviceId || selected !== scenario.deviceId) throw new Error('The host-supplied task destination did not select the real daemon device')
+  if (!scenario.deviceId || selected !== scenario.deviceId) throw fixtureModelError('MODEL_DESTINATION_MISMATCH')
   observe({ kind: 'destination', deviceId: selected })
   const call = (toolName, input, phase = 'dispatch') => {
-    if (!request.tools?.some(tool => tool.name === toolName)) throw new Error(`Coordinator did not register ${toolName}`)
+    if (!request.tools?.some(tool => tool.name === toolName)) throw fixtureModelError('MODEL_TOOL_MISSING', toolName)
     const toolCallId = `${scenario.marker}-${phase}-${toolName}`
     observe({ kind: 'tool', toolName, toolCallId, input })
     return result([{ type: 'tool-call', toolCallId, toolName, input: JSON.stringify(input) }], 'tool-calls')
@@ -61,10 +62,10 @@ export function answerModel(request, scenario, observe = () => {}) {
   if (!identities) return call('list_agents', {})
   const harness = scenario.harness === 'synthetic-codex' ? 'codex' : 'mock'
   const identity = identities.find(row => row.deviceId === selected && row.harness === harness && row.deviceOnline)
-  if (!identity) throw new Error('The real daemon did not register the selected online fixture execution identity')
+  if (!identity) throw fixtureModelError('MODEL_IDENTITY_MISSING', 'list_agents')
   const run = output(messages, 'dispatch_run')
   if (!run) return call('dispatch_run', { issueId: issue.id, agentId: identity.id, repo: scenario.repo })
-  if (!run.runId) throw new Error('Real dispatch_run did not queue a thread')
+  if (!run.runId) throw fixtureModelError('MODEL_RUN_NOT_QUEUED', 'dispatch_run')
   observe({ kind: 'dispatched', issueId: issue.id, runId: run.runId, deviceId: selected })
   return text('已在你选择的电脑上启动线程。')
 }

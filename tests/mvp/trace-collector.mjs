@@ -74,6 +74,35 @@ export function decodeOtlp(body, signal) {
 
 const aiAllowed = new Set(['$ai_trace_id', '$ai_span_id', '$ai_parent_id', '$ai_session_id', '$session_id', '$ai_model', '$ai_provider', '$ai_input_tokens', '$ai_output_tokens',
   '$ai_cache_read_input_tokens', '$ai_cache_creation_input_tokens', '$ai_total_cost_usd', '$ai_cost_passthrough', '$ai_latency', '$ai_time_to_first_token', '$ai_is_error'])
+
+/** Failure evidence may have no completed cases. Keep a bounded count of the
+ * already-sanitized AI span metadata, never the original spans or their IDs. */
+export function summarizeAiSpans(spans) {
+  const operations = new Set(['coordinator', 'bot', 'decision', 'compaction', 'profile_extraction', 'short_title', 'action_title', 'agent'])
+  const errorTypes = new Set(['Error', 'TypeError', 'SyntaxError', 'RangeError', 'ReferenceError', 'AggregateError', 'AbortError', 'TimeoutError',
+    'APIError', 'AI_APICallError', 'AI_RetryError', 'AI_NoOutputGeneratedError', 'AI_JSONParseError', 'AI_TypeValidationError',
+    'ActionFailureError', 'SubscriptionRefusal', 'WorkerRefusal', 'ProviderError', 'ProviderFailureError', 'CodedError', 'unknown'])
+  const names = { 'mikka.ai.generation': 0, 'daemon.ai.generation': 0 }
+  const byService = { web: 0, daemon: 0, other: 0 }, groups = new Map()
+  let total = 0, errors = 0, ungrouped = 0
+  for (const span of spans) {
+    if (!Object.hasOwn(names, span.name)) continue
+    total++; names[span.name]++
+    const service = span.service === 'mikka-web' ? 'web' : span.service === 'mikka-daemon' ? 'daemon' : 'other'
+    byService[service]++
+    const operation = operations.has(span.attributes?.['mikka.ai.operation']) ? span.attributes['mikka.ai.operation'] : 'unknown'
+    const error = span.attributes?.['error.type']
+    const errorType = errorTypes.has(error) ? error : (error || span.status === 2 ? 'unknown' : 'none')
+    if (span.status === 2) errors++
+    const key = JSON.stringify([span.name, service, operation, errorType])
+    const existing = groups.get(key)
+    if (existing) existing.count++
+    else if (groups.size < 64) groups.set(key, { span: span.name, service, operation, errorType, count: 1 })
+    else ungrouped++
+  }
+  return { total, errors, byService, bySpanName: names, groups: [...groups.values()], ungrouped }
+}
+
 export async function startTraceCollector(port = 3196) {
   const evidence = { spans: [], logs: [], generations: [], privacyViolations: 0, dropped: 0, malformed: 0 }
   const forbidden = new Set()

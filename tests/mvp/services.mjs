@@ -10,6 +10,7 @@ import { answerModel } from './model.mjs'
 import { subscriptionPrompt, subscriptionChunks, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
 import { MVP_SERVICES, REPOSITORY } from './isolated-env.mjs'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
+import { fixtureFailure } from './diagnostics.mjs'
 
 const execute = promisify(execFile)
 // Run as root, dev:local hands the origin to MIKKA_DEV_DAEMON_USER; Git then refuses it as dubious ownership without this exception.
@@ -48,12 +49,14 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
   const server = createServer(async (request, response) => {
     const requestId = `mvp-${randomUUID()}`
     const url = new URL(request.url, 'http://127.0.0.1')
+    let handler = 'route'
     const reply = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json', 'x-mvp-request-id': requestId }); response.end(JSON.stringify(value)) }
     try {
-      if (routes && await routes(request, response, url)) return
+      if (routes) { handler = 'extension'; if (await routes(request, response, url)) return; handler = 'route' }
       if (url.pathname === '/health') return reply({ ready: true })
       if (url.pathname === '/observations') return reply({ observations, errors, pullRequests: pullRequests.map(pr => ({ number: pr.number, url: pr.html_url, branch: pr.head.ref, draft: pr.draft })) })
       if (url.pathname === '/streaming/scenario' && request.method === 'POST') {
+        handler = 'streaming_scenario'
         const input = await readBody(request)
         assert.match(input.marker, /^mvp-stream-[a-f0-9-]{36}$/)
         for (const text of [input.first, input.last]) assert.ok(typeof text === 'string' && text.length > 0 && text.length <= 256)
@@ -64,6 +67,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         return reply({ configured: true })
       }
       if (['/streaming/state', '/streaming/release'].includes(url.pathname) && request.method === 'POST') {
+        handler = 'streaming_control'
         const { marker } = await readBody(request)
         const stream = streams.get(marker)
         assert.ok(stream)
@@ -71,6 +75,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         return reply({ started: stream.started, released: stream.released })
       }
       if (url.pathname === '/scenario' && request.method === 'POST') {
+        handler = 'scenario'
         const input = await readBody(request)
         assert.match(input.marker, /^mvp-[a-f0-9-]{36}$/)
         assert.equal(typeof input.title, 'string')
@@ -94,6 +99,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         return reply({ barePath, repo: REPOSITORY, baseBranch: 'trunk' })
       }
       if (url.pathname === '/scenario/device' && request.method === 'POST') {
+        handler = 'scenario_device'
         const { deviceId } = await readBody(request)
         assert.ok(scenario)
         assert.match(deviceId, /^[a-f0-9-]{36}$/)
@@ -101,12 +107,16 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         return reply({ configured: true })
       }
       if (url.pathname === '/subscription/model' && request.method === 'POST') {
+        handler = 'subscription_model'
         const payload=await readBody(request)
         assert.equal(payload.model,MVP_SUBSCRIPTION_MODEL)
         observe({kind:'subscription-model-request',requestId})
+        handler = 'subscription_prompt'
         const prompt=subscriptionPrompt(payload)
         const stream=[...streams.values()].find(value=>prompt.prompt.some(message=>message.role==='user' && message.content.some(part=>part.type==='text' && part.text.includes(value.marker))))
+        handler = 'subscription_answer'
         const answer=stream ? null : answerModel(prompt,scenario,observe)
+        handler = 'subscription_chunks'
         response.writeHead(200,{'content-type':'text/event-stream'})
         if(stream) {
           stream.started++
@@ -118,10 +128,12 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         return response.end(subscriptionChunks(answer,payload.model))
       }
       if (url.pathname === '/v1/language-model' && request.method === 'POST') {
+        handler = 'language_model'
         observe({ kind: 'model-request', requestId })
         return reply(answerModel(await readBody(request), scenario, observe))
       }
       if (url.pathname === '/decisions' && request.method === 'POST') {
+        handler = 'decisions'
         // The real triage transport still validates a model response and issues
         // its own execution receipt. This scripted response is only evidence of
         // that integration contract, never live model judgment or authorization.
@@ -132,6 +144,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         const question = input.questions[0]
         assert.equal(question.type, 'choice')
         if (question.name === 'push') {
+          handler = 'decisions_push'
           // Whether a Coordinator reply also goes to the phone (lib/push-reasons.ts):
           // the answered events and the reply, one per line, as plain text.
           assert.deepEqual(question.choices?.map(choice => choice.value), ['decide', 'review', 'finished', 'briefing', 'none'])
@@ -151,6 +164,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         assert.equal(input.input[0].content?.length, 1)
         assert.equal(input.input[0].content[0].type, 'input_text')
         if (question.name === 'outcome') {
+          handler = 'decisions_outcome'
           // An ended run's outcome (lib/run-outcome.ts): the run's facts, one per line.
           assert.deepEqual(question.choices?.map(choice => choice.value), ['done', 'blocked', 'needs_input', 'failed', 'idle'])
           const facts = input.input[0].content[0].text
@@ -163,6 +177,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
             answers: [{ type: 'choice', name: 'outcome', choice: status === 'succeeded' ? 'done' : 'idle' }],
           })
         }
+        handler = 'decisions_tier'
         assert.equal(question.name, 'tier')
         assert.deepEqual(question.choices?.map(choice => choice.value), ['attention', 'result', 'background'])
         const state = JSON.parse(input.input[0].content[0].text)
@@ -182,6 +197,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         })
       }
       if (!url.pathname.startsWith('/github/')) throw new Error('Unexpected fixture route')
+      handler = 'github'
       assert.ok(scenario, 'GitHub called before the fixture scenario exists')
       const githubUser = { id: scenario.githubAccountId, login: `mvp-owner-${scenario.githubAccountId}` }
       const path = decodeURIComponent(url.pathname.slice('/github'.length))
@@ -331,10 +347,10 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       }
       throw new Error(`Unexpected GitHub operation: ${method} ${path}`)
     } catch (error) {
-      // Never expose request bodies/headers or assertion diffs containing a JWT.
-      const message = error instanceof assert.AssertionError ? 'Fixture contract assertion failed' : error instanceof Error ? error.message : 'Fixture request failed'
-      errors.push({ requestId, path: url.pathname, message })
-      reply({ error: message }, 500)
+      // Even assertion messages can contain headers. Retain only closed
+      // provenance so the acceptance report can explain a refusal safely.
+      if (errors.length < 16) errors.push(fixtureFailure(error, handler, request.method))
+      reply({ error: 'fixture_request_failed' }, 500)
     }
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
@@ -343,6 +359,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
     // In-process acceptance can fail promptly without reading private requests
     // or printing assertion messages from the synthetic provider boundary.
     hasFailures: () => errors.length > 0,
+    failureDiagnostics: () => structuredClone(errors),
     async close() {
       for (const stream of streams.values()) stream.release()
       server.closeAllConnections()

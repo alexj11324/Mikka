@@ -12,7 +12,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { assertMvpEnvironment, MVP_ORIGIN, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { startMvpServices } from './services.mjs'
-import { startTraceCollector } from './trace-collector.mjs'
+import { startTraceCollector, summarizeAiSpans } from './trace-collector.mjs'
 import { tracePublicationReady } from './model.mjs'
 import { MVP_SUBSCRIPTION_MODEL, seedMvpSubscription, seedMvpExecutionOrder } from './subscription.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
@@ -36,8 +36,8 @@ const evidenceDirectory = resolve(process.env.MIKKA_TRACE_EVIDENCE_DIR ?? join(r
 await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 })
 const privateLogDirectory = join(evidenceDirectory, 'private-logs')
 await mkdir(privateLogDirectory, { recursive: true, mode: 0o700 })
-const children = [], results = [], collectors = []
-let accounts, services, collector, phase = 'starting', failure, workflowHealth
+const children = [], results = [], collectors = [], routeReadiness = []
+let accounts, services, collector, phase = 'starting', failure, workflowHealth, telemetryDrainMs = 0
 const checkpoint = value => { phase = value; console.info(`trace-acceptance ${value}`) }
 const child = (label, args, env) => {
   const job = spawn(process.execPath, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -111,6 +111,18 @@ try {
   assert.equal(health.status, 200, 'WORKFLOW_ROUTE_UNAVAILABLE')
   workflowHealth.healthy = (await health.json()).healthy === true
   assert.equal(workflowHealth.healthy, true, 'WORKFLOW_ROUTE_UNAVAILABLE')
+  // As in dev:local, compile the lazy native routes without credentials or
+  // tasks. This is readiness, not proof that a prior mailbox failure was cold
+  // compilation. Retain only closed HTTP metadata; never response bodies.
+  checkpoint('native-routes-ready')
+  for (const [route, path] of [['mcp', '/api/mcp'], ['github_token', '/api/runs/github-token']]) {
+    const started = Date.now()
+    const response = await fetch(`${MVP_ORIGIN}/mikka${path}`, { method: 'POST', signal: AbortSignal.timeout(120_000) })
+    const type = response.headers.get('content-type')?.split(';', 1)[0]
+    routeReadiness.push({ route, status: response.status, contentType: ['application/json', 'text/plain', 'text/html'].includes(type) ? type : 'other', durationMs: Date.now() - started })
+    await response.body?.cancel()
+    assert.ok([400, 401, 403, 405, 406, 415].includes(response.status), 'NATIVE_ROUTE_UNAVAILABLE')
+  }
   checkpoint('account-lease')
   accounts = await acquireTestAccounts({ database: pool, environment, runId: randomUUID(), workerId: 'trace-1512', requestId: randomUUID() })
   const ownerId = accounts.owner.userId
@@ -142,7 +154,7 @@ try {
     await recordAuthenticationSecrets([credential], { environment })
     await pool.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash") VALUES ($1,$2,$3,$4)', [tokenId, ownerId, 'Trace acceptance daemon', createHash('sha256').update(credential).digest('hex')])
     const daemon = child(`daemon-${kind}`, ['--import', 'tsx', 'tests/mvp/start-trace-daemon.mts'], {
-      ...process.env, NODE_OPTIONS: '', MIKKA_E2E_DEVICE_TOKEN: credential, MIKKA_E2E_DAEMON_DIR: daemonDirectory,
+      ...process.env, NODE_OPTIONS: '', MIKKA_E2E_DEVICE_TOKEN: credential, MIKKA_E2E_DAEMON_DIR: daemonDirectory, MIKKA_DEV_GIT_ORIGIN: scenario.barePath,
       MIKKA_TRACE_FIXTURES_DIR: fixtureDirectory, MIKKA_TRACE_FIXTURE_CONTEXT: JSON.stringify({ traceparent, sessionId, posthogDistinctId: ownerId }),
       GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_COUNT: '2',
       GIT_CONFIG_KEY_0: `url.${pathToFileURL(scenario.barePath).href}.insteadOf`, GIT_CONFIG_VALUE_0: REPOSITORY,
@@ -251,12 +263,18 @@ try {
   failure = { phase, code: /^[A-Z0-9_.-]{1,100}$/.test(code) ? code : 'TRACE_ACCEPTANCE_FAILED' }
   process.exitCode = 1
 } finally {
+  // Fast refusal must not kill the API's existing 10s PostHog batch before it
+  // exports the failed generation. Preserve the failure; no extra model or
+  // business request and no cross-process flush API is involved.
+  if (failure && collector) { telemetryDrainMs = 20_000; await delay(telemetryDrainMs) }
   if (accounts) await accounts.release({ outcome: 'dirty' }).catch(() => { process.exitCode = 1 })
   for (const job of children.reverse()) await stop(job)
   await services?.close()
   for (const current of collectors) await current.close()
   await pool.end()
-  const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, workflowHealth, syntheticCLI: true, cases: results,
+  const evidence = { version: 1, revision, result: process.exitCode ? 'failed' : 'passed', failure, workflowHealth, routeReadiness, syntheticCLI: true, cases: results,
+    serviceFailures: services?.failureDiagnostics() ?? [],
+    telemetryDrainMs, aiSpans: summarizeAiSpans(collector?.evidence.spans ?? []),
     processes: children.map(job => ({ label: job.label, exitCode: job.exitCode, signal: job.signalCode,
       privateLogRetained: !job.logFailed, privateLogBytes: job.logBytes })),
     counts: collector ? { spans: collector.evidence.spans.length, logs: collector.evidence.logs.length,
@@ -268,5 +286,6 @@ try {
       'no browser, production, Preview, real-provider, replay-UI or deployment acceptance'],
   }
   await writeFile(join(evidenceDirectory, 'trace-chain.json'), JSON.stringify(evidence, null, 2) + '\n', { mode: 0o600 })
-  console.info(JSON.stringify({ traceAcceptance: evidence.result, revision, phase, cases: results.map(({ kind, runId, traceId, status }) => ({ kind, runId, traceId, status })), counts: evidence.counts, evidenceFile: join(evidenceDirectory, 'trace-chain.json'), ...(failure ? { failure } : {}) }))
+  console.info(JSON.stringify({ traceAcceptance: evidence.result, revision, phase, cases: results.map(({ kind, runId, traceId, status }) => ({ kind, runId, traceId, status })), counts: evidence.counts, serviceFailures: evidence.serviceFailures,
+    telemetryDrainMs, aiSpans: evidence.aiSpans, evidenceFile: join(evidenceDirectory, 'trace-chain.json'), ...(failure ? { failure } : {}) }))
 }
