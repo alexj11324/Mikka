@@ -32,13 +32,13 @@ WITH latest AS (
     FROM pace
 )
 SELECT
-    if(eligible, equivalent_monthly_bytes / 5000000000, NULL) AS value,
+    if(eligible, equivalent_monthly_bytes / 500000000000, NULL) AS value,
     concat('UTC daily run rate | today=', toString(round(today_bytes, 0)), ' bytes/', toString(utc_hours), ' reported hours',
         ' | projected day=', toString(round(projected_daily_bytes, 0)), ' bytes',
-        ' | ', toString(utc_month_days), '-day equivalent=', toString(round(equivalent_monthly_bytes, 0)), ' bytes vs 5000000000 budget',
+        ' | ', toString(utc_month_days), '-day equivalent=', toString(round(equivalent_monthly_bytes, 0)), ' bytes vs 500000000000 budget',
         ' | reported=', toString(toTimeZone(reported_through, 'UTC')),
         ' | snapshot age=', toString(snapshot_age_minutes), 'm; provider age=', toString(provider_age_minutes), 'm',
         ' | ', if(eligible, 'eligible', 'suppressed: stale/unhealthy/early UTC day')) AS source,
-    today_bytes, utc_hours, projected_daily_bytes, equivalent_monthly_bytes, 5000000000 AS monthly_budget_bytes,
+    today_bytes, utc_hours, projected_daily_bytes, equivalent_monthly_bytes, 500000000000 AS monthly_budget_bytes,
     snapshot_age_minutes, provider_age_minutes, reported_through, snapshot_at, eligible
 FROM result
