@@ -252,6 +252,8 @@
     "continueGoogle": "使用 Google 继续",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
     "continueGithub": "使用 GitHub 继续",
+    "continueAs": "以 {name} 继续",
+    "switchAccount": "换个账号",
     "orEmail": "或",
     "name": "称呼",
     "namePlaceholder": "怎么称呼你",

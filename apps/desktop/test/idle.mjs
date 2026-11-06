@@ -19,6 +19,7 @@ import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
+import { continueInSystemBrowser } from './browser-handoff.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -111,7 +112,7 @@ try {
   }
   assert.equal(new URL(external).origin, environment.origin)
   const systemBrowser = await context.newPage()
-  await systemBrowser.goto(external, { waitUntil: 'domcontentloaded' })
+  await continueInSystemBrowser(systemBrowser, external)
   await handoff
   const identity = await waitForBundledSession(page, scope.owner.userId)
   await systemBrowser.close()
