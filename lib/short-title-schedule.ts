@@ -10,7 +10,11 @@ import { afterDatabaseCommit } from '@/lib/db/commit-effects'
 export function scheduleShortTitle(executor: object, issueId: string, ownerId: string) {
   try {
     afterDatabaseCommit(executor, `short-title:${issueId}`, () => afterJob('after:short-title', async () => {
-      await (await import('./short-title-server')).writeShortTitle(issueId, ownerId)
+      // The commit context still names the creating transaction as the ambient database; its client is back in the
+      // pool by now. Leave it, keeping the request's database, so the job's reads and its write get their own connection.
+      const { withoutDatabaseClient } = await import('./db/request-scope')
+      const { writeShortTitle } = await import('./short-title-server')
+      await withoutDatabaseClient(() => writeShortTitle(issueId, ownerId))
     }, { orRun: true, retainContext: true }))
   } catch (error) {
     console.warn('Short title not scheduled', error instanceof Error ? error.name : 'unknown')
