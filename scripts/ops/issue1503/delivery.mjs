@@ -1,0 +1,543 @@
+#!/usr/bin/env node
+/** #1503 production acceptance through the ordinary smoke-owner HTTP APIs.
+ * Run with Node 24 + tsx. No SQL, synthetic sessions, provider credentials,
+ * manual pushes/PRs, state repair, or timer-based business-data polling.
+ */
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { smokeSession, fail, SMOKE_ID } from './http.ts'
+import { encode, decode } from '../../../lib/desktop-rpc/wire.ts'
+
+const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
+const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
+const digest = value => createHash('sha256').update(value).digest('hex')
+const check = (condition, code) => { if (!condition) fail(code) }
+const REPOSITORY = 'alexj11324/Mikka-handoff'
+const defaultWorkspace = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
+const defaultTeam = '62a760fc-da79-4d50-a8fa-a818e25d2f9a'
+const briefOrder = view => ({ location: view.location, preferredHarness: view.preferredHarness, autoModelRouting: view.autoModelRouting,
+  customized: view.customized, entries: view.entries.map(({ harness, model, source }) => ({ harness, model, source })) })
+const binding = task => ({ taskId: task.id, issueId: task.issueId, attemptId: task.attemptId, candidateId: task.candidateId, revision: task.revision })
+const nonempty = value => typeof value === 'string' && value.trim().length > 0
+const verificationPath = '/api/integrations/github/repositories/verification'
+const criteriaPassed = criteria => Array.isArray(criteria) && criteria.length > 0 && criteria.every(item => item.passed === true
+  && (item.status ?? 'passed') === 'passed' && nonempty(item.evidence))
+
+export function fileSpecification(marker, harness) {
+  const initial = `Factory delivery acceptance #1503\nCase: ${marker}-${harness}\nState: initial\n`
+  return { path: `docs/issue-1503/${marker}-${harness}.txt`, initial, revised: initial.replace('State: initial', 'State: revised') }
+}
+
+/** The host executes this exact command after the agent submits. Validate the
+ * current file and every other smoke file present, including the final newline.
+ * The other harness's file may not exist yet when the first case runs. */
+export function repositoryVerifyCommand(specifications, requiredPath) {
+  check(specifications.some(item => item.path === requiredPath), 'verification_file_missing')
+  const script = `const f=require("node:fs"),c=require("node:crypto"),s=${JSON.stringify(specifications)},r=[];for(const x of s){if(!f.existsSync(x.path)){if(x.path===${JSON.stringify(requiredPath)})throw Error("required_file_missing");continue}const b=f.readFileSync(x.path),state=b.equals(Buffer.from(x.initial))?"initial":b.equals(Buffer.from(x.revised))?"revised":null;if(!state)throw Error("file_bytes_mismatch");r.push({path:x.path,state,bytes:b.length,sha256:c.createHash("sha256").update(b).digest("hex")})}console.log(JSON.stringify({issue:1503,files:r}))`
+  const command = `node -e '${script.replace(/'/g, "'\\''")}'`
+  check(command.length <= 2000, 'verification_command_too_long')
+  return command
+}
+
+/** Empty/missing/duplicated projections cannot stand in for completed checks. */
+export function matchedCheckEvidence(state, passed) {
+  check(passed.length > 0 && Array.isArray(state.checks), 'verification_checks_missing')
+  const selected = state.checks.filter(item => passed.some(attempt => attempt.id === item.attemptId))
+  check(selected.length === passed.length && new Set(selected.map(item => item.attemptId)).size === passed.length, 'verification_checks_missing')
+  return passed.map(attempt => {
+    const item = selected.find(value => value.attemptId === attempt.id)
+    const candidate = state.candidates.find(value => value.id === attempt.candidateId)
+    check(candidate && sha(candidate.sha) && uuid(attempt.runId) && item.status === 'passed' && item.stage === attempt.stage
+      && item.runId === attempt.runId && item.candidateId === attempt.candidateId && item.candidateSha === candidate.sha, 'verification_check_binding_mismatch')
+    check(criteriaPassed(item.criteria) && item.criteria.every(criterion => criterion.status === 'passed'), 'verification_criteria_missing')
+    // The accepted V2 flow has a report-only review. It intentionally has no
+    // daemon command; actual artifact observations are checked separately.
+    if (!(state.task.route?.flowVersion === 2 && item.stage === 'review')) check(item.verify?.status === 'passed'
+      && nonempty(item.verify.command) && item.verify.exitCode === 0, 'independent_command_verification_missing')
+    return item
+  })
+}
+
+export function verifiedFileBytes(report, command, filePath, expectedText, expectedState) {
+  const verify = report?.verify
+  check(verify?.status === 'passed' && verify.command === command && verify.exitCode === 0
+    && verify.timedOut === false && verify.signal === null, 'implementation_command_verification_missing')
+  let receipt
+  try { receipt = JSON.parse(verify.output?.trim().split('\n').at(-1)) } catch {}
+  const matches = receipt?.issue === 1503 && Array.isArray(receipt.files) ? receipt.files.filter(item => item.path === filePath) : []
+  check(matches.length === 1 && matches[0].state === expectedState && matches[0].bytes === Buffer.byteLength(expectedText)
+    && matches[0].sha256 === digest(expectedText), 'implementation_file_bytes_mismatch')
+  return { ...matches[0], source: 'daemon_verify', commandSha256: digest(command) }
+}
+
+function artifactToolValues(value, depth = 0) {
+  if (depth > 4) return []
+  if (typeof value === 'string') { try { return artifactToolValues(JSON.parse(value), depth + 1) } catch { return [] } }
+  if (!value || typeof value !== 'object' || value.isError === true) return []
+  if (Array.isArray(value)) return value.flatMap(item => artifactToolValues(item, depth + 1))
+  if (value.type === 'text' && typeof value.text === 'string') return artifactToolValues(value.text, depth + 1)
+  if (Array.isArray(value.content)) return value.content.flatMap(item => item.type === 'text' ? artifactToolValues(item.text, depth + 1) : [])
+  return [value]
+}
+
+/** Read-only native tool observations, not the reviewer's narrative. Keep only
+ * safe hashes and identifiers in the report; never dump a thread transcript. */
+export function reviewArtifactObservations(thread, runId, candidateSha, filePath, expectedText) {
+  check(thread.thread?.id === runId && thread.thread.latestRunId === runId && thread.thread.status === 'succeeded' && thread.chunkCursor?.chain === runId
+    && Array.isArray(thread.chunks), 'review_thread_binding_mismatch')
+  const chunks = thread.chunks.map(item => item.chunk)
+  const matches = []
+  for (const [index, input] of chunks.entries()) {
+    if (input.type !== 'tool-input-available' || input.toolName !== 'mcp__mikka__inspect_artifact' || input.input?.path !== filePath) continue
+    const inputs = chunks.filter(item => item.type === 'tool-input-available' && item.toolCallId === input.toolCallId)
+    const outputs = chunks.map((item, i) => ({ item, i })).filter(({ item }) => ['tool-output-available', 'tool-output-error'].includes(item.type) && item.toolCallId === input.toolCallId)
+    if (!nonempty(input.toolCallId) || inputs.length !== 1 || outputs.length !== 1 || outputs[0].i <= index || outputs[0].item.type !== 'tool-output-available') continue
+    const observed = artifactToolValues(outputs[0].item.output).find(item => item.path === filePath && item.head === candidateSha
+      && item.contentUtf8 === expectedText && item.bytes === Buffer.byteLength(expectedText) && item.sha256 === digest(expectedText)
+      && item.committedSha256 === digest(expectedText) && item.contentMatchesGit === true && item.textUnavailable === null)
+    if (observed) matches.push({ runId, candidateSha, path: filePath, bytes: observed.bytes, sha256: observed.sha256,
+      toolCallId: input.toolCallId, inputSha256: digest(JSON.stringify(input.input)), outputSha256: digest(JSON.stringify(outputs[0].item.output)),
+      contentMatchesGit: true, source: 'review_inspect_artifact' })
+  }
+  check(matches.length > 0, 'review_artifact_observations_missing')
+  return matches
+}
+
+const repositoryVerificationValue = value => {
+  check(value?.viewerId === SMOKE_ID && value.repository === REPOSITORY
+    && (value.verifyCommand === null || nonempty(value.verifyCommand)), 'repository_verification_scope_mismatch')
+  return value.verifyCommand
+}
+
+export async function restoreRepositoryVerification(json, post, originalCommand, installedCommands) {
+  const readPath = `${verificationPath}?repository=${encodeURIComponent(REPOSITORY)}`
+  const current = repositoryVerificationValue(await json(readPath))
+  if (current !== originalCommand) {
+    // Do not overwrite a concurrent operator's unrelated setting.
+    check(installedCommands.has(current), 'repository_verification_restore_conflict')
+    const restored = repositoryVerificationValue(await json(verificationPath, { ...post({ repository: REPOSITORY, verifyCommand: originalCommand }), method: 'PATCH' }))
+    check(restored === originalCommand, 'repository_verification_restore_mismatch')
+  }
+  check(repositoryVerificationValue(await json(readPath)) === originalCommand, 'repository_verification_restore_mismatch')
+  return { kind: 'repository_verification_restored', configured: originalCommand !== null,
+    commandSha256: originalCommand === null ? null : digest(originalCommand) }
+}
+
+/** Owner/workspace invalidations only. Timers maintain the socket and deadlines;
+ * business reads occur on initial load, acknowledged writes, or live messages.
+ */
+export class LiveChanges {
+  constructor(json, workspaceId, { Socket = WebSocket } = {}) {
+    Object.assign(this, { json, workspaceId, Socket, sequence: 0, connection: 0, versions: new Map(), waiters: new Set(), closed: false,
+      socket: null, heartbeat: null, renewal: null, reconnect: null, reconnects: 0, messages: 0 })
+  }
+  stamp(keys) { return `${this.connection}:${keys.map(key => this.versions.get(key) ?? 0).join(':')}` }
+  notify(key) {
+    if (key) this.versions.set(key, ++this.sequence)
+    for (const waiter of [...this.waiters]) waiter()
+  }
+  async start() { await this.connect() }
+  async connect() {
+    if (this.closed) return
+    clearTimeout(this.reconnect)
+    const ticket = await this.json(`/api/live/ticket?workspace=${this.workspaceId}`)
+    check(typeof ticket.url === 'string' && /^wss:\/\//.test(ticket.url) && typeof ticket.protocol === 'string'
+      && Number.isFinite(ticket.expiresAt) && ticket.expiresAt > Date.now(), 'live_ticket_unavailable')
+    const url = new URL(ticket.url); url.searchParams.set('revisions', '1')
+    const socket = this.socket = new this.Socket(url.href, ticket.protocol)
+    await new Promise((resolve, reject) => {
+      let ready = false, pong = true
+      const timeout = setTimeout(() => reject(new Error('issue1503_live_ready_timeout')), 15000)
+      const reconnect = () => {
+        if (this.closed || this.socket !== socket) return
+        clearInterval(this.heartbeat); clearTimeout(this.renewal); clearTimeout(timeout)
+        this.socket = null
+        try { socket.close() } catch {}
+        if (!ready) { reject(new Error('issue1503_live_connection_failed')); return }
+        if (++this.reconnects > 8) { this.failure = new Error('issue1503_live_disconnected'); this.notify(); return }
+        this.reconnect = setTimeout(() => this.connect().catch(error => { this.failure = error; this.notify() }), 1000)
+      }
+      socket.onmessage = event => {
+        if (this.socket !== socket) return
+        if (event.data === 'pong') { pong = true; return }
+        if (typeof event.data !== 'string' || event.data.length > 2048) return
+        let value
+        try { value = JSON.parse(event.data) } catch { return }
+        if (value.type === 'live_ready') {
+          if (![1, 2].includes(value.version) || !['factory_task', 'factory_issue'].every(kind => value.kinds?.includes(kind))) {
+            clearTimeout(timeout); reject(new Error('issue1503_live_capabilities_missing')); return
+          }
+          if (ready) return
+          ready = true; clearTimeout(timeout); this.connection++; this.notify(); resolve()
+          this.heartbeat = setInterval(() => { if (!pong) { reconnect(); return }; pong = false; try { socket.send('ping') } catch { reconnect() } }, 30000)
+          this.renewal = setTimeout(reconnect, Math.max(1, ticket.expiresAt - Date.now()))
+          return
+        }
+        if (ready && uuid(value.id) && ['factory_task', 'factory_issue', 'pull_request_status'].includes(value.kind)) {
+          this.messages++; this.notify(`${value.kind}:${value.id}`)
+        }
+      }
+      socket.onerror = socket.onclose = reconnect
+    })
+  }
+  async changed(keys, before, deadline) {
+    if (this.failure) throw this.failure
+    if (this.stamp(keys) !== before) return
+    await new Promise((resolve, reject) => {
+      const done = () => {
+        if (this.failure || this.stamp(keys) !== before || this.closed) {
+          clearTimeout(timer); this.waiters.delete(done)
+          if (this.failure) reject(this.failure)
+          else if (this.closed) reject(new Error('issue1503_live_closed'))
+          else resolve()
+        }
+      }
+      const timer = setTimeout(() => { this.waiters.delete(done); reject(new Error('issue1503_task_timeout')) }, Math.max(1, deadline - Date.now()))
+      this.waiters.add(done); done()
+    })
+  }
+  async until(keys, read, predicate, timeoutMs) {
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      if (this.failure) throw this.failure
+      const before = this.stamp(keys)
+      const value = await read()
+      if (predicate(value)) return value
+      check(Date.now() < deadline, 'task_timeout')
+      await this.changed(keys, before, deadline)
+    }
+  }
+  close() {
+    this.closed = true; clearInterval(this.heartbeat); clearTimeout(this.renewal); clearTimeout(this.reconnect)
+    if (this.socket) { this.socket.onclose = this.socket.onerror = this.socket.onmessage = null; this.socket.close() }
+    this.notify()
+  }
+}
+
+export async function runDeliveryAcceptance(env = process.env) {
+  const expectedSha = env.MIKKA_EXPECTED_DEPLOYMENT_SHA
+  const workspaceId = env.MIKKA_1503_WORKSPACE_ID ?? defaultWorkspace
+  const teamId = env.MIKKA_1503_TEAM_ID ?? defaultTeam
+  const marker = env.MIKKA_1503_RUN_MARKER ?? `${env.GITHUB_RUN_ID ?? 'manual'}-${env.GITHUB_RUN_ATTEMPT ?? '1'}`
+  const harness = env.MIKKA_1503_HARNESS || undefined
+  const timeoutMs = Number(env.MIKKA_ACCEPTANCE_TIMEOUT_MS ?? 1200000)
+  check(sha(expectedSha) && uuid(workspaceId) && uuid(teamId) && /^[a-zA-Z0-9_-]{3,43}$/.test(marker)
+    && (harness === undefined || ['claude_code', 'codex'].includes(harness))
+    && Number.isFinite(timeoutMs) && timeoutMs >= 60000 && timeoutMs <= 3600000, 'delivery_configuration_required')
+  const cases = [
+    { harness: 'claude_code', model: 'claude-haiku-5-5', source: { kind: 'subscription', connectionId: env.MIKKA_1503_CLAUDE_CONNECTION_ID ?? '93b6ab23-900b-4e18-9ea0-baccf2d104ce' } },
+    { harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: env.MIKKA_1503_CODEX_CONNECTION_ID ?? 'ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5' } },
+  ].filter(item => harness === undefined || item.harness === harness)
+  check(cases.every(item => uuid(item.source.connectionId)), 'subscription_reference_invalid')
+  const specifications = cases.map(item => fileSpecification(marker, item.harness))
+  const report = { issue: 1503, phase: 'delivery', startedAt: new Date().toISOString(), expectedSha, workspaceId, teamId,
+    marker, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
+  let session, live, originalOrder, currentOrder, profile, activeCase, project, originalVerification
+  const installedVerificationCommands = new Set()
+  const reportPath = resolve(env.MIKKA_1503_REPORT ?? 'issue1503-report/delivery.json')
+  const checkpoint = async () => { await mkdir(resolve(reportPath, '..'), { recursive: true }); await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 }) }
+  let rpc, json, request
+  const stage = async name => { report.stage = name; console.log(JSON.stringify({ phase: name, harness: activeCase?.harness, taskId: activeCase?.taskId })); await checkpoint() }
+  try {
+    session = await smokeSession()
+    request = (path, init = {}) => session.request(path, { ...init, headers: { cookie: `mikka-workspace=${workspaceId}`, 'x-mikka-locale': 'en', ...init.headers } })
+    json = async (path, init) => {
+      const response = await request(path, init)
+      const value = await response.json().catch(() => null)
+      if (!response.ok) {
+        const known = typeof value?.error === 'string' && /^[a-zA-Z][a-zA-Z0-9_]{1,100}$/.test(value.error) ? value.error : null
+        report.lastHttpFailure = { path: path.split('?')[0], status: response.status, ...(known ? { code: known } : {}) }
+        fail(`http_${response.status}`)
+      }
+      check(value !== null, 'http_json_invalid'); return value
+    }
+    rpc = async (action, args) => {
+      const result = await json('/api/desktop/rpc', session.post({ version: 1, action, args: encode(args) }))
+      check(result.ok === true, 'rpc_failed')
+      const value = decode(result.result)
+      check(value?.ok !== false && !value?.error, 'rpc_action_failed')
+      return value?.ok === true && Object.hasOwn(value, 'data') ? value.data : value
+    }
+    const pin = async () => check((await json('/api/version')).build === expectedSha, 'deployment_changed')
+    const order = async () => rpc('model-order.getModelOrder', [workspaceId])
+    const changeOrder = async change => { currentOrder = await rpc('model-order.changeModelOrder', [change, workspaceId]); return currentOrder }
+    await pin(); await rpc('workspace.switchWorkspace', [workspaceId])
+    const directory = await rpc('teams.loadTeamDirectory', [workspaceId])
+    check(directory.teams.some(team => team.id === teamId && team.identifier === 'F1503'), 'fixture_team_mismatch')
+    const github = await json('/api/integrations/github')
+    check(github.connected && github.viewerId === SMOKE_ID && github.login === 'alexj11324'
+      && github.repositories?.some(repo => repo.fullName === REPOSITORY), 'github_authorization_missing')
+    report.githubLogin = github.login
+    originalVerification = { command: repositoryVerificationValue(await json(`${verificationPath}?repository=${encodeURIComponent(REPOSITORY)}`)) }
+    report.repositoryVerification = { originalConfigured: originalVerification.command !== null,
+      originalCommandSha256: originalVerification.command === null ? null : digest(originalVerification.command), installed: [] }
+    // createBot takes the registered repository's versioned identity, not its
+    // display name. Its normal server action rechecks workspace installation.
+    const botRepository = `v2/github.com/${REPOSITORY.toLowerCase()}`
+    const profiles = await json(`/api/factory/agent-profiles?workspaceId=${workspaceId}&location=cloud`)
+    check(!(profiles.profiles ?? []).some(item => item.enabled && !item.archivedAt), 'fixture_has_enabled_profiles')
+    originalOrder = currentOrder = await order(); report.originalOrder = briefOrder(originalOrder)
+    check(originalOrder.cloudReady, 'cloud_unavailable')
+    live = new LiveChanges(json, workspaceId); await live.start()
+    await stage('create_project')
+    project = (await rpc('projects.saveProject', [{ name: `Factory 1503 ${marker}`, summary: 'Production delivery acceptance for issue #1503',
+      description: 'Two tiny, independent text-file changes in alexj11324/Mikka-handoff. Each is reviewed, sent back once, repaired on the same PR, and merged by the owner.',
+      status: 'started', priority: 'normal', lead: 'me', team: 'Mikka', startDate: '', targetDate: '' }])).project
+    check(uuid(project?.id), 'project_missing')
+    project = await rpc('team-relations.setProjectTeams', [{ projectId: project.id, revision: project.revision, teamIds: [teamId], primaryTeamId: teamId }])
+    report.projectId = project.id
+    for (const definition of cases) {
+      const specification = fileSpecification(marker, definition.harness)
+      const { initial: initialText, revised: revisedText } = specification
+      const verifyCommand = repositoryVerifyCommand(specifications, specification.path)
+      activeCase = { harness: definition.harness, model: definition.model, status: 'running', filePath: specification.path, runs: [] }
+      report.cases.push(activeCase)
+      await stage('configure_repository_verification'); await pin()
+      const currentVerification = repositoryVerificationValue(await json(`${verificationPath}?repository=${encodeURIComponent(REPOSITORY)}`))
+      check(currentVerification === originalVerification.command || installedVerificationCommands.has(currentVerification), 'repository_verification_configuration_conflict')
+      installedVerificationCommands.add(verifyCommand)
+      check(repositoryVerificationValue(await json(verificationPath, { ...session.post({ repository: REPOSITORY, verifyCommand }), method: 'PATCH' })) === verifyCommand,
+        'repository_verification_configuration_mismatch')
+      report.repositoryVerification.installed.push({ harness: definition.harness, requiredPath: specification.path, commandSha256: digest(verifyCommand) })
+      await stage('configure_small_official_model'); await pin()
+      for (const entry of [...currentOrder.entries]) await changeOrder({ kind: 'remove', id: entry.id })
+      await changeOrder({ kind: 'add', entries: [definition] })
+      await changeOrder({ kind: 'location', location: 'cloud' })
+      await changeOrder({ kind: 'autoRouting', enabled: false })
+      await changeOrder({ kind: 'preferred', harness: definition.harness })
+      check(currentOrder.entries.length === 1 && currentOrder.entries[0].model === definition.model && !currentOrder.entries[0].block, 'required_model_unavailable')
+      profile = (await json('/api/factory/agent-profiles', session.post({ workspaceId, requestId: randomUUID(), profile: {
+        name: `1503 ${marker} ${definition.harness}`, description: 'Tiny code delivery and independent Factory review.', roles: ['execute', 'review', 'verify'],
+        enabled: true, harness: definition.harness, model: { mode: 'fixed', ...definition }, effort: 'low', skills: [],
+        instructions: 'Perform the assigned Factory stage faithfully. Use the existing repository instructions, make only the requested tiny file change, and report actual command results. During the independent review, use mikka.inspect_artifact on the requested file with its exact expectedUtf8 contents to observe the fixed commit, complete bytes and final newline. Record those concrete observations in each applicable criterion. The v2 review is read-only and report-only; implementation owns command verification.' } }))).profile
+      check(uuid(profile?.id), 'profile_missing'); activeCase.profileId = profile.id
+      const bot = await rpc('bots.createBot', [{ name: `1503 ${marker} ${definition.harness}`, color: 'bleu', shape: 'cercle', repository: botRepository, model: null }])
+      check(uuid(bot?.id), 'bot_missing'); activeCase.botId = bot.id
+      const taskText = `Repository: ${REPOSITORY}. Create only ${activeCase.filePath} as UTF-8 text with a final newline.\nInitial contents:\n${initialText}\nAcceptance: the header and Case line must stay exactly as given; State is initially initial. If the human requests changes, update only State to revised and preserve the header and Case line. Do not edit any other file. Run a small command that reads the file and verifies these requirements. Commit your change and complete the normal Mikka submission so the host automatically pushes the assigned task branch and opens the PR. Do not merge it yourself. Do not call any external messaging API.`
+      await stage('create_numbered_task')
+      let issue = (await rpc('issues.saveIssue', [{ title: `Factory #1503 ${marker} ${definition.harness}`, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: taskText }] }] }, status: 'todo', priority: 'low' }])).issue
+      check(uuid(issue?.id) && typeof issue.identifier === 'string' && /-\d+$/.test(issue.identifier), 'number_missing_at_creation')
+      activeCase.issueId = issue.id; activeCase.personalIdentifier = issue.identifier
+      issue = (await rpc('issues.promoteIssueToTeam', [{ requestId: randomUUID(), issueId: issue.id, revision: issue.revision, teamId, expectedTeamId: null }])).issue
+      check(issue?.scope === 'workspace' && /^F1503-\d+$/.test(issue.identifier), 'team_number_missing')
+      activeCase.identifier = issue.identifier; activeCase.expectedBranch = `mikka/${issue.identifier.toLowerCase()}`
+      const workspaceIssues = await rpc('issues.listWorkspaceIssues', [workspaceId])
+      check(Array.isArray(workspaceIssues) && workspaceIssues.some(item => item.id === issue.id && item.identifier === issue.identifier), 'workspace_issue_number_mismatch')
+      activeCase.workspaceList = { count: workspaceIssues.length, identifier: issue.identifier }
+      project = (await rpc('projects.setProjectIssues', [{ id: project.id, revision: project.revision, issueIds: report.cases.map(item => item.issueId) }])).project
+      const issueKeys = [`factory_issue:${issue.id}`]
+      const before = await json(`/api/factory/tasks?issueId=${issue.id}`)
+      check(before.liveWorkspaceId === workspaceId && before.tasks.length === 0, 'fixture_task_not_fresh')
+      await stage('dispatch'); await pin()
+      // This is the existing task-dialog submission, including its human
+      // source, explicit destination and Profile. The Coordinator performs
+      // ordinary dispatch_run, which binds the real remote repository.
+      const submissionId = randomUUID()
+      const dispatchText = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read its existing description and use that exact task; do not create a duplicate. This is repository work, so use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, and the selected Profile ${profile.id}. It is a tiny file task and needs no specification approval: needsSpec false. Preserve the task's existing acceptance criteria, publish automatically, and leave its PR for my Factory review. I will request one change and then merge it.`
+      const dispatched = await rpc('coordinator.sendCoordinatorMessage', [dispatchText, null, bot.id, submissionId, { kind: 'cloud' }, null, [], undefined, profile.id])
+      check(dispatched.queued === true, 'dispatch_failed'); activeCase.submissionId = submissionId
+      const found = await live.until(issueKeys, () => json(`/api/factory/tasks?issueId=${issue.id}`), value => value.tasks.length > 0, timeoutMs)
+      check(found.tasks.length === 1, 'multiple_factory_tasks'); activeCase.taskId = found.tasks[0].id
+      const keys = [`factory_task:${activeCase.taskId}`, ...issueKeys, `pull_request_status:${issue.id}`]
+      let lastState = ''
+      const read = async () => {
+        const state = await json(`/api/factory/tasks/${activeCase.taskId}`)
+        check(state.task.id === activeCase.taskId && state.task.issueId === issue.id && state.liveWorkspaceId === workspaceId, 'task_scope_mismatch')
+        const now = `${state.task.stage}:${state.task.status}:${state.task.revision}`
+        if (now !== lastState) { lastState = now; console.log(JSON.stringify({ phase: 'factory_progress', harness: definition.harness, taskId: state.task.id, stage: state.task.stage, status: state.task.status, revision: state.task.revision })) }
+        activeCase.lastState = { stage: state.task.stage, status: state.task.status, revision: state.task.revision }
+        activeCase.threadRunId ??= state.attempts.find(item => item.stage === 'execute' && uuid(item.runId))?.runId
+        activeCase.runIdsSeen = [...new Set([...(activeCase.runIdsSeen ?? []), ...state.attempts.map(item => item.runId).filter(uuid)])]
+        if (['failed', 'blocked', 'cancelled', 'revoked'].includes(state.task.status)) {
+          activeCase.failedAttempt = state.attempts.filter(item => item.id === state.task.attemptId).map(item => ({ id: item.id, runId: item.runId, stage: item.stage, status: item.status,
+            ...(typeof item.output?.reasonCode === 'string' && /^[a-zA-Z0-9_]{1,100}$/.test(item.output.reasonCode) ? { reasonCode: item.output.reasonCode } : {}) }))[0]
+          fail('factory_terminal_failure')
+        }
+        return state
+      }
+      const approval = previous => live.until(keys, read, state => state.task.stage === 'approval' && ['pending', 'waiting'].includes(state.task.status)
+        && (!previous || state.task.candidateId !== previous), timeoutMs)
+      const proof = async (state, expectedText, label) => {
+        const candidate = state.candidates.find(item => item.id === state.task.candidateId)
+        check(candidate && sha(candidate.sha) && uuid(candidate.runId), 'candidate_missing')
+        check(state.delivery?.pullRequest?.state === 'open' && new RegExp(`^https://github\\.com/${REPOSITORY}/pull/\\d+$`, 'i').test(state.delivery.pullRequest.url), 'automatic_pr_missing')
+        const flowVersion = state.task.route?.flowVersion ?? 1
+        const historicalReview = flowVersion === 2 && label === 'repaired'
+        const passed = state.attempts.filter(item => ['review', 'verify'].includes(item.stage) && item.status === 'passed'
+          && (historicalReview ? activeCase.initial.checks.some(prior => prior.attemptId === item.id && prior.runId === item.runId && prior.candidateId === item.candidateId) : item.candidateId === candidate.id))
+        check(passed.some(item => item.stage === 'review') && (flowVersion === 2 || passed.some(item => item.stage === 'verify')), 'independent_checks_missing')
+        if (historicalReview) check(state.attempts.filter(item => item.stage === 'review' && item.runId).length === activeCase.initial.reviewAttemptCount,
+          'v2_unexpected_second_review')
+        check(new Set([candidate.runId, ...passed.map(item => item.runId)]).size === passed.length + 1, 'checks_not_independent')
+        // V2 has one review. A repaired head must not inherit a false claim
+        // that its SHA was independently reviewed. Its implementation must
+        // instead provide fresh, successful verification of the new content.
+        const verification = matchedCheckEvidence(state, passed)
+        for (const runId of [...new Set(state.attempts.map(item => item.runId).filter(uuid))]) {
+          if (activeCase.runs.some(item => item.runId === runId)) continue
+          const evidence = await json(`/api/runs/${runId}/evidence`)
+          check(evidence.run.harness === definition.harness && evidence.run.model === definition.model && evidence.run.credentialType === 'subscription'
+            && evidence.run.subscriptionRoute === (definition.harness === 'codex' ? 'codex_cli' : 'claude_code_cli'), 'official_model_provenance_mismatch')
+          activeCase.runs.push({ runId, harness: evidence.run.harness, model: evidence.run.model, credentialType: evidence.run.credentialType, subscriptionRoute: evidence.run.subscriptionRoute,
+            profileId: evidence.run.agentProfile?.profileId, profileVersion: evidence.run.agentProfile?.version })
+        }
+        const reviewArtifacts = []
+        for (const verified of verification) {
+          if (historicalReview) {
+            const prior = activeCase.initial.reviewArtifacts.find(item => item.attemptId === verified.attemptId && item.runId === verified.runId
+              && item.candidateId === verified.candidateId && item.candidateSha === verified.candidateSha)
+            check(prior && prior.observations.length > 0, 'historical_review_observations_missing')
+            reviewArtifacts.push({ ...prior, appliesToCurrentCandidate: false })
+            continue
+          }
+          const artifactRef = `run-report:${verified.runId}`
+          const checked = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(artifactRef)}`)
+          const raw = checked.raw
+          check(raw?.check?.sha === verified.candidateSha && raw.check.readOnly === true && Array.isArray(raw.filesChanged)
+            && raw.filesChanged.length === 0 && criteriaPassed(raw.criteria), 'independent_report_evidence_missing')
+          let observations = []
+          if (flowVersion === 2 && verified.stage === 'review') {
+            check(raw.reviewVerdict === 'passed', 'independent_review_verdict_missing')
+            const thread = await rpc('agents.getIssueThread', [issue.id, verified.runId])
+            observations = reviewArtifactObservations(thread, verified.runId, verified.candidateSha, activeCase.filePath, expectedText)
+          } else verifiedFileBytes(raw, verifyCommand, activeCase.filePath, expectedText, label === 'initial' ? 'initial' : 'revised')
+          reviewArtifacts.push({ attemptId: verified.attemptId, runId: verified.runId, stage: verified.stage, candidateId: verified.candidateId,
+            candidateSha: verified.candidateSha, artifact: artifactRef, reportSha256: digest(JSON.stringify(raw)),
+            reviewVerdict: raw.reviewVerdict ?? null, verifyStatus: raw.verify?.status ?? null, appliesToCurrentCandidate: true, observations,
+            criteria: raw.criteria.map(item => ({ criterionId: item.criterionId ?? null, passed: item.passed, status: item.status ?? 'passed', evidenceSha256: digest(item.evidence) })) })
+        }
+        const artifact = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(`run-report:${candidate.runId}`)}`)
+        const publish = artifact.raw?.publish
+        check(publish?.pushed === true && publish.branch === activeCase.expectedBranch && publish.commit === candidate.sha && publish.remote === 'origin', 'publication_report_mismatch')
+        const verifiedContent = verifiedFileBytes(artifact.raw, verifyCommand, activeCase.filePath, expectedText, label === 'initial' ? 'initial' : 'revised')
+        const actualVerifyCommands = [{ command: verifyCommand, commandSha256: digest(verifyCommand), exitCode: 0, source: 'daemon_verify' }]
+        const changes = await rpc('agents.getThreadChanges', [issue.id, candidate.runId])
+        check(changes.state === 'ready' && changes.changes.files.length === 1 && changes.changes.files[0].path === activeCase.filePath, 'unexpected_file_changes')
+        const file = changes.changes.files[0]
+        const newLines = file.blocks.filter(block => block.kind === 'line' && block.line.kind !== 'removed').map(block => block.line)
+        check(newLines.some(line => line.text === (label === 'initial' ? 'State: initial' : 'State: revised')), 'requested_file_change_missing')
+        if (file.status === 'added') check(newLines.map(line => line.text).join('\n') + '\n' === expectedText, 'file_content_mismatch')
+        const item = { candidateId: candidate.id, candidateSha: candidate.sha, runId: candidate.runId, pullRequestUrl: state.delivery.pullRequest.url,
+          branch: publish.branch, expectedFileSha256: digest(expectedText), checkpointSha256: digest(JSON.stringify(file)),
+          flowVersion, actualVerifyCommands, verifiedContent, reviewArtifacts, reviewAppliesToCurrentCandidate: !historicalReview,
+          reviewAttemptCount: state.attempts.filter(item => item.stage === 'review' && item.runId).length,
+          verification: verification.map(item => ({ attemptId: item.attemptId, runId: item.runId, stage: item.stage,
+            candidateId: item.candidateId, candidateSha: item.candidateSha, status: item.status,
+            verifyStatus: item.verify?.status, exitCode: item.verify?.exitCode, commandSha256: nonempty(item.verify?.command) ? digest(item.verify.command) : null,
+            criteria: item.criteria.map(criterion => ({ criterionId: criterion.criterionId, passed: criterion.passed, status: criterion.status,
+              evidenceSha256: digest(criterion.evidence), exitCode: criterion.exitCode })) })),
+          checks: passed.map(check => ({ attemptId: check.id, runId: check.runId, stage: check.stage, candidateId: check.candidateId,
+            candidateSha: state.candidates.find(item => item.id === check.candidateId)?.sha ?? null })) }
+        activeCase[label] = item; await checkpoint(); return item
+      }
+      await stage('wait_initial_review')
+      const initial = await approval()
+      activeCase.sourceEventId = initial.task.sourceEventId
+      const first = await proof(initial, initialText, 'initial')
+      await stage('request_changes'); await pin()
+      const rejectionId = randomUUID()
+      const rejected = await json(`/api/factory/tasks/${activeCase.taskId}/approval`, session.post({ operation: 'reject', input: { binding: binding(initial.task), eventId: rejectionId,
+        candidateId: first.candidateId, note: `Please revise only ${activeCase.filePath}: change State: initial to State: revised. Preserve its exact header, Case line, final newline, and all other files. Verify the change, commit, and submit through the same Mikka task and PR.` } }))
+      check(rejected.rejectionId === rejectionId && !rejected.repairBudgetExhausted, 'reject_failed')
+      activeCase.rejectionId = rejectionId
+      // Exactly the existing sendBack UI behavior: no recovery endpoint or redispatch.
+      await stage('wait_automatic_repair')
+      const repaired = await approval(first.candidateId)
+      check(repaired.task.sourceEventId === activeCase.sourceEventId, 'repair_replaced_acceptance_target')
+      const second = await proof(repaired, revisedText, 'repaired')
+      check(second.pullRequestUrl === first.pullRequestUrl && second.candidateSha !== first.candidateSha, 'repair_not_same_pr')
+      const rejectionLedger = await json(`/api/factory/tasks/${activeCase.taskId}/approval?view=ledger`)
+      check(rejectionLedger.rejections?.some(item => item.id === rejectionId && item.candidateId === first.candidateId && item.actor?.userId === SMOKE_ID), 'human_rejection_receipt_missing')
+      await stage('approve_and_merge'); await pin()
+      const acceptId = randomUUID()
+      const accepted = await json(`/api/factory/tasks/${activeCase.taskId}/approval`, session.post({ operation: 'accept', input: { binding: binding(repaired.task), eventId: acceptId } }))
+      check(['merged', 'merging'].includes(accepted.status) && accepted.pullRequestUrl === first.pullRequestUrl, 'merge_not_requested')
+      const final = await live.until(keys, read, state => state.task.stage === 'publish' && state.task.status === 'passed' && state.delivery?.pullRequest?.state === 'merged', timeoutMs)
+      const ledger = await json(`/api/factory/tasks/${activeCase.taskId}/approval?view=ledger`)
+      const merged = ledger.merges?.find(item => item.id === accepted.mergeId && item.status === 'merged')
+      check(merged && merged.source === 'mikka' && merged.candidateId === second.candidateId && merged.sha === second.candidateSha
+        && merged.headSha === second.candidateSha && sha(merged.mergeCommitSha), 'merge_receipt_missing')
+      const githubState = await json('/api/github/pull-request-status', session.post({ issueId: issue.id, url: first.pullRequestUrl }))
+      check(githubState.viewerId === SMOKE_ID && githubState.state === 'merged', 'github_merge_unconfirmed')
+      activeCase.merge = { mergeId: merged.id, eventId: acceptId, candidateSha: merged.sha, headSha: merged.headSha, mergeCommitSha: merged.mergeCommitSha, pullRequestUrl: merged.pullRequestUrl, source: merged.source }
+      activeCase.finalBinding = binding(final.task); activeCase.status = 'passed'
+      await json(`/api/factory/agent-profiles/${profile.id}`, { ...session.post({ workspaceId, version: profile.version }), method: 'DELETE' })
+      report.cleanup.push({ kind: 'profile_archived', id: profile.id }); profile = null
+      await checkpoint(); activeCase = null
+    }
+    await pin()
+    report.status = 'passed'
+  } catch (error) {
+    report.status = 'failed'
+    report.code = /^issue1503_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'issue1503_delivery_failed'
+    if (activeCase) activeCase.status = 'failed'
+  } finally {
+    live?.close()
+    // Stop only this invocation's unfinished tasks. Leave evidence and receipts.
+    if (activeCase?.taskId && json) {
+      try {
+        const state = await json(`/api/factory/tasks/${activeCase.taskId}`)
+        activeCase.runIdsSeen = [...new Set([...(activeCase.runIdsSeen ?? []), ...state.attempts.map(item => item.runId).filter(uuid)])]
+        if (!['passed', 'cancelled', 'revoked'].includes(state.task.status)) {
+          await json(`/api/factory/tasks/${activeCase.taskId}`, session.post({ binding: { taskId: activeCase.taskId, revision: state.task.revision }, eventId: randomUUID(), action: 'cancel', reason: 'Issue #1503 acceptance round ended; release its temporary run resources.' }))
+          report.cleanup.push({ kind: 'task_cancelled', id: activeCase.taskId })
+        }
+      } catch { report.cleanup.push({ kind: 'task_cancel_failed', id: activeCase.taskId }) }
+    }
+    if (activeCase?.threadRunId && request) {
+      try {
+        const stopped = await request(`/api/mobile/threads/${activeCase.threadRunId}/stop`, session.post({}))
+        const value = await stopped.json().catch(() => null)
+        check(stopped.ok || (stopped.status === 409 && value?.error === 'runChainEnded'), 'run_cleanup_failed')
+        report.cleanup.push({ kind: stopped.ok ? 'thread_stopped' : 'thread_already_ended', id: activeCase.threadRunId })
+      } catch { report.cleanup.push({ kind: 'thread_stop_failed', id: activeCase.threadRunId }) }
+    }
+    if (request) for (const item of report.cases) for (const runId of new Set([...(item.runIdsSeen ?? []), ...item.runs.map(run => run.runId), item.threadRunId].filter(uuid))) {
+      try {
+        const response = await request(`/api/threads/${runId}/machine`, session.post({ action: 'end' }))
+        const result = await response.json().catch(() => null)
+        check((response.ok && result?.state === 'ended') || response.status === 404, 'machine_cleanup_failed')
+        report.cleanup.push({ kind: response.status === 404 ? 'thread_machine_not_allocated' : 'thread_machine_ended', id: runId })
+      } catch { report.cleanup.push({ kind: 'thread_machine_end_failed', id: runId }); report.status = 'failed' }
+    }
+    if (profile && json) {
+      try { await json(`/api/factory/agent-profiles/${profile.id}`, { ...session.post({ workspaceId, version: profile.version }), method: 'DELETE' }); report.cleanup.push({ kind: 'profile_archived', id: profile.id }) }
+      catch { report.cleanup.push({ kind: 'profile_archive_failed', id: profile.id }) }
+    }
+    if (originalVerification && installedVerificationCommands.size && json) {
+      try { report.cleanup.push(await restoreRepositoryVerification(json, session.post, originalVerification.command, installedVerificationCommands)) }
+      catch (error) { report.cleanup.push({ kind: 'repository_verification_restore_failed',
+        code: /^issue1503_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'issue1503_verification_restore_failed' }); report.status = 'failed' }
+    }
+    if (originalOrder && rpc) {
+      try {
+        currentOrder = await rpc('model-order.getModelOrder', [workspaceId])
+        for (const entry of currentOrder.entries) await rpc('model-order.changeModelOrder', [{ kind: 'remove', id: entry.id }, workspaceId])
+        if (originalOrder.entries.length) await rpc('model-order.changeModelOrder', [{ kind: 'add', entries: briefOrder(originalOrder).entries }, workspaceId])
+        for (const change of [{ kind: 'location', location: originalOrder.location }, { kind: 'autoRouting', enabled: originalOrder.autoModelRouting }, { kind: 'preferred', harness: originalOrder.preferredHarness }])
+          await rpc('model-order.changeModelOrder', [change, workspaceId])
+        const restored = briefOrder(await rpc('model-order.getModelOrder', [workspaceId]))
+        check(JSON.stringify({ ...restored, customized: undefined }) === JSON.stringify({ ...briefOrder(originalOrder), customized: undefined }), 'settings_restore_mismatch')
+        report.restoredOrder = restored
+        report.cleanup.push({ kind: 'effective_model_order_restored', customizedFlagPreserved: restored.customized === originalOrder.customized })
+      } catch { report.cleanup.push({ kind: 'model_order_restore_failed' }); report.status = 'failed' }
+    }
+    await session?.close().catch(() => undefined)
+    report.live = { messages: live?.messages ?? 0, reconnects: live?.reconnects ?? 0 }
+    report.completedAt = new Date().toISOString(); await checkpoint()
+  }
+  return report
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  try {
+    const report = await runDeliveryAcceptance()
+    console.log(JSON.stringify({ status: report.status, code: report.code, cases: report.cases.map(item => ({ harness: item.harness, status: item.status, issueId: item.issueId, taskId: item.taskId, pullRequestUrl: item.merge?.pullRequestUrl })), report: process.env.MIKKA_1503_REPORT ?? 'issue1503-report/delivery.json' }))
+    if (report.status !== 'passed') process.exitCode = 1
+  } catch (error) {
+    console.error(JSON.stringify({ status: 'failed', code: /^issue1503_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'issue1503_delivery_failed' }))
+    process.exitCode = 1
+  }
+}
