@@ -85,6 +85,23 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       assert.deepEqual(await snapshot(), before, 'list reads must not change metadata or reserve unused numbers')
     })
 
+    await t.test('#1492: the list reads while several people have saved a prefix, each task with its own owner prefix', async () => {
+      const { listIssues } = await import('../app/actions/issues')
+      const { actAs } = await import('../lib/acting-user')
+      const { issuePrefixes } = await import('../lib/db/schema')
+      const [owner, other, third] = [await user(), await user(), await user()]
+      await db.insert(issuePrefixes).values([
+        { userId: owner, prefix: 'MINE', updatedAt: new Date() },
+        { userId: other, prefix: 'OTHR', updatedAt: new Date() },
+        { userId: third, prefix: 'THRD', updatedAt: new Date() },
+      ])
+      const id = randomUUID()
+      await db.insert(issues).values({ id, userId: owner, title: 'prefixed', content: content(), status: 'todo', priority: 'normal' })
+      const listed = await actAs(owner, () => listIssues())
+      const row = listed.find(item => item.id === id)
+      assert.ok(row, 'the list read succeeds with several saved prefixes')
+      assert.match(row.identifier ?? '', /^MINE-[1-9][0-9]*$/)
+    })
     await t.test('the counter owner lock remains compatible with FK KEY SHARE', async () => {
       const owner = await user()
       const holder = await pool.connect()
