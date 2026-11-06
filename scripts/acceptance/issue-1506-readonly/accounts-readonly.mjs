@@ -1,20 +1,17 @@
-// One observation per account. No message, dispatch, stop, selection, or policy writes.
+// Only the verified ACME account's own personal workspace. No message or policy writes.
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { decode, productionSession } from '../issue-1504-1506/production-session.mjs'
+import { decode } from '../issue-1504-1506/production-session.mjs'
 import { ALEX_OWNER_ID, alexSession } from './alex-session.mjs'
 
-export const TARGET = Object.freeze({ id: 'd32ed7ad-4253-47dd-a94a-66b24dd07d35', ref: 'e917cd887945',
-  name: 'Issues 1504-1506 production acceptance', slug: 'acceptance-1504-1506-42274865746',
-  smokeOwner: 'cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3', smokeBotRef: '87b186df9c42',
-  workflowRunId: 'wrun_41M6S4DDPT0GXRWK0JQRX06QSW' })
+export const TARGET = Object.freeze({ id: '4ae2a643-b09e-43eb-816c-1e5557bef170', kind: 'personal' })
 const SHA = /^[0-9a-f]{40}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const hash = value => createHash('sha256').update(value).digest('hex')
 const ref = value => hash(value).slice(0, 12)
-const SOURCES = new Set(['d1751637b97e74c21b09cef6f72c390dc87a142c910940464430c3c71e5363ca',
-  '04903b6d2ad4d60a579485ef3e0a705a5a7283cf41414f6a044dbd2074f7e37c'])
+const SOURCES = new Set(['ccca34377eae9409a9c3e3c6bca856ba0f9ea23d5fe79e148a560f37c928615c',
+  'f05380d0f88c99a624bd7a78b0357c6d4841ddff43438c0bdcf7705d62f5374e'])
 const MODELS = new Set(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-1',
   'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.5', 'deepseek-flash', ''])
 const fixed = (value, values) => values.includes(value) ? value : 'unknown'
@@ -30,7 +27,7 @@ const safeError = error => ({ error: ERRORS.has(error?.message) ? error.message 
   ...(Number.isInteger(error?.details?.status) && error.details.status >= 100 && error.details.status <= 599 ? { httpStatus: error.details.status } : {}) })
 const READ_ACTIONS = new Set(['workspace-settings.getWorkspaceGeneral', 'model-order.getModelOrder',
   'execution-settings.getBotModelMenu', 'personal-policy.getCreditShare', 'personal-policy.getSubscriptionShare',
-  'personal-policy.getSharePolicy', 'coordinator.syncCoordinatorChat'])
+  'personal-policy.getSharePolicy'])
 
 function reader(session) {
   const json = async path => {
@@ -42,7 +39,7 @@ function reader(session) {
   const rpc = async (action, args = []) => {
     const isSwitch = action === 'workspace.switchWorkspace' && args.length === 1 && args[0] === TARGET.id
     if (!isSwitch && !READ_ACTIONS.has(action)) fail('read_action_not_allowed')
-    if ((action === 'coordinator.syncCoordinatorChat' || action === 'execution-settings.getBotModelMenu') &&
+    if (action === 'execution-settings.getBotModelMenu' &&
       (args.length !== 1 || !UUID.test(args[0] ?? ''))) fail('read_action_not_allowed')
     const response = await session.request('/api/rpc', { signal: AbortSignal.timeout(20_000),
       body: { version: 1, action, args }, headers: { 'x-mikka-rpc': '1' } })
@@ -61,8 +58,10 @@ async function selectedWorkspace(session, report) {
   const switcher = await json('/api/workspace/switcher')
   const accounts = Array.isArray(switcher?.accounts) ? switcher.accounts.filter(account => account.id === session.identity.userId) : []
   const choices = accounts.length === 1 && Array.isArray(accounts[0].choices) ? accounts[0].choices : []
-  const targets = choices.filter(choice => choice.id === TARGET.id && choice.kind === 'team' && choice.name === TARGET.name)
-  if (targets.length !== 1 || ref(targets[0].id) !== TARGET.ref) fail('workspace_target_missing')
+  report.workspaceInventory = { count: choices.length, personal: choices.filter(choice => choice.kind === 'personal').length,
+    team: choices.filter(choice => choice.kind === 'team').length }
+  const targets = choices.filter(choice => choice.id === TARGET.id && choice.kind === 'personal')
+  if (targets.length !== 1 || choices.filter(choice => choice.kind === 'personal').length !== 1) fail('workspace_target_missing')
   const switched = await rpc('workspace.switchWorkspace', [TARGET.id])
   if (switched?.ok !== true || switched?.data?.workspaceId !== TARGET.id) fail('workspace_switch_failed')
   report.sessionWorkspaceSwitches = 1
@@ -70,19 +69,17 @@ async function selectedWorkspace(session, report) {
     json('/api/workspace?workspace=' + TARGET.id), rpc('workspace-settings.getWorkspaceGeneral', [TARGET.id]),
     json('/api/workspace/switcher'),
   ])
-  if (actual?.workspace?.id !== TARGET.id || metadata?.workspace?.id !== TARGET.id || metadata.workspace.kind !== 'team' ||
-    metadata.workspace.name !== TARGET.name || metadata.currentUserId !== session.identity.userId ||
-    general?.id !== TARGET.id || general.name !== TARGET.name || general.slug !== TARGET.slug || general.personal !== false) fail('workspace_scope_mismatch')
+  if (actual?.workspace?.id !== TARGET.id || metadata?.workspace?.id !== TARGET.id || metadata.workspace.kind !== 'personal' ||
+    metadata.currentUserId !== session.identity.userId || general?.id !== TARGET.id || general.personal !== true) fail('workspace_scope_mismatch')
   if (!Array.isArray(metadata.members) || !Array.isArray(metadata.invitations)) fail('workspace_members_mismatch')
-  report.workspace = { id: TARGET.id, ref: TARGET.ref, kind: 'team', exactNameAndSlug: true,
+  report.workspace = { id: TARGET.id, ref: ref(TARGET.id), kind: 'personal', verifiedOwnerPersonalWorkspace: true,
     role: fixed(metadata.role, ['admin', 'member']), canEdit: general.canEdit === true, canTransfer: general.canTransfer === true,
     members: metadata.members.map(member => ({ userRef: typeof member.userId === 'string' ? ref(member.userId) : null,
       role: fixed(member.role, ['admin', 'member']), status: fixed(member.status, ['active', 'suspended']) })),
     invitationCount: metadata.invitations.length }
-  const expected = new Map([[TARGET.smokeOwner, 'admin'], [ALEX_OWNER_ID, 'member']])
-  if (metadata.members.length !== 2 || new Set(metadata.members.map(member => member.userId)).size !== 2 ||
-    metadata.members.some(member => expected.get(member.userId) !== member.role || member.status !== 'active') ||
-    metadata.invitations.length !== 0 || metadata.role !== expected.get(session.identity.userId)) fail('workspace_members_mismatch')
+  if (metadata.members.length !== 1 || metadata.members[0].userId !== ALEX_OWNER_ID ||
+    metadata.members[0].role !== 'admin' || metadata.members[0].status !== 'active' ||
+    metadata.invitations.length !== 0 || metadata.role !== 'admin') fail('workspace_members_mismatch')
   return { json, rpc }
 }
 
@@ -127,15 +124,14 @@ export function publicMenu(menu) {
       options: group.options.map(value => option(value, group.kind)) })) }
 }
 
-async function accountObservation(label, provider, work) {
-  const report = { account: label, status: 'failed', sessionWorkspaceSwitches: 0, chatReads: 0, requests: [] }
+async function accountObservation(provider, work) {
+  const report = { account: 'alex_acme', status: 'failed', sessionWorkspaceSwitches: 0, chatReads: 0, requests: [] }
   const started = Date.now()
   let requests = []
   try {
     await provider(async session => {
       requests = session.requests
-      const expectedOwner = label === 'alex' ? ALEX_OWNER_ID : TARGET.smokeOwner
-      if (session.identity?.userId !== expectedOwner) fail('acceptance_identity_mismatch')
+      if (session.identity?.userId !== ALEX_OWNER_ID) fail('acceptance_identity_mismatch')
       if (!SHA.test(session.version?.build ?? '')) fail('acceptance_version_invalid')
       report.ownerRef = ref(session.identity.userId); report.identityVerified = true
       report.applicationSha = session.version.build
@@ -153,24 +149,11 @@ async function accountObservation(label, provider, work) {
   return report
 }
 
-export async function observeAccounts({ smokeProvider = productionSession, alexProvider = alexSession, checkpoint = true } = {}) {
+export async function observeAccounts({ alexProvider = alexSession, checkpoint = true } = {}) {
   const report = { schemaVersion: 1, issues: [1504, 1506], phase: 'account-readonly', startedAt: new Date().toISOString(),
     taskCreationRequests: 0, messageSendRequests: 0, stopRequests: 0, modelSelectionWrites: 0, subscriptionOrCreditWrites: 0,
-    status: 'incomplete', accounts: [] }
-  report.accounts.push(await accountObservation('smoke', smokeProvider, async (session, observation, { json, rpc }) => {
-    const bots = scopedBots(await json('/api/bots'), session.identity.userId)
-    const matches = bots.filter(bot => ref(bot.id) === TARGET.smokeBotRef)
-    if (matches.length !== 1) fail('baseline_bot_missing')
-    observation.botRef = TARGET.smokeBotRef
-    observation.chatReads++
-    const chat = (await rpc('coordinator.syncCoordinatorChat', [matches[0].id]))?.chat
-    if (chat?.botId !== matches[0].id || chat.unchanged || typeof chat.working !== 'boolean' || !Array.isArray(chat.items)) fail('chat_invalid')
-    observation.chat = { working: chat.working, activeStream: Boolean(chat.streamRunId),
-      targetWorkflowActive: chat.streamRunId === TARGET.workflowRunId, itemCount: chat.items.length,
-      idle: !chat.working && !chat.streamRunId }
-    observation.observedAt = new Date().toISOString()
-  }))
-  report.accounts.push(await accountObservation('alex', alexProvider, async (session, observation, { json, rpc }) => {
+    status: 'incomplete', accounts: [], smokeSessionAttempts: 0 }
+  report.accounts.push(await accountObservation(alexProvider, async (session, observation, { json, rpc }) => {
     const bots = scopedBots(await json('/api/bots'), session.identity.userId)
     observation.ownedBotCount = bots.length
     observation.order = publicOrder(await rpc('model-order.getModelOrder', [TARGET.id]))
@@ -184,6 +167,8 @@ export async function observeAccounts({ smokeProvider = productionSession, alexP
     observation.subscriptions = { personal: subscription.personal === true, shared: subscription.shared,
       allowOthers: subscription.allowOthers === true, allowed: subscription.allowed === true,
       ownProviders: Array.isArray(subscription.own) ? subscription.own.map(value => fixed(value, ['claude', 'codex'])) : [],
+      personalViewOmitsOwnProviders: subscription.personal === true,
+      ownProvidersFromVerifiedOrderSources: [...new Set(observation.order.candidates.filter(item => item.authorizedAlexSource).map(item => item.provider))],
       pooledProviderCounts: { claude: Array.isArray(subscription.available) ? subscription.available.filter(value => value.provider === 'claude').length : 0,
         codex: Array.isArray(subscription.available) ? subscription.available.filter(value => value.provider === 'codex').length : 0 },
       policy: { allowed: policy.allowed, canEdit: policy.canEdit === true } }

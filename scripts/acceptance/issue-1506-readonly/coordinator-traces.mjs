@@ -39,11 +39,20 @@ export async function readTraces({ env = process.env, fetchImpl = globalThis.fet
     from: TRACE.from, until: TRACE.until, traceId: TRACE.traceId, workflowRunId: TRACE.workflowRunId,
     workflowCorrelation: 'supplied_baseline_metadata_not_a_PostHog_join', status: 'observed',
     sampled: true, actualSamplingRateNotAssumed: true, modelCacheCountersObserved: false, productionWrites: 0, queries: [] }
-  const key = env.POSTHOG_PERSONAL_API_KEY
+  const rawKey = env.POSTHOG_PERSONAL_API_KEY
+  const key = typeof rawKey === 'string' ? rawKey.trim() : ''
+  // PostHog documents a Bearer personal API key, not a restricted client-side
+  // character alphabet: https://posthog.com/docs/api/personal-api-keys
+  // Only non-secret shape diagnostics are retained; no prefix, value or hash.
+  report.credentialShape = { exists: typeof rawKey === 'string' && rawKey.length > 0,
+    startsPhx: typeof rawKey === 'string' && rawKey.startsWith('phx_'),
+    hasWhitespace: typeof rawKey === 'string' && /\s/.test(rawKey), length: typeof rawKey === 'string' ? rawKey.length : 0 }
   if ((env.MIKKA_TRACE_FROM && env.MIKKA_TRACE_FROM !== TRACE.from) || (env.MIKKA_TRACE_UNTIL && env.MIKKA_TRACE_UNTIL !== TRACE.until)) {
     report.status = 'incomplete'; report.error = 'trace_window_invalid'
-  } else if (!/^phx_[A-Za-z0-9_-]{8,}$/.test(key ?? '')) {
+  } else if (!key) {
     report.status = 'incomplete'; report.error = 'trace_credential_missing'
+  } else if (/^phc(?:_|-)/i.test(key) || key.length > 8192 || /[\r\n\u0000]/.test(key)) {
+    report.status = 'incomplete'; report.error = 'trace_credential_invalid'
   } else for (const query of QUERIES) {
     const row = { name: query.name, columns: query.columns, status: 'failed' }
     report.queries.push(row)

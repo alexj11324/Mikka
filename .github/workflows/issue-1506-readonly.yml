@@ -36,34 +36,6 @@ jobs:
           node --check scripts/acceptance/issue-1506-readonly/accounts-readonly.mjs
           node --check scripts/acceptance/issue-1506-readonly/coordinator-traces.mjs
           node --test scripts/acceptance/issue-1506-readonly/readonly.test.mjs
-      - name: Read the existing Smoke email only
-        if: always() && !cancelled() && steps.guards.outcome == 'success'
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_EMAIL
-          recursive: false
-          include-imports: false
-      - name: Read the existing Smoke password only
-        if: always() && !cancelled() && steps.guards.outcome == 'success'
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_PASSWORD
-          recursive: false
-          include-imports: false
       - name: Read Alex's existing email only
         if: always() && !cancelled() && steps.guards.outcome == 'success'
         continue-on-error: true
@@ -106,7 +78,7 @@ jobs:
           secret-name: POSTHOG_PERSONAL_API_KEY
           recursive: false
           include-imports: false
-      - name: Observe the old Smoke chat once and Alex's available models
+      - name: Observe only Alex's own personal workspace and models
         if: always() && !cancelled() && steps.guards.outcome == 'success'
         run: node scripts/acceptance/issue-1506-readonly/accounts-readonly.mjs observe
       - name: Query only the fixed production trace window

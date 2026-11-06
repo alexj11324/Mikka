@@ -5,7 +5,7 @@ import { decode } from '../issue-1504-1506/production-session.mjs'
 const ORIGIN = 'https://app.aspectlylabs.com'
 const BASE = ORIGIN + '/mikka'
 const SHA = /^[0-9a-f]{40}$/
-export const ALEX_OWNER_ID = 'XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ'
+export const ALEX_OWNER_ID = 'OFtPbAHifGBAOYiek9hd3w'
 
 export async function alexSession(work, { deadlineAt = null, expectedSha = process.env.MIKKA_ACCEPTANCE_SHA,
   env = process.env, fetchImpl = globalThis.fetch } = {}) {
