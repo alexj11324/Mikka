@@ -59,6 +59,6 @@ test('official jobs keep private code out of public artifacts and pin desktop to
   const checkout = desktop.jobs.macos.steps.find(step => step.with?.repository === 'alexj11324/mikka-hosted-ui')
   assert.equal(checkout.with.ref, '${{ needs.preflight.outputs.overlay-sha }}')
   assert.equal(checkout.with['persist-credentials'], false)
-  assert.ok(desktop.jobs.macos.steps.some(step => step.run?.includes('audit "$RUNNER_TEMP/official-packaged-app/dist"')))
+  assert.ok(desktop.jobs.macos.steps.some(step => step.run?.includes('audit "$RUNNER_TEMP/official-packaged-app"')))
   assert.ok(web.jobs.deploy.steps.some(step => step.run?.includes('audit .vercel/output/static')))
 })

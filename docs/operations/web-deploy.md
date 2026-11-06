@@ -19,10 +19,12 @@ See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/w
    through the existing GitHub OIDC identity. This is a dedicated Mikka-team
    token, so it can be rotated without touching `VERCEL_TOKEN` or
    `VERCEL_TEAM_TOKEN`.
-2. **Skip.** Applies the same documentation-only rule the old Vercel Ignored
-   Build Step used (`scripts/vercel-ignore-build.mjs`). The comparison is
-   against the commit production serves now, not the previous push, so a
-   failed deploy is never skipped over.
+2. **Build selection.** Every main push builds public main plus private main,
+   including documentation changes, so the private/public compatibility check
+   covers every main update. Manual overlay/runtime refreshes also always
+   build. Ordinary manual dispatch retains the documentation-only rule
+   (`scripts/vercel-ignore-build.mjs`), comparing with the source production
+   serves now rather than the previous push.
 3. **Environment.**
    - `vercel pull` fetches project settings and the production environment.
      Vercel returns sensitive values empty.
@@ -219,7 +221,7 @@ rules still apply. New desktop runs cancel obsolete ones.
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
   source, `.map`, inline source-map directives and `sourcesContent`.
 - The desktop production renderer and main/preload emit no source maps.
-  After signing, the actual ASAR's app-owned `dist/` is extracted and audited
+  After signing, the complete actual ASAR is extracted and audited
   before publication. The private checkout remains outside the package.
 - Do not print environment files, credentials or private source while debugging.
   Rotate an expired read token in Infisical; never broaden its repository or

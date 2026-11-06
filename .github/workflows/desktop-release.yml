@@ -222,7 +222,8 @@ jobs:
           const app = createRequire(builder.resolve('app-builder-lib'))
           app('@electron/asar').extractAll('apps/desktop/release/mac-arm64/Mikka.app/Contents/Resources/app.asar', `${process.env.RUNNER_TEMP}/official-packaged-app`)
           NODE
-          node scripts/release/hosted-ui.mjs audit "$RUNNER_TEMP/official-packaged-app/dist"
+          node scripts/release/hosted-ui.mjs audit "$RUNNER_TEMP/official-packaged-app"
+          node scripts/release/hosted-ui.mjs audit apps/desktop/release/mac-arm64/Mikka.app/Contents/Resources
       - name: Verify production fuses in the signed bundle
         run: |
           node --input-type=module <<'NODE'

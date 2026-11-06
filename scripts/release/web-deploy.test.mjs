@@ -283,7 +283,7 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(checkJob, /RUNTIME_REFRESH: \$\{\{ steps\.control\.outputs\.refresh \}\}/)
   for (const path of RUNTIME_RELEASE_PATHS) assert.ok(e2b.includes(`      - '${path}'`), `main push filter must include ${path}`)
   assert.match(web, /workflow_call:/)
-  assert.match(web, /RUNTIME_REFRESH: \$\{\{ inputs\.runtime-refresh \|\| inputs\.overlay-refresh \}\}/)
+  assert.match(web, /RUNTIME_REFRESH: \$\{\{ inputs\.runtime-refresh \|\| inputs\.overlay-refresh \|\| github\.event_name == 'push' \}\}/)
   // queue:max is GitHub's documented queue contract, not a locally simulated
   // scheduler. Stale jobs still need the main fences regardless of queue order.
 })

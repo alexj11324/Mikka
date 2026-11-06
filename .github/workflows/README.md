@@ -103,7 +103,7 @@ Infisical OIDC and `HOSTED_UI_READ_TOKEN` (`prod:/platform`, Contents: read on
 `alexj11324/mikka-hosted-ui` only). They set `MIKKA_UI_OVERLAY_DIR` and record
 `MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build the default public UI
 without either variable or any private secret. The production Web job checks
-public main plus private main on each main update. Private main pushes dispatch
+public main plus private main on each main update, including docs-only pushes. Private main pushes dispatch
 the official Web job again with `overlay-refresh: true`, so docs-only changes
 cannot skip an overlay rebuild; they also dispatch desktop with the expected
 overlay SHA. No schedule is involved.
@@ -114,6 +114,6 @@ verifies equality again before publishing. New desktop runs cancel older runs.
 Desktop seals, verifies and publishes from one macOS job with no public Actions
 artifact upload. Release assets include the sealed `mikka-ui-overlay.json`.
 Official compiler logs stay on the ephemeral runner, and both distributable
-static output and the signed ASAR's app-owned dist are audited for source maps.
+static output and the complete signed ASAR are audited for source maps.
 See [the deployment runbook](../../docs/operations/web-deploy.md#official-private-ui-overlay)
 for identities, rollout, source exposure boundaries and recovery.

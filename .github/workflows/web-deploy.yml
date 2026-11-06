@@ -70,12 +70,14 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_DEPLOY_TOKEN
           include-imports: false
+      # Every public main update must validate public main + private main.
+      # Manual overlay dispatches also rebuild when the public SHA is unchanged.
       - name: Skip documentation-only changes
         id: skip
         run: node scripts/release/web-deploy.mjs skip
         env:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
-          RUNTIME_REFRESH: ${{ inputs.runtime-refresh || inputs.overlay-refresh }}
+          RUNTIME_REFRESH: ${{ inputs.runtime-refresh || inputs.overlay-refresh || github.event_name == 'push' }}
       - name: Read the private UI checkout credential
         if: steps.skip.outputs.skip != 'true'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
