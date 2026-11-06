@@ -3,10 +3,15 @@
 - **状态：** 设计稿，等 Alex 看图（2026-11-06）。图没被接受之前不改应用代码；`main` 上仍是抽屉版。
 - **起因：** Alex 觉得抽屉版（#1408、#1446、#1453）不好看，不要抽屉，参照 Comma 的移动端重做
   （[决定 2026-11-06-1200](decisions/2026-11-06-1200-ios-drop-drawer-comma-redesign.md)）。
-- **图：** [`mobile-comma/light/`](mobile-comma/light/) 和 [`mobile-comma/dark/`](mobile-comma/dark/)，iPhone
-  393×852 pt，2 倍图；总览见 [`overview-light.png`](mobile-comma/overview-light.png) /
-  [`overview-dark.png`](mobile-comma/overview-dark.png)。源文件是 [`mobile-comma/source/screens.html`](mobile-comma/source/screens.html)，
-  `FONT_DIR=<Noto Sans SC woff2 目录> node docs/design/mobile-comma/source/render.mjs` 重新出图。
+- **图（源）：** Figma 文件 `zPe5LKycb2XuT1ivCLRw07` 的页面
+  「待 Alex 确认 · iOS 按 Comma 重做（2026-11-06）」（[打开](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07/?node-id=1020-1346)），
+  上排浅色、下排深色。系统控件全部是 **Apple 官方 Figma 库「iOS and iPadOS 27」** 的组件实例（见下面「Figma 里用的 Apple 组件」），
+  颜色绑定该库的 `Color Scheme` 变量（Light / Dark 两个模式），文字用该库的文字样式（SF Pro；中文字符用 Noto Sans SC，
+  因为 Figma 网页端、服务端和 Mac 都有它，三处排版一致；真机上是 PingFang SC）。
+- **图（导出）：** [`mobile-comma/light/`](mobile-comma/light/) 和 [`mobile-comma/dark/`](mobile-comma/dark/)，iPhone 17 Pro
+  402×874 pt（Apple 当前这套库的 iPhone 组件都是 402 宽，没有 393 版本，所以没有拉伸它们去凑 393×852），由 Figma 按 1 倍导出；
+  要看细节请直接在 Figma 里放大。总览：[`overview-light.png`](mobile-comma/overview-light.png) /
+  [`overview-dark.png`](mobile-comma/overview-dark.png)。
 - **Comma 参照：** [AFK-surf/comma](https://github.com/AFK-surf/comma) 的原生 iOS 应用
   `clients/apps/apple/iOS`（SwiftUI + UIKit），读的是提交
   [`66ab3dc`](https://github.com/AFK-surf/comma/tree/66ab3dc92475005aea9afd123df36a28e4ef86ab/clients/apps/apple/iOS)。
@@ -95,28 +100,51 @@ NativeTabs（系统 tab bar，Liquid Glass）
 
 | # | 图 | 结构和取舍 | 对应 Comma |
 | --- | --- | --- | --- |
-| 01 | [对话](mobile-comma/light/01-chats.png) | 左上工作区按钮（玻璃胶囊：工作区字母 + 名字 + ⌄），右上新建（玻璃圆钮）。大标题「对话」。置顶格（Coordinator、研究员、设计师；星标是置顶，橙点是等你，蓝色数字是未读）。分区：正在工作（灰色脉动点 + 进行中）、Bot、群聊；每行头像 44、名字 17 semibold、最后一句 15、时间 13。没有分隔线，按压面离两侧 10 pt。 | Home 的列表行样式、无分隔线；问候行没有采用（R-40：不加没信息的话） |
+| 01 | [对话](mobile-comma/light/01-chats.png) | 左上工作区按钮（系统文字栏按钮「Mikka ⌄」），右上新建（系统玻璃圆钮 square.and.pencil）。大标题「对话」。置顶格（Coordinator、研究员、设计师；星标是置顶，橙点是等你，蓝色数字是未读）。分区：正在工作（灰色脉动点 + 进行中）、Bot、群聊；每行头像 44、名字 17 semibold、最后一句 15、时间 13。没有分隔线，按压面离两侧 10 pt。 | Home 的列表行样式、无分隔线；问候行没有采用（R-40：不加没信息的话） |
 | 02 | [长按菜单](mobile-comma/light/02-chats-longpress.png) | 系统 context menu：上面是那个聊天的实时预览，下面：标为已读、置顶、隐藏、信息、更多 › 复制 ID（与现在 `chat-menu.tsx` 一致）。 | Comma 的任务行菜单 |
 | 03 | [左滑](mobile-comma/light/03-chats-swipe.png) | 左滑出两个胶囊动作：置顶（橙）、隐藏（灰），图标 + 文字。 | Inbox 的胶囊滑动动作 |
 | 04 | [工作区切换](mobile-comma/light/04-workspace-menu.png) | 工作区按钮弹系统菜单：当前工作区打勾，其它一点即切；编辑顺序、工作区设置。 | Settings › Workspace 选择页（另有入口见 19） |
 | 05 | [新建](mobile-comma/light/05-new-menu.png) | 新建钮弹菜单：新建 Bot、新建群聊。 | Comma 的新建入口在聊天里；Mikka 的新建对象是 Bot 和群聊，所以放在对话页 |
 | 06 | [新建 Bot](mobile-comma/light/06-new-bot.png) | sheet 打开状态。左上 ✕，右上 ✓（强调色填充），标题「新建 Bot」，无副标题。大头像预览、名字、形状 6 选 1、颜色 12 选 1。 | Comma 的 sheet 关闭位置；外观按 HIG |
 | 07 | [新建群聊](mobile-comma/light/07-new-group.png) | 群聊名称、选择 Bot（勾选圆圈）。 | 同上 |
-| 08 | [聊天](mobile-comma/light/08-chat.png) | 导航栏：返回圆钮、中间头像 + 名字的玻璃胶囊（点开 Bot 资料）、更多。简报是一个气泡，每项一个对象芯片（R-41）；主动消息卡片（结果和截止时间、来源、三个按钮）；我的蓝气泡；线程卡片（状态图标 + 名字 + 产出芯片，R-15/R-66）；Bot 回复下面一个复制钮。底部：独立玻璃「+」+ 玻璃输入框。一对一聊天不显示头像和名字（R-13）。 | 输入框形态、气泡尺寸、浮动输入框 |
+| 08 | [聊天](mobile-comma/light/08-chat.png) | 系统导航栏：返回、标题（Bot 名字，点开 Bot 资料）、更多。简报是一个气泡，每项一个对象芯片（R-41）；主动消息卡片（结果和截止时间、来源、三个按钮）；我的蓝气泡；线程卡片（状态图标 + 名字 + 产出芯片，R-15/R-66）；Bot 回复下面一个复制钮。底部：独立玻璃「+」+ 玻璃输入框。一对一聊天不显示头像和名字（R-13）。 | 输入框形态、气泡尺寸、浮动输入框 |
 | 09 | [消息长按](mobile-comma/light/09-chat-message-menu.png) | 背景模糊，气泡被托起；上方六个反应（一人一个，再点取消），下方：回复、复制、选择文本。 | Comma 的消息菜单；反应放法沿用 Mikka 已有决定 |
-| 10 | [附件](mobile-comma/light/10-chat-attach.png) | 「+」长出一张玻璃卡片：相机 + 最近照片一排，下面「所有照片」「文件」。替换现在的底部 sheet。 | 「+」卡片 |
+| 10 | [附件](mobile-comma/light/10-chat-attach.png) | 「+」弹出系统菜单：相机、照片、文件。替换现在的底部 sheet。 | 「+」卡片的入口位置；形态改用系统菜单（HIG：菜单优先于自画卡片） | |
 | 11 | [右滑引用](mobile-comma/light/11-chat-reply-swipe.png) | 气泡被拖向右边，左侧露出回复箭头；过线松手引用到输入框。左边缘仍是系统返回。 | ReplySwipe |
-| 12 | [群聊](mobile-comma/light/12-group-chat.png) | 标题胶囊是群头像 + 群名 + 「3 个 Bot」。Bot 消息在左边带小头像和名字，我的在右边；`@前端` 指定谁回答。 | — |
+| 12 | [群聊](mobile-comma/light/12-group-chat.png) | 系统标题是群名。Bot 消息在左边带小头像和名字，我的在右边；`@前端` 指定谁回答。 | — |
 | 13 | [线程](mobile-comma/light/13-threads.png) | 大标题「线程」，右上新线程。分段控件「线程 / 任务」；设备芯片（在线绿点）。分组：等待你、进行中、受阻、空闲、已解决（折叠，R-52）。底部浮着玻璃状态切换器：全部（文字）、等待你、进行中、已解决（图标），手指可滑动连续切换——替换现在的筛选菜单。 | 浮动状态切换器 |
 | 14 | [线程页](mobile-comma/light/14-thread.png) | 行内标题：线程名 + 「Bot · 执行器 · 机器图标」。工具调用折叠成「已探索 4 次搜索」等行；产出芯片（PR、图片）；运行中时输入框的发送键变成停止键。 | 任务 dock 的内容区；外层仍是 push |
-| 15 | [任务](mobile-comma/light/15-tasks.png) | 「任务」分段：进行中、待办、已完成；行 = 圆形状态 + 标题 + 「#编号 · Bot」，右边 ↗ 表示在网页打开。 | Home 的任务行 |
+| 15 | [任务](mobile-comma/light/15-tasks.png) | 「任务」分段：进行中、待办、已完成；行 = 圆形状态 + 标题 + 「#编号 · Bot」，点开在网页打开。 | Home 的任务行 |
 | 16 | [建议](mobile-comma/light/16-suggestions.png) | 大标题「建议」，右上插件钮。一排已连接应用卡片（应用、要你处理的数量）；「今天」的条目一行一个、动词开头（R-41）；已处理折叠。点条目进 Coordinator 聊天。 | Home 的应用卡片和简报 |
-| 17 | [插件](mobile-comma/light/17-plugins.png) | 系统搜索栏、分段「应用 / 技能」、已连接（绿点）、热门。行打开网页上的连接流程（已有实现）。 | — |
+| 17 | [插件](mobile-comma/light/17-plugins.png) | 右上系统搜索钮、分段「应用 / 技能」、已连接（绿点）、热门。行打开网页上的连接流程（已有实现）。 | — |
 | 18 | [设置](mobile-comma/light/18-settings.png) | 大标题「设置」。账号行（头像、名字、邮箱 → 个人资料）；工作区；通知、记忆、已连接的 App；外观、语言、版本；退出登录。行带彩色系统图标方块。 | Settings 页的顺序和账号行 |
 | 19 | [工作区](mobile-comma/light/19-workspaces.png) | 工作区列表，当前打勾，选中即返回；右上「编辑」排序。 | WorkspacePickerView |
 | 20 | [搜索](mobile-comma/light/20-search.png) | 搜索 tab 的按钮外观：键盘直接升起，搜索框和关闭钮在键盘上方；结果按 Bot、群聊、线程分组。 | TaskSearchView（范围扩大到 Bot 和群聊） |
 
-深色版颜色全是系统深色（页面纯黑、分组卡 #1C1C1E），不是 Comma 的 #0F0F10。
+深色版是同一套 Apple `Color Scheme` 变量切到 Dark 模式（页面纯黑、分组卡 #1C1C1E，sheet 里用 Elevated 层级），不是 Comma 的 #0F0F10。
+
+### Figma 里用的 Apple 组件（iOS and iPadOS 27 库）
+
+| 部分 | Apple 组件 |
+| --- | --- |
+| 状态栏、Home 指示条 | `Status Bar - iPhone`（iPhone 17 Pro）、`Home Indicator` |
+| 导航栏 | `Toolbar - Top - iPhone`：tab 根页 `Large Title`，聊天 `Default`，线程页 `Title 2 Line`；按钮是它插槽里的 `_Buttons - 44pt`（Back / Symbol / Text / Symbol - Prominent） |
+| Tab bar | `Tab Bar - iPhone`，`Tabs=5, Type=Search Role`（4 个 tab + 末端搜索圆钮） |
+| 长按 | `Context Menu` + `Context Menu - Dimming Overlay`，菜单项是 `Menu Items` |
+| 栏按钮菜单（工作区、新建、附件） | `Menu` + `Menu Items` |
+| 左滑 | `Row with Swipe Actions` 里的 `_Swipe Actions/Symbol and Label Stacked` |
+| Sheet | `Sheet - iPhone`（Detent=Large，grabber、压暗层、左 ✕ 右 ✓） |
+| 表单 | `Text Field`、`Header`（Nested）、`Row`、`Row - Button`（Destructive）、`Segmented Control`（Small） |
+| 卡片里的按钮 | `Button - Liquid Glass - Text`（Glass Prominent / Glass） |
+| 输入框和浮动状态切换器的材质 | `Liquid Glass - Regular - Medium` |
+| 搜索 | `Accessory Bar - iPhone/Search` + `Keyboard` |
+| 图标 | SF Symbols（SF Pro 字体里的符号字符） |
+
+Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub 头像、对话行、置顶格、群头像、线程行、气泡、线程卡片、输入框。
+它们的颜色也绑 Apple 的变量；只有「我的气泡」和发送键用 Mikka 的 `accentFill` #0068DA（白字对比度，见 `apps/mobile/lib/tokens.ts`）。
+
+和第一版（HTML 画的）相比，用了 Apple 组件以后有几处变化：聊天页标题是系统标题，不再是自画的玻璃胶囊；「+」附件用系统菜单
+（相机、照片、文件），不再是自画的玻璃卡片；搜索是系统的键盘上方搜索栏。
 
 ## 五、和现在的抽屉版有什么不同
 
@@ -128,7 +156,7 @@ NativeTabs（系统 tab bar，Liquid Glass）
 | 搜索是对话页导航栏下的系统搜索框，只搜 Bot 和群聊 | 搜索 tab，搜 Bot、群聊、线程 |
 | 对话页没有标题 | 大标题「对话」 |
 | 线程筛选是右上的菜单 | 浮动玻璃状态切换器 |
-| 附件是底部 sheet（相机/照片/文件三块） | 「+」长出的玻璃卡片，带最近照片 |
+| 附件是底部 sheet（相机/照片/文件三块） | 「+」弹出系统菜单（相机、照片、文件） |
 | 账号在抽屉底部 | 设置 tab（头像图标）顶部的账号行 |
 
 ## 六、实现时用什么
@@ -144,7 +172,7 @@ NativeTabs（系统 tab bar，Liquid Glass）
 | 分段控件 | `@expo/ui` `Picker`（segmented），沿用 `Segmented.ios.tsx`。 |
 | 设置、工作区、新建 Bot / 群聊的表单 | `@expo/ui` `Form` / `Section` / `FieldGroup`（`components/settings.tsx` 的 `Row` 迁过去，`mobile.md` 已列为待办）。 |
 | Sheet | 路由 `presentation: 'formSheet'`，`sheetAllowedDetents: [1]`、`sheetGrabberVisible`；左上 ✕ / 右上 ✓ 用 `Stack.Toolbar`。 |
-| 输入框、「+」、附件卡片、线程状态切换器 | `expo-glass-effect` 的 `GlassView`（`isInteractive`）和 `GlassContainer` 让「+」与输入框融合；`isLiquidGlassAvailable()` 为假时退回不透明 `surface`。状态切换器放在 `NativeTabs.BottomAccessory`（iOS 26，`usePlacement()` 处理收起时的 inline 形态）。 |
+| 输入框、「+」、线程状态切换器（附件用系统 `Menu`） | `expo-glass-effect` 的 `GlassView`（`isInteractive`）和 `GlassContainer` 让「+」与输入框融合；`isLiquidGlassAvailable()` 为假时退回不透明 `surface`。状态切换器放在 `NativeTabs.BottomAccessory`（iOS 26，`usePlacement()` 处理收起时的 inline 形态）。 |
 | 图标 | SF Symbols（`expo-symbols`，现有 `Symbol.ios.tsx`）。 |
 
 ## 七、可以原样保留的部分
@@ -165,6 +193,5 @@ NativeTabs（系统 tab bar，Liquid Glass）
 
 ## 没有复制 Comma 的内容
 
-本 PR 只有文档和自绘的设计图。图用 HTML/CSS 按尺寸画、Playwright 出图，颜色是 Mikka 自己的 token（`apps/mobile/lib/tokens.ts`），
-头像是 Mikka 的 bloub，图标是为这些图重画的。没有复制 Comma（AGPL-3.0）的代码、文字、图标或截图；上面的数值和行为是读源码后的
+本 PR 只有文档和设计图。图在 Figma 里用 Apple 官方 iOS 27 库的组件和 Mikka 自己的组件拼成，头像是 Mikka 的 bloub。没有复制 Comma（AGPL-3.0）的代码、文字、图标或截图；上面的数值和行为是读源码后的
 描述，链接指向它的仓库。
