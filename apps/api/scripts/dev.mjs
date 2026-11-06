@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { Agent } from 'node:http'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
@@ -115,11 +116,16 @@ export async function startDevelopment({ args = [], root = repository, log = con
   const generate = () => execute(process.execPath, ['apps/api/scripts/generate-routes.mjs'], { cwd: root, maxBuffer: 1024 * 1024 })
   await generate()
   let nitro, vite, closing, workerReady
+  const proxyAgent = new Agent({ keepAlive: true, maxSockets: 256, maxTotalSockets: 256, maxFreeSockets: 64 })
   const close = () => closing ??= (async () => {
     // Keep the public origin alive while the real Workflow close hook drains.
     // Nitro closes its own worker/watcher/listener; Vite owns its HMR sockets.
     workerReady?.dispose()
-    try { await nitro?.close() } finally { await vite?.close() }
+    try { await nitro?.close() }
+    finally {
+      try { await vite?.close() }
+      finally { proxyAgent.destroy() }
+    }
   })()
   try {
     nitro = await createNitro({
@@ -156,7 +162,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
         allowedHosts: configuration.server?.allowedHosts === true ? true : [
           ...configuration.server?.allowedHosts ?? [], new URL(process.env.BETTER_AUTH_URL).hostname,
         ],
-        proxy: apiProxyOptions(listener.url),
+        proxy: apiProxyOptions(listener.url, proxyAgent),
       },
     })
     // Normal source edits are handled by each compiler. A route declaration
