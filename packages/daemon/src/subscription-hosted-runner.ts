@@ -47,6 +47,7 @@ import { withTaskEnv } from "./task-env";
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide } from "./permissions";
 import { removeRunCredentials } from "./run-scratch";
+import { daemonTracer } from "./tracing";
 
 const exec = promisify(execFile);
 const bootstrap = fileURLToPath(
@@ -323,7 +324,7 @@ export async function createHostedBotRunner(host: {
       }
       // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
       if (selected && host.reportedModels) {
-        const report = await host.reportedModels(kind).catch(() => null);
+        const report = await daemonTracer.span("daemon.adapter.start.models", {}, () => host.reportedModels!(kind)).catch(() => null);
         if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw new Error("subscription_model_not_reported");
       }
       const lifetime = new AbortController();
@@ -434,7 +435,7 @@ export async function createHostedBotRunner(host: {
               }
             }
           };
-          const first = nativeBrokerContextSchema.parse(await context());
+          const first = nativeBrokerContextSchema.parse(await daemonTracer.span("daemon.adapter.start.context", {}, () => context()));
           await live();
           startup.sameRoute = first.route === selected.route;
           startup.sameModel = first.modelId === options.model;
@@ -496,7 +497,7 @@ export async function createHostedBotRunner(host: {
         const shadow = join(paths.runDir, "runtime-git");
         const emptyHome = join(paths.runDir, "git-bootstrap-home");
         mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
-        if (!existsSync(shadow)) {
+        if (!existsSync(shadow)) await daemonTracer.span("daemon.adapter.start.shadow_git", {}, async () => {
           await exec(
             "git",
             [
@@ -529,7 +530,7 @@ export async function createHostedBotRunner(host: {
             env: { ...bareEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
             timeout: 30000, signal: lifetime.signal, maxBuffer: 1024 * 1024,
           });
-        }
+        });
         await live();
         if (
           !lstatSync(shadow).isDirectory() ||
@@ -601,7 +602,7 @@ export async function createHostedBotRunner(host: {
           broker = created;
           return created;
         });
-        const readyBroker = await brokerStarting;
+        const readyBroker = await daemonTracer.span("daemon.adapter.start.broker", {}, () => brokerStarting!);
         startup.brokerReady = true;
         await live();
         const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
@@ -774,9 +775,10 @@ export async function createHostedBotRunner(host: {
                   },
                 });
           const runtimeOptions = { ...options, ...(continuation ? { continueSession: continuation } : {}), ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}), credential: placeholderCredential, ...(githubCli ? { githubRuntime: { nodeBinary: process.execPath, ghBinary: githubCli } } : {}) };
-          const session = previous && !continuation
-            ? await adapter.resume(previous.sessionId, runtimeOptions)
-            : await adapter.start(runtimeOptions);
+          // The CLI's cold start until it reports initialized (MCP servers included).
+          const session = await daemonTracer.span("daemon.adapter.start.cli", {}, () => previous && !continuation
+            ? adapter.resume(previous.sessionId, runtimeOptions)
+            : adapter.start(runtimeOptions));
           if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
             await session.cancel();
             throw unavailable("session_mismatch");

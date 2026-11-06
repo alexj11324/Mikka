@@ -66,6 +66,11 @@ export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool,
     try { await runtime.endRuns(ownerId, runs); if (sandboxId) await runtime.kill(machine.workspaceId, sandboxId) }
     catch { reasons.add('cloud_runtime_cleanup_required') }
   }
+  // Ready thread machines (thread-machine-pool.ts) belong to no workspace yet.
+  for (const row of (await database.query<{ sandboxId: string }>('SELECT "sandboxId" FROM thread_machine_pool WHERE "ownerId"=$1 AND "sandboxId" IS NOT NULL', [ownerId])).rows) {
+    try { await runtime.kill('', row.sandboxId); await database.query('DELETE FROM thread_machine_pool WHERE "sandboxId"=$1', [row.sandboxId]) }
+    catch { reasons.add('cloud_runtime_cleanup_required') }
+  }
   // Keep source references until every provider deletion acknowledges. Repeated
   // DELETE of a known owned object is idempotent; no mapping disappears first.
   const sources = (await database.query<{ workspaceId: string; sandboxId: string }>(`SELECT "workspaceId","sandboxId" FROM cloud_machines WHERE "ownerId"=$1 AND "sandboxId" IS NOT NULL

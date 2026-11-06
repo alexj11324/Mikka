@@ -3,6 +3,7 @@ import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { ENDED_RUN_STATUSES } from './run-outcome'
 import { LEASED_RUN_STATUSES } from './run-retry'
 import { pendingTaskReportsSql } from './coordinator/group-factory'
+import { THREAD_MACHINE_POOL_DUE_SQL } from './cloud-computer/thread-machine-pool-due'
 
 /** Mirrors OUTCOME_WINDOW_DAYS in lib/run-outcome-judge.ts (kept import-free for this query). */
 const OUTCOME_WINDOW_DAYS = 7
@@ -22,7 +23,7 @@ const MACHINE_RECHECK = '10 minutes'
 export const OUTCOME_RETRY_AT_SQL = `("outcomeAt" + greatest(interval '1 hour', "outcomeAt" - coalesce("finishedAt", "updatedAt")))`
 
 /** The run-recovery sweeps (lib/run-recovery.ts), as RUN_RECOVERY_DUE_SQL labels each due time. */
-export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks'] as const
+export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks', 'threadPool'] as const
 export type RunRecoverySweep = typeof RUN_RECOVERY_SWEEPS[number]
 
 /** Each run-recovery due time, as rows of `at` and the `sweep` that does it; parameters $1-$4 come from runRecoveryDueParams. */
@@ -43,6 +44,8 @@ export const RUN_RECOVERY_DUE_SQL = `
     UNION ALL SELECT now(), 'taskMachines' WHERE EXISTS (SELECT 1 FROM thread_machines m LEFT JOIN issues i ON i.id = m."issueId"
       WHERE m.state = 'paused' AND m."issueId" IS NOT NULL
         AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate') OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL))
+    -- reapThreadMachinePool: a ready instance unused for a week, a refill that died, a claim its run never recorded.
+    UNION ALL ${THREAD_MACHINE_POOL_DUE_SQL}
     -- retrySandboxKills: a kill that did not go through is tried again each minute.
     UNION ALL SELECT min(coalesce("lastAttemptAt", "createdAt") + interval '${RECHECK}'), 'sandboxKills' FROM sandbox_kill_retries
     -- resumePendingGroupTurns: queued or orphaned turns at the minute cadence, a pending judgment at its retry time.
