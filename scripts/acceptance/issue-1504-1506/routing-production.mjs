@@ -170,13 +170,16 @@ export async function runRoutingAcceptance({ mode = 'dispatch', receiptPath = nu
             harness: fixed(entry.harness, ['claude_code', 'codex']),
             model: Object.hasOwn(KNOWN_MODELS, entry.model) ? entry.model : 'unknown',
             block: entry.block ? fixed(entry.block.reason, ['checking', 'quota', 'expired', 'paused', 'missing', 'removed', 'modelGone', 'keyRefused', 'balance', 'providerUnavailable', 'noDevice']) : null,
+            cloudModel: fixed(order.cloudModels?.[entry.id], ['ready', 'cloudModelsUnknown', 'cloudModelNotReported']),
           })) : null }; save()
         if (order.autoModelRouting !== true || order.cloudReady !== true || !Array.isArray(order.candidates) || !order.candidates.length || !Array.isArray(order.entries)) fail('routing_unavailable')
         for (const entry of [...order.candidates, ...order.entries]) {
           if (entry.source?.kind !== 'subscription' || typeof entry.source.connectionId !== 'string' ||
             !AUTHORIZED_CONNECTIONS.has(sha256(entry.source.connectionId))) fail('candidate_source_not_authorized')
         }
-        const available = order.entries.filter(entry => !entry.block)
+        // The settings view marks quota older than 15 minutes as checking without probing it.
+        // Ordinary dispatch admission refreshes that state and still enforces the actual quota.
+        const available = order.entries.filter(entry => !entry.block || entry.block.reason === 'checking')
         if (!CASES.every(item => available.some(entry => entry.harness === item.harness && KNOWN_MODELS[entry.model] === item.tier))) fail('routing_unavailable')
         const fingerprint = sha256(JSON.stringify({ location: order.location, customized: order.customized,
           preferredHarness: order.preferredHarness, autoModelRouting: order.autoModelRouting,
