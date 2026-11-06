@@ -82,8 +82,8 @@ export function EnabledModelsDialog({ source, onClose }: { source: EnabledModels
               </Label>)}
             </div>)}
           </div>
-          {!source.invalid && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
-            {t(source.kind === 'subscription' ? 'autoEnableVersions' : 'autoEnableNew')}
+          {!source.invalid && source.kind === 'subscription' && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
+            {t('autoEnableVersions')}
             <Switch className="ml-auto" checked={store.autoEnable(source.id, source.kind)} onCheckedChange={checked => store.setAutoEnable(source.id, checked)} />
           </Label>}
         </>}
