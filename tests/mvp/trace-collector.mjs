@@ -103,6 +103,43 @@ export function summarizeAiSpans(spans) {
   return { total, errors, byService, bySpanName: names, groups: [...groups.values()], ungrouped }
 }
 
+/** Project the existing chain predicates even when a case has not passed.
+ * Counts and bounded opaque IDs diagnose a split/drop without retaining spans. */
+export function summarizeTraceChain(evidence, runId, traceId) {
+  const validRun = typeof runId === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(runId)
+  const validTrace = typeof traceId === 'string' && /^[a-f0-9]{32}$/.test(traceId)
+  const opaqueSpan = value => typeof value === 'string' && /^[a-f0-9]{16}$/.test(value) ? value : null
+  const spans = evidence.spans ?? [], logs = evidence.logs ?? []
+  const current = validTrace ? spans.filter(span => span.traceId === traceId) : []
+  const ids = new Set(current.map(span => span.spanId))
+  const ownRuns = validRun ? spans.filter(span => span.service === 'mikka-daemon' && span.name === 'daemon.run' && span.attributes?.['mikka.run_id'] === runId) : []
+  const daemonRun = ownRuns.find(span => span.traceId === traceId)
+  const count = predicate => ({ inTrace: current.filter(predicate).length,
+    otherTraces: spans.filter(span => span.traceId !== traceId && predicate(span)).length })
+  const requiredStages = Object.fromEntries(['daemon.registration', 'daemon.run.repository', 'daemon.run.worktree', 'daemon.adapter.start']
+    .map(name => [name, count(span => span.name === name)]))
+  const workflow = count(span => /workflow[.:]/.test(span.name))
+  const steps = count(span => span.name === 'step.execute')
+  const completion = span => span.service === 'mikka-web' && span.name.endsWith('/complete')
+  const completions = current.filter(completion)
+  const linkedCompletions = completions.filter(span => ids.has(span.parentSpanId))
+  const postgres = count(span => /(?:pg\.|postgresql)/i.test(span.name) || span.attributes?.['db.system'] === 'postgresql' || span.attributes?.['db.system.name'] === 'postgresql')
+  const runLogs = daemonRun ? logs.filter(log => log.spanId === daemonRun.spanId && log.traceId === traceId).length : 0
+  const checks = { daemonRun: Boolean(daemonRun),
+    registration: requiredStages['daemon.registration'].inTrace > 0,
+    repository: requiredStages['daemon.run.repository'].inTrace > 0,
+    worktree: requiredStages['daemon.run.worktree'].inTrace > 0,
+    adapterStart: requiredStages['daemon.adapter.start'].inTrace > 0,
+    workflow: workflow.inTrace > 0, completionParent: linkedCompletions.length > 0, postgres: postgres.inTrace > 0, runLog: runLogs > 0 }
+  return { runId: validRun ? runId : null, traceId: validTrace ? traceId : null,
+    ready: Object.values(checks).every(Boolean), checks, spanCount: current.length,
+    daemonRuns: { inTrace: ownRuns.filter(span => span.traceId === traceId).length, otherTraces: ownRuns.filter(span => span.traceId !== traceId).length,
+      spanId: opaqueSpan(daemonRun?.spanId), status: [0, 1, 2].includes(daemonRun?.status) ? daemonRun.status : null },
+    requiredStages, workflow, steps, postgres, runLogs,
+    completions: { ...count(completion), withParent: linkedCompletions.length,
+      ids: completions.slice(0, 8).map(span => ({ spanId: opaqueSpan(span.spanId), parentSpanId: opaqueSpan(span.parentSpanId), parentPresent: ids.has(span.parentSpanId) })) } }
+}
+
 export async function startTraceCollector(port = 3196) {
   const evidence = { spans: [], logs: [], generations: [], privacyViolations: 0, dropped: 0, malformed: 0 }
   const forbidden = new Set()

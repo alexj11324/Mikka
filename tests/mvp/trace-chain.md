@@ -103,6 +103,13 @@ web and daemon generation spans by fixed service, operation and error category,
 including when no case completed. Failed runs leave the API alive for one
 20-second telemetry drain before shutdown so its existing batch timer can
 export already-created events; no model call or business request is retried.
+Each reached telemetry wait also retains its exact predicate booleans and
+counts at the wait boundary and after that drain. The summary identifies the
+target run/trace, same-trace versus other-trace run and stage counts, completion
+parent presence, Workflow/Postgres counts and linked run logs. Only fixed
+labels and bounded opaque span IDs are retained; raw span attributes and
+content are not copied into this failure summary. The 30-second telemetry
+deadline and all acceptance assertions remain unchanged.
 The peer also retains only closed command-stage/code/source diagnostics in its
 owned mode-0600 `trace-peer-failures.jsonl`; the report revalidates these fields
 before including `peerFailures`. The daemon's fixture-only fetch wrapper writes

@@ -12,7 +12,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { assertMvpEnvironment, MVP_ORIGIN, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { startMvpServices } from './services.mjs'
-import { startTraceCollector, summarizeAiSpans } from './trace-collector.mjs'
+import { startTraceCollector, summarizeAiSpans, summarizeTraceChain } from './trace-collector.mjs'
 import { tracePublicationReady } from './model.mjs'
 import { readPeerFailures } from './diagnostics.mjs'
 import { MVP_SUBSCRIPTION_MODEL, seedMvpSubscription, seedMvpExecutionOrder } from './subscription.mjs'
@@ -37,7 +37,7 @@ const evidenceDirectory = resolve(process.env.MIKKA_TRACE_EVIDENCE_DIR ?? join(r
 await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 })
 const privateLogDirectory = join(evidenceDirectory, 'private-logs')
 await mkdir(privateLogDirectory, { recursive: true, mode: 0o700 })
-const children = [], results = [], collectors = [], routeReadiness = [], peerDirectories = []
+const children = [], results = [], collectors = [], routeReadiness = [], peerDirectories = [], telemetryTargets = []
 let accounts, services, collector, phase = 'starting', failure, workflowHealth, telemetryDrainMs = 0
 const checkpoint = value => { phase = value; console.info(`trace-acceptance ${value}`) }
 const child = (label, args, env) => {
@@ -211,11 +211,13 @@ try {
         }, 60_000)
       }
       checkpoint(`${kind}-telemetry`)
+      const telemetry = { kind, runId: run.id, traceId, atWaitEnd: null }
+      telemetryTargets.push(telemetry)
       // The daemon flushes at run end; web spans/logs use their normal batch.
       // Wait for both services before checking the completed cross-service tree.
       const requiredStages = ['daemon.registration', 'daemon.run.repository', 'daemon.run.worktree', 'daemon.adapter.start']
       const postgresSpan = span => /(?:pg\.|postgresql)/i.test(span.name) || span.attributes['db.system'] === 'postgresql' || span.attributes['db.system.name'] === 'postgresql'
-      await until(() => {
+      try { await until(() => {
         const current = collector.evidence.spans.filter(span => span.traceId === traceId)
         const ids = new Set(current.map(span => span.spanId))
         const daemonRun = current.find(span => span.service === 'mikka-daemon' && span.name === 'daemon.run' && span.attributes['mikka.run_id'] === run.id)
@@ -224,7 +226,7 @@ try {
           && current.some(span => span.service === 'mikka-web' && span.name.endsWith('/complete') && ids.has(span.parentSpanId))
           && current.some(postgresSpan)
           && collector.evidence.logs.some(log => log.spanId === daemonRun.spanId && log.traceId === traceId)
-      }, 30_000)
+      }, 30_000) } finally { telemetry.atWaitEnd = summarizeTraceChain(collector.evidence, run.id, traceId) }
       const spans = collector.evidence.spans.filter(span => span.traceId === traceId), ids = new Set(spans.map(span => span.spanId))
       const daemonRun = spans.find(span => span.service === 'mikka-daemon' && span.name === 'daemon.run' && span.attributes['mikka.run_id'] === run.id)
       assert.ok(daemonRun, 'DAEMON_TRACE_SPLIT')
@@ -278,6 +280,8 @@ try {
     serviceFailures: services?.failureDiagnostics() ?? [],
     peerFailures: peerDirectories.flatMap(({ kind, directory }) => readPeerFailures(directory).map(failure => ({ kind, ...failure }))),
     telemetryDrainMs, aiSpans: summarizeAiSpans(collector?.evidence.spans ?? []),
+    telemetry: telemetryTargets.map(target => ({ kind: target.kind, atWaitEnd: target.atWaitEnd,
+      afterDrain: summarizeTraceChain(collector.evidence, target.runId, target.traceId) })),
     processes: children.map(job => ({ label: job.label, exitCode: job.exitCode, signal: job.signalCode,
       privateLogRetained: !job.logFailed, privateLogBytes: job.logBytes })),
     counts: collector ? { spans: collector.evidence.spans.length, logs: collector.evidence.logs.length,
