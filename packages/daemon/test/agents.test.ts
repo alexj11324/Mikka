@@ -436,6 +436,86 @@ describe("run context", () => {
     } finally { client.close() }
   })
 
+  it.each(['claude_code', 'codex'] as const)('reports the full committed change scope for a read-only %s check without changing Git state', async harness => {
+    const repo = await makeRepo(), other = await makeRepo(), worktree = await worktreeOf(repo)
+    const git = (...args: string[]) => execa('git', args, { cwd: worktree })
+    const commit = (message: string) => git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', message)
+    writeFileSync(join(worktree, '.gitattributes'), 'README.md diff=probe\n')
+    await git('add', '.gitattributes')
+    await commit('Baseline attributes')
+    const baseCommit = (await git('rev-parse', 'HEAD')).stdout
+    const content = 'mikka-group-policy-v3\npath=claude-code\nstatus=ready\n'
+    writeFileSync(join(worktree, 'target.txt'), content)
+    mkdirSync(join(worktree, 'docs'))
+    writeFileSync(join(worktree, 'docs', 'extra\nfile.txt'), 'Also changed in the candidate.\n')
+    await git('add', 'target.txt', 'docs')
+    await commit('First candidate changes')
+    writeFileSync(join(worktree, 'README.md'), '# Changed sandbox\n')
+    await git('add', 'README.md')
+    await commit('Second candidate changes')
+    const head = (await git('rev-parse', 'HEAD')).stdout
+    const index = readFileSync(join(repo, '.git', 'worktrees', 'wt', 'index'))
+    const marker = join(tempDir(), 'must-not-run'), hostile = join(tempDir(), 'hostile.sh')
+    writeFileSync(hostile, `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 })
+    await git('config', 'diff.external', hostile)
+    await git('config', 'diff.probe.textconv', hostile)
+    const ctx = new RunContext({ harness, kind: 'acceptance', worktree, runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'review', reportOnly: true, inferCommand: false }, policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3), {
+      ...process.env, GIT_DIR: join(other, '.git'), GIT_WORK_TREE: other, GIT_EXTERNAL_DIFF: hostile,
+    })
+    try {
+      const observed = await client.request('tools/call', { name: 'inspect_repository', arguments: { path: 'docs', baseCommit } }) as { result: { isError?: boolean; content: { text: string }[] } }
+      expect(observed.result.isError).not.toBe(true)
+      expect(JSON.parse(observed.result.content[0].text)).toMatchObject({ head, path: 'docs', status: { dirty: false, truncated: false },
+        comparison: { baseCommit, head, changes: [
+          { status: 'M', path: 'README.md' }, { status: 'A', path: 'docs/extra\nfile.txt' }, { status: 'A', path: 'target.txt' },
+        ], truncated: false } })
+      const artifact = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path: 'target.txt', expectedUtf8: content } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(artifact.result.content[0].text)).toMatchObject({ head, bytes: 52, contentUtf8: content,
+        sha256: createHash('sha256').update(content).digest('hex'), contentMatchesGit: true, matchesExpectedUtf8: true })
+      expect(existsSync(marker)).toBe(false)
+      expect(readFileSync(join(repo, '.git', 'worktrees', 'wt', 'index'))).toEqual(index)
+      expect((await git('rev-parse', 'HEAD')).stdout).toBe(head)
+      expect(ctx.readHandoff()).toBeNull()
+    } finally { client.close() }
+  })
+
+  it('bounds committed change scope and refuses missing, non-commit or non-exact bases', async () => {
+    const repo = await makeRepo(), worktree = await worktreeOf(repo)
+    const git = (...args: string[]) => execa('git', args, { cwd: worktree })
+    const baseCommit = (await git('rev-parse', 'HEAD')).stdout
+    for (let i = 0; i < 240; i++) writeFileSync(join(worktree, `${String(i).padStart(3, '0')}-${'x'.repeat(110)}.txt`), '')
+    await git('add', '.')
+    await git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Many committed changes')
+    const head = (await git('rev-parse', 'HEAD')).stdout
+    const tree = (await git('rev-parse', 'HEAD^{tree}')).stdout, blob = (await git('rev-parse', 'HEAD:README.md')).stdout
+    const ctx = new RunContext({ harness: 'claude_code', kind: 'acceptance', worktree, runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'verify', reportOnly: true, inferCommand: false }, policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    const inspect = (args: unknown) => client.request('tools/call', { name: 'inspect_repository', arguments: args }) as Promise<{ result: { isError?: boolean; content: { text: string }[] } }>
+    try {
+      const observed = await inspect({ baseCommit })
+      expect(observed.result.isError).not.toBe(true)
+      expect(Buffer.byteLength(JSON.stringify(observed))).toBeLessThan(64 * 1024)
+      const value = JSON.parse(observed.result.content[0].text)
+      expect(value.comparison).toMatchObject({ baseCommit, head, truncated: true })
+      expect(value.comparison.changes.length).toBeGreaterThan(0)
+      expect(value.comparison.changes.length).toBeLessThanOrEqual(200)
+      expect(value.comparison.changes.reduce((bytes: number, change: unknown) => bytes + Buffer.byteLength(JSON.stringify(change)), 0)).toBeLessThanOrEqual(16 * 1024)
+      expect(value.status).toMatchObject({ dirty: false, truncated: false })
+      expect(JSON.parse((await inspect({ baseCommit: head })).result.content[0].text).comparison).toEqual({ baseCommit: head, head, changes: [], truncated: false })
+      expect(JSON.parse((await inspect({})).result.content[0].text).comparison).toBeNull()
+      for (const base of ['HEAD', 'HEAD~1', '--help', `${baseCommit}\n`, baseCommit.slice(1), `${baseCommit}0`, baseCommit.toUpperCase(), 'f'.repeat(40), tree, blob, null, 1]) {
+        const refused = await inspect({ baseCommit: base })
+        expect(refused.result.isError).toBe(true)
+        expect(JSON.stringify(refused)).not.toContain('"comparison"')
+      }
+      expect(ctx.readHandoff()).toBeNull()
+      expect((await git('rev-parse', 'HEAD')).stdout).toBe(head)
+    } finally { client.close() }
+  })
+
   it('keeps artifact-reader advertising unchanged for writable executions and command checks', async () => {
     const worktree = await worktreeOf(await makeRepo())
     for (const options of [

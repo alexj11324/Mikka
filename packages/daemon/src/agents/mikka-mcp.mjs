@@ -110,10 +110,11 @@ function selectRepository(args) {
 }
 const ARTIFACT_TEXT_LIMIT = 64 * 1024
 const ARTIFACT_TOOL = { name: 'inspect_artifact', description: 'Read a file in this fixed worktree: byte count, SHA256, Git HEAD, committed file SHA256, Git comparison and complete UTF8 text up to 64 KiB. Optionally compare exact expected UTF8 bytes, including every newline. Binary or larger files return no text. No shell commands, changes, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to this worktree.' }, expectedUtf8: { type: 'string', maxLength: ARTIFACT_TEXT_LIMIT, description: 'Optional exact expected text, including all whitespace and the final newline; at most 64 KiB as UTF8.' } }, required: ['path'], additionalProperties: false } }
-const INSPECT_REPOSITORY_TOOL = { name: 'inspect_repository', description: 'Read this fixed worktree’s actual Git HEAD, sanitized GitHub origin, working-tree status and one directory’s files. Start with path ".", then inspect a listed directory or read a file with inspect_artifact. Directory listings and status are bounded and mark truncation. Symlinks and .git are not listed. No shell commands, changes, repository selection, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', maxLength: 2000, description: 'Directory relative to this worktree; defaults to ".".' } }, additionalProperties: false } }
+const INSPECT_REPOSITORY_TOOL = { name: 'inspect_repository', description: 'Read this fixed worktree’s actual Git HEAD, sanitized GitHub origin, working-tree status and one directory’s files. Supply baseCommit to observe committed changes from that exact baseline to HEAD across the whole worktree. Start with path ".", then inspect a listed directory or read a file with inspect_artifact. Listings, status and comparison are bounded and mark truncation; truncated observations cannot establish the complete change scope. Symlinks and .git are not listed. No shell commands, changes, repository selection, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', maxLength: 2000, description: 'Directory relative to this worktree; defaults to ".".' }, baseCommit: { type: 'string', pattern: '^[a-f0-9]{40}$', description: 'Optional exact baseline commit SHA for committed change scope; full 40-character lowercase hex, never a branch or revision expression.' } }, additionalProperties: false } }
 
 function inspectRepository(args) {
-  if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => key !== 'path')) throw new Error('repository_input')
+  if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => key !== 'path' && key !== 'baseCommit')) throw new Error('repository_input')
+  if (args.baseCommit !== undefined && (typeof args.baseCommit !== 'string' || !/^[a-f0-9]{40}$/.test(args.baseCommit))) throw new Error('repository_base')
   const path = args.path ?? '.'
   if (typeof path !== 'string' || !path || path.length > 2000 || isAbsolute(path) || /[\\\0]/.test(path) ||
       path.split('/').some(part => part === '..' || part === '.git')) throw new Error('repository_path')
@@ -125,7 +126,7 @@ function inspectRepository(args) {
   const git = argv => execFileSync('git', ['--no-pager', '--no-optional-locks', '-C', artifactRoot,
     '-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', '-c', 'core.pager=cat',
     '-c', 'core.untrackedCache=false', '-c', 'status.submoduleSummary=false', '-c', 'submodule.recurse=false', ...filterOverrides, ...argv],
-  { env: metadataGitEnv, timeout: 5000, maxBuffer: 64 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  { env: { ...metadataGitEnv, GIT_NO_LAZY_FETCH: '1', GIT_NO_REPLACE_OBJECTS: '1' }, timeout: 5000, maxBuffer: 64 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
   // A stat-dirty tracked file makes `git status` run configured clean/process
   // filters. Read names only, never values, then disable each bounded driver.
   let filterKeys = []
@@ -137,6 +138,26 @@ function inspectRepository(args) {
   }
   const head = git(['rev-parse', '--verify', 'HEAD']).toString('utf8').trim()
   if (!/^[a-f0-9]{40}$/.test(head)) throw new Error('repository_head')
+  let comparison = null
+  if (args.baseCommit !== undefined) {
+    const baseCommit = args.baseCommit
+    if (git(['cat-file', '-t', baseCommit]).toString('utf8').trim() !== 'commit') throw new Error('repository_base')
+    // Compare committed trees, not the clean/dirty working copy or just the
+    // last commit. The listed directory never narrows this change scope.
+    const parts = new TextDecoder('utf-8', { fatal: true }).decode(git(['diff', '--name-status', '-z',
+      '--no-renames', '--no-ext-diff', '--no-textconv', '--no-relative', '--ignore-submodules=none',
+      '-O/dev/null', baseCommit, head, '--'])).split('\0')
+    if (parts.pop() !== '' || parts.length % 2 !== 0) throw new Error('repository_comparison')
+    const changes = []
+    let changeBytes = 0
+    for (let i = 0; i < parts.length; i += 2) {
+      const change = { status: parts[i], path: parts[i + 1] }
+      const bytes = Buffer.byteLength(JSON.stringify(change))
+      if (changes.length >= 200 || changeBytes + bytes > 16 * 1024) break
+      changes.push(change); changeBytes += bytes
+    }
+    comparison = { baseCommit, head, changes, truncated: changes.length < parts.length / 2 }
+  }
   let repository = null
   try {
     let remote = git(['remote', 'get-url', 'origin']).toString('utf8').trim()
@@ -168,7 +189,7 @@ function inspectRepository(args) {
     if (entries.length >= 200 || entryBytes + bytes > 16 * 1024) break
     entries.push(value); entryBytes += bytes
   }
-  return { content: [{ type: 'text', text: JSON.stringify({ path, head, repository,
+  return { content: [{ type: 'text', text: JSON.stringify({ path, head, repository, comparison,
     origin: repository ? `https://github.com/${repository}.git` : null,
     status: { dirty: status.length > 0, porcelain, truncated: statusTruncated },
     entries, truncated: entries.length < directoryEntries.length }) }] }

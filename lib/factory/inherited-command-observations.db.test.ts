@@ -16,7 +16,7 @@ import { createFactoryHumanStore } from './human-store'
 import { handleFactory } from './http'
 import { createFactoryQuestions } from './questions/store'
 import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract'
-import { factoryCheckGates, producerCommandObservations } from './checks'
+import { configureFactoryCheck, factoryCheckGates, producerCommandObservations } from './checks'
 import { factoryCheckIndependent } from './check-independence'
 import { sweepFactoryWatchdog } from './watchdog'
 import { factoryEventId } from './event-id'
@@ -208,6 +208,49 @@ test('isolated PG: direct question recovery exposes historical native observatio
       assert.deepEqual(attempt.output.check.questionCommandSources.map((source: { runId: string; outputChunkId: string }) =>
         [source.runId, source.outputChunkId]), [[f.historyRunId, f.outputId]]);
     });
+
+    const executionAssignment = (prompt: string) => {
+      const lines = prompt.split('\n')
+      const index = lines.findIndex(line => line.startsWith('Host-recorded producer execution assignment ('))
+      assert.ok(index >= 0)
+      return JSON.parse(lines[index + 1])
+    }
+
+    await t.test('the check receives the real native claim separately from the frozen selection and unknown provider model', async () => {
+      const { rows: [attempt] } = await pool.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [result.task.attemptId])
+      const { rows: [review] } = await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [attempt.runId])
+      const observed = executionAssignment(review.prompt)
+      assert.equal(observed.runId, f.producerRunId)
+      assert.equal(observed.sessionId, 'original-native-session')
+      assert.equal(observed.observedModel, null, 'requested model must never fill a missing provider observation')
+      assert.deepEqual(observed.subscription, { bindingId: f.bindingId, route: 'codex_cli', modelId: 'gpt-5.6-luna' })
+      assert.deepEqual(observed.nativeClaim, { bindingId: f.bindingId, connectionId: f.connectionId,
+        connectionRevision: 2, route: 'codex_cli', modelId: 'gpt-5.6-luna' })
+      assert.equal(observed.apiClaim, false)
+      assert.doesNotMatch(review.prompt, /synthetic-credential-name|synthetic-subject|secretDigest|accessSecretName/)
+      assert.match(review.prompt, /A null observedModel remains unknown/)
+      assert.match(review.prompt, /Missing or conflicting required routing evidence remains unverified/)
+    })
+
+    await t.test('a frozen subscription cannot invent a native claim and actual API use remains visible', async () => {
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        const { rows: [attempt] } = await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [result.task.attemptId])
+        await tx.query('DELETE FROM byos_native_runs WHERE "runId"=$1', [f.producerRunId])
+        await tx.query('INSERT INTO model_api_key_runs("runId","keyId") VALUES($1,$2)', [f.producerRunId, randomUUID()])
+        await configureFactoryCheck(tx, { ...result.task, status: 'pending' }, attempt.runId)
+        const { rows: [review] } = await tx.query('SELECT prompt FROM agent_runs WHERE id=$1', [attempt.runId])
+        const observed = executionAssignment(review.prompt)
+        assert.equal(observed.subscription.bindingId, f.bindingId)
+        assert.equal(observed.nativeClaim, null, 'only a persisted receipt may supply native claim evidence')
+        assert.equal(observed.apiClaim, true, 'do not infer no API use from the frozen subscription')
+        assert.equal(observed.observedModel, null)
+      } finally {
+        await tx.query('ROLLBACK')
+        tx.release()
+      }
+    })
 
     await t.test('a real migrated legacy graph exposes only the direct inherited pair with explicit failed-source attribution', async () => {
       const before = await history(), observed = await read()
