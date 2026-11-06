@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
@@ -229,4 +229,14 @@ test('dispatch order: the 优先使用的 Agent\'s list first, then the other\'s
   assert.deepEqual(dispatchOrder(rows.filter(row => row.harness === 'codex'), 'claude_code').map(row => row.id), ['codex-a', 'codex-b'])
   assert.deepEqual(dispatchOrder([], 'codex'), [])
   assert.deepEqual(rows.map(row => row.id), ['codex-a', 'claude-x', 'codex-b', 'claude-y'])
+})
+
+test('a place in the 运行位置 chain says why it cannot take a run: 参与调度 off before offline before a missing Agent', () => {
+  assert.equal(placeStage(device('mac', { enabled: false, online: false }), [first], 'claude_code'), 'off')
+  assert.equal(placeStage(device('vm', { online: false }), [first], 'claude_code'), 'offline')
+  assert.equal(placeStage(device('box', { harnesses: [] }), [first, second], 'claude_code'), 'notInstalled')
+  assert.equal(placeStage(device('mac'), [first], 'claude_code'), 'ready')
+  // With no runnable model it is judged on the preferred Agent alone.
+  assert.equal(placeStage(device('mac'), [], 'claude_code'), 'ready')
+  assert.equal(placeStage(device('box', { harnesses: [] }), [], 'claude_code'), 'notInstalled')
 })
