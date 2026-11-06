@@ -9,8 +9,8 @@ import { WebBarMenu } from '@/components/WebBarMenu'
 /** An SF Symbol name, as the toolbar takes it. */
 type SFSymbol = Extract<NonNullable<ComponentProps<typeof Stack.Toolbar.MenuAction>['icon']>, string>
 
-/** A bar button: an icon, or with `text` a word (编辑, 完成). */
-export type BarButton = { icon: SFSymbol; label: string; onPress: () => void; web: ReactNode; disabled?: boolean; busy?: boolean; text?: string }
+/** A bar button: an icon, or with `text` a word (编辑, 完成); `prominent` fills it with the accent (a sheet's ✓). */
+export type BarButton = { icon: SFSymbol; label: string; onPress: () => void; web: ReactNode; disabled?: boolean; busy?: boolean; text?: string; prominent?: boolean }
 /** A bar menu: an icon button, or with `text` a text button with a chevron (the workspace switcher); `plain` draws `web` as it is. */
 export type BarMenu = { icon: SFSymbol; label: string; web: ReactNode; onOpen: () => void; items: { label: string; icon?: SFSymbol; on?: boolean; onPress: () => void }[]; text?: string; plain?: boolean }
 /** A drawn item, such as the person's avatar; it fills its own circle, without the bar's glass behind it. */
@@ -48,7 +48,7 @@ function nativeItem(item: BarItem) {
     )
   }
   if (item.text) return <Stack.Toolbar.Button key={item.label} accessibilityLabel={item.label} disabled={item.disabled || item.busy} onPress={item.onPress}>{item.text}</Stack.Toolbar.Button>
-  return <Stack.Toolbar.Button key={item.label} icon={item.busy ? 'hourglass' : item.icon} accessibilityLabel={item.label} disabled={item.disabled || item.busy} onPress={item.onPress} />
+  return <Stack.Toolbar.Button key={item.label} icon={item.busy ? 'hourglass' : item.icon} accessibilityLabel={item.label} disabled={item.disabled || item.busy} onPress={item.onPress} variant={item.prominent ? 'prominent' : undefined} />
 }
 
 const webItem = (item: BarItem) => 'view' in item

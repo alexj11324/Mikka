@@ -6,7 +6,7 @@ import { colors } from '@/lib/theme'
 /** How many rows a closed section (已解决, 已完成) shows before 显示全部. */
 export const CLOSED_SHOWN = 5
 
-/** A list section's header, as on the home list: its name in small grey type and how many rows it has. */
+/** A list section's header, as on the home list (Comma designs 01, 13, 15): its name in grey semibold, and a count when given. */
 export function ListSectionHeader({ title, count }: { title: string; count?: number }) {
   return (
     <View style={styles.header}>
@@ -26,9 +26,9 @@ export function ShowAllRow({ count, onPress }: { count: number; onPress: () => v
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
-  title: { fontSize: 13, lineHeight: 18, fontWeight: '500', color: colors.secondary },
-  count: { fontSize: 13, lineHeight: 18, color: colors.tertiary },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
+  title: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.secondary },
+  count: { fontSize: 15, lineHeight: 20, color: colors.tertiary },
   all: { alignSelf: 'flex-start', paddingHorizontal: 20, paddingVertical: 8 },
   allText: { fontSize: 14, lineHeight: 19, fontWeight: '500', color: colors.accent },
 })

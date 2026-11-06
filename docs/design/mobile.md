@@ -1,6 +1,6 @@
 # Mobile app
 
-- **Redesign:** Alex dropped the push drawer and accepted the tab-bar design after Comma on 2026-11-06 ([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)); the frames are in [`mobile-comma-redesign.md`](mobile-comma-redesign.md). The shell and 对话 below are built; the other tabs move to their frames screen by screen.
+- **Redesign:** Alex dropped the push drawer and accepted the tab-bar design after Comma on 2026-11-06 ([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)); the frames are in [`mobile-comma-redesign.md`](mobile-comma-redesign.md). The shell, 对话, 线程 / 任务, 建议, 插件, 设置 and the 新建 sheets follow the frames.
 - **Status:** implemented baseline; UI/UX acceptance tracked in [#1296](https://github.com/alexj11324/Mikka/issues/1296) (2026-11-05)
 - **GitHub:** #1296
 - **Figma:** `zPe5LKycb2XuT1ivCLRw07`; page `268:4750` is archived per #1296 and is not a design authority. Page `358:9186` is a reference to verify. Current main and accepted decisions govern; do not redesign from archived or unaccepted frames.
@@ -58,6 +58,13 @@ their counts as the system's tab badges.
 **工作区** (design 19, 设置 › 工作区, also 编辑顺序 in the workspace menu) lists the
 workspaces with a check on the open one; a tap switches and goes back. 编辑 shows
 handles that arrange them on this device.
+
+**线程** (designs 13, 15) has a 线程 | 任务 segment under its large title. 线程 lists the device chips and the
+threads by group; a floating glass switcher above the tab bar filters 全部 / 等待你 / 进行中 / 已解决 (it replaced the
+filter menu). 任务 lists the tasks by status, each opening on the web.
+
+**建议** (design 16) has a card per app with today's count, then 今天; 插件 is its bar button. **插件** (design 17) is
+pushed inside the 建议 and 设置 tabs: system search, 应用 | 技能, inset groups, a green dot for a connected app.
 
 **搜索** (design 20) is the search tab: the system search field matches bots, group
 chats and threads by name. It reads the thread list only while there is a query.

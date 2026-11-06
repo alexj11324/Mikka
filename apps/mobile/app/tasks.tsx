@@ -1,75 +1,14 @@
-import { ReadNotice } from '@/components/ReadNotice'
-import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUpRight, Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
-import { Spinner } from '@/components/icons'
-import { Symbol } from '@/components/Symbol'
-import { Text } from '@/components/Text'
-import { NavBar, underBar } from '@/components/NavBar'
-import type { Task } from '@/lib/types'
-import { useLiveApi, useRefresh } from '@/lib/useApi'
-import { tasksLive } from '@/lib/live-keys'
-import { useHome } from '@/lib/home'
-import { openOnWeb } from '@/lib/web'
+import { View } from 'react-native'
+import { NavBar } from '@/components/NavBar'
+import { TaskList } from '@/features/tasks/components/task-list'
 import { colors } from '@/lib/theme'
 
-/** The web's task statuses (lib/issue-meta.ts) in board order, with their names. */
-const SECTIONS: { status: string[]; title: string }[] = [
-  { status: ['doing'], title: '进行中' },
-  { status: ['review'], title: '评审中' },
-  { status: ['todo'], title: '待办' },
-  { status: ['backlog'], title: '待整理' },
-  { status: ['done'], title: '已完成' },
-  { status: ['canceled', 'duplicate'], title: '已取消' },
-]
-
-function TaskIcon({ status }: { status: string }) {
-  if (status === 'done') return <CircleCheck size={18} color={colors.success} strokeWidth={2} />
-  if (status === 'doing') return <CircleDot size={18} color={colors.orange} strokeWidth={2} />
-  if (status === 'review') return <CircleDashed size={18} color={colors.success} strokeWidth={2} />
-  if (status === 'canceled' || status === 'duplicate') return <CircleX size={18} color={colors.tertiary} strokeWidth={2} />
-  return <Circle size={18} color={colors.secondary} strokeWidth={2} />
-}
-
-/** 任务: a list grouped by status; no board on mobile (mobile.md, out of scope). */
+/** 任务 on its own page, opened from a chat's task card; the 线程 tab shows the same list under its 任务 segment. */
 export default function TasksScreen() {
-  const insets = useSafeAreaInsets()
-  const home = useHome().data
-  const { data, error, loading, reload } = useLiveApi<{ tasks: Task[] }>('/api/mobile/tasks', () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
-  const refresh = useRefresh(reload)
-  const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
-    <View style={styles.screen}>
+    <View style={{ flex: 1, backgroundColor: colors.page }}>
       <NavBar title="任务" large />
-      <SectionList
-        sections={sections}
-        keyExtractor={t => t.id}
-        stickySectionHeadersEnabled={false}
-        {...underBar}
-        refreshControl={<RefreshControl {...refresh} />}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label="任务" onRetry={reload} />}
-        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>还没有任务。</Text>}
-        renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
-        renderItem={({ item }) => (
-          // The task opens on the web, signed in: issue editing stays there (mobile.md, out of scope).
-          <Pressable accessibilityRole="link" onPress={() => void openOnWeb(`/?issue=${item.id}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-            <TaskIcon status={item.status} />
-            {item.identifier ? <Text style={styles.key}>{item.identifier}</Text> : null}
-            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-            <Symbol name="arrow.up.right" size={12} color={colors.tertiary} web={<ArrowUpRight size={15} color={colors.tertiary} strokeWidth={2} />} />
-          </Pressable>
-        )}
-      />
+      <TaskList />
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.page },
-  section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 16, marginBottom: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, minHeight: 48, paddingVertical: 10 },
-  key: { fontSize: 13, color: colors.secondary, minWidth: 56 },
-  title: { flex: 1, fontSize: 16 },
-  empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
-})
