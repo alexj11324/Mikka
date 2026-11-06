@@ -21,10 +21,11 @@ export function appLinkUrl(scheme: string, id: string): string {
 
 /** The id of `<scheme>://auth/done?id=<id>`, or null for anything else. */
 export function parseAppLink(raw: unknown, scheme: string): string | null {
-  if (typeof raw !== 'string' || raw.length > 256 || !raw.toLowerCase().startsWith(`${scheme}:`)) return null
+  // The exact prefix also rules out user info and a port before the host.
+  if (typeof raw !== 'string' || raw.length > 256 || !raw.toLowerCase().startsWith(`${scheme}://auth/done?`)) return null
   let url: URL
   try { url = new URL(raw) } catch { return null }
-  if (url.protocol !== `${scheme}:` || url.username || url.password || url.port || url.hostname !== 'auth' || url.pathname !== '/done' || url.hash) return null
+  if (url.protocol !== `${scheme}:` || url.host !== 'auth' || url.pathname !== '/done' || url.hash) return null
   const keys = [...url.searchParams.keys()]
   const id = url.searchParams.get('id')
   return keys.length === 1 && keys[0] === 'id' && id && ID.test(id) ? id : null
