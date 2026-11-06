@@ -171,7 +171,7 @@ try {
       assert.ok(daemonRun, 'DAEMON_TRACE_SPLIT')
       for (const name of ['daemon.registration', 'daemon.run.repository', 'daemon.run.worktree', 'daemon.adapter.start']) assert.ok(spans.some(span => span.name === name), `MISSING_${name}`)
       assert.ok(spans.some(span => /workflow[.:]/.test(span.name)), 'MISSING_WORKFLOW_SPAN')
-      assert.ok(spans.some(span => span.service === 'mikka-web' && /\/complete$/.test(span.name) && ids.has(span.parentSpanId)), 'COMPLETION_HTTP_PARENT_MISSING')
+      assert.ok(spans.some(span => span.service === 'mikka-web' && span.name.endsWith('/complete') && ids.has(span.parentSpanId)), 'COMPLETION_HTTP_PARENT_MISSING')
       assert.ok(spans.some(span => /(?:pg\.|postgresql)/i.test(span.name) || span.attributes['db.system'] === 'postgresql' || span.attributes['db.system.name'] === 'postgresql'), 'MISSING_POSTGRES_SPAN')
       const runLog = collector.evidence.logs.find(log => log.spanId === daemonRun.spanId && log.traceId === traceId)
       assert.ok(runLog, 'RUN_LOG_TRACE_LINK_MISSING')
