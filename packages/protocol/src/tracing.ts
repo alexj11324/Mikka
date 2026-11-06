@@ -1,4 +1,4 @@
-import { causeFields } from "./coded-error"
+import { causeFields } from "./coded-error.ts"
 
 // Span privacy rules shared by the web server (lib/tracing/sanitize.ts) and
 // the daemon (packages/daemon/src/tracing.ts). docs/operations/tracing.md, "Privacy".

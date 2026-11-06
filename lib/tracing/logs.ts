@@ -1,10 +1,10 @@
-import { ROOT_CONTEXT, SpanStatusCode, trace } from '@opentelemetry/api'
+import { ROOT_CONTEXT, SpanStatusCode, trace, type Context } from '@opentelemetry/api'
 import { SeverityNumber, type Logger } from '@opentelemetry/api-logs'
 import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchLogRecordProcessor, LoggerProvider, type LogRecordExporter, type ReadableLogRecord } from '@opentelemetry/sdk-logs'
-import type { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace-base'
+import type { ReadableSpan, Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { SERVICE_NAME, type TraceEnvironment } from './config'
 import { sanitizeAttributes, sanitizeSpanName } from './sanitize'
 
@@ -43,9 +43,10 @@ export function createLogProvider(options: { endpoint: string; token: string; en
 
 /** Workflow and dispatch stages plus errors; SQL/query success spans stay APM-only. */
 export class StageLogProcessor implements SpanProcessor {
-  constructor(private readonly logger: Logger) {}
-  onStart(): void {}
+  constructor(private readonly logger: Logger, private readonly next?: SpanProcessor) {}
+  onStart(span: Span, parent: Context): void { this.next?.onStart(span, parent) }
   onEnd(span: ReadableSpan): void {
+    this.next?.onEnd(span)
     const failed = span.status.code === SpanStatusCode.ERROR
     if (!failed && !/^(?:workflow[.:]|step[.:]|dispatch[._]|cloud[._]|computer[._]|factory[._]|completion[._]|e2b[._])/.test(span.name)) return
     try {
@@ -60,6 +61,6 @@ export class StageLogProcessor implements SpanProcessor {
       })
     } catch { /* telemetry never changes the completed operation */ }
   }
-  forceFlush(): Promise<void> { return Promise.resolve() }
-  shutdown(): Promise<void> { return Promise.resolve() }
+  forceFlush(): Promise<void> { return this.next?.forceFlush() ?? Promise.resolve() }
+  shutdown(): Promise<void> { return this.next?.shutdown() ?? Promise.resolve() }
 }

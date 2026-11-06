@@ -202,7 +202,8 @@ try {
   assert.equal(collector.evidence.dropped, 0, 'COLLECTOR_CAPACITY_EXCEEDED')
   checkpoint('passed')
 } catch (error) {
-  failure = { phase, code: /^[A-Z0-9_.-]{1,100}$/.test(error?.message ?? '') ? error.message : 'TRACE_ACCEPTANCE_FAILED' }
+  const code = typeof error?.message === 'string' ? error.message.split('\n')[0] : ''
+  failure = { phase, code: /^[A-Z0-9_.-]{1,100}$/.test(code) ? code : 'TRACE_ACCEPTANCE_FAILED' }
   process.exitCode = 1
 } finally {
   if (accounts) await accounts.release({ outcome: 'dirty' }).catch(() => { process.exitCode = 1 })

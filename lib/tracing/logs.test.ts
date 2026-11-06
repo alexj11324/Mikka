@@ -27,3 +27,21 @@ test('Workflow and failure logs share OTel trace/span IDs and exclude content', 
   assert.equal(JSON.stringify({ body: record.body, attributes: record.attributes }).includes('private'), false)
   await provider.shutdown(); await logs.shutdown()
 })
+
+test('tail-retained ordinary failures give native Logs the same effective rate as APM', async () => {
+  const logMemory = new InMemoryLogRecordExporter(), spans = new InMemorySpanExporter()
+  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
+  const provider = createTracerProvider({ exporter: new SafeExporter(spans), sampleRate: 0.000001, environment: 'dev', logger: logs.getLogger('test') })
+  try {
+    const span = provider.getTracer('test').startSpan('GET /api/ordinary')
+    span.setStatus({ code: SpanStatusCode.ERROR }); span.end()
+    await provider.forceFlush(); await logs.forceFlush()
+    const [saved] = spans.getFinishedSpans(), [record] = logMemory.getFinishedLogRecords()
+    assert.equal(saved.attributes['mikka.trace.sample_rate'], 1)
+    assert.equal(record.attributes['mikka.trace.sample_rate'], 1)
+    assert.equal(record.attributes['mikka.trace.retention'], 'error_or_slow')
+    assert.equal(record.spanContext?.traceId, saved.spanContext().traceId)
+    assert.equal(record.spanContext?.spanId, saved.spanContext().spanId)
+    assert.equal(record.spanContext?.traceFlags, saved.spanContext().traceFlags)
+  } finally { await provider.shutdown(); await logs.shutdown() }
+})

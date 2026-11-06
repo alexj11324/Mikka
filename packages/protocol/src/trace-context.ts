@@ -14,6 +14,8 @@ export type RunTraceContext = {
   workflowRunId?: string
   posthogDistinctId?: string
   sessionId?: string
+  /** Actual upstream rate in a durable payload; never accepted from HTTP headers. */
+  sampleRate?: number
 }
 
 export const TRACE_FIELDS = {
@@ -37,16 +39,18 @@ export function sanitizeTraceContext(value: unknown): RunTraceContext | undefine
     const field = input[key]
     if (telemetryId(field)) result[key] = field
   }
+  if (typeof input.sampleRate === 'number' && Number.isFinite(input.sampleRate) && input.sampleRate > 0 && input.sampleRate <= 1) result.sampleRate = input.sampleRate
   return result
 }
 
-export function traceAttributes(value: RunTraceContext | undefined): Record<string, string> {
+export function traceAttributes(value: RunTraceContext | undefined): Record<string, string | number> {
   const clean = sanitizeTraceContext(value)
-  const attributes: Record<string, string> = {}
+  const attributes: Record<string, string | number> = {}
   if (clean) for (const [key, attribute] of Object.entries(TRACE_FIELDS)) {
-    const field = clean[key as keyof RunTraceContext]
+    const field = clean[key as keyof typeof TRACE_FIELDS]
     if (field) attributes[attribute] = field
   }
+  if (clean?.sampleRate !== undefined) attributes['mikka.trace.sample_rate'] = clean.sampleRate
   return attributes
 }
 
@@ -54,7 +58,12 @@ export function traceAttributes(value: RunTraceContext | undefined): Record<stri
 export function runTraceHeaders(value: RunTraceContext | undefined): Record<string, string> {
   const clean = sanitizeTraceContext(value)
   if (!clean) return {}
-  return Object.fromEntries(Object.entries(clean).map(([key, field]) => [key === 'traceparent' ? key : `x-mikka-trace-${key.toLowerCase()}`, field]))
+  const headers: Record<string, string> = { traceparent: clean.traceparent }
+  for (const key of Object.keys(TRACE_FIELDS) as (keyof typeof TRACE_FIELDS)[]) {
+    const field = clean[key]
+    if (field) headers[`x-mikka-trace-${key.toLowerCase()}`] = field
+  }
+  return headers
 }
 
 export function traceContextFromHeaders(get: (key: string) => unknown): RunTraceContext | undefined {

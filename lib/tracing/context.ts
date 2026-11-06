@@ -11,10 +11,12 @@ export function traceMetadata(scope: Context = context.active()): Partial<RunTra
   const parent = trace.getSpan(scope) as unknown as { attributes?: Attributes } | undefined
   for (const [field, attribute] of Object.entries(TRACE_FIELDS)) {
     const value = parent?.attributes?.[attribute]
-    if (telemetryId(value)) metadata[field as keyof RunTraceContext] = value
+    if (telemetryId(value)) metadata[field as keyof typeof TRACE_FIELDS] = value
   }
   const workflowRunId = parent?.attributes?.['workflow.run.id']
   if (telemetryId(workflowRunId)) metadata.workflowRunId = workflowRunId
+  const sampleRate = parent?.attributes?.['mikka.trace.sample_rate']
+  if (typeof sampleRate === 'number') metadata.sampleRate = sampleRate
   return metadata
 }
 
