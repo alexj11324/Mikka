@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, promptMessages } from './context'
-import { coordinatorStopToken, stoppedMessages, stoppedStepText } from './stop'
+import { coordinatorStopToken, lastAssistantText, stoppedMessages, stoppedStepText, untilStopped } from './stop'
 import type { CoordinatorWorkflowStreamPart } from './stream'
 
 const parts = (...list: unknown[]) => new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { for (const part of list) controller.enqueue(part as CoordinatorWorkflowStreamPart); controller.close() } })
@@ -52,4 +52,30 @@ test('the chat shows a stopped reply with its words, and a stop before any word 
   assert.deepEqual(silent.map(item => [item.from, item.text, item.stopped]), [['person', 'status?', undefined], ['coordinator', '', true]])
   // The empty mark is for the chat; the model never gets an empty message.
   assert.deepEqual(promptMessages(null, [{ position: 1, message: { role: 'user', content: 'status?' } }, { position: 2, message: { role: 'assistant', content: '' } }]).map(message => message.role), ['user'])
+})
+
+test('a turn that ends before 停止 gives its result; 停止 first ends the wait without the turn', async () => {
+  const done = new AbortController()
+  assert.deepEqual(await untilStopped(Promise.resolve('reply'), done.signal), { stopped: false, result: 'reply' })
+  // A tool call still running never settles here: the stop does not wait for it.
+  const running = new AbortController()
+  const ended = untilStopped(new Promise<string>(() => {}), running.signal)
+  running.abort()
+  assert.deepEqual(await ended, { stopped: true })
+  // Already stopped before the turn was awaited.
+  assert.deepEqual(await untilStopped(new Promise<string>(() => {}), running.signal), { stopped: true })
+})
+
+test('a turn that fails because it was aborted counts as stopped; any other failure is the turn\'s own', async () => {
+  const stop = new AbortController()
+  const aborted = untilStopped(new Promise<string>((_, reject) => stop.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))), stop.signal)
+  stop.abort()
+  assert.deepEqual(await aborted, { stopped: true })
+  await assert.rejects(untilStopped(Promise.reject(new Error('subscription_generation_failed')), new AbortController().signal), /subscription_generation_failed/)
+})
+
+test('the last finished call\'s words are known, so a stop does not store them twice', () => {
+  assert.equal(lastAssistantText([]), '')
+  assert.equal(lastAssistantText([{ role: 'assistant', content: [{ type: 'text', text: 'Creating ' }, { type: 'tool-call', toolCallId: 'c', toolName: 'create_issue', input: {} }, { type: 'text', text: 'it.' }] }, { role: 'tool', content: [] }]), 'Creating it.')
+  assert.deepEqual(stoppedMessages([{ role: 'assistant', content: 'Creating it.' }], 'Creating it.', lastAssistantText([{ role: 'assistant', content: 'Creating it.' }])), [{ role: 'assistant', content: 'Creating it.' }])
 })

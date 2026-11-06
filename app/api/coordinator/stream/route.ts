@@ -4,7 +4,10 @@ import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { z } from 'zod'
 import { getRun } from 'workflow/api'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { COORDINATOR_LEASE_CHANNEL, nextNotification, openListener } from '@/lib/db/listen'
+import { hasPendingEvents } from '@/lib/coordinator/store'
+import { awaitTurnHolder, TURN_START_WAIT_MS } from '@/lib/coordinator/turn-holder'
 import { bots, coordinatorSessions } from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { coordinatorTextStream } from '@/lib/coordinator/stream-response'
@@ -33,8 +36,21 @@ async function handleGET(request: Request) {
     .where(and(eq(coordinatorSessions.userId, session.user.id), eq(coordinatorSessions.botId, botId))).limit(1)
   // The request's run id is only a version check. The authenticated chat supplies authority.
   const expected = params.get('runId')
-  const runId = chat?.leaseHolder
-  if (!coordinatorLeaseActive(chat) || !runId?.startsWith('wrun_') || expected && expected !== runId) return new Response(null, { status: 204 })
+  let runId = coordinatorLeaseActive(chat) ? chat?.leaseHolder : null
+  // Opened at send (`wait=1`): the message is in the inbox and its turn starts in a moment. Waiting here for it, woken
+  // by the turn taking the chat, shows its first words as they come instead of after the chat's next read.
+  if (!runId && !expected && params.get('wait') === '1') runId = await awaitTurnHolder(botId, Date.now() + TURN_START_WAIT_MS, {
+    read: async () => {
+      const [row] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil }).from(coordinatorSessions)
+        .where(and(eq(coordinatorSessions.userId, session.user.id), eq(coordinatorSessions.botId, botId))).limit(1)
+      if (coordinatorLeaseActive(row)) return { holder: row!.leaseHolder, waiting: true }
+      return { holder: null, waiting: await hasPendingEvents(session.user.id, botId) }
+    },
+    listen: () => openListener(pool, COORDINATOR_LEASE_CHANNEL),
+    next: (listener, payload, ms) => nextNotification(listener, payload, ms),
+    now: Date.now,
+  })
+  if (!runId?.startsWith('wrun_') || expected && expected !== runId) return new Response(null, { status: 204 })
   const fingerprints = await credentialChatFingerprints(session.user.id)
   const streamKey = createHash('sha256').update(JSON.stringify([runId, fingerprints])).digest('hex')
   const offset = z.coerce.number().int().min(0).max(1_000_000).safeParse(params.get('after') ?? 0)
@@ -72,6 +88,7 @@ async function handleGET(request: Request) {
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
     'X-Mikka-Stream-Key': streamKey,
+    'X-Mikka-Stream-Run': runId,
     'X-Mikka-Stream-Reset': offset.data > 0 && after === 0 ? '1' : '0',
   } })
 }
