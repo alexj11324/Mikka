@@ -236,7 +236,7 @@ function fullFixture(options = {}) {
     const proof = options.deployed ? await attestDeployedTarget({ env: selectedEnv, event: selectedEvent, fetchImpl, now: () => clock }) : undefined
     return runWorkflowMigrationProof({ env: selectedEnv, event: selectedEvent, fetchImpl, now: () => clock,
       wait: async ms => { clock += ms }, readerFactory,
-      attestation: proof && { ...proof, ...(options.attestationPatch ?? {}) } })
+      attestation: proof && { ...proof, ...options.attestationPatch } })
   } }
 }
 

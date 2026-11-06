@@ -359,10 +359,10 @@ export async function runProductionMcpProof({
     report.status = completed && !cleanupErrors.length && !report.cleanup.unresolvedResources ? 'passed' : 'failed'
     if (completed && report.status === 'failed') report.failureCode = 'cleanup_failed'
     cookies.clear(); token = undefined
-    const publicText = JSON.stringify(report)
-    if ([...secretValues].some(value => value.length >= 8 && publicText.includes(value))) {
-      return { version: 1, purpose: 'production-oauth-mcp', status: 'failed', failureCode: 'evidence_rejected' }
-    }
+  }
+  const publicText = JSON.stringify(report)
+  if ([...secretValues].some(value => value.length >= 8 && publicText.includes(value))) {
+    return { version: 1, purpose: 'production-oauth-mcp', status: 'failed', failureCode: 'evidence_rejected' }
   }
   return report
 }

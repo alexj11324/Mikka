@@ -310,13 +310,14 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
         report.cleanup.credentialRevoked = true
         // This is an actual read using the original repository transport and
         // credential; its 401 must be the client's typed session rejection.
+        let rejected = false
         try {
           await client.listRepos(deviceId ?? unusedDeviceId)
-          throw new ProofError('credential_still_admitted')
         } catch (cause) {
-          check(contract.rejected(cause), 'credential_still_admitted')
-          report.cleanup.oldCredentialRejected = true
+          rejected = contract.rejected(cause)
         }
+        check(rejected, 'credential_still_admitted')
+        report.cleanup.oldCredentialRejected = true
       } catch (cause) { error(cause) }
     }
     if (signedIn && beforeDevices && registrationAttempted) {

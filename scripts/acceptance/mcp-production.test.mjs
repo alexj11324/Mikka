@@ -227,7 +227,7 @@ test('catalogue failure remains a failure after successful cleanup; missing bind
   assert.equal(report.status, 'failed'); assert.equal(report.failureCode, 'catalogue_invalid')
   assert.equal(report.cleanup.clientAbsent, true)
   const noSecrets = environment()
-  Object.defineProperty(noSecrets, 'SMOKE_OWNER_PASSWORD', { get() { assert.fail('must not read credentials') } })
+  Object.defineProperty(noSecrets, 'SMOKE_OWNER_PASSWORD', { get() { return assert.fail('must not read credentials') } })
   const mismatch = fixture({ wrongMain: true }), rejected = await mismatch.run(noSecrets)
   assert.equal(rejected.failureCode, 'application_binding')
   assert.equal(mismatch.requests.some(row => row.origin === ORIGIN), false)
@@ -340,7 +340,7 @@ test('deployed MCP accepts a different real manual driver only after the immutab
 test('deployed MCP rejects a foreign attestation before reading owner credentials or registration', async () => {
   const f = fixture(), target = deployedFixture(f, environment())
   const attestation = { ...await target.proof(), driverRunId: 98 }
-  Object.defineProperty(target.env, 'SMOKE_OWNER_PASSWORD', { get() { assert.fail('unproven target must not read credentials') } })
+  Object.defineProperty(target.env, 'SMOKE_OWNER_PASSWORD', { get() { return assert.fail('unproven target must not read credentials') } })
   const report = await f.run(target.env, { ...target, attestation })
   assert.equal(report.status, 'failed')
   assert.equal(report.targetFailure.code, 'target_attestation')
