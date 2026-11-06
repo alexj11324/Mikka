@@ -1,0 +1,95 @@
+name: Issue 1415 production environment shape
+
+on:
+  push:
+    branches: [ops/issue1415-production-env-shape]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: issue1415-production-env-shape
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'alexj11324/Mikka' &&
+      github.repository_owner == 'alexj11324' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/issue1415-production-env-shape' &&
+      github.event.deleted == false &&
+      github.event.after == github.sha
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    env:
+      APPLICATION_SHA: ce512e77f01589f56729c31d00750c0203e46ed9
+      ENV_SHAPE_DEPENDENCIES: ${{ runner.temp }}/issue1415-env-shape-deps
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Install only the original pinned environment parsers
+        run: >-
+          npm install --prefix "$ENV_SHAPE_DEPENDENCIES"
+          --ignore-scripts --no-audit --no-fund --package-lock=false
+          dotenv@4.0.0 @next/env@16.4.1
+      - name: Verify the synthetic parser, precedence and closed-report guards
+        run: node scripts/ops/production-env-shape.mjs --self-test
+      - name: Bind the unchanged decoder source and current main before reading credentials
+        run: node scripts/ops/production-env-shape.mjs --check-context
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Read the existing normal pull credential only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read the exact application database source value only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Read the exact workspace database source value only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Observe only production value shapes through the real decoding paths
+        run: node scripts/ops/production-env-shape.mjs --diagnose
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Preserve only the closed shape report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1415-production-env-shape-${{ github.run_id }}
+          path: production-env-shape-report/report.json
+          if-no-files-found: ignore
+          retention-days: 7
