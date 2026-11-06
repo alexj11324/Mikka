@@ -1,4 +1,4 @@
-name: Issue 1505 historical exact template recovery
+name: Issue 1505 completed runtime exact template recovery
 on:
   push:
     branches: [ops/1505-runtime-diagnostic]
@@ -10,6 +10,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -26,13 +27,15 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Recover only the 25 templates from immutable issue-owned creation records
+      - name: Recover exact IDs only after both failed release runs completed
         timeout-minutes: 8
-        run: python3 scripts/e2b/historical-template-recovery.py
+        run: python3 scripts/e2b/completed-template-recovery.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: e2b-historical-template-recovery
-          path: ${{ runner.temp }}/historical-template-recovery.json
+          name: e2b-completed-template-recovery
+          path: ${{ runner.temp }}/completed-template-recovery.json
           if-no-files-found: error
           retention-days: 7
