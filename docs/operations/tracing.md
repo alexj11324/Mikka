@@ -36,6 +36,20 @@ Every span has `service.name=mikka-web` and `deployment.environment`
 | `mikka.app.version` | The iOS app's version (`1.2.3`), on `mobile` spans only |
 | `error.type`, `mikka.error.code`, `mikka.error.detail` | On a failed request or job: the error's class name, and the code and detail of the first coded error in its cause chain (`@mikka/protocol/tracing`). Never the message |
 
+Each call to the default model (Mikka 默认, `lib/abuse/zerocat.ts`) also writes
+one `model.route` span, and the same values as a `default_model_route` log line:
+
+| Attribute | Meaning |
+| --- | --- |
+| `mikka.model.id` | `deepseek/deepseek-v4.1-flash` |
+| `mikka.model.route` | `zerocat` (the main route) or `gateway` (the fallback) |
+| `mikka.model.fallback_reason` | On `gateway` only: `unconfigured`, `endpoint_unexpected`, `route_denied`, `timeout`, `rate_limited`, `quota`, `server_error`, `network`, `request_rejected` or `stream_error` |
+| `mikka.model.zerocat_status` | ZeroCat's HTTP status, when the failure had one |
+| `mikka.model.gateway_credential` | On `gateway`: `system` (Vercel bills) or `byok` (our own provider key), from Gateway's routing receipt |
+
+Count fallbacks with `SELECT properties.mikka.model.fallback_reason, count()` over
+`model.route` spans where `mikka.model.route = 'gateway'`.
+
 Database spans also have:
 
 | Attribute | Meaning |

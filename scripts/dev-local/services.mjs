@@ -4,6 +4,7 @@
 //
 //   /gateway/v*/ai/language-model  Vercel AI Gateway model (scripted, no LLM)
 //   /gateway/v1/decisions          AI Gateway Decision API (first choice / 0.5)
+//   /zerocat/v1/chat/completions   ZeroCat, Mikka 默认's model (the same script)
 //   /resend/emails                 Resend send-email → local outbox
 //   /mail, /mail.json              the outbox
 //
@@ -14,6 +15,8 @@ import { MVP_DECISION_KEY } from '../../tests/mvp/transport.mjs'
 
 /** The placeholder for RESEND_API_KEY when the developer set none. Not a credential. */
 export const LOCAL_RESEND_KEY = 'mikka-local-outbox'
+/** The placeholder for ZEROCAT_API_KEY when the developer set none. Not a credential. */
+export const LOCAL_ZEROCAT_KEY = 'mikka-local-zerocat'
 /** The placeholder for CRON_SECRET when the developer set none. Not a credential. */
 export const LOCAL_CRON_SECRET = 'mikka-local-cron'
 const MAX_BODY = 16 * 1024 * 1024
@@ -80,6 +83,35 @@ export function streamParts(answer, modelId) {
   return parts
 }
 
+/** An OpenAI chat-completions request read as the scripted model's prompt. */
+export function chatCompletionPrompt(body) {
+  const names = new Map()
+  for (const message of body.messages ?? []) for (const call of message.tool_calls ?? []) names.set(call.id, call.function?.name)
+  const prompt = (body.messages ?? []).map(message => message.role === 'tool'
+    ? { role: 'tool', content: [{ type: 'tool-result', toolName: names.get(message.tool_call_id) ?? 'tool', output: { value: message.content } }] }
+    : { role: message.role, content: message.content })
+  return { prompt, tools: (body.tools ?? []).map(tool => ({ name: tool.function?.name })) }
+}
+
+/** The scripted answer as an OpenAI chat completion, or its server-sent chunks. */
+export function chatCompletion(answer, model, stream) {
+  const id = `local-${randomUUID()}`, created = Math.floor(Date.now() / 1000)
+  const text = answer.content.filter(part => part.type === 'text').map(part => part.text).join('')
+  const calls = answer.content.filter(part => part.type === 'tool-call')
+    .map((part, index) => ({ index, id: part.toolCallId, type: 'function', function: { name: part.toolName, arguments: part.input } }))
+  const finish = answer.finishReason === 'tool-calls' ? 'tool_calls' : 'stop'
+  const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+  if (!stream) return { id, object: 'chat.completion', created, model, usage,
+    choices: [{ index: 0, finish_reason: finish, message: { role: 'assistant', content: text || null, ...(calls.length ? { tool_calls: calls } : {}) } }] }
+  const chunk = (delta, finishReason = null, extra = {}) => ({ id, object: 'chat.completion.chunk', created, model, choices: [{ index: 0, delta, finish_reason: finishReason }], ...extra })
+  return [
+    chunk({ role: 'assistant' }),
+    ...(text.match(/[\s\S]{1,24}/g) ?? []).map(content => chunk({ content })),
+    ...(calls.length ? [chunk({ tool_calls: calls })] : []),
+    chunk({}, finish, { usage }),
+  ]
+}
+
 /** Decision API answers: the first choice, or probability 0.5. */
 export function localDecision(input) {
   return {
@@ -132,6 +164,16 @@ export function localServiceRoutes({ log = console.info, origin = 'http://127.0.
         outbox.push(mail)
         log(`mail "${mail.subject}" to ${mail.to.join(', ')}: ${origin}/mail`)
         return json({ id: mail.id })
+      }
+      if (url.pathname === '/zerocat/v1/chat/completions' && request.method === 'POST') {
+        if (bearer !== LOCAL_ZEROCAT_KEY) return json({ error: { message: 'unknown key', type: 'authentication_error' } }, 401)
+        const body = await readJson(request)
+        const answer = localModelAnswer(chatCompletionPrompt(body))
+        if (!body.stream) return json(chatCompletion(answer, body.model, false))
+        response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+        for (const part of chatCompletion(answer, body.model, true)) response.write(`data: ${JSON.stringify(part)}\n\n`)
+        response.end('data: [DONE]\n\n')
+        return true
       }
       if (!url.pathname.startsWith('/gateway/')) return false
       if (bearer !== MVP_DECISION_KEY) return json({ error: { message: 'unknown key', type: 'authentication_error' } }, 401)

@@ -3,6 +3,8 @@ import { z } from 'zod'
 
 /** The installed Gateway SDK's server-owned transport, not a client proxy URL. */
 export const GATEWAY_MODEL_ENDPOINT = 'https://ai-gateway.vercel.sh/v4/ai'
+/** ZeroCat's OpenAI-compatible API, which serves the default model (lib/abuse/zerocat.ts). */
+export const ZEROCAT_MODEL_ENDPOINT = 'https://zero.cat/v1'
 // These are the existing private Go worker's fixed destinations, not supplied
 // by a binding, CLI or HTTP caller. Neither transport follows redirects.
 export const CODEX_SUBSCRIPTION_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses'
@@ -24,6 +26,9 @@ export const modelAdmissionPolicySchema = z.strictObject({
     // One physical serving route: no hidden provider fallback inside Gateway.
     servingProviders: z.array(providerId).length(1),
     ...routeScope,
+  }), z.strictObject({
+    provider: z.literal('zerocat'), endpoint: z.literal(ZEROCAT_MODEL_ENDPOINT),
+    model: modelId, servingProviders: z.tuple([z.literal('zerocat')]), ...routeScope,
   }), z.strictObject({
     provider: z.literal('openai-subscription'), endpoint: z.literal(CODEX_SUBSCRIPTION_ENDPOINT),
     model: subscriptionModelId, servingProviders: z.tuple([z.literal('openai')]), ...routeScope,

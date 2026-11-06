@@ -7,7 +7,7 @@ import { realCliMembershipGuard, type CliMembershipGuard } from '@/lib/agent-too
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { admitModelRoute, GATEWAY_MODEL_ENDPOINT, ModelAdmissionError, modelAdmissionRevision,
-  parseModelAdmissionPolicy, subscriptionModelRoute, type GatewayAdmission } from './contract'
+  parseModelAdmissionPolicy, subscriptionModelRoute, ZEROCAT_MODEL_ENDPOINT, type GatewayAdmission } from './contract'
 
 export interface ModelAdmissionScope { workspaceId: string; ownerId: string }
 export class ModelAdmissionStore {
@@ -73,6 +73,11 @@ export class ModelAdmissionStore {
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<(GatewayAdmission & { revision: string }) | null> {
     const admission = await this.admit(scope, model, { provider: 'vercel-gateway', endpoint }, options)
     return admission ? { ...admission, endpoint: GATEWAY_MODEL_ENDPOINT } : null
+  }
+  /** The default model's direct ZeroCat route (lib/abuse/zerocat.ts). */
+  zeroCat(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string = ZEROCAT_MODEL_ENDPOINT,
+    options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
+    return this.admit(scope, model, { provider: 'zerocat', endpoint }, options)
   }
   subscription(scope: { workspaceId: string; ownerId?: string }, model: string, route: string,
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {

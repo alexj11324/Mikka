@@ -17,7 +17,7 @@ import { localSecretsKey } from './dev-local/secrets-key.mjs'
 import { refreshQueue } from './dev-local/refresh-queue.mjs'
 import { stopOwnedServices } from './dev-local/shutdown.mjs'
 import { prepareLocalHarnesses } from './dev-local/prepare-harnesses.mjs'
-import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY } from './dev-local/services.mjs'
+import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './dev-local/services.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
 import { MVP_SERVICES, REPOSITORY } from '../tests/mvp/isolated-env.mjs'
 import { MVP_DECISION_KEY } from '../tests/mvp/transport.mjs'
@@ -118,6 +118,9 @@ watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port
     // A real key keeps the real service; without one the preload uses the local substitute.
     AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || MVP_DECISION_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY || LOCAL_RESEND_KEY,
+    // Mikka 默认 calls ZeroCat directly (lib/abuse/zerocat.ts); its fixed endpoint either way.
+    ZEROCAT_API_KEY: process.env.ZEROCAT_API_KEY || LOCAL_ZEROCAT_KEY,
+    ZEROCAT_BASE_URL: process.env.ZEROCAT_BASE_URL || 'https://zero.cat/v1',
     CRON_SECRET: cronSecret,
     // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
     WORKSPACE_SECRETS_KEY: secretsKey,
