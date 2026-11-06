@@ -55,7 +55,7 @@ test('one real question (the blank step dropped) answers on the first click', as
   await expect(chat.getByRole('button', { name: '提交回答并继续' })).toHaveCount(0)
   await card.getByRole('button', { name: /先列计划/ }).click()
   await expect(chat.getByText('先列计划', { exact: true }).last()).toBeVisible()
-  await expect(card.getByRole('button', { name: /先列计划/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(card.locator('[data-choice="picked"]')).toHaveText(/先列计划/)
   await shoot(page, testInfo, 'question-single')
 })
 
