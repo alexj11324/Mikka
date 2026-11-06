@@ -1,0 +1,63 @@
+name: Issue 1415 production database target inspection
+
+on:
+  push:
+    branches:
+      - ops/issue1415-production-database-targets
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue1415-production-database-targets
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: >-
+      github.repository == 'alexj11324/Mikka' &&
+      github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/issue1415-production-database-targets' &&
+      github.event.deleted == false
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the source-only inspector before the platform credential
+        run: node --test scripts/ops/production-database-targets.test.mjs
+      - name: Read only the existing platform team token
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Inspect only the two production database targets
+        run: node scripts/ops/production-database-targets.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Retain only the sanitized target report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1415-production-database-targets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: production-database-targets-report/report.json
+          retention-days: 14
+          if-no-files-found: error
