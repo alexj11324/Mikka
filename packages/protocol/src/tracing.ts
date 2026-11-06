@@ -36,7 +36,14 @@ export type ErrorAttributes = { "error.type": string; "mikka.error.code"?: strin
  * can echo user input, stderr or a credential.
  */
 export function safeErrorAttributes(error: unknown): ErrorAttributes {
-  const chain = causeFields(error)
+  let chain: ReturnType<typeof causeFields>
+  try {
+    chain = causeFields(error)
+  } catch {
+    // Provider errors can expose throwing getters. Diagnostics must preserve
+    // the original failure, never export or throw a new inspection error.
+    return { "error.type": "unknown" }
+  }
   const coded = chain.find(field => typeof field.code === "string" && CODE.test(field.code))
   return {
     "error.type": chain[0]?.name ?? "unknown",
