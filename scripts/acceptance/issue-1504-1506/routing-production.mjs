@@ -6,8 +6,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { decode, productionSession } from './production-session.mjs'
 
-export const ACCEPTANCE_SHA = 'e8dd7a1265027a0477819dde1a80178e7bcdb1ae'
-const WORKSPACE_REF = '43b16784a008'
+export const ACCEPTANCE_SHA = '2cba2a841ab770692559f1e5e18a0a57cff99952'
+const WORKSPACE_REF = 'e917cd887945'
 const AUTHORIZED_CONNECTIONS = new Set([
   'd1751637b97e74c21b09cef6f72c390dc87a142c910940464430c3c71e5363ca',
   '04903b6d2ad4d60a579485ef3e0a705a5a7283cf41414f6a044dbd2074f7e37c',
