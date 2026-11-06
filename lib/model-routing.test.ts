@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import type { DecisionAnswer } from './coordinator/decision'
-import { escalateModelRouting, MODEL_ROUTING_EFFORTS, modelTier, routingDecisionQuestions, selectModelRouting, supportedModelEfforts, type ModelRoutingCandidate, type ModelRoutingSnapshot } from './model-routing.ts'
+import { escalateModelRouting, MODEL_ROUTING_EFFORTS, modelRoutingDiagnostics, modelTier, routingDecisionQuestions, selectModelRouting, supportedModelEfforts, type ModelRoutingCandidate, type ModelRoutingSnapshot } from './model-routing.ts'
 
 const candidate = (id: string, model: string, harness: ModelRoutingCandidate['harness'], position: number): ModelRoutingCandidate => ({
   id, model, harness, tier: modelTier(model), position, efforts: supportedModelEfforts(model, harness),
@@ -14,8 +14,8 @@ const luna = candidate('candidate:3', 'gpt-6-luna', 'codex', 3)
 const sol = candidate('candidate:4', 'gpt-6.1-sol', 'codex', 4)
 const catalog = [strongest, light, standard, luna, sol]
 type ChoiceAnswer = Extract<DecisionAnswer, { type: 'choice' }>
-const answers = (model = light.id, difficulty = 'easy', effort = 'low', reason = 'difficulty_fit') => new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
-  Object.entries({ difficulty, model, effort, reason }).map(([name, choice]) => [name, { type: 'choice', name, choice, confidence: .9 }]))
+const answers = (model = light.id, difficulty = 'easy', effort = 'low') => new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
+  Object.entries({ difficulty, model, effort }).map(([name, choice]) => [name, { type: 'choice', name, choice, confidence: .9 }]))
 const withAnswer = (name: string, update: Partial<ChoiceAnswer>) => {
   const result = answers()
   result.set(name, { ...result.get(name), ...update } as ChoiceAnswer)
@@ -51,7 +51,7 @@ test('offered efforts exist in the retained native capability reports and run pr
 test('Decision questions enumerate choices and never serialize a candidate credential', () => {
   const extra = { ...light, source: { connectionId: 'private-connection' }, ownerId: 'private-owner', deviceId: 'private-device' }
   const questions = routingDecisionQuestions([extra, sol])
-  assert.deepEqual(questions.map(question => question.name), ['difficulty', 'model', 'effort', 'reason'])
+  assert.deepEqual(questions.map(question => question.name), ['difficulty', 'model', 'effort'])
   assert.ok(questions.every(question => question.type === 'choice'))
   const modelQuestion = questions[1]
   assert.equal(modelQuestion.type, 'choice')
@@ -126,20 +126,21 @@ test('tier and effort metadata never construct selectable models outside the hos
     harness: reported.harness, tier: reported.tier, reason: 'difficulty_fit' }), null)
 })
 
-test('effort must be supported by the selected model, not merely another candidate', () => {
+test('an effort the selected model does not support keeps the model with its native default', () => {
   const restricted = { ...light, efforts: ['low'] as const }
   const unknown = candidate('candidate:5', 'new-provider-model', 'codex', 5)
-  for (const answer of [answers(light.id, 'easy', 'max'), answers(light.id, 'easy', 'ultra'), answers(unknown.id, 'easy', 'low')]) {
+  for (const [answer, id] of [[answers(light.id, 'easy', 'max'), light.id], [answers(light.id, 'easy', 'ultra'), light.id], [answers(unknown.id, 'easy', 'low'), unknown.id]] as const) {
     const result = selectModelRouting([strongest, restricted, unknown], answer)!
-    assert.equal(result.id, strongest.id)
-    assert.equal(result.snapshot.reason, 'invalid_answer')
-    assert.equal(result.snapshot.difficulty, 'unknown')
+    assert.equal(result.id, id)
+    assert.equal(result.snapshot.reason, 'difficulty_fit')
+    assert.equal(result.snapshot.difficulty, 'easy')
     assert.ok(!Object.hasOwn(result.snapshot, 'effort'))
   }
 })
 
-for (const name of ['difficulty', 'model', 'effort', 'reason']) test(`confidence checks cover ${name}, including malformed numbers`, () => {
+for (const name of ['difficulty', 'model']) test(`low ${name} confidence abandons routing, including malformed numbers`, () => {
   assert.equal(selectModelRouting(catalog, withAnswer(name, { confidence: .549 }))?.snapshot.reason, 'low_confidence')
+  assert.equal(selectModelRouting(catalog, withAnswer(name, { confidence: .549 }))?.snapshot.difficulty, 'unknown')
   assert.equal(selectModelRouting(catalog, withAnswer(name, { confidence: .55 }))?.id, light.id)
   assert.equal(selectModelRouting(catalog, withAnswer(name, { confidence: undefined }))?.id, light.id)
   for (const confidence of [Number.NaN, Infinity, -Infinity, -.1, 1.01]) {
@@ -150,12 +151,51 @@ for (const name of ['difficulty', 'model', 'effort', 'reason']) test(`confidence
   }
 })
 
+test('low effort confidence keeps the routed model and uses its default effort', () => {
+  for (const confidence of [0, .2, .549]) {
+    const result = selectModelRouting(catalog, withAnswer('effort', { confidence }))!
+    assert.deepEqual(result, { id: light.id, snapshot: { version: 1, difficulty: 'easy', model: light.model, harness: light.harness, tier: 'light', reason: 'difficulty_fit' } })
+  }
+  assert.equal(selectModelRouting(catalog, withAnswer('effort', { confidence: .55 }))?.snapshot.effort, 'low')
+  for (const confidence of [Number.NaN, 1.01]) assert.equal(selectModelRouting(catalog, withAnswer('effort', { confidence }))?.snapshot.reason, 'invalid_answer')
+})
+
+test('confidence combinations: only difficulty or model can abandon the judgement', () => {
+  const low = .3, high = .9
+  for (const difficulty of [low, high]) for (const model of [low, high]) for (const effort of [low, high]) {
+    const answer = answers(sol.id, 'hard', 'high')
+    for (const [name, confidence] of Object.entries({ difficulty, model, effort })) answer.set(name, { ...answer.get(name), confidence } as ChoiceAnswer)
+    const result = selectModelRouting(catalog, answer)!
+    const label = JSON.stringify({ difficulty, model, effort })
+    if (difficulty === low || model === low) {
+      assert.deepEqual([result.id, result.snapshot.reason, result.snapshot.difficulty], [strongest.id, 'low_confidence', 'unknown'], label)
+    } else {
+      assert.deepEqual([result.id, result.snapshot.reason, result.snapshot.difficulty, result.snapshot.effort], [sol.id, 'difficulty_fit', 'hard', effort === high ? 'high' : undefined], label)
+    }
+  }
+})
+
+test('diagnostics carry per-field confidence and the outcome, never candidate IDs or text', () => {
+  const answer = withAnswer('effort', { confidence: .31 })
+  const selected = selectModelRouting(catalog, answer)
+  const diagnostics = modelRoutingDiagnostics(catalog, answer, selected)
+  assert.deepEqual(diagnostics, { difficulty: { choice: 'easy', confidence: .9 }, model: { tier: 'light', confidence: .9 },
+    effort: { choice: 'low', confidence: .31, applied: false }, reason: 'difficulty_fit' })
+  const odd = answers('none', 'I think hard', 'ultra')
+  const oddDiagnostics = modelRoutingDiagnostics(catalog, odd, selectModelRouting(catalog, odd))
+  assert.deepEqual(oddDiagnostics, { difficulty: { choice: 'invalid', confidence: .9 }, model: { tier: 'none', confidence: .9 },
+    effort: { choice: 'invalid', confidence: .9, applied: false }, reason: 'no_selection' })
+  assert.ok(!JSON.stringify(oddDiagnostics).includes('candidate:'))
+  assert.deepEqual(modelRoutingDiagnostics(catalog, null, selectModelRouting(catalog, null)), { reason: 'decision_unavailable' })
+})
+
 test('none, refusals, missing answers and unrecognized values retain list order', () => {
-  assert.equal(selectModelRouting(catalog, answers('none', 'easy', 'default', 'no_selection'))?.snapshot.reason, 'no_selection')
-  assert.equal(selectModelRouting(catalog, answers(light.id, 'easy', 'low', 'no_selection'))?.snapshot.reason, 'no_selection')
-  const missing = answers(); missing.delete('effort')
+  assert.equal(selectModelRouting(catalog, answers('none', 'easy', 'default'))?.snapshot.reason, 'no_selection')
+  const missingEffort = answers(); missingEffort.delete('effort')
+  assert.deepEqual([selectModelRouting(catalog, missingEffort)?.id, selectModelRouting(catalog, missingEffort)?.snapshot.effort], [light.id, undefined])
+  const missing = answers(); missing.delete('difficulty')
   const wrongType = answers(); wrongType.set('model', { name: 'model', type: 'predicate', probability: .99 })
-  for (const answer of [missing, wrongType, answers(light.id, 'impossible'), answers(light.id, 'easy', 'low', 'I think this fits'), withAnswer('model', { name: 'another-question' })]) {
+  for (const answer of [missing, wrongType, answers(light.id, 'impossible'), withAnswer('model', { name: 'another-question' })]) {
     const result = selectModelRouting(catalog, answer)!
     assert.equal(result.id, strongest.id)
     assert.equal(result.snapshot.reason, 'invalid_answer')

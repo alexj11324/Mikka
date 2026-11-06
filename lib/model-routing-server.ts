@@ -5,7 +5,7 @@ import type { OrderScope } from './model-order'
 import { hostedBillingScope } from './abuse/context'
 import { invokeDecision } from './coordinator/decide'
 import { maskFactoryNote } from './factory/note-mask'
-import { modelTier, supportedModelEfforts, routingDecisionQuestions, selectModelRouting, escalateModelRouting, type ModelRoutingSnapshot } from './model-routing'
+import { modelTier, supportedModelEfforts, routingDecisionQuestions, selectModelRouting, escalateModelRouting, modelRoutingDiagnostics, type ModelRoutingSnapshot } from './model-routing'
 
 /** Supplied by the dispatch host, never accepted as a model/tool permission. */
 export interface ModelRoutingContext {
@@ -59,5 +59,9 @@ export async function routeModelCandidates(pool: Pool, scope: OrderScope, entrie
   try { result = await hostedBillingScope.run({ ownerId: scope.ownerId, workspaceId: scope.workspaceId },
     () => decision('task-model-routing', input, routingDecisionQuestions(eligible))) }
   catch { /* The frozen reason records an unavailable decision without provider text. */ }
-  return withExplicitEffort(selectModelRouting(eligible, result?.answers ?? null))
+  const answers = result?.answers ?? null
+  const selected = selectModelRouting(eligible, answers)
+  // Per-field confidence and the outcome only: no task, note or candidate text.
+  console.info(JSON.stringify({ event: 'model_routing_decision', ...modelRoutingDiagnostics(eligible, answers, selected) }))
+  return withExplicitEffort(selected)
 }

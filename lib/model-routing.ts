@@ -96,10 +96,6 @@ export function routingDecisionQuestions(catalog: readonly ModelRoutingCandidate
       { value: 'default', description: 'Preserve the native default; send no effort override.' },
       ...MODEL_ROUTING_EFFORTS.filter(effort => catalog.some(candidate => candidate.efforts.includes(effort))).map(value => ({ value })),
     ] },
-    { type: 'choice', name: 'reason', instructions: 'Select difficulty_fit when the candidate fits the estimated difficulty, or no_selection when there is no confident model choice.', choices: [
-      { value: 'difficulty_fit', description: 'This model and effort fit the task difficulty.' },
-      { value: 'no_selection', description: 'No confident model selection.' },
-    ] },
   ]
 }
 
@@ -110,6 +106,36 @@ const selection = (candidate: ModelRoutingCandidate, difficulty: ModelRoutingSna
   snapshot: { version: 1, difficulty, model: candidate.model, harness: candidate.harness, tier: candidate.tier, ...(effort ? { effort } : {}), reason },
 })
 
+/** Below this, difficulty or model is too uncertain to override the person's
+ * list order. Effort is secondary: an uncertain or unsupported effort keeps
+ * the selected model and sends no override (the model's native default). */
+export const ROUTING_MIN_CONFIDENCE = 0.55
+const ROUTING_QUESTIONS = ['difficulty', 'model', 'effort'] as const
+type ChoiceAnswer = Extract<DecisionAnswer, { type: 'choice' }>
+
+/** Numbers and closed-set choices only, for logs: never task text. The model
+ * choice is projected to its tier, since candidate IDs are per-call handles. */
+export interface ModelRoutingDiagnostics {
+  difficulty?: { choice: string; confidence?: number }
+  model?: { tier: ModelRoutingTier | 'none' | 'invalid'; confidence?: number }
+  effort?: { choice: string; confidence?: number; applied: boolean }
+  reason: RoutingReason
+}
+export function modelRoutingDiagnostics(catalog: readonly ModelRoutingCandidate[], answers: RoutingAnswers, selected: ModelRoutingSelection | null): ModelRoutingDiagnostics {
+  const choice = (name: string) => { const answer = answers?.get(name); return answer?.type === 'choice' ? answer : undefined }
+  const closed = (value: string, allowed: readonly string[]) => allowed.includes(value) ? value : 'invalid'
+  const confidence = (answer: ChoiceAnswer) => answer.confidence !== undefined && Number.isFinite(answer.confidence) ? { confidence: answer.confidence } : {}
+  const [difficulty, model, effort] = ROUTING_QUESTIONS.map(choice)
+  const tier = model && (model.choice === 'none' ? 'none' : catalog.find(candidate => candidate.id === model.choice)?.tier ?? 'invalid')
+  return {
+    ...(difficulty ? { difficulty: { choice: closed(difficulty.choice, MODEL_ROUTING_DIFFICULTIES), ...confidence(difficulty) } } : {}),
+    ...(model && tier ? { model: { tier, ...confidence(model) } } : {}),
+    ...(effort ? { effort: { choice: closed(effort.choice, ['default', ...MODEL_ROUTING_EFFORTS]), ...confidence(effort),
+      applied: selected?.snapshot.reason === 'difficulty_fit' && selected.snapshot.effort === effort.choice } } : {}),
+    reason: selected?.snapshot.reason ?? 'no_selection',
+  }
+}
+
 /** Host-side check after the Decision transport: exact candidate, bounded confidence,
  * and the selected model's efforts. Failure preserves the person's existing order. */
 export function selectModelRouting(catalog: readonly ModelRoutingCandidate[], answers: RoutingAnswers, options: { enabled?: boolean; fallbackReason?: FallbackReason } = {}): ModelRoutingSelection | null {
@@ -118,17 +144,19 @@ export function selectModelRouting(catalog: readonly ModelRoutingCandidate[], an
   const fallback = (reason: FallbackReason) => selection(first, 'unknown', reason)
   if (options.enabled === false) return fallback('list_order')
   if (!answers) return fallback(options.fallbackReason ?? 'decision_unavailable')
-  const names = ['difficulty', 'model', 'effort', 'reason'] as const
-  const choices = names.map(name => answers.get(name))
-  if (choices.some((answer, index) => answer?.type !== 'choice' || answer.name !== names[index])) return fallback('invalid_answer')
-  const [difficulty, model, effort, reason] = choices as Extract<DecisionAnswer, { type: 'choice' }>[]
-  if (choices.some(answer => answer?.type === 'choice' && answer.confidence !== undefined && (!Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1))) return fallback('invalid_answer')
-  if (choices.some(answer => answer?.type === 'choice' && answer.confidence !== undefined && answer.confidence < 0.55)) return fallback('low_confidence')
-  if (model.choice === 'none' || reason.choice === 'no_selection') return fallback('no_selection')
+  const difficulty = answers.get('difficulty'), model = answers.get('model'), effortAnswer = answers.get('effort')
+  if (difficulty?.type !== 'choice' || difficulty.name !== 'difficulty' || model?.type !== 'choice' || model.name !== 'model') return fallback('invalid_answer')
+  const effort = effortAnswer?.type === 'choice' && effortAnswer.name === 'effort' ? effortAnswer : undefined
+  const malformed = (answer: ChoiceAnswer | undefined) => answer?.confidence !== undefined && (!Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1)
+  if ([difficulty, model, effort].some(malformed)) return fallback('invalid_answer')
+  const uncertain = (answer: ChoiceAnswer) => answer.confidence !== undefined && answer.confidence < ROUTING_MIN_CONFIDENCE
+  if (uncertain(difficulty) || uncertain(model)) return fallback('low_confidence')
+  if (model.choice === 'none') return fallback('no_selection')
   const candidate = catalog.find(candidate => candidate.id === model.choice)
-  if (!candidate || !(MODEL_ROUTING_DIFFICULTIES as readonly string[]).includes(difficulty.choice) || reason.choice !== 'difficulty_fit') return fallback('invalid_answer')
-  if (effort.choice !== 'default' && !candidate.efforts.includes(effort.choice as ModelRoutingEffort)) return fallback('invalid_answer')
-  return selection(candidate, difficulty.choice as ModelRoutingDifficulty, 'difficulty_fit', effort.choice === 'default' ? undefined : effort.choice as ModelRoutingEffort)
+  if (!candidate || !(MODEL_ROUTING_DIFFICULTIES as readonly string[]).includes(difficulty.choice)) return fallback('invalid_answer')
+  const chosenEffort = effort && !uncertain(effort) && candidate.efforts.includes(effort.choice as ModelRoutingEffort)
+    ? effort.choice as ModelRoutingEffort : undefined
+  return selection(candidate, difficulty.choice as ModelRoutingDifficulty, 'difficulty_fit', chosenEffort)
 }
 
 /** The existing retry/review path calls this once. It never starts another loop,

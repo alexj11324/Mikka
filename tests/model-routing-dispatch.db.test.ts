@@ -24,7 +24,7 @@ function decisionFixture(model: string, difficulty = 'easy', effort = 'low', opt
     const choice = options.choice ?? body.candidates.find(candidate => candidate.model === model)?.id ?? 'not-a-candidate'
     return {
       answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
-        Object.entries({ difficulty, model: choice, effort, reason: choice === 'none' ? 'no_selection' : 'difficulty_fit' })
+        Object.entries({ difficulty, model: choice, effort })
           .map(([name, value]) => [name, { name, type: 'choice', choice: value, confidence: options.confidence ?? .95 }])),
       execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-model-routing',
         startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' },
