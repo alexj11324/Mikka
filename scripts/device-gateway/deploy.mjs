@@ -7,7 +7,8 @@ export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const ALIAS = 'app.aspectlylabs.com'
 export const WORKER = 'mikka-device-gateway'
-export const RELEASE_PATHS = ['cloudflare/device-gateway', 'lib/device-gateway-ticket.ts', 'lib/device-presence.ts',
+export const RELEASE_PATHS = ['cloudflare/device-gateway', 'lib/device-gateway-ticket.ts', 'lib/device-presence.ts', 'lib/device-presence-grant.ts',
+  'lib/live/presence.ts', 'lib/live/events.ts', 'lib/live/scope.ts',
   'lib/device-gateway-client.ts', 'lib/device-gateway-notify.ts', 'scripts/device-gateway', '.github/workflows/device-gateway.yml']
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const CONFIG = 'cloudflare/device-gateway/wrangler.jsonc'
