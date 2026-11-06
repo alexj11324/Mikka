@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { AgentToolApprovalStore, ApprovalUnavailable } from './store'
 import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
 import { acquireWorkspaceMembership } from '../workspace-membership-guard'
@@ -13,6 +14,7 @@ if (!url) throw new Error('An isolated local approval_e2e database is required')
 const target = new URL(url)
 if (!['localhost','127.0.0.1','[::1]'].includes(target.hostname) || !/^\/approval_e2e(?:_[a-f0-9]{24})?$/.test(target.pathname)) throw new Error('Refusing non-isolated database')
 const pool = new Pool({ connectionString: url })
+observePoolCommits(pool)
 const store = new AgentToolApprovalStore(pool)
 const runId = randomUUID(), deviceId = randomUUID(), actor = { userId: 'synthetic-owner', deviceId }
 let initialRevision = ''
@@ -217,7 +219,7 @@ test('policy changes and live tool checks share run-before-policy lock order', {
 })
 
 test('human control preserves the existing lease, then expires through the existing liveness poll', async () => {
-  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text, ADD COLUMN "updatedAt" timestamptz`)
+  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text`)
   await pool.query(`CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text, "workspaceId" uuid);
     CREATE TABLE bot_desktops ("botId" uuid, "ownerId" text, "workspaceId" uuid, control text, "controlUntil" timestamptz)`)
   const bot = randomUUID(), workspace = randomUUID()

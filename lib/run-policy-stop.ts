@@ -28,7 +28,7 @@ export function runPolicyStopSQL(scope: RunPolicyStopScope): SQL {
     case 'team': case 'project': where = sql`r.cli_policy_hierarchy->>${scope.kind === 'team' ? 'teamId' : 'projectId'}=${scope.scopeId}
       ${scope.ownerId ? sql`AND r."userId"=${scope.ownerId}` : sql``}`; break
     case 'task': where = sql`r."issueId"=${scope.issueId}::uuid`; break
-    case 'tasks': where = sql`r."issueId"=ANY(${scope.issueIds}::uuid[])`; break
+    case 'tasks': where = sql`r."issueId"=ANY(${sql.param(scope.issueIds)}::uuid[])`; break
   }
   return sql`WITH affected AS MATERIALIZED (
     SELECT r.id,r."deviceId",r."machineAuthority" FROM agent_runs r

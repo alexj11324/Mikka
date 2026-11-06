@@ -8,6 +8,7 @@ import { z } from 'zod'
 import test from 'node:test'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { readCliRunPolicy, readCliAgentPolicy, lockCliTaskScope, providerContinuationPolicy } from './policy-store'
 import { readIssueMetadata } from '../issue-metadata'
 import { setCliPolicy, setCliAgentPolicy } from './policy-settings'
@@ -35,6 +36,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   const priorSecret = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET = 'isolated-policy-distribution-test-fixture-only'
   const pool = new Pool({ connectionString: target })
+  observePoolCommits(pool)
   const { workspacePool } = await import('../workspace-db')
   const { pool: appPool } = await import('../db')
   const tokenId = randomUUID(), token = randomUUID()
