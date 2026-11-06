@@ -27,7 +27,7 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import { ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 
 /** Where a decision draws into the reader: its actions in the header, its report above the document (P1). */
-export interface ArtifactDecisionSlots { actions: HTMLElement | null; lead: HTMLElement | null }
+export interface ArtifactDecisionSlots { actions: HTMLElement | null; lead: HTMLElement | null; /** The report banner's action area, once the report lead has drawn one. */ banner?: HTMLElement | null }
 
 /** What the reader hands the chat beside it. */
 export interface ArtifactChatSlot {
@@ -45,7 +45,7 @@ const versionPath = (id: string, version: number, file: 'frame' | 'download') =>
  * reads and answers in one place. Versions open from the pill by the title;
  * an older version shows its changes against the newest.
  */
-export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quotes, chat, decision, canQuote = true }: {
+export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quotes, chat, decision, canQuote = true, title }: {
   artifactId: string
   onArtifactChange: (id: string) => void
   onClose: () => void
@@ -58,6 +58,8 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   decision?: (view: { version: number; latestVersion: number; slots: ArtifactDecisionSlots }) => ReactNode
   /** False when the chat beside it cannot take a quote (a thread): no 选择元素, no quoting. */
   canQuote?: boolean
+  /** Stands in for the artifact's own title in the header (a PR report: 「ALEX-84 · PR #6」). */
+  title?: string
 }) {
   const t = useTranslations('Artifact')
   const format = useFormatter()
@@ -109,7 +111,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
       className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-2xl ring-0 sm:max-w-none">
       <header className="relative flex h-13 shrink-0 items-center gap-2 px-4">
         {detail && <ArtifactKindIcon kind={detail.kind} className="size-4 shrink-0 text-muted-foreground" />}
-        <DialogTitle className="truncate text-sm leading-5 font-medium">{detail?.title ?? ''}</DialogTitle>
+        <DialogTitle className="truncate text-sm leading-5 font-medium">{title ?? detail?.title ?? ''}</DialogTitle>
         {detail && <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="secondary" size="xs" className="gap-0.5 rounded-md px-1.5 font-normal text-muted-foreground" aria-label={t('versions')} />}>
             {t('version', { version })}<ChevronDown data-icon="inline-end" />

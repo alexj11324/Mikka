@@ -135,7 +135,8 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
       {lead}
       <h1 className="text-2xl font-semibold text-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{title}</h1>
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
-      <div ref={articleRef} data-slot="artifact-document" className="mt-6 group-has-[[data-changes-open]]/doc:hidden">
+      {/* Under a PR report lead the report's opening paragraph (the agent's summary) is already in 改动: shown once. */}
+      <div ref={articleRef} data-slot="artifact-document" className="mt-6 group-has-[[data-changes-open]]/doc:hidden group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:[&>p:first-child]:hidden">
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>
     </article>

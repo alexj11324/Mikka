@@ -4728,6 +4728,7 @@
     "mergeConfirm": "Merge"
   },
   "ArtifactReview": {
+    "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · Made when the thread finishes",
       "preparing": "Artifact · Preparing the PR",

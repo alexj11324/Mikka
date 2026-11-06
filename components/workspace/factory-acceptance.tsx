@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import useSWR from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
@@ -17,6 +18,7 @@ import { FactoryAcceptancePane, request, useAcceptance, type ArtifactReviewSlots
 import { FactoryFlowBadge, FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
 import { flowKey, readFlow } from '@/lib/factory/flow-client'
 import { InlineLoadError } from '@/components/load-error'
+import { ArtifactReportLead } from './acceptance-report'
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
@@ -59,11 +61,18 @@ function ArtifactDecision({ task, artifactId, version, latestVersion, review }: 
 }
 
 /** Ordinary artifacts have no task hint; every hinted task still goes through the normal authorized list and flow. */
-export function FactoryArtifactAcceptance({ taskId, issueId, ...view }: { taskId: string; issueId: string; artifactId: string; version: number; latestVersion: number; review?: Omit<ArtifactReviewSlots, 'artifactId'> }) {
+export function FactoryArtifactAcceptance({ taskId, issueId, review, ...view }: { taskId: string; issueId: string; artifactId: string; version: number; latestVersion: number; review?: Omit<ArtifactReviewSlots, 'artifactId'> }) {
   const { allTasks, error, isValidating, mutate } = useAcceptanceTasks(issueId)
+  const [banner, setBanner] = useState<HTMLElement | null>(null)
   const task = allTasks.find(row => row.id === taskId)
   if (error) return <div className="shrink-0 px-4 pb-3"><FactoryListError retrying={isValidating} onRetry={() => { if (!isValidating) void mutate() }} /></div>
-  return task ? <ArtifactDecision task={task} {...view} /> : null
+  if (!task) return null
+  // The report lead is read-only and drawn in every state of the PR, also while a fix run or failed checks
+  // unbind the decision below (P3, P7b); the decision's actions stay bound to the current candidate.
+  return <>
+    {review?.slots.lead && view.version === view.latestVersion && createPortal(<ArtifactReportLead task={task} artifactId={view.artifactId} onBannerSlot={setBanner} />, review.slots.lead)}
+    <ArtifactDecision task={task} {...view} review={review && { ...review, slots: { ...review.slots, banner } }} />
+  </>
 }
 
 /** The state chip next to a thread's name (等你验收, 已批准 …), from the same ledger as the pane. */

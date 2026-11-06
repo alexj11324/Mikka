@@ -25,7 +25,6 @@ import { FieldError } from '@/components/ui/field'
 import { RunErrorDetails } from './run-error-text'
 import { RequestError, request } from '@/lib/factory/browser-request'
 import { isFlowV2, useFactoryFlow } from './factory-flow'
-import { AcceptanceReport, ReportBanner } from './acceptance-report'
 import { artifactReviewKind, pullNumberOf } from '@/lib/factory/artifact-review'
 import type { ArtifactDecisionSlots } from '@/components/artifacts/artifact-viewer'
 
@@ -196,7 +195,10 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   const { ledger, reload, ledgerError, derived: acceptance, check, current: currentTask, detailLoaded, detailError, v2, flow, flowError, reloadFlow } = useAcceptance(task)
   // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
   const needsEvidence = v2 ? flow?.stage === 'handoff' || flow?.stage === 'completed' : task.stage === 'approval' || Boolean(acceptance?.superseded) || acceptance?.state === 'merged'
-  const { data: evidence, error: evidenceError } = useSWR<Evidence>(needsEvidence ? `/api/factory/tasks/${task.id}/approval` : null, request)
+  const { data: evidence, error: evidenceReadError } = useSWR<Evidence>(needsEvidence ? `/api/factory/tasks/${task.id}/approval` : null, request)
+  // A candidate whose review has not passed has no evidence yet (409): the pane shows none instead of failing to load.
+  const evidenceMissing = evidenceReadError instanceof RequestError && evidenceReadError.status === 409
+  const evidenceError = evidenceMissing ? undefined : evidenceReadError
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
   useLiveKey('factory_task', task.id, needsEvidence ? [`/api/factory/tasks/${task.id}/approval`] : [], detail?.liveWorkspaceId ?? null)
@@ -384,7 +386,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   const open = viewing ? groups[viewing.group] : undefined
 
   if (ledgerError || evidenceError || detailError || (v2 && flowError)) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
-  if (!detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
+  if (!detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence && !evidenceMissing)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
   if (!reportCurrent) return null
   if (artifactBinding && artifact) {
     const kind = artifactReviewKind({ hasArtifact: true, runSucceeded: true, flow: v2 ? flow : null, merge: derived })
@@ -394,7 +396,6 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     const unverified = flow?.acceptance?.counts.unverified ?? 0
     const unverifiedNames = criteria.filter(group => group.passed === null).map(group => group.title).filter(Boolean).join('、')
     const merged = ledger.merges?.filter(merge => merge.status === 'merged').at(-1)
-    const lastReject = ledger.rejections?.at(-1)
     const ask = () => artifact.onRequestChanges(number ? tReview('changeRequestChip', { number }) : tReview('changeRequestLabel'))
     const failedChecks = results.filter(row => row.status === 'failed')
     const actions = <>
@@ -413,18 +414,16 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
             onCancel: () => setConfirming(false) }} />
       </div>}
     </>
-    const banner = kind === 'fixing' ? <ReportBanner tone="muted" icon={<Spinner />} title={lastReject ? tReview('changesRequestedAt', { time: time(lastReject.createdAt) }) : tReview('state.fixing')} detail={lastReject?.note} />
-      : kind === 'refused' && refusal ? <ReportBanner tone="destructive" icon={<CircleX aria-hidden="true" />} title={tReview('mergeFailed', { reason: t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable') })}>
+    // The report lead (drawn whether or not this decision is bound) states the problem; these are its actions.
+    const bannerActions = kind === 'refused' && refusal ? <>
         {canRequest && <Button size="sm" variant="secondary" onClick={ask}>{tReview('letAgentFix')}</Button>}
         <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void accept() }}>{busy ? <Spinner data-icon="inline-start" /> : null}{t('retry')}</Button>
-      </ReportBanner>
-      : kind === 'blocked' || failedChecks.length ? <ReportBanner tone="destructive" icon={<CircleX aria-hidden="true" />} title={failedChecks.length ? tReview('checksFailed', { names: failedChecks.map(row => tReview(row.stage)).join(' · ') }) : tReview('state.blocked')} detail={currentTask.reason || null}>
-        {pullRequestUrl && <Button size="sm" variant="secondary" nativeButton={false} render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}>{t('openOnGitHub')}</Button>}
-        {(retryCheck || recheck) && <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck(!retryCheck) }}>{busy ? <Spinner data-icon="inline-start" /> : null}{tReview('rerunChecks')}</Button>}
-      </ReportBanner> : undefined
+      </>
+      : (kind === 'blocked' || failedChecks.length > 0) && (retryCheck || recheck) ? <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck(!retryCheck) }}>{busy ? <Spinner data-icon="inline-start" /> : null}{tReview('rerunChecks')}</Button>
+      : null
     return <>
       {artifact.slots.actions && createPortal(actions, artifact.slots.actions)}
-      {artifact.slots.lead && detail && createPortal(<AcceptanceReport artifactId={artifact.artifactId} issueId={task.issueId} runId={task.candidateRunId} detail={detail} flow={v2 ? flow ?? null : null} results={results} banner={banner} />, artifact.slots.lead)}
+      {artifact.slots.banner && bannerActions && createPortal(bannerActions, artifact.slots.banner)}
       {error && <FieldError className="px-4 pb-2 text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </>
   }
