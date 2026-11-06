@@ -10,6 +10,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: local-device-node22-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   package:
     runs-on: ubuntu-latest
