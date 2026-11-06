@@ -44,39 +44,60 @@ its existing protected status names and real acceptance coverage.
 
 ## Cloud worker template release
 
-Current replacement: `e2b-official-runtime.yml` validates new official instances
-without building or changing a template. It compares file/link/permission
-manifests, bootstraps the pinned Mikka source beneath `/opt/mikka`, and measures
-the actual CLI model catalogue. Only reviewed `main` runs receive the existing
-E2B validation key and Vercel release token in separate jobs. Publication pairs
-the official template names, worker digest, source commit and model catalogue in
-one request, and redeploys only a READY application of that exact Git commit.
-The worker digest ignores package.json scripts and lockfile entries outside
-the daemon install. When that digest and the published variables already match
-production, the workflow does not rebuild or redeploy.
-If the latest READY application has moved to another source, publication stops
-before changing configuration; retry against the latest reviewed main rather
-than replacing a newer application with the older release.
-PR runs have no secrets and run source/publisher checks. This validation does
-not send a model prompt and does not replace real subscription acceptance.
+`e2b-official-runtime.yml` is the only production release coordinator. It checks
+the immutable worker digest, then calls `e2b-template.yml` to build unique
+candidates from the official `desktop`, `claude` and `codex` bases. The builder
+executes the existing additive installer beneath `/opt/mikka`, leaving an
+anonymous worker preloaded at E2B's ready checkpoint. No runtime credential or
+user data enters the template.
 
-The historical workflow below is retained unchanged and **disabled** after
-[the preservation decision](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
-Do not resume it as part of the replacement release.
+Publication has two mandatory gates: original official files retain their
+SHA-256, type, mode, owner and link target; and both official Claude Code
+(`claude-haiku-5-5`) and Codex (`gpt-6-luna`) execute a real subscription task on
+the exact candidates. A model catalogue probe is additional capability data,
+not subscription acceptance. Candidate tests use normal device enrollment,
+owner-bound runs and subscription leases. Each release records original CLI
+paths and hashes in its own manifest; production, probing and acceptance use
+the same resolver, without an acceptance-only binary override.
+The gate also requires the official CLI to acknowledge this exact task
+(Claude's matching first-prompt UUID echo or Codex's `turn/start` ACK), plus a
+complete run-bound HTTP receipt with no extra execution-time authorization or
+provider-proxy calls. Process startup and `system/init` cannot satisfy it.
+Installation preserves every original persistent entry exactly. E2B's final
+boot and a disposable fresh instance are checked separately against the
+recorded exact-path provider-runtime policy; original CLI/software bytes and
+all other fields remain protected. File-scan verification instances are never
+reused as cold-start performance samples.
+The finalizer always closes instances labelled with this exact source, run and
+attempt. A failed build, obsolete source, failed Web wait or subscription gate
+also removes this run's exact named private candidates and verifies their
+absence. Public images and previous releases remain available. Cleanup receipts
+are artifacts; a cleanup error fails the workflow. After a failed release, rerun
+all jobs to rebuild candidates, since a failed-jobs-only rerun would refer to
+candidates that the finalizer has already removed.
 
-Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates
-with the Mikka worker added ([decision 2026-11-01-2335](../../docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+After both gates pass, the workflow makes the candidates public and publishes
+all three IDs, their official base kinds, worker digest, source commit and
+measured models in one verified Vercel upsert inside Web deploy's production
+queue. `MIKKA_CLOUD_RUNTIME_PREVIOUS` retains the previous paired configuration;
+old template IDs and aliases are never updated or deleted. A failure before
+publication leaves the selected release unchanged. Exact-main and exact-serving
+source checks reject stale jobs. Per-variable readback detects a partial upsert;
+an inconsistent tuple requires revalidation and cannot overwrite the last valid
+previous configuration. A rollback uses the normal rollback PR and matched
+application/worker release, preserving these gates.
 
-- `e2b-template.yml` builds the three templates from `main`, makes them
-  public and points Vercel Production at them (all three template ids and the
-  worker hash in one request), then redeploys Production. A `check` job first compares the worker
-  hash with Production's and stops when it is unchanged. Pull requests run only
-  its unit tests. Branch testing uses `-dev` templates built from the branch,
-  never the production templates or Vercel's production variables
-  (`docs/dev-workflow.md` § 7).
-  The build job holds only `E2B_API_KEY` (Infisical `prod:/vercel`) and the
-  check and publish jobs only `VERCEL_TEAM_TOKEN` (`prod:/platform`), both read through the
-  existing GitHub OIDC identity.
+PR runs use no release credentials. Main builds read the existing `E2B_API_KEY`
+from Infisical `prod:/vercel`. The subscription gate reads the authorized
+`ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` from `prod:/`, signs in normally, uses
+tasks titled “测试” in `alexj11324/Mikka-handoff`, then removes its own fixtures.
+Publication uses `VERCEL_TEAM_TOKEN` from `prod:/platform`. Delivery uses the
+existing GitHub OIDC identity; credential values never enter reports or logs.
+
+The worker digest excludes unrelated web lock entries and package scripts, so
+unrelated changes do not rebuild templates. The existing no-new-polling rule
+and task-owner E2B billing apply. See
+[Alex's preservation clarification](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
 
 ## GitHub branch protection (separate repository setting)
 

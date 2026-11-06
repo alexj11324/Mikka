@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 const handlePOST = subscriptionNativeLease({
   authorize: async (request, deviceId) => {
     const caller = await authenticateDevice(request)
-    if (!caller || !leaseDevice(await ownedDeviceWithReport(deviceId, caller.userId))) return null
+    if (!caller || !leaseDevice(await ownedDeviceWithReport(deviceId, caller.userId), deviceId, caller.scopeDeviceId)) return null
     return caller.userId
   },
   service: () => subscriptionRuntime(true, false, { exportAccessLease: true }),

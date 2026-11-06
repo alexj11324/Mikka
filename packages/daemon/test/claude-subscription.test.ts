@@ -1,4 +1,6 @@
 import { ToolApprovalGate } from "../src/agents/tool-approval"
+import { randomUUID } from 'node:crypto'
+import { query } from '@anthropic-ai/claude-agent-sdk'
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { afterEach, expect, it, vi } from "vitest"
@@ -10,9 +12,77 @@ import {
 import { buildChildEnv } from "../src/env"
 import { createLogger } from "../src/log"
 import { NoSandbox } from "../src/agents/sandbox"
+import { runRuntimeTimings } from '../src/run-runtime-timing'
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 
 afterEach(cleanupTempDirs)
+
+it('the installed official CLI acknowledges an exact SDK user frame without starting a model turn', async () => {
+  const directory = tempDir(), sessionId = randomUUID(), uuid = randomUUID()
+  let send!: () => void, acknowledged!: () => void
+  const input = new Promise<void>(resolve => { send = resolve })
+  const accepted = new Promise<void>(resolve => { acknowledged = resolve })
+  const abort = new AbortController()
+  const timeout = setTimeout(() => abort.abort(), 15_000)
+  const session = query({
+    prompt: (async function* () {
+      await input
+      // Official protocol: append/replay the user frame without querying the
+      // model. This tests the shipped binary with no credential or paid call.
+      yield { type: 'user' as const, uuid, session_id: sessionId, parent_tool_use_id: null, shouldQuery: false,
+        message: { role: 'user' as const, content: [{ type: 'text' as const, text: 'Offline protocol acknowledgement.' }] } }
+      await new Promise<void>(() => {})
+    })(),
+    options: { cwd: directory, sessionId, abortController: abort, extraArgs: { 'replay-user-messages': null },
+      settingSources: [], tools: [], mcpServers: {},
+      env: { PATH: process.env.PATH, HOME: directory, CLAUDE_CONFIG_DIR: join(directory, '.claude'), DISABLE_NON_ESSENTIAL_TRAFFIC: '1' },
+    },
+  })
+  const frames: string[] = []
+  const read = (async () => {
+    for await (const message of session) if (message.type === 'user' && message.session_id === sessionId && message.uuid === uuid) {
+      frames.push(message.uuid); acknowledged()
+    }
+  })()
+  void read.catch(() => {})
+  try {
+    await session.initializationResult()
+    send()
+    await Promise.race([accepted, new Promise<never>((_, reject) => abort.signal.addEventListener('abort', () => reject(Error('Official CLI acknowledgement timed out')), { once: true }))])
+    expect(frames).toEqual([uuid])
+  } finally {
+    clearTimeout(timeout); send(); session.close(); abort.abort(); await read.catch(() => {})
+  }
+})
+
+it('records execution acceptance only for the exact task user acknowledgement after authentication', async () => {
+  let allow!: () => void, entered!: () => void
+  const verified = new Promise<void>(resolve => { allow = resolve })
+  const verifying = new Promise<void>(resolve => { entered = resolve })
+  const { adapter, options, processReceipt } = await fixture({ accountId: 'fixture-account',
+    verify: async () => { entered(); await verified },
+    token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-early-init', expiresAt: new Date(Date.now() + 3_600_000).toISOString() }),
+  })
+  const observation = runRuntimeTimings.begin(options.runId, 'fixture-device', 'claude_code')
+  const accepted = vi.spyOn(runRuntimeTimings, 'agentAccepted')
+  let session: Awaited<ReturnType<typeof adapter.start>> | undefined
+  const starting = adapter.start({ ...options, prompt: 'HANG' })
+  try {
+    await verifying
+    expect(JSON.parse(readFileSync(processReceipt, 'utf8')).prompts).toBe(0)
+    expect(accepted).not.toHaveBeenCalled()
+    allow()
+    session = await starting
+    await waitFor(() => accepted.mock.calls.length > 0)
+    expect(accepted.mock.calls).toEqual([[options.runId, 'claude_user_ack']])
+    expect(JSON.parse(readFileSync(processReceipt, 'utf8')).prompts).toBe(1)
+    expect(observation.finish()?.agentAccepted?.kind).toBe('claude_user_ack')
+  } finally {
+    allow()
+    await (session ?? await starting.catch(() => undefined))?.cancel()
+    observation.close(); accepted.mockRestore()
+  }
+})
 
 it.each([
   ['fixture-gateway', 'account_info', 'provider_refused'],
@@ -130,6 +200,21 @@ it("delivers an access-only lease through the native input without reading host 
   expect(source.token).toHaveBeenCalledOnce()
   expect(events.at(-1)).toMatchObject({ type: "exit", outcome: "succeeded" })
   expect(JSON.stringify(events)).not.toContain("fixture-access")
+})
+
+it('answers the actual SDK oauth_token_refresh control request from its prepared token cache', async () => {
+  let reads = 0
+  const token = vi.fn(async () => ({ accountId: 'fixture-account',
+    accessToken: ++reads === 1 ? 'fixture-access' : 'fixture-access-rotated',
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString() }))
+  const { adapter, options, processReceipt } = await fixture({ accountId: 'fixture-account', automaticRefresh: true, token })
+  const session = await adapter.start({ ...options, prompt: 'REFRESH' })
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(token).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(readFileSync(join(processReceipt, '..', 'fixture-refresh.json'), 'utf8'))).toEqual({ accepted: true })
+  expect(JSON.stringify(events)).not.toMatch(/fixture-access/)
 })
 
 it('accepts the older explicit no-API-key response too', async () => {
