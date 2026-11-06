@@ -78,7 +78,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     assert.doesNotMatch(review.criteria[1].text!, /xyz/);
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
-    assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null, branch: { head: 'mik-7-fix', base: 'main' }, mergeAs: null }, 'no receipt: deploymentEnvironment null');
+    assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null, branch: { head: 'mik-7-fix', base: 'main' }, mergeAs: null, summary: null }, 'no receipt: deploymentEnvironment null');
 
     await t.test('public task readers keep the v1 contract on a one-connection pool', async () => {
       const single = new Pool({ connectionString: target.toString(), max: 1 });
