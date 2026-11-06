@@ -76,6 +76,19 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     return { id, agents }
   }
 
+  await t.test('a display caller can supply its invocation-local devices without a second device read', async () => {
+    const scope = await person('order-display-projection')
+    await device(scope.ownerId, [])
+    const devices = await order.poolDevices(pool, scope.ownerId)
+    const ordinary = await order.orderView(pool, scope)
+    let suppliedReads = 0
+    const projected = await order.orderView(pool, scope, async () => { suppliedReads++; return devices })
+    assert.equal(suppliedReads, 1)
+    assert.deepEqual(projected, ordinary)
+    assert.equal(projected.devices, 1)
+    assert.equal((await order.orderView(pool, scope, async () => [])).devices, 0, 'the supplied display snapshot is the one consumed')
+  })
+
   await t.test('a new binding can dispatch before Settings is opened: probe null/stale quota once, and keep paid keys out after a failed check', async () => {
     const scope = await person('order-first-dispatch')
     const ctx = { ...scope, botId: null }

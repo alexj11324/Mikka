@@ -267,12 +267,13 @@ export async function poolDevices(query: Query, ownerId: string): Promise<PoolDe
   }))
 }
 
-/** The page: credentials' candidates, the list with each entry's status, and 运行位置. */
-export async function orderView(query: Query, scope: OrderScope): Promise<OrderView> {
+/** The page: credentials' candidates, the list with each entry's status, and 运行位置.
+ * A display caller may share its own device read; execution/dispatch never consumes this projection. */
+export async function orderView(query: Query, scope: OrderScope, readDevices: () => Promise<PoolDevice[]> = () => poolDevices(query, scope.ownerId)): Promise<OrderView> {
   const candidates = await orderCandidates(query, scope)
   const order = await readOrder(query, scope, candidates)
   const states = await credentialStates(query, scope, order.entries, candidates, Date.now(), { probe: false, display: true })
-  const devices = await poolDevices(query, scope.ownerId)
+  const devices = await readDevices()
   const added = new Set(order.entries.map(entryKey))
   const agents = agentsByOffer(candidates)
   const { usableApiKeys } = await import('./model-api-keys')

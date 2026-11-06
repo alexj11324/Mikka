@@ -56,9 +56,10 @@ stub('../attention/store.ts', { recordDecision: forbidden, settleTurn: forbidden
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
 
 let preparePrompt: typeof import('../../workflows/coordinator/steps')['preparePrompt']
+let prepareTurn: typeof import('../../workflows/coordinator/steps')['prepareTurn']
 before(async () => {
   overrideDeploymentSwitch('factoryRouting', false)
-  ;({ preparePrompt } = await import('../../workflows/coordinator/steps'))
+  ;({ preparePrompt, prepareTurn } = await import('../../workflows/coordinator/steps'))
 })
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
@@ -109,4 +110,15 @@ test('an instruction read refusal is propagated unchanged without retry or a par
   denied = new Error('Synthetic instruction read refusal')
   await assert.rejects(preparePrompt(owner, bot, snapshot), error => error === denied)
   assert.equal(calls.filter(call => call.reader === 'personal').length, 1)
+})
+
+test('prepareTurn returns only fixed numeric context timings beside the unchanged model prompt', async () => {
+  const prepared = await prepareTurn(owner, bot, 'synthetic-holder', { snapshot, mailboxEnabled: false, runtime: null })
+  assert.deepEqual(prepared.prompt, expectedPrompt())
+  assert.deepEqual(Object.keys(prepared.contextMs).sort(), ['execution', 'github', 'personal'])
+  assert.ok(Object.values(prepared.contextMs).every(value => Number.isFinite(value) && value >= 0))
+  assert.deepEqual(prepared.mailboxTools, [])
+  assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github'])
+  assert.doesNotMatch(JSON.stringify(prepared.contextMs), /Synthetic|owner|request|instruction|repositories/)
+  assert.ok(!('contextMs' in prepared.prompt) && !('phaseMs' in prepared.prompt), 'diagnostics never become model options or cached text')
 })

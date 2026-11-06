@@ -602,3 +602,40 @@ test('migration cannot adapt manual events or reuse another issue, stale main, f
   await assert.rejects(runProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(),
     attestation: proof, now: () => NOW, fetchImpl: () => assert.fail('1415 proof silently replaced default mode') }), /attestation_required/)
 })
+
+test('deployed target mode separates the actual dispatch driver from the application', () => {
+  const environment = { ...env(), GITHUB_SHA: OTHER, GITHUB_REPOSITORY_OWNER: 'alexj11324',
+    GITHUB_RUN_ID: '7001', GITHUB_RUN_ATTEMPT: '2',
+    GITHUB_WORKFLOW_REF: REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP,
+    WEB_DEPLOY_RUN_ID: '81', VERCEL_DEPLOYMENT_ID: 'dpl_SyntheticDeployed1415' }
+  const payload = { repository: { full_name: REPOSITORY, owner: { login: 'alexj11324' } },
+    inputs: { application_sha: APP, web_run_id: '81', deployment_id: 'dpl_SyntheticDeployed1415' } }
+  const guard = productionGuard(environment, payload)
+  assert.equal(guard.targetMode, 'deployed-target')
+  assert.equal(guard.applicationSha, APP); assert.equal(guard.driverRevision, OTHER)
+  assert.equal(guard.driverRunId, 7001); assert.equal(guard.driverRunAttempt, 2)
+  assert.equal(guard.webDeployRunId, 81); assert.equal(guard.deploymentId, payload.inputs.deployment_id)
+  assert.throws(() => productionGuard({ ...environment, MIKKA_ACCEPTANCE_TARGET_MODE: '' }, payload))
+})
+
+
+test('new deployed mode authorizes only the 1415 attestation and never reopens read/cache measurement', async () => {
+  const environment = { ...env(), GITHUB_SHA: OTHER, GITHUB_REPOSITORY_OWNER: 'alexj11324',
+    GITHUB_RUN_ID: '7001', GITHUB_RUN_ATTEMPT: '2',
+    GITHUB_WORKFLOW_REF: REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP,
+    WEB_DEPLOY_RUN_ID: '81', VERCEL_DEPLOYMENT_ID: 'dpl_SyntheticDeployed1415' }
+  const payload = { repository: { full_name: REPOSITORY, owner: { login: 'alexj11324' } },
+    inputs: { application_sha: APP, web_run_id: '81', deployment_id: 'dpl_SyntheticDeployed1415' } }
+  const options = { env: noCredentials(environment), event: payload,
+    fetchImpl: () => assert.fail('out-of-scope mode reached the network') }
+  await assert.rejects(attestProductionReadCache(options), /trigger_rejected/)
+  await assert.rejects(runProductionReadCache({ ...options, issueNumber: 1415 }), /trigger_rejected/)
+})
+
+test('default consumers cannot adopt an explicit deployed-target attestation', async () => {
+  await assert.rejects(runProductionReadCache({ env: noCredentials(env()), event: event(),
+    attestation: { ...attestation(), targetMode: 'deployed-target' }, now: () => NOW,
+    fetchImpl: () => assert.fail('a new-mode proof entered the default transport') }), /attestation_required/)
+})

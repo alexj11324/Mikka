@@ -76,11 +76,12 @@ export class SubscriptionService {
       await this.admitModel({ workspaceId: binding.workspaceId, ownerId: use.ownerId }, binding.modelId, binding.route, callSignal)
     }
     await admit()
-    const row = await this.repository.connection(use.ownerId, binding.connectionId)
-    const client = this.worker(this.repository.scope(row)).forUse(use)
     return resolveSubscriptionModel(use, binding.modelId, {
       access: () => this.access(use, signal),
-      model: async modelId => {
+      model: async (modelId, { connection }) => {
+        // This call's access check already read and verified the custody scope.
+        // Each later model/HTTP call still runs its own fresh authorization.
+        const client = this.worker({ ownerId: connection.ownerId, workspaceId: connection.workspaceId, connectionId: connection.id, provider: connection.provider === 'openai' ? 'codex' : 'claude' }).forUse(use)
         const provider = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'private-worker-placeholder',
           fetch: async (_url, init) => {
             if (typeof init?.body !== 'string') {

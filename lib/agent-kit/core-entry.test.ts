@@ -65,6 +65,7 @@ const switches={issueTools:true,factoryRouting:false,factoryLifecycle:false}
 const mailboxCatalogue=async(...args:unknown[])=>{record('mailboxCatalogue')(...args);return ['mailbox_inbox']}
 const noteQuotaSwitch=async(...args:unknown[])=>{record('quotaSwitch')(...args)}
 let preparedPrompt:Record<string,unknown>|null=null
+let contextMs:{execution:number;personal:number;github:number}|undefined
 const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return preparedPrompt ?? {prompt:'synthetic request'}}
 stub('../../workflows/coordinator/steps.ts',{
   turnSettings:async()=>{await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
@@ -73,7 +74,7 @@ stub('../../workflows/coordinator/steps.ts',{
     if (input.runtime) await noteQuotaSwitch(userId,holder,input.runtime,botId)
     const prompt=await preparePrompt(userId,botId,input.snapshot,mailboxTools)
     await deliverEarlyStop('prepare')
-    return {mailboxTools,prompt}
+    return {mailboxTools,prompt,...(contextMs ? {contextMs} : {})}
   },
   computerToolsEnabled:async()=>false,
   personalWriteToolsEnabled:async()=>false,
@@ -98,6 +99,7 @@ let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordi
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
 function reset(harness?:string){
   calls.length=0;stopDuringTurn=false;stopDuringTool=false;stopAt=null;extraInbox=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
+  contextMs=undefined
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
 }
 test('real workflow entry uses the returned execution snapshot for model, prompt and tool registry',async()=>{
@@ -115,6 +117,27 @@ test('real workflow entry uses the returned execution snapshot for model, prompt
   assert.ok(calls.findIndex(c=>c.name==='append') < calls.findIndex(c=>c.name==='stream' && (c.args[1] as {type:string}).type==='coordinator-turn-committed'))
   assert.equal(calls.filter(c=>c.name==='failed').length,0)
   assert.equal(calls.filter(c=>c.name==='mailboxCatalogue').length,0, 'flag-off never resolves mailbox persistence')
+})
+test('normal completion reports fixed preparation timings only in the existing post-commit turn log',async()=>{
+  reset('ai_sdk')
+  contextMs={execution:13,personal:5,github:21}
+  await coordinatorTurn(owner,bot)
+  const timings=calls.filter(call=>call.name==='timing')
+  assert.equal(timings.length,1)
+  const line=timings[0].args[0] as {phaseMs:Record<string,number>}
+  assert.deepEqual(Object.keys(line.phaseMs).sort(),['begin','execution','github','inbox','personal','prepare','settings'])
+  assert.ok(Object.values(line.phaseMs).every(value=>Number.isFinite(value)&&value>=0))
+  assert.deepEqual([line.phaseMs.execution,line.phaseMs.personal,line.phaseMs.github],[13,5,21])
+  const committed=calls.findIndex(call=>call.name==='stream'&&(call.args[1] as {type:string}).type==='coordinator-turn-committed')
+  assert.ok(committed<calls.findIndex(call=>call.name==='timing'))
+  const options=calls.find(call=>call.name==='hosted')!.args[2] as Record<string,unknown>
+  assert.ok(!('contextMs' in options)&&!('phaseMs' in options))
+  assert.doesNotMatch(JSON.stringify(line.phaseMs),/synthetic|grounded|reply/)
+
+  reset('ai_sdk')
+  await coordinatorTurn(owner,bot)
+  const older=(calls.find(call=>call.name==='timing')!.args[0] as {phaseMs:Record<string,number>}).phaseMs
+  assert.deepEqual([older.execution,older.personal,older.github],[0,0,0], 'recorded prepare results from an earlier deployment remain readable')
 })
 test('disabled Agent Kit still resolves the connected account model without inventing a definition snapshot',async()=>{
   reset()
