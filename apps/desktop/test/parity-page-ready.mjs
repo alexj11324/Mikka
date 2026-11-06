@@ -134,6 +134,9 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     await expect(task).toHaveAttribute('aria-busy', 'false', { timeout: 45_000 })
     await task.locator('#task-title:not([readonly])').waitFor()
     await text('Review conversations, task details, artifacts and workspace settings in the desktop app.')
+    // Activity versions are a separate read from the task's editable fields.
+    // The fixture's creation event must finish rendering before comparison.
+    await task.getByText(messages.Workspace.detail.createdTask, { exact: true }).waitFor()
   } else if (name === 'new-task') {
     const dialog = page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true })
     await expect(dialog.getByRole('combobox', { name: messages.Shell.newTaskDialog.device, exact: true })).toContainText(`${messages.Shell.newTaskDialog.workspaceDefault} ·`, { timeout: 45_000 })

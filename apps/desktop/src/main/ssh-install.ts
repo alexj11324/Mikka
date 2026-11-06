@@ -37,19 +37,38 @@ export function loginShell(env: NodeJS.ProcessEnv = process.env, platform: NodeJ
 
 export function runProcess(command: string, args: string[], input?: string, timeout = 60_000, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, SSH_ASKPASS_REQUIRE: 'never' } })
+    // A login shell/npm can start children. Cancelling only the shell leaves
+    // those installers writing into the next attempt's package directory.
+    // Own one POSIX process group; never signal an inherited/user service group.
+    const grouped = process.platform !== 'win32'
+    const child = spawn(command, args, { detached: grouped, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, SSH_ASKPASS_REQUIRE: 'never' } })
     let output = ''; let error = ''
-    const abort = () => { child.kill('SIGKILL') }
+    let timedOut = false
+    let stopped = false
+    let closed = false
+    const stop = () => {
+      if (stopped || closed || !child.pid) return
+      stopped = true
+      try {
+        if (grouped) process.kill(-child.pid, 'SIGKILL')
+        else child.kill('SIGKILL')
+      } catch (reason) { if ((reason as NodeJS.ErrnoException).code !== 'ESRCH') reject(reason) }
+    }
+    const abort = () => { stop() }
     signal?.addEventListener('abort', abort, { once: true })
     if (signal?.aborted) abort()
-    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('SSH operation timed out')) }, timeout)
+    // Resolve/reject only after close, including timed out commands. Cleanup
+    // must not start a new installation while the old command is still alive.
+    const timer = setTimeout(() => { timedOut = true; stop() }, timeout)
     child.stdout.on('data', chunk => { output = (output + chunk).slice(-65536) })
     child.stderr.on('data', chunk => { error = (error + chunk).slice(-4096) })
-    child.on('error', reason => { clearTimeout(timer); reject(reason) })
+    child.on('error', reason => { closed = true; clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(reason) })
     child.on('close', code => {
+      closed = true
       clearTimeout(timer)
       signal?.removeEventListener('abort', abort)
       if (signal?.aborted) { reject(new Error('cancelled')); return }
+      if (timedOut) { reject(new Error('SSH operation timed out')); return }
       if (code === 0) resolve(output.trim())
       else reject(new Error(error.trim() || `Remote command failed (${code})`))
     })

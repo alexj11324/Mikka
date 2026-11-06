@@ -5116,7 +5116,7 @@
     "serverUnavailable": "无法连接 Mikka",
     "networkUnavailable": "没有网络",
     "reconnecting": "正在重新连接…",
-    "offlineHint": "请检查网络后重试。",
+    "offlineHint": "等待连接恢复。",
     "retry": "立即重试",
     "browserTitle": "在浏览器中继续",
     "browserOpened": "页面已在浏览器打开。完成后可以返回 Mikka。",

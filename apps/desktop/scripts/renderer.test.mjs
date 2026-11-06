@@ -4,7 +4,7 @@ import { build } from 'esbuild'
 import { Window } from 'happy-dom'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { actionSignatures, applicationBoundary } from './build-renderer.mjs'
+import { actionReferences, actionSignatures, applicationBoundary, usedActionImports } from './build-renderer.mjs'
 
 const repository = fileURLToPath(new URL('../../..', import.meta.url))
 const renderer = join(repository, 'apps/desktop/src/renderer')
@@ -69,6 +69,36 @@ test('generated action stubs preserve declaration arity, including SWR zero-argu
   await actions.listProjects('SWR cache key')
   await actions.getArtifact('artifact-id', 'extra ignored argument')
   assert.deepEqual(requests.map(request => [request.action, request.args]), [['projects.listProjects', []], ['artifacts.getArtifact', ['artifact-id']]])
+}))
+
+test('action inventory includes the actual billing re-export chain and excludes type-only aliases', async () => {
+  assert.deepEqual(await usedActionImports(['lib/billing/verification-client.ts']), [
+    'billing.cardVerificationStatus', 'billing.getHostedUsage', 'billing.startCardVerification', 'billing.startPointsPurchase',
+  ])
+  assert.deepEqual(actionReferences(`
+    import { getBilling as read, type getCreditBilling } from '@/app/actions/billing'
+    export { startCardVerification as verify, type getHostedUsage } from '@/app/actions/billing'
+    export type { cardVerificationStatus } from '@/app/actions/billing'
+    export { startPointsPurchase } from '@/app/actions/billing'
+  `, 'consumer.ts'), ['billing.getBilling', 'billing.startCardVerification', 'billing.startPointsPurchase'])
+})
+
+test('real billing client re-exports reach the native RPC with only their declared parameters', () => browser(async () => {
+  const requests = []
+  globalThis.fetch = async (_path, init) => {
+    requests.push(JSON.parse(init.body))
+    return Response.json({ version: 1, ok: true, result: { url: 'https://checkout.stripe.com/c/fixture' } })
+  }
+  const client = await moduleFrom({
+    source: 'export { startCardVerification, startPointsPurchase } from "@/lib/billing/verification-client";',
+    plugins: [applicationBoundary(new Map())],
+  })
+  const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  await client.startCardVerification(workspace)
+  await client.startPointsPurchase(workspace, 25)
+  assert.deepEqual(requests.map(request => [request.action, request.args]), [
+    ['billing.startCardVerification', [workspace]], ['billing.startPointsPurchase', [workspace, 25]],
+  ])
 }))
 
 test('public configuration keeps only existing flags and discards the previous owner snapshot on reset', async () => {

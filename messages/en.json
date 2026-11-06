@@ -5116,7 +5116,7 @@
     "serverUnavailable": "Can't reach Mikka",
     "networkUnavailable": "No network",
     "reconnecting": "Reconnecting…",
-    "offlineHint": "Check your connection, then retry.",
+    "offlineHint": "Waiting for the connection to recover.",
     "retry": "Retry now",
     "browserTitle": "Continue in your browser",
     "browserOpened": "The page is open in your browser. You can return to Mikka when finished.",

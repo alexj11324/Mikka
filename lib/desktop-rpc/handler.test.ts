@@ -129,6 +129,15 @@ test('explicit schemas and function map have exactly matching action names', () 
   assert.deepEqual(registered, Object.keys(desktopActionSchemas).sort())
 })
 
+test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {
+  const verification = desktopActionSchemas['billing.startCardVerification']
+  for (const args of [[], [undefined], [owner]]) assert.equal(verification.safeParse(args).success, true)
+  for (const args of [[null], ['invalid'], [{ userId: owner }], [owner, peer], [owner, 'https://foreign.test']]) assert.equal(verification.safeParse(args).success, false)
+  const purchase = desktopActionSchemas['billing.startPointsPurchase']
+  for (const amount of [10, 25, 50]) assert.equal(purchase.safeParse([owner, amount]).success, true)
+  for (const args of [[], [owner], [undefined, 10], ['invalid', 10], [owner, '10'], [owner, 0], [owner, -10], [owner, 10.5], [owner, 100], [owner, NaN], [owner, Infinity], [owner, 25, { userId: peer }]]) assert.equal(purchase.safeParse(args).success, false)
+})
+
 test('Coordinator history keeps the current bounded page size and previous two-argument calls', () => {
   const schema = desktopActionSchemas['coordinator.coordinatorHistory']
   for (const args of [[null, 0], [owner, 20, undefined], [null, 50, 1], [owner, 500, 200]]) assert.equal(schema.safeParse(args).success, true)

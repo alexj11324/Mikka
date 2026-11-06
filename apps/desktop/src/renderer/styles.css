@@ -27,3 +27,9 @@
   --font-inter: "Mikka Inter";
   --font-geist-mono: "Mikka Geist Mono";
 }
+
+/* The standalone native fallback has no application scrollbar gutter. Match
+ * its full viewport only while that same offline card is mounted. */
+html:has(.desktop-offline) {
+  scrollbar-gutter: auto;
+}

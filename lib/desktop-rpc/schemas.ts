@@ -7,6 +7,7 @@ import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-referen
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
+import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -119,7 +120,9 @@ export const desktopActionSchemas = {
   'billing.getHostedUsage': inWorkspace,
   'billing.openBillingPortal': tuple(text(2048).min(1), workspace),
   'billing.startPlanCheckout': tuple(text(2048).min(1), workspace),
+  'billing.startPointsPurchase': tuple(uuid, z.number().refine(amount => (POINTS_PURCHASE_AMOUNTS as readonly number[]).includes(amount))),
   'billing.startChatPointsPurchase': tuple(z.number().finite().positive(), bot),
+  'billing.startCardVerification': inWorkspace,
   'bots.listBots': none,
   'bots.pollBots': none,
   'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() })),

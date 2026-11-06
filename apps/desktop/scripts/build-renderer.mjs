@@ -2,6 +2,9 @@ import { build } from 'esbuild'
 import postcss from 'postcss'
 import tailwind from '@tailwindcss/postcss'
 import ts from 'typescript'
+import { loadBindings } from 'next/dist/build/swc/index.js'
+import webBrowserTargets from 'next/dist/shared/lib/modern-browserslist-target.js'
+import { getTargets } from 'next/dist/build/webpack/loaders/lightningcss-loader/src/utils.js'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
@@ -87,14 +90,26 @@ export function applicationBoundary(actions) {
   }
 }
 
+export async function compileSharedStyles(css, filename) {
+  const result = await postcss([tailwind({ base: repository, optimize: true })]).process(css, { from: filename })
+  // The web applies its Lightning CSS pass after Tailwind. Keeping explicit
+  // zero-hue oklch() neutrals changes color-mix() in Chromium (soft blue becomes
+  // pink), so use the same build-only engine and browser targets here as well.
+  const { css: { lightning } } = await loadBindings()
+  const transformed = lightning.transform({
+    filename, code: Buffer.from(result.css), minify: true,
+    targets: getTargets({ key: 'mikka-desktop-shared-css', targets: webBrowserTargets }),
+  })
+  return Buffer.from(transformed.code).toString()
+}
+
 function sharedStyles() {
   return {
     name: 'mikka-shared-tailwind',
     setup(builder) {
       builder.onLoad({ filter: /[\\/]app[\\/]globals\.css$/ }, async args => {
         const css = await readFile(args.path, 'utf8')
-        const result = await postcss([tailwind({ base: repository, optimize: true })]).process(css, { from: args.path })
-        return { contents: result.css, loader: 'css', resolveDir: dirname(args.path) }
+        return { contents: await compileSharedStyles(css, args.path), loader: 'css', resolveDir: dirname(args.path) }
       })
     },
   }
@@ -184,17 +199,28 @@ function bundledSyntaxCatalogue() {
   }
 }
 
-async function usedActionImports(inputs) {
+/** Named re-exports are real consumers too: the billing adapter forwards its
+ * existing actions through a client-only module. Type-only bindings disappear. */
+export function actionReferences(source, filename) {
+  const file = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true)
+  const imports = new Set()
+  for (const statement of file.statements) {
+    const imported = ts.isImportDeclaration(statement)
+    const exported = ts.isExportDeclaration(statement)
+    if ((!imported && !exported) || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue
+    if ((imported && statement.importClause?.isTypeOnly) || (exported && statement.isTypeOnly)) continue
+    const match = /^@\/app\/actions\/([\w-]+)$/.exec(statement.moduleSpecifier.text)
+    const bindings = imported ? statement.importClause?.namedBindings : statement.exportClause
+    if (!match || !bindings || (!ts.isNamedImports(bindings) && !ts.isNamedExports(bindings))) continue
+    for (const binding of bindings.elements) if (!binding.isTypeOnly) imports.add(`${match[1]}.${binding.propertyName?.text ?? binding.name.text}`)
+  }
+  return [...imports].sort()
+}
+
+export async function usedActionImports(inputs) {
   const imports = new Set()
   for (const path of inputs.filter(name => /\.[cm]?[jt]sx?$/.test(name) && !name.includes('node_modules'))) {
-    const file = ts.createSourceFile(path, await readFile(resolve(repository, path), 'utf8'), ts.ScriptTarget.Latest, true)
-    for (const statement of file.statements) {
-      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || statement.importClause?.isTypeOnly) continue
-      const match = /^@\/app\/actions\/([\w-]+)$/.exec(statement.moduleSpecifier.text)
-      const bindings = statement.importClause?.namedBindings
-      if (!match || !bindings || !ts.isNamedImports(bindings)) continue
-      for (const imported of bindings.elements) if (!imported.isTypeOnly) imports.add(`${match[1]}.${imported.propertyName?.text ?? imported.name.text}`)
-    }
+    for (const name of actionReferences(await readFile(resolve(repository, path), 'utf8'), path)) imports.add(name)
   }
   return [...imports].sort()
 }

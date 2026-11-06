@@ -163,13 +163,15 @@ export async function assertRunProfileClaim(query: Query, runId: string) {
   const workspaceId = definition.executionIdentity?.workspaceId
   if (!workspaceId || !run.issueId) throw new AgentProfileAdmissionError({ detail: 'scope_unavailable' })
   if ((definition.agentProfile.profileId === BUILTIN_AGENT_PROFILE_ID || definition.agentProfile.source === 'default') && (!isBuiltinAgentProfileSelection(definition.agentProfile) || definition.agentProfile.scope.ownerId !== run.userId || definition.agentProfile.scope.workspaceId !== workspaceId)) throw new AgentProfileAdmissionError({ detail: 'snapshot_invalid' })
-  if (run.questionContinuation && run.kind === 'implement') {
+  if (run.questionContinuation && (run.kind === 'implement' || run.kind === 'plan')) {
+    const stage = run.kind === 'plan' ? 'spec' : 'execute'
     const { rows: [task] } = await query.query(`SELECT t.* FROM factory_tasks t
       JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id AND a."runId"=$1
       JOIN factory_questions q ON q."taskId"=t.id AND q."continuationRunId"=a."runId" AND q."userId"=t."userId" AND q."issueId"=t."issueId"
-      WHERE t."userId"=$2 AND t."issueId"=$3 AND t.stage='execute' AND t.status='running' AND a.status='running'
-        AND q.status='resuming' AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp()) FOR SHARE OF t,a,q`, [run.id,run.userId,run.issueId])
-    const edge = task ? await (await import('./questions/execution-continuation')).questionExecutionContinuation(query,task,task.attemptId) : null
+      WHERE t."userId"=$2 AND t."issueId"=$3 AND t.stage=$4 AND a.stage=$4 AND q.stage=$4 AND t.status='running' AND a.status='running'
+        AND q.status='resuming' AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp()) FOR SHARE OF t,a,q`, [run.id,run.userId,run.issueId,stage])
+    const readers = await import('./questions/execution-continuation')
+    const edge = task ? await (run.kind === 'plan' ? readers.questionPlanContinuation : readers.questionExecutionContinuation)(query,task,task.attemptId) : null
     if (!edge || run.stopRequestedAt || run.status !== 'queued') throw new AgentProfileAdmissionError({ detail: 'question_receipt' })
     const source = await admitProfileSelection(query, { ownerId: run.userId, workspaceId, issueId: run.issueId,
       harness: definition.harness, model: definition.model, apiKeyId: definition.apiKey?.keyId,

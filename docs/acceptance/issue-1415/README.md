@@ -32,13 +32,17 @@
 
 [Factory Profile 总预算复验](factory-profile-budget-4eb.json)：独立 checkout `4eb36650`，仅将包含完整迁移与顺序子用例的父测试上限从 120 秒改为 240 秒；15 秒 SQL 和 5 秒锁等待上限、全部业务断言保持不变。在既有 Large 的新独立数据库运行该单文件，113/113 通过、0 跳过，42.666 秒，进程退出 0，专属数据库清理通过。此结果不代表原 4 CPU CI 并发分片已经通过；后续正常 CI 仍是必要检查。
 
+[82241 CI 局部记录](ci-82241-partial.json)：分支 `82241b468c`，实际 Desktop checkout `c34481fcd9`，12 个关联 workflow 中 11 个通过。主 CI 包括四个真实数据库分片已全部通过，Factory Profile 的正常并发 CI 复验完成。Desktop 的 Linux 冒烟 7/7、Mac 完整包签名和 entitlement 核验、三进程两 profile 的真实 Keychain 创建/续用/读取、Mac 冒烟 7/7、公共页 8/8 均通过；公共页最大差异 0.00895%。随后自动安装本机设备的 180 秒就绪等待失败，完整矩阵、生命周期、冷启动、一小时预算和最终 Dev ZIP 没有执行。不能据此将整个 Desktop 验收标为通过。
+
 字节值是已预热 PostgreSQL 连接的 socket `bytesRead` 差值，范围以各 JSON 为准。上述每次读取的比较不能替代完整一小时空闲测量，也不能推广为所有路由已经验收。
 
 会话缓存复用 Better Auth 原有签名、版本、到期和 bearer 绑定规则；没有额外 TTL。证明只保存在原生主进程的加密账户记录中，刷新由正常请求带回。数据库回归包含跨账号、伪造、到期、撤销、敏感操作重新查库、REST 续签、资料更新、一次性 PKCE 和鉴权审计失败。下一次发布后的 CI 与原生运行结果仍须绑定实际提交。
 
 ## 原生诊断状态
 
-`9f27b28f` 的真实 Mac runner 已完成完整 ad-hoc 签名，`--strict --deep` 通过；包核验器随后在读取 entitlement 时失败，尚未运行三进程加密、账号验收、冷启动或一小时测量。已修正 `codesign --xml` 输出解析，并读取真实 ARM64 Mach-O 类型：只有 `MH_DYLIB` 可以无 entitlement，主程序及所有可执行 helper 仍须精确四项 Dev 权限。独立包/加密证据采用固定文件名与闭集规范 JSON 审计，避免尚无账号环境时丢失早期诊断；原账号审计和生产加密实现不变。[冻结修复记录](mac-verifier-fix.json)的 24 个聚焦测试、lint 和 Workflow 检查通过，真实跨进程 Keychain 结果等待新提交的正常 CI。
+`82241b468c` 的真实 Mac runner 已完成完整 ad-hoc 签名、`--strict --deep`、精确 entitlement 和跨进程 Keychain 验证。主程序及可执行 helper 仍须四项 Dev 权限，只有真实 `MH_DYLIB` 可无 entitlement；没有放宽加密或账号边界。新的阻塞点是本机 daemon 安装后的在线等待。[安装取消修复及诊断记录](native-installer-cancel-fix.json)保留了真实子进程仍在写心跳的复现；取消现在只终止安装器自己创建的进程组，并等待关闭。此缺陷尚未被证明是 Mac 超时的原因。就绪总预算改为既有 npm 安装上限 300 秒加原 180 秒其他步骤，安装终止失败则立即报告；原 online、deviceId、signedIn 和 server 条件保持不变，新增诊断只导出闭集枚举和布尔值。
+
+[Linux 完整原生截图记录](native-parity-7973-5c0b605a.md)保留 `7973afa9` 的 100 项原始结果：58 通过、42 失败，精确清理通过。后续修复包括透传原审批接口所需的两个公开证明响应头、使用与网页相同的构建期 CSS 引擎和目标、离线布局/文案一致，以及等待实际任务活动行就绪。[源文件冻结清单](native-parity-fix-source-hashes.json)绑定这些修复；不能将源码或局部样式验证当作新的截图通过结果。组合 desktop 测试在自身 VM 为 main 114/114、helper 89/94；其余五项都在创建真实 Unix socket 时遇到环境 `listen EPERM`，未跳过或改写测试，交由正常 Linux CI 实际复验。
 
 固定 `6149eb2b` / `7973afa9` 的[网页迁移前后视觉证据](web-parity-6149-7973.md)已齐备：原 98 项矩阵中 97 项通过，唯一浅色工作区链接因列表尚未完成而失败；原失败保留。仅补该入口的真实列表、摘要及 Computer 标签就绪条件后，浅/深色定点复验分别为 0.00540123% / 0.00478395%，均低于原 0.1% 门槛。四次采集清理通过，完整附件保留 300 张原图/差异图、两份冻结脚本和报告；不把组合证据称为一次新的完整 98/98 运行。
 
@@ -57,7 +61,7 @@
 - [ ] 同一 main 基线的网页迁移前后截图一致，全部网页测试通过。
 - [ ] 最终提交的全部 CI 通过，提供连隔离 HTTPS 后端的 unsigned Mikka Dev Apple Silicon ZIP。
 
-第二阶段按 [Alex 的追加要求](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6664526271)，在上述第一阶段完成后继续。目前只有[兼容性研究](../../operations/issue-1415-phase2-feasibility.md)，没有将研究当成迁移实现或验收结果。生产设置、正式签名、发布和生产切换均未执行。
+第二阶段按 [Alex 的追加要求](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6664526271)继续推进。[兼容性研究](../../operations/issue-1415-phase2-feasibility.md)之外，共享 Vite 前端和独立 API 已在隔离工作树中实现并开始整合；这些尚未发布的实现不构成迁移验收结果。生产设置、正式签名、发布和生产切换均未执行。
 
 [独立 Workflow 运行验证](workflow-runtime-feasibility.json) 已实际通过重试、5 秒定时、hook 和原任务的进程重启恢复。两次原失败记录保留：缺少 Local World 生命周期关闭，以及打包后 SDK 自身版本元数据丢失。显式接入官方 `start` / `close` 并保留真实包后，同一个停住的任务无需再次 `start` 即恢复完成，SIGTERM 正常退出约 1.016 秒；测试进程和端口均已关闭。这只证明 Hono/Nitro 与当前 Workflow 版本的本地集成可行，不能代替业务 workflow、Vercel 队列、网页迁移或生产验收。
 

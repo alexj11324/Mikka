@@ -100,6 +100,47 @@ test('process runner returns output and maps failures and timeouts', async () =>
   await assert.rejects(runProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], undefined, 50), /timed out/)
 })
 
+test('cancelled and timed out commands stop their own installer descendants', { skip: process.platform === 'win32', timeout: 10_000 }, async () => {
+  for (const mode of ['cancel', 'timeout']) {
+    const directory = await mkdtemp(join(tmpdir(), 'mikka-installer-process-'))
+    const pidFile = join(directory, 'child.pid')
+    const beatFile = join(directory, 'heartbeat')
+    const controller = new AbortController()
+    let pid: number | undefined
+    let failure: unknown
+    try {
+      const leaf = `const fs=require('node:fs');setInterval(()=>fs.writeFileSync(${JSON.stringify(beatFile)},String(Date.now())),20)`
+      const parent = `const{spawn}=require('node:child_process');const fs=require('node:fs');const child=spawn(process.execPath,['-e',${JSON.stringify(leaf)}],{stdio:'ignore'});fs.writeFileSync(${JSON.stringify(pidFile)},String(child.pid));setInterval(()=>{},1000)`
+      const running = runProcess(process.execPath, ['-e', parent], undefined, mode === 'timeout' ? 1500 : 5000, controller.signal)
+      // Attach before waiting for the child, so an actual early failure is not
+      // an unhandled rejection. The assertion below still observes the result.
+      running.catch(() => {})
+      const deadline = Date.now() + 1000
+      let heartbeat: string | undefined
+      while (!heartbeat && Date.now() < deadline) {
+        try { pid = Number(await readFile(pidFile, 'utf8')); heartbeat = await readFile(beatFile, 'utf8') } catch { /* Child has not started yet. */ }
+        if (!heartbeat) await new Promise(done => setTimeout(done, 20))
+      }
+      assert.ok(heartbeat && Number.isSafeInteger(pid) && pid! > 1, 'The real descendant must be running before cancellation')
+      if (mode === 'cancel') controller.abort()
+      await assert.rejects(running, { message: mode === 'cancel' ? 'cancelled' : 'SSH operation timed out' })
+      const stopped = await readFile(beatFile, 'utf8')
+      await new Promise(done => setTimeout(done, 120))
+      assert.equal(await readFile(beatFile, 'utf8'), stopped, 'A completed cancellation must leave no installer descendant writing')
+    } catch (error) { failure = error
+    } finally {
+      controller.abort()
+      // Only the exact test-owned descendant is eligible for fallback cleanup
+      // if the regression reappears; no scan or broad process matching.
+      if (pid) { try { process.kill(pid, 'SIGKILL') } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') failure = new AggregateError([...(failure ? [failure] : []), error], 'Fixture process cleanup failed')
+      } }
+      await rm(directory, { recursive: true, force: true })
+    }
+    if (failure) throw failure
+  }
+})
+
 test('host details use OpenSSH resolution, with explicit aliases only', async () => {
   const home = await mkdtemp(join(tmpdir(), 'mikka-ssh-hosts-'))
   try {

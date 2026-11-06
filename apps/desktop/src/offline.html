@@ -32,12 +32,13 @@
     <script>
       (() => {
         // The title says what failed (review C9): this computer has no network, or Mikka did not answer.
-        // The status line says only the state (R-40); the page keeps retrying on its own.
+        // The status line describes both native transports truthfully. Main's
+        // recovery policy and the bundled renderer's online event own retries.
         const params = new URLSearchParams(location.search);
         const en = /^en\b/i.test(navigator.language);
         const copy = en
-          ? { network: 'No network', server: "Can't reach Mikka", waiting: s => 'Disconnected for ' + s + 's · retrying', reconnecting: 'Reconnecting…', retry: 'Retry now' }
-          : { network: '没有网络', server: '无法连接 Mikka', waiting: s => '已断开 ' + s + ' 秒 · 自动重试中', reconnecting: '正在重新连接…', retry: '立即重试' };
+          ? { network: 'No network', server: "Can't reach Mikka", waiting: 'Waiting for the connection to recover.', reconnecting: 'Reconnecting…', retry: 'Retry now' }
+          : { network: '没有网络', server: '无法连接 Mikka', waiting: '等待连接恢复。', reconnecting: '正在重新连接…', retry: '立即重试' };
         const app = params.get('app');
         const retry = document.getElementById('retry');
         const status = document.getElementById('status');
@@ -53,9 +54,7 @@
         if (!app || !/^https?:\/\//.test(app)) { retry.hidden = true; return; }
         retry.href = app;
         retry.addEventListener('click', () => { status.textContent = copy.reconnecting; });
-        let seconds = 0;
-        status.textContent = copy.waiting(seconds);
-        setInterval(() => { seconds += 1; status.textContent = copy.waiting(seconds); }, 1000);
+        status.textContent = copy.waiting;
       })();
     </script>
   </body>

@@ -61,20 +61,69 @@ export type QuestionExecutionContinuation = {
  * Normal cloud resumes leave continuesRunId empty; only their validated
  * question_resume receipt may bind the direct question origin instead. */
 export async function questionExecutionContinuation(tx: Query, scope: Scope, continuationAttemptId: string): Promise<QuestionExecutionContinuation | null> {
+  const result = await readQuestionContinuation(tx, scope, continuationAttemptId, 'execute')
+  if (!result) return null
+  const { historyRunId: _history, sourceUnclaimed: _unclaimed, ...execution } = result
+  return execution
+}
+
+/** A plan can retain its native role without acquiring execution evidence.
+ * The stage/kind and read-only pairing is fixed here, never chosen by JSON. */
+export async function questionPlanContinuation(tx: Query, scope: Scope, continuationAttemptId: string) {
+  return readQuestionContinuation(tx, scope, continuationAttemptId, 'spec')
+}
+
+/** A failed claim never created a new native history. This is limited to a
+ * host-receipted read-only plan, with no lease, session or execution evidence.
+ * The caller still owns the current question/task/placement transaction. */
+export async function unclaimedPlanQuestionContinuation(tx: Query, scope: Scope, runId: string) {
+  const { rows } = await tx.query(`SELECT a.id FROM factory_tasks t
+    JOIN factory_attempts a ON a."taskId"=t.id AND a.stage='spec' AND a."candidateId" IS NULL
+    JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+    JOIN factory_questions q ON q.id::text=r."questionContinuation"->>'questionId'
+      AND q."taskId"=t.id AND q."userId"=t."userId" AND q."issueId"=t."issueId" AND q.stage='spec'
+    WHERE t.id=$1 AND t."userId"=$2 AND t."issueId"=$3 AND t."sourceEventId"=$4
+      AND t."botId" IS NOT DISTINCT FROM $5::uuid AND t.stage='spec' AND t."candidateId" IS NULL
+      AND r.id=$6 AND r.kind='plan' AND r."agentDefinition"->'readOnly'='true'::jsonb
+      AND r.status='failed' AND r."stopReason"='blocked' AND r."startedAt" IS NULL AND r."sessionId" IS NULL
+      AND r."leaseExpiresAt" IS NULL AND r."stopRequestedAt" IS NULL AND r."retryOf" IS NULL
+      AND r."lastReply" IS NULL AND r."lastReplyPart" IS NULL AND r."lastReplyAt" IS NULL AND a."sessionId" IS NULL
+      AND q.status IN ('answered','resuming','blocked') AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp())
+      AND NOT EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=r.id)
+      AND NOT EXISTS(SELECT 1 FROM run_chunks c WHERE c."runId"=r.id)
+      AND NOT EXISTS(SELECT 1 FROM run_checkpoints c WHERE c."runId"=r.id)
+      AND NOT EXISTS(SELECT 1 FROM artifacts ar WHERE ar."runId"=r.id)
+      AND NOT EXISTS(SELECT 1 FROM run_captures c WHERE c."runId"=r.id)
+    FOR SHARE OF t,a,r,q`, [scope.id, scope.userId, scope.issueId, scope.sourceEventId, scope.botId, runId])
+  if (rows.length !== 1) return null
+  const edge = await questionPlanContinuation(tx, scope, rows[0].id)
+  return edge?.continuationRunId === runId ? edge : null
+}
+
+type QuestionNativeContinuation = QuestionExecutionContinuation & {
+  historyRunId: string
+  sourceUnclaimed: boolean
+}
+
+async function readQuestionContinuation(tx: Query, scope: Scope, continuationAttemptId: string,
+  stage: 'execute' | 'spec', seen = new Set<string>()): Promise<QuestionNativeContinuation | null> {
+  if (seen.has(continuationAttemptId) || seen.size >= 32) return null
+  seen.add(continuationAttemptId)
   const { rows } = await tx.query(`SELECT to_jsonb(q) AS question, ${ownerEvent} AS "ownerEventMatches",
     e."eventId",e.request,e.result,pa.id AS "childAttemptId",sa.id AS "sourceAttemptId",oa.id AS "questionOriginAttemptId",
-    p.id AS "childRunId",s.id AS "sourceRunId",p."botId" AS "childBotId",s."botId" AS "sourceBotId",o."botId" AS "originBotId",p."questionContinuation" AS "childContinuation",s."questionContinuation" AS "sourceContinuation"
-    FROM factory_tasks t JOIN factory_attempts pa ON pa."taskId"=t.id AND pa.id=$6 AND pa.stage='execute'
+    p.id AS "childRunId",s.id AS "sourceRunId",p."botId" AS "childBotId",s."botId" AS "sourceBotId",o."botId" AS "originBotId",p."questionContinuation" AS "childContinuation",s."questionContinuation" AS "sourceContinuation",
+    s."sessionId" IS NULL AS "sourceUnclaimed"
+    FROM factory_tasks t JOIN factory_attempts pa ON pa."taskId"=t.id AND pa.id=$6 AND pa.stage=$7
     JOIN agent_runs p ON p.id=pa."runId" AND p."userId"=t."userId" AND p."issueId"=t."issueId"
     JOIN factory_questions q ON q.id::text=p."questionContinuation"->>'questionId'
-      AND q."taskId"=t.id AND q."userId"=t."userId" AND q."issueId"=t."issueId" AND q.stage='execute'
+      AND q."taskId"=t.id AND q."userId"=t."userId" AND q."issueId"=t."issueId" AND q.stage=$7
     JOIN factory_events e ON e."taskId"=t.id AND e.request->>'kind' IN ('question_resume','question_recover') AND e.result->>'continuationRunId'=p.id::text
     JOIN agent_runs s ON s.id=CASE
       WHEN e.request->>'kind'='question_resume' AND p."continuesRunId" IS NULL THEN q."originRunId"
       ELSE p."continuesRunId" END AND s."userId"=t."userId" AND s."issueId"=t."issueId"
-    JOIN factory_attempts sa ON sa."taskId"=t.id AND sa."runId"=s.id AND sa.stage='execute' AND sa.position+1=pa.position
+    JOIN factory_attempts sa ON sa."taskId"=t.id AND sa."runId"=s.id AND sa.stage=$7 AND sa.position+1=pa.position
     JOIN agent_runs o ON o.id=q."originRunId" AND o."userId"=t."userId" AND o."issueId"=t."issueId"
-    JOIN factory_attempts oa ON oa.id=q."attemptId" AND oa."taskId"=t.id AND oa."runId"=o.id AND oa.stage='execute' AND oa.position<=sa.position
+    JOIN factory_attempts oa ON oa.id=q."attemptId" AND oa."taskId"=t.id AND oa."runId"=o.id AND oa.stage=$7 AND oa.position<=sa.position
     LEFT JOIN computer_run_bindings pc ON pc."runId"=p.id LEFT JOIN computer_run_bindings sc ON sc."runId"=s.id
     JOIN devices d ON d.id=p."deviceId" AND d."ownerId"=t."userId"
     LEFT JOIN byos_bindings b ON b.id::text=p."agentDefinition"->'subscription'->>'bindingId'
@@ -82,9 +131,21 @@ export async function questionExecutionContinuation(tx: Query, scope: Scope, con
     LEFT JOIN byos_native_runs pn ON pn."runId"=p.id LEFT JOIN byos_native_runs sn ON sn."runId"=s.id
     WHERE t.id=$1 AND t."userId"=$2 AND t."issueId"=$3 AND t."sourceEventId"=$4 AND t."botId" IS NOT DISTINCT FROM $5::uuid
       AND q.status IN ('answered','resuming','resolved','blocked') AND q."candidateId" IS NULL
-      AND p.kind='implement' AND s.kind='implement' AND p."retryOf" IS NULL AND s."retryOf" IS NULL
+      AND p.kind=$8 AND s.kind=$8 AND p."retryOf" IS NULL AND s."retryOf" IS NULL
+      AND ($7<>'spec' OR (t.stage='spec' AND t."candidateId" IS NULL AND pa."candidateId" IS NULL
+        AND o.kind='plan' AND p."agentDefinition"->'readOnly'='true'::jsonb
+        AND s."agentDefinition"->'readOnly'='true'::jsonb AND o."agentDefinition"->'readOnly'='true'::jsonb))
       AND s."stopRequestedAt" IS NULL AND o."stopRequestedAt" IS NULL AND o.status='stopped'
-      AND s."sessionId"=q."originSessionId" AND o."sessionId"=q."originSessionId"
+      AND (s."sessionId"=q."originSessionId" OR ($7='spec' AND e.request->>'kind'='question_recover'
+        AND s.status='failed' AND s."stopReason"='blocked' AND s."sessionId" IS NULL AND s."startedAt" IS NULL
+        AND s."leaseExpiresAt" IS NULL AND s."lastReply" IS NULL AND s."lastReplyPart" IS NULL AND s."lastReplyAt" IS NULL
+        AND sa."sessionId" IS NULL
+        AND NOT EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=s.id)
+        AND NOT EXISTS(SELECT 1 FROM run_chunks c WHERE c."runId"=s.id)
+        AND NOT EXISTS(SELECT 1 FROM run_checkpoints c WHERE c."runId"=s.id)
+        AND NOT EXISTS(SELECT 1 FROM artifacts a WHERE a."runId"=s.id)
+        AND NOT EXISTS(SELECT 1 FROM run_captures c WHERE c."runId"=s.id)))
+      AND o."sessionId"=q."originSessionId" AND ($7<>'spec' OR o."startedAt" IS NOT NULL)
       AND s."deviceId"=p."deviceId" AND s."deviceRepoId"=p."deviceRepoId" AND s."agentId"=p."agentId"
       AND s."baseBranch" IS NOT DISTINCT FROM p."baseBranch"
       AND o."deviceId"=p."deviceId" AND o."deviceRepoId"=p."deviceRepoId" AND o."agentId"=p."agentId"
@@ -105,8 +166,9 @@ export async function questionExecutionContinuation(tx: Query, scope: Scope, con
           AND b.route=p."agentDefinition"->'subscription'->>'route'
           AND b.route=CASE p."agentDefinition"->>'harness' WHEN 'codex' THEN 'codex_cli' WHEN 'claude_code' THEN 'claude_code_cli' END
           AND bc.provider=CASE p."agentDefinition"->>'harness' WHEN 'codex' THEN 'codex' WHEN 'claude_code' THEN 'claude' END
+          AND ($7<>'spec' OR (bc.state='connected' AND bc.paused=false))
           AND (pn."runId" IS NULL OR pn."bindingId"=b.id) AND (sn."runId" IS NULL OR sn."bindingId"=b.id)
-          AND (e.request->>'kind'='question_resume' OR sn."bindingId"=b.id)))
+          AND (e.request->>'kind'='question_resume' OR sn."bindingId"=b.id OR ($7='spec' AND s."sessionId" IS NULL))))
       AND sa."candidateId" IS NULL AND oa."candidateId" IS NULL
       AND COALESCE(pa.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
       AND COALESCE(sa.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
@@ -119,7 +181,7 @@ export async function questionExecutionContinuation(tx: Query, scope: Scope, con
       AND ((e.request->>'kind'='question_resume' AND s.id=o.id AND sa.id=oa.id AND s.status='stopped')
         OR (e.request->>'kind'='question_recover' AND s.status='failed' AND oa.position<sa.position
           AND (s."stopReason" IS NULL OR s."stopReason" NOT IN ('cancelled','revoked'))))`,
-  [scope.id, scope.userId, scope.issueId, scope.sourceEventId, scope.botId, continuationAttemptId])
+  [scope.id, scope.userId, scope.issueId, scope.sourceEventId, scope.botId, continuationAttemptId, stage, stage === 'spec' ? 'plan' : 'implement'])
   if (rows.length !== 1) return null
   const row = rows[0], q = row.question as Question
   for (const run of [{ id: row.childRunId, botId: row.childBotId }, { id: row.sourceRunId, botId: row.sourceBotId }, { id: q.originRunId, botId: row.originBotId }])
@@ -132,7 +194,7 @@ export async function questionExecutionContinuation(tx: Query, scope: Scope, con
     row.result?.questionId !== q.id || row.result.continuationRunId !== row.childRunId ||
     row.result.originRunId !== q.originRunId || row.result.originSessionId !== q.originSessionId ||
     saved?.id !== scope.id || saved.userId !== scope.userId || saved.issueId !== scope.issueId || saved.botId !== scope.botId ||
-    saved.sourceEventId !== scope.sourceEventId || saved.attemptId !== row.childAttemptId || saved.stage !== 'execute' ||
+    saved.sourceEventId !== scope.sourceEventId || saved.attemptId !== row.childAttemptId || saved.stage !== stage ||
     saved.status !== 'running' || saved.candidateId !== null || !Number.isInteger(saved.revision)) return null
   const kind = row.request.kind as QuestionExecutionContinuation['kind']
   if (kind === 'question_resume') {
@@ -150,10 +212,20 @@ export async function questionExecutionContinuation(tx: Query, scope: Scope, con
       reference.questionRevision > q.revision || reference.binding.taskId !== scope.id || reference.binding.issueId !== scope.issueId ||
       reference.binding.attemptId !== row.sourceAttemptId || reference.binding.candidateId !== null || saved.revision <= reference.binding.revision) return null
   }
+  let historyRunId = row.sourceRunId as string
+  if (row.sourceUnclaimed) {
+    // A never-claimed plan has no native history of its own. Its earlier host
+    // receipt must prove the same answer/origin before following that history.
+    if (stage !== 'spec' || kind !== 'question_recover') return null
+    const source = await readQuestionContinuation(tx, scope, row.sourceAttemptId, stage, seen)
+    if (!source || source.continuationRunId !== row.sourceRunId || source.questionId !== q.id ||
+      source.questionOriginRunId !== q.originRunId || source.originSessionId !== q.originSessionId || source.answerId !== answer.answerId) return null
+    historyRunId = source.historyRunId
+  }
   return { kind, originAttemptId: row.sourceAttemptId, continuationAttemptId: row.childAttemptId,
     questionOriginAttemptId: row.questionOriginAttemptId, sourceRunId: row.sourceRunId, continuationRunId: row.childRunId,
     questionOriginRunId: q.originRunId, originSessionId: q.originSessionId, questionId: q.id,
-    answerId: answer.answerId, recoveryEventId: row.eventId }
+    answerId: answer.answerId, recoveryEventId: row.eventId, historyRunId, sourceUnclaimed: Boolean(row.sourceUnclaimed) }
 }
 
 /** Before the child exists, the verified answer and the host retry event

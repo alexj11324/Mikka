@@ -19,6 +19,7 @@ import { assertNativeViewport, assertViewportPng, setNativeViewport } from './na
 import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
 import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
 import { settingsReadRequirements, settingsReady } from './parity-settings-ready.mjs'
+import { waitForNativeDevice } from './native-device-ready.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -35,7 +36,7 @@ const initialWorkspaceMenuNames = [messages.Nav.workspaceMenu, JSON.parse(await 
 const actionIds = await readActionIds(resolve(process.env.MIKKA_TEST_APP_DIR ?? process.cwd()))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
   timeZone: 'UTC',
@@ -272,17 +273,6 @@ async function coordinatorReady(page) {
   await page.getByRole('region', { name: messages.Coordinator.conversation, exact: true }).getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
 }
 
-async function nativeDeviceReady(target) {
-  const deadline = Date.now() + 180_000
-  while (Date.now() < deadline) {
-    await scope.assertActive()
-    const state = await target.page.evaluate(async () => ({ device: await window.mikka.device.status(), install: await window.mikka.ssh.state() }))
-    if (state.device.status === 'online' && state.device.deviceId && state.device.signedIn === true && state.device.server === 'online' && !['running', 'fingerprint'].includes(state.install?.status)) return
-    await new Promise(resolve => setTimeout(resolve, 250))
-  }
-  throw new Error('PARITY_NATIVE_DEVICE_NOT_READY')
-}
-
 function screens(fixture) {
   const route = (name, path, ready) => ({ name, open: async target => { await go(target, path); if (ready) await ready(target.page) } })
   const text = value => page => page.getByText(value, { exact: true }).first().waitFor()
@@ -471,7 +461,8 @@ try {
       }
     }
     async function captureAuthenticated(target) {
-      await nativeDeviceReady(target)
+      stage = `native-device-${target.mode}`
+      await waitForNativeDevice(target, { scope, profile: profiles[0], record: value => { (report.nativeDeviceChecks ??= []).push(value) } })
       for (const appearance of report.themes) {
         await theme(target, appearance)
         for (const screen of matrix) await pair(screen.name, appearance, [target], screen.open, screen.check)
