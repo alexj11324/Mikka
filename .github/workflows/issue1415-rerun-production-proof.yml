@@ -1,0 +1,46 @@
+name: Issue 1415 restore unexecuted production proof
+
+on:
+  push:
+    branches:
+      - ops/issue1415-rerun-production-proof
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue1415-rerun-production-proof-controller
+  cancel-in-progress: false
+
+jobs:
+  rerun:
+    if: >-
+      github.repository == 'alexj11324/Mikka' &&
+      github.repository_owner_id == '183887963' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/issue1415-rerun-production-proof'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: read
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Request the original unexecuted run once after exact guards
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ops/rerun-production-proof.mjs
+      - name: Retain only the closed controller result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue1415-production-proof-rerun-${{ github.run_id }}
+          path: production-proof-rerun-report/result.json
+          retention-days: 14
+          if-no-files-found: error
