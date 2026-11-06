@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { encode } from '../../lib/desktop-rpc/wire.ts'
 import { cancellationObserved, creationEvidence, managedEvidence, occurrenceEvidence,
   readTimerHook, reminderDefinition, runWorkflowMigrationProof } from './workflow-migration-production.mjs'
+import { DEPLOYED_WORKFLOW, attestDeployedTarget } from './deployed-target.mjs'
 
 const SHA = 'a'.repeat(40), OTHER = 'b'.repeat(40), NOW = Date.parse('2026-11-06T12:00:00Z')
 const ORIGIN = 'https://app.aspectlylabs.com', REPOSITORY = 'alexj11324/Mikka'
@@ -129,14 +130,35 @@ test('the real locked SDK absent-hook error is pending, while auth/transport err
 })
 
 function fullFixture(options = {}) {
-  let clock = NOW, definition, submitted = false, cancelled = false, timerReads = 0
+  let clock = NOW, definition, submitted = false, cancelled = false, timerReads = 0, deploymentReads = 0
   const requests = [], managerCalls = []
+  const repository = { full_name: REPOSITORY, owner: { login: 'alexj11324' } }
+  const selectedEnv = options.deployed ? { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: OTHER,
+    GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_RUN_ID: '20', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_WORKFLOW_REF: REPOSITORY + '/' + DEPLOYED_WORKFLOW + '@refs/heads/main',
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: SHA,
+    WEB_DEPLOY_RUN_ID: '10', VERCEL_DEPLOYMENT_ID: DEPLOYMENT } : env
+  const selectedEvent = options.deployed ? { repository,
+    inputs: { application_sha: SHA, web_run_id: '10', deployment_id: DEPLOYMENT } } : event
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), headers = new Headers(init.headers), method = init.method ?? 'GET'
     requests.push({ origin: url.origin, path: url.pathname, method, body: init.body })
     assert.equal(init.redirect, 'error')
     if (url.origin === 'https://api.github.com') {
       assert.equal(headers.get('authorization'), 'Bearer SYNTHETIC_GH_TOKEN')
+      if (options.deployed) {
+        assert.notEqual(url.pathname, '/repos/' + REPOSITORY + '/git/ref/heads/main')
+        if (url.pathname.endsWith('/actions/runs/20')) return json({ id: 20, run_attempt: 1,
+          repository, head_repository: repository, url: 'https://api.github.com/repos/' + REPOSITORY + '/actions/runs/20',
+          path: DEPLOYED_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: OTHER,
+          status: 'in_progress', conclusion: null })
+        if (url.pathname.endsWith('/actions/runs/10')) return json({ ...release, repository, head_repository: repository, run_attempt: 1 })
+        if (url.pathname.endsWith('/actions/runs/10/attempts/1/jobs')) return json({ total_count: 1, jobs: [{
+          id: 30, run_id: 10, name: 'deploy', head_sha: SHA, status: 'completed', conclusion: 'success',
+          steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
+            'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),
+        }] })
+      }
       if (url.pathname.endsWith('/issues/1415')) return json({ number: 1415, state: options.closed ? 'closed' : 'open',
         url: 'https://api.github.com/repos/' + REPOSITORY + '/issues/1415', repository_url: 'https://api.github.com/repos/' + REPOSITORY })
       if (url.pathname.endsWith('/git/ref/heads/main')) return json({ ref: 'refs/heads/main', object: { type: 'commit', sha: options.wrongMain ? OTHER : SHA } })
@@ -145,8 +167,13 @@ function fullFixture(options = {}) {
     if (url.origin === 'https://api.vercel.com') {
       assert.equal(headers.get('authorization'), 'Bearer ' + TOKEN)
       assert.equal(url.searchParams.get('teamId'), TEAM); assert.equal(method, 'GET')
-      return url.pathname.startsWith('/v4/') ? json({ alias: 'app.aspectlylabs.com', projectId: PROJECT, deploymentId: DEPLOYMENT, updatedAt: NOW })
-        : json({ projectId: PROJECT, gitSource: { sha: SHA }, readyState: 'READY', target: 'production' })
+      return url.pathname.startsWith('/v4/') ? json({ alias: 'app.aspectlylabs.com', projectId: PROJECT,
+        deploymentId: options.driftAfterSubmit && submitted ? 'dpl_ChangedSameSha' : DEPLOYMENT, updatedAt: NOW })
+        : json({ id: DEPLOYMENT,
+          ...(options.nestedProject ? { project: { id: PROJECT } } : { projectId: PROJECT }),
+          ...(options.conflictingManagedProject && ++deploymentReads === 3
+            ? { projectId: PROJECT, project: { id: 'prj_Foreign' } } : {}),
+          gitSource: { sha: SHA }, readyState: 'READY', target: 'production' })
     }
     assert.equal(url.origin, ORIGIN); assert.equal(headers.get('authorization'), null)
     if (url.pathname === '/mikka/api/version') return json({ build: SHA })
@@ -156,7 +183,7 @@ function fullFixture(options = {}) {
       return json({}, 200, { 'set-cookie': 'better-auth.session_token=' + COOKIE + '; Path=/; Secure; HttpOnly' })
     }
     assert.equal(headers.get('cookie'), 'better-auth.session_token=' + COOKIE)
-    if (url.pathname.endsWith('/sign-out')) return json({})
+    if (url.pathname.endsWith('/sign-out')) return json({}, options.logoutStatus ?? 200)
     if (url.pathname.endsWith('/get-session')) return json({ user: { id: OWNER, email: EMAIL } })
     if (url.pathname === '/mikka/api/workspace') return json({ currentUserId: OWNER, role: 'admin',
       workspace: { id: id(10), kind: options.shared ? 'shared' : 'personal' } })
@@ -205,8 +232,12 @@ function fullFixture(options = {}) {
       async events() { managerCalls.push('events'); return options.noWait ? events().filter(event => event.eventType !== 'wait_completed') : events() },
     }
   }
-  return { requests, managerCalls, run: () => runWorkflowMigrationProof({ env, event, fetchImpl, now: () => clock,
-    wait: async ms => { clock += ms }, readerFactory }) }
+  return { requests, managerCalls, run: async () => {
+    const proof = options.deployed ? await attestDeployedTarget({ env: selectedEnv, event: selectedEvent, fetchImpl, now: () => clock }) : undefined
+    return runWorkflowMigrationProof({ env: selectedEnv, event: selectedEvent, fetchImpl, now: () => clock,
+      wait: async ms => { clock += ms }, readerFactory,
+      attestation: proof && { ...proof, ...options.attestationPatch } })
+  } }
 }
 
 test('complete driver separates manager credentials, performs one normal post, reads real row identity and closes its session', async () => {
@@ -269,4 +300,67 @@ test('workflow keeps standalone read acceptance and serializes the bounded migra
   const desktop = await readFile(new URL('../../.github/workflows/desktop.yml', import.meta.url), 'utf8')
   assert.ok(!desktop.includes("'scripts/acceptance/"))
   assert.ok(!desktop.includes("'.github/workflows/read-cache-production.yml'"))
+})
+
+
+test('explicit deployed target reuses the same owner and managed reminder proof with a different real driver', async () => {
+  const f = fullFixture({ deployed: true }), report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(report.targetMode, 'deployed-target')
+  assert.equal(report.applicationSha, SHA); assert.equal(report.driverRevision, OTHER)
+  assert.equal(report.driverRunId, 20); assert.equal(report.driverRunAttempt, 1)
+  assert.equal(report.webDeployJobId, 30); assert.equal(report.deploymentId, DEPLOYMENT)
+  assert.equal(report.targetBefore.status, 'ready'); assert.equal(report.targetAfter.status, 'ready')
+  assert.equal(report.managed.coordinatorCompleted, true); assert.equal(report.managed.dueTimerObserved, true)
+  assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 0)
+  assert.equal(report.futureScheduleConfirmedAbsent, true); assert.equal(report.sessionClosed, true)
+  for (const secret of [EMAIL, PASSWORD, COOKIE, TOKEN, OWNER, BOT, SCHEDULE])
+    assert.equal(JSON.stringify(report).includes(secret), false)
+})
+
+test('deployed proof cannot be replaced by a legacy or different-driver file before owner access', async () => {
+  for (const attestationPatch of [{ purpose: 'production-readiness' }, { driverRevision: SHA }, { driverRunId: 99 }]) {
+    const f = fullFixture({ deployed: true, attestationPatch }), report = await f.run()
+    assert.equal(report.status, 'blocked'); assert.equal(report.code, 'target_attestation')
+    assert.equal(report.submissionCount, 0)
+    assert.equal(f.requests.some(row => row.path.endsWith('/sign-in/email')), false)
+  }
+})
+
+test('target drift still permits only exact known-schedule cleanup and closes the owned session', async () => {
+  const f = fullFixture({ deployed: true, noOccurrence: true, driftAfterSubmit: true }), report = await f.run()
+  assert.equal(report.status, 'inconclusive'); assert.equal(report.code, 'target_changed')
+  assert.equal(report.businessFailure.code, 'reminder_not_observed')
+  assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 1)
+  assert.equal(report.futureScheduleConfirmedAbsent, true); assert.equal(report.sessionClosed, true)
+  assert.equal(report.futureScheduleEvidence, 'normal-owner-schedule-cancel')
+  assert.equal(f.requests.filter(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST').length, 2)
+  const logout = f.requests.findLastIndex(row => row.path.endsWith('/sign-out'))
+  const lastProof = f.requests.findLastIndex(row => row.path.endsWith('/actions/runs/20'))
+  assert.ok(logout >= 0 && lastProof > logout, 'the final target check follows resource and session cleanup')
+})
+
+test('target drift cannot downgrade an actual cleanup failure to inconclusive', async () => {
+  const f = fullFixture({ deployed: true, noOccurrence: true, driftAfterSubmit: true, logoutStatus: 500 })
+  const report = await f.run()
+  assert.equal(report.status, 'fail'); assert.equal(report.code, 'session_close_failed')
+  assert.equal(report.sessionClosed, false); assert.equal(report.futureScheduleConfirmedAbsent, true)
+  assert.equal(report.targetAfterFailure.code, 'target_changed')
+})
+
+
+test('new managed mode accepts the actual nested provider project identity without changing the default path', async () => {
+  const report = await fullFixture({ deployed: true, nestedProject: true }).run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.managed.coordinatorCompleted, true)
+  assert.equal(report.sessionClosed, true); assert.equal(report.futureScheduleConfirmedAbsent, true)
+  const legacy = await fullFixture({ nestedProject: true }).run()
+  assert.equal(legacy.status, 'fail'); assert.equal(legacy.code, 'deployment_mismatch')
+  assert.equal(legacy.submissionCount, 0)
+})
+
+test('new managed repeated deployment read rejects conflicting project scopes before owner access', async () => {
+  const f = fullFixture({ deployed: true, conflictingManagedProject: true }), report = await f.run()
+  assert.notEqual(report.status, 'pass')
+  assert.equal(report.submissionCount, 0)
+  assert.equal(f.requests.some(row => row.path.endsWith('/sign-in/email')), false)
 })

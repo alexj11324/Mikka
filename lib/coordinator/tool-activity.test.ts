@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatTool } from './context'
-import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget } from './tool-activity'
+import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown } from './tool-activity'
 
 const tool = (name: string, extra: Partial<ChatTool> = {}): ChatTool => ({ call: name, name, state: 'done', ...extra })
 
@@ -63,4 +63,13 @@ test('a call that names a task or thread by id gives that id, for the chat to sh
   assert.equal(toolObjectId(tool('get_run', { input: '{"runId": "r1"}' })), 'r1')
   assert.equal(toolObjectId(tool('list_runs', { input: '{"issueId": "i1", "limit": 5}' })), 'i1')
   assert.equal(toolObjectId(tool('web_search', { input: '{"query": "x"}' })), null)
+})
+
+test('a call to a tool the bot does not have is known as such, so its made-up name never shows (#1516)', () => {
+  const raw = "AI_NoSuchToolError: Model tried to call unavailable tool 'none'. Available tools: get_issue."
+  assert.equal(toolUnknown(tool('none', { state: 'error', output: raw })), true)
+  assert.equal(toolUnknown(tool('none', { state: 'error', output: JSON.stringify({ error: raw }) })), true)
+  assert.equal(toolUnknown(tool('get_issue', { state: 'error', output: 'boom' })), false)
+  // Only a call that failed: a tool that merely mentions the class in a result is not unknown.
+  assert.equal(toolUnknown(tool('web_search', { output: raw })), false)
 })
