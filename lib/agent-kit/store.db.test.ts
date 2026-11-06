@@ -250,6 +250,31 @@ test('audit events are idempotent, immutable, redacted and closed to unassigned 
   await store.finishExecution(scope,execution.id,'failed','tool_error')
   await assert.rejects(store.recordTool(scope,execution.id,'new-call','web_search','start'),/agentExecutionClosed/)
 })
+
+test('a stopped execution closes only its already-started tool audits, without inventing failure cases',async()=>{
+  const scope=await owner()
+  for(const outcome of ['stopped','ok'] as const){
+    const execution=await store.beginExecution(scope,`stopped-audit-${outcome}`,'host',{harness:'ai_sdk',model:'fixture'},defaults)
+    await store.recordTool(scope,execution.id,'already-started','web_search','start')
+    await store.finishExecution(scope,execution.id,'completed')
+    await assert.rejects(store.recordTool(scope,execution.id,'already-started','get_issue','finish',outcome),/agentExecutionClosed/)
+    await store.recordTool(scope,execution.id,'already-started','web_search','finish',outcome)
+    await store.recordTool(scope,execution.id,'already-started','web_search','finish',outcome)
+    const events=await pool.query('select kind,payload from agent_kit_events where execution_id=$1 and kind=$2',[execution.id,'tool_finished'])
+    assert.deepEqual(events.rows,[{kind:'tool_finished',payload:{toolName:'web_search',outcome}}])
+    await assert.rejects(store.recordTool(scope,execution.id,'never-started','web_search','finish',outcome),/agentExecutionClosed/)
+    await assert.rejects(store.recordTool(scope,execution.id,'already-started','get_issue','finish',outcome),/agentEventConflict|agentExecutionClosed/)
+    await assert.rejects(store.recordTool(scope,execution.id,'new-call','web_search','start'),/agentExecutionClosed/)
+  }
+  const unrelated=await store.beginExecution(scope,'unrelated-execution','host',{harness:'ai_sdk',model:'fixture'},defaults)
+  await store.finishExecution(scope,unrelated.id,'completed')
+  await assert.rejects(store.recordTool(scope,unrelated.id,'already-started','web_search','finish','stopped'),/agentExecutionClosed/)
+  const failed=await store.beginExecution(scope,'failed-audit','host',{harness:'ai_sdk',model:'fixture'},defaults)
+  await store.recordTool(scope,failed.id,'started-before-failure','web_search','start')
+  await store.finishExecution(scope,failed.id,'failed')
+  await assert.rejects(store.recordTool(scope,failed.id,'started-before-failure','web_search','finish','stopped'),/agentExecutionClosed/)
+  assert.equal((await store.dataset(scope)).length,0,'a user stop is not a tool failure')
+})
 test('three distinct failure cases generate an inactive capability-preserving candidate',async()=>{
   const scope=await owner();const proposal=await failures(scope)
   assert.equal(proposal.evidence.length,3)

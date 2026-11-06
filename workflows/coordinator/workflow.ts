@@ -32,7 +32,9 @@ export async function coordinatorTurn(userId: string, botId: string) {
   // What the run reads once and its first inbox, side by side: each step is a durable round trip, and they are independent.
   const [{ computerEnabled, mailboxEnabled, writeEnabled, switches, coordinator, runtime: selected }, firstInbox] = await Promise.all([steps.turnSettings(userId,botId), steps.takeInbox(userId,holder,botId)])
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    if (controller.signal.aborted) controller = new AbortController()
+    // A stop while the first steps were running belongs to the first inbox.
+    // Only a later inbox, after that stopped round, gets a fresh signal.
+    if (round > 0 && controller.signal.aborted) controller = new AbortController()
     const signal = controller.signal
     const inbox = round === 0 ? firstInbox : await steps.takeInbox(userId,holder,botId)
     // The Workflow clock is the durable event time: this is when the inbox was taken.
@@ -63,7 +65,9 @@ export async function coordinatorTurn(userId: string, botId: string) {
       const mailboxTools = prepared.mailboxTools
       // Every model call that finished with its tools, as it finishes: 停止 keeps these without waiting for the rest.
       const finished: ModelMessage[] = []
-      const turn = selected.harness === 'ai_sdk'
+      const turn = signal.aborted && !inbox.scheduledRead
+        ? Promise.resolve({ text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] })
+        : selected.harness === 'ai_sdk'
         ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
         : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal,finished)
       // A scheduled read is not stoppable from the chat: it posts only its fenced result. Otherwise 停止 ends a hosted

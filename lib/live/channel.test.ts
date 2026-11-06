@@ -533,6 +533,32 @@ function revisionFixture() {
   return { ...f, urls, ready }
 }
 
+test('one coalesced read requires the highest pushed revision of every entity behind its key', async () => {
+  const f = revisionFixture()
+  const reads: { key: string; required?: Readonly<Record<string, number>>; reuseCompleted?: boolean }[] = []
+  const refresh = (key: string, required?: Readonly<Record<string, number>>, reuseCompleted?: boolean) => { reads.push({ key, required, reuseCompleted }) }
+  f.channel.subscribe('bot_chat', task, ['chat'], refresh, { revisions: { chat: 5 } })
+  f.channel.subscribe('run', other, ['chat'], refresh, { revisions: { chat: 2 } })
+  await f.open()
+  f.sockets[0].message(JSON.stringify({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat', 'run'] }))
+  reads.length = 0
+  for (const rev of [6, 7, 6]) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
+  f.sockets[0].message(JSON.stringify({ kind: 'run', id: other, rev: 3 }))
+  await f.advance(1_000)
+  assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 7, [`run:${other}`]: 3 }, reuseCompleted: true }])
+  reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
+  await f.advance(1_000)
+  assert.deepEqual(reads, [{ key: 'chat', required: undefined, reuseCompleted: false }], 'unversioned events retain their existing read path')
+  for (const revisions of [[6, undefined], [undefined, 6]]) {
+    reads.length = 0
+    for (const rev of revisions) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
+    await f.advance(1_000)
+    assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 6 }, reuseCompleted: false }], 'an unversioned event preserves known requirements but cannot reuse a completed read')
+  }
+  f.channel.dispose()
+})
+
 test('a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one', async () => {
   const f = revisionFixture()
   const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
@@ -589,9 +615,10 @@ test('a revision never skips a key it does not cover, a version 1 Worker, or a k
 
 test('an unconditional push merged with a covered one still reads', async () => {
   const f = revisionFixture()
-  f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
+  const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
   await f.open(); f.ready(2); f.reads.length = 0
   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 6 }))
+  subscription.update({ revisions: { chat: 6 }, minIntervalMs: 2_000 })
   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
   await f.advance(3_000)
   assert.deepEqual(f.reads, ['chat'])

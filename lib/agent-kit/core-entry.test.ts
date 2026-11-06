@@ -18,6 +18,13 @@ let stopNow=()=>{}
 let stopDuringTurn=false
 // 停止 while a tool call runs: the agent never returns (the tool step is still running) after one finished model call.
 let stopDuringTool=false
+let stopAt:'settings'|'inbox'|'prepare'|null=null
+let extraInbox=false
+const deliverEarlyStop=async(stage:typeof stopAt)=>{
+  if(stopAt!==stage)return
+  stopAt=null;stopNow()
+  await Promise.resolve();await Promise.resolve()
+}
 // A tool's finish record the model call started and the round has not awaited yet: 'slow' settles after the model, 'fail' rejects.
 let pendingAudit:'slow'|'fail'|null=null
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable,
@@ -60,11 +67,13 @@ const noteQuotaSwitch=async(...args:unknown[])=>{record('quotaSwitch')(...args)}
 let preparedPrompt:Record<string,unknown>|null=null
 const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return preparedPrompt ?? {prompt:'synthetic request'}}
 stub('../../workflows/coordinator/steps.ts',{
-  turnSettings:async()=>({computerEnabled:false,mailboxEnabled,writeEnabled:false,switches,coordinator:false,runtime:{harness:'ai_sdk'}}),
+  turnSettings:async()=>{await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
   prepareTurn:async(userId:string,botId:string,holder:string,input:{snapshot?:unknown;executionId?:string;mailboxEnabled:boolean;runtime:unknown}) => {
     const mailboxTools=input.mailboxEnabled ? await mailboxCatalogue(userId,botId,input.executionId) : []
     if (input.runtime) await noteQuotaSwitch(userId,holder,input.runtime,botId)
-    return {mailboxTools,prompt:await preparePrompt(userId,botId,input.snapshot,mailboxTools)}
+    const prompt=await preparePrompt(userId,botId,input.snapshot,mailboxTools)
+    await deliverEarlyStop('prepare')
+    return {mailboxTools,prompt}
   },
   computerToolsEnabled:async()=>false,
   personalWriteToolsEnabled:async()=>false,
@@ -72,14 +81,14 @@ stub('../../workflows/coordinator/steps.ts',{
   isCoordinatorChat:async()=>false,
   mailboxToolsEnabled:async()=>mailboxEnabled,
   mailboxCatalogue,
-  takeInbox:async()=>{const added=!inboxTaken;inboxTaken=true;return {held:true,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
+  takeInbox:async()=>{await deliverEarlyStop('inbox');const added=!inboxTaken || extraInbox;if(inboxTaken)extraInbox=false;inboxTaken=true;return {held:true,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
   releaseLease:async()=>false,
   preparePrompt,
   appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
   noteQuotaSwitch,
   writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
   logTurnTiming:async(...args:unknown[])=>{record('timing')(...args)},
-  markStopped:async(...args:unknown[])=>{record('stream')(args[0],{type:'coordinator-turn-stopped',id:args[2]});record('stoppedText')(...args.slice(1));return stopDuringTool ? 'Creating it.' : 'The task is'},
+  markStopped:async(...args:unknown[])=>{record('stream')(args[0],{type:'coordinator-turn-stopped',id:args[2]});record('stoppedText')(...args.slice(1));return !calls.some(c=>c.name==='hosted') ? '' : stopDuringTool ? 'Creating it.' : 'The task is'},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
@@ -88,7 +97,7 @@ stub('../../workflows/coordinator/steps.ts',{
 let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
 function reset(harness?:string){
-  calls.length=0;stopDuringTurn=false;stopDuringTool=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
+  calls.length=0;stopDuringTurn=false;stopDuringTool=false;stopAt=null;extraInbox=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
 }
 test('real workflow entry uses the returned execution snapshot for model, prompt and tool registry',async()=>{
@@ -155,6 +164,25 @@ test('停止 while a tool call runs ends the turn at once: the finished call is 
   // The words of the finished call are already in its messages: they are not stored a second time.
   assert.deepEqual(calls.find(c=>c.name==='append')?.args,[owner,'synthetic-workflow',[{role:'assistant',content:[{type:'text',text:'Creating it.'}]},{role:'tool',content:[]},{role:'assistant',content:''}],null,bot,'synthetic-workflow:0',true])
   assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>(c.args[1] as {type:string}).type),['coordinator-turn-start','coordinator-turn-stopped','coordinator-turn-committed'])
+  assert.equal(calls.filter(c=>c.name==='failed').length,0)
+})
+
+for(const stage of ['settings','inbox','prepare'] as const)test(`停止 during ${stage} keeps the stop and never starts the model or tools`,async()=>{
+  reset('ai_sdk');stopAt=stage
+  await coordinatorTurn(owner,bot)
+  assert.equal(calls.filter(c=>c.name==='hosted').length,0)
+  assert.equal(calls.filter(c=>c.name==='tools').length,0)
+  assert.deepEqual(calls.find(c=>c.name==='append')?.args,[owner,'synthetic-workflow',[{role:'assistant',content:''}],null,bot,'synthetic-workflow:0',true])
+  assert.equal(calls.filter(c=>c.name==='failed').length,0)
+})
+
+test('a message taken after the stopped round gets a fresh signal and runs normally',async()=>{
+  reset('ai_sdk');stopAt='settings';extraInbox=true
+  await coordinatorTurn(owner,bot)
+  const hosted=calls.filter(c=>c.name==='hosted')
+  assert.equal(hosted.length,1,'the stopped first round never starts the model')
+  assert.equal((hosted[0].args[2] as {abortSignal:AbortSignal}).abortSignal.aborted,false)
+  assert.deepEqual(calls.filter(c=>c.name==='append').map(c=>[c.args[5],c.args[6]===true]),[['synthetic-workflow:0',true],['synthetic-workflow:1',false]])
   assert.equal(calls.filter(c=>c.name==='failed').length,0)
 })
 

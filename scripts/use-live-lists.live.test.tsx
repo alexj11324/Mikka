@@ -6,6 +6,7 @@ import type { State } from 'swr'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { liveKeyConnection } from '../lib/swr/live-focus'
+import { PersistentReadCache } from '../lib/swr/persistent-cache'
 
 const home = '10000000-0000-4000-8000-000000000001'
 const team = '20000000-0000-4000-8000-000000000001'
@@ -203,6 +204,42 @@ test('real list hooks update held revisions after an asynchronous read without l
   assert.equal(tickets.length, before.tickets)
   assert.equal(sockets.length, before.sockets)
   assert.equal(liveKeyConnection(cache, issueKey), true)
+})
+
+test('real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes', { timeout: 15_000 }, async () => {
+  const scoped = [0, 1, 2].map(() => new PersistentReadCache({ userId: 'owner', workspaceId: team, build: 'fixture', role: 'member' }))
+  await Promise.all(scoped.map(value => value.hydrate(async () => undefined)))
+  const snapshotAt = (revision: number): Read => {
+    const value = snapshot('bots')
+    return { ...value, items: [{ id: 'bots', title: `revision-${revision}` }], live: { ...value.live, revisions: { [`bot_chat_list:${home}`]: revision } } }
+  }
+  replies.set('bots', async () => snapshotAt(5))
+  await act(async () => root.render(<>{scoped.map((provider, index) => <SWRConfig key={index} value={{ provider: () => provider, dedupingInterval: 0 }}>
+    <LiveProvider ownerId="owner" workspaceId={team}><div data-tab={index}><Bots owner="owner" /></div></LiveProvider>
+  </SWRConfig>)}</>))
+  await settled(); await wait(2_100)
+  assert.equal(sockets.length, 3)
+  for (const socket of sockets) socket.message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat_list'] })
+  const held = deferred<Read>()
+  const before = count('bots')
+  replies.set('bots', () => held.promise)
+  try {
+    await act(async () => sockets[0].message({ kind: 'bot_chat_list', id: home })); await wait()
+    assert.equal(count('bots'), before + 1, 'the first tab is reading a snapshot captured before revision 6')
+    replies.set('bots', async () => snapshotAt(6))
+    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 6 }) }); await wait()
+    assert.equal(count('bots'), before + 1, 'the other tabs join the outstanding claim')
+    await act(async () => held.resolve(snapshotAt(5))); await settled(); await wait(2_100)
+    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-6'), 'the newer push must reach every tab without another push or reconnect')
+    assert.equal(count('bots'), before + 2, 'old read + one fresh read, including the paced leader trailing read')
+
+    await wait(2_100)
+    replies.set('bots', async () => snapshotAt(7))
+    const fresh = count('bots')
+    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 7 }) }); await settled()
+    assert.equal(count('bots'), fresh + 1, 'matching pushes still coalesce across real providers')
+    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-7'))
+  } finally { held.resolve(snapshotAt(5)) }
 })
 
 test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {

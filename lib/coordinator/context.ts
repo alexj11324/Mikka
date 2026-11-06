@@ -282,19 +282,16 @@ export function instructionsWithMemory(instructions: string, memory: string): st
   return `${instructions}\n\n## What the person asked you to remember\n${memory}`
 }
 
-/**
- * The system prompt with its cacheable prefix first: the rules and the GitHub lines (the authorized repository
- * list), which stay the same from turn to turn, then the memory and what changes each turn. `stable` is where the
- * prefix ends (lib/prompt-cache.ts), so a turn with the same rules and repositories reuses the cached prefix.
- */
 /** The cached context after the rules: the GitHub lines, then the allowed models list; empty parts are left out. */
 export function cachedContextLines(...parts: string[]): string {
   return parts.filter(Boolean).join('\n')
 }
 
-export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number } {
+/** Keep a rules breakpoint before the repository/model context: a repository push or a newly used repository
+ * can change that context between turns, while the rules and tool definitions remain reusable. */
+export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number; stableRules: number } {
   const prefix = github ? `${rules}\n${github}` : rules
-  return { stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
+  return { stableRules: rules.length, stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
 }
 
 /**

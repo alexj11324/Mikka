@@ -1,4 +1,5 @@
 import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type LiveKind } from './events'
+import { liveRevisionKey, type LiveRevisions } from './revisions'
 
 export const LIVE_FALLBACK_MS = 60_000
 const HEARTBEAT_MS = 30_000
@@ -25,9 +26,11 @@ export type LiveSubscriptionOptions = {
    * key's read; a missing or unknown revision always reads. */ revisions?: Readonly<Record<string, number | null | undefined>> | null
 }
 export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
-type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number> }
-/** `waits: null` reads unconditionally; otherwise the read is skipped once every listed revision is held. */
-type PendingRead = { refresh: Subscription['refresh']; at: number; waits: { subscription: Subscription; key: string; rev: number }[] | null }
+/** Shared reads cover every known revision; only fully versioned pushes may reuse a completed result. */
+export type LiveRefresh = (key: string, requiredRevisions?: Readonly<LiveRevisions>, reuseCompleted?: boolean) => unknown
+type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: LiveRefresh; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number> }
+/** An unversioned event always reads, while retaining any known revisions merged into that read. */
+type PendingRead = { refresh: Subscription['refresh']; at: number; unconditional: boolean; waits: { subscription: Subscription; key: string; rev: number }[] }
 const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(Object.entries(value ?? {})
   .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isSafeInteger(entry[1]) && entry[1] > 0))
 
@@ -184,9 +187,9 @@ export class LiveChannel {
         if (rev !== undefined && (subscription.revisions.get(key) ?? 0) >= rev) { this.skippedReads++; continue }
         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
         const previous = this.pending.get(key)
-        const wait = rev === undefined ? null : [{ subscription, key, rev }]
-        const waits = !wait || (previous && !previous.waits) ? null : [...previous?.waits ?? [], ...wait]
-        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity), waits })
+        const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
+        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity),
+          unconditional: rev === undefined || previous?.unconditional === true, waits })
       }
     }
     this.scheduleFlush()
@@ -194,7 +197,7 @@ export class LiveChannel {
 
   /** Every push behind this read is covered by data that arrived meanwhile. */
   private covered(read: PendingRead) {
-    return read.waits !== null && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
+    return !read.unconditional && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
   }
 
   private scheduleFlush() {
@@ -225,7 +228,12 @@ export class LiveChannel {
         // A notification during a read is still dirty: deliver one trailing read.
         this.scheduleFlush()
       }
-      try { Promise.resolve(refresh(key)).catch(() => {}).finally(settled) }
+      const required = read.waits.length ? read.waits.reduce<LiveRevisions>((revisions, { subscription, rev }) => {
+        const ref = liveRevisionKey(subscription.kind, subscription.id.toLowerCase())
+        revisions[ref] = Math.max(revisions[ref] ?? 0, rev)
+        return revisions
+      }, {}) : undefined
+      try { Promise.resolve(refresh(key, required, !read.unconditional)).catch(() => {}).finally(settled) }
       catch { settled() } // SWR owns read errors.
     }
     this.scheduleFlush()

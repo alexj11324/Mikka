@@ -319,12 +319,15 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const execution = await executionContextParts(userId, botId)
+  const [execution, rules, github] = await Promise.all([
+    executionContextParts(userId, botId),
+    withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined),
+    githubContext(userId, undefined, undefined, botId),
+  ])
   // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
-  const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
   // The GitHub lines (the authorized repository list) and the allowed models list are part of the cached prefix: they change only
   // when the repositories or 优先使用的模型 do. Which models can run right now changes per turn, so it stays after the memory.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
   return { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
