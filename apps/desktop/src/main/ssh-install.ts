@@ -246,7 +246,8 @@ export class SshInstaller {
       await writeFile(logPath, `step=${this.current.step}\ncode=${failure.code}\ncause=${failure.cause}\n${redactInstallLog(diagnostic)}\n`, { mode: 0o600 })
       failure.logPath = logPath
     } catch { /* A read-only home still gets the structured failure, without an invented log path. */ }
-    const reason = INSTALL_FAILURE_REASON[failure.cause] + (error instanceof InstallProcessError ? `\n\n${redactInstallLog(diagnostic)}` : '')
+    const summary = INSTALL_FAILURE_REASON[failure.cause]
+    const reason = summary + (diagnostic.trim() === summary ? '' : `\n\n${redactInstallLog(diagnostic)}`)
     if (!this.controller.signal.aborted) this.report({ status: 'failed', retryable: true, reason, error: failure })
   }
   private remote(command: string, input?: string, timeout?: number) {

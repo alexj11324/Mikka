@@ -379,7 +379,7 @@ test('a failed automatic install keeps the reason and 重试 installs again', as
   assert.equal(failed.status, 'failed')
   assert.equal(failed.step, 'install')
   assert.equal(failed.error?.cause, 'npm_permission')
-  assert.equal(failed.reason, 'Cannot write the Mikka install directory')
+  assert.match(failed.reason ?? '', /^Cannot write the Mikka install directory/)
   settled = new Promise<SshInstallState>(resolve => { settle = resolve })
   await installer.beginLocal()
   assert.equal((await settled).status, 'online')
