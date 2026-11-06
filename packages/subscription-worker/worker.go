@@ -244,10 +244,11 @@ func (w *Worker) Recover(ctx context.Context) (Metadata, error) {
 // This implements the official host-managed Codex auth parameter shape only;
 // actual CPA token audience/CLI-version compatibility still needs validation.
 type CodexNativeAuth struct {
-	Type             string `json:"type"`
-	AccessToken      string `json:"accessToken"`
-	ChatGPTAccountID string `json:"chatgptAccountId"`
-	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
+	Type             string    `json:"type"`
+	AccessToken      string    `json:"accessToken"`
+	ChatGPTAccountID string    `json:"chatgptAccountId"`
+	ChatGPTPlanType  string    `json:"chatgptPlanType,omitempty"`
+	ExpiresAt        time.Time `json:"expiresAt"`
 }
 
 func (CodexNativeAuth) String() string   { return "[native auth redacted]" }
@@ -271,7 +272,11 @@ func (w *Worker) CodexNativeAuth(ctx context.Context, expectedEpoch int64) (Code
 	access, _ := auth.Metadata["access_token"].(string)
 	account, _ := auth.Metadata["account_id"].(string)
 	plan, _ := auth.Metadata["plan_type"].(string)
-	return CodexNativeAuth{"chatgptAuthTokens", access, account, plan}, nil
+	expires, known := auth.AccessTokenExpirationTime()
+	if !known {
+		return CodexNativeAuth{}, ErrCredential
+	}
+	return CodexNativeAuth{"chatgptAuthTokens", access, account, plan, expires}, nil
 }
 
 // Private access lease for the documented CLAUDE_CODE_OAUTH_TOKEN input. It

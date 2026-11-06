@@ -2,7 +2,8 @@
 // API. Keep the existing production environment and migration guards: there is
 // no framework detection, second install, or implicit Next build in this path.
 import { execFileSync, spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, openSync, closeSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
@@ -41,7 +42,12 @@ export function buildVercel({ root = process.cwd(), env = process.env, file = '.
   const buildEnv = productionBuildEnvironment({ text: readFileSync(resolve(root, file), 'utf8'), env, sourceSha })
   const manager = execFileSync('pnpm', ['--version'], { cwd: root, env: buildEnv, encoding: 'utf8' }).trim()
   if (manager !== '10.34.3') throw new Error('webDeploy:pinnedPnpmRequired')
-  const result = spawnSync('pnpm', ['build'], { cwd: root, env: buildEnv, stdio: 'inherit' })
+  // A compiler error can quote paid UI source. Official diagnostics stay on
+  // the ephemeral runner and are never sent to public logs or artifacts.
+  const log = buildEnv.MIKKA_UI_OVERLAY_DIR ? openSync(resolve(env.RUNNER_TEMP || tmpdir(), 'official-web-build.log'), 'w', 0o600) : undefined
+  let result
+  try { result = spawnSync('pnpm', ['build'], { cwd: root, env: buildEnv, stdio: log === undefined ? 'inherit' : ['ignore', log, log] }) }
+  finally { if (log !== undefined) closeSync(log) }
   if (result.error || result.status !== 0) throw new Error('webDeploy:buildFailed')
   const config = JSON.parse(readFileSync(resolve(root, '.vercel/output/config.json'), 'utf8'))
   if (config.version !== 3 || !Array.isArray(config.routes)) throw new Error('webDeploy:prebuiltOutputInvalid')

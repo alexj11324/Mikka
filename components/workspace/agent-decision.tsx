@@ -2,7 +2,7 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useLocale, useTranslations } from 'next-intl'
-import { createContext, use, useRef, useState } from 'react'
+import { createContext, use, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { Check, ChevronRight, ExternalLink } from 'lucide-react'
 import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
 import { Link } from '@/i18n/navigation'
@@ -177,8 +177,8 @@ export const ReplyAnswer = createContext<string | null>(null)
 /**
  * One question with a few answers (Figma 379:5694, 395:24805, 395:24642): the
  * question in the reply's bubble, an optional task chip ahead of it, then grey
- * rows lettered A, B, C…; a click is the reply. The picked row turns dark with
- * a check and the others dim. Anything else goes through the composer.
+ * rows lettered A, B, C…; a click is the reply. The picked row is marked with
+ * a check; the others stay readable. Anything else goes through the composer.
  */
 /** Where the user stores their own E2B key (the cloud computer runs on it). */
 export const CLOUD_KEY_SETTINGS = '/settings?section=models'
@@ -226,40 +226,22 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
       {options.map((option, index) => {
         const selected = chosen === option.value
         const label = copy(option)
-        const letter = String.fromCharCode(65 + index)
-        // No E2B key yet: this row opens the settings where the key is set instead of answering. It stays an Item
-        // once answered (dimmed, not a link) so the row never swaps component and jumps.
-        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={CLOUD_KEY_SETTINGS} />}>
-          <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
-          <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
-          <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
-        </Item>
-        // 没有可用的电脑: 让这台电脑参与调度 switches that device on, then tells the bot to dispatch again.
-        if (option.action === 'allowAutoSchedule') return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
-          disabled={answered || status !== 'pending'} onClick={() => { void allowAutoSchedule(option.value, label) }}>
-          <Kbd data-icon="inline-start">{letter}</Kbd>{label}
-          {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : answered && <Check data-icon="inline-end" aria-hidden="true" />)}
-        </Button>
-        // The other rows open their setup (a dialog, or Settings › 电脑); a saved E2B key also tells the bot to dispatch again.
-        if (option.action === 'connectServer' || option.action === 'serverOnline' || option.action === 'modelSettings') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
-          className={cn(answered && 'pointer-events-none opacity-50')} render={<Link href={option.action === 'modelSettings' ? MODEL_SETTINGS : CONNECT_SERVER_SETTINGS} />}>
-          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
-        </Button>
+        const row = { key: option.value, letter: String.fromCharCode(65 + index), label, selected, answered }
+        const done = selected && (pending ? <Spinner aria-label={agentCopy.sendingChoice} /> : answered && <Check aria-hidden="true" />)
+        const opens = <ChevronRight aria-hidden="true" />
+        // Once answered every row is plain text: the picked one marked, the others still readable (Claude, ChatGPT).
+        if (answered) return <ChoiceRow {...row} render={<div />} end={done || null} />
+        // No E2B key yet, 没有可用的电脑, a model to allow: the row opens the setup it names instead of answering.
+        if (option.action === 'cloudKeySettings' || option.action === 'connectServer' || option.action === 'serverOnline' || option.action === 'modelSettings')
+          return <ChoiceRow {...row} end={opens} render={<Link href={option.action === 'cloudKeySettings' ? CLOUD_KEY_SETTINGS : option.action === 'modelSettings' ? MODEL_SETTINGS : CONNECT_SERVER_SETTINGS} />} />
         // 已授权的仓库里没有: the GitHub App's page opens in a new tab, where the person adds repositories; nothing is answered.
-        if (option.action === 'githubInstall') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
-          className={cn(answered && 'pointer-events-none opacity-50')} render={<a href={GITHUB_APP_INSTALL_URL} target="_blank" rel="noopener noreferrer" />}>
-          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ExternalLink data-icon="inline-end" aria-hidden="true" />
-        </Button>
-        if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <Button key={option.value} type="button" variant="secondary" disabled={answered}
-          onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')}>
-          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
-        </Button>
-        // Answered rows stay the same Button, disabled, so nothing changes height or colour.
-        return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
-          disabled={answered || status !== 'pending'} onClick={() => { setPicked(option.value); void send(label) }}>
-          <Kbd data-icon="inline-start">{letter}</Kbd>{label}
-          {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : answered && <Check data-icon="inline-end" aria-hidden="true" />)}
-        </Button>
+        if (option.action === 'githubInstall') return <ChoiceRow {...row} end={<ExternalLink aria-hidden="true" />} render={<a href={GITHUB_APP_INSTALL_URL} target="_blank" rel="noopener noreferrer" />} />
+        if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <ChoiceRow {...row} end={opens}
+          render={<Button variant="bare" onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')} />} />
+        const busy = status !== 'pending'
+        // 没有可用的电脑: 让这台电脑参与调度 switches that device on, then tells the bot to dispatch again.
+        return <ChoiceRow {...row} end={done || null} render={<Button variant="bare" aria-pressed={selected} disabled={busy}
+          onClick={() => { if (option.action === 'allowAutoSchedule') void allowAutoSchedule(option.value, label); else { setPicked(option.value); void send(label) } }} />} />
       })}
     </div>
     {(error || autoError) && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error || autoError}</AlertDescription></Alert></div>}
@@ -270,4 +252,18 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
       if (changed && e2b && !answered) { setPicked(e2b.value); void send(copy(e2b)) }
     }} />}
   </div>
+}
+
+/**
+ * One lettered row of a choice card: the library's Item, left-aligned, its letter a Kbd. It looks the same whether it
+ * answers, opens a setup page or a dialog; `render` decides which (the shared Button, a link, or a plain row once
+ * answered). Item's look wins over the bare Button's sizing. Hover and picked use QuestionnaireChoice's own tones.
+ */
+function ChoiceRow({ letter, label, selected, answered, end, render }: { letter: string; label: string; selected: boolean; answered: boolean; end: ReactNode; render: ReactElement }) {
+  return <Item size="sm" variant="outline" data-choice={selected ? 'picked' : answered ? 'other' : 'open'} render={render}
+    className={cn('h-auto justify-start text-left whitespace-normal disabled:opacity-100', !answered && 'cursor-pointer hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent', selected && 'border-primary/40 bg-muted', answered && !selected && 'text-muted-foreground')}>
+    <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
+    <ItemContent><ItemTitle className={cn('line-clamp-none font-normal', selected && 'font-medium')}>{label}</ItemTitle></ItemContent>
+    {end && <ItemActions className="text-muted-foreground [&_svg]:size-4">{end}</ItemActions>}
+  </Item>
 }

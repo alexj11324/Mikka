@@ -22,6 +22,7 @@ import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics
 import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
 import { settingsReadRequirements, settingsReady } from './parity-settings-ready.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
+import { continueInSystemBrowser } from './browser-handoff.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -247,7 +248,7 @@ async function authenticateBundled(bundled) {
     assert.ok(external, 'Main must open the real sign-in continuation')
     assert.equal(new URL(external).origin, environment.origin)
     stage = 'bundled-auth-handoff'
-    await page.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await continueInSystemBrowser(page, external)
     await handoff
     stage = 'bundled-auth-session'
     const identity = await waitForBundledSession(bundled.page, scope.owner.userId)

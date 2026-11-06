@@ -6,6 +6,7 @@ import { cp, mkdir, readFile, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildRenderer } from './build-renderer.mjs'
+import { desktopOverlayEvidence } from '../../../scripts/release/hosted-ui.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const outdir = resolve(root, 'dist')
@@ -46,5 +47,7 @@ await build({ ...common, entryPoints: [resolve(root, 'src/main/index.ts')], outf
 await build({ ...common, entryPoints: [resolve(root, 'src/preload/index.ts')], outfile: resolve(outdir, 'preload.cjs'), sourcemap: flavor === 'dev' })
 await cp(resolve(root, 'src/offline.html'), resolve(outdir, 'offline.html'))
 await cp(resolve(root, 'src/update.html'), resolve(outdir, 'update.html'))
+
+if (process.env.MIKKA_UI_OVERLAY_DIR) await desktopOverlayEvidence(outdir, process.env.MIKKA_UI_OVERLAY_SHA)
 
 console.log(`built @mikka/desktop ${pkg.version} (${flavor}) -> ${appUrl}`)

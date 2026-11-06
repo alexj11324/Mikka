@@ -184,11 +184,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{order ? t('noDevice') : t('loadingPlacement')}</span>}
         {botChoices.length > 0 && <Select value={handler?.id ?? 'coordinator'} onValueChange={value => setBotPick(value && value !== 'coordinator' ? value : null)} items={[{ value: 'coordinator', label: 'Coordinator' }, ...botChoices.map(bot => ({ value: bot.id, label: bot.name }))]}>
-          <SelectTrigger size="sm" className="h-7 min-w-28 max-w-48 gap-1.5 rounded-full px-2.5" aria-label={t('bot')}>{handler ? <BotAvatar color={handler.color} shape={handler.shape} size="row" /> : <CoordinatorAvatar size="row" />}<SelectValue className="min-w-0 truncate" /></SelectTrigger>
+          <SelectTrigger size="sm" className="h-7 min-w-28 max-w-48 gap-1.5 rounded-full px-2.5" aria-label={t('bot')}>{handler ? <BotAvatar id={handler.id} color={handler.color} shape={handler.shape} size="row" /> : <CoordinatorAvatar size="row" />}<SelectValue className="min-w-0 truncate" /></SelectTrigger>
           <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-48">
             <SelectGroup>
               <SelectItem value="coordinator"><CoordinatorAvatar size="row" /><span className="min-w-0 flex-1 truncate pr-3">Coordinator</span></SelectItem>
-              {botChoices.map(bot => <SelectItem key={bot.id} value={bot.id}><BotAvatar color={bot.color} shape={bot.shape} size="row" /><span className="min-w-0 flex-1 truncate pr-3">{bot.name}</span></SelectItem>)}
+              {botChoices.map(bot => <SelectItem key={bot.id} value={bot.id}><BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /><span className="min-w-0 flex-1 truncate pr-3">{bot.name}</span></SelectItem>)}
             </SelectGroup>
           </SelectContent>
         </Select>}

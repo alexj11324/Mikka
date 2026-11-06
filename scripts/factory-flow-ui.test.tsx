@@ -35,6 +35,12 @@ mock.module('next-intl', { namedExports: { useTranslations: translationsFor, use
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 mock.module(new URL('../components/workspace/workspace-navigation.ts', import.meta.url).href, { namedExports: {
   navigate: (change: unknown) => { navigated.push(change) }, openArtifact: (id: string) => { navigated.push({ artifact: id }) },
+  workspaceLink: (href: string) => href,
+} })
+// The report's diff rows use @pierre/diffs, which registers a web component on import; they draw only in a browser.
+mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.url).href, { namedExports: {
+  ThreadChangesPane: () => null, ThreadChangesView: () => null, ChangesTabLabel: () => null, Counts: () => null, FileSection: () => null,
+  useDiffWrap: () => ['nowrap', () => {}],
 } })
 
 const browser = new Window({ url: 'https://mikka.example/zh-CN' })

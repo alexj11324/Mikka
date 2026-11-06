@@ -5,7 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, Square } from 'lucide-react-native'
 import { BotBubble, MyBubble } from '@/components/chat'
-import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
+import { Spinner, StatusIcon } from '@/components/icons'
+import { ThreadPlace } from '@/components/ThreadPlace'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
@@ -22,7 +23,6 @@ import type { ThreadDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
-import { HARNESS } from '@/lib/harness'
 
 const STATUS_WORD = { running: '运行中', waiting: '等待你', paused: '已暂停', failed: '失败', done: '完成', stopped: '已停止' } as const
 
@@ -69,8 +69,9 @@ export default function ThreadScreen() {
             <View style={{ flexShrink: 1 }}>
               <Text style={styles.title} numberOfLines={1}>{thread.name}</Text>
               <View style={styles.subtitleRow}>
-                <Text style={styles.subtitle} numberOfLines={1}>{error ? '上次状态：' : ''}{STATUS_WORD[thread.status]} · {HARNESS[thread.harness] ?? thread.harness}</Text>
-                {thread.device ? <MachineIcon machine={thread.device.kind} size={11} /> : null}
+                {/* Icons only after the state: where it runs; a tap names the machine (Alex, 2026-11-06). */}
+                <Text style={styles.subtitle} numberOfLines={1}>{error ? '上次状态：' : ''}{STATUS_WORD[thread.status]}{thread.device ? ' ·' : ''}</Text>
+                {thread.device ? <ThreadPlace threadId={id} kind={thread.device.kind} /> : null}
               </View>
             </View>
           </View>

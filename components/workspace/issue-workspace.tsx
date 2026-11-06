@@ -516,7 +516,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // One thing on the right at a time: the thread, else 全部线程, else the browser, else 概览.
   const rightTaken = browserShown || !!threadShown || !!threadsView
   // On a phone the chat's pill sits in its header and opens the right column as a page over the chat (R-82).
-  const chatHeading = isConversation ? <ConversationPillButton name={activeBot ? activeBot.name : i18nText('Nav.coordinator')} avatar={<BotAvatar {...(activeBot ? { color: activeBot.color, shape: activeBot.shape } : COORDINATOR_AVATAR)} size="pill" />} onOpen={() => setPanelSheet(true)} />
+  const chatHeading = isConversation ? <ConversationPillButton name={activeBot ? activeBot.name : i18nText('Nav.coordinator')} avatar={<BotAvatar {...(activeBot ? { id: activeBot.id, color: activeBot.color, shape: activeBot.shape } : COORDINATOR_AVATAR)} size="pill" />} onOpen={() => setPanelSheet(true)} />
     : groupPanel ? <ConversationPillButton name={groupPanel.title || i18nText('GroupChat.untitled')} avatar={<GroupPillAvatar id={groupPanel.id} title={groupPanel.title || i18nText('GroupChat.untitled')} />} onOpen={() => setPanelSheet(true)} /> : undefined
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })

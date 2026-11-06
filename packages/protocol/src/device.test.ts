@@ -97,6 +97,30 @@ describe("device link schemas", () => {
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionBinding, modelCredential: provider }).success).toBe(false)
   })
 
+  it("accepts a prepared subscription lease only with its matching native harness and binding", () => {
+    const subscriptionBinding = { bindingId: "00000000-0000-4000-8000-000000000001", ownerId: "o", workspaceId: "00000000-0000-4000-8000-000000000002", consumerId: "00000000-0000-4000-8000-000000000003", route: "claude_code_cli" }
+    const subscriptionLease = { route: "claude_code_cli", modelId: "claude-haiku-5-5", revision: 1, accountId: "fixture", expiresAt: "2026-11-06T21:00:00.000Z", accessToken: "fixture-access" }
+    const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "claude_code", prompt: "p", subscriptionBinding }
+    expect(runAssignmentSchema.parse({ ...base, subscriptionLease }).subscriptionLease).toEqual(subscriptionLease)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, subscriptionBinding: undefined }).success).toBe(false)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, harness: "codex" }).success).toBe(false)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease: { ...subscriptionLease, route: "codex_cli" } }).success).toBe(false)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease: { ...subscriptionLease, accessToken: "fixture\nheader" } }).success).toBe(false)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, modelCredential: { kind: "api_key", key: "fixture-key" } }).success).toBe(false)
+  })
+
+  it("accepts prepared GitHub credentials with their natural expiry and keeps old assignments compatible", () => {
+    const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "codex", prompt: "p" }
+    const github = { endpoint: "https://example.com/api/runs/github-token", repository: "owner/repo" }
+    expect(runAssignmentSchema.safeParse({ ...base, github }).success).toBe(true)
+    for (const expiresAt of [null, "2026-11-06T21:00:00.000Z"]) {
+      expect(runAssignmentSchema.parse({ ...base, github: { ...github, token: "fixture-access", expiresAt } }).github?.token).toBe("fixture-access")
+    }
+    expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, token: "fixture-access" } }).success).toBe(false)
+    expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, expiresAt: null } }).success).toBe(false)
+    expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, token: "fixture\nheader", expiresAt: null } }).success).toBe(false)
+  })
+
   it("accepts every daemon-local state in a patch, including stopped", () => {
     expect(
       runPatchSchema.parse({ state: "stopped", stopReason: "turn_ended" })

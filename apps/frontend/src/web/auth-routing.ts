@@ -1,7 +1,7 @@
 import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
 import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthCallbackPath, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
 import { localeHref, localeOf, withoutLocale } from '../../../desktop/src/renderer/location'
 
 /** Preserve the original sign-in/up page's validated handoff and OAuth query
@@ -38,6 +38,8 @@ export function authenticatedReturn(location: URL): string | null {
   if (value.addAccount || value.desktopRefused) return null
   if (value.oauthResume) return withBasePath(value.oauthResume)
   if (value.composioResume) return value.composioResume
-  if (value.desktopFlow) return withBasePath(desktopAuthCallbackPath(value.desktopFlow.state, value.desktopFlow.next, value.desktopFlow.callback))
+  // A desktop handoff stays on the page: the person sees which account the
+  // app gets, or chooses another (components/auth/desktop-account-choice.tsx).
+  if (value.desktopFlow) return null
   return withBasePath(localeHref(value.next, localeOf(location.pathname)))
 }

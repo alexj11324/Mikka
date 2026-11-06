@@ -9,7 +9,9 @@ import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } 
 // run's `CODEX_HOME`, so a follow-up run copies the earlier run's
 // `sessions` into its own before `thread/resume`.
 import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
+import { mkdirSync } from "node:fs"
 import { daemonTracer, runIdHash } from "../tracing"
+import { runRuntimeTimings } from '../run-runtime-timing'
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
 
@@ -333,7 +335,7 @@ export class CodexAdapter implements AgentAdapter {
     const managedAuth = Boolean(externalAuth || brokerAuth)
     if (brokerAuth && (!this.options.spawnCli || externalAuth || options.credential)) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     if (managedAuth) {
-      const clean = buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
@@ -345,7 +347,7 @@ export class CodexAdapter implements AgentAdapter {
       )
         throw new Error(SUBSCRIPTION_AUTH_ERROR)
     }
-    if (mode === "continue" && options.continueSession) {
+    if (!options.machineEnvironment && mode === "continue" && options.continueSession) {
       try {
         const earlier = runPaths(
           this.options.stateDir,
@@ -365,7 +367,10 @@ export class CodexAdapter implements AgentAdapter {
       }
     }
     // Inside the run dir: one run's home is never another run's.
-    const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
+    const codexHome = options.machineEnvironment
+      ? { home: options.env.CODEX_HOME ?? join(options.env.HOME, '.codex') }
+      : prepareCodexHome(join(runDir, "codex-home"), log)
+    if (options.machineEnvironment) mkdirSync(codexHome.home, { recursive: true, mode: 0o700 })
     if (mailboxCatalogue && threadId) verifyCodexMailboxResume(
       this.options.stateDir,
       mode === 'continue' ? options.continueSession!.runId : options.runId,
@@ -384,9 +389,11 @@ export class CodexAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
+      githubEnvironment: options.githubEnvironment,
       mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
+      machineEnvironment: options.machineEnvironment,
       childPath,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
@@ -439,7 +446,8 @@ export class CodexAdapter implements AgentAdapter {
         "-c", "model_providers.mikka.requires_openai_auth=false",
         "-c", "model_providers.mikka.supports_websockets=false",
       ] : []),
-      // Its shells get a filtered env; give them writable temp dirs.
+      ...(options.machineEnvironment ? ["-c", 'shell_environment_policy.inherit="all"', "-c", 'shell_environment_policy.ignore_default_excludes=true'] : []),
+      // Personal devices retain their own run temp paths.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
         `shell_environment_policy.set.${key}=${toml(value)}`,
@@ -763,6 +771,7 @@ export class CodexAdapter implements AgentAdapter {
         pendingTurnStart = response.then(({ turn }) => { if (!ending) activeTurn = turn.id })
         try { await pendingTurnStart } finally { pendingTurnStart = null }
       } else { const { turn } = await response; activeTurn ??= turn.id }
+      runRuntimeTimings.agentAccepted(options.runId, 'codex_turn_start_ack')
     }
 
     void child.exited.then(({ code, signal }) => {

@@ -58,6 +58,7 @@ import { bindBotSubscription } from '@/lib/computer/bot-subscription'
 import { recordDecision, settleTurn } from '@/lib/attention/store'
 import type { CreateIssueInput, UpdateIssueInput } from '@/lib/coordinator/issue-input'
 import { systemActor } from '@/lib/activity-actor'
+import { timedPhase, withDispatchTiming } from '@/lib/dispatch-timing'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -543,13 +544,19 @@ function namedThreadProfile(previous: import('@/lib/computer/run-model').RunMode
 
 export async function dispatchRun(userId: string, input: { issueId: string; profileId?: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
+  // The performance boundary includes initial scope and Profile admission.
+  return withDispatchTiming(() => dispatchRunBody(userId, input, scope, botId, execution, requestEventId))
+}
+
+async function dispatchRunBody(userId: string, input: { issueId: string; profileId?: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
+  await timedPhase('authorizeDispatch', () => assertNativeToolScope(userId,scope))
   if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
   const { newThread, sourceEventId, target: offeredTarget, ...request } = input
   let target = offeredTarget
   requestEventId ??= sourceEventId
   try {
-    const selection = await (await import('@/lib/factory/profile-request')).requestedTaskSelection(pool, { ownerId: userId, botId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId) }, requestEventId, request.profileId)
+    const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
+    const selection = await timedPhase('requestedAgentProfile', async () => (await import('@/lib/factory/profile-request')).requestedTaskSelection(pool, { ownerId: userId, botId, workspaceId }, requestEventId, request.profileId))
     request.profileId = selection.profileId
     if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
   } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
@@ -582,8 +589,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; prof
     repositoryMove = (await sameRepository(userId, request.repo, previous.remoteUrl).catch(() => null)) !== true
     return repositoryMove
   }
-  const { withDispatchTiming } = await import('@/lib/dispatch-timing')
-  return asToolResult(() => withDispatchTiming(async () => placed(await dispatchToTask(userId, request.issueId, {
+  return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread, sourceEventId: requestEventId,
     // A named place other than the thread's own is a move, which only the person's explicit request grants. So is a
     // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
@@ -624,7 +630,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; prof
       if (customProfile) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
       return byRules(note, target, previous.remoteUrl, previous.id)
     },
-  }))))
+  })))
 }
 
 /** Whether the person's own message (host-supplied event) names this repository: their words, not the model's, grant a move. */

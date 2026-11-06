@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { visibleAcceptance } from '@/lib/factory/acceptance-view'
-import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from './factory-acceptance-pane'
+import { FactoryAcceptancePane, request, useAcceptance, type ArtifactReviewSlots, type FactoryTask } from './factory-acceptance-pane'
 import { FactoryFlowBadge, FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
 import { flowKey, readFlow } from '@/lib/factory/flow-client'
 import { InlineLoadError } from '@/components/load-error'
@@ -41,7 +41,7 @@ export function useThreadAcceptance(issueId: string | null, runId: string) {
 }
 
 /** The v2 report's decision uses the existing pane actions, bound to its current candidate and version. */
-function ArtifactDecision({ task, artifactId, version, latestVersion }: { task: FactoryTask; artifactId: string; version: number; latestVersion: number }) {
+function ArtifactDecision({ task, artifactId, version, latestVersion, review }: { task: FactoryTask; artifactId: string; version: number; latestVersion: number; review?: Omit<ArtifactReviewSlots, 'artifactId'> }) {
   const t = useTranslations('FactoryAcceptance')
   const { data: detail } = useFactoryTaskDetail(task.id)
   const key = flowKey(task.id)
@@ -55,11 +55,11 @@ function ArtifactDecision({ task, artifactId, version, latestVersion }: { task: 
       report.artifactId !== artifactId || version !== latestVersion || report.version !== version ||
       report.candidateId !== task.candidateId || report.runId !== task.candidateRunId) return null
   return <FactoryAcceptancePane key={`${task.id}:${report.candidateId}:${version}`} task={task}
-    artifactBinding={{ candidateId: report.candidateId, revision: flow.revision }} />
+    artifactBinding={{ candidateId: report.candidateId, revision: flow.revision }} artifact={review && { ...review, artifactId }} />
 }
 
 /** Ordinary artifacts have no task hint; every hinted task still goes through the normal authorized list and flow. */
-export function FactoryArtifactAcceptance({ taskId, issueId, ...view }: { taskId: string; issueId: string; artifactId: string; version: number; latestVersion: number }) {
+export function FactoryArtifactAcceptance({ taskId, issueId, ...view }: { taskId: string; issueId: string; artifactId: string; version: number; latestVersion: number; review?: Omit<ArtifactReviewSlots, 'artifactId'> }) {
   const { allTasks, error, isValidating, mutate } = useAcceptanceTasks(issueId)
   const task = allTasks.find(row => row.id === taskId)
   if (error) return <div className="shrink-0 px-4 pb-3"><FactoryListError retrying={isValidating} onRetry={() => { if (!isValidating) void mutate() }} /></div>
