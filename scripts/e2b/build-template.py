@@ -290,6 +290,8 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
         if kind == 'desktop':
             ready += (' && test ! -e /run/mikka-viewer/key && '
                       'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')
+        ready += (' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json'
+                  ' > /opt/mikka/official-files-ready.json')
         # E2B's template builder freezes the initialized process. New instances
         # resume the already imported worker and receive a fresh normal handoff.
         template = template.set_user('root').set_start_cmd('bash /opt/mikka/start-prebuilt.sh', ready)
@@ -337,7 +339,7 @@ def probe_conservation(template_id, api_key, sandbox_factory=None):
         sandbox_factory = Sandbox.create
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60)
     try:
-        result = sandbox.commands.run('cat /opt/mikka/official-files-conservation.json', user='root', timeout=15)
+        result = sandbox.commands.run('cat /opt/mikka/official-files-ready.json', user='root', timeout=15)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
         conservation = json.loads(result.stdout)
@@ -372,6 +374,8 @@ def verify_release_evidence(report):
                 or row.get('sourceCommit') != report['sourceCommit'] or row.get('workerSha') != report['workerSha']
                 or row.get('harness') != harness or row.get('model') != model
                 or row.get('credentialRoute') != 'subscription' or row.get('replyVerified') is not True
+                or not re.fullmatch(r'[a-f0-9]{64}', row.get('officialBinarySha256', ''))
+                or not isinstance(row.get('officialCliVersion'), str) or not row['officialCliVersion']
                 or not row.get('runId') or not row.get('deviceId')):
             raise ValueError(f'release_subscription_acceptance_missing {kind}')
     return report

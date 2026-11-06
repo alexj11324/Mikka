@@ -124,6 +124,7 @@ class Publish(unittest.TestCase):
         report['subscriptionAcceptance'] = {
             kind: {'status': 'passed', 'templateId': 'tpl-' + kind, 'sourceCommit': report['sourceCommit'],
                    'workerSha': report['workerSha'], 'harness': harness, 'model': model, 'credentialRoute': 'subscription',
+                   'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
         self.assertIs(bt.verify_release_evidence(report), report)
