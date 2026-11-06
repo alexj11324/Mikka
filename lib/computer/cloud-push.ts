@@ -6,7 +6,7 @@ import { issues, runPublications } from '@/lib/db/schema'
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
-import { deliveryIdentifier, publicationBranch } from '@/lib/run-publication-policy'
+import { publicationBranch } from '@/lib/run-publication-policy'
 import { admitRepositoryTask, type RepositoryAdmission } from '@/lib/repository-admission'
 /**
  * A cloud run's task branch, admitted the way a local run's is: a github.com
@@ -26,7 +26,7 @@ export async function admitCloudPush(client: PoolClient, input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, task.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
     const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
-    const identifier = previous?.identifier ?? deliveryIdentifier(identifiers.get(task.id), task.id)
+    const identifier = previous?.identifier ?? identifiers.get(task.id) ?? null
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch) return null
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)

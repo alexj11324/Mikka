@@ -1,8 +1,10 @@
 // How a task is named in the UI (MIK-46). The single source of truth: every
 // place that shows a task id goes through `taskIdentifier`.
-// - Workspace tasks use their Linear identifier (MIK-12) once Linear has one.
-// - Personal tasks never reach Linear and use a four-letter personal prefix
-//   (ALEX-12). Linear team keys are usually three letters, so they do not clash.
+// - Workspace tasks use their team key and their number in that team (AL-12),
+//   which the database assigns when the task joins the team. A linked Linear
+//   id is only an outside alias.
+// - Personal tasks use a four-letter personal prefix (ALEX-12) and the
+//   owner's number. Every owner has a prefix: their own, else a default.
 
 export type TaskScope = 'workspace' | 'personal'
 export const TASK_SCOPES = ['workspace', 'personal'] as const satisfies readonly TaskScope[]
@@ -13,17 +15,17 @@ const PREFIX_PATTERN = /^[A-Z]{4}$/
 export type TaskIdentifierInput = {
   scope: TaskScope
   number?: number | null
-  /** The linked Linear issue's identifier, e.g. `MIK-12`. */
-  linearIdentifier?: string | null
+  /** The task's team key and its number in that team, e.g. `AL` and 12. */
+  team?: { key: string; number: number } | null
   /** The owner's personal prefix, already resolved by `resolvePersonalPrefix`. */
   personalPrefix?: string | null
 }
 
-/** `MIK-12`, `ALEX-12`, `#12` when the owner has no usable prefix yet, or null before a number or Linear id exists. */
+/** `AL-12` or `ALEX-12`; null only while the database has not yet given the task its team or number. */
 export function taskIdentifier(task: TaskIdentifierInput): string | null {
-  if (task.scope === 'workspace') return task.linearIdentifier ?? null
-  if (!task.number) return null
-  return task.personalPrefix ? `${task.personalPrefix}-${task.number}` : `#${task.number}`
+  if (task.scope === 'workspace') return task.team ? `${task.team.key}-${task.team.number}` : null
+  if (!task.number || !task.personalPrefix) return null
+  return `${task.personalPrefix}-${task.number}`
 }
 
 /** The first four letters of the email's local part, skipping digits and symbols; null when there are fewer than four. */
@@ -41,8 +43,11 @@ export function prefixCollides(prefix: string, linearTeamKeys: readonly string[]
   return linearTeamKeys.some(key => key.toUpperCase() === prefix.toUpperCase())
 }
 
-/** The prefix personal tasks show: the saved one, else the email default, never one that equals a connected Linear team key. */
+/** The prefix of an owner whose own and email prefixes are unusable. */
+export const FALLBACK_PERSONAL_PREFIX = 'TASK'
+
+/** The prefix personal tasks show: the saved one, else the email default, never one that equals a connected Linear team key; never none. */
 export function resolvePersonalPrefix(input: { saved?: string | null; email: string; linearTeamKeys: readonly string[] }) {
   const prefix = input.saved ? normalizePersonalPrefix(input.saved) : defaultPersonalPrefix(input.email)
-  return prefix && !prefixCollides(prefix, input.linearTeamKeys) ? prefix : null
+  return prefix && !prefixCollides(prefix, input.linearTeamKeys) ? prefix : FALLBACK_PERSONAL_PREFIX
 }

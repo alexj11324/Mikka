@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { deliveryIdentifier, publicationBranch, publicationGate } from './run-publication-policy'
+import { publicationBranch, publicationGate } from './run-publication-policy'
 import type { RunReport } from '@mikka/protocol/run'
 
 const report: RunReport = { summary: 'Done.', filesChanged: ['a.ts'], verify: { status: 'passed' }, openQuestions: [], nextStep: null, publish: { branch: 'mikka/mik-42', commit: 'a'.repeat(40), pushed: true, remote: 'origin' } }
@@ -10,17 +10,6 @@ test('ADR 0024 uses existing task team and number without inventing a team', () 
   assert.equal(publicationBranch('MIK-42'), 'mikka/mik-42')
   assert.equal(publicationBranch('ALEX-7'), 'mikka/alex-7')
   for (const identifier of [null, '', '#7', 'MIK-0', 'MIK-01', 'MIK-999999999999999999999', 'MIK/42']) assert.equal(publicationBranch(identifier), null)
-})
-
-test('a task without a branch-ready identifier still delivers on a stable branch', () => {
-  const issueId = 'c7db3824-177c-4aac-9d86-bd0b0ed44779'
-  assert.equal(deliveryIdentifier('ALEX-7', issueId), 'ALEX-7')
-  for (const identifier of [null, undefined, '', '#7']) {
-    const fallback = deliveryIdentifier(identifier, issueId)
-    assert.equal(fallback, `TASK-${0xc7db3824 + 1}`)
-    assert.match(publicationBranch(fallback) ?? '', /^mikka\/task-[1-9][0-9]*$/)
-  }
-  assert.equal(deliveryIdentifier(null, '00000000-0000-4000-8000-000000000000'), 'TASK-1')
 })
 
 test('only approved, matching pushes enter PR publication', () => {

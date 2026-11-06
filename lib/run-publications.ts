@@ -17,7 +17,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { systemActor } from '@/lib/activity-actor'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
-import { deliveryIdentifier, publicationBranch, publicationGate } from '@/lib/run-publication-policy'
+import { publicationBranch, publicationGate } from '@/lib/run-publication-policy'
 import { openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
 import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue } from './run-completion'
@@ -70,7 +70,7 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
       .where(and(eq(runPublications.issueId, issueId), eq(runPublications.remoteKey, key), sql`${runPublications.branch} is not null`))
       .orderBy(asc(runPublications.createdAt)).limit(1)
     const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
-    const identifier = previous?.identifier ?? deliveryIdentifier(identifiers.get(issueId), issueId)
+    const identifier = previous?.identifier ?? identifiers.get(issueId) ?? null
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (admission && branch !== admission.targetBranch) throw new PublicationError('publication_mismatch')
     if (branch) {
