@@ -99,10 +99,20 @@ API execution creates one temporary fixed Agent Profile, selects the correspondi
 Coordinator composer subscription, and calls coordinator.sendCoordinatorMessage
 through /api/rpc with a cloud destination and the Profile ID. The task requests a
 tiny text Artifact with exact bytes, plus the ordinary independent review and
-verify stages. Because the temporary Profile is the only enabled Profile, the
+normal delivery acceptance. The frozen Factory flowVersion controls the checks:
+v2 requires execute and one independent review; historical tasks also require
+verify. Because the temporary Profile is the only enabled Profile, the
 automatic checks also select that fixed subscription. Every native run is checked
 against its frozen identity, model, harness, credential type, cloud owner and
 Profile receipt.
+
+Only a no-repository deliverable candidate is eligible. Once its required native
+stages have passed for the current candidate and request epoch, the driver
+downloads the exact Artifact bytes and uses the normal Owner approval API once.
+It requires the accepted response and the corresponding passed approval attempt
+with its deliverable acceptance receipt. Pending approval, a missing/failed check,
+or a missing receipt is never reported as completed work. Repository candidates
+are refused before approval; no merge or publication is requested.
 
 The request includes a fresh W3C traceparent. Its trace ID is reported as a
 client-supplied parent; backendObserved remains false until the operator finds it
@@ -117,8 +127,9 @@ harness, cloud destination, expiresAt, and the code-generated input and Artifact
 bytes. This fixed acceptance input is deliberately public fixture text; it is
 not copied from account messages or settings. The final report omits the text.
 
-Use the independently signed-in browser in the reported workspace. Open New task
-outside a project page, choose its Coordinator, explicitly choose Mikka Cloud,
+Use the independently signed-in browser in the reported workspace. Refresh the
+page to the deployed revision, then open New task outside a project page.
+Choose its Coordinator, explicitly choose Mikka Cloud,
 select the temporary Profile named by marker, paste input unchanged, and click
 Send once before expiresAt. The deadline includes this waiting time. The driver
 does not inject a browser cookie or invoke an API message submission in this mode.
@@ -141,8 +152,9 @@ Progress reads follow authenticated WebSocket invalidations. The socket renews
 its normal five-minute connection capability and uses keepalive pings; it does
 not periodically poll application data. If push disconnects, the case stops.
 
-One execute, one review and one verify run are allowed per case. No message,
-model failure or task creation is retried by the driver. The first observed
+One execute and one review run are allowed for v2; historical tasks also allow
+one verify run. No message, model failure, task creation or approval request is
+retried by the driver. The first observed
 extra attempt triggers cancellation. This is an observation-based limit, not a
 server-side atomic spending fence: the API exposes neither a synchronous
 per-task native-attempt cap nor a hard dollar budget. A server-side continuation
@@ -161,8 +173,9 @@ The browser-ready line is the sole exception for locally generated fixture input
 not account content.
 
 Task, thread and Artifact receipts are retained for PostHog correlation. On
-completion or failure the driver cancels its own still-live Factory task and
-stops its own threads, archives its temporary Profile only after work is quiet,
+completion or failure the driver cancels its own unfinished Factory task and
+stops its own active threads. A genuinely accepted deliverable remains accepted.
+The driver archives its temporary Profile only after work is quiet,
 and restores the original explicit composer choice. It compares that setting
 before restoration and does not overwrite a concurrent edit. The current API
 offers no atomic model-choice revision; this is an optimistic comparison.
@@ -180,8 +193,9 @@ automatic rerun, including after a browser-wait timeout.
 ## Result meanings
 
 - ready: all selected preflight cases passed; no model task was submitted.
-- runtime_verified: actual frozen native receipts, distinct execute/review/verify
-  runs, passed checks and downloaded Artifact bytes were verified.
+- runtime_verified: actual frozen native receipts, distinct required native runs
+  for that Factory version, passed current-epoch checks, downloaded Artifact bytes
+  and the normal deliverable acceptance receipt were verified.
 - blocked: a gate, execution or cleanup failed; its closed code identifies the
   next investigation.
 

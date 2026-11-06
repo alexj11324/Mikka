@@ -21,8 +21,9 @@ function inventory() {
 const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archivedAt: null, name: 'PRIVATE_PROFILE_NAME',
   description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
   skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
-function fixture({ failure, profileBusy = false, paidFallback = false } = {}) {
-  const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set()
+function fixture({ failure, profileBusy = false, paidFallback = false, flowVersion = 2 } = {}) {
+  const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set()
+  const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
   if (profileBusy) profiles.set(existingProfile.id, structuredClone(existingProfile))
   let current = { ...original }, closed = 0, liveClosed = 0, fallback = paidFallback || failure === 'paid_fallback', concurrentEdit = false
   const response = (value, status = 200, headers) => Response.json(value, { status, headers })
@@ -40,8 +41,8 @@ function fixture({ failure, profileBusy = false, paidFallback = false } = {}) {
   function supplySubmission(profileId, prompt) {
     const profile = profiles.get(profileId), item = CASES.find(value => value.model === profile.model.model), index = submissions.length
     submissions.push({ ...fixtureIdentity(revision, item), item, profileId, prompt, issueId: id(100 + index), taskId: id(200 + index),
-      candidateId: id(300 + index), artifactId: id(500 + index), eventId: id(600 + index),
-      runs: Array.from({ length: failure === 'budget' ? 4 : 3 }, (_, offset) => id(400 + index * 10 + offset)) })
+      candidateId: id(300 + index), artifactId: id(500 + index), eventId: id(600 + index), attemptId: id(700 + index), acceptanceId: id(800 + index),
+      runs: Array.from({ length: stages.length + (failure === 'budget' ? 1 : 0) }, (_, offset) => id(400 + index * 10 + offset)) })
   }
   const chat = () => ({ botId, enabled: true, working: false, cursor: 10 + submissions.length * 2,
     items: submissions.flatMap((value, index) => [
@@ -147,16 +148,35 @@ function fixture({ failure, profileBusy = false, paidFallback = false } = {}) {
     if (path === '/api/mobile/bots/' + botId) return response({ threads: submissions.flatMap(value => value.runs.map(runId => ({ id: runId, status: 'done' }))) })
     if (path === '/api/factory/tasks') {
       const found = submissions.find(value => value.issueId === url.searchParams.get('issueId'))
-      return response({ tasks: found ? [{ id: found.taskId, stage: 'verify', status: cancelled.has(found.taskId) ? 'cancelled' : 'passed' }] : [] })
+      return response({ tasks: found ? [{ id: found.taskId, stage: 'approval', candidateId: found.candidateId, candidateSha: null,
+        status: cancelled.has(found.taskId) ? 'cancelled' : accepted.has(found.taskId) ? 'passed' : 'pending' }] : [] })
+    }
+    if (/^\/api\/factory\/tasks\/[^/]+\/approval$/.test(path)) {
+      const found = submissions.find(value => value.taskId === path.split('/')[4]); assert.ok(found)
+      assert.equal(method, 'POST')
+      const binding = { taskId: found.taskId, issueId: found.issueId, attemptId: found.attemptId, candidateId: found.candidateId, revision: 1 }
+      assert.deepEqual(body, { operation: 'accept', input: { binding, eventId: found.profileId } })
+      assert.equal(accepted.has(found.taskId), false)
+      if (failure === 'approval_refused') return response({ error: 'factoryStale' }, 409)
+      accepted.add(found.taskId)
+      if (failure === 'lost_acceptance_response') throw new Error('PRIVATE_NETWORK_ERROR')
+      return response({ status: 'accepted', acceptanceId: found.acceptanceId, binding: { ...binding, revision: 2 } })
     }
     if (path.startsWith('/api/factory/tasks/')) {
       const found = submissions.find(value => value.taskId === path.split('/').at(-1)); assert.ok(found)
       if (method === 'POST') { assert.equal(body.action, 'cancel'); cancelled.add(found.taskId) }
-      return response({ task: { id: found.taskId, issueId: found.issueId, userId: ownerId, botId, stage: 'verify',
-        status: cancelled.has(found.taskId) ? 'cancelled' : 'passed', revision: 1, candidateId: found.candidateId, sourceEventId: found.eventId },
-        attempts: found.runs.map((runId, index) => ({ runId, stage: ['execute', 'review', 'verify', 'execute'][index], status: 'passed',
-          candidateId: found.candidateId, output: { requestEpoch: found.eventId } })),
-        candidates: [{ id: found.candidateId, runId: found.runs[0] }] })
+      const complete = accepted.has(found.taskId)
+      const attempts = found.runs.map((runId, index) => ({ runId, stage: stages[index] ?? 'execute',
+        status: failure === 'review_failed' && stages[index] === 'review' ? 'failed' : 'passed', candidateId: found.candidateId,
+        output: { requestEpoch: failure === 'review_stale' && stages[index] === 'review' ? id(999) : found.eventId } }))
+        .filter(value => failure !== value.stage + '_missing')
+      if (complete) attempts.push({ id: found.attemptId, runId: null, stage: 'approval', candidateId: found.candidateId,
+        status: 'passed', output: { requestEpoch: found.eventId, ...(failure === 'acceptance_receipt_missing' ? {} : { deliverableAcceptanceId: found.acceptanceId }) } })
+      return response({ task: { id: found.taskId, issueId: found.issueId, userId: ownerId, botId, stage: 'approval',
+        status: cancelled.has(found.taskId) ? 'cancelled' : complete ? 'passed' : 'pending', revision: complete ? 2 : 1,
+        attemptId: found.attemptId, candidateId: found.candidateId, sourceEventId: found.eventId, ...(flowVersion === 2 ? { route: { flowVersion: 2 } } : {}) },
+        attempts, candidates: [{ id: found.candidateId, runId: found.runs[0], repository: failure === 'repository_candidate' ? 'owner/repo' : 'none',
+          kind: failure === 'repository_candidate' ? 'repository' : 'deliverable', sha: failure === 'repository_candidate' ? revision : null }] })
     }
     if (/^\/api\/runs\/[^/]+\/evidence$/.test(path)) {
       const { run, submission } = runData(path.split('/')[3])
@@ -172,7 +192,7 @@ function fixture({ failure, profileBusy = false, paidFallback = false } = {}) {
   }
   return { calls, profiles, submissions, foreignMessages, supplySubmission, fetchImpl,
     openLiveImpl: async () => ({ revision: 0, wait: async () => { throw new AcceptanceError('task_timeout') }, close: () => { liveClosed++ } }),
-    get state() { return { closed, liveClosed, current, cancelled, fallback } } }
+    get state() { return { closed, liveClosed, current, cancelled, accepted, fallback } } }
 }
 const run = (data, execute = false, overrides = {}, settings = {}) => runObservabilityAcceptance({ env: { ...env, ...overrides }, execute,
   fetchImpl: data.fetchImpl, openLiveImpl: data.openLiveImpl, ...settings })
@@ -204,7 +224,8 @@ test('two executed cases retain exact native receipts, restore model/profile sta
   assert.deepEqual(data.state.current, original)
   assert.ok([...data.profiles.values()].every(value => value.archivedAt && !value.enabled))
   for (const value of report.cases) {
-    assert.equal(value.runs.length, 3); assert.equal(value.checks.length, 2)
+    assert.equal(value.flowVersion, 2); assert.equal(value.runs.length, 2); assert.deepEqual(value.checks.map(check => check.stage), ['review'])
+    assert.equal(value.acceptance.status, 'accepted'); assert.equal(value.task.stage, 'approval'); assert.equal(value.task.status, 'passed')
     assert.equal(value.cleanup.evidence, 'retained'); assert.equal(value.cleanup.state, 'complete')
     assert.equal(value.artifact.bytes > 0, true)
     assert.match(value.requestTrace.traceId, /^[0-9a-f]{32}$/)
@@ -215,8 +236,36 @@ test('two executed cases retain exact native receipts, restore model/profile sta
     assert.equal(call.headers['x-posthog-session-id'], undefined)
   }
   assert.equal(report.browserReplayVerified, false); assert.equal(report.posthogIngestionVerified, false)
+  assert.equal(data.state.accepted.size, 2); assert.equal(data.state.cancelled.size, 0)
   assert.equal(data.calls.filter(value => value.method === 'DELETE' && !value.path.includes('/agent-profiles/')).length, 0)
   safe(report)
+})
+test('legacy Factory tasks still require review and verify before the normal deliverable acceptance', async () => {
+  const data = fixture({ flowVersion: 1 }), report = await run(data, true)
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  assert.equal(report.cases[0].flowVersion, 1); assert.equal(report.cases[0].runs.length, 3)
+  assert.deepEqual(report.cases[0].checks.map(value => value.stage), ['review', 'verify'])
+  assert.equal(data.state.accepted.size, 1); assert.equal(data.state.cancelled.size, 0); safe(report)
+})
+test('missing, failed or stale Factory checks never reach approval, including legacy verify', async () => {
+  for (const [flowVersion, failure] of [[2, 'execute_missing'], [2, 'review_missing'], [2, 'review_failed'], [2, 'review_stale'], [1, 'verify_missing']]) {
+    const data = fixture({ flowVersion, failure }), report = await run(data, true)
+    assert.equal(report.cases[0].code, 'task_checks_missing', JSON.stringify(report))
+    assert.equal(data.calls.filter(value => value.path.endsWith('/approval')).length, 0)
+    assert.equal(data.state.accepted.size, 0); assert.equal(data.state.cancelled.size, 1)
+    assert.equal(report.cases[0].cleanup.state, 'complete'); safe(report)
+  }
+})
+test('deliverable approval requires its receipt, never accepts a repository and never retries a lost response', async () => {
+  for (const [failure, code, posts] of [['repository_candidate', 'task_scope', 0], ['approval_refused', 'http_refused', 1],
+    ['acceptance_receipt_missing', 'task_acceptance', 1], ['lost_acceptance_response', 'request_failed', 1]]) {
+    const data = fixture({ failure }), report = await run(data, true)
+    assert.equal(report.status, 'blocked'); assert.equal(report.cases[0].code, code, JSON.stringify(report))
+    assert.equal(data.calls.filter(value => value.path.endsWith('/approval')).length, posts)
+    assert.equal(report.cases[0].cleanup.state, 'complete', JSON.stringify(report))
+    assert.equal(data.state.cancelled.size, data.state.accepted.size ? 0 : 1)
+    assert.equal(data.submissions.length, 1); safe(report)
+  }
 })
 test('uncertain mutation responses never resubmit and still reconcile own temporary settings', async () => {
   for (const failure of ['lost_profile_response', 'lost_model_response', 'lost_submission_response']) {

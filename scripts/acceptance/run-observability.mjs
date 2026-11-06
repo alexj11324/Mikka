@@ -9,7 +9,7 @@
  * Optional: MIKKA_OBSERVABILITY_MODEL_CASE=all|claude|codex; timeout per model
  * MIKKA_OBSERVABILITY_TIMEOUT_MS (60_000..600_000, default 480_000).
  * Infisical credentials stay in the runner. Never enable fetch/HTTP debug output.
- * One execute/review/verify is allowed; first observed excess triggers stop.
+ * One execute/review (plus legacy verify) is allowed; observed excess stops.
  * No endpoint provides a hard dollar cap or synchronous native-attempt fence.
  * PostHog/APM ingestion and real browser replay require independent verification.
  */
@@ -45,6 +45,7 @@ const errorCodes = new Set([
   'run_scope', 'run_model', 'run_identity', 'run_profile', 'run_failed', 'budget_exceeded', 'task_blocked',
   'artifact_missing', 'artifact_content', 'cleanup_incomplete', 'acceptance_failed',
   'owner_busy', 'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
+  'task_checks_missing', 'task_acceptance',
 ])
 const serverCodes = new Set(['authRequired', 'modelUnavailable', 'factoryStale', 'factoryStopped', 'runChainEnded',
   'agentProfileNotFound', 'agentProfileRequestConflict', 'agentProfileVersionConflict', 'subscriptionConflict',
@@ -55,7 +56,9 @@ export class AcceptanceError extends Error {
 const check = (condition, code) => { if (!condition) throw new AcceptanceError(code) }
 const hash = value => createHash('sha256').update(value).digest('hex')
 const uuid = value => typeof value === 'string' && UUID.test(value)
-const settledTask = task => ['cancelled', 'revoked', 'completed', 'succeeded'].includes(task.status) || task.stage === 'monitor' && task.status === 'passed'
+const settledTask = (task, candidates = []) => ['cancelled', 'revoked', 'completed', 'succeeded'].includes(task.status)
+  || task.status === 'passed' && (task.stage === 'monitor'
+    || task.stage === 'approval' && (Object.hasOwn(task, 'candidateSha') ? task.candidateSha : candidates.find(value => value.id === task.candidateId)?.sha) === null)
 const sameModel = (a, b) => a?.id === b?.id && a?.kind === b?.kind && a?.modelId === b?.modelId && a?.provider === b?.provider && a?.chosen === b?.chosen && !a?.fallback
 const sourceKey = value => JSON.stringify([value?.harness, value?.model, value?.source?.kind, value?.source?.connectionId])
 const profilePath = (workspaceId, id = '') => '/api/factory/agent-profiles' + (id ? '/' + id : '') + '?workspaceId=' + workspaceId
@@ -109,7 +112,7 @@ export function fixtureTask(revision, item) {
   const content = 'mikka-observability:' + fixture.marker + '\nstatus=ready\n'
   const input = '请创建且只创建一个 Factory 任务，标题必须为 ' + fixture.marker + '。在所选云端和固定 Agent Profile 上完成一次很小的真实交付：创建名称为 ' + title
     + ' 的纯文本 Artifact，UTF-8 内容必须精确等于这个 JSON 字符串解码后的字节（包括末尾换行）：' + JSON.stringify(content)
-    + '。实际读取文件验证后，通过正常 Artifact 工具提交，交给独立 review 和 verify。使用选中的 Profile，所有阶段只允许我的官方订阅 ' + item.model
+    + '。实际读取文件验证后，作为无仓库 deliverable 候选通过正常 Artifact 工具提交，交给当前 Factory 流程的独立 review；只有旧版流程需要独立 verify。等待正常交付验收，不合并或发布仓库。使用选中的 Profile，所有阶段只允许我的官方订阅 ' + item.model
     + '，失败就停止；不要切换账号、API Key、模型，或重试/修复/创建第二个任务。不要外部发消息、推送代码或改别的资源。完成后只回复此任务、线程和 Artifact 链接。'
   return { ...fixture, title, content, input }
 }
@@ -165,11 +168,29 @@ export function runProof(found, { item, ownerId, workspaceId, botId, issueId, pr
   return { runId: run.id, status: run.status, harness: item.harness, model: item.model, subscriptionRoute: run.subscriptionRoute,
     profileId, ownSubscription: true, ownCloudRuntime: true }
 }
-export function assertAttemptBudget(attempts) {
+export function assertAttemptBudget(attempts, flowVersion = 1) {
   const runs = attempts.filter(attempt => uuid(attempt.runId))
-  check(runs.length <= 3 && new Set(runs.map(attempt => attempt.runId)).size === runs.length
-    && runs.every(attempt => ['execute', 'review', 'verify'].includes(attempt.stage))
+  const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
+  check(runs.length <= stages.length && new Set(runs.map(attempt => attempt.runId)).size === runs.length
+    && runs.every(attempt => stages.includes(attempt.stage))
     && new Set(runs.map(attempt => attempt.stage)).size === runs.length, 'budget_exceeded')
+}
+/** The host freezes flowVersion. v2 has one independent review; historical
+ * tasks retain review + verify. Approval never substitutes for either check. */
+export function factoryReviewProof(state, proofs) {
+  const task = state.task, flowVersion = task.route?.flowVersion === 2 ? 2 : 1
+  const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
+  assertAttemptBudget(state.attempts ?? [], flowVersion)
+  check(!['failed', 'blocked', 'cancelled', 'revoked'].includes(task.status), 'task_blocked')
+  if (task.stage !== 'approval') return null
+  const candidate = state.candidates?.find(value => value.id === task.candidateId)
+  check(candidate && uuid(candidate.id) && uuid(candidate.runId) && uuid(task.sourceEventId), 'task_checks_missing')
+  const attempts = stages.map(stage => (state.attempts ?? []).find(value => value.stage === stage && value.candidateId === candidate.id))
+  check(attempts.every(value => value && uuid(value.runId) && value.status === 'passed' && value.output?.requestEpoch === task.sourceEventId
+    && proofs.get(value.runId)?.status === 'succeeded') && attempts[0].runId === candidate.runId, 'task_checks_missing')
+  // This acceptance is only for its tiny file, never a repository publication.
+  check(candidate.kind === 'deliverable' && candidate.sha === null && candidate.repository === 'none', 'task_scope')
+  return { flowVersion, candidate, checks: attempts.slice(1) }
 }
 
 /** No business polling. One authenticated push socket; only post-commit keys
@@ -253,7 +274,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   check(!env.MIKKA_ACCEPTANCE_BASE_URL || env.MIKKA_ACCEPTANCE_BASE_URL === ORIGIN + '/mikka', 'origin_rejected')
   const report = { version: 1, issue: 1512, revision, mode: execute ? 'execute' : 'preflight', status: 'running',
     startedAt: new Date(now()).toISOString(), browserReplayVerified: false, posthogIngestionVerified: false,
-    budget: { submissionsPerModel: 1, nativeRunsPerModel: 3, enforcement: 'stop_on_first_observed_excess', timeoutMs, paidResubmissions: 0, hardDollarCap: false },
+    budget: { submissionsPerModel: 1, nativeRunsByFlowVersion: { 1: 3, 2: 2 }, enforcement: 'stop_on_first_observed_excess', timeoutMs, paidResubmissions: 0, hardDollarCap: false },
     modelCase, submissionSource: browserSubmit ? 'browser' : 'api', cases: [], sessionClosed: false,
     preparation: { requested: prepare, profilesDisabled: 0, profilesRestored: 0, fallbackChanged: false, restoration: 'not_needed' } }
   const cookies = responseCookieJar(now)
@@ -312,7 +333,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       && threads.threads.every(thread => ['failed', 'done', 'stopped'].includes(thread.status)), 'workspace_busy')
     for (let index = 0; index < tasks.length; index += 10) {
       const ledgers = await Promise.all(tasks.slice(index, index + 10).map(task => read('/api/factory/tasks?issueId=' + task.id)))
-      check(ledgers.every(ledger => Array.isArray(ledger.tasks) && ledger.tasks.every(settledTask)), 'workspace_busy')
+      check(ledgers.every(ledger => Array.isArray(ledger.tasks) && ledger.tasks.every(task => settledTask(task))), 'workspace_busy')
     }
     check(chat.botId === botId && chat.enabled === true, 'coordinator_disabled')
     check(chat.working === false && !chat.streamRunId && !chat.items.some(item => item.pending), 'coordinator_busy')
@@ -511,7 +532,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           // A shared Coordinator is stopped only while its new human messages
           // still belong exclusively to this exact submission.
           if (!foreignActivity && (latest.chat.working || latest.chat.streamRunId)) await read('/api/mobile/chat/stop', { body: { botId }, cleanup: true })
-          if (task && !settledTask(task.task)) {
+          if (task && !settledTask(task.task, task.candidates)) {
             await read('/api/factory/tasks/' + task.task.id, { body: { binding: { taskId: task.task.id, revision: task.task.revision },
               eventId: fixture.profileId, action: 'cancel', reason: 'Issue #1512 bounded acceptance completed; retain evidence.' }, cleanup: true })
           }
@@ -525,7 +546,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
             const before = live.revision
             const state = await inspect(true)
             if (!state.chat.working && !state.chat.streamRunId && [...proofs.values()].every(proof => nativeTerminal.has(proof.status))
-              && (!task || settledTask(task.task))) { cleanup.ownRunsStopped = true; break }
+              && (!task || settledTask(task.task, task.candidates))) { cleanup.ownRunsStopped = true; break }
             await live.wait(before, deadline)
           }
         }
@@ -617,14 +638,11 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
         check(sameModel((await menuRead()).current, selectedModel), 'model_changed')
         check((await read('/api/settings/api-keys?workspace=' + workspaceId)).apiKeyAfterQuota === false, 'paid_fallback_enabled')
         if (task) {
-          assertAttemptBudget(task.attempts ?? [])
           check([...proofs.values()].every(proof => !['failed', 'stopped', 'cancelled', 'paused', 'waiting_input'].includes(proof.status)), 'run_failed')
-          const candidate = task.candidates?.find(value => value.id === task.task.candidateId)
-          const checks = (task.attempts ?? []).filter(value => value.candidateId === candidate?.id && ['review', 'verify'].includes(value.stage) && value.status === 'passed')
-          if (candidate && uuid(candidate.runId) && checks.length === 2 && new Set(checks.map(value => value.stage)).size === 2
-            && [candidate.runId, ...checks.map(value => value.runId)].every(id => proofs.get(id)?.status === 'succeeded')
-            && checks.every(value => value.output?.requestEpoch === task.task.sourceEventId)
-            && latest.chat.working === false && workflowIds.size > 0 && (!browserSubmit || result.submission?.observed === true)) {
+          const reviewed = factoryReviewProof(task, proofs)
+          if (reviewed && latest.chat.working === false && !latest.chat.streamRunId && workflowIds.size > 0
+            && (!browserSubmit || result.submission?.observed === true)) {
+            const { candidate, checks, flowVersion } = reviewed
             const produced = await read('/api/runs/' + candidate.runId + '/evidence')
             const files = (produced.artifacts ?? []).filter(value => value.title === title && uuid(value.id))
             check(files.length === 1, 'artifact_missing')
@@ -643,10 +661,28 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
             check(bytes.equals(Buffer.from(content, 'utf8')), 'artifact_content')
             result.artifact = { id: file.id, version: file.latestVersion, bytes: bytes.length, sha256: hash(bytes) }
             result.checks = checks.map(value => ({ stage: value.stage, runId: value.runId, status: 'passed' }))
+            result.flowVersion = flowVersion
+            const current = task.task
+            check(['pending', 'waiting'].includes(current.status) && uuid(current.attemptId)
+              && Number.isSafeInteger(current.revision) && current.revision > 0, 'task_acceptance')
+            const binding = { taskId: current.id, issueId: current.issueId, attemptId: current.attemptId,
+              candidateId: current.candidateId, revision: current.revision }
+            // One ordinary Owner acceptance after verifying exact file bytes.
+            // Never retry this POST, even if its response is lost.
+            const accepted = await read('/api/factory/tasks/' + current.id + '/approval', { body: {
+              operation: 'accept', input: { binding, eventId: fixture.profileId },
+            } })
+            check(accepted.status === 'accepted' && uuid(accepted.acceptanceId)
+              && isDeepStrictEqual(accepted.binding, { ...binding, revision: binding.revision + 1 }), 'task_acceptance')
+            await inspect()
+            check(factoryReviewProof(task, proofs)?.candidate.id === candidate.id && task.task.stage === 'approval' && task.task.status === 'passed'
+              && task.attempts.some(value => value.id === task.task.attemptId && value.stage === 'approval' && value.candidateId === candidate.id
+                && value.status === 'passed' && value.output?.requestEpoch === task.task.sourceEventId
+                && value.output?.deliverableAcceptanceId === accepted.acceptanceId), 'task_acceptance')
+            result.acceptance = { status: 'accepted', id: accepted.acceptanceId, stage: 'approval' }
             result.status = 'runtime_verified'
             break
           }
-          check(!['failed', 'blocked', 'cancelled', 'revoked'].includes(task.task.status), 'task_blocked')
         }
         await live.wait(before, deadline, signal)
       }
