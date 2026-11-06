@@ -48,3 +48,12 @@ test('a person flags a task in and out of 受阻', () => {
   // Flagged and failed: the thread's reason names it.
   assert.deepEqual(taskBlock(todo({ block: FLAGGED_BLOCK }), run, none), { reason: 'failed' })
 })
+
+test('the board can save the 受阻 flag through the RPC allowlist', async () => {
+  const { desktopActionSchemas } = await import('./desktop-rpc/schemas')
+  const schema = desktopActionSchemas['issue-metadata.updateIssueMetadata']
+  const id = '6f1b5f3e-8c1a-4f3e-9a51-0a8c2f1d9b10'
+  assert.equal(schema.safeParse([{ id, revision: 2, patch: { block: FLAGGED_BLOCK } }]).success, true)
+  assert.equal(schema.safeParse([{ id, revision: 2, patch: { block: clearedBlock({ runId: 'r1' }) } }]).success, true)
+  assert.equal(schema.safeParse([{ id, revision: 2, patch: { block: { blocked: 'yes', runId: null } } }]).success, false)
+})
