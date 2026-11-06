@@ -77,6 +77,108 @@ class Publish(unittest.TestCase):
             bt.probe_models('tpl1', 'desktop', 'fixture-key', factory)
         self.assertEqual(calls[-1], 'killed')
 
+    def test_model_probe_timeout_records_only_safe_counts_and_preserves_the_failure(self):
+        class TimeoutException(Exception): pass
+        failure = TimeoutException('private transport detail')
+        cause = OSError('private connection detail')
+        output = json.dumps([{'harness': 'codex', 'installed': True, 'models': ['private-模型']}], ensure_ascii=False)
+        stderr = 'private-account-凭证\n'
+        calls = []
+        class Probe:
+            def __init__(self): self.commands = self
+            def run(self, command, **options):
+                calls.append(('run', command, options))
+                options['on_stdout'](output[:17])
+                options['on_stdout'](output[17:])
+                options['on_stderr'](stderr)
+                raise failure from cause
+            def kill(self): calls.append(('kill',))
+        def factory(*args, **options):
+            calls.append(('create', args, options))
+            return Probe()
+        log = io.StringIO()
+        with patch.object(bt.time, 'monotonic', side_effect=[100, 145.25]), patch.object(bt.sys, 'stderr', log):
+            with self.assertRaises(TimeoutException) as raised:
+                bt.probe_models('private-template', 'codex', 'private-key', factory)
+        self.assertIs(raised.exception, failure)
+        self.assertIs(raised.exception.__cause__, cause)
+        self.assertEqual([call[0] for call in calls], ['create', 'run', 'kill'])
+        self.assertEqual(calls[0][2]['timeout'], 60)
+        self.assertEqual(calls[1][2]['timeout'], 45)
+        self.assertNotIn('request_timeout', calls[1][2])
+        self.assertEqual(json.loads(log.getvalue()), {
+            'event': 'mikka_model_probe_failed', 'kind': 'codex', 'error': 'timeout',
+            'stdoutBytes': len(output.encode('utf-8')), 'stderrBytes': len(stderr.encode('utf-8')),
+            'elapsedMs': 45250, 'modelsJsonReceived': True,
+        })
+        self.assertNotIn('private', log.getvalue())
+        self.assertNotIn('凭证', log.getvalue())
+
+    def test_model_probe_partial_output_does_not_expose_an_unknown_error(self):
+        failure = RuntimeError('private unexpected detail')
+        calls = []
+        class Probe:
+            def __init__(self): self.commands = self
+            def run(self, _, **options):
+                calls.append('run')
+                options['on_stdout']('[{"harness":')
+                raise failure
+            def kill(self): calls.append('kill')
+        log = io.StringIO()
+        with patch.object(bt.time, 'monotonic', side_effect=[10, 11]), patch.object(bt.sys, 'stderr', log):
+            with self.assertRaises(RuntimeError) as raised:
+                bt.probe_models('private-template', 'claude', 'private-key', lambda *_, **__: Probe())
+        self.assertIs(raised.exception, failure)
+        self.assertEqual(calls, ['run', 'kill'])
+        self.assertEqual(json.loads(log.getvalue()), {
+            'event': 'mikka_model_probe_failed', 'kind': 'claude', 'error': 'command_failed',
+            'stdoutBytes': 12, 'stderrBytes': 0, 'elapsedMs': 1000, 'modelsJsonReceived': False,
+        })
+        self.assertNotIn('private', log.getvalue())
+
+    def test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error(self):
+        for log_fails in (False, True):
+            with self.subTest(log_fails=log_fails):
+                failure = TimeoutError('private command failure')
+                cause = OSError('private transport cause')
+                calls = []
+                class Probe:
+                    def __init__(self): self.commands = self
+                    def run(self, _, **options):
+                        calls.append('run')
+                        raise failure from cause
+                    def kill(self):
+                        calls.append('kill')
+                        raise RuntimeError('private cleanup failure')
+                class Log(io.StringIO):
+                    def write(self, message):
+                        if log_fails:
+                            raise OSError('private logging failure')
+                        return super().write(message)
+                log = Log()
+                with patch.object(bt.sys, 'stderr', log):
+                    with self.assertRaises(TimeoutError) as raised:
+                        bt.probe_models('private-template', 'codex', 'private-key', lambda *_, **__: Probe())
+                self.assertIs(raised.exception, failure)
+                self.assertIs(raised.exception.__cause__, cause)
+                self.assertEqual(calls, ['run', 'kill'])
+                self.assertEqual(failure.__notes__, (['model_probe_diagnostic_failed'] if log_fails else []) + ['model_probe_cleanup_failed'])
+                self.assertNotIn('private', log.getvalue())
+
+    def test_model_probe_success_still_fails_if_its_sandbox_cannot_be_cleaned_up(self):
+        failure = RuntimeError('private cleanup failure')
+        class Probe:
+            def __init__(self): self.commands = self
+            def run(self, _, **options):
+                return SimpleNamespace(exit_code=0, stdout=json.dumps([{'harness': 'codex', 'installed': True, 'models': ['fixture-model']}]))
+            def kill(self): raise failure
+        log = io.StringIO()
+        with patch.object(bt.sys, 'stderr', log):
+            with self.assertRaises(RuntimeError) as raised:
+                bt.probe_models('private-template', 'codex', 'private-key', lambda *_, **__: Probe())
+        self.assertIs(raised.exception, failure)
+        self.assertEqual(log.getvalue(), '')
+
     def test_capability_manifest_matches_template_kinds_and_task_environment(self):
         manifest = json.loads((bt.ROOT / 'scripts/e2b/template-capabilities.json').read_text())
         self.assertEqual(set(manifest), set(bt.KINDS))

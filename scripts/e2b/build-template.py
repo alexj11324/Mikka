@@ -398,21 +398,63 @@ def probe_models(template_id, kind, api_key, sandbox_factory=None):
         sandbox_factory = Sandbox.create
     required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
+    began = time.monotonic()
+    stdout_chunks = []
+    stdout_bytes = stderr_bytes = 0
+    failure = None
+    category = 'command_failed'
+
+    def on_stdout(chunk):
+        nonlocal stdout_bytes
+        stdout_bytes += len(chunk.encode('utf-8'))
+        stdout_chunks.append(chunk)
+
+    def on_stderr(chunk):
+        nonlocal stderr_bytes
+        stderr_bytes += len(chunk.encode('utf-8'))
+
     try:
-        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
+        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45,
+                                      on_stdout=on_stdout, on_stderr=on_stderr)
         if result.exit_code != 0:
             raise RuntimeError('model_probe_failed')
+        category = 'invalid_model_json'
         reports = json.loads(result.stdout)
         if not isinstance(reports, list):
             raise RuntimeError('model_probe_invalid')
+        category = 'required_harness_missing'
         for harness in required:
             found = next((row for row in reports if isinstance(row, dict) and row.get('harness') == harness and row.get('installed') is True), None)
             if not found or not (found.get('models') or found.get('modelSlots')):
                 raise RuntimeError(f'model_probe_missing {harness}')
         return [row for row in reports if row.get('harness') in required]
+    except Exception as error:
+        failure = error
+        try:
+            try:
+                models_json_received = isinstance(json.loads(''.join(stdout_chunks)), list)
+            except (ValueError, TypeError):
+                models_json_received = False
+            if type(error).__name__ in ('TimeoutException', 'TimeoutError', 'ReadTimeout', 'ConnectTimeout'):
+                category = 'timeout'
+            # Counts only: CLI output can contain account details or credentials.
+            print(json.dumps({
+                'event': 'mikka_model_probe_failed', 'kind': kind, 'error': category,
+                'stdoutBytes': stdout_bytes, 'stderrBytes': stderr_bytes,
+                'elapsedMs': round((time.monotonic() - began) * 1000),
+                'modelsJsonReceived': models_json_received,
+            }, separators=(',', ':')), file=sys.stderr, flush=True)
+        except Exception:
+            error.add_note('model_probe_diagnostic_failed')
+        raise
     finally:
         # This probe created this disposable sandbox; no existing worker is touched.
-        sandbox.kill()
+        try:
+            sandbox.kill()
+        except Exception:
+            if failure is None:
+                raise
+            failure.add_note('model_probe_cleanup_failed')
 
 
 def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
