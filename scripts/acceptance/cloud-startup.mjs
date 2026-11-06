@@ -170,7 +170,7 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
   record.messageSubmittedAt = iso(now())
   await client.rpc('coordinator.sendCoordinatorMessage', [text, null, botId, randomUUID(),
-    deviceId ? { kind: 'device', deviceId } : { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, profileId],
+    deviceId ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId],
   { headers: { traceparent: trace.traceparent } })
   const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, timeoutMs)
   assert(response.status === 200 && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'coordinator_stream_unavailable')
@@ -609,7 +609,14 @@ export function alignServerTimings(report, timings) {
     && Number.isFinite(item.totalMs) && item.failed === false)
   for (const sample of report.samples) {
     if (!sample.agentStart || !sample.firstProviderChunk) continue
-    const matching = clean.filter(item => item.workflowRunId === sample.workflowRunId)
+    let matching = clean.filter(item => item.workflowRunId === sample.workflowRunId)
+    // One durable workflow can dispatch several chat turns. Correlate using
+    // the owned run's server-side ensure interval, never runner wall clocks.
+    if (matching.length > 1) {
+      const owned = timings.filter(item => item?.msg === 'cloud_startup_timing' && item.stage === 'cloud.thread.ensure'
+        && item.runIdHash === sample.runIdHash && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt))
+      if (owned.length) matching = matching.filter(item => owned.some(run => run.startedAt >= item.startedAt && run.endedAt <= item.endedAt))
+    }
     if (matching.length !== 1) { sample.timing = { status: 'unavailable', reason: matching.length ? 'ambiguous_dispatch' : 'dispatch_log_missing' }; continue }
     const log = matching[0], end = dateValue(sample.agentStart.storedAt), provider = dateValue(sample.firstProviderChunk.storedAt)
     if (![end, provider].every(Number.isFinite) || end < log.startedAt || provider < end) {

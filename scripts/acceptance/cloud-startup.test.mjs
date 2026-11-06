@@ -73,6 +73,8 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, true)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
           assert.equal(input.model, undefined)
+          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
+          assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
@@ -248,4 +250,20 @@ test('alignment rejects missing, ambiguous and reversed clocks; baseline does no
   assert.equal(alignServerTimings(make(), []).samples[0].timing.reason, 'dispatch_log_missing')
   assert.equal(alignServerTimings(make(), [...logs, logs[0]]).samples[0].timing.reason, 'ambiguous_dispatch')
   assert.equal(alignServerTimings(make(), logs.map(log => ({ ...log, startedAt: epoch + 7000, endedAt: epoch + 8000 }))).samples[0].timing.reason, 'clock_or_receipt_invalid')
+})
+
+
+test('reused Coordinator workflow aligns only through the owned run server interval', () => {
+  const hashes = ['a'.repeat(16), 'b'.repeat(16)]
+  const report = { mode:'baseline', maxStartupMs:5000, cleanup:{errors:[]}, samples: hashes.map((runIdHash,index)=>({
+    workflowRunId:'wrun_SHARED', runIdHash, status:'execution_proved_awaiting_server_timing', execution:{credentialType:'subscription'},
+    cleanup:{status:'passed'}, agentStart:{storedAt:new Date(epoch+index*10000+3500).toISOString()},
+    firstProviderChunk:{storedAt:new Date(epoch+index*10000+5000).toISOString()}})) }
+  const logs = hashes.flatMap((runIdHash,index)=>[
+    {msg:'dispatch_timing',workflowRunId:'wrun_SHARED',stepId:`step_${index}`,startedAt:epoch+index*10000,endedAt:epoch+index*10000+3000,totalMs:3000,failed:false},
+    {msg:'cloud_startup_timing',runIdHash,stage:'cloud.thread.ensure',startedAt:epoch+index*10000+200,endedAt:epoch+index*10000+2900,ms:2700}])
+  const aligned = alignServerTimings(report,logs)
+  assert.equal(aligned.status,'baseline_recorded')
+  assert.deepEqual(aligned.samples.map(sample=>sample.timing.dispatchToAgentStartMs),[3500,3500])
+  assert.deepEqual(aligned.samples.map(sample=>sample.timing.stepId),['step_0','step_1'])
 })
