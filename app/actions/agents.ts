@@ -376,6 +376,22 @@ function originalSessionRetryAvailable(question: { recoveryRequest?: unknown; qu
   return !!question && (!!question.recoveryRequest || (question.questionStatus === 'blocked' && question.taskStatus === 'blocked' && question.runStatus === 'failed' && question.continuationRunId === runId))
 }
 
+/**
+ * Where a thread runs, for the run-location icon after its title
+ * (docs/design/thread-run-location.md). Only the thread's owner sees which
+ * machine; anyone else who may read the thread gets null. Its own read, so the
+ * conversation's frequent reads never wait on a device's presence.
+ */
+export async function getThreadMachine(issueId: string | null, runId: string): Promise<import('@/lib/thread-machine').ThreadMachine | null> {
+  return withDatabaseOperation('/actions/threads/machine', async () => {
+    const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
+    if (row.userId !== user.id) return null
+    const chain = await readRunChain(pool, row.userId, row.id)
+    const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
+    return (await import('@/lib/thread-machine-view')).readThreadMachine(pool, user.id, runIds)
+  })
+}
+
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
 export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
   return withDatabaseOperation('/actions/threads/detail', () => readIssueThread(issueId, runId, after))
