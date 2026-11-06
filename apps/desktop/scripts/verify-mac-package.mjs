@@ -135,6 +135,14 @@ export function packageFuses(wire, variant) {
   return result
 }
 
+/** Read the signed production bundle using the same production fuse policy as
+ * the Dev integrity check. Developer ID and notarization are verified by the
+ * normal release hook; the ad-hoc-only identity verifier is deliberately not used. */
+export async function inspectReleaseFuses(appPath, { readFuses = getCurrentFuseWire } = {}) {
+  need(isAbsolute(appPath) && basename(appPath) === 'Mikka.app', 'MAC_PACKAGE_ARGUMENTS')
+  return packageFuses(await readFuses(appPath), 'dev')
+}
+
 async function codeBundles(appPath) {
   const bundles = [appPath]
   async function visit(directory) {

@@ -9,14 +9,15 @@ const quote = value => `"${value.replaceAll('"', '""')}"`
 /** Real application rows, confined to a leased pair and freshly reserved IDs.
  * No provider, auth, RPC or UI response is simulated. The disabled device and
  * ended run never dispatch work or spend model/provider credits. */
-export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DESKTOP_FIXTURE_EPOCH ?? `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z` } = {}) {
+export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DESKTOP_FIXTURE_EPOCH ?? `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`, includePeerCoordinator = false } = {}) {
   await scope.assertActive()
   // Threads deliberately have a 30-day list window. Keep the same explicit
   // recent UTC day in paired captures, and record it with the evidence.
   const at = Date.parse(epoch)
   if (!/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(epoch) || !Number.isFinite(at) || at > Date.now() || at <= Date.now() - 30 * 86_400_000) throw new TestAccountError('PARITY_FIXTURE_EPOCH_INVALID')
   const AT = epoch
-  const ids = Object.fromEntries(['workspace', 'team', 'coordinator', 'bot', 'issue', 'version', 'device', 'agent', 'run', 'chunk', 'group', 'groupMessage', 'markdown', 'markdownVersion', 'markdownShare', 'html', 'htmlVersion', 'htmlShare', 'coordinatorUser', 'coordinatorReply', 'botUser', 'botReply'].map(key => [key, randomUUID()]))
+  const ids = Object.fromEntries(['workspace', 'team', 'coordinator', ...(includePeerCoordinator ? ['peerCoordinator'] : []), 'bot', 'issue', 'version', 'device', 'agent', 'run', 'chunk', 'group', 'groupMessage', 'markdown', 'markdownVersion', 'markdownShare', 'html', 'htmlVersion', 'htmlShare', 'coordinatorUser', 'coordinatorReply', 'botUser', 'botReply'].map(key => [key, randomUUID()]))
+  const coordinatorIds = [ids.coordinator, ...(includePeerCoordinator ? [ids.peerCoordinator] : [])]
   const fixture = {
     ...ids, epoch, workspaceName: 'Desktop acceptance', teamName: 'Application', botName: 'Ada', groupName: 'Release review',
     issueTitle: 'Review the desktop workspace', artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
@@ -30,6 +31,10 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
     ['teams', ids.team], ['team_members', ids.team], ['team_issues', ids.issue],
     ['bots', ids.coordinator], ['bots', ids.bot], ['coordinator_bots', ids.coordinator],
     ['coordinator_sessions', ids.coordinator], ['coordinator_sessions', ids.bot],
+    ...(includePeerCoordinator ? [
+      ['bots', ids.peerCoordinator, scope.peer.userId], ['coordinator_bots', ids.peerCoordinator, scope.peer.userId],
+      ['coordinator_sessions', ids.peerCoordinator, scope.peer.userId],
+    ] : []),
     ['issues', ids.issue], ['issue_versions', ids.version], ['devices', ids.device], ['agents', ids.agent],
     ['agent_runs', ids.run], ['run_chunks', ids.chunk],
     ['conversations', ids.group], ['conversation_members', ids.group], ['conversation_messages', ids.groupMessage],
@@ -40,7 +45,7 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
   ]
   // Reservation uses the pool's owner, environment, generation and absence
   // checks. A failed insertion still leaves a cleanup record for every ID.
-  for (const [type, id] of resources) await scope.recordResource({ type, id, ownerId: scope.owner.userId })
+  for (const [type, id, ownerId = scope.owner.userId] of resources) await scope.recordResource({ type, id, ownerId })
   await recordAuthenticationSecrets([fixture.markdownToken, fixture.htmlToken], { environment: scope.pool.environment })
   const content = {
     type: 'doc', attrs: { mikka: { assignee: null, project: null, labels: [], pullRequests: [], parentId: null, blockedByIds: [], relatedIds: [], duplicateOfId: null, dueDate: null, estimate: null, favoriteUserIds: [], subscriberUserIds: [scope.owner.userId], deletedAt: null } },
@@ -82,8 +87,8 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
         ['artifact_shares', 'id', [ids.markdownShare, ids.htmlShare]], ['artifact_versions', 'artifactId', [ids.markdown, ids.html]], ['artifacts', 'id', [ids.markdown, ids.html]],
         ['run_chunks', 'runId', [ids.run]], ['agent_runs', 'id', [ids.run]], ['agents', 'id', [ids.agent]], ['devices', 'id', [ids.device]],
         ['issue_versions', 'issueId', [ids.issue]], ['issue_documents', 'issueId', [ids.issue]], ['mikka_team_issues', 'issueId', [ids.issue]], ['issues', 'id', [ids.issue]],
-        ['coordinator_messages', 'botId', [ids.coordinator, ids.bot]], ['coordinator_sessions', 'botId', [ids.coordinator, ids.bot]],
-        ['coordinator_bots', 'botId', [ids.coordinator]], ['bots', 'id', [ids.coordinator, ids.bot]],
+        ['coordinator_messages', 'botId', [...coordinatorIds, ids.bot]], ['coordinator_sessions', 'botId', [...coordinatorIds, ids.bot]],
+        ['coordinator_bots', 'botId', coordinatorIds], ['bots', 'id', [...coordinatorIds, ids.bot]],
         ['mikka_team_members', 'teamId', [ids.team]], ['mikka_teams', 'id', [ids.team]],
         ['mikka_workspace_members', 'workspaceId', [ids.workspace]], ['mikka_workspaces', 'id', [ids.workspace]],
       ]) await remove(table, key, values)
@@ -110,6 +115,14 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
         await insert(client, 'bots', { id, ownerId: owner, workspaceId: ids.workspace, name, color, shape: 'cercle', publicRole: role, createdAt: AT, updatedAt: AT })
       }
       await insert(client, 'coordinator_bots', { ownerId: owner, workspaceId: ids.workspace, botId: ids.coordinator, createdAt: AT })
+      // The multi-account lifecycle enters this team as both leased members.
+      // Its normal reads need a separately owned Coordinator for each member;
+      // reserve the peer's ID before insertion instead of adopting a later row.
+      // Ordinary parity fixtures retain their existing owner-only bot list.
+      if (includePeerCoordinator) {
+        await insert(client, 'bots', { id: ids.peerCoordinator, ownerId: scope.peer.userId, workspaceId: ids.workspace, name: 'Coordinator', color: 'encre', shape: 'cercle', publicRole: '', createdAt: AT, updatedAt: AT })
+        await insert(client, 'coordinator_bots', { ownerId: scope.peer.userId, workspaceId: ids.workspace, botId: ids.peerCoordinator, createdAt: AT })
+      }
       await insert(client, 'issues', { id: ids.issue, userId: owner, title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', scope: 'workspace', scopeSetBy: 'user', linearSyncBlocked: true, createdAt: AT, updatedAt: AT })
       await insert(client, 'issue_versions', { id: ids.version, issueId: ids.issue, userId: owner, revision: 1, title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', actor_type: 'user', actor_id: owner, createdAt: AT })
       await insert(client, 'mikka_team_issues', { issueId: ids.issue, teamId: ids.team, workspaceId: ids.workspace, userId: owner, createdAt: AT })

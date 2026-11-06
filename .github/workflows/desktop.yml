@@ -41,11 +41,6 @@ on:
       - 'pnpm-workspace.yaml'
       - '.github/workflows/desktop.yml'
   workflow_dispatch:
-    inputs:
-      test_backend_url:
-        description: Disposable HTTPS backend for the ad-hoc Mikka Dev artifact
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -270,21 +265,12 @@ jobs:
         run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle
         env:
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
-      - name: Build Alex's isolated test package with production inspector fuse
-        run: pnpm --filter @mikka/desktop package:dev:mac
-        env:
-          # Issue #1415 expressly requests this disposable sandbox endpoint.
-          # Other branches default to loopback; no artifact contacts production.
-          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || ((github.head_ref == 'desktop/bundled-renderer' || github.head_ref == 'desktop/runtime-phase2' || github.head_ref == 'batch/2026-11-06-1415') && 'https://3000-001m6p8qt9pcng01mwgkmshdz6m.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
       - name: Keep final package integrity evidence
         if: always()
         run: |
           mkdir -p .cache/desktop-native-evidence
           if test -f apps/desktop/release-acceptance/mac-package-verification.json; then
             cp apps/desktop/release-acceptance/mac-package-verification.json .cache/desktop-native-evidence/mac-acceptance-package.json
-          fi
-          if test -f apps/desktop/release-dev/mac-package-verification.json; then
-            cp apps/desktop/release-dev/mac-package-verification.json .cache/desktop-native-evidence/mac-dev-package.json
           fi
       - name: Audit closed package and crypto reports
         if: always()
@@ -304,12 +290,6 @@ jobs:
         run: |
           test -f .cache/e2e/environment.json || { echo '::error::NATIVE_ACCOUNT_ENVIRONMENT_MISSING'; exit 1; }
           node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: success()
-        with:
-          name: Mikka-Dev-Apple-Silicon-${{ github.sha }}
-          path: apps/desktop/release-dev/*.zip
-          retention-days: 7
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && steps.evidence.outcome == 'success'
         with:

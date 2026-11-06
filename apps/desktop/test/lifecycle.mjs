@@ -280,7 +280,7 @@ try {
   scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 300_000 })
   releaseObserver = await observeAccountRelease(scope)
   generatedWorkspaceName = await captureGeneratedWorkspaceName(scope)
-  fixtures = await createParityFixtures(scope)
+  fixtures = await createParityFixtures(scope, { includePeerCoordinator: true })
   nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
   let run = await launch('bundled')

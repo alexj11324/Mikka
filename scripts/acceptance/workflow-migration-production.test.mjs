@@ -251,10 +251,19 @@ test('closed issue, stale main, denied manager or shared workspace never submits
   }
 })
 
-test('workflow keeps the original read acceptance, serializes migration after it, and uses no desktop-triggering paths', async () => {
+test('workflow keeps standalone read acceptance and serializes the bounded migration proof', async () => {
   const text = await readFile(new URL('../../.github/workflows/read-cache-production.yml', import.meta.url), 'utf8')
-  assert.match(text, /needs: \[guards, acceptance\]/)
-  assert.match(text, /read-cache-production\.mjs --migration-1415/)
+  const migration = text.slice(text.indexOf('  workflow-migration:'))
+  const acceptance = text.slice(text.indexOf('  acceptance:'), text.indexOf('  workflow-migration:'))
+  assert.match(acceptance, /run: node --import tsx scripts\/acceptance\/read-cache-production\.mjs\n/)
+  assert.match(migration, /needs: \[guards, acceptance\]/)
+  assert.match(migration, /read-cache-production\.mjs --attest --migration-1415/)
+  assert.doesNotMatch(migration, /read-cache-production\.mjs --migration-1415/)
+  assert.doesNotMatch(migration, /production-web-parity-evidence|sandboxes-cloud\.docker\.com/)
+  assert.match(migration, /if: steps\.attest\.outputs\.readable == 'true'\n        run: pnpm exec playwright install --with-deps --only-shell chromium/)
+  assert.match(migration, /if: steps\.attest\.outputs\.readable == 'true'\n        run: pnpm exec playwright test -c playwright\.smoke\.config\.ts/)
+  assert.ok(migration.indexOf('secret-name: SMOKE_OWNER_PASSWORD') < migration.indexOf('run: pnpm exec playwright test'))
+  assert.ok(migration.indexOf('run: pnpm exec playwright test') < migration.indexOf('secret-name: VERCEL_TEAM_TOKEN'))
   assert.match(text, /secret-name: VERCEL_TEAM_TOKEN/)
   assert.match(text, /workflow-migration-production\.test\.mjs/)
   const desktop = await readFile(new URL('../../.github/workflows/desktop.yml', import.meta.url), 'utf8')

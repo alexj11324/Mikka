@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { checkEntitlements, inspectMacPackage, machOFileType, packageFuses, readMachOBinaryType, signatureIdentity } from './verify-mac-package.mjs'
+import { checkEntitlements, inspectMacPackage, inspectReleaseFuses, machOFileType, packageFuses, readMachOBinaryType, signatureIdentity } from './verify-mac-package.mjs'
 
 const appPath = '/owned/Mikka Dev.app'
 const identity = `Executable=${appPath}/Contents/MacOS/Mikka Dev
@@ -142,4 +142,49 @@ test('actual file reads follow only sealed in-app binaries and bound FAT offsets
   const link = join(app, 'linked')
   await symlink(outside, link)
   await assert.rejects(readMachOBinaryType(link, app), /MAC_PACKAGE_MACHO_TYPE/)
+})
+
+test('signed production release reads its own package and requires the production fuse policy', async () => {
+  const releasePath = '/owned/release/mac-arm64/Mikka.app'
+  const calls = []
+  const fuses = await inspectReleaseFuses(releasePath, {
+    readFuses: async path => { calls.push(path); return { ...wire, 3: 48 } },
+  })
+  assert.deepEqual(calls, [releasePath])
+  assert.equal(fuses.RunAsNode, false)
+  assert.equal(fuses.EnableNodeOptionsEnvironmentVariable, false)
+  assert.equal(fuses.EnableNodeCliInspectArguments, false)
+  assert.equal(fuses.OnlyLoadAppFromAsar, true)
+})
+
+test('release fuse verification rejects the inspector or incomplete wire and preserves read failures', async () => {
+  for (const unsafe of [wire, { ...wire, 3: 48, 5: undefined }]) {
+    await assert.rejects(inspectReleaseFuses('/owned/Mikka.app', { readFuses: async () => unsafe }), /MAC_PACKAGE_FUSES/)
+  }
+  const failure = new Error('FIXTURE_FUSE_READ_FAILED')
+  await assert.rejects(inspectReleaseFuses('/owned/Mikka.app', { readFuses: async () => { throw failure } }), error => error === failure)
+  let calls = 0
+  for (const invalid of ['relative/Mikka.app', '/owned/Mikka Dev.app']) {
+    await assert.rejects(inspectReleaseFuses(invalid, { readFuses: async () => { calls++; return { ...wire, 3: 48 } } }), /MAC_PACKAGE_ARGUMENTS/)
+  }
+  assert.equal(calls, 0)
+})
+
+test('release verification uses the installed fuse SDK to read an actual fixture file', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-release-fuses-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const app = join(root, 'Mikka.app')
+  const framework = join(app, 'Contents', 'Frameworks', 'Electron Framework.framework')
+  await mkdir(framework, { recursive: true })
+  const executable = join(framework, 'Electron Framework')
+  // A fuse-wire fixture, not a signed Mach-O application. The production path
+  // uses this same SDK reader after the normal signature/notarization hook.
+  const prefix = Buffer.from('fixture:dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX')
+  const states = [48, 49, 48, 48, 48, 49, 48, 49]
+  const bytes = () => Buffer.concat([prefix, Buffer.from([1, states.length, ...states])])
+  await writeFile(executable, bytes())
+  assert.equal((await inspectReleaseFuses(app)).EnableNodeCliInspectArguments, false)
+  states[3] = 49
+  await writeFile(executable, bytes())
+  await assert.rejects(inspectReleaseFuses(app), /MAC_PACKAGE_FUSES/)
 })

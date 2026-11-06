@@ -18,6 +18,23 @@ on:
     branches: [main]
     paths:
       - 'apps/desktop/**'
+      # Shared renderer source and build inputs are part of the shipped app.
+      - 'apps/frontend/**'
+      - 'app/\[locale\]/**'
+      - 'app/actions/**'
+      - 'app/fonts/**'
+      - 'app/globals.css'
+      - 'components/**'
+      - 'hooks/**'
+      - 'lib/**'
+      - 'messages/**'
+      - 'i18n/**'
+      - 'public/**'
+      - 'packages/config/**'
+      - 'instrumentation-client.ts'
+      - 'next.config.mjs'
+      - 'postcss.config.mjs'
+      - 'tsconfig.json'
       - 'packages/daemon/**'
       - 'packages/protocol/**'
       - 'lib/daemon-commands.ts'
@@ -98,10 +115,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-      # Only the shell is packaged (`files: dist/**/*`), so install the desktop
-      # subgraph rather than all ~2,000 workspace packages. The `...` suffix
-      # keeps its workspace dependencies (@mikka/protocol, daemon, config).
-      - run: pnpm install --frozen-lockfile --filter "@mikka/desktop..."
+      # The installed renderer uses the shared Vite and application dependency
+      # graph, including apps/frontend and root UI/CSS build dependencies.
+      - run: pnpm install --frozen-lockfile
       - name: Cache electron-builder downloads
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -142,6 +158,14 @@ jobs:
         run: npm pkg set version="$RELEASE_VERSION"
       - name: Package signed macOS app
         run: pnpm --filter @mikka/desktop package:mac
+      - name: Verify production fuses in the signed bundle
+        run: |
+          node --input-type=module <<'NODE'
+          import { resolve } from 'node:path'
+          import { inspectReleaseFuses } from './apps/desktop/scripts/verify-mac-package.mjs'
+          const fuses = await inspectReleaseFuses(resolve('apps/desktop/release/mac-arm64/Mikka.app'))
+          console.log(JSON.stringify({ version: 1, kind: 'production-desktop-fuses', passed: true, fuses }))
+          NODE
       - name: Verify updater metadata
         run: |
           version=$(node -p "require('./apps/desktop/package.json').version")
@@ -168,7 +192,9 @@ jobs:
   release:
     needs: [preflight, macos]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Existing checks may wait 20 minutes and matching Web deployment 40;
+    # retain time for artifact verification and the final release upload.
+    timeout-minutes: 75
     permissions:
       contents: write
       actions: read
@@ -190,6 +216,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/ci-gate.mjs
+      - name: Require the matching production Web deployment
+        # The installed shared UI needs its matching backend before it is published.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/web-deploy.mjs await-web
       - name: Verify the signed candidate before creating the release
         env:
           RELEASE_MANIFEST_SHA256: ${{ needs.macos.outputs.manifest-sha256 }}
