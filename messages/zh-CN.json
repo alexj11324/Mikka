@@ -5257,5 +5257,23 @@
     "checkUpdate": "检查更新",
     "renderFailed": "此页面未能打开",
     "renderHint": "请重试打开页面。"
+  },
+  "HostedSettings": {
+    "models": {
+      "filterLabel": "筛选模型",
+      "filterAll": "全部",
+      "filterSubscription": "订阅",
+      "filterApiKey": "API Key",
+      "filterCustom": "自定义",
+      "search": "搜索模型",
+      "clearSearch": "清除搜索",
+      "noMatch": "没有匹配「{query}」的模型",
+      "noCustom": "还没有自定义服务商",
+      "defaultBadge": "默认",
+      "readOnly": "暂时不能逐个停用模型",
+      "providerOn": "{on}/{total} 个可用",
+      "firstModel": "任务先用",
+      "keyProvider": "服务商"
+    }
   }
 }
