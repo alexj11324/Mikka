@@ -4,6 +4,7 @@ import { WorkerRefusal } from "../packages/daemon/src/subscription-worker-client
 import { isDeviceAuthorityError } from "./db/device-scope";
 import { ModelAdmissionError } from "./model-admission/contract";
 import type { SubscriptionService } from "./subscription-service";
+import { subscriptionNativeTiming } from "./subscription-native-timing";
 
 const input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("context") }).strict(),
@@ -36,6 +37,8 @@ export function subscriptionNativeHTTP(deps: {
     let identity: { deviceId: string; runId: string } | undefined;
     let operation: "context" | "request" | null = null;
     let phase = "input";
+    let timing: ReturnType<typeof subscriptionNativeTiming> | undefined;
+    let outcome: 'ok' | 'error' = 'ok';
     try {
       const { deviceId, runId } = await context.params;
       if (
@@ -44,12 +47,14 @@ export function subscriptionNativeHTTP(deps: {
       )
         return new Response(null, { status: 404, headers });
       identity = { deviceId, runId };
+      timing = subscriptionNativeTiming('http', runId);
       phase = "authorize";
-      const owner = await deps.authorize(request, deviceId);
-      if (!owner) return new Response(null, { status: 401, headers });
+      const owner = await timing.measure('authorize', () => deps.authorize(request, deviceId));
+      if (!owner) { outcome = 'error'; return new Response(null, { status: 401, headers }); }
       phase = "input";
-      if (!request.headers.get("content-type")?.startsWith("application/json"))
-        return new Response(null, { status: 415, headers });
+      if (!request.headers.get("content-type")?.startsWith("application/json")) {
+        outcome = 'error'; return new Response(null, { status: 415, headers });
+      }
       const reader = request.body?.getReader();
       if (!reader) throw new Error("request refused");
       const parts: Uint8Array[] = [];
@@ -79,23 +84,24 @@ export function subscriptionNativeHTTP(deps: {
       phase = "runtime";
       const service = deps.service();
       phase = "binding";
-      const use = await service.nativeRun(owner, deviceId, runId);
+      const use = await timing.measure('binding', () => service.nativeRun(owner, deviceId, runId));
       if (body.action === "context") {
         phase = "context";
-        return Response.json(await service.nativeContext(use, request.signal), {
+        return Response.json(await timing.measure('context', () => service.nativeContext(use, request.signal)), {
           headers,
         });
       }
       phase = "request";
-      const upstream = await service.nativeRequest(
+      const upstream = await timing.measure('request', () => service.nativeRequest(
         use,
         body.payload,
         request.signal,
-      );
+      ));
       return new Response(upstream.body, {
         headers: { ...headers, "content-type": upstream.contentType },
       });
     } catch (error) {
+      outcome = 'error';
       // Preserve the outer device route's revoked 401 / unavailable 503 fence.
       if (isDeviceAuthorityError(error)) throw error;
       const subscription = error instanceof SubscriptionRefusal;
@@ -115,6 +121,8 @@ export function subscriptionNativeHTTP(deps: {
         // Keep explicit refusals and invalid input on their existing conflict path.
         { status: subscription || worker || model || phase === "input" ? 409 : 503, headers },
       );
+    } finally {
+      timing?.end(outcome);
     }
   };
 }
