@@ -32,8 +32,8 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       const owner = await user()
       const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }], 'Read-only list fixture')
       const ids = [randomUUID(), randomUUID()]
-      // Model a row from a writer that did not use the new allocator. Reading
-      // it must leave it alone; historical backfill belongs to the migration.
+      // A writer that did not use the allocator: the database numbers the row
+      // itself (assign_issue_number). Reading must still leave every row alone.
       await db.insert(issues).values([
         { id: ids[0], userId: owner, title: 'already numbered', content: content(7), status: 'todo', priority: 'normal' },
         { id: ids[1], userId: owner, title: 'missing number', content: content(), status: 'todo', priority: 'normal' },
@@ -51,7 +51,8 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
           await tx.execute(sql`SET TRANSACTION READ ONLY`)
           const result = await withDatabaseTransaction(tx, () => actAs(owner, () => explicitWorkspace ? listWorkspaceIssues(workspace.id) : listIssues()))
           assert.deepEqual(new Set(result.map(row => row.id)), new Set(ids))
-          assert.equal(result.find(row => row.id === ids[1])?.metadata.number, undefined)
+          const assigned = result.find(row => row.id === ids[1])?.metadata.number
+          assert.ok(typeof assigned === 'number' && assigned > 0 && assigned !== 7)
           ready()
           await held // The request transaction remains in flight during NOWAIT.
         })

@@ -41,7 +41,6 @@ import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
-import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 
@@ -114,16 +113,18 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // Fingerprint before reading links that will be reused below. A relation
   // moved during this read must invalidate the next poll, never be acknowledged
   // with a newer fingerprint while returning its older team.
-  const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
+  const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId, number: teamIssues.number }).from(teamIssues)
     .where(or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)), workspaceDb)
   const visibility = await issueVisibility(userId, false, undefined, db, { teams: allTeams })
   const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
   // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
+  // Qualified by alias: drizzle renders columns bare here, and a bare "userId" inside
+  // issue_prefixes would compare that table with itself.
   const signature = db.select({ id: candidates.id, scope: candidates.scope, updatedAt: candidates.updatedAt, item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
-    (select ${users.email} from ${users} where ${users.id}=${candidates.ownerId}),
-    (select ${issuePrefixes.prefix} from ${issuePrefixes} where ${issuePrefixes.userId}=${candidates.ownerId}),
-    (select jsonb_agg(${linearTeamSyncs.linearTeamKey} order by ${linearTeamSyncs.linearTeamKey}) from ${linearTeamSyncs} where ${linearTeamSyncs.ownerId}=${candidates.ownerId}),
-    (select jsonb_agg(${linearIssueLinks.linearIdentifier} order by ${linearIssueLinks.linearIdentifier}) from ${linearIssueLinks} where ${linearIssueLinks.issueId}=${candidates.id})
+    (select owner.email from "user" owner where owner.id = task_list."userId"),
+    (select prefix.prefix from issue_prefixes prefix where prefix."userId" = task_list."userId"),
+    (select jsonb_agg(sync."linearTeamKey" order by sync."linearTeamKey") from linear_team_syncs sync where sync."ownerId" = task_list."userId"),
+    (select jsonb_agg(link."linearIdentifier" order by link."linearIdentifier") from linear_issue_links link where link."issueId" = task_list.id)
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
   const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
