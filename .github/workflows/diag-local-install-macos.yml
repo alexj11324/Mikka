@@ -7,57 +7,27 @@ permissions:
 jobs:
   mac:
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
-      - name: Login shells as a Finder-launched app sees them
-        run: |
-          for sh in /bin/zsh /bin/bash; do
-            echo "== $sh"; env -i HOME="$HOME" USER="$USER" SHELL=$sh $sh -lc 'echo PATH=$PATH; command -v node; node -v; command -v npm; npm -v; npm prefix -g; ls -ld "$(npm prefix -g)/lib/node_modules" "$(npm prefix -g)/bin"' 2>&1 || true
-          done
-          ls -la ~ | grep -E 'profile|rc' || true
-          which -a node || true
-      - name: Product check step in the default login shell
-        run: |
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'node -e '"'"'if (+process.versions.node.split(".")[0] < 24) { console.error("Node.js >=24 required"); process.exit(1) }'"'"''; echo "exit=$?"
-      - name: Install Homebrew Node (current) like a typical Mac
-        run: |
-          brew install node 2>&1 | tail -3 || true
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; command -v node; node -v; npm prefix -g'
-      - name: npm install --global, first time
-        run: |
-          set +e
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; npm install --global @aspectlylabs/mikka' > out1.txt 2> err1.txt; echo "exit=$?"
-          echo "--- stderr"; cat err1.txt; echo "--- stdout"; tail -5 out1.txt
-      - name: npm install --global, again over the existing install
-        run: |
-          set +e
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; npm install --global @aspectlylabs/mikka' > out2.txt 2> err2.txt; echo "exit=$?"
-          echo "--- stderr"; cat err2.txt
-      - name: Interrupted install (SIGKILL the group like Cancel/quit), then retry
-        run: |
-          set +e
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; npm cache clean --force >/dev/null 2>&1; npm install --global @aspectlylabs/mikka' > /dev/null 2>&1 &
-          pid=$!; sleep 6; pkill -KILL -P $pid; kill -KILL $pid; pkill -KILL -f 'npm install --global' ; sleep 1
-          ls -la /opt/homebrew/lib/node_modules/@aspectlylabs/ || true
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; npm install --global @aspectlylabs/mikka' > out3.txt 2> err3.txt; echo "exit=$?"
-          echo "--- stderr"; cat err3.txt
-          ls -la /opt/homebrew/lib/node_modules/@aspectlylabs/ || true
-      - name: Service install, status (production server, nothing signed in)
-        run: |
-          set +e
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; command -v mikka; mikka --version; mikka daemon service install --server https://app.aspectlylabs.com/mikka --device-type laptop' > out4.txt 2> err4.txt; echo "exit=$?"
-          echo "--- stderr"; cat err4.txt; echo "--- stdout"; cat out4.txt
-          sleep 5
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh /bin/zsh -lc 'eval "$(/opt/homebrew/bin/brew shellenv)"; mikka daemon status' 2>&1; echo "exit=$?"
-      - name: Official nodejs.org layout (/usr/local, root-owned) like the .pkg installer
+      - name: nodejs.org Node 24 with an earlier sudo install, then a normal reinstall
         run: |
           set +e
           v=$(curl -fsSL https://nodejs.org/dist/index.json | python3 -c 'import json,sys;print(next(r["version"] for r in json.load(sys.stdin) if r["version"].startswith("v24.")))')
           curl -fsSLO https://nodejs.org/dist/$v/node-$v.pkg && sudo installer -pkg node-$v.pkg -target / >/dev/null
-          ls -ld /usr/local/lib/node_modules /usr/local/bin
-          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c 'node -v; npm prefix -g; npm install --global @aspectlylabs/mikka' > out5.txt 2> err5.txt; echo "exit=$?"
-          echo "--- stderr"; cat err5.txt
+          sudo env PATH=/usr/local/bin:/usr/bin:/bin npm install --global @aspectlylabs/mikka@0.0.500 >/dev/null 2>&1; echo "sudo exit=$?"
+          ls -la /usr/local/lib/node_modules/@aspectlylabs
+          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c 'npm install --global @aspectlylabs/mikka' > out.txt 2> err.txt; echo "exit=$?"
+          echo "--- stderr"; cat err.txt
+      - name: Fallback into a user prefix, then service and status by absolute path
+        run: |
+          set +e
+          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c 'npm install --global --prefix "$HOME/.mikka/npm" @aspectlylabs/mikka' > out.txt 2> err.txt; echo "exit=$?"
+          cat err.txt
+          ls -la ~/.mikka/npm/bin
+          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c '"$HOME/.mikka/npm/bin/mikka" daemon service install --server https://app.aspectlylabs.com/mikka --device-type laptop'; echo "exit=$?"
+          plutil -p ~/Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist | grep -A4 ProgramArguments
+          sleep 5
+          env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh PATH=/usr/local/bin:/usr/bin:/bin /bin/zsh -c '"$HOME/.mikka/npm/bin/mikka" daemon status' | head -12; echo "exit=$?"
       - name: Stop the daemon service
         if: always()
-        run: |
-          launchctl bootout gui/$(id -u)/com.aspectlylabs.mikka.daemon 2>/dev/null || true
+        run: launchctl bootout gui/$(id -u)/com.aspectlylabs.mikka.daemon 2>/dev/null || true
