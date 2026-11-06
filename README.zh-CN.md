@@ -23,7 +23,7 @@
 
 Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。云端桌面支持查看、接管和交还；使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
 
-在网页或 macOS 桌面应用中，于同一个地方跟进进展、回应问题并审阅结果。
+在网页、macOS 桌面应用或 iOS 应用中，于同一个地方跟进进展、回应问题并审阅结果。
 
 ## 工作方式
 
@@ -58,38 +58,40 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
   <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：来自对话、Telegram、Slack 或 MCP 的请求经过分诊；不清楚的请求交回给人补充细节，清楚的请求派发给 Agent。Agent 可以请求澄清，并收到送回运行的答案。运行完成后交给审查与验证 Agent，检查未通过时回到修复运行，通过后进入验收与发布，监控会把故障转为新 issue。">
 </picture>
 
-每一步都已在生产环境中运行。Factory 流程（接收与澄清、独立的审查与验证、检查未通过时的修复运行、验收与发布，以及监控）已在生产环境中开启；端到端验收仍在 [#192](https://github.com/alexj11324/Mikka/issues/192)、[#193](https://github.com/alexj11324/Mikka/issues/193) 和 [#195](https://github.com/alexj11324/Mikka/issues/195) 中跟踪。以合并 pull request 作为验收的方案在 [#528](https://github.com/alexj11324/Mikka/issues/528) 中规划。
+每一步都已在生产环境中运行。在 Factory 流程中，任务按需要走最短的路径，经过分诊、方案、实现和审阅；检查未通过时回到修复，监控会把故障转为新 issue。在验收页上验收，会以你自己的 GitHub 账号合并 pull request。使用真实模型和应用的端到端验收在 [#181](https://github.com/alexj11324/Mikka/issues/181) 中跟踪。
 
 ## 当前功能
 
 - **将需求转化为运行。** Coordinator 为你的任务派发运行，并判断每个新任务归属于工作区还是个人。如判断有误，可一键修改。Coordinator 也可以自行创建和更新任务。
+- **任务短标题。** 任务和它的线程在列表中以短标题显示，由一个小模型在任务创建后写一次。你自己改过的标题优先。
 - **自建 bot。** 左栏列出 Coordinator 和你创建的 bot。每个 bot 都有独立的对话、未读标记和动画头像。
 - **完整呈现执行过程。** 派发出的线程会以卡片形式出现在对话中，并随运行实时更新；点开即可进入该线程自己的对话。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理。你可以直接回复或停止自己的线程。
 - **用图表和卡片回复。** Bot 使用 OpenUI 组件回复：柱状图、折线图、面积图、环形图和径向图，表格、统计数字、任务和运行标签，以及包含选项、开关、滑块和日期范围的问题卡片。
 - **线程内容仅自己可见。** 在工作区任务上，同事只能看到线程的归属人、状态和时间，看不到指令、对话记录或结果。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。需要最新信息时，bot 可以搜索网页。
 - **交付「Artifact」。** Bot 可以将文档或 HTML 页面作为「Artifact」交付，支持版本记录和分享链接。
-- **通过 Factory 交付。** 任务接收与澄清、独立的审查与验证线程、检查未通过时的修复运行、以运行截图作为证据、任务上的验收视图，以及开出后续 issue 的监控。端到端验收仍在上文的 issue 中跟踪。
-- **在已连接应用中操作。** Bot 可以提出邮件、Google 日历、Notion 和 Slack 操作，经你批准后执行。真实外部写入仍待端到端验收。
-- **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号。⌘K 可搜索 bot、历史对话、任务和项目。
+- **通过 Factory 交付。** 分诊与澄清、审阅、检查未通过时的修复运行、以运行截图作为证据、以你的身份合并 pull request 的验收页，以及开出后续 issue 的监控。端到端验收在 [#181](https://github.com/alexj11324/Mikka/issues/181) 中跟踪。
+- **在已连接应用中操作。** Bot 可以提出邮件、Google 日历、Notion 和 Slack 操作，经你批准后执行。真实外部写入仍待端到端验收（[#181](https://github.com/alexj11324/Mikka/issues/181)）。
+- **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号。⌘K 可搜索 bot、群聊、任务、线程和项目。
 - **判断哪些事需要你。** Mikka 按「置之不理的代价」为来自 GitHub、Linear、Notion 和 Gmail 的通知评级。紧急事项交给 Coordinator，它每天最多打扰你五次；其余事项留在「建议」中。每日简报会在你所在时区 08:00 之后发送到 Coordinator 对话中。
+- **新手引导。** 首次打开时引导你创建第一个 bot 并连接订阅，可以在 设置 › 偏好设置 中重新播放。
+- **使用自己的订阅和 key。** 在 设置 › 模型与订阅 中连接 ChatGPT（Codex）或 Claude 订阅，或添加模型服务商的 API key。订阅可以回复 bot 对话，并在你的电脑上运行线程。key 提供服务商为它列出的模型，并直接调用服务商。使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
 - **插件。** 一个「插件」页面（也显示在 设置 › 连接 中）列出你的应用（Gmail、Google 日历、Notion、Slack、GitHub、Linear 和 Telegram），并可搜索公开的 agent 技能。每个应用连接属于建立它的人。
 - **应用内设置。** 设置在应用窗口内打开，包含账户、安全、偏好、通知、记忆、连接、模型、已保存的登录、隐私和设备等分区；工作区管理员另有通用、成员、团队、权限、密钥（包括工作区自己的 E2B API key）、审计日志、用量和计费。
 - **计费。** 托管模型（Mikka 默认）需要先验证银行卡。验卡通过 Stripe Checkout 完成，首个使用该卡的工作区获得一次性 1 美元免费额度。预付点数通过 Stripe Checkout 充值到余额。使用自己的订阅、设备和 E2B key 无需银行卡。
 - **管理设备。** 设置 › 设备列出你的电脑。移除在线设备时会同时卸载其 daemon。
 - **支持从其他工具调用。** 可在 Claude Code 或 Codex 中通过 [MCP server](https://aspectlylabs.com/mikka/docs/mcp) 操作 Mikka，也可通过 Telegram 或 Slack 联系 Coordinator。
 - **支持团队协作。** 提供工作区、成员、邀请和团队管理，支持邮箱、Google 和 GitHub 登录。邮箱登录有 kill switch；Google 和 GitHub 登录始终开启。
-- **桌面应用。** 适用于 Apple Silicon 的 macOS 应用，在半透明窗口中渲染同一套界面，通过系统浏览器登录，在 Dock 和系统通知中提示等待中的运行，并从 GitHub Releases 自动更新。它还可以通过 SSH 添加 `~/.ssh/config` 中的服务器。
+- **桌面应用。** 适用于 Apple Silicon 的 macOS 应用，在半透明窗口中渲染同一套界面，通过系统浏览器登录，在 Dock 和系统通知中提示等待中的运行，并从 GitHub Releases 自动更新。它还可以通过 SSH 添加 `~/.ssh/config` 中的服务器。应用图标是分层的 Liquid Glass 图标，在 macOS 26 上有默认、深色、着色和透明四种外观。
+- **iOS 应用。** 已在 TestFlight 上，尚未上架 App Store。位于 [`apps/mobile`](apps/mobile)，使用原生标签栏：对话、线程（含任务）、建议、设置和搜索，支持推送通知。
 - **双语界面。** 应用提供英文和简体中文界面。
 
 以下功能处于早期体验阶段，需开启 flag 或开关，或仍待验收：
 
-- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，使用工作区自己的 E2B key。支持实时查看、接管和交还控制权；你接管期间运行会暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器。桌面操作遵守适用的授权策略。
-- **使用自己的订阅。** 在设置中连接 ChatGPT（Codex）或 Claude 订阅，使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
+- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，使用工作区自己的 E2B key。支持实时查看、接管和交还控制权；你接管期间运行会暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器。桌面操作遵守适用的授权策略。每个 bot 都显示「电脑」标签；端到端验收在 [#181](https://github.com/alexj11324/Mikka/issues/181) 中跟踪。
 - **已保存的登录。** 网页分身遇到登录页时，bot 会发送安全登录卡片。密码存入 KMS 加密的保管库，模型无法读取，之后同一网站可复用；你可以在设置中删除。默认开启；当前版本的真实环境验收仍待完成。
-- **定时任务。** Bot 可以创建提醒、任务快照和只读 agent 任务，在指定时间或按周期运行。仍待验收（[#179](https://github.com/alexj11324/Mikka/issues/179)）。
+- **定时任务。** Bot 可以创建提醒、任务快照和只读 agent 任务，在指定时间或按周期运行。端到端验收仍待完成（[#181](https://github.com/alexj11324/Mikka/issues/181)）。
 - **关于你的记忆。** Mikka 从已评级的通知中提取关于你的信息，每晚合并，并在「记忆」中展示，每一条都可以修改或删除。
-- **移动端应用。** [`apps/mobile`](apps/mobile) 中的 iOS 应用以 Coordinator 对话为核心，包含建议、线程、任务、设置和推送通知。尚未发布。
 
 ## 开发路线
 
@@ -99,15 +101,13 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **云端电脑** | 上文的 bot 专属桌面处于早期体验阶段。下一步：每个云端线程拥有独立的机器（已在开关后完成，并设有按个人和按工作区的费用上限），以及向所有人开放在 Mikka Cloud 上运行的 Agent。 | [#172](https://github.com/alexj11324/Mikka/issues/172) |
+| **云端电脑** | 同一个任务的云端运行已共用一台独立的 sandbox，两次运行之间暂停；有 E2B key 的人默认在云端运行。下一步：使用真实订阅在 Mikka Cloud 上运行的 Agent 完成端到端验收，以及由 Mikka 计费的算力（已完成，但由 `mikka-computer-billing` 隐藏）。 | [#181](https://github.com/alexj11324/Mikka/issues/181) |
 | **混合执行** | 你电脑上的 Agent 将构建、测试和开发服务器交给 Mikka Cloud 运行。 | [#572](https://github.com/alexj11324/Mikka/issues/572) |
-| **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。后端已合入 main，界面尚未完成。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | 已在生产环境运行；下一步：逐阶段完成端到端验收，并以合并 pull request 作为验收，取代单独的批准与发布步骤。 | [#192](https://github.com/alexj11324/Mikka/issues/192)、[#193](https://github.com/alexj11324/Mikka/issues/193)、[#195](https://github.com/alexj11324/Mikka/issues/195)、[#528](https://github.com/alexj11324/Mikka/issues/528) |
-| **Connected apps** | 邮件、日历、Notion 和 Slack 审批后写入的真实环境验收。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。后端已合入 main，网页上已能用自己的 bot 创建群聊；其余界面尚未完成。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
+| **Factory** | 已在生产环境运行；下一步：使用真实模型逐阶段完成端到端验收。 | [#181](https://github.com/alexj11324/Mikka/issues/181) |
+| **Connected apps** | 邮件、日历、Notion 和 Slack 审批后写入的真实环境验收。 | [#181](https://github.com/alexj11324/Mikka/issues/181) |
 | **插件** | 个人 MCP server 和已安装技能已有后端和 Coordinator 工具，但还没有页面；工作区管理员可单独停用应用。 | [#595](https://github.com/alexj11324/Mikka/issues/595) |
-| **自带模型 key** | 通过 Vercel AI Gateway 使用自己的模型 API key。 | [#589](https://github.com/alexj11324/Mikka/issues/589) |
 | **主动建议** | 每晚的后台调研，根据你的截止日期和兴趣每天生成少量建议卡片，点击即可开始任务。 | [#350](https://github.com/alexj11324/Mikka/issues/350) |
-| **体验优化** | 新用户引导和更完整的 ⌘K 搜索。 | [#129](https://github.com/alexj11324/Mikka/issues/129)、[#131](https://github.com/alexj11324/Mikka/issues/131) |
 
 ## 接入 agent
 
@@ -150,7 +150,7 @@ Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入�
 
 Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox，运行同一个 daemon，并提供可通过 noVNC 查看的桌面。[`packages/subscription-worker`](packages/subscription-worker) 中的 Go 订阅 worker 保管你所连接订阅的登录凭据，密钥存放在 Infisical 中。[`services/credential-broker`](services/credential-broker) 中独立的凭据 broker 是唯一能解密已保存登录的组件，使用 AWS KMS。
 
-托管模型通过 Vercel AI Gateway 运行并按次计量；验卡和充值通过 Stripe Checkout 及其 webhook 完成。
+托管的默认模型（Mikka 默认）通过 ZeroCat 的 OpenAI 兼容 API 调用，Vercel AI Gateway 作为回退，并按次计量；验卡和充值通过 Stripe Checkout 及其 webhook 完成。
 
 一个 Cloudflare Worker 每分钟触发一次，调用应用的 cron 路由：每分钟处理到期的 Coordinator 唤醒、定时任务、运行恢复、账号删除、审计保留和运行监控，每 15 分钟写简报，每小时做通知对账和个人画像合并（[建议定时任务](docs/suggestions-cron.md)）。Linear 同步运行在另一个 Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更；它由 PostHog flag 关闭。
 
@@ -162,8 +162,8 @@ Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox
 | --- | --- |
 | 应用 | Next.js 16、React 19、Tailwind CSS 4、shadcn/ui、ReUI，bot 回复使用 OpenUI |
 | 桌面端 | [`apps/desktop`](apps/desktop) 中的 Electron 与 electron-updater（macOS，Apple Silicon） |
-| 移动端 | [`apps/mobile`](apps/mobile) 中的 Expo 与 Expo Router（React Native） |
-| Bot | Vercel AI SDK 与 AI Gateway；包括 Coordinator 在内的所有 bot 都是运行在 [Vercel Workflow](workflows/coordinator) 上的持久化循环 |
+| 移动端 | [`apps/mobile`](apps/mobile) 中的 Expo 与 Expo Router（React Native），使用原生标签栏 |
+| Bot | Vercel AI SDK；托管的默认模型走 ZeroCat，Vercel AI Gateway 作为回退；包括 Coordinator 在内的所有 bot 都是运行在 [Vercel Workflow](workflows/coordinator) 上的持久化循环 |
 | 分诊 | 由具备能力的模型判断业务语义，按策略执行 allow / ask / deny，并保留机械安全检查；现有规则优先路由仍待调整和验收 |
 | 数据 | Neon 托管的 Postgres，Drizzle 迁移位于 [`drizzle/`](drizzle) |
 | 认证 | Better Auth，支持邮箱、Google 和 GitHub 登录，邮箱注册使用 Cloudflare Turnstile，并为 MCP 提供 OAuth 2.1 server |
@@ -172,7 +172,7 @@ Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox
 | 集成 | GitHub 与 Linear 使用 webhook；Gmail、Google 日历、Notion、Slack 通过 Composio 接入；定时工作和 Linear 同步运行在 Cloudflare Worker 上；Telegram 和 Slack 基于 Vercel Chat SDK；网页搜索使用 Firecrawl |
 | 云端电脑 | E2B sandbox 与 noVNC 桌面 |
 | 凭据 | 使用 AWS KMS 信封加密的凭据 broker；项目密钥存放在 Infisical |
-| 订阅 | [`packages/subscription-worker`](packages/subscription-worker) 中的 Go worker，密钥存放在 Infisical（早期体验） |
+| 订阅 | [`packages/subscription-worker`](packages/subscription-worker) 中的 Go worker，密钥存放在 Infisical |
 | Agent | Mikka daemon 为每个线程通过 CLI 适配器运行 Claude Code、Codex 或 Cursor |
 
 ## 目录结构
@@ -202,6 +202,12 @@ factory.yaml         # 经过审查的 Factory 定义
 
 开发和功能验收在云端 Linux 中进行，使用本地应用、真实的隔离 Postgres 数据库，必要时使用真实的 daemon。构建、类型检查和 API/CLI 验收在云端 Linux 中运行；CI 运行源码、daemon 和数据库检查。凭据统一存放在 Infisical Cloud，不得提交至仓库或写入本地 `.env` 文件。
 
+在新的云端 Linux 会话中，一条命令即可装好已迁移 `mikka_e2e` 的 PostgreSQL 17、Node 24、依赖、sandbox 工具和用于截图的 Chromium（见 [docs/local-bootstrap.md](docs/local-bootstrap.md)）：
+
+```sh
+eval "$(scripts/dev/bootstrap-local.sh)"
+```
+
 安装依赖并运行源码检查：
 
 ```sh
@@ -223,6 +229,18 @@ pnpm desktop:dev
 ```
 
 开发过程中，运行 `pnpm typecheck`、`pnpm lint`、所改动部分的单元测试，以及所改动流程的本地 API/CLI 验收（`pnpm test:local-loop`）。CI 和本地都不跑浏览器测试；`main` 由 Vercel 构建，CI 不做生产构建。详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)（"How changes are tested"）。
+
+### 仅在本地运行的测试
+
+以下测试不在任何 CI workflow 中运行。改动它们覆盖的部分时，在云端 Linux 中运行。
+
+| 测试 | 需要 | 为什么不在 CI 中 |
+| --- | --- | --- |
+| `pnpm test:factory-http`（`tests/factory-{query,question,monitor-cycle}-http.test.ts`） | 生产构建（`next build`），以及 `eval "$(bash scripts/dev/bootstrap-local.sh)"`（从一个随机生成的本地文件导出 `BETTER_AUTH_SECRET`）。运行器把其服务器的 `BETTER_AUTH_URL` 指向自己的 origin。在本地测试账号模式下，运行器会在回环地址的 `*_e2e` 数据库上为探针创建各自的非超级用户数据库角色（`factory192`、`factoryquestions192`、`factorycycle192`） | CI 不做生产构建（[决定](docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md)，第 3 条） |
+| `pnpm test:test-accounts-http`（`tests/test-account-pool.http.test.mjs`） | 生产构建，以及用 `scripts/test-accounts/bootstrap.mjs` 注册的一次性测试环境 | 同上：CI 不做生产构建 |
+| `pnpm test:local-loop` 及其 `:mailbox`、`:cloud`、`:worker-mailbox` 变体 | `dev:local`、真实的 daemon、一个模型 API key；云端那一项还需要 E2B 模板 | 需要真实凭据，且在 CI 身份下拒绝运行 |
+| `tests/byos-handoff-browser.test.mjs` | `/usr/bin/chromium` 上的 Chromium | 它会驱动浏览器；CI 不跑浏览器测试（[决定](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md)） |
+| `packages/daemon/test/codex-contract.node-test.mts` | 官方 Codex CLI，通过 `CODEX_CONTRACT_BIN` 传入；没有时跳过 | CI 不下载 Codex 二进制 |
 
 建议首先阅读以下文档：
 

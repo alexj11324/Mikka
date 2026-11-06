@@ -27,8 +27,8 @@ organizes coding tasks for Claude Code, Codex and Cursor on connected devices.
 Cloud desktops support viewing, takeover and handback; Agents on Mikka Cloud
 with a real subscription still await acceptance.
 
-Track progress, respond when needed and review results in one place, on the web
-or in the macOS desktop app.
+Track progress, respond when needed and review results in one place, on the web,
+in the macOS desktop app or in the iOS app.
 
 ## How Mikka works
 
@@ -78,15 +78,12 @@ or in the macOS desktop app.
   <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request from chat, Telegram, Slack or MCP is triaged; an unclear one goes back to the person for details, a clear one is dispatched to an Agent. The Agent can ask for clarification and gets the answer back. A finished run goes to review and verification Agents, back to a fix run when a check fails, then to acceptance and release, and monitoring turns incidents into new issues.">
 </picture>
 
-Every step runs in production. The Factory loop (intake and clarification,
-independent review and verification, a fix run when a check fails, acceptance
-and release, and monitoring) is switched on in production; its end-to-end
-acceptance is still tracked in
-[#192](https://github.com/alexj11324/Mikka/issues/192),
-[#193](https://github.com/alexj11324/Mikka/issues/193) and
-[#195](https://github.com/alexj11324/Mikka/issues/195). Acceptance by merging
-the pull request is planned in
-[#528](https://github.com/alexj11324/Mikka/issues/528).
+Every step runs in production. In the Factory loop a task takes the shortest
+path it needs through triage, plan, implementation and review; a failed check
+sends it back for a fix, and monitoring turns incidents into new issues. Accepting the work on its acceptance page merges the pull
+request as you, with your own GitHub account. End-to-end acceptance with real
+models and apps is tracked in
+[#181](https://github.com/alexj11324/Mikka/issues/181).
 
 ## What Mikka does today
 
@@ -94,6 +91,9 @@ the pull request is planned in
   and decides whether each new task belongs to the workspace or to you. You can
   change the assignment in one click. The Coordinator can also create and
   update tasks itself.
+- **Names tasks briefly.** A task and its threads show in lists under a short
+  title that a small model writes once, after the task is created. A title you
+  change yourself wins.
 - **Lets you create bots.** The left column lists the Coordinator and the bots
   you create. Each bot has its own chat, with unread markers and an animated
   avatar.
@@ -112,21 +112,29 @@ the pull request is planned in
   information.
 - **Hands back Artifacts.** A bot can deliver a document or an HTML page as an
   Artifact, with versions and a share link.
-- **Delivers through Factory.** Task intake and clarification, independent
-  review and verification threads, a fix run when a check fails, run captures
-  as evidence, an acceptance view on the task, and monitoring that opens a
-  follow-up issue. End-to-end acceptance is still tracked in the issues above.
+- **Delivers through Factory.** Triage and clarification, review, a fix run
+  when a check fails, run captures as evidence, an acceptance page that merges the pull request as you, and
+  monitoring that opens a follow-up issue. End-to-end acceptance is tracked in
+  [#181](https://github.com/alexj11324/Mikka/issues/181).
 - **Acts in your apps.** Bots propose email, Google Calendar, Notion and Slack
   actions, which run after your approval. Real external writes still need
-  end-to-end acceptance.
+  end-to-end acceptance ([#181](https://github.com/alexj11324/Mikka/issues/181)).
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
   relations, activity history and per-person task numbers. ⌘K searches bots,
-  older chats, tasks and projects.
+  group chats, tasks, threads and projects.
 - **Decides what needs you.** Mikka rates notifications from GitHub, Linear,
   Notion and Gmail by what it costs to ignore them. Urgent matters go to the
   Coordinator, which interrupts you at most five times a day; the rest wait in
   Suggestions. A daily briefing arrives in the Coordinator chat after 08:00 in
   your time zone.
+- **Gets you started.** A first-run guide has you create your first bot and
+  connect a subscription. You can replay it from Settings › Preferences.
+- **Uses your own subscriptions and keys.** Connect a ChatGPT (Codex) or Claude
+  subscription, or add a model provider's API key, in Settings › Models and
+  subscriptions. A subscription answers bot chats and runs threads on your
+  computers. A key offers the models the provider lists for it and is called at
+  the provider directly. Agents on Mikka Cloud with a real subscription still
+  await acceptance.
 - **Plugins.** One 插件 page, also shown in Settings › Connections, lists your
   apps (Gmail, Google Calendar, Notion, Slack, GitHub, Linear and Telegram)
   and searches public agent skills. Each app connection belongs to the person
@@ -152,7 +160,12 @@ the pull request is planned in
 - **Desktop app.** A macOS app for Apple Silicon renders the same UI in a
   translucent window, signs in through the system browser, shows waiting runs
   in the Dock and system notifications, and updates itself from GitHub
-  Releases. It also enrolls servers from your `~/.ssh/config` over SSH.
+  Releases. It also enrolls servers from your `~/.ssh/config` over SSH. Its
+  icon is a layered Liquid Glass icon with default, dark, tinted and clear
+  looks on macOS 26.
+- **iOS app.** In TestFlight, not yet in the App Store. Built in
+  [`apps/mobile`](apps/mobile) around a native tab bar: chats, threads (with
+  tasks), suggestions, settings and search, with push notifications.
 - **Bilingual interface.** The app is available in English and Simplified Chinese.
 
 In early access, behind a flag or switch, or awaiting acceptance:
@@ -161,22 +174,18 @@ In early access, behind a flag or switch, or awaiting acceptance:
   the workspace's own E2B key. You can watch it live, take control and hand it back; runs pause
   while you hold it, it sleeps when idle and keeps its disk. Bots can start web
   sub-agents there, each in its own browser. Bot desktop actions follow the
-  applicable authorization policy.
-- **Your own subscriptions.** Connect a ChatGPT (Codex) or Claude subscription in
-  Settings. Agents on Mikka Cloud with a real subscription still await acceptance.
+  applicable authorization policy. The 电脑 tab shows for every bot; end-to-end
+  acceptance is tracked in [#181](https://github.com/alexj11324/Mikka/issues/181).
 - **Saved logins.** When a web sub-agent reaches a login page, the bot sends a
   secure login card. The password goes to a KMS-encrypted vault that the model
   never reads, and is reused for that site; you can delete it in Settings. On
   by default; live acceptance at the current version is pending.
 - **Scheduled tasks.** Bots can create reminders, task snapshots and read-only
-  agent tasks that run at a set time or on a schedule. Acceptance is pending
-  ([#179](https://github.com/alexj11324/Mikka/issues/179)).
+  agent tasks that run at a set time or on a schedule. End-to-end acceptance is
+  pending ([#181](https://github.com/alexj11324/Mikka/issues/181)).
 - **Memory of you.** Mikka reads rated notifications for facts about you, merges
   them nightly, and shows them in Memory, where you can correct or delete each
   one.
-- **Mobile app.** An iOS app in [`apps/mobile`](apps/mobile), built around the
-  Coordinator chat, with suggestions, threads, tasks, settings and push
-  notifications. Not yet released.
 
 ## What we're building
 
@@ -192,15 +201,13 @@ Work in progress is tracked in
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | The per-bot desktop above is in early access. Next: each cloud thread on a machine of its own (built behind a switch, with per-owner and per-workspace spend limits), and Agents on Mikka Cloud turned on for everyone. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
+| **Cloud computer** | Each task's cloud runs already share one sandbox of their own, paused between runs, and the cloud is the default run location for people with an E2B key. Next: end-to-end acceptance of Agents on Mikka Cloud with a real subscription, and Mikka-billed compute, built but hidden behind `mikka-computer-billing`. | [#181](https://github.com/alexj11324/Mikka/issues/181) |
 | **Hybrid execution** | Agents on your computer offload builds, tests and dev servers to Mikka Cloud. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
-| **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. The backend is on main; the interface is not. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | Running in production; next: end-to-end acceptance of each stage, and acceptance by merging the pull request in place of the separate approve-and-publish step. | [#192](https://github.com/alexj11324/Mikka/issues/192), [#193](https://github.com/alexj11324/Mikka/issues/193), [#195](https://github.com/alexj11324/Mikka/issues/195), [#528](https://github.com/alexj11324/Mikka/issues/528) |
-| **Connected apps** | Live acceptance of the approved email, calendar, Notion and Slack writes. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. The backend is on main, and a group of your own bots can be created on the web; the rest of the interface is not done. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
+| **Factory** | Running in production; next: end-to-end acceptance of each stage with real models. | [#181](https://github.com/alexj11324/Mikka/issues/181) |
+| **Connected apps** | Live acceptance of the approved email, calendar, Notion and Slack writes. | [#181](https://github.com/alexj11324/Mikka/issues/181) |
 | **Plugins** | Personal MCP servers and installed skills have a backend and Coordinator tools but no page yet; workspace admins switching single apps off. | [#595](https://github.com/alexj11324/Mikka/issues/595) |
-| **Your own model keys** | Bring-your-own model API keys routed through Vercel AI Gateway. | [#589](https://github.com/alexj11324/Mikka/issues/589) |
 | **Proactive suggestions** | A nightly research run that turns your deadlines and interests into a few suggestion cards a day, which start a task when tapped. | [#350](https://github.com/alexj11324/Mikka/issues/350) |
-| **Usability** | Onboarding and fuller ⌘K search. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131) |
 
 ## Connect your agents
 
@@ -292,8 +299,8 @@ Linear sync, Agents on Mikka Cloud and the credential vault.
 | --- | --- |
 | App | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, ReUI, OpenUI for bot replies |
 | Desktop | Electron with electron-updater in [`apps/desktop`](apps/desktop) (macOS, Apple Silicon) |
-| Mobile | Expo and Expo Router (React Native) in [`apps/mobile`](apps/mobile) |
-| Bots | Vercel AI SDK and AI Gateway; every bot, including the Coordinator, is a durable loop on [Vercel Workflow](workflows/coordinator) |
+| Mobile | Expo and Expo Router (React Native) with native tabs in [`apps/mobile`](apps/mobile) |
+| Bots | Vercel AI SDK; the hosted default model on ZeroCat, with Vercel AI Gateway as fallback; every bot, including the Coordinator, is a durable loop on [Vercel Workflow](workflows/coordinator) |
 | Triage | A capable model judges business meaning; policy controls allow / ask / deny and mechanical checks protect execution. Current rules-first routing remains to be updated and accepted |
 | Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
 | Auth | Better Auth, with email, Google and GitHub sign-in, Cloudflare Turnstile on email sign-up, and an OAuth 2.1 server for MCP |
@@ -302,7 +309,7 @@ Linear sync, Agents on Mikka Cloud and the credential vault.
 | Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack; Cloudflare Workers for scheduled work and Linear sync; Vercel Chat SDK for Telegram and Slack; Firecrawl for web search |
 | Cloud computer | E2B sandboxes with a noVNC desktop |
 | Credentials | A credential broker with AWS KMS envelope encryption; project secrets in Infisical |
-| Subscriptions | A Go worker in [`packages/subscription-worker`](packages/subscription-worker), with secrets in Infisical (early access) |
+| Subscriptions | A Go worker in [`packages/subscription-worker`](packages/subscription-worker), with secrets in Infisical |
 | Agents | The Mikka daemon runs Claude Code, Codex or Cursor through a CLI adapter for each thread |
 
 ## Repository layout
