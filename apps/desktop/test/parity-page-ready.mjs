@@ -98,7 +98,8 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     await expect(resolved).toHaveAttribute('aria-expanded', /^(?:true|false)$/, { timeout: 45_000 })
     if (await resolved.getAttribute('aria-expanded') === 'false') await resolved.click()
     await expect(resolved).toHaveAttribute('aria-expanded', 'true')
-    await root.getByRole('button', { name: fixture.issueTitle, exact: true }).waitFor()
+    // A thread row is named by its task: the team number the database gave it, then its title.
+    await root.getByRole('button', { name: `${fixture.issueIdentifier} ${fixture.issueTitle}`, exact: true }).waitFor()
     await root.getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: false }).waitFor()
   }
   if (name === 'workspace-link') {

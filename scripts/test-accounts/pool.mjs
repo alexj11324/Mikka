@@ -303,7 +303,8 @@ export class TestAccountPool {
         const signature = JSON.stringify([conditions, args])
         if (queried.get(table) === signature) continue
         queried.set(table, signature)
-        const rows = (await client.query(`SELECT to_jsonb(t)::text AS data FROM public.${quote(table)} t WHERE $1::text IS NOT NULL AND (${conditions.join(' OR ')}) LIMIT 10001`, args)).rows
+        // Number counters only move forward: a task numbered and then cleaned up leaves its owner unchanged.
+        const rows = (await client.query(`SELECT (to_jsonb(t) - 'lastIssueNumber')::text AS data FROM public.${quote(table)} t WHERE $1::text IS NOT NULL AND (${conditions.join(' OR ')}) LIMIT 10001`, args)).rows
         if (rows.length > 10000) fail('ACCOUNT_FOOTPRINT_UNPROVEN')
         const ordered = rows.map(row => ({ text: row.data, value: JSON.parse(row.data) })).sort((a, b) => a.text.localeCompare(b.text))
         if (JSON.stringify(ordered.map(row => row.text)) !== JSON.stringify((owned.get(table) ?? []).map(row => row.text))) changed = true

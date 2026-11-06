@@ -10,7 +10,7 @@ export interface RepositoryPushApproval {
   approvedAt?: string
 }
 
-/** Preserve the existing task identifier: never invent a team or fallback branch. */
+/** The task's own identifier as its branch (`mikka/al-12`); every task has one from creation. */
 export function publicationBranch(identifier: string | null | undefined): string | null {
   const match = identifier?.match(/^([a-z0-9]+(?:-[a-z0-9]+)*)-([1-9][0-9]*)$/i)
   if (!match || !Number.isSafeInteger(Number(match[2]))) return null
