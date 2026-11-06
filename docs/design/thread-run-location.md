@@ -1,6 +1,6 @@
 # Where a thread runs, and reviewing its PR
 
-- **Status:** in review (2026-11-06), waiting for Alex
+- **Status:** accepted with two changes (Alex, 2026-11-06): icons only in the title bar; an Artifact button that is always there
 - **Figma:** file `zPe5LKycb2XuT1ivCLRw07`, page 「待 Alex 确认 · 线程运行位置与 PR 验收（2026-11-06）」 `1052:6875`
 - **Owner thread:** run-location mark and hover card (web, desktop, iOS) in this
   thread; the PR review view goes to the Factory delivery thread once confirmed.
@@ -26,10 +26,13 @@ Screenshots of the key frames are in [`thread-run-location/`](thread-run-locatio
 | I3 iOS tap on subtitle: offline computer, light / dark | `1056:1262` / `1056:1570` |
 | Parts: mark variants (`1054:77`), hover cards, icons | `1053:2` |
 
-- **Mark.** After the title: the device type icon (lucide `Cloud`, `Laptop`,
-  `Server`, R-74) with the StatusDot on its top right (R-24), then the short
-  name in 12px secondary text. Hover shows the subtle background and opens the
-  card. The desktop app is the same web view.
+- **Icons only** (Alex, 2026-11-06: 「这些都只留图标，文字必须要 hover 上去才能看得见」).
+  After the title come two icons and no text: the device type icon (lucide
+  `Cloud`, `Laptop`, `Server`) with the StatusDot on its top right (R-24),
+  then the Agent's mark. Hovering the device icon opens the card below; the
+  Agent mark has a tooltip 「Claude Code · Mikka Frontend 派出」. The mark
+  component's 「显示名称」 property is off in headers and on inside the identity
+  dialog. The desktop app uses the same web view.
 - **Hover card.** `HoverCard` (`components/ui/hover-card.tsx`, unused so far),
   288 wide. Title row: icon, name, status as dot + word (R-87).
   - Cloud: ID (full E2B sandbox ID, mono, copy button), 模板 (`claude` / `codex`
@@ -40,8 +43,8 @@ Screenshots of the key frames are in [`thread-run-location/`](thread-run-locatio
 - **Cloud display name.** 「云电脑 <first 6 characters of the sandbox ID>」,
   for example 「云电脑 i8k2m3」. It is derived when the thread is read; the
   `devices` row keeps its locked name 「Thread computer」, so no column is added.
-- **iOS.** The nav subtitle becomes `<Agent> · <SF Symbol> <name>` (`cloud`,
-  `laptopcomputer`, `server.rack`). A tap opens a SwiftUI popover kept as a
+- **iOS.** The nav subtitle becomes `<status> · <SF Symbol>` (`cloud`,
+  `laptopcomputer`, `server.rack`), with no name. A tap opens a SwiftUI popover kept as a
   popover on iPhone, with the same rows plus 「复制 ID」 and 「打开电脑」.
 - **Thread list rows: no mark.** R-53 keeps a row to two lines, and the
   全部线程 rows already carry the Agent mark and time (R-50). Where a thread runs
@@ -64,11 +67,14 @@ polling; state changes arrive through the thread's existing live key.
 Built on the accepted acceptance page (decision
 [2026-11-04-2200](decisions/2026-11-04-2200-factory-flow-like-warp.md)): the
 existing Artifact window, the report on the left, the thread on the right.
-Glossary: the word 产物 is not used in the UI; the entry is named by the PR.
+The entry is called **Artifact** everywhere (Alex, 2026-11-06), the same
+Artifact the product already has; a PR a thread delivers opens as its Artifact.
 
 | Frame | Node |
 | --- | --- |
-| E1 Entry in the thread header, seven states, light / dark | `1058:1785` / `1058:1962` |
+| E1 Artifact button in the thread header, seven states with their tooltips, light / dark | `1058:1785` / `1058:1962` |
+| L3 Thread finished: Artifact card under its last message, light / dark | `1067:4874` / `1067:5144` |
+| C1 Bot chat: the completion notice carries the Artifact card, light / dark | `1067:5261` / `1067:5433` |
 | E2 Entry on the task page (「需要你」 block → 查看 PR #1288), light / dark | `1060:4925` / `1060:5107` |
 | P1 Waiting for review, light / dark | `1058:1115` / `1060:3115` |
 | P1b 「查看改动」: the whole change set (`ThreadChangesPane`) | `1060:4332` |
@@ -80,11 +86,17 @@ Glossary: the word 产物 is not used in the UI; the entry is named by the PR.
 | P7 Failed: merge refused (conflict), retry, light / dark | `1059:4682` / `1060:3924` |
 | P7b Failed: checks did not pass, rerun | `1059:5314` |
 
-- **Entry.** One button at the right of the thread header, named by the PR and
-  its state: none while running without a PR; 「准备 PR」 disabled with a
-  spinner; 「PR #1288 待你审」 filled (the only filled button, R-89); 修复中 and
-  合并中 with a spinner; 已合并 with the merged mark; 受阻 on the destructive tint.
-  For a PR thread it takes the place of 「Artifact · N」. On the task, the
+- **Entry.** The thread header always has one Artifact icon button
+  (`icon-sm`, `ArtifactIcon`), left of stop. Before there is anything it is
+  disabled, tooltip 「Artifact · 线程完成后生成」; while the PR is prepared,
+  「Artifact · 正在准备 PR」. Once there is one it opens the window (P1); a
+  status dot on its corner says the state: amber 待你审 (on a subtle fill),
+  grey 修复中 / 合并中, purple 已合并, red 受阻, each named in the tooltip
+  (「Artifact · PR #1288 待你审」). It replaces 「Artifact · N」; several
+  Artifacts open the existing list menu.
+- **In the chat.** The thread's finishing message is followed by the existing
+  `ArtifactCard` (title, 「Artifact · 待你审」); the bot's completion notice in
+  its chat (and the Coordinator's) carries the same card. On the task, the
   existing 「需要你」 block's button reads 「查看 PR #1288」.
 - **Report.** PR title and verdict badges (existing), then one card: 分支 with
   a GitHub link, 检查 as one status (4/4 通过) plus the check names in grey text,
