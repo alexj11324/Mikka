@@ -78,7 +78,7 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
         onSend: async note => { const sent = await sendBack.current?.(note) ?? false; if (sent) setChangeRequest(null); return sent } } : undefined} />} />
   // A bot that is gone, or a list that failed, falls back to the Coordinator.
   if (bot) return <ArtifactViewer {...shared} quotes={quotes}
-    bot={{ name: bot.name, avatar: <BotAvatar color={bot.color} shape={bot.shape} size="pill" /> }}
+    bot={{ name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="pill" /> }}
     chat={slot => <CoordinatorChat onOpenIssue={openIssue} compact embedded={slot} bot={bot} />} />
   return <ArtifactViewer {...shared} quotes={quotes}
     bot={{ name: tNav('coordinator'), avatar: <CoordinatorAvatar size="pill" /> }}

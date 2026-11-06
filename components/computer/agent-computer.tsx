@@ -39,7 +39,7 @@ export function AgentComputer({ botId, name, header = true, workspaceId }: { bot
   const missing = key?.configured === false
   return <div className={cn('flex flex-col items-center gap-3', header && 'pt-6')}>
     {header && <>
-      <BotAvatar color={bot?.color ?? colorFor(name)} shape={bot?.shape} size="profile" />
+      <BotAvatar id={bot?.id} color={bot?.color ?? colorFor(name)} shape={bot?.shape} size="profile" />
       <h2 className="max-w-full truncate pb-3 text-xl font-semibold">{bot?.name ?? name}</h2>
     </>}
     {loading ? <Skeleton className="aspect-[16/10] w-full rounded-lg" />
