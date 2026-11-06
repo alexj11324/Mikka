@@ -1,6 +1,6 @@
 name: Issue 1212 explicit owner device presence acceptance
 
-# Only an explicit change of this invocation starts the bounded production case.
+# Explicit v3 diagnostic case: retain the prior failed run; fixed socket reasons, unchanged health gates.
 on:
   push:
     branches: [acceptance/issues-1504-1506]
@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      MIKKA_ACCEPTANCE_SHA: 2f84230d24f28c6b5d1ef78669f7d6cbaf438bfc
-      MIKKA_PRESENCE_RUN_KEY: acme-1212-20261106-a
+      MIKKA_ACCEPTANCE_SHA: 1a70bb79d7dc4ab31418e9fa674dd39c0a1cae01
+      MIKKA_PRESENCE_RUN_KEY: acme-1212-20261106-b
       MIKKA_PRESENCE_MODE: baseline
       MIKKA_PRESENCE_REPORT_DIR: presence-acceptance-report
     steps:
@@ -49,7 +49,7 @@ jobs:
         env:
           MIKKA_PRESENCE_SOURCE_ROOT: presence-source
           MIKKA_PRESENCE_BASELINE_SOURCE_ROOT: presence-baseline-source
-        run: node --test scripts/acceptance/issue-1212-presence/presence.test.mjs
+        run: node --test scripts/acceptance/issue-1212-presence/presence.test.mjs scripts/acceptance/issue-1212-presence/presence-baseline-diagnostics.test.mjs
       - name: Read the issue-bound ACME email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
