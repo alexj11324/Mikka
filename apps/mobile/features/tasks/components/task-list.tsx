@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Circle, CircleDashed, CircleX } from 'lucide-react-native'
+import { Circle } from 'lucide-react-native'
 import { Spinner } from '@/components/icons'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
@@ -25,19 +25,15 @@ const SECTIONS: { status: string[]; title: string; closed?: boolean }[] = [
   { status: ['canceled', 'duplicate'], title: '已取消', closed: true },
 ]
 
-/** A task's status mark (Comma design 15): an orange half circle in progress, a filled green circle done. */
-function TaskIcon({ status }: { status: string }) {
-  if (status === 'done') return <View style={[styles.mark, { backgroundColor: colors.success }]} accessibilityLabel="已完成" />
-  if (status === 'doing') return <View style={[styles.mark, styles.half]} accessibilityLabel="进行中"><View style={styles.halfFill} /></View>
-  if (status === 'review') return <CircleDashed size={20} color={colors.success} strokeWidth={2} accessibilityLabel="评审中" />
-  if (status === 'canceled' || status === 'duplicate') return <CircleX size={20} color={colors.tertiary} strokeWidth={2} accessibilityLabel="已取消" />
-  return <Circle size={20} color={colors.secondary} strokeWidth={1.8} accessibilityLabel="待办" />
+/** A task's mark: a plain circle (R-52, a circle is a task). Its section names its state, so it adds no colour (Alex 2026-11-06). */
+function TaskIcon() {
+  return <Circle size={20} color={colors.secondary} strokeWidth={1.8} />
 }
 
 export type TaskRow = { key: string; task: Task } | { key: string; title: string } | { key: string; more: number; section: string }
 
 /**
- * The person's tasks as list rows by status (Comma design 15): a section name, then each task as its status mark and
+ * The person's tasks as list rows by status (Comma design 15): a section name, then each task as a plain circle and
  * its title on one line (Alex 2026-11-06). 已完成 and 已取消 show their first rows until 显示全部. The 线程 tab draws
  * these rows in its own list, so its large title and segment stay on one scroll view.
  */
@@ -66,7 +62,7 @@ function TaskRowView({ task }: { task: Task }) {
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={task.title} onPress={() => void openOnWeb(`/?issue=${task.id}`)}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      <View style={styles.icon}><TaskIcon status={task.status} /></View>
+      <View style={styles.icon}><TaskIcon /></View>
       <Text style={styles.title} numberOfLines={1}>{displayTitle(task.title)}</Text>
     </Pressable>
   )
@@ -101,9 +97,6 @@ const styles = StyleSheet.create({
   /** One line per row (Alex 2026-11-06): 52 pt tall, text 16 pt in from each edge (lib/theme.ts LIST_INSET). */
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10 },
   icon: { width: 22, alignItems: 'center' },
-  mark: { width: 18, height: 18, borderRadius: 9 },
-  half: { borderWidth: 2, borderColor: colors.orange, overflow: 'hidden', flexDirection: 'row' },
-  halfFill: { width: '50%', backgroundColor: colors.orange },
   title: { flex: 1, minWidth: 0, fontSize: 17, lineHeight: 22 },
   center: listStyles.center,
   empty: listStyles.empty,

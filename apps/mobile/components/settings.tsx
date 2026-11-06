@@ -11,7 +11,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { API_URL } from '@/lib/config'
 import { NavBar, underBar } from '@/components/NavBar'
-import { colors, GROUP_INSET } from '@/lib/theme'
+import { colors } from '@/lib/theme'
 
 /** The person's photo, or their initials on green when they have none. */
 export function Avatar({ name, image, size }: { name: string; image: string | null; size: number }) {
@@ -39,7 +39,7 @@ export function SettingsPage({ title, children, footer }: { title: string; child
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
       <NavBar back={() => router.canGoBack() ? router.back() : router.replace('/settings')} title={title} />
-      <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: GROUP_INSET, paddingTop: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>
+      <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>
         <ReadNotice error={error} hasData={Boolean(data)} label="设置" onRetry={reload} />
         {!data && loading ? <View style={{ padding: 24, alignItems: 'center' }}><Spinner /></View> : null}
         {data ? children : null}

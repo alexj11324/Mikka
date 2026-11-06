@@ -8,7 +8,6 @@ import { Spinner, StatusIcon } from '@/components/icons'
 import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
-import { Dot } from '@/components/ui'
 import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
@@ -122,19 +121,18 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
 type Row = { key: string; thread: Thread } | { key: string; title: string } | { key: string; more: number }
 
 /**
- * A thread on one line (Alex 2026-11-06): the icon of its group and its title, without the issue key or date stamp the
- * title may carry (display-title.ts); a blue dot while it waits on the person. Long press keeps 停止 / 复制 ID.
+ * A thread on one line (Alex 2026-11-06): a plain bubble and its title, without the issue key or date stamp the title
+ * may carry (display-title.ts). The section it sits in names its state, so the row adds no dot. Long press keeps
+ * 停止 / 复制 ID.
  */
 export function ThreadRow({ thread, onStopped }: { thread: Thread; onStopped?: () => void }) {
-  const waiting = thread.status === 'waiting'
   return (
     // The side margin sits on a plain View: on iOS the row's press is inside a Link, which may not pass a style on.
     <View style={styles.row}>
       <ThreadLink thread={thread} onStopped={onStopped} style={({ pressed }) => [styles.rowPress, pressed && { backgroundColor: colors.pressed }]}>
         <View style={styles.rowInner}>
-          <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} /></View>
+          <View style={styles.rowIcon}><StatusIcon status={thread.group ? GROUP_ICON[thread.group] : thread.status} size={20} plain /></View>
           <Text style={styles.rowTitle} numberOfLines={1}>{displayTitle(thread.name)}</Text>
-          {waiting ? <Dot /> : null}
         </View>
       </ThreadLink>
     </View>
