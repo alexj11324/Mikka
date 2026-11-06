@@ -89,8 +89,12 @@ export const threadMachineProvider = {
       const { pool } = await import('@/lib/db')
       const ready = await import('./thread-machine-pool')
       const { afterJob } = await import('@/lib/background')
-      afterJob('after:thread-machine-pool-refill', () => ready.refillThreadMachinePool(pool, ownerId, snapshotId), { orRun: true })
       const claimed = await ready.claimReadyThreadMachine(pool, ownerId, snapshotId, operationId).catch(() => null)
+      // After the claim: outside a request (a Workflow step) the refill starts at once.
+      afterJob('after:thread-machine-pool-refill', async () => {
+        const started = Date.now(), outcome = await ready.refillThreadMachinePool(pool, ownerId, snapshotId)
+        console.info(JSON.stringify({ msg: 'thread_machine_pool_refill', template: snapshotId, outcome, ms: Date.now() - started }))
+      }, { orRun: true })
       if (claimed) { pooledSandboxes.add(claimed); return claimed }
     }
     const base = await options(ownerId)
