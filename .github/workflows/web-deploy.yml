@@ -125,9 +125,9 @@ jobs:
         run: node scripts/e2b/publish-template-env.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          DESKTOP_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids).desktop }}
-          CLAUDE_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids).claude }}
-          CODEX_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids).codex }}
+          DESKTOP_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').desktop }}
+          CLAUDE_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').claude }}
+          CODEX_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').codex }}
           SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
           MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
           TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
