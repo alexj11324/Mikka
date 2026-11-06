@@ -55,6 +55,9 @@ export function traceGitHubEnvironment(directory, env = process.env) {
 export function createTraceGitHubBinary(directory) {
   const bin = join(directory, 'fixture-bin')
   mkdirSync(bin, { recursive: true, mode: 0o700 })
+  // Test-mode Daemon also constructs MockAdapter, whose default mkdir would
+  // otherwise create this parent as 0755 before native credentials arrive.
+  mkdirSync(join(directory, 'adapters'), { recursive: true, mode: 0o700 })
   const binary = join(bin, 'gh')
   writeFileSync(binary, `#!${process.execPath}\nimport { fixtureGh } from ${JSON.stringify(ghScript)}\nimport { traceGitHubEnvironment } from ${JSON.stringify(import.meta.url)}\ntry { await fixtureGh(process.argv.slice(2), { env: traceGitHubEnvironment(${JSON.stringify(realpathSync(directory))}) }) }\ncatch { process.stderr.write('SYNTHETIC_GITHUB_FIXTURE_FAILED\\n'); process.exitCode = 1 }\n`, { mode: 0o700, flag: 'wx' })
   return binary

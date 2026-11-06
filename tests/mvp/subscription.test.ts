@@ -117,12 +117,7 @@ test('trace synthetic Codex peer passes real version/model probes and requires s
   const git = (args: string[]) => traceGitCommand(scenario.barePath, cwd, args)
   await traceGitCommand(scenario.barePath, directory, ['clone', REPOSITORY, cwd])
   const originalBranch = await git(['branch', '--show-current'])
-  const github = createTraceGitHubBinary(directory), bridge = join(directory, 'test-credential-bin')
-  await mkdir(bridge)
-  // This protocol test supplies a labelled synthetic credential wrapper. The
-  // full chain uses the real authorized claim's prepared login and run-local gh.
-  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
-  await writeFile(join(bridge, 'gh'), `#!/bin/sh\nGH_TOKEN=mvp-synthetic-installation-run exec ${quote(github)} "$@"\n`, { mode: 0o700 })
+  const github = createTraceGitHubBinary(directory)
   await writeFile(fixture, JSON.stringify({ t: 0, exit: { outcome: 'failed', error: 'private-fixture-error' } }) + '\n')
   // This unit test has only a stdio peer. Full HTTP acceptance uses the real
   // Mikka MCP process, current run authority and durable handoff.
@@ -135,7 +130,21 @@ for await (const line of createInterface({ input: process.stdin })) {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { content: [], isError: false } }) + '\\n')
 }`)
   const binary = createTraceCodexBinary(directory, fixture, scenario.barePath)
+  let preparedGitHub: { env: Record<string, string>; close(): void } | undefined
   try {
+    const { MockAdapter } = await import(new URL('../../packages/daemon/src/adapters/mock.ts', import.meta.url).href)
+    const { prepareLocalGitHub } = await import(new URL('../../packages/daemon/src/agents/local-github.ts', import.meta.url).href)
+    // The actual test-mode daemon constructs this adapter even when its
+    // advertised harness is Codex. Preserve that initialization side effect.
+    const previousUmask = process.umask(0o022)
+    try { assert.equal(new MockAdapter({ stateDir: join(directory, 'adapters') }).harness, 'mock') }
+    finally { process.umask(previousUmask) }
+    preparedGitHub = await prepareLocalGitHub({ runId: randomUUID(), deviceId: randomUUID(), issueId: randomUUID(), repoId: randomUUID(),
+      harness: 'codex', prompt: 'synthetic', github: { endpoint: 'http://localhost:3100/mikka/api/runs/github-token',
+        repository: 'mikka-e2e/core-loop', token: 'mikka-local-synthetic-user-token', expiresAt: null } },
+    { stateDir: join(directory, 'adapters', 'github'), signal: new AbortController().signal, link: {}, onCredential() {},
+      path: `${dirname(github)}${delimiter}${process.env.PATH ?? ''}` })
+    assert.ok(preparedGitHub)
     const ready = await preflightLocalSubscription('codex', { store: { root: directory }, scratchDir: directory, binary })
     assert.deepEqual(ready, { ready: true, version: HARNESS_PINS.harnesses.codex.version })
     // The standalone daemon is typechecked in its own environment, without
@@ -147,7 +156,7 @@ for await (const line of createInterface({ input: process.stdin })) {
     const child = spawn(binary, ['app-server', '-c', `mcp_servers.mikka.command=${JSON.stringify(process.execPath)}`, '-c', `mcp_servers.mikka.args=${JSON.stringify([mcp])}`],
       // Match RunContext.tempEnv: its CLI-only TMPDIR differs from the host
       // root that owns the scenario's bare origin.
-      { cwd, env: { PATH: `${bridge}${delimiter}${process.env.PATH ?? ''}`, HOME: home, CODEX_HOME: home, TMPDIR: childTmp, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
+      { cwd, env: { PATH: preparedGitHub.env.PATH, HOME: home, CODEX_HOME: home, TMPDIR: childTmp, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'ignore'] })
     const output: Record<string, any>[] = []
     const lines = createInterface({ input: child.stdout })
     lines.on('line', line => output.push(JSON.parse(line)))
@@ -196,7 +205,7 @@ for await (const line of createInterface({ input: process.stdin })) {
       assert.ok(observed.observations.some((value: Record<string, unknown>) => value.kind === 'synthetic-ci-checked' && value.commit === commit))
       await assert.rejects(git(['ls-remote', 'https://github.com/not-fixture/forbidden.git']), /transport 'https' not allowed/)
     } finally { child.kill(); lines.close(); await new Promise(resolve => child.once('close', resolve)) }
-  } finally { await services.close(); await rm(directory, { recursive: true, force: true }) }
+  } finally { preparedGitHub?.close(); await services.close(); await rm(directory, { recursive: true, force: true }) }
 })
 
 test('trace prerequisites verify local commands and the owned synthetic GitHub shim without service requests', async () => {
