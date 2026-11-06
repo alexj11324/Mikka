@@ -89,6 +89,7 @@ beforeEach(t => {
   reservations.length = settlements.length = admissions.length = zeroCatSent.length = gatewaySent.length = routes.length = 0
   providerConfig = chatModelId = zeroCatFailure = zeroCatStream = undefined
   zeroCatDenied = false
+  zeroCat?.resumeZeroCat()
   t.mock.method(console, 'info', (line: string) => { const value = JSON.parse(line); if (value.event === 'default_model_route') routes.push(value) })
 })
 after(() => {
@@ -112,7 +113,9 @@ test('the default model calls ZeroCat with the configured key and its own model 
   assert.equal(result.usage.outputTokens.total, 400)
   // 10k uncached + 40k cached input and 400 output tokens at the list price.
   assert.deepEqual(settlements, [{ cost: ZEROCAT_COST, input: 50_000, output: 400 }])
-  assert.deepEqual(routes, [{ event: 'default_model_route', 'mikka.model.id': DEFAULT, 'mikka.model.route': 'zerocat' }])
+  const { 'mikka.model.zerocat_ms': ms, ...route } = routes[0]
+  assert.equal(typeof ms, 'number')
+  assert.deepEqual(route, { event: 'default_model_route', 'mikka.model.id': DEFAULT, 'mikka.model.route': 'zerocat' })
 })
 
 test('a streamed default-model turn settles its cost from the finish usage', async () => {
@@ -134,13 +137,16 @@ for (const [status, reason] of [[500, 'server_error'], [503, 'server_error'], [4
     assert.deepEqual(admissions.map(a => a.kind), ['zerocat', 'zerocat', 'gateway'])
     assert.deepEqual(gatewaySent[0].providerOptions, { gateway: { order: ['other'], user: 'workspace' } })
     assert.deepEqual(settlements, [{ cost: 3000, input: 50_000, output: 400, generationId: 'gen-fallback' }])
-    assert.deepEqual(routes, [{ event: 'default_model_route', 'mikka.model.id': DEFAULT, 'mikka.model.route': 'gateway',
-      'mikka.model.fallback_reason': reason, 'mikka.model.zerocat_status': status, 'mikka.model.gateway_credential': 'system' }])
+    const { 'mikka.model.zerocat_ms': ms, ...route } = routes[0]
+    assert.equal(typeof ms, 'number')
+    assert.deepEqual(route, { event: 'default_model_route', 'mikka.model.id': DEFAULT, 'mikka.model.route': 'gateway',
+      'mikka.model.fallback_reason': reason, 'mikka.model.zerocat_status': status, 'mikka.model.gateway_credential': 'system',
+      'mikka.model.zerocat_error': 'AI_APICallError' })
   })
 
 test('a network failure or timeout before ZeroCat answers goes to Gateway', async () => {
   for (const [failure, reason] of [[new TypeError('fetch failed'), 'network'], [new DOMException('slow', 'TimeoutError'), 'timeout']] as const) {
-    routes.length = 0; zeroCatFailure = failure
+    routes.length = 0; zeroCatFailure = failure; zeroCat.resumeZeroCat()
     const wrapped = await hostedModel('workspace', DEFAULT, undefined, 'alice')
     const parts = await drain((await wrapped.doStream({ prompt: [] } as never)).stream)
     assert.deepEqual(parts.map(part => part.delta).filter(Boolean), ['from gateway'])
@@ -177,6 +183,7 @@ test('a stream error before the first token goes to Gateway; after it the stream
   assert.equal(routes[0]['mikka.model.fallback_reason'], 'server_error')
 
   routes.length = gatewaySent.length = 0
+  zeroCat.resumeZeroCat()
   zeroCatStream = () => { let pulls = 0; return new ReadableStream({ pull(c) {
     if (pulls++ === 0) c.enqueue({ type: 'text-delta', id: 't', delta: 'half' }); else c.error(new Error('connection reset'))
   } }) }
@@ -228,4 +235,30 @@ test('the route span keeps every attribute through the tracing privacy filter', 
   const { event: _event, ...attributes } = routes[0]
   assert.deepEqual(sanitizeAttributes(attributes as never), attributes)
   assert.deepEqual(Object.keys(attributes).sort(), ['mikka.model.fallback_reason', 'mikka.model.gateway_credential', 'mikka.model.id', 'mikka.model.route', 'mikka.model.zerocat_status'])
+})
+
+test('a refused redirect is named, the failure is logged by names and code only, and later calls skip ZeroCat for a while', async () => {
+  const redirect = Object.assign(new Error('Cannot connect to API: fetch failed https://zero.cat/v1?key=secret'), { name: 'AI_APICallError',
+    cause: Object.assign(new TypeError('fetch failed'), { cause: new Error('unexpected redirect') }) })
+  zeroCatFailure = redirect
+  let wrapped = await hostedModel('workspace', DEFAULT, undefined, 'alice')
+  await wrapped.doGenerate({ prompt: [] } as never)
+  assert.equal(routes[0]['mikka.model.fallback_reason'], 'redirect')
+  assert.equal(routes[0]['mikka.model.zerocat_error'], 'AI_APICallError>TypeError>Error')
+  assert.ok(!JSON.stringify(routes).includes('secret'), 'no error message reaches the log')
+
+  // The next call does not wait on ZeroCat again.
+  zeroCatFailure = undefined; routes.length = 0; zeroCatSent.length = 0
+  wrapped = await hostedModel('workspace', DEFAULT, undefined, 'alice')
+  await wrapped.doGenerate({ prompt: [] } as never)
+  assert.equal(zeroCatSent.length, 0)
+  assert.equal(routes[0]['mikka.model.fallback_reason'], 'paused')
+  // After the pause it is tried again.
+  assert.equal(zeroCat.zeroCatPaused(Date.now() + zeroCat.ZEROCAT_PAUSE_MS + 1), false)
+})
+
+test('a connection error keeps its system code', () => {
+  const error = Object.assign(new Error('x'), { name: 'AI_APICallError', cause: Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('reset'), { code: 'ECONNRESET' }) }) })
+  assert.deepEqual(zeroCat.zeroCatFailureDetail(error), { error: 'AI_APICallError>TypeError>Error', code: 'ECONNRESET' })
+  assert.equal(zeroCat.zeroCatFailureReason(error), 'network')
 })

@@ -43,7 +43,9 @@ one `model.route` span, and the same values as a `default_model_route` log line:
 | --- | --- |
 | `mikka.model.id` | `deepseek/deepseek-v4.1-flash` |
 | `mikka.model.route` | `zerocat` (the main route) or `gateway` (the fallback) |
-| `mikka.model.fallback_reason` | On `gateway` only: `unconfigured`, `endpoint_unexpected`, `route_denied`, `timeout`, `rate_limited`, `quota`, `server_error`, `network`, `request_rejected` or `stream_error` |
+| `mikka.model.fallback_reason` | On `gateway` only: `unconfigured`, `endpoint_unexpected`, `route_denied`, `paused` (ZeroCat failed in this instance in the last 60 s and was skipped), `timeout`, `rate_limited`, `quota`, `server_error`, `redirect` (ZeroCat answered with a redirect, which the transport refuses), `network`, `request_rejected` or `stream_error` |
+| `mikka.model.zerocat_error`, `mikka.model.zerocat_error_code` | On a ZeroCat failure: the error names along its cause chain (`AI_APICallError>TypeError>Error`) and the first system code in it (`ECONNRESET`, `UND_ERR_CONNECT_TIMEOUT` …). Never a message |
+| `mikka.model.zerocat_ms` | How long the ZeroCat attempt took, success or failure |
 | `mikka.model.zerocat_status` | ZeroCat's HTTP status, when the failure had one |
 | `mikka.model.gateway_credential` | On `gateway`: `system` (Vercel bills) or `byok` (our own provider key), from Gateway's routing receipt |
 

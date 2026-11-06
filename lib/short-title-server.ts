@@ -9,6 +9,7 @@ import { issues } from '@/lib/db/schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { isCjk, parseShortTitle, shortTitlePrompt } from './short-title'
+import { causeFields } from '@mikka/protocol/coded-error'
 
 /** The small text model that names tasks; the Coordinator's flash model, as for 建议's action lines. */
 const SHORT_TITLE_MODEL = COORDINATOR_MODEL
@@ -43,6 +44,7 @@ export async function writeShortTitle(issueId: string, ownerId: string): Promise
       if (written.length) await issueListChanged(tx, issueId, true)
     })
   } catch (error) {
-    console.error('Short title failed', error instanceof Error ? error.name : 'unknown')
+    // By name and code only: a failed query's message carries its parameters, which hold the task's title.
+    console.error('Short title failed', JSON.stringify(causeFields(error)))
   }
 }
