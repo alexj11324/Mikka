@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { agentRuns } from '../../db/schema';
 import { retryWorkerDefinition } from '../../agent-kit/worker';
+import { runMayUseCredentialSql } from '../../personal-policy';
 import { FactoryError } from '../contract';
 import type { FactoryQueue } from '../dispatch';
 import { factoryRunBotMatches } from '../run-scope';
@@ -35,7 +36,8 @@ export async function admitCloudQuestionContinuation(
     JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId"
       AND m."issueId"=r."issueId" AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId"
     JOIN byos_bindings credential ON credential.id=(r."agentDefinition"->'subscription'->>'bindingId')::uuid
-      AND credential."ownerId"=r."userId" AND credential."workspaceId"=b."workspaceId"::text AND credential."consumerId"=r."agentId"::text
+      AND ${runMayUseCredentialSql('credential."ownerId"', 'r."userId"', 'b."workspaceId"')}
+      AND credential."workspaceId"=b."workspaceId"::text AND credential."consumerId"=r."agentId"::text
       AND credential."modelId"=r."agentDefinition"->>'model' AND credential.route=r."agentDefinition"->'subscription'->>'route'
       AND credential."modelId"=r."agentDefinition"->'subscription'->>'modelId'
     JOIN byos_connections c ON c.id=credential."connectionId" AND c."ownerId"=credential."ownerId"
