@@ -1,3 +1,4 @@
+import { frontendRuntimeSource } from './frontend-runtime.mjs'
 import { builtinModules } from 'node:module'
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
@@ -107,7 +108,7 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
     },
     async load(id) {
       if (id === '\0mikka:frontend-runtime') {
-        return `${development ? 'globalThis[Symbol.for("openui.devtools.autoMount")] = true;\n' : ''}${target === 'web' ? `import ${JSON.stringify(resolve(frontend, 'src/web/runtime.ts'))};` : 'export {};'}\n`
+        return frontendRuntimeSource(target, { development, frontend, renderer })
       }
       if (id === '\0mikka:renderer-build') return 'export const rendererBuild = "development";'
       if (id === '\0mikka:native-offline' || id === '\0mikka:native-offline.css') return (await offline.load({ path: id.slice(1) })).contents
