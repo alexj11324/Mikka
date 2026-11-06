@@ -208,10 +208,10 @@ error code and its numbers.
 
 | Alert | Fires when | Tune |
 | --- | --- | --- |
-| Mikka transfer reaches 50% of 5 GB operating budget | The billing period's Neon transfer reaches 50% of 5 GB (`monthly-budget.sql`) | The threshold `upper: 0.5` in `ALERTS` |
+| Mikka transfer reaches 50% of 500 GB plan allowance | The billing period's Neon transfer reaches 50% of the Launch plan's 500 GB (`monthly-budget.sql`) | The threshold `upper: 0.5` in `ALERTS` |
 | Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
 | [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's sampled DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 200)` (≈2,000 real queries), or its sampled JSON bytes exceed `max(3 × median, 1 MB)` (≈10 MB). Needs 24 observed hours of history; bytes only when ≥95% of the hour's queries carry a size (`alert-source-anomaly.sql`) | `3 *` (the multiple) and the floors `200` / `1000000` in `metrics`; `covered_hours >= 24` for warm-up |
-| [1324] Mikka 日速率外推超过5GB月预算 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 5 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `5000000000` (the budget) and `utc_hours >= 3` |
+| [1324] Mikka 日速率外推超过500GB月额度 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 500 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `500000000000` (the allowance) and `utc_hours >= 3` |
 | [1324] Mikka 错误码小时突增 | One service's error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 5)` (≈50 real spans), after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `5` in `metrics` |
 
 Every alert query returns exactly one row and the alert reads it

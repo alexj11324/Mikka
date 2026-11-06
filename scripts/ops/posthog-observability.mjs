@@ -80,8 +80,8 @@ export const INSIGHTS = [
   { key: 'alert-source-anomaly', shortId: 'k3M88Rs8', name: '[1324] Mikka 来源数据库小时异常', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
     description: 'DB samples > max(3×available 7d median,200 queries/1MB JSON≈2,000 queries/10MB at 10%). Warmup 24 prior observed full hours; launch/gaps excluded; absent routes zero-filled. Bytes require ≥95% coverage now and in ≥24 baseline hours. No current service telemetry→NULL. Monthly 50% and heartbeat remain.',
     query: hogql(sql('alert-source-anomaly'), { display: 'ActionsTable' }) },
-  { key: 'alert-daily-pace', shortId: 'E08gP1zi', name: '[1324] Mikka 日速率外推超过5GB月预算', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
-    description: 'UTC today bytes / elapsed hours through reported bucket ×24×month days vs 5GB. ≥3h; same UTC day; healthy snapshot≤60m/provider≤180m. Assumes complete provider day cumulative. Daily pace equivalent, not billing-period forecast; monthly 50% retained.',
+  { key: 'alert-daily-pace', shortId: 'E08gP1zi', name: '[1324] Mikka 日速率外推超过500GB月额度', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
+    description: 'UTC today bytes / elapsed hours through reported bucket ×24×month days vs 500GB. ≥3h; same UTC day; healthy snapshot≤60m/provider≤180m. Assumes complete provider day cumulative. Daily pace equivalent, not billing-period forecast; monthly 50% retained.',
     query: hogql(sql('alert-daily-pace'), { display: 'ActionsTable' }) },
   { key: 'alert-error-spike', shortId: 'STBizeTe', name: '[1324] Mikka 错误码小时突增', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
     description: 'Service+code error spans > max(3×available 7d median,5 samples≈50 spans at 10%). Only mikka-web/daemon; code→error.type→unknown_error. Warmup 24 observed full hours; code absences zero-filled only when service observed. No current telemetry→NULL. Routes are examples; spans≠failed requests.',
@@ -98,13 +98,13 @@ export const DASHBOARD = {
 const hourly = { calculation_interval: 'hourly', condition: { type: 'absolute_value' } }
 /** The plan allows five alerts; these are all of them. Email goes to the subscribed users. */
 export const ALERTS = [
-  { key: 'monthly-50', id: '01a1a144-b73e-0000-37ee-ecdafb0b932e', insight: 'monthly-budget', name: 'Mikka transfer reaches 50% of 5 GB operating budget',
+  { key: 'monthly-50', id: '01a1a144-b73e-0000-37ee-ecdafb0b932e', insight: 'monthly-budget', name: 'Mikka transfer reaches 50% of 500 GB plan allowance',
     ...hourly, enabled: true, threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row' } },
   { key: 'heartbeat', id: '01a1a144-bcba-0000-00ba-fb44e2874871', insight: 'heartbeat', name: 'Mikka monitoring collection failed or heartbeat absent',
     ...hourly, enabled: true, threshold: { type: 'absolute', bounds: { lower: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row' } },
   { key: 'source-anomaly', id: '01a1a9eb-1a3a-0000-6f0b-151446674319', insight: 'alert-source-anomaly', name: '[1324] Mikka 来源数据库小时异常',
     ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row', label_column: 'source' } },
-  { key: 'daily-pace', id: '01a1a144-b4dc-0000-fbbe-edbede0dfdb5', insight: 'alert-daily-pace', name: '[1324] Mikka 日速率外推超过5GB月预算',
+  { key: 'daily-pace', id: '01a1a144-b4dc-0000-fbbe-edbede0dfdb5', insight: 'alert-daily-pace', name: '[1324] Mikka 日速率外推超过500GB月额度',
     ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 1 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row', label_column: 'source' } },
   { key: 'error-spike', id: '01a1a144-b9d6-0000-6229-896dc85243ec', insight: 'alert-error-spike', name: '[1324] Mikka 错误码小时突增',
     ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row', label_column: 'source' } },
