@@ -15,7 +15,6 @@ import {
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { HostedModelLabel, ModelLabel } from '@/components/labels/entity-labels'
-import { groupByModelFamily, modelDisplayName } from '@/lib/model-display-name'
 import { HOSTED_CHOICE, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
 import { cn } from '@/lib/utils'
 
@@ -105,7 +104,7 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
   }, [botId, shown, menu.error])
   // Someone else's bot gets no chip; while the menu loads, the chip keeps the model it showed last time (state completeness).
   // It is the chip's look only, not a control, until the menu it opens has arrived.
-  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" data-next-message={running || undefined} aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId ? modelDisplayName(last.modelId).name : t('unknownModel') })}
+  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" data-next-message={running || undefined} aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel') })}
     className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full bg-control px-2 text-sm whitespace-nowrap text-foreground [&_svg]:shrink-0 [&>svg]:size-3.5">
     <span className="flex min-w-0"><OptionLabel t={t} option={last} /></span>
     <ChevronDown className="text-muted-foreground" />
@@ -138,7 +137,7 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
     } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
   }
 
-  const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId ? modelDisplayName(current.modelId).name : t('unknownModel')
+  const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
   const checking = current.availability === 'checking'
   const unavailable = !current.available && !checking
   const label = [name,
@@ -157,7 +156,7 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
           {/* A rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
           {index === 1 && <DropdownMenuSeparator />}
           <DropdownMenuLabel className="truncate font-normal" title={heading(t, group)}>{heading(t, group)}</DropdownMenuLabel>
-          {groupByModelFamily(group.options, option => option.modelId).map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick onClick={() => { if (option.id === value && !current.chosen) void choose(option.id) }}>
+          {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick onClick={() => { if (option.id === value && !current.chosen) void choose(option.id) }}>
             <OptionLabel t={t} option={option} />
             {tag(t, group) && <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{tag(t, group)}</span>}
           </DropdownMenuRadioItem>)}

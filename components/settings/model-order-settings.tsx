@@ -11,7 +11,6 @@ import { arrayMove } from '@dnd-kit/sortable'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
-import { groupByModelFamily, modelDisplayName } from '@/lib/model-display-name'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -277,13 +276,13 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
   return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
-    <KanbanItemHandle render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('handle', { model: modelDisplayName(row.model).name, position: index + 1 })} />} className="touch-none text-muted-foreground">
+    <KanbanItemHandle render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('handle', { model: row.model, position: index + 1 })} />} className="touch-none text-muted-foreground">
       <GripVertical aria-hidden="true" />
     </KanbanItemHandle>
     <span aria-hidden="true" className="w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
     <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
       <span className="flex min-w-0 items-center text-sm font-medium">
-        {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate" title={row.model}>{modelDisplayName(row.model).name}</span></span>
+        {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{row.model}</span></span>
           : <ModelLabel model={row.model} source={row.harness} />}
       </span>
       {/* Every row here runs on this list's Agent; only a model both Agents run says so (its Agent menu is beside it). */}
@@ -293,7 +292,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
     <span className="ml-auto flex shrink-0 items-center gap-3">
     {/* A model both Agents run: its Agent here, 优先 marking the preferred one (Harness draft). */}
     {row.agents.length > 1 && <DropdownMenu>
-      <DropdownMenuTrigger disabled={pending} render={<Button variant="secondary" size="sm" aria-label={t('agentMenu', { model: modelDisplayName(row.model).name, agent: harnessName(row.harness) })} />}>
+      <DropdownMenuTrigger disabled={pending} render={<Button variant="secondary" size="sm" aria-label={t('agentMenu', { model: row.model, agent: harnessName(row.harness) })} />}>
         {harnessName(row.harness)}<ChevronDown aria-hidden="true" data-icon="inline-end" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
@@ -315,7 +314,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
     </span>
     {retry && <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={retry}>{commonT('retry')}</Button>}
     <DropdownMenu>
-      <DropdownMenuTrigger disabled={pending} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { model: modelDisplayName(row.model).name })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+      <DropdownMenuTrigger disabled={pending} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { model: row.model })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
           <DropdownMenuItem disabled={index === 0} onClick={onFirst}>{t('moveFirst')}</DropdownMenuItem>
@@ -345,7 +344,7 @@ function AddModelsDialog({ candidates, onClose }: { candidates: Candidate[]; onC
   const commonT = useTranslations('Common')
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const groups = [...new Map(candidates.map(item => [item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId, item])).values()]
-    .map(head => ({ head, items: groupByModelFamily(candidates.filter(item => (item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId) === (head.source.kind === 'subscription' ? head.source.connectionId : head.source.keyId)), item => item.model) }))
+    .map(head => ({ head, items: candidates.filter(item => (item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId) === (head.source.kind === 'subscription' ? head.source.connectionId : head.source.keyId)) }))
   const chosen = candidates.filter(item => picked.has(sourceKey(item)))
   return <Dialog open onOpenChange={open => { if (!open) onClose([]) }}>
     <DialogContent>
@@ -359,7 +358,7 @@ function AddModelsDialog({ candidates, onClose }: { candidates: Candidate[]; onC
               <Checkbox checked={item.added || picked.has(key)} disabled={item.added}
                 onCheckedChange={checked => setPicked(current => { const next = new Set(current); if (checked) next.add(key); else next.delete(key); return next })} />
               {/* One row is one model on one Agent (Harness draft): a key both Agents run lists its model twice. */}
-              <span className="min-w-0 truncate" title={item.model}>{modelDisplayName(item.model).name}</span>
+              <span className="min-w-0 truncate">{item.model}</span>
               <span className="shrink-0 text-xs text-muted-foreground">{harnessName(item.harness)}</span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.added ? t('added') : null}</span>
             </Label>
