@@ -147,14 +147,14 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /platform
-          secret-name: HOSTED_UI_READ_TOKEN
+          secret-name: HOSTED_UI_READ_KEY
           include-imports: false
       - name: Check out the production Web UI revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: alexj11324/mikka-hosted-ui
           ref: ${{ needs.preflight.outputs.overlay-sha }}
-          token: ${{ env.HOSTED_UI_READ_TOKEN }}
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui
           persist-credentials: false
       - name: Pin the private UI revision

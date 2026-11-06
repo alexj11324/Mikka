@@ -17,7 +17,7 @@ export async function recordOverlay(directory, { env = process.env } = {}) {
   if (/[\r\n]/.test(path)) throw new Error('hostedUi:invalidDirectory')
   const sha = overlaySha(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: path, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim())
   if (env.MIKKA_UI_OVERLAY_SHA && sha !== env.MIKKA_UI_OVERLAY_SHA) throw new Error('hostedUi:checkoutMismatch')
-  if (env.GITHUB_ENV) await appendFile(env.GITHUB_ENV, `MIKKA_UI_OVERLAY_DIR=${path}\nMIKKA_UI_OVERLAY_SHA=${sha}\n`)
+  if (env.GITHUB_ENV) await appendFile(env.GITHUB_ENV, `MIKKA_UI_OVERLAY_DIR=${path}\nMIKKA_UI_OVERLAY_SHA=${sha}\n${env.HOSTED_UI_READ_KEY ? 'HOSTED_UI_READ_KEY=\n' : ''}`)
   return { overlaySha: sha }
 }
 

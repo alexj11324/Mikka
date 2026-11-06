@@ -24,6 +24,11 @@ test('records an immutable private checkout and rejects mismatch before exportin
   assert.equal(before, `MIKKA_UI_OVERLAY_DIR=${path}\nMIKKA_UI_OVERLAY_SHA=${overlaySha}\n`)
   await assert.rejects(recordOverlay(path, { env: { GITHUB_ENV: envFile, MIKKA_UI_OVERLAY_SHA: SHA } }), /checkoutMismatch/)
   assert.equal(await readFile(envFile, 'utf8'), before)
+  const cleared = join(path, 'cleared-env')
+  await recordOverlay(path, { env: { GITHUB_ENV: cleared, HOSTED_UI_READ_KEY: 'private-key-sentinel' } })
+  const exported = await readFile(cleared, 'utf8')
+  assert.ok(exported.endsWith('HOSTED_UI_READ_KEY=\n'))
+  assert.ok(!exported.includes('private-key-sentinel'))
 })
 test('requires a real Web source and matching overlay, with no credentials on the public request', async () => {
   const options = { expectedOverlay: SHA, fetchImpl: async (url, init) => {
@@ -63,6 +68,8 @@ test('official jobs keep private code out of public artifacts and pin desktop to
   const checkout = desktop.jobs.macos.steps.find(step => step.with?.repository === 'alexj11324/mikka-hosted-ui')
   assert.equal(checkout.with.ref, '${{ needs.preflight.outputs.overlay-sha }}')
   assert.equal(checkout.with['persist-credentials'], false)
+  assert.equal(checkout.with['ssh-key'], '${{ env.HOSTED_UI_READ_KEY }}')
+  assert.equal(checkout.with.token, undefined)
   assert.ok(desktop.jobs.macos.steps.some(step => step.run?.includes('audit "$RUNNER_TEMP/official-packaged-app"')))
   assert.ok(web.jobs.deploy.steps.some(step => step.run?.includes('audit .vercel/output/static')))
 })

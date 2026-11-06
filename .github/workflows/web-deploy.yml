@@ -88,7 +88,7 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /platform
-          secret-name: HOSTED_UI_READ_TOKEN
+          secret-name: HOSTED_UI_READ_KEY
           include-imports: false
       - name: Check out the private UI
         if: steps.skip.outputs.skip != 'true'
@@ -96,7 +96,7 @@ jobs:
         with:
           repository: alexj11324/mikka-hosted-ui
           ref: main
-          token: ${{ env.HOSTED_UI_READ_TOKEN }}
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui
           persist-credentials: false
       - name: Pin the private UI revision

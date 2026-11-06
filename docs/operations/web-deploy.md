@@ -173,10 +173,14 @@ as a recovery step.
 Open-source builds, including every public/fork PR check, leave
 `MIKKA_UI_OVERLAY_DIR` unset and use the public slot implementations. Only the
 trusted `main` official release jobs check out `alexj11324/mikka-hosted-ui`.
-They read `HOSTED_UI_READ_TOKEN` from Infisical `prod:/platform` with the existing
-GitHub OIDC identity. This fine-grained credential must grant **Contents: read
-only**, on **mikka-hosted-ui only**; it is not a public-repository secret.
-Checkout does not persist it in Git configuration.
+They read `HOSTED_UI_READ_KEY` from Infisical `prod:/platform` with the existing
+GitHub OIDC identity. This is a GitHub
+**read-only deploy key**, registered on **mikka-hosted-ui only** (`read_only:
+true` verified through the repository API); it is not a public-repository
+secret. The existing native-runner administration identity used for one-off
+registration is never delivered to public build jobs.
+Checkout uses SSH without persisting credentials in Git configuration. The
+record step clears the key from subsequent job steps before any build runs.
 
 Web checks out private `main` into ignored `.hosted-ui/`, records the exact
 commit in `MIKKA_UI_OVERLAY_SHA`, then exports `MIKKA_UI_OVERLAY_DIR` before
@@ -197,7 +201,9 @@ and dispatches Web with `overlay-refresh: true`, bypassing the documentation
 skip. No scheduled polling is used. Every public main build and private push
 therefore validates the combination of public main and private main; external
 PRs need no private access. The private workflow also dispatches the normal
-official desktop release, since its renderer includes the changed private UI.
+official desktop release when bundled UI or release inputs change. Private
+documentation-only pushes refresh Web without publishing an installer; manual
+private workflow dispatches release both, following the existing desktop rule.
 During the initial rollout it detects an unmerged public pipeline and makes no
 production change.
 
@@ -228,5 +234,6 @@ rules still apply. New desktop runs cancel obsolete ones.
   After signing, the complete actual ASAR is extracted and audited
   before publication. The private checkout remains outside the package.
 - Do not print environment files, credentials or private source while debugging.
-  Rotate an expired read token in Infisical; never broaden its repository or
-  permission scope to get a build through.
+  Rotate a checkout key through Infisical and the same repository’s read-only
+  deploy-key registration; never broaden its repository or permission scope
+  to get a build through.
