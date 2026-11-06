@@ -72,7 +72,7 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 - **交付「Artifact」。** Bot 可以将文档或 HTML 页面作为「Artifact」交付，支持版本记录和分享链接。
 - **通过 Factory 交付。** 分诊与澄清、审阅、检查未通过时的修复运行、以运行截图作为证据、以你的身份合并 pull request 的验收页，以及开出后续 issue 的监控。
 - **在已连接应用中操作。** Bot 可以提出邮件、Google 日历、Notion 和 Slack 操作，经你批准后执行。
-- **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号。⌘K 可搜索 bot、群聊、任务、线程和项目。
+- **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系和活动记录。每个任务在创建时就有编号：工作区任务用团队前缀（AL-12），个人任务用个人前缀（ALEX-12）；任务的分支和 PR 都带这个编号。⌘K 可搜索 bot、群聊、任务、线程和项目。
 - **判断哪些事需要你。** Mikka 按「置之不理的代价」为来自 GitHub、Linear、Notion 和 Gmail 的通知评级。紧急事项交给 Coordinator，它每天最多打扰你五次；其余事项留在「建议」中。每日简报会在你所在时区 08:00 之后发送到 Coordinator 对话中。
 - **新手引导。** 首次打开时引导你创建第一个 bot 并连接订阅，可以在 设置 › 偏好设置 中重新播放。
 - **使用自己的订阅和 key。** 在 设置 › 模型与订阅 中连接 ChatGPT（Codex）或 Claude 订阅，或添加模型服务商的 API key。订阅可以回复 bot 对话，并在你的电脑上运行线程。key 提供服务商为它列出的模型，并直接调用服务商。
@@ -256,10 +256,12 @@ Mikka 目前处于早期体验阶段。请发送邮件至 [mikka@aspectlylabs.co
 
 ## 许可证
 
-Mikka 采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。
+Mikka 的版权归 Aspectly Labs 所有（© 2026），采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。
+
+如需不受 AGPL 义务约束的商业许可，请联系 Aspectly Labs：[legal@aspectlylabs.com](mailto:legal@aspectlylabs.com)。
 
 如果你将修改后的 Mikka 作为网络服务提供给他人使用，AGPL 要求你向这些用户提供所部署版本的源代码。
 
 ## 参与贡献
 
-欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。贡献的代码按照项目的 [AGPL-3.0-only](LICENSE) 协议授权，无需另行签署贡献者协议；贡献者保留其作品的版权。
+欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。贡献者保留其作品的版权，并按 [AGPL-3.0-only](LICENSE) 授权；提交贡献即同意 Aspectly Labs 可以按其他条款（包括商业许可）提供这些贡献。无需另行签署任何文件，完整条款见 [`CONTRIBUTING.md`](CONTRIBUTING.md#license)。

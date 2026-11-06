@@ -38,10 +38,36 @@ export function MyBubble({ text, photos, selecting }: { text: string; photos?: I
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
           {quoted ? <Text numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
-          {selecting ?? (words ? <Text style={[styles.body, { color: colors.onAccent }]}>{words}</Text> : null)}
+          {selecting ?? (words ? <FoldedWords text={words} color={colors.onAccent} /> : null)}
         </View>
       ) : null}
     </View>
+  )
+}
+
+/** Lines a long message keeps when folded, and the length it must pass before it folds (25pt lines, styles.body). */
+const FOLD_LINES = 10
+const FOLD_AFTER = 13
+
+/**
+ * A long message folded to its first lines with 显示更多 / 收起 under it, as Messages and
+ * ChatGPT fold a long one. The full height is measured once from layout (works on iOS and
+ * Expo Web alike); folding is the native line limit.
+ */
+export function FoldedWords({ text, color }: { text: string; color: string }) {
+  const [long, setLong] = useState(false)
+  const [open, setOpen] = useState(false)
+  useEffect(() => { setLong(false); setOpen(false) }, [text])
+  return (
+    <>
+      <Text style={[styles.body, { color }]} numberOfLines={long && !open ? FOLD_LINES : undefined}
+        onLayout={event => { if (!long && event.nativeEvent.layout.height > FOLD_AFTER * styles.body.lineHeight) setLong(true) }}>{text}</Text>
+      {long ? (
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={8} onPress={() => { tap(); setOpen(value => !value) }} style={styles.foldToggle}>
+          <Text style={[styles.foldLabel, { color }]}>{open ? '收起' : '显示更多'}</Text>
+        </Pressable>
+      ) : null}
+    </>
   )
 }
 
@@ -324,6 +350,8 @@ const styles = StyleSheet.create({
   reactionMine: { backgroundColor: colors.objectChip },
   reactionText: { fontSize: 14 },
   body: { fontSize: 16, lineHeight: 25 },
+  foldToggle: { alignSelf: 'flex-start', marginTop: 4 },
+  foldLabel: { fontSize: 15, fontWeight: '600', opacity: 0.85 },
   botBubble: { alignSelf: 'flex-start', maxWidth: '86%', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11 },
   myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accentFill, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
   quoted: { fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.75)', borderLeftWidth: 2, borderLeftColor: 'rgba(255,255,255,0.6)', paddingLeft: 8, marginBottom: 6 },

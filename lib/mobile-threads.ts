@@ -6,7 +6,7 @@ import { citationSources } from '@/lib/coordinator/store'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { threadName } from '@/lib/issue-threads'
 import type { RunSource } from '@/lib/coordinator/citations'
-import { runBotName } from '@/lib/run-bot-name'
+import { runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { groupThreads, pullRequestsOf, THREAD_GROUPS, threadGroup, type GroupIssue, type PrGroup, type ThreadGroup } from '@/lib/thread-groups'
@@ -72,7 +72,7 @@ function listed(rows: Awaited<ReturnType<typeof runRows>>): MobileThread[] {
 /** Threads with what their task links: its id, title and pull requests, as far as this person can see it. */
 async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const rows = await db.select({
-    id: agentRuns.id, prompt: sql<string>`left(${agentRuns.prompt}, 300)`, status: agentRuns.status,
+    id: agentRuns.id, prompt: sql<string>`left(${runTaskPrompt}, 300)`, status: agentRuns.status,
     agentName: runBotName, harness: agents.harness,
     deviceId: devices.id, deviceName: devices.name, platform: devices.platform, deviceKind: devices.kind,
     createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, outcome: agentRuns.outcome,

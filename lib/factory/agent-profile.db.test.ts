@@ -84,7 +84,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal(selected.target.agentId, agents[selected.target.entry.harness])
     const { routing, ...target } = selected.target
     assert.deepEqual(target, await resolveModelDispatch(pool, scope, undefined, 'local'))
-    assert.deepEqual(routing, { version: 1, difficulty: 'unknown', model: 'claude-haiku-5-5',
+    assert.deepEqual(routing, { version: 2, required: 'unknown', model: 'claude-haiku-5-5',
       harness: 'claude_code', tier: 'light', reason: 'decision_unavailable' })
     assert.deepEqual(selected.agentProfile.targetEntry, selected.target.entry)
     const binding = (await pool.query('SELECT "consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
@@ -102,7 +102,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     if (actual.target.kind !== 'device') assert.fail('local default must select the fixture device')
     const { routing, ...target } = actual.target
     assert.deepEqual(target, expected, 'an unavailable routing Decision preserves every original execution target field')
-    assert.deepEqual(routing, { version: 1, difficulty: 'unknown', model: 'claude-haiku-5-5',
+    assert.deepEqual(routing, { version: 2, required: 'unknown', model: 'claude-haiku-5-5',
       harness: 'claude_code', tier: 'light', reason: 'decision_unavailable' })
     assert.deepEqual(decisionPurposes, ['task-model-routing'])
     const { changeOrder } = await import('@/lib/model-order')

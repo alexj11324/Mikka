@@ -11,6 +11,9 @@ export interface DispatchTiming {
   workflowRunId: string | null
   stepId: string | null
   attempt: number | null
+  /** Host wall-clock bounds, so production execution receipts can share the same dispatch origin. */
+  startedAt: number
+  endedAt: number
   totalMs: number
   /** In the order they ran; a phase that ran twice is listed twice. */
   phases: { phase: string; ms: number }[]
@@ -48,10 +51,11 @@ export async function withDispatchTiming<T>(run: () => Promise<T>, now: () => nu
     failed = false
     return result
   } finally {
-    const totalMs = now() - started
+    const endedAt = now()
+    const totalMs = endedAt - started
     try {
       const step = await identity()
-      log({ msg: 'dispatch_timing', workflowRunId: step.workflowRunId ?? null, stepId: step.stepId ?? null, attempt: step.attempt ?? null, totalMs, phases: recording.phases, github: recording.github, failed })
+      log({ msg: 'dispatch_timing', workflowRunId: step.workflowRunId ?? null, stepId: step.stepId ?? null, attempt: step.attempt ?? null, startedAt: started, endedAt, totalMs, phases: recording.phases, github: recording.github, failed })
     } catch { /* timing never fails the dispatch */ }
   }
 }

@@ -3,7 +3,7 @@ import { ExportResultCode } from "@opentelemetry/core"
 import { InMemorySpanExporter, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
 import { CodedError } from "@mikka/protocol/coded-error"
 import { HttpServerLink } from "./server-link-http"
-import { DaemonTracer, daemonSampleRate, daemonTracer, routeTemplate, runIdHash, SafeExporter, type TraceSettings } from "./tracing"
+import { DaemonTracer, daemonSampleRate, daemonTracer, routeTemplate, runIdHash, SafeExporter, STARTUP_TIMING_PHASE_LIMIT, type DaemonStartupTiming, type TraceSettings } from "./tracing"
 
 const settings: TraceSettings = { endpoint: "https://us.i.posthog.com/i/v1/traces", projectToken: "phc_testtoken123", sampleRate: 1, environment: "dev" }
 const deviceId = "6f1c1f1e-3a5b-4c8d-9e0f-1a2b3c4d5e6f"
@@ -128,5 +128,104 @@ describe("daemon tracing", () => {
     expect(routeTemplate(`/v1/devices/${deviceId}/runs/run_abc123/claim`)).toBe("/v1/devices/[id]/runs/[id]/claim")
     expect(routeTemplate("/v1/runs/r1/skill-receipt?receiptId=secret")).toBe("/v1/runs/[id]/skill-receipt")
     expect(routeTemplate("/v1/devices/register")).toBe("/v1/devices/register")
+  })
+})
+
+describe("unsampled startup timings", () => {
+  const attributes = { "mikka.run.id_hash": runIdHash("private-run"), "mikka.harness": "claude_code" }
+
+  it("captures closed numeric intervals with tracing disabled, excluding arbitrary names and private attributes", async () => {
+    const tracer = new DaemonTracer(), records: DaemonStartupTiming[] = []
+    expect(tracer.configure({ ...settings, sampleRate: 0 })).toBe(false)
+    const result = await tracer.span("daemon.adapter.start", { ...attributes, prompt: "private-prompt" }, async () => {
+      await tracer.span("daemon.adapter.auth", attributes, async () => {
+        await tracer.span("daemon.adapter.auth.gate", { ...attributes, token: "private-token" }, async span => {
+          span.set("path", "/home/private-file")
+          return 1
+        })
+      })
+      await tracer.span("daemon.adapter.cli_init", attributes, async span => { span.fail(new Error("private-error"), "private-outcome") })
+      await tracer.span("daemon.adapter.private-prompt", attributes, async () => 1)
+      await tracer.span("daemon.adapter.auth.context", { ...attributes, "mikka.run.id_hash": runIdHash("other-run") }, async () => 1)
+      await tracer.span("daemon.adapter.auth.context", { ...attributes, "mikka.harness": "codex" }, async () => 1)
+      await tracer.span("daemon.run", attributes, () => tracer.span("daemon.adapter.auth.context", attributes, async () => 1), { root: true })
+      return 42
+    }, { onStartupTiming: timing => records.push(timing) })
+    expect(result).toBe(42)
+    expect(tracer.headers()).toEqual({})
+    expect(records).toHaveLength(1)
+    const timing = records[0]
+    expect(timing).toMatchObject({ version: 1, runIdHash: attributes["mikka.run.id_hash"], harness: "claude_code", outcome: "ok", truncated: false })
+    expect(timing.endedAt).toBeGreaterThanOrEqual(timing.startedAt)
+    expect(timing.phases.map(phase => phase.name)).toEqual(["daemon.adapter.auth", "daemon.adapter.auth.gate", "daemon.adapter.cli_init"])
+    expect(timing.phases[2].outcome).toBe("error")
+    expect(timing.phases[0].startMs).toBeLessThanOrEqual(timing.phases[1].startMs)
+    expect(timing.phases[0].endMs).toBeGreaterThanOrEqual(timing.phases[1].endMs)
+    for (const phase of timing.phases) {
+      expect(Object.keys(phase).sort()).toEqual(["endMs", "ms", "name", "outcome", "startMs"])
+      expect(phase.startMs).toBeGreaterThanOrEqual(0)
+      expect(phase.endMs).toBeGreaterThanOrEqual(phase.startMs)
+      expect(timing.ms).toBeGreaterThanOrEqual(phase.endMs)
+      expect(Math.abs(phase.ms - (phase.endMs - phase.startMs))).toBeLessThanOrEqual(0.002)
+    }
+    expect(JSON.stringify(records)).not.toMatch(/private-|other-run|\/home/)
+  })
+
+  it("preserves synchronous and asynchronous errors and ignores a throwing measurement callback", async () => {
+    const tracer = new DaemonTracer(), records: DaemonStartupTiming[] = []
+    const error = new Error("private-start-error")
+    const options = { onStartupTiming: (timing: DaemonStartupTiming) => { records.push(timing); throw new Error("callback-error") } }
+    expect(() => tracer.span("daemon.adapter.start", attributes, () => { throw error }, options)).toThrow(error)
+    await expect(tracer.span("daemon.adapter.start", attributes,
+      () => tracer.span("daemon.adapter.auth.context", attributes, async () => { throw error }), options)).rejects.toBe(error)
+    expect(await tracer.span("daemon.adapter.start", attributes, async () => "same-value", options)).toBe("same-value")
+    expect(records.map(record => record.outcome)).toEqual(["error", "error", "ok"])
+    expect(records[1].phases[0].outcome).toBe("error")
+    expect(JSON.stringify(records)).not.toContain("private-start-error")
+    await tracer.span("daemon.adapter.start", { ...attributes, "mikka.run.id_hash": "private-run" }, async () => 1, options)
+    await tracer.span("daemon.adapter.start", { ...attributes, "mikka.harness": "private-harness" }, async () => 1, options)
+    expect(records).toHaveLength(3)
+  })
+
+  it("keeps overlapping run scopes separate even when children finish in reverse order", async () => {
+    const tracer = new DaemonTracer(), records: DaemonStartupTiming[] = []
+    let releaseFirst!: () => void, releaseSecond!: () => void
+    const firstReady = new Promise<void>(resolve => { releaseFirst = resolve })
+    const secondReady = new Promise<void>(resolve => { releaseSecond = resolve })
+    const secondAttributes = { "mikka.run.id_hash": runIdHash("second-run"), "mikka.harness": "codex" }
+    const options = { onStartupTiming: (timing: DaemonStartupTiming) => { records.push(timing) } }
+    const first = tracer.span("daemon.adapter.start", attributes,
+      () => tracer.span("daemon.adapter.auth.gate", attributes, () => firstReady), options)
+    const second = tracer.span("daemon.adapter.start", secondAttributes,
+      () => tracer.span("daemon.adapter.cli_init", secondAttributes, () => secondReady), options)
+    releaseSecond(); await second
+    releaseFirst(); await first
+    expect(records.map(record => [record.harness, record.runIdHash, record.phases.map(phase => phase.name)])).toEqual([
+      ["codex", secondAttributes["mikka.run.id_hash"], ["daemon.adapter.cli_init"]],
+      ["claude_code", attributes["mikka.run.id_hash"], ["daemon.adapter.auth.gate"]],
+    ])
+  })
+
+  it("bounds records and closes the scope before detached CLI activity can append to it", async () => {
+    const tracer = new DaemonTracer(), records: DaemonStartupTiming[] = []
+    const options = { onStartupTiming: (timing: DaemonStartupTiming) => { records.push(timing) } }
+    await tracer.span("daemon.adapter.start", attributes, async () => {
+      for (let i = 0; i < STARTUP_TIMING_PHASE_LIMIT + 3; i++) await tracer.span("daemon.adapter.auth.gate", attributes, async () => i)
+    }, options)
+    expect(records[0].phases).toHaveLength(STARTUP_TIMING_PHASE_LIMIT)
+    expect(records[0].truncated).toBe(true)
+    let release!: () => void, detached!: Promise<unknown>
+    const ready = new Promise<void>(resolve => { release = resolve })
+    await tracer.span("daemon.adapter.start", attributes, async () => {
+      detached = tracer.span("daemon.adapter.auth.context", attributes, async () => {
+        await ready
+        await tracer.span("daemon.adapter.auth.gate", attributes, async () => 1)
+      })
+    }, options)
+    expect(records[1]).toMatchObject({ phases: [], truncated: true })
+    const before = JSON.stringify(records)
+    release(); await detached
+    await tracer.span("daemon.adapter.auth.context", attributes, async () => 1)
+    expect(JSON.stringify(records)).toBe(before)
   })
 })

@@ -48,3 +48,18 @@ test('interjections carry their host source id while preserving body bytes and p
 
   assert.equal(JSON.parse(runMessagePrompt({ id: 'legacy', runId: 'bound-run', origin: 'unexpected', text: '' }).split('\n')[0]).authorKind, 'unknown')
 })
+
+test('the prompt records where its task ends, and the thread shows only the task', async () => {
+  const { runPromptParts } = await import('./run-prompt')
+  const { threadPromptView } = await import('./thread-prompt')
+  const { prompt, taskLength } = runPromptParts('测试派发流程：新建测试文件 🧪', '任务正文', 'Use the shared environment.', 'Run once.')
+  assert.equal(prompt, runPrompt('测试派发流程：新建测试文件 🧪', '任务正文', 'Use the shared environment.', 'Run once.'))
+  const view = threadPromptView(prompt, 0, taskLength)
+  assert.equal(view.task, '# 测试派发流程：新建测试文件 🧪\n\n任务正文\n\n## Notes for this run\n\nRun once.')
+  assert.equal(view.hasInstructions, true)
+  // Factory guidance prepended in SQL shifts the start by its char_length (code points).
+  const preamble = 'Factory implementation owns validation. 🔍\n\n'
+  assert.deepEqual(threadPromptView(preamble + prompt, [...preamble].length, taskLength), view)
+  // A run without the range shows its whole prompt, as before.
+  assert.deepEqual(threadPromptView(prompt, null, null), { task: prompt, hasInstructions: false })
+})

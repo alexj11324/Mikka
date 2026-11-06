@@ -9,6 +9,7 @@ import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } 
 // run's `CODEX_HOME`, so a follow-up run copies the earlier run's
 // `sessions` into its own before `thread/resume`.
 import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
+import { daemonTracer, runIdHash } from "../tracing"
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
 
@@ -744,7 +745,7 @@ export class CodexAdapter implements AgentAdapter {
       quota = undefined
       const verify = externalAuth?.verify ?? brokerAuth?.verify
       if (verify) {
-        try { await verify() } catch (error) { throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error }) }
+        try { await daemonTracer.span("daemon.adapter.account_check", { "mikka.harness": "codex", "mikka.run.id_hash": runIdHash(options.runId) }, () => verify()) } catch (error) { throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error }) }
       }
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
@@ -785,7 +786,8 @@ export class CodexAdapter implements AgentAdapter {
       untilReady(child, step, `codex ${label}`)
     let startupPhase: 'initialize' | 'oauth_login' | 'thread_start' | 'turn_start' = 'initialize'
     try {
-      const initialized = await ready(
+      const traceAttributes = { "mikka.harness": "codex", "mikka.run.id_hash": runIdHash(options.runId) }
+      const initialized = await daemonTracer.span("daemon.adapter.cli_init", traceAttributes, () => ready(
         rpc.sendRequest<{ userAgent?: string }>("initialize", {
           clientInfo: {
             name: "mikka",
@@ -795,7 +797,7 @@ export class CodexAdapter implements AgentAdapter {
           capabilities: managedAuth || options.mailbox ? { experimentalApi: true } : null
         }),
         "initialize",
-      )
+      ))
       await rpc.sendNotification("initialized")
       const mailboxResumeVerified = codexMailboxResumeVerified(initialized.userAgent)
       if (mailboxCatalogue && mode !== 'new' && !mailboxResumeVerified)
@@ -804,16 +806,16 @@ export class CodexAdapter implements AgentAdapter {
         startupPhase = 'oauth_login'
         try {
           const auth = subscriptionTokens(
-            await externalAuth.token(false),
+            await daemonTracer.span("daemon.adapter.auth.token", traceAttributes, () => externalAuth.token(false)),
             externalAuth.accountId
           )
-          const loggedIn = await ready(
+          const loggedIn = await daemonTracer.span("daemon.adapter.account_check.login", traceAttributes, () => ready(
             rpc.sendRequest<{ type: string }>("account/login/start", {
               type: "chatgptAuthTokens",
               ...auth
             }),
             "subscription login"
-          )
+          ))
           if (loggedIn.type !== "chatgptAuthTokens")
             throw new Error(SUBSCRIPTION_AUTH_ERROR)
         } catch (error) {

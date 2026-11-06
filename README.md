@@ -115,8 +115,10 @@ your own GitHub account.
 - **Acts in your apps.** Bots propose email, Google Calendar, Notion and Slack
   actions, which run after your approval.
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
-  relations, activity history and per-person task numbers. ⌘K searches bots,
-  group chats, tasks, threads and projects.
+  relations, activity history and a number every task gets when it is
+  created: its team key for a workspace task (AL-12), your own prefix for a
+  personal one (ALEX-12). The task's branch and pull request carry it. ⌘K
+  searches bots, group chats, tasks, threads and projects.
 - **Decides what needs you.** Mikka rates notifications from GitHub, Linear,
   Notion and Gmail by what it costs to ignore them. Urgent matters go to the
   Coordinator, which interrupts you at most five times a day; the rest wait in
@@ -405,9 +407,12 @@ follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
 
 ## License
 
-Mikka is licensed under [AGPL-3.0-only](LICENSE). Third-party components keep
-their own licenses; see
+Mikka is copyright © 2026 Aspectly Labs and licensed under
+[AGPL-3.0-only](LICENSE). Third-party components keep their own licenses; see
 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md).
+
+Commercial licenses for use without the AGPL's obligations are available from
+Aspectly Labs: [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
 
 If you run a modified version of Mikka as a network service, the AGPL requires
 you to offer its users the source code of your version.
@@ -415,5 +420,7 @@ you to offer its users the source code of your version.
 ## Contributing
 
 Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
-Contributions are made under the project's [AGPL-3.0-only](LICENSE) license;
-no separate contributor agreement is required.
+Contributors keep the copyright in their work and license it under
+[AGPL-3.0-only](LICENSE); by submitting it they also allow Aspectly Labs to
+offer it under other terms, including commercial licenses. There is no form to
+sign. The terms are in [`CONTRIBUTING.md`](CONTRIBUTING.md#license).

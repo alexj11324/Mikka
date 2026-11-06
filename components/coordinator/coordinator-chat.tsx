@@ -28,6 +28,7 @@ import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
+import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { ReplyAnswer } from '@/components/workspace/agent-decision'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
@@ -104,9 +105,10 @@ const TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(['usage_in_progress', 'u
 
 export const coordinatorChatKey = chatKeys.detail
 
-/** A reply still streaming, drawn by the same row as a stored one. */
-function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
+/** A reply still streaming, drawn by the same row as a stored one; after 停止 it reads 已停止 before the server has stored it. */
+function streamedItem(reply: CoordinatorLiveReply, stopping = false): Chat['items'][number] {
   return { position: -1, from: 'coordinator', text: reply.text, tools: [], threads: [], artifacts: [], createdAt: '',
+    ...(stopping && reply.committedThrough === undefined ? { stopped: true } : {}),
     ...(reply.tools?.length || reply.thinking ? { activity: { tools: reply.tools ?? [], thought: Boolean(reply.thinking) } } : {}) }
 }
 
@@ -124,7 +126,7 @@ function liveThinking(reply: CoordinatorLiveReply) {
 /** A sent message's words, under the reply words it quotes (lib/chat-quote.ts) and anything else it carries. */
 function PersonWords({ text, before }: { text: string; before?: ReactNode }) {
   const { quote, text: words } = splitReplyQuote(text)
-  return <>{quote && <QuoteLine slot="reply-quote" text={quote} />}{before}<UserMessageText text={words} /></>
+  return <CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}{before}<UserMessageText text={words} /></CollapsibleMessage>
 }
 
 /** A message the person just sent brings the chat back to its end, wherever they had scrolled. */
@@ -216,7 +218,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       await mutate(current => current ? { ...current, items: [...page.items, ...current.items.filter(item => item.pending || item.position > through)], sources: { ...current.sources, ...page.sources }, artifacts: { ...current.artifacts, ...page.artifacts }, historyBefore: page.historyBefore } : current, { revalidate: false })
     } catch { toast.error(actionError()) } finally { setLoadingHistory(false) }
   }
-  const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
+  // A sent message waits in the inbox for its turn: the stream opens now, so the first words show as they come.
+  const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, waiting: Boolean(data?.working && !data.streamRunId), cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
   useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
   const stateKey = `bot-chat:${botId ?? 'coordinator'}:${embedded?.activeArtifactId ?? 'main'}`
   const [draft, setDraft] = useViewState(`${stateKey}:draft`, '')
@@ -385,7 +388,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // A quote just picked in the reader: put the cursor where the request goes.
   useEffect(() => { if (embedded?.quote) inputRef.current?.focus() }, [embedded?.quote])
 
-  // 停止: the turn ends on the server, keeping what it had said; the button waits until the chat stops working.
+  // 停止 shows at once, as Esc does in Claude Code and Codex: the reply in flight reads 已停止 and the composer is free
+  // again while the turn ends on the server, keeping what it had said.
   const [stopping, setStopping] = useState(false)
   const working = Boolean(data?.working)
   useEffect(() => { if (!working) setStopping(false) }, [working])
@@ -478,7 +482,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
             {[...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
-              ...stream.replies.map(reply => ({ item: streamedItem(reply), live: reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
+              // After 停止 the reply in flight no longer draws as streaming (no cursor, no running activity) while it is stored.
+              ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
               {!live && dividerAt === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={live ? live.id : String(item.position)} className={cn('[content-visibility:visible]', (live ? arriving(`stream-${live.id}`) : entering(item)) && ENTER)}
                 {...(live ? { 'data-coordinator-stream-id': live.id, 'data-streaming': live.committedThrough === undefined } : item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
@@ -533,7 +538,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             {/* Before the reply has anything to show: the Trace's Thinking row. Once the reply streams, its own Trace takes
                 over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the
                 reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && <div className={cn('flex', workingEnter && ENTER)}><ReplyWaiting /></div>}
+            {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && (stopping
+              ? <Message align="start"><MessageContent><MessageFooter><p role="status">{t('stopped')}</p></MessageFooter></MessageContent></Message>
+              : <div className={cn('flex', workingEnter && ENTER)}><ReplyWaiting /></div>)}
             </ActivityExpansionContext>
           </MessageScrollerContent>
         </MessageScrollerViewport>
@@ -555,7 +562,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
         model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
         quote={embedded?.quote || replyQuote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">

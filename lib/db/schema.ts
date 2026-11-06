@@ -370,6 +370,8 @@ export const agentRuns = pgTable('agent_runs', {
   resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
+  /** Where the task the thread shows sits in `prompt`, in code points (lib/thread-prompt.ts); null shows the whole prompt. */
+  promptTaskStart: integer('promptTaskStart'), promptTaskLength: integer('promptTaskLength'),
   /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */
   dispatchKey: text('dispatchKey'),
   /** Hash of the original dispatch parameters; rejects reuse for different work. */
