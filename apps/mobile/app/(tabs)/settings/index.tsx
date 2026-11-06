@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { ReadNotice } from '@/components/ReadNotice'
-import { ActionSheetIOS, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
+import { ActionSheetIOS, Linking, Platform, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
@@ -12,7 +12,7 @@ import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
 import { Avatar, Row } from '@/components/settings'
 import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { CloseButton, Group } from '@/components/ui'
+import { Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
 import { clearApiCache } from '@/lib/useApi'
 import { useSettings } from '@/lib/settings'
@@ -32,7 +32,6 @@ export default function SettingsScreen() {
   const leaving = useRef(false)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutFailed, setSignOutFailed] = useState(false)
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const signOut = async () => {
     if (leaving.current) return
     leaving.current = true; setSigningOut(true); setSignOutFailed(false)
@@ -51,12 +50,7 @@ export default function SettingsScreen() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      {Platform.OS === 'ios' ? <NavBar title="设置" right={{ icon: 'xmark', label: '关闭', onPress: close, web: null }} /> : (
-        <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-          <Text style={styles.title}>设置</Text>
-          <CloseButton onPress={close} />
-        </View>
-      )}
+      <NavBar title="设置" large />
       {!data && error ? (
         <View style={{ paddingTop: 40, alignItems: 'center', gap: 10 }}>
           <Text style={{ color: colors.danger, fontSize: 13 }}>设置加载失败。</Text>
@@ -74,7 +68,7 @@ export default function SettingsScreen() {
           <Group label="Coordinator">
             <Row icon={icon('bell', Bell)} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
             <Row icon={icon('book', BookOpen)} label="记忆" onPress={() => router.push('/settings/memory')} />
-            <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => { router.dismiss(); router.push('/plugins') }} />
+            <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => router.push('/plugins')} />
           </Group>
           <Group label="App">
             <Row icon={icon('globe', Globe)} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
@@ -90,8 +84,3 @@ export default function SettingsScreen() {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 },
-  title: { fontSize: 32, fontWeight: '700' },
-})

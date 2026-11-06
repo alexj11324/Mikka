@@ -1,48 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { dragProgress, drawerWidth, OPEN_SCALE, settlesOpen, surfaceDim, surfaceRadius, surfaceScale } from '../features/shell/model/drawer.ts'
 import { TOKENS } from '../lib/tokens.ts'
-import { dragSlot, moveTo, moveWorkspace, orderWorkspaces, parseWorkspaceOrder } from '../features/shell/model/workspace-order.ts'
-
-test('the drawer is the screen less 52 points, between 280 and 360', () => {
-  assert.equal(drawerWidth(393), 341)
-  assert.equal(drawerWidth(430), 360)
-  assert.equal(drawerWidth(320), 280)
-})
-
-test('the surface rounds to the screen corners, at least 34 points', () => {
-  assert.equal(surfaceRadius({ top: 0, bottom: 0 }), 34)
-  assert.equal(surfaceRadius({ top: 59, bottom: 34 }), 59)
-})
-
-test('the open surface shrinks just enough to show its corners, under a veil lighter than a modal', () => {
-  assert.equal(surfaceScale(0), 1)
-  assert.equal(surfaceScale(1), OPEN_SCALE)
-  assert.ok(OPEN_SCALE >= 0.94, 'still the app, not a small card')
-  assert.equal(surfaceDim(0), 0)
-  assert.equal(surfaceDim(1), 1)
-  const alpha = (color: string) => Number(color.match(/[\d.]+(?=\))/)?.[0])
-  assert.ok(alpha(TOKENS.drawerDim.light) < alpha(TOKENS.scrim.light))
-  assert.ok(alpha(TOKENS.drawerDim.dark) < alpha(TOKENS.scrim.dark))
-  assert.equal(TOKENS.drawer.ios, 'secondarySystemBackground')
-  assert.equal(TOKENS.drawerRow.ios, 'tertiarySystemBackground')
-  assert.notEqual(TOKENS.drawer.light, TOKENS.page.light)
-  assert.notEqual(TOKENS.drawer.dark, TOKENS.page.dark)
-})
-
-test('a released drag settles open past halfway, a flick carrying it either way', () => {
-  assert.equal(settlesOpen(0.6, 0), true)
-  assert.equal(settlesOpen(0.4, 0), false)
-  assert.equal(settlesOpen(0.2, 2), true, 'a quick flick open from a short way')
-  assert.equal(settlesOpen(0.8, -2), false, 'a quick flick shut')
-})
-
-test('a drag moves the drawer by its own width, within closed and open', () => {
-  assert.equal(dragProgress(0, 170, 340), 0.5)
-  assert.equal(dragProgress(0, -40, 340), 0)
-  assert.equal(dragProgress(1, -85, 340), 0.75)
-  assert.equal(dragProgress(1, 40, 340), 1)
-})
+import { dragSlot, moveTo, moveWorkspace, orderWorkspaces, parseWorkspaceOrder } from '../features/workspace/model/workspace-order.ts'
 
 test('workspaces keep the order the person gave them; new ones follow, gone ones drop', () => {
   const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
@@ -102,13 +61,13 @@ test('a drop pins, moves a pin, or places a chat in its own section and unpins i
 
 test('the row swipe: armed past 144 pt until back under 128; released, it pins, opens at 88 or closes', async () => {
   const { armedAt, settleSwipe } = await import('../features/home/model/pin-swipe.ts')
-  assert.equal(armedAt(150, false), true)
-  assert.equal(armedAt(140, false), false)
-  assert.equal(armedAt(130, true), true, 'between the marks it stays as it was')
-  assert.equal(armedAt(120, true), false)
-  assert.equal(settleSwipe(-150, 0, true), 'pin')
-  assert.equal(settleSwipe(-60, 0, false), 'open')
-  assert.equal(settleSwipe(-30, 0, false), 'close')
-  assert.equal(settleSwipe(-20, -400, false), 'open', 'a quick flick left opens it')
-  assert.equal(settleSwipe(-80, 600, false), 'close', 'a flick back closes it')
+  assert.equal(armedAt(235, false), true)
+  assert.equal(armedAt(225, false), false)
+  assert.equal(armedAt(215, true), true, 'between the marks it stays as it was')
+  assert.equal(armedAt(205, true), false)
+  assert.equal(settleSwipe(-235, 0, true), 'pin')
+  assert.equal(settleSwipe(-80, 0, false), 'open')
+  assert.equal(settleSwipe(-60, 0, false), 'close')
+  assert.equal(settleSwipe(-20, -500, false), 'open', 'a quick flick left opens it')
+  assert.equal(settleSwipe(-120, 600, false), 'close', 'a flick back closes it')
 })

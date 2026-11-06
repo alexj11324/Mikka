@@ -184,12 +184,14 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 - 消息菜单 `MessageMenu.ios.tsx`、OpenUI 卡片 `components/OpenUI.tsx`、`cards.tsx`、输入框里的模型菜单 `ModelMenu.ios.tsx`、所有 `app/api/mobile/*` 接口。
 - 要删的只有抽屉：`features/shell/components/app-drawer.tsx`、`drawer-content.tsx` 和 `drawerDim` / `drawerLift` / `drawer` / `drawerRow` token。
 
-## 八、请 Alex 定的几件事
+## 八、Alex 的决定（2026-11-06）
 
-1. 四个 tab 叫「对话 · 线程 · 建议 · 设置」，任务放在「线程」里的分段，可以吗？
-2. 进入聊天和线程页时收起 tab bar（图 08、14），还是保留？
-3. 要不要 Comma 的底部任务 dock 代替 push 线程页（要改 R-15 那条）？
-4. 线程筛选用浮动状态切换器（图 13）替换右上筛选菜单，可以吗？
+设计图 01–20 通过（[决定](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)）。
+
+1. 四个 tab 叫「对话 · 线程 · 建议 · 设置」，最后是搜索 tab（`role="search"`）。任务是「线程」里的分段。
+2. 进入聊天和线程页时收起 tab bar。
+3. 不做底部任务 dock，线程页仍然 push（R-15 不变）。
+4. 线程筛选用浮动状态切换器（图 13），替换右上筛选菜单。
 
 ## 没有复制 Comma 的内容
 
