@@ -105,7 +105,7 @@ import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
-import { daemonTracer, runIdHash, type SpanHandle } from '../tracing'
+import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
 
 export interface SupervisorDeps {
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
@@ -943,12 +943,14 @@ export class RunSupervisor {
   private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
+    let startupTiming: DaemonStartupTiming | undefined
     try {
-      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work())
-      this.emit(runId, runStageChunk(stage, performance.now() - started, true))
+      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
+        { onStartupTiming: timing => { startupTiming = timing } })
+      this.emit(runId, runStageChunk(stage, performance.now() - started, true, startupTiming))
       return value
     } catch (error) {
-      this.emit(runId, runStageChunk(stage, performance.now() - started, false))
+      this.emit(runId, runStageChunk(stage, performance.now() - started, false, startupTiming))
       throw error
     }
   }

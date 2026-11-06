@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url"
 import { gzipSync } from 'node:zlib'
 import { RepositoryCache } from "../src/repositories"
 import { runPolicy } from "../src/permissions"
+import { runIdHash } from "../src/tracing"
 
 import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -353,6 +354,11 @@ describe("mock runs", () => {
     // Each start-up stage is stored with its duration, in order.
     expect(stages(chunks)).toEqual([["repository", true], ["worktree", true], ["agent_start", true]])
     expect(chunks.filter((c) => c.type === "data-run-stage").every((c) => !("transient" in c) && typeof (c.data as { ms: number }).ms === "number")).toBe(true)
+    const stageChunks = chunks.filter(c => c.type === "data-run-stage")
+    expect(stageChunks).toHaveLength(3)
+    expect(stageChunks[0].data.startupTiming).toBeUndefined()
+    expect(stageChunks[1].data.startupTiming).toBeUndefined()
+    expect(stageChunks[2].data.startupTiming).toMatchObject({ version: 1, runIdHash: runIdHash(runId), harness: "mock", outcome: "ok", phases: [], truncated: false })
     expect(chunks.some((c) => c.type === "data-file-change")).toBe(true)
     expect(server.issueStatus.get("issue-success-edit")).toBe("in_review")
     expect(server.runs.get(runId)?.state).toBe("succeeded")
@@ -371,6 +377,18 @@ describe("mock runs", () => {
     })
     expect(server.unownedRuns()).toEqual([])
     client.close()
+  })
+
+  it("includes failed adapter startup timing in the same stored stage event", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = queue(server, "missing-startup-fixture")
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.state).toBe("failed")
+    const stageChunks = server.chunksFor(runId).filter(c => c.type === "data-run-stage")
+    expect(stageChunks).toHaveLength(3)
+    expect(stageChunks[2].data).toMatchObject({ stage: "agent_start", ok: false,
+      startupTiming: { version: 1, runIdHash: runIdHash(runId), harness: "mock", outcome: "error", truncated: false } })
   })
 
   it("masks injected secrets (raw + base64, split across deltas) before upload; env vars and unlisted names are left", async () => {
