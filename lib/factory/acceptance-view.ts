@@ -26,7 +26,13 @@ export interface AcceptanceCheck {
  */
 export interface AcceptanceDelivery {
   candidateSha: string | null
-  pullRequest: { url: string; state: 'open' | 'draft' | 'merged' | 'closed'; title?: string | null } | null
+  pullRequest: { url: string; state: 'open' | 'draft' | 'merged' | 'closed'; title?: string | null; additions?: number; deletions?: number } | null
+  /** The PR's head → base branch. */
+  branch?: { head: string; base: string | null } | null
+  /** The person's connected GitHub login, the account a merge goes out as. */
+  mergeAs?: string | null
+  /** The candidate run's one-paragraph summary of its change. */
+  summary?: string | null
   repository: string | null
   previewUrl: string | null
   /** The Neon preview branch the run used, such as `preview/mik-48`. */
