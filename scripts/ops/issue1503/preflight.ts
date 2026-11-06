@@ -13,11 +13,13 @@ import { ownerWorkspaceListsChanged, workspaceListChanged } from '../../../lib/l
 const report: Record<string, any> = { issue: 1503, phase: 'preflight', startedAt: new Date().toISOString(), status: 'running' }
 let session: Awaited<ReturnType<typeof smokeSession>> | undefined
 try {
+  report.stage = 'normal_smoke_login'
   session = await smokeSession()
   report.smokeUserId = session.user.id
   report.productionBuild = (await session.json('/api/version')).build
   console.log(JSON.stringify({ phase: 'normal_smoke_sign_in', userId: report.smokeUserId, build: report.productionBuild }))
   const slug = 'issue-1503-factory-smoke-20261106'
+  report.stage = 'dedicated_workspace'
   const existing = await workspaceDb.select({ id: workspaces.id, userId: workspaces.userId, kind: workspaces.kind })
     .from(workspaces).where(eq(workspaces.slug, slug)).limit(1)
   if (existing[0] && (existing[0].userId !== SMOKE_ID || existing[0].kind !== 'team')) fail('fixture_workspace_mismatch')
@@ -41,11 +43,13 @@ try {
       await ownerWorkspaceListsChanged(tx, OWNER_ID, ['workspace_settings'])
     }
   })
+  report.stage = 'subscription_share'
   const before = await getSubscriptionShare(OWNER_ID, workspaceId)
   report.shareBefore = { shared: before.shared, allowOthers: before.allowOthers, allowed: before.allowed }
   if (!before.allowed) fail('fixture_share_policy_denied')
   const after = await setOwnSubscriptionShare(OWNER_ID, workspaceId, { shared: true, allowOthers: true })
   report.shareAfter = { shared: after.shared, allowOthers: after.allowOthers, allowed: after.allowed }
+  report.stage = 'numbered_team'
   const directory = await session.rpc('teams.loadTeamDirectory', [workspaceId])
   let team = directory.teams.find((item: any) => item.identifier === 'F1503')
   if (!team) team = (await session.rpc('teams.saveTeam', [{ workspaceId, name: 'Factory #1503 smoke', identifier: 'F1503', description: 'Issue #1503 production delivery acceptance; alexj11324/Mikka-handoff only.' }])).data
@@ -55,10 +59,12 @@ try {
   report.e2bConfigured = Boolean(e2b)
   report.e2bChanged = false
   if (!e2b || e2b.lastErrorCode) fail('smoke_e2b_unavailable')
+  report.stage = 'factory_catalog'
   const profiles = await session.json(`/api/factory/agent-profiles?workspaceId=${workspaceId}&location=cloud`)
   report.catalog = { keys: Object.keys(profiles.catalog ?? {}), models: (profiles.catalog?.models ?? []).filter((model: any) =>
     JSON.stringify(model).includes('claude-haiku-5-5') || JSON.stringify(model).includes('gpt-6-luna')) }
   report.existingProfiles = profiles.profiles?.map((profile: any) => ({ id: profile.id, version: profile.version, name: profile.definition?.name ?? profile.name }))
+  report.stage = 'github_read'
   const github = await session.json('/api/integrations/github')
   report.github = { connected: github.connected, viewerId: github.viewerId, login: github.login, githubAccountId: github.githubAccountId,
     handoffAccessible: github.repositories?.some((repo: any) => repo.fullName === 'alexj11324/Mikka-handoff') ?? false }
@@ -69,6 +75,8 @@ try {
   report.status = 'failed'
   report.code = error instanceof Error && /^issue1503_[a-z0-9_]+$/.test(error.message) ? error.message : 'issue1503_preflight_failed'
   report.errorType = error instanceof Error ? error.name : 'UnknownError'
+  const causeCode = (error as any)?.code ?? (error as any)?.cause?.code
+  if (typeof causeCode === 'string' && /^[a-zA-Z0-9_]{1,80}$/.test(causeCode)) report.causeCode = causeCode
   process.exitCode = 1
 } finally {
   if (session) await session.close().catch(() => undefined)

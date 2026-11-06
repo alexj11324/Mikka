@@ -43,7 +43,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /vercel
+          secret-path: /neon
           secret-name: DATABASE_URL
           recursive: false
           include-imports: false
