@@ -15,6 +15,12 @@ export const SETUP = Object.freeze({
   authorizationBodySha256: 'fe40b6d0490479f426f85dccc7c139e7f128cc6407c5331665053b677119943e',
   policyEmailSha256: '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3',
 })
+// Root verified the current workspace owner and selected the existing team.
+// The other current-owner team is the separately authorized issue 1506 fixture.
+export const TEAM_BINDING = Object.freeze({
+  ownerIdentityHash: '9fc5236d85a7528481f5fce2cc09d9a10df40cb884ff8a0f7ce1202d597f5d56',
+  teamWorkspaceHash: 'fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade',
+})
 const REPORT = 'production-once-team-setup-report/report.json'
 const sha = value => createHash('sha256').update(value).digest('hex')
 const normalizedEmail = value => typeof value === 'string' ? value.trim().toLowerCase() : ''
@@ -271,7 +277,11 @@ function newReport(env) {
     driverRunAttempt: Number(env.GITHUB_RUN_ATTEMPT) || null,
     authorization: { issue: 1515, comment: 6694934529, ownerConfirmed: false, ordinaryAcceptanceUsesSmokeOnly: true },
     applicationBefore: null, applicationAfter: null, phase: 'preflight',
-    team: { candidates: 0, selfAdminCandidates: 0, unique: false, hash: null, name: null,
+    team: { candidates: 0, selfAdminCandidates: 0, boundSelfAdminCandidates: 0,
+      ownerIdentityBindingVerified: false,
+      selectionBasis: 'verified-current-owner-and-team-hash',
+      rootEvidence: 'root-readonly-binding-and-owner-comment-1506-6694431207',
+      unique: false, hash: null, name: null,
       existingTeamContainsCurrentAlexAdmin: false, actorSnapshotEmailMatchesCanonical: null, staleSnapshot: false },
     membership: { alreadyActive: false, inviteAttempted: false, inviteResponseObserved: false, inviteOutcomeUnresolved: false,
       acceptAttempted: false, acceptResponseObserved: false, acceptReconciled: false, confirmed: false, pendingAfterUnknownInvite: false },
@@ -301,7 +311,7 @@ export async function preflightOneTimeTeamSetup({ env, event, fetchImpl = fetch,
   return report
 }
 
-export async function runOneTimeTeamSetup({ env, event, fetchImpl = fetch, now = Date.now }) {
+export async function runOneTimeTeamSetup({ env, event, fetchImpl = fetch, now = Date.now, teamBinding = TEAM_BINDING }) {
   const report = newReport(env), internal = { ...report, event }
   const api = clients({ env, fetchImpl, now, report: internal })
   const alex = { label: 'alex', jar: responseCookieJar(now), email: normalizedEmail(env.ACME_DEMO_EMAIL), password: env.ACME_DEMO_PASSWORD, attempted: false }
@@ -311,11 +321,15 @@ export async function runOneTimeTeamSetup({ env, event, fetchImpl = fetch, now =
     await api.preflight()
     report.authorization.ownerConfirmed = true
     report.applicationBefore = SETUP.applicationSha
+    check(teamBinding && /^[a-f0-9]{64}$/.test(teamBinding.ownerIdentityHash ?? '') &&
+      /^[a-f0-9]{64}$/.test(teamBinding.teamWorkspaceHash ?? ''), 'team_binding_invalid')
     check(sha(alex.email) === SETUP.policyEmailSha256 && isSmokeAccountEmail(smoke.email) && smoke.email !== alex.email &&
       typeof alex.password === 'string' && alex.password.length > 0 &&
       typeof smoke.password === 'string' && smoke.password.length > 0, 'credentials_rejected')
     report.phase = 'alex-session'
     await api.login(alex)
+    check(sha('workspace-owner\0' + alex.id) === teamBinding.ownerIdentityHash, 'owner_identity_mismatch')
+    report.team.ownerIdentityBindingVerified = true
     const initial = workspace(await api.app('/mikka/api/workspace', alex), alex)
     check(Array.isArray(initial.choices) && initial.choices.length <= 64, 'workspace_response_invalid')
     const teamIds = initial.choices.filter(item => item?.kind === 'team').map(item => item.id)
@@ -334,13 +348,15 @@ export async function runOneTimeTeamSetup({ env, event, fetchImpl = fetch, now =
     }
     report.team.selfAdminCandidates = matches.length
     report.team.existingTeamContainsCurrentAlexAdmin = matches.length > 0
-    check(matches.length > 0, 'team_selection_missing')
-    check(matches.length === 1, 'team_selection_ambiguous')
-    selected = matches[0].value
+    const bound = matches.filter(item => sha('team-workspace\0' + item.value.workspace.id) === teamBinding.teamWorkspaceHash)
+    report.team.boundSelfAdminCandidates = bound.length
+    check(bound.length > 0, 'bound_team_missing')
+    check(bound.length === 1, 'bound_team_ambiguous')
+    selected = bound[0].value
     targetId = selected.workspace.id
     report.team.unique = true
     report.team.hash = sha('team-workspace\0' + targetId)
-    report.team.actorSnapshotEmailMatchesCanonical = normalizedEmail(matches[0].admin.email) === alex.email
+    report.team.actorSnapshotEmailMatchesCanonical = normalizedEmail(bound[0].admin.email) === alex.email
     report.team.staleSnapshot = !report.team.actorSnapshotEmailMatchesCanonical
     check(!report.team.staleSnapshot, 'staleSnapshot')
     report.team.name = safeWorkspaceName(selected.workspace.name)

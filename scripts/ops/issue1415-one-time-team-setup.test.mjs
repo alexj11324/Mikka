@@ -13,6 +13,7 @@ const ALEX_ID = 'fixture-alex-user'
 const SMOKE_ID = 'fixture-smoke-user'
 const OTHER_ID = 'fixture-unrelated-user'
 const TEAM = '22222222-2222-4222-8222-222222222222'
+const OTHER_TEAM = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const PERSONAL_ALEX = '11111111-1111-4111-8111-111111111111'
 const PERSONAL_SMOKE = '33333333-3333-4333-8333-333333333333'
 const INVITATION = '44444444-4444-4444-8444-444444444444'
@@ -25,6 +26,7 @@ const NOW = Date.parse('2026-11-07T00:00:00.000Z')
 const AUTH_COOKIE = 'mikka-fixture-session'
 const SESSION = { alex: 'fixture-alex-session-canary', smoke: 'fixture-smoke-session-canary' }
 const HASH = value => createHash('sha256').update(value).digest('hex')
+const TEST_TEAM_BINDING = Object.freeze({ ownerIdentityHash: HASH('workspace-owner\0' + ALEX_ID), teamWorkspaceHash: HASH('team-workspace\0' + TEAM) })
 const WRITE_ACTIONS = new Set([
   'workspace.switchWorkspace', 'workspace.createWorkspaceInvitation', 'workspace.acceptWorkspaceInvitation',
   'personal-policy.updateSubscriptionShare', 'model-api-keys.updateApiKeyShare',
@@ -84,16 +86,17 @@ function fixture(options = {}) {
   ]
   function settings(label, id) {
     const user = person(label)
-    const team = id === TEAM
+    const team = id === TEAM || id === OTHER_TEAM
     return {
       currentUserId: user.id, currentUser: user,
       workspace: { id, kind: team ? 'team' : 'personal', name: team ? 'Fixture acceptance workspace' : 'Fixture personal workspace' },
       role: team && label === 'smoke' ? 'member' : 'admin',
-      members: team ? members() : [{ userId: user.id, email: user.email, role: 'admin', status: 'active' }],
+      members: team ? members().filter(member => id === TEAM || member.userId !== SMOKE_ID) : [{ userId: user.id, email: user.email, role: 'admin', status: 'active' }],
       invitations: team && label === 'alex' && state.pending
         ? [{ id: state.pendingId, email: SMOKE_EMAIL, role: 'member', status: 'pending', expiresAt: new Date(NOW + 86_400_000).toISOString() }] : [],
       choices: [
         { id: label === 'alex' ? PERSONAL_ALEX : PERSONAL_SMOKE, kind: 'personal', role: 'admin', name: 'Fixture personal workspace' },
+        ...(label === 'alex' && options.additionalAdminTeam ? [{ id: OTHER_TEAM, kind: 'team', role: 'admin', name: 'Fixture acceptance workspace' }] : []),
         ...((label === 'alex' || state.joined) ? [{ id: TEAM, kind: 'team', role: label === 'alex' ? 'admin' : 'member', name: 'Fixture acceptance workspace' }] : []),
       ],
     }
@@ -206,8 +209,9 @@ function fixture(options = {}) {
       }
       if (url.pathname === '/mikka/api/workspace') {
         assert.equal(method, 'GET')
-        assert.ok(url.search === '' || url.search === '?workspace=' + TEAM, 'only the listed team may be read')
-        const id = url.search ? TEAM : cookie.includes('mikka-workspace=' + TEAM) ? TEAM : label === 'alex' ? PERSONAL_ALEX : PERSONAL_SMOKE
+        const listedTeams = options.additionalAdminTeam ? [OTHER_TEAM, TEAM] : [TEAM]
+        assert.ok(url.search === '' || listedTeams.some(id => url.search === '?workspace=' + id), 'only listed teams may be read')
+        const id = url.search ? url.searchParams.get('workspace') : cookie.includes('mikka-workspace=' + TEAM) ? TEAM : label === 'alex' ? PERSONAL_ALEX : PERSONAL_SMOKE
         if (id === TEAM && label === 'smoke' && !state.joined) return response({ error: 'workspaceAccessDenied' }, { status: 403 })
         return response(settings(label, id))
       }
@@ -291,7 +295,7 @@ function fixture(options = {}) {
     }
   }
   async function run() {
-    const report = await runOneTimeTeamSetup({ env, event, fetchImpl, now: () => NOW })
+    const report = await runOneTimeTeamSetup({ env, event, fetchImpl, now: () => NOW, teamBinding: options.teamBinding ?? TEST_TEAM_BINDING })
     assert.deepEqual(state.failures, [], 'HTTP fixture contract violations must not be hidden by the runtime error projection')
     return report
   }
@@ -308,7 +312,7 @@ function clean(report, labels = ['smoke', 'alex']) {
 function privateValuesAbsent(report) {
   const serialized = JSON.stringify(report)
   for (const value of [
-    ALEX_EMAIL, SMOKE_EMAIL, ALEX_ID, SMOKE_ID, OTHER_ID, TEAM, INVITATION, KEY_A, KEY_B,
+    ALEX_EMAIL, SMOKE_EMAIL, ALEX_ID, SMOKE_ID, OTHER_ID, TEAM, OTHER_TEAM, INVITATION, KEY_A, KEY_B,
     INVITE_TOKEN, SESSION.alex, SESSION.smoke, 'fixture-github-token-canary',
     'fixture-alex-password-canary', 'fixture-smoke-password-canary', 'fixture-private-',
   ]) assert.equal(serialized.includes(value), false, 'a fixture private value appeared in the public report')
@@ -320,7 +324,7 @@ function privateValuesAbsent(report) {
   assert.equal(report.automaticMutationRetries, 0)
 }
 
-test('real context, unchanged Owner authorization, and separate account identity gate authentication', async () => {
+test('real context, unchanged Owner authorization, and bound identities gate setup writes', async () => {
   const wrongContext = fixture({ env: { GITHUB_RUN_ATTEMPT: '2' } })
   assert.equal((await wrongContext.run()).code, 'context_rejected')
   assert.equal(wrongContext.state.requests.length, 0)
@@ -331,6 +335,24 @@ test('real context, unchanged Owner authorization, and separate account identity
   assert.equal((await sameActor.run()).code, 'credentials_rejected')
   assert.deepEqual(sameActor.state.logins, [])
   assert.equal(sameActor.writes().length, 0)
+  const wrongOwner = fixture({ teamBinding: { ...TEST_TEAM_BINDING, ownerIdentityHash: '0'.repeat(64) } })
+  const rejectedOwner = await wrongOwner.run()
+  assert.equal(rejectedOwner.code, 'owner_identity_mismatch')
+  assert.deepEqual(wrongOwner.state.logins, ['alex'])
+  assert.equal(wrongOwner.writes().length, 0)
+  clean(rejectedOwner, ['alex'])
+  privateValuesAbsent(rejectedOwner)
+  const wrongTeam = fixture({ additionalAdminTeam: true,
+    teamBinding: { ...TEST_TEAM_BINDING, teamWorkspaceHash: HASH('team-workspace\0' + PERSONAL_SMOKE) } })
+  const rejectedTeam = await wrongTeam.run()
+  assert.equal(rejectedTeam.code, 'bound_team_missing')
+  assert.equal(rejectedTeam.team.selfAdminCandidates, 2)
+  assert.equal(rejectedTeam.team.boundSelfAdminCandidates, 0)
+  assert.equal(wrongTeam.state.requests.filter(request => request.path.startsWith('/mikka/api/workspace?workspace=')).length, 2)
+  assert.deepEqual(wrongTeam.state.logins, ['alex'])
+  assert.equal(wrongTeam.writes().length, 0)
+  clean(rejectedTeam, ['alex'])
+  privateValuesAbsent(rejectedTeam)
 })
 
 test('stale current-user member snapshot or disabled team policy causes zero setup mutations', async () => {
@@ -349,7 +371,7 @@ test('stale current-user member snapshot or disabled team policy causes zero set
 })
 
 test('normal one-time join and sharing use separate server-issued cookie jars and preserve existing sharing', async () => {
-  const f = fixture(), report = await f.run()
+  const f = fixture({ additionalAdminTeam: true }), report = await f.run()
   assert.equal(report.status, 'passed')
   assert.equal(report.code, null)
   assert.equal(report.membership.inviteAttempted, true)
@@ -358,6 +380,14 @@ test('normal one-time join and sharing use separate server-issued cookie jars an
   assert.equal(report.membershipAndSharesCompleted, true)
   assert.equal(report.setupCompleted, true)
   assert.equal(report.team.hash, HASH('team-workspace\0' + TEAM))
+  assert.equal(report.team.candidates, 2)
+  assert.equal(report.team.selfAdminCandidates, 2)
+  assert.equal(report.team.boundSelfAdminCandidates, 1)
+  assert.equal(report.team.ownerIdentityBindingVerified, true)
+  assert.equal(report.team.selectionBasis, 'verified-current-owner-and-team-hash')
+  assert.equal(report.team.rootEvidence, 'root-readonly-binding-and-owner-comment-1506-6694431207')
+  assert.deepEqual(f.state.requests.filter(request => request.path.startsWith('/mikka/api/workspace?workspace=')).slice(0, 2).map(request => request.path),
+    ['/mikka/api/workspace?workspace=' + OTHER_TEAM, '/mikka/api/workspace?workspace=' + TEAM])
   assert.equal(f.count('workspace.createWorkspaceInvitation'), 1)
   assert.equal(f.count('workspace.acceptWorkspaceInvitation'), 1)
   assert.equal(f.count('personal-policy.updateSubscriptionShare'), 1)
