@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process'
 import { Agent } from 'node:http'
-import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -28,15 +27,23 @@ export function developmentOptions(args = [], env = process.env) {
   return { port: Number(port), host, origin: `http://${browserHost}:${Number(port)}` }
 }
 
-export async function tracingEntry({ directory, originalEntry, tracing }) {
-  if (typeof originalEntry !== 'string' || !originalEntry) throw new Error('API_DEV_RUNTIME_ENTRY_MISSING')
-  await mkdir(directory, { recursive: true })
-  await writeFile(join(directory, 'tracing.mjs'), tracing)
-  const entry = join(directory, 'entry.mjs')
-  // Every Nitro worker, including hot replacements, loads tracing before its
-  // dynamic application graph. A plugin runs too late for pg instrumentation.
-  await writeFile(entry, `import "./tracing.mjs"\nconst application = await import(${JSON.stringify(originalEntry)})\nexport default application.default\n`)
-  return entry
+export function developmentTracing(nitro, tracing) {
+  const config = nitro.options.rolldownConfig ?? {}
+  nitro.options.rolldownConfig = {
+    ...config,
+    output: { ...config.output, entryFileNames: 'mikka-application.mjs' },
+    plugins: [...config.plugins ?? [], {
+      name: 'mikka-development-tracing',
+      generateBundle() {
+        // These final assets must not enter the application bundling graph:
+        // Rolldown can hoist external pg imports ahead of an in-graph wrapper.
+        // Every worker, including hot replacements, loads the finished entry.
+        this.emitFile({ type: 'asset', fileName: 'mikka-tracing.mjs', source: tracing })
+        this.emitFile({ type: 'asset', fileName: 'index.mjs', source:
+          'import "./mikka-tracing.mjs"\nconst application = await import("./mikka-application.mjs")\nexport default application.default\n' })
+      },
+    }],
+  }
 }
 
 const startupFailure = code => Object.assign(new Error(code), { code })
@@ -139,7 +146,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     // Config merging appends arrays; explicitly remove production public assets
     // so a clean development checkout needs no previous frontend build.
     nitro.options.publicAssets = []
-    nitro.options.entry = await tracingEntry({ directory, originalEntry: nitro.options.entry, tracing: await compileTracing(root) })
+    developmentTracing(nitro, await compileTracing(root))
     const api = createDevServer(nitro)
     workerReady = developmentWorkerReady(api)
     const compiled = Promise.withResolvers()

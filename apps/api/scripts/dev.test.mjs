@@ -1,15 +1,9 @@
 import assert from 'node:assert/strict'
-import { execFile } from 'node:child_process'
 import { Agent } from 'node:http'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-import { promisify } from 'node:util'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
-import { build } from 'esbuild'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, tracingEntry } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -94,20 +88,6 @@ test('HEAD does not transform a document; unknown APIs/assets and writes never g
   assert.equal(write.status, 405)
   assert.equal(write.headers.get('allow'), 'GET, HEAD')
 })
-
-test('the bundled worker entry executes tracing before loading its dynamic runtime graph', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'mikka-dev-tracing-'))
-  try {
-    const runtime = join(directory, 'runtime.mjs')
-    await writeFile(runtime, 'if (globalThis.__tracingBeforeRuntime !== true) throw new Error("TRACING_TOO_LATE"); console.log("tracing-first"); export default {fetch(){return new Response("ok")}}\n')
-    const entry = await tracingEntry({ directory, originalEntry: runtime, tracing: 'globalThis.__tracingBeforeRuntime = true;\n' })
-    const output = join(directory, 'compiled.mjs')
-    await build({ entryPoints: [entry], outfile: output, bundle: true, platform: 'node', format: 'esm', target: 'node24', logLevel: 'silent' })
-    const { stdout } = await promisify(execFile)(process.execPath, [output], { timeout: 10_000 })
-    assert.equal(stdout.trim(), 'tracing-first')
-  } finally { await rm(directory, { recursive: true, force: true }) }
-})
-
 
 function workerMessages() {
   const listeners = new Set()
