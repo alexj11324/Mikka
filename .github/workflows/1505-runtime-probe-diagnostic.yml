@@ -1,0 +1,47 @@
+name: Issue 1505 exact candidate recovery and anonymous probe
+on:
+  push:
+    branches: [ops/1505-runtime-diagnostic]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m venv "$RUNNER_TEMP/e2b"
+          "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - id: key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Probe only the exact failed desktop candidate and recover its release images
+        timeout-minutes: 5
+        run: '"$RUNNER_TEMP/e2b/bin/python" scripts/e2b/runtime-probe-diagnostic.py --output "$RUNNER_TEMP/runtime-probe-diagnostic.json"'
+      - name: Close owned diagnostic resources after any outcome
+        if: always() && steps.key.outcome == 'success'
+        timeout-minutes: 5
+        run: '"$RUNNER_TEMP/e2b/bin/python" scripts/e2b/runtime-probe-diagnostic.py --cleanup-only --output "$RUNNER_TEMP/runtime-probe-cleanup.json"'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: e2b-exact-candidate-diagnostic
+          path: |
+            ${{ runner.temp }}/runtime-probe-diagnostic.json
+            ${{ runner.temp }}/runtime-probe-cleanup.json
+          if-no-files-found: error
+          retention-days: 7
