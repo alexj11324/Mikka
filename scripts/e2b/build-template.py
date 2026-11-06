@@ -48,6 +48,10 @@ KINDS = {
     'claude': {'base': 'claude', 'harnesses': ()},
     'codex': {'base': 'codex', 'harnesses': ()},
 }
+ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
+                          "read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && "
+                          "kill -0 \"$mikka_preloaded_pid\" && "
+                          "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
 
 NPM_RUNTIME_CHECK = r'''export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
 node --input-type=module <<'JS'
@@ -296,7 +300,7 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
                     .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='user')
                     .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
-        ready = ('test -s /home/user/.mikka/preloaded.pid && '
+        ready = (ANONYMOUS_WORKER_READY + ' && '
                  'test ! -e /home/user/.mikka/bootstrap.json && '
                  'test ! -e /home/user/.mikka/worker/device.json')
         if kind == 'desktop':
@@ -434,7 +438,7 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         stage('preload_receipts')
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
-        result = sandbox.commands.run(f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+        result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
                                       user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')

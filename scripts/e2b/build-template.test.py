@@ -135,6 +135,8 @@ class Publish(unittest.TestCase):
             self.assertIn(' '.join(['a' * 40, 'b' * 40, kind]), commands[install])
             self.assertFalse(any('apt-get' in command or 'ln -sf' in command or 'systemctl' in command for command in commands))
             self.assertEqual(called['start'], 'bash /opt/mikka/start-prebuilt.sh')
+            self.assertIn('kill -0 "$mikka_preloaded_pid"', called['ready'])
+            self.assertIn("grep -Fxq -- '--wait-bootstrap'", called['ready'])
             self.assertIn('test ! -e /home/user/.mikka/bootstrap.json', called['ready'])
             self.assertIn('test ! -e /home/user/.mikka/worker/device.json', called['ready'])
             if kind == 'desktop': self.assertIn('test ! -e /run/mikka-viewer/key', called['ready'])
