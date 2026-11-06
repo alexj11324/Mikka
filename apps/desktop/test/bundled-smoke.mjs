@@ -8,6 +8,7 @@ import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { observeAccountRelease } from './account-release-observer.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { nativeCleanupFailure, recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
@@ -32,11 +33,13 @@ let application
 let browser
 let scope
 let nativeResources
+let releaseObserver
 let passed = false
 let failure
 
 try {
   scope = await acquireTestAccounts({ runId: `desktop-${started}`, workerId: 'bundled-smoke', requestId: `desktop-${started}`, ttlMs: 300_000 })
+  releaseObserver = await observeAccountRelease(scope)
   nativeResources = await captureNativeResources(scope)
   application = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
@@ -153,6 +156,8 @@ try {
     try { evidence.nativeCleanup = await cleanup('native-resources', () => nativeResources.cleanup({ drained: true })) } catch (error) { failedCleanup(error) }
   }
   if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(failedCleanup)
+  evidence.accountObservation = releaseObserver?.read() ?? { observed: false }
+  releaseObserver?.restore()
   if (cleanupErrors.length) failure = new AggregateError([...(failure ? [failure] : []), ...cleanupErrors], 'DESKTOP_SMOKE_CLEANUP_FAILED')
   if (failure) evidence.failure = nativeCleanupFailure(failure)
   evidence.finishedAt = new Date().toISOString()

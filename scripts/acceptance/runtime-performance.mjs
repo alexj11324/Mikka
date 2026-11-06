@@ -4,13 +4,14 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
-import { access, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, lstat, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { arch, cpus, freemem, hostname, platform, release, totalmem } from 'node:os'
 import { isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stripVTControlCharacters } from 'node:util'
+import { processTree, stopTree } from './owned-process-tree.mjs'
 
 export const component = 'components/blocks/auth-19/components/auth.tsx'
 export const documentPath = '/mikka/sign-in?login=1'
@@ -156,40 +157,7 @@ export async function preflight(config) {
   return { targets, env, chromium: require('@playwright/test').chromium }
 }
 
-async function processGroup(group) {
-  const members = []
-  await Promise.all((await readdir('/proc')).filter(name => /^\d+$/.test(name)).map(async name => {
-    try {
-      const line = await readFile(`/proc/${name}/stat`, 'utf8')
-      const fields = line.slice(line.lastIndexOf(')') + 2).trim().split(/\s+/)
-      if (Number(fields[2]) !== group || Number(fields[3]) !== group || fields[0] === 'Z') return
-      const status = await readFile(`/proc/${name}/status`, 'utf8')
-      const rss = /^VmRSS:\s+(\d+)\s+kB$/m.exec(status)
-      members.push({ pid: Number(name), startTicks: fields[19], rssBytes: rss ? Number(rss[1]) * 1024 : 0 })
-    } catch (error) { if (!['ENOENT', 'ESRCH'].includes(error.code)) throw error }
-  }))
-  return members
-}
 
-async function stopGroup(child, leaderStart) {
-  if (!child?.pid) return { stopped: true, forced: false }
-  let members = await processGroup(child.pid)
-  if (!members.length) return { stopped: true, forced: false }
-  const leader = members.find(member => member.pid === child.pid)
-  assert.ok(!leader || !leaderStart || leader.startTicks === leaderStart, 'Refusing a reused process-group leader')
-  try { process.kill(-child.pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
-  const waitGone = async timeout => {
-    const deadline = performance.now() + timeout
-    do { members = await processGroup(child.pid); if (!members.length) return true; await new Promise(resolve => setTimeout(resolve, 100)) } while (performance.now() < deadline)
-    return false
-  }
-  if (await waitGone(30_000)) return { stopped: true, forced: false }
-  const current = members.find(member => member.pid === child.pid)
-  assert.ok(!current || !leaderStart || current.startTicks === leaderStart, 'Refusing a reused process-group leader')
-  try { process.kill(-child.pid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') throw error }
-  assert.ok(await waitGone(5_000), 'Owned development process group did not stop')
-  return { stopped: true, forced: true }
-}
 
 async function freePort(origin) {
   const url = new URL(origin), server = createServer()
@@ -199,6 +167,8 @@ async function freePort(origin) {
 
 async function coldAndHot({ target, iteration, browser, output, env, redact, signal, save }) {
   const result = { kind: target.kind, iteration, revision: target.revision, status: 'running', stage: 'preflight', startedAt: new Date().toISOString(), sourceSha256: target.sourceSha256, rssSamples: [] }
+  const receiptPath = join(output, target.kind + '-' + iteration + '-descendants.json')
+  const supervisor = fileURLToPath(new URL('./owned-process-supervisor.py', import.meta.url))
   let child, context, sampler, busy = false, leaderStart, edited, log
   const sourceRestored = async () => {
     const current = await readFile(target.source)
@@ -235,7 +205,7 @@ async function coldAndHot({ target, iteration, browser, output, env, redact, sig
     result.stage = 'cold'
     const start = performance.now()
     const remaining = () => Math.max(1, 180_000 - elapsed(start))
-    child = spawn(target.command[0], target.command.slice(1), { cwd: target.root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: {
+    child = spawn('/usr/bin/python3', [supervisor, receiptPath, ...target.command], { cwd: target.root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: {
       PATH: process.env.PATH, HOME: process.env.HOME, LANG: 'C.UTF-8', ...env,
       NODE_ENV: 'development', BETTER_AUTH_URL: target.origin, PORT: new URL(target.origin).port,
       VERCEL_GIT_COMMIT_SHA: target.revision, MIKKA_DEV_SKIP_ENV_FILES: '1',
@@ -248,7 +218,7 @@ async function coldAndHot({ target, iteration, browser, output, env, redact, sig
       if (busy || !child.pid) return
       busy = true
       try {
-        const members = await processGroup(child.pid)
+        const members = await processTree(child.pid)
         leaderStart ??= members.find(member => member.pid === child.pid)?.startTicks
         result.rssSamples.push({ atMs: elapsed(start), bytes: members.reduce((sum, member) => sum + member.rssBytes, 0), processes: members.length })
       } finally { busy = false }
@@ -325,7 +295,7 @@ async function coldAndHot({ target, iteration, browser, output, env, redact, sig
     result.cleanup = {}
     try { result.cleanup.sourceRestored = await sourceRestored() } catch (error) { result.cleanup.sourceFailure = safeError(error, redact) }
     try { await bounded(context?.close(), 10_000, 'BROWSER_CONTEXT_CLOSE_TIMEOUT'); result.cleanup.contextClosed = true } catch (error) { result.cleanup.contextFailure = safeError(error, redact) }
-    try { result.cleanup.process = await stopGroup(child, leaderStart) } catch (error) { result.cleanup.processFailure = safeError(error, redact) }
+    try { result.cleanup.process = await stopTree(child, leaderStart, receiptPath) } catch (error) { result.cleanup.processFailure = safeError(error, redact) }
     if (log) await new Promise(resolve => log.end(resolve))
     if (!result.cleanup.sourceRestored || !result.cleanup.contextClosed || !result.cleanup.process?.stopped || result.cleanup.process.forced) result.status = 'failed'
     result.finishedAt = new Date().toISOString()
@@ -341,7 +311,7 @@ export async function run(config, { check = false } = {}) {
   await mkdir(output, { recursive: false, mode: 0o700 })
   const redact = redactor(Object.values(env))
   const report = { version: 1, status: 'running', scriptSha256: sha256(await readFile(fileURLToPath(import.meta.url))), startedAt: new Date().toISOString(), documentPath, component,
-    method: { repetitions: 3, order: 'alternating-next-vite', cold: 'fresh process, fresh browser context, explicit compiler caches removed; OS page cache remains', hmr: 'one data attribute on the byte-identical existing React auth main', rss: 'sum of owned Linux process-group RSS sampled every 250 ms; browser excluded', serverTimeoutMs: 180000, hmrTimeoutMs: 45000, sandbox: true },
+    method: { repetitions: 3, order: 'alternating-next-vite', cold: 'fresh process, fresh browser context, explicit compiler caches removed; OS page cache remains', hmr: 'one data attribute on the byte-identical existing React auth main', rss: 'sum of the full owned Linux descendant-tree RSS sampled every 250 ms, including the dedicated Python subreaper; browser excluded; sampled maxima are not kernel peak RSS', serverTimeoutMs: 180000, hmrTimeoutMs: 45000, sandbox: true },
     host: { hostname: hostname(), platform: platform(), arch: arch(), release: release(), cpus: cpus().length, memoryBytes: totalmem(), freeMemoryBeforeBytes: freemem(), node: process.version },
     browser: { ...config.browser }, targets: targets.map(({ kind, revision, root, command, cachePaths, sourceSha256, versions, origin }) => ({ kind, revision, root, command, cachePaths, sourceSha256, versions, origin })), samples: [] }
   const save = async result => { if (!report.samples.includes(result)) report.samples.push(result); await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 }) }
