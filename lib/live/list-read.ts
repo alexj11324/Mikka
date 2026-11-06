@@ -1,5 +1,6 @@
 import { LIVE_ID } from './events'
 import { botKeys, issueKeys } from '@/lib/swr/keys'
+import type { PresenceProof } from './presence'
 
 export type ListLiveRead = {
   ownerId: string
@@ -8,6 +9,9 @@ export type ListLiveRead = {
   deadline?: { at: string; afterMs: number }
   /** Live keys' revisions, read before this list (lib/live/revisions.ts). */
   revisions?: Record<string, number>
+  /** A device-dependent read needs an acknowledged watch before its presence
+   * fallback can stop. Null explicitly retains it; absent means no dependency. */
+  presence?: PresenceProof | null
 }
 export type ObservedList = { live?: ListLiveRead; requestedAt?: number }
 
