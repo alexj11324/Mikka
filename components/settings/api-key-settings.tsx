@@ -97,7 +97,7 @@ export function useApiKeyList(workspaceId: string) {
     } catch { setFailed({ message: actionError(), retry: () => void remove(key) }) } finally { setPending(false); setRemoving(null) }
   }
 
-  const modelsSource = (key: Key): EnabledModelsSource => ({ id: key.id, kind: 'api_key', title: `${title(key)} · ••••${key.last4}`, models: key.models, invalid: key.modelsError === 'invalid', onRefresh: () => void refetch(key) })
+  const modelsSource = (key: Key): EnabledModelsSource => ({ id: key.id, kind: 'api_key', title: `${title(key)} · ••••${key.last4}`, models: key.models, invalid: key.modelsError === 'invalid', onRefresh: () => void refetch(key), onReplaceKey: () => { setModelsOpen(null); setAdding(true) } })
   const modelsLine = (key: Key) => {
     const refetchButton = <Button type="button" variant="secondary" size="xs" disabled={pending} aria-label={t('refetchLabel', { name: title(key) })} onClick={() => void refetch(key)}>{t('refetch')}</Button>
     if (key.modelsError) return <span role="status" className="flex flex-wrap items-center gap-2 text-xs text-warning-foreground">

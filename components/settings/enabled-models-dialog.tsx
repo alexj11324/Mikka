@@ -50,7 +50,6 @@ export function EnabledModelsDialog({ source, onClose }: { source: EnabledModels
     else groups.push({ family, models: [model] })
   }
   const all = enabled.length === source.models.length
-  const some = enabled.length > 0 && !all
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
     <DialogContent className="gap-4 sm:max-w-md" data-slot="enabled-models-dialog">
       <DialogHeader><DialogTitle className="truncate">{source.title}</DialogTitle></DialogHeader>
@@ -68,7 +67,7 @@ export function EnabledModelsDialog({ source, onClose }: { source: EnabledModels
           </div>
           <div className={cn('flex max-h-[min(60vh,32rem)] flex-col overflow-y-auto rounded-xl border border-border', source.invalid && 'opacity-60')}>
             <Label className="flex items-center gap-2.5 border-b border-border px-3 py-2.5 font-medium">
-              <Checkbox checked={all} indeterminate={some} disabled={source.invalid} onCheckedChange={checked => store.setAll(source.id, source.models, checked === true)} />
+              <Checkbox checked={all} disabled={source.invalid} onCheckedChange={checked => store.setAll(source.id, source.models, checked === true)} />
               {t('all')}
               <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">{enabled.length}/{source.models.length}</span>
             </Label>

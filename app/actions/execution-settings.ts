@@ -44,7 +44,8 @@ async function designFixtureMenu(menu: BotModelMenu, ownerId: string): Promise<B
   const { rows } = await pool.query<{ id: string; provider: "claude" | "codex"; accountLabel: string | null; models: unknown }>(
     `SELECT id::text AS id, provider, "accountLabel", "modelCatalog"->'models' AS models FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND NOT paused AND "removedAt" IS NULL ORDER BY provider`, [ownerId]);
   const groups = rows.map((row) => ({ kind: "subscription" as const, provider: row.provider, plan: row.provider === "codex" ? "Plus" : "Max", credentialLabel: row.accountLabel ?? "", options: (Array.isArray(row.models) ? row.models.map(String) : []).map((model) => ({ id: `fixture:${row.id}:${model}`, modelId: model, provider: row.provider })) }));
-  const first = groups[0]?.options[0];
+  const { rows: order } = await pool.query<{ model: string }>(`SELECT model FROM model_order_entries WHERE "ownerId"=$1 ORDER BY position LIMIT 1`, [ownerId]);
+  const first = groups.flatMap((group) => group.options).find((option) => option.modelId === order[0]?.model) ?? groups[0]?.options[0];
   return { ...menu, groups: [...groups, ...menu.groups], ...(first ? { current: { ...menu.current, id: first.id, modelId: first.modelId, provider: first.provider, chosen: true, available: true, availability: "available", kind: "subscription" } } : {}) } as BotModelMenu;
 }
 /** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
