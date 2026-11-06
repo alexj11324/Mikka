@@ -1,10 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 import { createHash } from "node:crypto"
-import { ROOT_CONTEXT, SpanStatusCode, createContextKey, isSpanContextValid, trace, type Attributes, type AttributeValue, type Context, type Span } from "@opentelemetry/api"
+import { ROOT_CONTEXT, SpanStatusCode, isSpanContextValid, trace, type Attributes, type AttributeValue, type Context, type Span } from "@opentelemetry/api"
 import { ExportResultCode, W3CTraceContextPropagator, type ExportResult } from "@opentelemetry/core"
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto"
 import { resourceFromAttributes } from "@opentelemetry/resources"
-import { BasicTracerProvider, BatchSpanProcessor, ParentBasedSampler, SamplingDecision, TraceIdRatioBasedSampler, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
+import { BasicTracerProvider, BatchSpanProcessor, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
 import type { LoggerProvider, LogRecordExporter } from "@opentelemetry/sdk-logs"
 import type { DeviceRegistered } from "@mikka/protocol/device"
 import { HARNESSES, type Harness } from "@mikka/protocol/harness"
@@ -12,6 +12,7 @@ import { safeErrorAttributes, scrubLocalString } from "@mikka/protocol/tracing"
 import { TRACE_FIELDS, runTraceHeaders, sanitizeTraceContext, telemetryId, traceAttributes, type RunTraceContext } from "@mikka/protocol/trace-context"
 import { createLogProvider, StageLogProcessor } from "./tracing-logs"
 import { AI_NUMBERS, createAiSink, generationAttributes, generationEvent, modelLabel, type AiSink, type GenerationMetrics } from "./tracing-ai"
+import { DaemonRetainingSpanProcessor, DaemonSampler, RETENTIONS, RUN_CONTEXT, sampleRate, spanSamplingAttributes } from "./tracing-sampling"
 
 // Traces of the daemon's own operations (docs/operations/tracing.md, "Daemon"):
 // runs, their start-up stages, the gateway connection, tool approval and each
@@ -74,6 +75,7 @@ const ALLOWED = new Set([
   "mikka.error.code", "mikka.error.detail", "mikka.gateway.mode",
   "error.type", "http.request.method", "http.response.status_code", "url.path",
   "mikka.error.causes", "mikka.stage", "mikka.duration_ms", "mikka.status",
+  "mikka.trace.sample_rate", "mikka.trace.critical", "mikka.trace.retention",
   ...Object.values(TRACE_FIELDS),
   ...Object.values(AI_NUMBERS).map(([attribute]) => attribute),
   "mikka.ai.provider", "mikka.ai.model", "mikka.ai.operation",
@@ -104,7 +106,10 @@ export function cleanAttributes(attributes: Attributes): Attributes {
   const clean: Attributes = {}
   for (const [key, value] of Object.entries(attributes)) {
     if (!ALLOWED.has(key)) continue
-    if (ID_ATTRIBUTES.has(key)) { if (telemetryId(value)) clean[key] = value }
+    if (key === "mikka.trace.sample_rate") { const rate = sampleRate(value); if (rate !== undefined) clean[key] = rate }
+    else if (key === "mikka.trace.critical") { if (typeof value === "boolean") clean[key] = value }
+    else if (key === "mikka.trace.retention") { if (typeof value === "string" && RETENTIONS.has(value)) clean[key] = value }
+    else if (ID_ATTRIBUTES.has(key)) { if (telemetryId(value)) clean[key] = value }
     else if (key === "mikka.ai.model") { const model = modelLabel(value); if (model) clean[key] = model }
     else if (typeof value === "string") clean[key] = scrubLocalString(value)
     else if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) clean[key] = value
@@ -151,7 +156,6 @@ export class SafeExporter implements SpanExporter {
 const propagator = new W3CTraceContextPropagator()
 const setter = { set(carrier: Record<string, string>, key: string, value: string) { carrier[key] = value } }
 const getter = { get: (carrier: Record<string, string>, key: string) => carrier[key], keys: (carrier: Record<string, string>) => Object.keys(carrier) }
-const RUN_CONTEXT = createContextKey("mikka.daemon.run")
 
 export class DaemonTracer {
   private provider: BasicTracerProvider | null = null
@@ -169,7 +173,6 @@ export class DaemonTracer {
       const rate = daemonSampleRate(settings, env)
       if (rate <= 0) return false
       const inner = exporter ?? new OTLPTraceExporter({ url: settings.endpoint, headers: { Authorization: `Bearer ${settings.projectToken}` }, timeoutMillis: 5_000 })
-      const ratio = new TraceIdRatioBasedSampler(rate)
       const environment = settings.environment ?? "production"
       const resource = resourceFromAttributes({
         "service.name": SERVICE_NAME,
@@ -181,16 +184,11 @@ export class DaemonTracer {
       this.ai = aiSink === undefined ? createAiSink(settings.endpoint, settings.projectToken) : aiSink
       this.provider = new BasicTracerProvider({
         resource,
-        // Current server carriers already retain critical runs. Legacy or
-        // locally initiated runs must be complete too; ordinary background
-        // traffic keeps the configured ratio. A zero rate still disables setup.
-        sampler: new ParentBasedSampler({ root: {
-          shouldSample: (parent, id, name) => /^daemon\.(?:run(?:\.|$)|adapter\.|registration$|bootstrap(?:\.|$))/.test(name)
-            ? { decision: SamplingDecision.RECORD_AND_SAMPLED } : ratio.shouldSample(parent, id),
-          toString: () => 'MikkaDaemonCriticalRootSampler',
-        } }),
-        spanProcessors: [new BatchSpanProcessor(new SafeExporter(inner), { maxQueueSize: 512, maxExportBatchSize: 256, scheduledDelayMillis: 10_000, exportTimeoutMillis: 10_000 }),
-          new StageLogProcessor(this.logProvider.getLogger("mikka.daemon"), cleanAttributes)],
+        sampler: new DaemonSampler(rate),
+        spanProcessors: [new DaemonRetainingSpanProcessor([
+          new BatchSpanProcessor(new SafeExporter(inner), { maxQueueSize: 512, maxExportBatchSize: 256, scheduledDelayMillis: 10_000, exportTimeoutMillis: 10_000 }),
+          new StageLogProcessor(this.logProvider.getLogger("mikka.daemon"), cleanAttributes),
+        ])],
       })
     } catch {
       this.provider = null
@@ -264,8 +262,12 @@ export class DaemonTracer {
       const incoming = sanitizeTraceContext(traceContext)
       if (incoming) scope = propagator.extract(ROOT_CONTEXT, { traceparent: incoming.traceparent }, getter).setValue(RUN_CONTEXT, incoming)
       if (provider) {
-        span = provider.getTracer("mikka.daemon").startSpan(name, { ...(startedAt === undefined ? {} : { startTime: new Date(startedAt) }), attributes: cleanAttributes({ "mikka.client_kind": "daemon",
-          ...traceAttributes(scope.getValue(RUN_CONTEXT) as RunTraceContext | undefined), ...definedAttributes(attributes) }) }, scope)
+        const initial = cleanAttributes({ "mikka.client_kind": "daemon",
+          ...traceAttributes(scope.getValue(RUN_CONTEXT) as RunTraceContext | undefined), ...definedAttributes(attributes) })
+        // Sampling metadata comes from the sampler's actual decision, never an
+        // operation's arbitrary attributes. The carrier lives in the context.
+        for (const key of Object.keys(initial)) if (key.startsWith("mikka.trace.")) delete initial[key]
+        span = provider.getTracer("mikka.daemon").startSpan(name, { ...(startedAt === undefined ? {} : { startTime: new Date(startedAt) }), attributes: initial }, scope)
         scope = trace.setSpan(scope, span)
         const metadata = { ...(scope.getValue(RUN_CONTEXT) as RunTraceContext | undefined) }
         for (const [field, key] of Object.entries(TRACE_FIELDS)) {
@@ -273,6 +275,7 @@ export class DaemonTracer {
           if (telemetryId(value)) Object.assign(metadata, { [field]: value })
         }
         const parent = span.spanContext()
+        metadata.sampleRate = sampleRate(spanSamplingAttributes(span)?.["mikka.trace.sample_rate"]) ?? sampleRate(metadata.sampleRate)
         scope = scope.setValue(RUN_CONTEXT, sanitizeTraceContext({ ...metadata,
           traceparent: `00-${parent.traceId}-${parent.spanId}-${parent.traceFlags.toString(16).padStart(2, "0")}` }))
       }
@@ -298,6 +301,8 @@ export class DaemonTracer {
       const active = this.scope.getStore(), span = active && trace.getSpanContext(active)
       if (!span || !isSpanContextValid(span)) return undefined
       return sanitizeTraceContext({ ...(active?.getValue(RUN_CONTEXT) as RunTraceContext | undefined),
+        sampleRate: sampleRate(spanSamplingAttributes(trace.getSpan(active!))?.["mikka.trace.sample_rate"])
+          ?? sampleRate((active?.getValue(RUN_CONTEXT) as RunTraceContext | undefined)?.sampleRate),
         traceparent: `00-${span.traceId}-${span.spanId}-${span.traceFlags.toString(16).padStart(2, "0")}` })
     } catch { return undefined }
   }
@@ -373,7 +378,7 @@ const NOOP: SpanHandle = { set() {}, fail() {} }
 
 function handleFor(span: Span): SpanHandle {
   return {
-    set(key, value) { try { if (value !== undefined) span.setAttribute(key, value) } catch { /* ignored */ } },
+    set(key, value) { try { if (value !== undefined && !key.startsWith("mikka.trace.")) span.setAttribute(key, value) } catch { /* ignored */ } },
     fail(error, outcome = "error") {
       try {
         span.setAttributes({ ...safeErrorAttributes(error), "mikka.outcome": outcome })

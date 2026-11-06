@@ -21,6 +21,7 @@ describe("daemon tracing", () => {
     await tracer.span('daemon.run', { 'mikka.run_id': 'legacy_run' }, () => tracer.span('POST /v1/runs/[id]/complete', {}, async () => {}), { root: true })
     await tracer.flush()
     expect(spans.getFinishedSpans().map(span => span.name).sort()).toEqual(['POST /v1/runs/[id]/complete', 'daemon.registration', 'daemon.run'])
+    expect(spans.getFinishedSpans().every(span => span.attributes['mikka.trace.sample_rate'] === 1 && span.attributes['mikka.trace.critical'] === true)).toBe(true)
     await tracer.shutdown()
   })
 
@@ -29,13 +30,14 @@ describe("daemon tracing", () => {
     const events: NonNullable<ReturnType<typeof generationEvent>>[] = []
     const carrier: RunTraceContext = { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
       runId: 'e8c2ff88-b000-4000-8000-000000000001', threadId: 'e8c2ff88-b000-4000-8000-000000000002',
-      taskId: 'e8c2ff88-b000-4000-8000-000000000003', workflowRunId: 'wfr_run123', posthogDistinctId: 'user_123', sessionId: 'browser_session123' }
+      taskId: 'e8c2ff88-b000-4000-8000-000000000003', workflowRunId: 'wfr_run123', posthogDistinctId: 'user_123', sessionId: 'browser_session123', sampleRate: 1 }
     daemonTracer.configure(settings, { exporter: spans, logExporter: logs, env: {}, aiSink: {
       capture: event => { events.push(event) }, flush: async () => {}, shutdown: async () => {},
     } })
     const seen: Headers[] = []
     const link = new HttpServerLink('https://mikka.test', async (_input, init) => { seen.push(new Headers(init?.headers)); return Response.json({ repos: [] }) })
     await daemonTracer.span('daemon.run', {}, async () => {
+      expect(daemonTracer.capture()?.sampleRate).toBe(1)
       await daemonTracer.span('daemon.adapter.start', {}, async () => { await link.listRepos(deviceId) })
       daemonTracer.generation({ harness: 'claude_code', provider: 'anthropic', model: 'claude-haiku-5-5', inputTokens: 120, outputTokens: 25, cacheReadTokens: 100, ttftMs: 150, latencyMs: 500 })
     }, { root: true, traceContext: carrier })
@@ -45,12 +47,15 @@ describe("daemon tracing", () => {
     expect(run.parentSpanContext?.spanId).toBe('0123456789abcdef')
     expect(finished.every(span => span.spanContext().traceId === carrier.traceparent.slice(3, 35))).toBe(true)
     expect(finished.every(span => span.attributes['mikka.run_id'] === carrier.runId)).toBe(true)
+    expect(finished.every(span => span.attributes['mikka.trace.sample_rate'] === 1)).toBe(true)
     expect(seen[0].get('x-mikka-trace-runid')).toBe(carrier.runId)
     expect(seen[0].get('x-mikka-trace-sessionid')).toBe(carrier.sessionId)
+    expect(seen[0].has('x-mikka-trace-samplerate')).toBe(false)
     const records = logs.getFinishedLogRecords()
     expect(records.length).toBe(3)
     expect(records.every(record => record.spanContext?.traceId === run.spanContext().traceId)).toBe(true)
     expect(records.every(record => record.body === 'mikka.stage.completed')).toBe(true)
+    expect(records.every(record => record.attributes['mikka.trace.sample_rate'] === 1)).toBe(true)
     expect(events).toHaveLength(1)
     expect(events[0].properties).toMatchObject({ '$ai_trace_id': run.spanContext().traceId, '$ai_span_id': generation.spanContext().spanId,
       '$ai_parent_id': run.spanContext().spanId, '$ai_session_id': carrier.sessionId, '$ai_input_tokens': 120,
@@ -92,7 +97,7 @@ describe("daemon tracing", () => {
     await tracer.flush()
     const [span] = memory.getFinishedSpans()
     expect(span.name).toBe("daemon.run [home]")
-    expect(Object.keys(span.attributes).sort()).toEqual(["mikka.client_kind", "mikka.error.detail", "mikka.harness", "mikka.outcome", "mikka.route", "mikka.run.id_hash"])
+    expect(Object.keys(span.attributes).sort()).toEqual(["mikka.client_kind", "mikka.error.detail", "mikka.harness", "mikka.outcome", "mikka.route", "mikka.run.id_hash", "mikka.trace.critical", "mikka.trace.retention", "mikka.trace.sample_rate"])
     expect(span.attributes["mikka.route"]).toBe("/v1/runs/[id] in [home]")
     expect(span.attributes["mikka.run.id_hash"]).toMatch(/^[0-9a-f]{16}$/)
     expect(span.resource.attributes["service.name"]).toBe("mikka-daemon")
@@ -114,6 +119,8 @@ describe("daemon tracing", () => {
     expect(span.attributes["mikka.error.code"]).toBe("subscription_local_runtime_unavailable")
     expect(span.attributes["mikka.error.detail"]).toBe("adapter_start_failed")
     expect(span.attributes["mikka.outcome"]).toBe("error")
+    expect(span.attributes["mikka.trace.sample_rate"]).toBe(1)
+    expect(span.attributes["mikka.trace.critical"]).toBe(true)
     expect(JSON.stringify(span.attributes)).not.toContain("alex")
     await tracer.shutdown()
   })

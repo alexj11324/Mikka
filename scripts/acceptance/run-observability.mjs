@@ -4,7 +4,7 @@
  * (apart from creating/closing its own login session). --execute submits one
  * small Factory deliverable on each required subscription, once per deployment.
  *
- * Node 24: node scripts/acceptance/run-observability.mjs [--execute]
+ * Node 24: node scripts/acceptance/run-observability.mjs [--execute [--prepare] [--browser-submit]]
  * Required env: ACME_DEMO_EMAIL, ACME_DEMO_PASSWORD, MIKKA_EXPECTED_DEPLOYMENT_SHA.
  * Optional: MIKKA_OBSERVABILITY_MODEL_CASE=all|claude|codex; timeout per model
  * MIKKA_OBSERVABILITY_TIMEOUT_MS (60_000..600_000, default 480_000).
@@ -16,8 +16,11 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 import { decode, encode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 import { liveInvalidation, liveReadiness } from '../../lib/live/events.ts'
+import en from '../../messages/en.json' with { type: 'json' }
+import zh from '../../messages/zh-CN.json' with { type: 'json' }
 import { responseCookieJar } from './response-cookie-jar.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
@@ -41,6 +44,7 @@ const errorCodes = new Set([
   'task_timeout', 'interrupted', 'submission_refused', 'foreign_activity', 'task_scope', 'fixture_ambiguous',
   'run_scope', 'run_model', 'run_identity', 'run_profile', 'run_failed', 'budget_exceeded', 'task_blocked',
   'artifact_missing', 'artifact_content', 'cleanup_incomplete', 'acceptance_failed',
+  'owner_busy', 'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
 ])
 const serverCodes = new Set(['authRequired', 'modelUnavailable', 'factoryStale', 'factoryStopped', 'runChainEnded',
   'agentProfileNotFound', 'agentProfileRequestConflict', 'agentProfileVersionConflict', 'subscriptionConflict',
@@ -55,6 +59,39 @@ const settledTask = task => ['cancelled', 'revoked', 'completed', 'succeeded'].i
 const sameModel = (a, b) => a?.id === b?.id && a?.kind === b?.kind && a?.modelId === b?.modelId && a?.provider === b?.provider && a?.chosen === b?.chosen && !a?.fallback
 const sourceKey = value => JSON.stringify([value?.harness, value?.model, value?.source?.kind, value?.source?.connectionId])
 const profilePath = (workspaceId, id = '') => '/api/factory/agent-profiles' + (id ? '/' + id : '') + '?workspaceId=' + workspaceId
+const profileDefinition = value => Object.fromEntries(['name', 'description', 'roles', 'enabled', 'harness', 'model', 'effort', 'instructions', 'skills']
+  .filter(key => value[key] !== undefined).map(key => [key, structuredClone(value[key])]))
+
+/** The relation picker is the existing uncapped, authorized cursor API. Follow
+ * server cursors exactly; a bounded page scan is not periodic data polling. */
+export async function issueInventory(read, workspaceId) {
+  const items = new Map(), cursors = new Set()
+  let cursor = null, first
+  const path = '/api/issues/search?workspaceId=' + workspaceId + '&limit=50&q='
+  for (let page = 0; page < 100; page++) {
+    const found = await read(path + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''))
+    check(Array.isArray(found?.items) && found.items.length <= 50 && found.truncated === false
+      && (found.nextCursor === null || typeof found.nextCursor === 'string' && found.nextCursor.length <= 1024), 'response_invalid')
+    const signature = value => JSON.stringify([value.nextCursor, value.items.map(item => [item.id, item.revision, item.updatedAt])])
+    if (page === 0) first = signature(found)
+    for (const item of found.items) {
+      check(uuid(item.id) && !items.has(item.id), 'task_inventory_changed')
+      items.set(item.id, { id: item.id })
+    }
+    if (found.nextCursor === null) {
+      // A move during the scan must not silently skip an older task. One head
+      // check validates this finite scan; concurrent activity fails closed.
+      if (page > 0) {
+        const head = await read(path)
+        check(Array.isArray(head?.items) && head.truncated === false && signature(head) === first, 'task_inventory_changed')
+      }
+      return [...items.values()]
+    }
+    check(found.items.length > 0 && !cursors.has(found.nextCursor), 'task_inventory_changed')
+    cursors.add(found.nextCursor); cursor = found.nextCursor
+  }
+  throw new AcceptanceError('task_inventory_truncated')
+}
 
 export function publicFailure(error) {
   return { status: 'blocked', code: error instanceof AcceptanceError ? error.code : 'acceptance_failed',
@@ -66,8 +103,29 @@ export function fixtureIdentity(revision, item) {
   const value = hash('mikka-observability:1512:' + revision + ':' + item.id)
   return { marker: 'm1512-' + value.slice(0, 16), profileId: value.slice(0, 8) + '-' + value.slice(8, 12) + '-4' + value.slice(13, 16) + '-8' + value.slice(17, 20) + '-' + value.slice(20, 32) }
 }
-/** No mutable owner-wide preferences are changed. A sole fixed Profile also
- * pins Factory's independent checks; its native receipt proves that selection. */
+/** Code-generated, non-private acceptance input; never reused for user content. */
+export function fixtureTask(revision, item) {
+  const fixture = fixtureIdentity(revision, item), title = fixture.marker + '.txt'
+  const content = 'mikka-observability:' + fixture.marker + '\nstatus=ready\n'
+  const input = '请创建且只创建一个 Factory 任务，标题必须为 ' + fixture.marker + '。在所选云端和固定 Agent Profile 上完成一次很小的真实交付：创建名称为 ' + title
+    + ' 的纯文本 Artifact，UTF-8 内容必须精确等于这个 JSON 字符串解码后的字节（包括末尾换行）：' + JSON.stringify(content)
+    + '。实际读取文件验证后，通过正常 Artifact 工具提交，交给独立 review 和 verify。使用选中的 Profile，所有阶段只允许我的官方订阅 ' + item.model
+    + '，失败就停止；不要切换账号、API Key、模型，或重试/修复/创建第二个任务。不要外部发消息、推送代码或改别的资源。完成后只回复此任务、线程和 Artifact 链接。'
+  return { ...fixture, title, content, input }
+}
+export function browserSubmissionText(input, locale) {
+  check(['en', 'zh-CN'].includes(locale), 'configuration_required')
+  const text = (locale === 'en' ? en : zh).Shell.newTaskDialog
+  const context = text.contextDevice.replace('{device}', () => text.cloud)
+  return text.promptWithContext.replace('{context}', () => context).replace('{text}', () => input)
+}
+// The runner log must expose readiness before waiting for the real UI. Only
+// locally generated fixture text and explicitly selected safe IDs enter here.
+const emitBrowserReady = value => new Promise((resolve, reject) => {
+  process.stdout.write(JSON.stringify(value) + '\n', error => error ? reject(error) : resolve())
+})
+/** A sole fixed Profile pins Factory's independent checks; its native receipt
+ * proves that selection. Optional preparation happens outside this gate. */
 export function preflightCase(item, { ownerId, menu, order, connections, keys, profiles }) {
   check(Array.isArray(menu?.groups) && Array.isArray(order?.candidates) && Array.isArray(order?.entries)
     && Array.isArray(connections?.connections) && Array.isArray(profiles?.profiles), 'response_invalid')
@@ -182,20 +240,26 @@ export async function openLive(read, workspaceId, { now = Date.now, socketFactor
   }
 }
 
-export async function runObservabilityAcceptance({ env = process.env, execute = false, fetchImpl = fetch, now = Date.now, openLiveImpl = openLive, signal } = {}) {
+export async function runObservabilityAcceptance({ env = process.env, execute = false, prepare = false, browserSubmit = false,
+  onBrowserReady = emitBrowserReady, fetchImpl = fetch, now = Date.now, openLiveImpl = openLive, signal } = {}) {
+  check((!prepare && !browserSubmit || execute) && typeof onBrowserReady === 'function', 'configuration_required')
   const revision = env.MIKKA_EXPECTED_DEPLOYMENT_SHA
   const timeoutMs = Number(env.MIKKA_OBSERVABILITY_TIMEOUT_MS ?? 480_000)
   const modelCase = env.MIKKA_OBSERVABILITY_MODEL_CASE ?? 'all'
   check(['all', 'claude', 'codex'].includes(modelCase), 'configuration_required')
+  check(!browserSubmit || modelCase !== 'all', 'configuration_required')
   const cases = CASES.filter(item => modelCase === 'all' || item.id === modelCase)
   check(SHA.test(revision ?? '') && Number.isSafeInteger(timeoutMs) && timeoutMs >= 60_000 && timeoutMs <= 600_000, 'configuration_required')
   check(!env.MIKKA_ACCEPTANCE_BASE_URL || env.MIKKA_ACCEPTANCE_BASE_URL === ORIGIN + '/mikka', 'origin_rejected')
   const report = { version: 1, issue: 1512, revision, mode: execute ? 'execute' : 'preflight', status: 'running',
     startedAt: new Date(now()).toISOString(), browserReplayVerified: false, posthogIngestionVerified: false,
     budget: { submissionsPerModel: 1, nativeRunsPerModel: 3, enforcement: 'stop_on_first_observed_excess', timeoutMs, paidResubmissions: 0, hardDollarCap: false },
-    modelCase, cases: [], sessionClosed: false }
+    modelCase, submissionSource: browserSubmit ? 'browser' : 'api', cases: [], sessionClosed: false,
+    preparation: { requested: prepare, profilesDisabled: 0, profilesRestored: 0, fallbackChanged: false, restoration: 'not_needed' } }
   const cookies = responseCookieJar(now)
   let ownerId, workspaceId, botId, closeSession = false
+  // Full definitions never leave this closure or appear in the public report.
+  const preparation = { profiles: [], fallback: null }
   async function request(path, { body, method = body === undefined ? 'GET' : 'POST', headers: extra, cleanup = false } = {}) {
     check(path.startsWith('/api/') || path.startsWith('/mikka/api/artifacts/'), 'origin_rejected')
     const url = new URL(path.startsWith('/mikka/') ? path : '/mikka' + path, ORIGIN)
@@ -226,7 +290,8 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     return value
   }
   async function rpc(action, args, options = {}) {
-    check(['coordinator.sendCoordinatorMessage', 'issues.getIssue', 'agents.getIssueThread'].includes(action), 'configuration_required')
+    check(['coordinator.sendCoordinatorMessage', 'issues.getIssue', 'agents.getIssueThread', 'task-runs.pollThreads',
+      'task-runs.pollTaskRuns', 'model-api-keys.updateApiKeyAfterQuota'].includes(action), 'configuration_required')
     const value = await read('/api/rpc', { ...options, body: { version: DESKTOP_RPC_VERSION, action, args: encode(args) },
       headers: { 'x-mikka-rpc': '1', ...options.headers } })
     check(value.ok === true, 'response_invalid')
@@ -240,20 +305,18 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   const menuRead = (options = {}) => read('/api/mobile/model?bot=' + botId, options)
   async function quiet() {
     const [bots, threads, tasks, chat] = await Promise.all([
-      read('/api/settings/workspace-bots'), read('/api/mobile/threads'), read('/api/mobile/tasks'), read('/api/coordinator/messages'),
+      read('/api/settings/workspace-bots'), read('/api/mobile/threads'), issueInventory(read, workspaceId), read('/api/coordinator/messages'),
     ])
-    check(Array.isArray(bots?.bots) && Array.isArray(threads?.threads) && Array.isArray(tasks?.tasks) && Array.isArray(chat?.items), 'response_invalid')
+    check(Array.isArray(bots?.bots) && Array.isArray(threads?.threads) && Array.isArray(chat?.items), 'response_invalid')
     check(bots.bots.every(bot => bot.status === 'idle' && bot.runningThreads === 0)
       && threads.threads.every(thread => ['failed', 'done', 'stopped'].includes(thread.status)), 'workspace_busy')
-    check(tasks.tasks.length < 100, 'task_inventory_truncated')
-    for (const task of tasks.tasks) {
-      check(uuid(task.id), 'response_invalid')
-      const ledger = await read('/api/factory/tasks?issueId=' + task.id)
-      check(Array.isArray(ledger.tasks) && ledger.tasks.every(settledTask), 'workspace_busy')
+    for (let index = 0; index < tasks.length; index += 10) {
+      const ledgers = await Promise.all(tasks.slice(index, index + 10).map(task => read('/api/factory/tasks?issueId=' + task.id)))
+      check(ledgers.every(ledger => Array.isArray(ledger.tasks) && ledger.tasks.every(settledTask)), 'workspace_busy')
     }
     check(chat.botId === botId && chat.enabled === true, 'coordinator_disabled')
     check(chat.working === false && !chat.streamRunId && !chat.items.some(item => item.pending), 'coordinator_busy')
-    return { chat, threads: new Set(threads.threads.map(thread => thread.id)), issues: new Set(tasks.tasks.map(task => task.id)) }
+    return { chat, threads: new Set(threads.threads.map(thread => thread.id)), issues: new Set(tasks.map(task => task.id)) }
   }
   async function inventory() {
     const [menu, order, connections, keys, profiles] = await Promise.all([
@@ -262,18 +325,121 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     ])
     return { ownerId, menu, order, connections, keys, profiles }
   }
+  async function ownerIdle(cleanup = false) {
+    // Both existing readers are owner-wide, including other workspaces. They
+    // expose at most 200 rows/30 days each; we claim only this visible scope.
+    const [threads, tasks] = await Promise.all([rpc('task-runs.pollThreads', [], { cleanup }), rpc('task-runs.pollTaskRuns', [], { cleanup })])
+    check(Array.isArray(threads?.items) && Array.isArray(tasks?.items), 'response_invalid')
+    check([...threads.items, ...tasks.items].every(value => nativeTerminal.has(value.status)), 'owner_busy')
+    report.preparation.visibleRunRowsChecked = threads.items.length + tasks.items.length
+  }
+  async function prepareSettings() {
+    await quiet(); await ownerIdle()
+    const state = await inventory()
+    check(typeof state.keys.apiKeyAfterQuota === 'boolean', 'response_invalid')
+    // Validate every other gate before changing settings. Actual case preflight
+    // still reads the resulting server state with no exemptions.
+    const gates = cases.map(item => {
+      try { preflightCase(item, { ...state, keys: { ...state.keys, apiKeyAfterQuota: false },
+        profiles: { ...state.profiles, profiles: state.profiles.profiles.map(value => ({ ...value, enabled: false })) } }); return null }
+      catch (error) { return error }
+    })
+    // One unavailable subscription does not prevent the other selected case.
+    // Each case still validates its own real state before making a model call.
+    if (gates.every(Boolean)) throw gates[0]
+    if (state.keys.apiKeyAfterQuota) {
+      await ownerIdle()
+      check((await read('/api/settings/api-keys?workspace=' + workspaceId)).apiKeyAfterQuota === true, 'preparation_conflict')
+      preparation.fallback = { before: true, acknowledged: false }
+      const changed = await rpc('model-api-keys.updateApiKeyAfterQuota', [false, workspaceId])
+      check(changed.apiKeyAfterQuota === false, 'preparation_conflict')
+      preparation.fallback.acknowledged = true; report.preparation.fallbackChanged = true
+    }
+    for (const profile of state.profiles.profiles.filter(value => value.enabled && !value.archivedAt)) {
+      check(uuid(profile.id) && Number.isSafeInteger(profile.version) && profile.version > 0, 'profile_scope')
+      await ownerIdle()
+      const current = (await profileRead(profile.id)).profile
+      check(current?.version === profile.version && typeof profile.digest === 'string' && /^[0-9a-f]{64}$/.test(profile.digest)
+        && current.digest === profile.digest && !current.archivedAt
+        && isDeepStrictEqual(profileDefinition(current), profileDefinition(profile)), 'preparation_conflict')
+      const entry = { id: profile.id, before: profileDefinition(profile), version: profile.version, written: null, rejected: false }
+      preparation.profiles.push(entry)
+      let changed
+      try { changed = (await read(profilePath(workspaceId, entry.id), { method: 'PATCH',
+        body: { workspaceId, version: entry.version, profile: { ...entry.before, enabled: false } } })).profile }
+      catch (error) { entry.rejected = [400, 401, 403, 404, 409, 422].includes(error.httpStatus); throw error }
+      check(changed?.id === entry.id && changed.version === entry.version + 1 && !changed.archivedAt && /^[0-9a-f]{64}$/.test(changed.digest)
+        && isDeepStrictEqual(profileDefinition(changed), { ...entry.before, enabled: false }), 'preparation_conflict')
+      entry.written = { version: changed.version, digest: changed.digest }
+      report.preparation.profilesDisabled++
+    }
+  }
+  async function restoreSettings() {
+    if (!preparation.fallback && !preparation.profiles.length) return
+    const summary = report.preparation
+    summary.restoration = 'complete'; summary.restoreFailures = 0
+    const failed = error => { summary.restoration = 'incomplete'; summary.restoreFailures++; summary.restoreError = publicFailure(error) }
+    try {
+      check(report.cases.every(value => value.cleanup?.state === 'complete'), 'cleanup_incomplete')
+      await ownerIdle(true)
+    } catch (error) { failed(error); return }
+    for (const entry of preparation.profiles.toReversed()) {
+      if (entry.rejected) continue
+      try {
+        await ownerIdle(true)
+        const current = (await profileRead(entry.id, { cleanup: true })).profile
+        check(current && !current.archivedAt, 'preparation_conflict')
+        if (!isDeepStrictEqual(profileDefinition(current), entry.before)) {
+          // A lost PATCH response cannot prove which writer advanced this
+          // profile. Preserve an unacknowledged/concurrent edit for review.
+          check(entry.written && current.version === entry.written.version && current.digest === entry.written.digest
+            && isDeepStrictEqual(profileDefinition(current), { ...entry.before, enabled: false }), 'preparation_conflict')
+          const restored = (await read(profilePath(workspaceId, entry.id), { method: 'PATCH', cleanup: true,
+            body: { workspaceId, version: current.version, profile: entry.before } })).profile
+          check(restored?.version === current.version + 1 && isDeepStrictEqual(profileDefinition(restored), entry.before), 'preparation_conflict')
+        }
+        summary.profilesRestored++
+      } catch (error) { failed(error) }
+    }
+    if (preparation.fallback) {
+      try {
+        await ownerIdle(true)
+        const current = (await read('/api/settings/api-keys?workspace=' + workspaceId, { cleanup: true })).apiKeyAfterQuota
+        if (current !== preparation.fallback.before) {
+          // This existing boolean setting has no version/CAS API. Compare its
+          // last acknowledged value immediately before restoring, never guess.
+          check(preparation.fallback.acknowledged && current === false, 'preparation_conflict')
+          const restored = await rpc('model-api-keys.updateApiKeyAfterQuota', [preparation.fallback.before, workspaceId], { cleanup: true })
+          check(restored.apiKeyAfterQuota === preparation.fallback.before, 'preparation_conflict')
+        }
+        summary.fallbackRestored = true
+      } catch (error) { failed(error) }
+    }
+  }
   async function runCase(item) {
     const result = { case: item.id, model: item.model, status: 'running', cleanup: { state: 'not_created' } }
-    const fixture = fixtureIdentity(revision, item)
+    const fixture = fixtureTask(revision, item)
     const started = now()
-    let baseline, previousModel, selectedModel, profileCreated = false, modelTouched = false, submitted = false, live, task, foreignActivity = false
+    let baseline, previousModel, selectedModel, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
     const issueIds = new Set(), runIds = new Set(), proofs = new Map(), workflowIds = new Set()
-    const title = fixture.marker + '.txt', content = 'mikka-observability:' + fixture.marker + '\nstatus=ready\n'
+    const { title, content, input } = fixture
+    const expectedMessages = new Map(browserSubmit ? ['en', 'zh-CN'].map(locale => [browserSubmissionText(input, locale), locale]) : [[input, 'api']])
     async function inspect(cleanup = false) {
       const [chat, page] = await Promise.all([read('/api/coordinator/messages', { cleanup: true }), read('/api/mobile/bots/' + botId, { cleanup: true })])
       check(Array.isArray(chat?.items) && Array.isArray(page?.threads), 'response_invalid')
       const fresh = chat.items.filter(value => value.position > baseline.chat.cursor)
-      foreignActivity ||= fresh.filter(value => value.from === 'person').some(value => !value.text?.includes(fixture.marker))
+      const human = fresh.filter(value => value.from === 'person'), matching = human.filter(value => expectedMessages.has(value.text))
+      foreignActivity ||= human.some(value => !expectedMessages.has(value.text))
+      if (browserSubmit && matching.length) {
+        submitted = true
+        const value = matching[0]
+        check(matching.length === 1 && Number.isSafeInteger(value.position), 'fixture_ambiguous')
+        if (!value.pending) {
+          check(result.submission?.position === undefined || result.submission.position === value.position, 'fixture_ambiguous')
+          result.submission = { source: 'browser', observed: true, position: value.position, locale: expectedMessages.get(value.text) }
+        }
+      }
+      check(matching.length <= 1, 'fixture_ambiguous')
       if (!cleanup) check(!foreignActivity, 'foreign_activity')
       for (const value of fresh) {
         const id = typeof value.streamId === 'string' ? value.streamId.replace(/:\d+$/, '') : null
@@ -330,8 +496,16 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     }
     async function end() {
       const cleanup = result.cleanup = { state: 'complete', profileArchived: !profileCreated, modelRestored: !modelTouched,
-        evidence: 'retained', ownRunsStopped: !submitted }
+        evidence: 'retained', ownRunsStopped: !submitted && !browserWaiting }
       try {
+        // Reconcile a real click whose push raced the wait deadline or abort.
+        if (browserWaiting) {
+          await inspect(true)
+          if (!submitted) {
+            check(runIds.size === 0 && issueIds.size === 0, 'cleanup_incomplete')
+            cleanup.ownRunsStopped = true
+          }
+        }
         if (submitted) {
           const latest = await inspect(true)
           // A shared Coordinator is stopped only while its new human messages
@@ -414,17 +588,23 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
         && available.availability?.[fixture.profileId]?.available === true, 'profile_changed')
       check((await read('/api/settings/api-keys?workspace=' + workspaceId)).apiKeyAfterQuota === false, 'paid_fallback_enabled')
       check(sameModel((await menuRead()).current, selectedModel), 'model_changed')
-      const traceId = randomBytes(16).toString('hex'), parentSpanId = randomBytes(8).toString('hex')
-      result.requestTrace = { traceId, parentSpanId, source: 'w3c_client_parent', backendObserved: false }
-      const prompt = '请创建且只创建一个 Factory 任务，标题必须为 ' + fixture.marker + '。在所选云端和固定 Agent Profile 上完成一次很小的真实交付：创建名称为 ' + title
-        + ' 的纯文本 Artifact，UTF-8 内容必须精确等于这个 JSON 字符串解码后的字节（包括末尾换行）：' + JSON.stringify(content)
-        + '。实际读取文件验证后，通过正常 Artifact 工具提交，交给独立 review 和 verify。使用选中的 Profile，所有阶段只允许我的官方订阅 ' + item.model
-        + '，失败就停止；不要切换账号、API Key、模型，或重试/修复/创建第二个任务。不要外部发消息、推送代码或改别的资源。完成后只回复此任务、线程和 Artifact 链接。'
-      submitted = true
-      const queued = await rpc('coordinator.sendCoordinatorMessage', [prompt, undefined, botId, fixture.profileId,
-        { kind: 'cloud' }, undefined, undefined, undefined, fixture.profileId], { headers: { traceparent: '00-' + traceId + '-' + parentSpanId + '-01' } })
-      check(queued.queued === true, 'submission_refused')
       const deadline = now() + timeoutMs
+      if (browserSubmit) {
+        // New task, no project context, this workspace's Coordinator, explicit
+        // Mikka Cloud and this temporary Profile. The actual browser owns its
+        // submission/trace/replay IDs; the driver neither obtains nor injects them.
+        browserWaiting = true; result.submission = { source: 'browser', observed: false }
+        await onBrowserReady({ type: 'mikka_observability_browser_ready', version: 1, revision, case: item.id,
+          workspaceId, botId, profileId: fixture.profileId, marker: fixture.marker, model: item.model, harness: item.harness,
+          destination: 'cloud', input, artifact: { title, content }, expiresAt: new Date(deadline).toISOString() })
+      } else {
+        const traceId = randomBytes(16).toString('hex'), parentSpanId = randomBytes(8).toString('hex')
+        result.requestTrace = { traceId, parentSpanId, source: 'w3c_client_parent', backendObserved: false }
+        submitted = true
+        const queued = await rpc('coordinator.sendCoordinatorMessage', [input, undefined, botId, fixture.profileId,
+          { kind: 'cloud' }, undefined, undefined, undefined, fixture.profileId], { headers: { traceparent: '00-' + traceId + '-' + parentSpanId + '-01' } })
+        check(queued.queued === true, 'submission_refused')
+      }
       for (;;) {
         if (signal?.aborted) throw new AcceptanceError('interrupted')
         check(now() < deadline, 'task_timeout')
@@ -435,6 +615,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
         check(profiles.profiles.filter(value => value.enabled && !value.archivedAt).length === 1
           && profiles.profiles.some(value => value.id === fixture.profileId && value.version === 1 && value.enabled), 'profile_changed')
         check(sameModel((await menuRead()).current, selectedModel), 'model_changed')
+        check((await read('/api/settings/api-keys?workspace=' + workspaceId)).apiKeyAfterQuota === false, 'paid_fallback_enabled')
         if (task) {
           assertAttemptBudget(task.attempts ?? [])
           check([...proofs.values()].every(proof => !['failed', 'stopped', 'cancelled', 'paused', 'waiting_input'].includes(proof.status)), 'run_failed')
@@ -443,7 +624,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           if (candidate && uuid(candidate.runId) && checks.length === 2 && new Set(checks.map(value => value.stage)).size === 2
             && [candidate.runId, ...checks.map(value => value.runId)].every(id => proofs.get(id)?.status === 'succeeded')
             && checks.every(value => value.output?.requestEpoch === task.task.sourceEventId)
-            && latest.chat.working === false && workflowIds.size > 0) {
+            && latest.chat.working === false && workflowIds.size > 0 && (!browserSubmit || result.submission?.observed === true)) {
             const produced = await read('/api/runs/' + candidate.runId + '/evidence')
             const files = (produced.artifacts ?? []).filter(value => value.title === title && uuid(value.id))
             check(files.length === 1, 'artifact_missing')
@@ -488,6 +669,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     const chat = await read('/api/coordinator/messages')
     check(uuid(chat.botId), 'response_invalid'); botId = chat.botId
     report.botId = botId; report.workspaceId = workspaceId
+    if (prepare) await prepareSettings()
     for (const item of cases) {
       const result = await runCase(item); report.cases.push(result)
       if (result.cleanup?.state === 'incomplete' || signal?.aborted) break
@@ -497,6 +679,8 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       ? execute ? 'runtime_verified' : 'ready' : 'blocked'
   } catch (error) { Object.assign(report, publicFailure(error)) }
   finally {
+    await restoreSettings()
+    if (report.preparation.restoration === 'incomplete') { report.status = 'blocked'; report.code = 'preparation_restore_failed' }
     if (closeSession) report.sessionClosed = await request('/api/auth/sign-out', { body: {}, cleanup: true }).then(response => response.ok).catch(() => false)
     cookies.clear()
     if (closeSession && !report.sessionClosed) { report.status = 'blocked'; report.code = 'cleanup_incomplete' }
@@ -511,8 +695,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
   let report
   try {
-    check(process.argv.slice(2).every(arg => arg === '--execute') && process.argv.length <= 3, 'configuration_required')
-    report = await runObservabilityAcceptance({ execute: process.argv.includes('--execute'), signal: controller.signal })
+    const args = process.argv.slice(2)
+    check(args.every(arg => ['--execute', '--prepare', '--browser-submit'].includes(arg)) && new Set(args).size === args.length, 'configuration_required')
+    report = await runObservabilityAcceptance({ execute: args.includes('--execute'), prepare: args.includes('--prepare'),
+      browserSubmit: args.includes('--browser-submit'), signal: controller.signal })
   } catch (error) { report = { version: 1, issue: 1512, ...publicFailure(error) } }
   finally { process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt) }
   const directory = 'production-run-observability-report'

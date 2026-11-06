@@ -138,6 +138,20 @@ why runs fail on users' computers.
   The daemon continues an incoming retained run parent, so critical runs stay
   complete. `MIKKA_DAEMON_TRACE_SAMPLE_RATE` can lower the ordinary rate;
   `0`, or `MIKKA_DAEMON_TRACING=0`, remains a kill switch.
+  Every known sampling decision exports its effective `mikka.trace.sample_rate`
+  on both spans and stage logs, plus `mikka.trace.critical` and
+  `mikka.trace.retention`. Independent critical roots use rate `1`. Fast ordinary
+  local trees use the actual configured rate (`head`); local errors, HTTP failures
+  and operations at least 1000 ms retain their recorded local tree at rate `1`
+  (`error_or_slow`). The buffer is bounded to 256 traces and 512 spans per trace;
+  an over-capacity tree can be dropped. Critical paths bypass this buffer.
+  Local children inherit the parent's actual weight. Run/bootstrap JSON can
+  carry a validated `sampleRate` captured from the actual parent span; HTTP
+  headers never carry it. A known remote parent's rate stays unchanged (`parent`):
+  local retention cannot recover upstream spans. An unfamiliar remote parent
+  without a rate is explicitly `parent_unknown`, with no fabricated numeric
+  weight. Remote unsampled parents remain unsampled. Historical SQL fallback
+  rates are estimates for those unknown/legacy rows, not measured weights.
 - **Never blocks.** A batch processor exports every 10 s from a queue of 512
   (then drops). A failed or thrown export drops its spans and pauses exporting
   for a minute; shutdown waits at most 2 s. Nothing is registered globally,

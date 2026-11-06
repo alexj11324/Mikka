@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { decode, encode } from '../../lib/desktop-rpc/wire.ts'
-import { CASES, ORIGIN, AcceptanceError, assertAttemptBudget, fixtureIdentity, openLive, preflightCase, publicFailure, runObservabilityAcceptance } from './run-observability.mjs'
+import { CASES, ORIGIN, AcceptanceError, assertAttemptBudget, browserSubmissionText, fixtureIdentity, fixtureTask, issueInventory, openLive, preflightCase, publicFailure, runObservabilityAcceptance } from './run-observability.mjs'
 
 const id = value => '10000000-0000-4000-8000-' + String(value).padStart(12, '0')
 const revision = 'a'.repeat(40), ownerId = 'ordinary-owner', workspaceId = id(1), botId = id(2)
@@ -18,9 +18,13 @@ function inventory() {
     keys: { apiKeyAfterQuota: false },
     profiles: { profiles: [], catalog: { models: candidates.map(value => ({ ...value, available: true })) } } }
 }
-function fixture({ failure, profileBusy = false } = {}) {
-  const calls = [], profiles = new Map(), submissions = [], cancelled = new Set()
-  let current = { ...original }, closed = 0, liveClosed = 0
+const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archivedAt: null, name: 'PRIVATE_PROFILE_NAME',
+  description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
+  skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
+function fixture({ failure, profileBusy = false, paidFallback = false } = {}) {
+  const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set()
+  if (profileBusy) profiles.set(existingProfile.id, structuredClone(existingProfile))
+  let current = { ...original }, closed = 0, liveClosed = 0, fallback = paidFallback || failure === 'paid_fallback', concurrentEdit = false
   const response = (value, status = 200, headers) => Response.json(value, { status, headers })
   const runData = runId => {
     const submission = submissions.find(value => value.runs.includes(runId))
@@ -33,11 +37,17 @@ function fixture({ failure, profileBusy = false } = {}) {
         personalResourcePolicy: 'requester_only', billingAccount: { model: { kind: 'subscription', ownerId, resourceId: id(70) }, runtime: { kind: 'e2b', ownerId } },
         resourceBindings: [{ kind: 'subscription', id: id(70), ownerId, access: 'owner' }] } } }
   }
+  function supplySubmission(profileId, prompt) {
+    const profile = profiles.get(profileId), item = CASES.find(value => value.model === profile.model.model), index = submissions.length
+    submissions.push({ ...fixtureIdentity(revision, item), item, profileId, prompt, issueId: id(100 + index), taskId: id(200 + index),
+      candidateId: id(300 + index), artifactId: id(500 + index), eventId: id(600 + index),
+      runs: Array.from({ length: failure === 'budget' ? 4 : 3 }, (_, offset) => id(400 + index * 10 + offset)) })
+  }
   const chat = () => ({ botId, enabled: true, working: false, cursor: 10 + submissions.length * 2,
     items: submissions.flatMap((value, index) => [
       { position: 11 + index * 2, from: 'person', text: value.prompt },
       { position: 12 + index * 2, from: 'coordinator', text: 'PRIVATE_RESPONSE', streamId: 'wrun_abcdefghijklmnop' + index + ':1' },
-    ]), sources: Object.fromEntries(submissions.map(value => [value.issueId, { kind: 'issue', id: value.issueId }])) })
+    ]).concat(foreignMessages), sources: Object.fromEntries(submissions.map(value => [value.issueId, { kind: 'issue', id: value.issueId }])) })
   async function fetchImpl(input, init = {}) {
     const url = new URL(input), method = init.method ?? 'GET', body = init.body ? JSON.parse(init.body) : undefined
     assert.equal(url.origin, ORIGIN)
@@ -58,8 +68,10 @@ function fixture({ failure, profileBusy = false } = {}) {
     if (path === '/api/settings/workspace-bots') return response({ bots: [{ status: 'idle', runningThreads: failure === 'busy' ? 1 : 0 }] })
     if (path === '/api/mobile/threads') return response({ threads: submissions.flatMap(value => value.runs.map(runId => ({ id: runId, status: 'done' }))) })
     if (path === '/api/mobile/tasks') return response({ tasks: submissions.map(value => ({ id: value.issueId, title: value.marker })) })
+    if (path === '/api/issues/search') return response({ items: submissions.map(value => ({ id: value.issueId, revision: 1, updatedAt: '2026-11-06T00:00:00.000Z' })), nextCursor: null, truncated: false })
     if (path === '/api/mobile/model' && method === 'GET') {
       if (failure === 'concurrent_model' && submissions.length) current = { ...original, id: id(999) }
+      if (failure === 'unchosen') current.chosen = false
       return response({ ...inventory().menu, current })
     }
     if (path === '/api/mobile/model' && method === 'PUT') {
@@ -69,12 +81,19 @@ function fixture({ failure, profileBusy = false } = {}) {
       if (failure === 'lost_model_response' && body.id !== original.id) throw new Error('PRIVATE_NETWORK_ERROR')
       return response({ ...inventory().menu, current })
     }
-    if (path === '/api/settings/model-order') return response(inventory().order)
+    if (path === '/api/settings/model-order') {
+      const order = inventory().order
+      if (failure === 'claude_blocked') order.entries = order.entries.map(value => value.harness === 'claude_code' ? { ...value, block: 'quota' } : value)
+      return response(order)
+    }
     if (path === '/api/subscriptions') return response(inventory().connections)
-    if (path === '/api/settings/api-keys') return response({ apiKeyAfterQuota: failure === 'paid_fallback', keys: [{ name: 'PRIVATE_KEY_NAME' }] })
+    if (path === '/api/settings/api-keys') {
+      if (failure === 'concurrent_fallback' && submissions.length) fallback = true
+      return response({ apiKeyAfterQuota: fallback, keys: [{ name: 'PRIVATE_KEY_NAME' }] })
+    }
     if (path === '/api/factory/agent-profiles' && method === 'GET') {
       const active = [...profiles.values()].filter(value => !value.archivedAt)
-      return response({ ...inventory().profiles, profiles: profileBusy ? [{ id: id(99), enabled: true }] : active,
+      return response({ ...inventory().profiles, profiles: active,
         availability: Object.fromEntries(active.map(value => [value.id, { available: true }])) })
     }
     if (path === '/api/factory/agent-profiles' && method === 'POST') {
@@ -86,6 +105,15 @@ function fixture({ failure, profileBusy = false } = {}) {
     if (path.startsWith('/api/factory/agent-profiles/')) {
       const value = profiles.get(path.split('/').at(-1))
       if (!value) return response({ error: 'agentProfileNotFound' }, 404)
+      if (value.id === existingProfile.id && failure === 'concurrent_profile' && submissions.length && !concurrentEdit) {
+        value.instructions = 'PRIVATE_CONCURRENT_EDIT'; value.version++; value.digest = 'f'.repeat(64); concurrentEdit = true
+      }
+      if (method === 'PATCH') {
+        if (body.version !== value.version || failure === 'prepare_profile_refused' && !body.profile.enabled
+          || failure === 'restore_profile_refused' && body.profile.enabled) return response({ error: 'agentProfileVersionConflict' }, 409)
+        Object.assign(value, body.profile, { version: value.version + 1, digest: String(value.version + 1).repeat(64).slice(0, 64) })
+        if (failure === 'prepare_profile_lost' && !body.profile.enabled) throw new Error('PRIVATE_NETWORK_ERROR')
+      }
       if (method === 'DELETE') {
         assert.equal(body.version, value.version)
         value.archivedAt = '2026-11-06T00:00:00.000Z'; value.enabled = false; value.version++
@@ -94,13 +122,21 @@ function fixture({ failure, profileBusy = false } = {}) {
     }
     if (path === '/api/rpc') {
       const args = decode(body.args)
+      if (body.action === 'task-runs.pollThreads' || body.action === 'task-runs.pollTaskRuns') {
+        const busy = failure === 'owner_busy' || failure === 'owner_busy_restore' && submissions.length
+        return response({ ok: true, result: encode({ items: busy ? [{ id: id(909), status: 'running', prompt: 'PRIVATE_OTHER_WORKSPACE' }] : [] }) })
+      }
+      if (body.action === 'model-api-keys.updateApiKeyAfterQuota') {
+        assert.deepEqual(args, [!fallback, workspaceId])
+        if (failure === 'restore_fallback_refused' && args[0]) return response({ error: 'subscriptionConflict' }, 409)
+        fallback = args[0]
+        if (failure === 'prepare_fallback_lost' && !fallback) throw new Error('PRIVATE_NETWORK_ERROR')
+        return response({ ok: true, result: encode({ apiKeyAfterQuota: fallback }) })
+      }
       if (body.action === 'coordinator.sendCoordinatorMessage') {
-        const profileId = args[8], profile = profiles.get(profileId), item = CASES.find(value => value.model === profile.model.model)
+        const profileId = args[8]
         assert.equal(args[2], botId); assert.equal(args[3], profileId); assert.deepEqual(args[4], { kind: 'cloud' })
-        const index = submissions.length
-        submissions.push({ ...fixtureIdentity(revision, item), item, profileId, prompt: args[0], issueId: id(100 + index), taskId: id(200 + index),
-          candidateId: id(300 + index), artifactId: id(500 + index), eventId: id(600 + index),
-          runs: Array.from({ length: failure === 'budget' ? 4 : 3 }, (_, offset) => id(400 + index * 10 + offset)) })
+        supplySubmission(profileId, args[0])
         if (failure === 'lost_submission_response') throw new Error('PRIVATE_NETWORK_ERROR')
         return response({ ok: true, result: encode({ queued: true }) })
       }
@@ -134,12 +170,12 @@ function fixture({ failure, profileBusy = false } = {}) {
     }
     throw new Error('Unexpected fixture route')
   }
-  return { calls, profiles, submissions, fetchImpl,
+  return { calls, profiles, submissions, foreignMessages, supplySubmission, fetchImpl,
     openLiveImpl: async () => ({ revision: 0, wait: async () => { throw new AcceptanceError('task_timeout') }, close: () => { liveClosed++ } }),
-    get state() { return { closed, liveClosed, current, cancelled } } }
+    get state() { return { closed, liveClosed, current, cancelled, fallback } } }
 }
-const run = (data, execute = false, overrides = {}) => runObservabilityAcceptance({ env: { ...env, ...overrides }, execute,
-  fetchImpl: data.fetchImpl, openLiveImpl: data.openLiveImpl })
+const run = (data, execute = false, overrides = {}, settings = {}) => runObservabilityAcceptance({ env: { ...env, ...overrides }, execute,
+  fetchImpl: data.fetchImpl, openLiveImpl: data.openLiveImpl, ...settings })
 const safe = report => assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|private-account|example\.test|prompt|COOKIE|TOKEN/)
 
 test('preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks', async () => {
@@ -219,6 +255,151 @@ test('cleanup preserves a concurrent model edit and reports incomplete restorati
   assert.equal(data.calls.filter(value => value.method === 'PUT').length, 1)
   assert.equal(data.submissions.length, 1)
   safe(report)
+})
+test('prepare is explicit, requires execution and restores only its acknowledged settings', async () => {
+  const invalid = fixture({ profileBusy: true, paidFallback: true })
+  await assert.rejects(run(invalid, false, {}, { prepare: true }), /configuration_required/)
+  assert.equal(invalid.calls.length, 0)
+  const data = fixture({ profileBusy: true, paidFallback: true }), report = await run(data, true, {}, { prepare: true })
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  assert.deepEqual(report.preparation, { requested: true, profilesDisabled: 1, profilesRestored: 1, fallbackChanged: true,
+    restoration: 'complete', visibleRunRowsChecked: 0, restoreFailures: 0, fallbackRestored: true })
+  assert.deepEqual(data.profiles.get(existingProfile.id), { ...existingProfile, version: 5, digest: '5'.repeat(64) })
+  assert.equal(data.state.fallback, true)
+  assert.deepEqual(data.calls.filter(value => value.body?.action === 'model-api-keys.updateApiKeyAfterQuota').map(value => decode(value.body.args)),
+    [[false, workspaceId], [true, workspaceId]])
+  assert.equal(data.submissions.length, 1); safe(report)
+})
+test('prepare refuses owner-wide activity and inherited model choices without changing settings', async () => {
+  for (const [failure, code] of [['owner_busy', 'owner_busy'], ['unchosen', 'model_not_restorable']]) {
+    const data = fixture({ failure, profileBusy: true, paidFallback: true }), report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, code, JSON.stringify(report))
+    assert.equal(report.preparation.restoration, 'not_needed')
+    assert.equal(data.submissions.length, 0); assert.equal(data.state.fallback, true)
+    assert.deepEqual(data.profiles.get(existingProfile.id), existingProfile)
+    assert.equal(data.calls.filter(value => value.method === 'PATCH' || value.body?.action === 'model-api-keys.updateApiKeyAfterQuota').length, 0)
+    safe(report)
+  }
+})
+test('a blocked case does not prevent preparation and execution of another available model', async () => {
+  const data = fixture({ failure: 'claude_blocked', profileBusy: true, paidFallback: true })
+  const report = await run(data, true, { MIKKA_OBSERVABILITY_MODEL_CASE: 'all' }, { prepare: true })
+  assert.equal(report.status, 'blocked')
+  assert.equal(report.cases[0].code, 'source_blocked')
+  assert.equal(report.cases[1].status, 'runtime_verified', JSON.stringify(report))
+  assert.equal(data.submissions.length, 1); assert.equal(data.submissions[0].item.id, 'codex')
+  assert.equal(report.preparation.restoration, 'complete'); assert.equal(data.state.fallback, true); safe(report)
+})
+test('preparation failures restore acknowledged writes but never guess after a lost response', async () => {
+  for (const failure of ['prepare_profile_refused', 'prepare_profile_lost', 'prepare_fallback_lost']) {
+    const data = fixture({ failure, profileBusy: true, paidFallback: true }), report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.status, 'blocked'); assert.equal(data.submissions.length, 0)
+    if (failure === 'prepare_profile_refused') {
+      assert.equal(report.code, 'http_refused'); assert.equal(report.preparation.restoration, 'complete')
+      assert.deepEqual(data.profiles.get(existingProfile.id), existingProfile); assert.equal(data.state.fallback, true)
+    } else {
+      assert.equal(report.code, 'preparation_restore_failed')
+      assert.equal(report.preparation.restoreError.code, 'preparation_conflict')
+      assert.equal(data.profiles.get(existingProfile.id).enabled, failure === 'prepare_fallback_lost')
+      assert.equal(data.state.fallback, failure !== 'prepare_fallback_lost')
+    }
+    assert.equal(data.state.closed, 1); safe(report)
+  }
+})
+test('restoration failures and concurrent edits remain visible without overwriting them', async () => {
+  for (const failure of ['restore_profile_refused', 'restore_fallback_refused', 'concurrent_profile', 'owner_busy_restore']) {
+    const data = fixture({ failure, profileBusy: true, paidFallback: true }), report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, 'preparation_restore_failed', JSON.stringify(report))
+    assert.equal(report.preparation.restoration, 'incomplete')
+    assert.equal(data.submissions.length, 1); assert.equal(data.state.closed, 1)
+    if (failure === 'concurrent_profile') {
+      assert.equal(report.preparation.restoreError.code, 'preparation_conflict')
+      assert.equal(data.profiles.get(existingProfile.id).instructions, 'PRIVATE_CONCURRENT_EDIT')
+      assert.equal(data.calls.filter(value => value.method === 'PATCH').length, 1)
+    } else if (failure === 'owner_busy_restore') {
+      assert.equal(report.preparation.restoreError.code, 'owner_busy')
+      assert.equal(data.state.fallback, false); assert.equal(data.profiles.get(existingProfile.id).enabled, false)
+    }
+    safe(report)
+  }
+  const data = fixture({ failure: 'concurrent_fallback', paidFallback: true }), report = await run(data, true, {}, { prepare: true })
+  assert.equal(report.cases[0].code, 'paid_fallback_enabled')
+  assert.equal(report.preparation.restoration, 'complete'); assert.equal(data.state.fallback, true)
+  assert.equal(data.calls.filter(value => value.body?.action === 'model-api-keys.updateApiKeyAfterQuota').length, 1)
+  safe(report)
+})
+test('issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan', async () => {
+  const rows = Array.from({ length: 135 }, (_, index) => ({ id: id(1000 + index), revision: 1, updatedAt: '2026-11-06T00:00:00.000Z' }))
+  const cursors = ['opaque-50_/+', 'opaque-100_/+'], calls = []
+  const read = async path => {
+    const url = new URL(path, ORIGIN), cursor = url.searchParams.get('cursor')
+    assert.equal(url.pathname, '/api/issues/search'); assert.equal(url.searchParams.get('workspaceId'), workspaceId)
+    assert.equal(url.searchParams.get('limit'), '50'); assert.equal(url.searchParams.get('q'), '')
+    assert.ok(cursor === null || cursors.includes(cursor)); calls.push(cursor)
+    const page = cursor === null ? 0 : cursors.indexOf(cursor) + 1
+    return { items: rows.slice(page * 50, (page + 1) * 50), truncated: false, nextCursor: cursors[page] ?? null }
+  }
+  assert.deepEqual(await issueInventory(read, workspaceId), rows.map(({ id }) => ({ id })))
+  assert.deepEqual(calls, [null, ...cursors, null])
+  let heads = 0
+  await assert.rejects(issueInventory(async path => {
+    const result = await read(path)
+    if (!new URL(path, ORIGIN).searchParams.has('cursor') && ++heads === 2) result.items = [{ ...rows[0], revision: 2 }, ...result.items.slice(1)]
+    return result
+  }, workspaceId), /task_inventory_changed/)
+  await assert.rejects(issueInventory(async () => ({ items: rows.slice(0, 50), nextCursor: cursors[0], truncated: false }), workspaceId), /task_inventory_changed/)
+})
+test('browser submission requires one executed case and does not authenticate on invalid options', async () => {
+  const data = fixture()
+  await assert.rejects(run(data, false, {}, { browserSubmit: true }), /configuration_required/)
+  await assert.rejects(run(data, true, { MIKKA_OBSERVABILITY_MODEL_CASE: 'all' }, { browserSubmit: true }), /configuration_required/)
+  assert.equal(data.calls.length, 0)
+})
+test('browser mode publishes readiness then observes the real-shaped UI click through push without an API submission', async () => {
+  for (const locale of ['en', 'zh-CN']) {
+    const data = fixture({ profileBusy: true, paidFallback: true })
+    let ready, liveRevision = 0, waits = 0
+    const report = await run(data, true, {}, { prepare: true, browserSubmit: true,
+      onBrowserReady: value => {
+        ready = value
+        assert.equal(data.submissions.length, 0); assert.equal(data.state.fallback, false)
+        assert.equal(data.profiles.get(value.profileId).enabled, true)
+        assert.equal(data.state.current.modelId, value.model)
+      },
+      openLiveImpl: async () => ({ get revision() { return liveRevision }, close() {}, wait: async after => {
+        assert.equal(after, liveRevision); assert.equal(waits++, 0); assert.ok(ready)
+        data.supplySubmission(ready.profileId, browserSubmissionText(ready.input, locale)); liveRevision++
+      } }),
+    })
+    assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+    assert.equal(ready.type, 'mikka_observability_browser_ready')
+    assert.equal(ready.input, fixtureTask(revision, CASES[0]).input)
+    assert.equal(ready.botId, botId); assert.equal(ready.workspaceId, workspaceId); assert.equal(ready.destination, 'cloud')
+    assert.equal(ready.artifact.content, fixtureTask(revision, CASES[0]).content)
+    assert.ok(Date.parse(ready.expiresAt) > Date.parse(report.startedAt))
+    assert.equal(waits, 1); assert.equal(data.submissions.length, 1)
+    assert.equal(report.submissionSource, 'browser')
+    assert.deepEqual(report.cases[0].submission, { source: 'browser', observed: true, position: 11, locale })
+    assert.equal(report.cases[0].requestTrace, undefined)
+    assert.equal(report.browserReplayVerified, false); assert.equal(report.posthogIngestionVerified, false)
+    assert.equal(data.calls.filter(value => value.body?.action === 'coordinator.sendCoordinatorMessage').length, 0)
+    assert.ok(data.calls.every(value => !value.headers.traceparent && !value.headers['x-posthog-session-id']))
+    assert.equal(report.preparation.restoration, 'complete'); assert.equal(report.cases[0].cleanup.state, 'complete')
+    safe(ready); safe(report)
+  }
+})
+test('browser waiting times out or blocks changed UI text without sending or repeating a task', async () => {
+  for (const foreign of [false, true]) {
+    const data = fixture(), report = await run(data, true, {}, { browserSubmit: true, onBrowserReady: value => {
+      if (foreign) data.foreignMessages.push({ position: 11, from: 'person', text: browserSubmissionText(value.input, 'en') + ' altered ' + value.marker })
+    } })
+    assert.equal(report.status, 'blocked')
+    assert.equal(report.cases[0].code, foreign ? 'foreign_activity' : 'task_timeout', JSON.stringify(report))
+    assert.equal(report.cases[0].cleanup.state, 'complete')
+    assert.equal(data.submissions.length, 0); assert.equal(data.state.closed, 1)
+    assert.equal(data.calls.filter(value => value.body?.action === 'coordinator.sendCoordinatorMessage').length, 0)
+    safe(report)
+  }
 })
 test('live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports', async () => {
   let socket
