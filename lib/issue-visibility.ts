@@ -27,11 +27,12 @@ export async function issueVisibility(reader: IssueReader, includeDeleted = fals
   onlyIssueIds?: readonly string[]
   /** Reuse only a membership read made by this same operation. */
   teams?: readonly TeamScope[]
+  withTaskNumbers?: boolean
 } = {}) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const token = readerTokenWorkspace(reader)
   const only = options.onlyIssueIds
-  const allowed = await issueTeamScope(userId, [], { onlyIssueIds: only, teams: options.teams })
+  const allowed = await issueTeamScope(userId, [], { onlyIssueIds: only, teams: options.teams, withTaskNumbers: options.withTaskNumbers })
   const scopeWorkspace = token ?? workspaceId
   const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
   const predicate = issueVisibilityPredicate(userId, { allowedIds }, includeDeleted)

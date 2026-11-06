@@ -115,8 +115,10 @@ your own GitHub account.
 - **Acts in your apps.** Bots propose email, Google Calendar, Notion and Slack
   actions, which run after your approval.
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
-  relations, activity history and per-person task numbers. ⌘K searches bots,
-  group chats, tasks, threads and projects.
+  relations, activity history and a number every task gets when it is
+  created: its team key for a workspace task (AL-12), your own prefix for a
+  personal one (ALEX-12). The task's branch and pull request carry it. ⌘K
+  searches bots, group chats, tasks, threads and projects.
 - **Decides what needs you.** Mikka rates notifications from GitHub, Linear,
   Notion and Gmail by what it costs to ignore them. Urgent matters go to the
   Coordinator, which interrupts you at most five times a day; the rest wait in
