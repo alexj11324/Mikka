@@ -48,7 +48,8 @@ export function isDeviceOnline(
       : typeof lastSeenAt === "number"
         ? lastSeenAt
         : Date.parse(lastSeenAt)
-  return Number.isFinite(seen) && now - seen <= DEVICE_ONLINE_WINDOW_MS
+  // A heartbeat from the future (a wrong clock, seeded data) is not a heartbeat: allow only a small clock skew.
+  return Number.isFinite(seen) && seen <= now + 5_000 && now - seen <= DEVICE_ONLINE_WINDOW_MS
 }
 
 /** "设备 n/m 在线": how many of the user's devices are online. */

@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
+import { DispatchOrder } from '@/components/settings/dispatch-order'
 import type { OrderRow, OrderView } from '@/lib/model-order'
 import type { OrderCandidate, OrderHarness } from '@/lib/model-order-plan'
 import { settingsRead } from '@/lib/settings-read'
@@ -132,10 +133,8 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   if (order.data?.error || order.error) return <FieldError>{actionError(order.data?.error)}</FieldError>
   if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
 
-  // The order each location tries (decision 2026-11-02-2330), then where a new run goes now (会先用, the same plan as dispatch).
-  const first = data.first ? data.first.kind === 'cloud' ? t('cloud') : data.first.name : null
+  // The order each location tries (decision 2026-11-02-2330) is drawn as a chain, not a sentence (Alex, 2026-11-06).
   const noKey = data.location === 'cloud' && e2b.configured === false
-  const locationLine = `${t(data.location === 'cloud' ? 'orderCloud' : 'orderLocal')}${t('clauseSeparator')}${first === null ? t(data.location === 'cloud' ? 'nowhere' : 'nowhereLocal') : noKey ? t('noKeyFirst', { place: first }) : t('first', { place: first })}`
   // R1: what fixes or explains the location sits on its row: 填入 E2B Key for 云端 without one; else 打开设备 when a computer would take the run or nothing would.
   const locationAction = noKey
     ? <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
@@ -152,7 +151,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   }
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
-      <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={locationLine}>
+      <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={<DispatchOrder data={data} workspaceId={workspaceId} e2bConfigured={e2b.configured} />}>
         <span className="flex items-center gap-2">
           {locationAction}
           <ToggleGroup aria-label={t('location')} variant="segment" spacing={0.5} value={[data.location]} disabled={pending}

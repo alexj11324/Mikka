@@ -17,7 +17,7 @@ let savedAutoRouting = true
 const changes: OrderChange[] = []
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
+mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
 mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => {
   events.push(value ? 'order-cache' : 'order')
   if (value) data = value
@@ -78,7 +78,7 @@ before(async () => {
 beforeEach(() => {
   configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
   changeFails = null; rereadFails = false; savedAutoRouting = true; changes.length = 0; liveKeys.length = 0
-  data = { location: 'cloud', customized: true, autoModelRouting: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
+  data = { location: 'cloud', customized: true, autoModelRouting: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, places: { cloud: 'ready', devices: [] }, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
   root = createRoot(container)
@@ -130,29 +130,30 @@ test('a shared subscription allowance check uses the authorized row action witho
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'ready')
 })
 
-test('each 运行位置 says the order it tries, then where a new run goes first', async () => {
+test('each 运行位置 is drawn in dispatch order, with no sentence about where runs go (Alex, 2026-11-06)', async () => {
   await render()
-  assert.ok(container.textContent?.includes('orderCloudclauseSeparatorfirst'))
+  const places = () => [...container.querySelectorAll('[data-slot="dispatch-order"] [role="listitem"] button')].map(item => item.getAttribute('aria-label'))
+  // 云端: the cloud, then servers, then computers; the cloud is used first.
+  assert.deepEqual(places(), ['cloud · stage.ready · firstHere', 'placeServers · noServers', 'placeComputers · noComputers'])
+  assert.ok(!container.textContent?.includes('clauseSeparator'), 'no 「现在都跑不了」 line')
   await act(async () => root.unmount())
   root = createRoot(container)
-  data = { ...data, location: 'local', cloudReady: false, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true } }
+  const server = { id: randomUUID(), name: 'vm', server: true, stage: 'offline' as const, lastSeenAt: Date.now() - 5 * 86_400_000 }
+  const computer = { id: randomUUID(), name: 'MacBook', server: false, stage: 'off' as const, lastSeenAt: null }
+  data = { ...data, location: 'local', cloudReady: false, places: { cloud: null, devices: [computer, server] }, first: null }
   await render()
-  assert.ok(container.textContent?.includes('orderLocalclauseSeparatorfirst'))
-  assert.ok(button('openDevices') === undefined && container.querySelector('a')?.textContent === 'openDevices', '打开设备 sits on the 运行位置 row when a computer takes the run')
-  await act(async () => root.unmount())
-  root = createRoot(container)
-  data = { ...data, first: null }
-  await render()
-  assert.ok(container.textContent?.includes('orderLocalclauseSeparatornowhereLocal'))
+  // 本地: no cloud; each place says why it cannot take a run.
+  assert.deepEqual(places(), ['placeServers · stage.offline', 'placeComputers · stage.off'])
+  assert.ok(container.querySelector('a')?.textContent === 'openDevices', '打开设备 sits on the 运行位置 row when nothing takes the run')
 })
 
 test('云端 without an E2B key: rows stay ready, the 运行位置 line says where runs go instead, and its button opens the key dialog', async () => {
   configured = false
-  data = { ...data, cloudReady: false, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true }, entries: [row(null)] }
+  data = { ...data, cloudReady: false, places: { cloud: 'noKey', devices: [] }, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true }, entries: [row(null)] }
   await render()
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'ready')
   assert.ok(![...container.querySelectorAll('li button')].some(item => item.textContent === 'setE2BKey'), 'the key is the 运行位置 row\'s, not each model\'s')
-  assert.ok(container.textContent?.includes('orderCloudclauseSeparatornoKeyFirst'))
+  assert.ok(container.querySelector('[data-slot="dispatch-order"] button')?.getAttribute('aria-label')?.startsWith('cloud · cloudNoKey'))
   await act(async () => button('setE2BKey')!.click())
   assert.equal(container.querySelector('[role="dialog"]')?.textContent, 'E2B key')
 })

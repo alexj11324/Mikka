@@ -20,6 +20,9 @@ describe("device online state", () => {
     expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS, now)).toBe(true)
     expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS - 1, now)).toBe(false)
     expect(isDeviceOnline(null, now)).toBe(false)
+    // A heartbeat from the future (seeded data, a wrong clock) is not online; a few seconds of skew are.
+    expect(isDeviceOnline(now + 3_000, now)).toBe(true)
+    expect(isDeviceOnline(new Date('2036-01-01'), now)).toBe(false)
     expect(isDeviceOnline("not a date", now)).toBe(false)
   })
 
