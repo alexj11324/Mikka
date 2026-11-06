@@ -11,6 +11,7 @@ import { PROTOCOL_SOURCE_SHA, openLiveObserver, parseStreamLine, readJson,
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const RUN = /^wrun_[a-zA-Z0-9_-]{1,160}$/
+export const DURING_TOOL_DELAY_MS = 600
 const reference = value => createHash('sha256').update(value).digest('hex').slice(0, 12)
 const ms = value => Math.round(value * 10) / 10
 const number = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
@@ -71,7 +72,7 @@ export async function readToolStopStream(body, onEvent, signal) {
 
 export async function runToolStop({ env = process.env, sessionProvider = alexSession, openLive = openLiveObserver,
   fixtureReceipt = null, streamTimeoutMs = 60_000, stopTimeoutMs = 20_000, checkpoint = true } = {}) {
-  const report = { schemaVersion: 1, issue: 1506, case: 'real-web-search-tool-call-stop', status: 'failed',
+  const report = { schemaVersion: 1, issue: 1506, case: 'real-web-search-tool-call-stop', sampleId: randomUUID(), status: 'failed',
     protocolSourceSha: PROTOCOL_SOURCE_SHA, applicationSha: null, startedAt: new Date().toISOString(),
     messageSendAttempts: 0, taskCreationRequests: 0, modelSelectionWrites: 0, postStopChatReads: 0,
     metrics: {}, tools: [], stop: { requested: false, acknowledged: false },
@@ -82,7 +83,7 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
   const save = () => {
     if (!checkpoint) return
     mkdirSync('issue-1506-alex-report', { recursive: true })
-    writeFileSync(`issue-1506-alex-report/coordinator-tool-stop-${report.fixture?.key === 'luna' ? 'luna' : 'haiku'}.json`, JSON.stringify(report, null, 2) + '\n')
+    writeFileSync(`issue-1506-alex-report/coordinator-tool-stop-${report.fixture?.key === 'luna' ? 'luna' : 'haiku'}-${report.requestedCase ?? 'unselected'}-${report.sampleId}.json`, JSON.stringify(report, null, 2) + '\n')
   }
   try {
     const expectedSha = requireExactSha(env.MIKKA_ACCEPTANCE_SHA)
@@ -90,6 +91,8 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
     if (!['observe', 'before_tool', 'during_tool'].includes(requestedCase)) fail('case_invalid')
     if (!(streamTimeoutMs > 0 && streamTimeoutMs <= 60_000 && stopTimeoutMs > 0 && stopTimeoutMs <= 20_000)) fail('timeout_invalid')
     report.applicationSha = expectedSha; report.requestedCase = requestedCase
+    report.sample = { attempts: 1, plannedDelayMs: requestedCase === 'during_tool' ? DURING_TOOL_DELAY_MS : 0,
+      classification: 'pending_server_timing_and_final_audit', countedEvenIfBoundaryMissed: true }
     await sessionProvider(async session => {
       requests = session.requests
       if (session.version?.build !== expectedSha) fail('acceptance_version_mismatch')
@@ -103,12 +106,15 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
       report.botRef = fixture.botRef
       report.menu = fixture.menu
       let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, started = null
+      let delayedStop = null, delayTimer = null, settleDelayedStop = null
       const since = () => started === null ? null : ms(performance.now() - started)
       const stop = trigger => {
         if (stopPromise) return stopPromise
         report.stop.requested = true; report.stop.trigger = trigger; report.metrics.stopRequestedMs = since()
+        report.stop.requestedAt = Date.now()
         stopPromise = rpc(session, 'coordinator.stopCoordinatorTurn', [botId], { timeoutMs: stopTimeoutMs })
-          .then(value => { report.stop.acknowledged = value?.stopped === true; report.metrics.stopAcknowledgedMs = since(); return report.stop.acknowledged })
+          .then(value => { report.stop.acknowledged = value?.stopped === true; report.metrics.stopAcknowledgedMs = since();
+            report.stop.acknowledgedAt = Date.now(); return report.stop.acknowledged })
           .catch(error => { report.stop.error = code(error); return false })
         save()
         return stopPromise
@@ -137,7 +143,7 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
             if (!event.id.startsWith(runId + ':')) fail('stream_turn_mismatch')
             if (event.type === 'start') {
               if (streamId) fail('stream_turn_mismatch')
-              streamId = event.id; report.metrics.streamStartedMs = since()
+              streamId = event.id; report.streamId = event.id; report.metrics.streamStartedMs = since()
             }
             if (!streamId || event.id !== streamId) fail('stream_turn_mismatch')
             if ((event.type === 'text' || event.type === 'reset') && event.text.length) report.metrics.firstTextMs ??= since()
@@ -146,10 +152,22 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
                 sequence: event.sequence, observedMs: since(), afterStopRequest: report.stop.requested }
               report.tools.push(observation)
               if (event.tool !== 'web_search') { void stop('unexpected_tool'); fail('unexpected_tool') }
-              if (event.state === 'running' && !report.stop.requested) {
+              if (event.state === 'running' && !report.triggerCallRef && !report.stop.requested) {
                 report.triggerCallRef = event.callRef; report.metrics.toolCallObservedMs = observation.observedMs
-                void stop('public_web_search_running')
-                clearTimeout(deadline); deadline = setTimeout(() => controller.abort('stop_deadline'), stopTimeoutMs)
+                const stopAtBoundary = () => {
+                  report.metrics.delayAfterToolCallMs = ms(since() - observation.observedMs)
+                  const stopped = stop(requestedCase === 'during_tool' ? 'public_web_search_running_after_fixed_delay' : 'public_web_search_running')
+                  clearTimeout(deadline); deadline = setTimeout(() => controller.abort('stop_deadline'), stopTimeoutMs)
+                  return stopped
+                }
+                if (requestedCase === 'during_tool') {
+                  // One client-side sample delay, never product polling or proof
+                  // that execution entered. Server intervals classify the result.
+                  delayedStop = new Promise(resolve => {
+                    settleDelayedStop = resolve
+                    delayTimer = setTimeout(() => { delayTimer = null; resolve(stopAtBoundary()) }, DURING_TOOL_DELAY_MS)
+                  })
+                } else void stopAtBoundary()
               }
             }
             if (event.type === 'committed') { report.committedObserved = true; report.metrics.committedMs = since() }
@@ -157,12 +175,16 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
           report.metrics.streamClosedMs = since()
           if (report.termination !== 'eof') fail('stream_deadline')
           if (!report.triggerCallRef) fail('tool_boundary_not_observed')
-          if (!await stopPromise) fail('stop_not_acknowledged')
+          if (!await (stopPromise ?? delayedStop)) fail('stop_not_acknowledged')
         } catch (error) { if (controller.signal.aborted) fail('stream_deadline'); throw error }
         finally { clearTimeout(deadline); controller.abort(); report.streamClosed = true }
       } catch (error) { failure = error }
       finally {
         report.cleanup.status = 'running'
+        if (delayTimer !== null) {
+          clearTimeout(delayTimer); delayTimer = null; settleDelayedStop?.(false)
+          report.sample.delayCancelledByFailure = true
+        }
         if (sent) {
           if (!stopPromise) void stop('error_cleanup')
           await stopPromise; controller?.abort()
@@ -199,6 +221,7 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
     path, method: method === 'POST' ? 'POST' : 'GET', status: Number.isInteger(status) ? status : null, headersMs: number(headersMs),
   }))
   report.signedOut = requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)
+  report.publicRunningCallCount = new Set(report.tools.filter(row => row.state === 'running').map(row => row.callRef)).size
   report.finishedAt = new Date().toISOString(); save(); return report
 }
 
@@ -208,6 +231,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (report.status !== 'observed') process.exitCode = 1
   } else {
     console.log('Usage: node coordinator-tool-stop.mjs tool-call-stop')
-    console.log('Requires exact MIKKA_ACCEPTANCE_SHA and normal ACME credentials plus a ready fixture receipt and MIKKA_FIXTURE_KIND; optional MIKKA_STOP_CASE=observe|before_tool|during_tool labels intent only.')
+    console.log('Requires exact MIKKA_ACCEPTANCE_SHA and normal ACME credentials plus a ready fixture receipt and MIKKA_FIXTURE_KIND; MIKKA_STOP_CASE=observe|before_tool stops at the public tool-call; during_tool waits once for 600ms. Actual classification requires matching server timing and final audit; every sample is retained.')
   }
 }
