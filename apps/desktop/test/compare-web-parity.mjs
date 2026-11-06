@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { compareImages } from './parity-images.mjs'
+import { assertSameCaptureClock } from './parity-clock.mjs'
 
 const [beforePath, afterPath, destination] = process.argv.slice(2)
 assert.ok(beforePath && afterPath && destination, 'Usage: compare-web-parity.mjs <before/parity> <after/parity> <diff-output>')
@@ -13,13 +14,14 @@ assert.equal(before.cleanup, 'passed'); assert.equal(after.cleanup, 'passed')
 assert.deepEqual(before.requiredScreens, after.requiredScreens)
 assert.deepEqual(before.themes, after.themes)
 assert.deepEqual(before.viewport, after.viewport)
+assertSameCaptureClock(before.captureClock, after.captureClock)
 assert.equal(typeof before.fixtureEpoch, 'string', 'Recent fixture epoch must be recorded')
 assert.equal(before.fixtureEpoch, after.fixtureEpoch, 'Both applications require the same recent fixture epoch')
 assert.equal(before.harnessSha256, after.harnessSha256, 'Before and after require identical capture and fixture helpers')
 assert.notEqual(before.environmentId, after.environmentId, 'Before and after require independently attested environments')
 const output = resolve(destination)
 await mkdir(output, { recursive: true })
-const report = { version: 1, fixtureEpoch: before.fixtureEpoch, before: { appRevision: before.appRevision, harnessRevision: before.harnessRevision, harnessSha256: before.harnessSha256, environmentId: before.environmentId }, after: { appRevision: after.appRevision, harnessRevision: after.harnessRevision, harnessSha256: after.harnessSha256, environmentId: after.environmentId }, screens: [] }
+const report = { version: 1, captureClock: before.captureClock, fixtureEpoch: before.fixtureEpoch, before: { appRevision: before.appRevision, harnessRevision: before.harnessRevision, harnessSha256: before.harnessSha256, environmentId: before.environmentId }, after: { appRevision: after.appRevision, harnessRevision: after.harnessRevision, harnessSha256: after.harnessSha256, environmentId: after.environmentId }, screens: [] }
 for (const previous of before.screens) {
   const current = after.screens.find(screen => screen.name === previous.name && screen.theme === previous.theme)
   assert.ok(current, `Missing ${previous.theme}/${previous.name}`)

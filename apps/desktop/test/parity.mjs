@@ -11,6 +11,7 @@ import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accoun
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
 import { compareImages, screenshot } from './parity-images.mjs'
+import { createCaptureClock, installCaptureClock } from './parity-clock.mjs'
 import { launchElectron } from './electron-launch.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
@@ -36,10 +37,11 @@ const initialWorkspaceMenuNames = [messages.Nav.workspaceMenu, JSON.parse(await 
 const actionIds = await readActionIds(resolve(process.env.MIKKA_TEST_APP_DIR ?? process.cwd()))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).update(await readFile(new URL('../../../scripts/acceptance/read-action-transport.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./parity-clock.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).update(await readFile(new URL('../../../scripts/acceptance/read-action-transport.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
   timeZone: 'UTC',
+  captureClock: createCaptureClock(started, process.env.MIKKA_DESKTOP_CAPTURE_TIME),
   nativeViewports: [],
   themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], startedAt: new Date(started).toISOString(), screens: [],
 }
@@ -99,6 +101,9 @@ async function launch(mode) {
   assert.equal(actualTimeZone, report.timeZone)
   report.nativeViewports.push({ mode, ...nativeViewport, timeZone: { method: 'cdp_timezone_override', actual: actualTimeZone } })
   await assertNativeViewport(page, report.viewport)
+  // Anonymous capture navigates and reloads after this point, so the shared
+  // provider's first render in every captured document sees the fixed Date.
+  await installCaptureClock(page, report.captureClock)
   return { mode, application, page, base }
 }
 
@@ -415,6 +420,7 @@ try {
     webBrowser = await chromium.launch({ headless: true })
     const context = await webBrowser.newContext({ viewport: report.viewport, deviceScaleFactor: 1, reducedMotion: 'reduce', timezoneId: 'UTC' })
     const page = await context.newPage()
+    await installCaptureClock(page, report.captureClock)
     page.setDefaultTimeout(45_000)
     page.on('pageerror', error => errors.push({ mode: 'web', name: error.name }))
     const target = { mode: 'web', page, base: `${environment.origin}${environment.basePath}` }

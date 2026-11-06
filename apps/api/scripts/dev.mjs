@@ -38,6 +38,52 @@ export async function tracingEntry({ directory, originalEntry, tracing }) {
   return entry
 }
 
+const startupFailure = code => Object.assign(new Error(code), { code })
+
+/** Subscribe before compilation. Nitro's dev:reload means the bundle exists;
+ * only the runner's address message means its application has initialized. */
+export function developmentWorkerReady(api) {
+  const pending = Promise.withResolvers()
+  void pending.promise.catch(() => {})
+  let settled = false, signal
+  const abort = () => finish(startupFailure('API_DEV_STARTUP_TIMEOUT'))
+  const finish = error => {
+    if (settled) return
+    settled = true
+    api.offMessage(message)
+    signal?.removeEventListener('abort', abort)
+    if (error) pending.reject(error)
+    else pending.resolve()
+  }
+  const message = value => {
+    if (value?.event === 'init-error') finish(startupFailure('API_DEV_WORKER_INIT_FAILED'))
+    else if (value?.address && typeof value.address === 'object') finish()
+  }
+  api.onMessage(message)
+  return {
+    wait(deadline) {
+      if (!settled) {
+        signal = deadline
+        if (signal.aborted) abort()
+        else signal.addEventListener('abort', abort, { once: true })
+      }
+      return pending.promise
+    },
+    dispose() { finish(startupFailure('API_DEV_WORKER_CANCELLED')) },
+  }
+}
+
+/** One deadline spans actual worker readiness and the original single HTTP
+ * check. A starting worker's temporary 503 is never used as its ready signal. */
+export async function developmentResponse(worker, origin, signal, read = fetch) {
+  try {
+    await worker.wait(signal)
+    const response = await read(origin + '/mikka/api/version', { signal })
+    if (!response.ok) throw startupFailure('API_DEV_STARTUP_RESPONSE_INVALID')
+    await response.body?.cancel()
+  } finally { worker.dispose() }
+}
+
 export async function closeDevelopment(development, log = console.error) {
   try { await development?.close(); return 0 }
   catch (error) {
@@ -68,10 +114,11 @@ export async function startDevelopment({ args = [], root = repository, log = con
   ])
   const generate = () => execute(process.execPath, ['apps/api/scripts/generate-routes.mjs'], { cwd: root, maxBuffer: 1024 * 1024 })
   await generate()
-  let nitro, vite, closing
+  let nitro, vite, closing, workerReady
   const close = () => closing ??= (async () => {
     // Keep the public origin alive while the real Workflow close hook drains.
     // Nitro closes its own worker/watcher/listener; Vite owns its HMR sockets.
+    workerReady?.dispose()
     try { await nitro?.close() } finally { await vite?.close() }
   })()
   try {
@@ -88,6 +135,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     nitro.options.publicAssets = []
     nitro.options.entry = await tracingEntry({ directory, originalEntry: nitro.options.entry, tracing: await compileTracing(root) })
     const api = createDevServer(nitro)
+    workerReady = developmentWorkerReady(api)
     const compiled = Promise.withResolvers()
     // Attach rejection immediately: prepare/build can finish after a watch error.
     void compiled.promise.catch(() => {})
@@ -128,9 +176,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     // build() installs a watcher. Wait for the first real graph and one existing
     // DB-free API through the public proxy before announcing readiness.
     await compiled.promise
-    const ready = await fetch(`${options.origin}/mikka/api/version`, { signal: AbortSignal.timeout(30_000) })
-    if (!ready.ok) throw new Error('API_DEV_STARTUP_RESPONSE_INVALID')
-    await ready.body?.cancel()
+    await developmentResponse(workerReady, options.origin, AbortSignal.timeout(30_000))
     log(`[dev] Local: ${options.origin}/mikka`)
     log(`[dev] Ready in ${Math.ceil(performance.now() - started)}ms (Vite + Nitro)`)
     return { ...options, nitro, vite, close }

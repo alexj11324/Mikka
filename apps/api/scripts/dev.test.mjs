@@ -5,9 +5,10 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import test from 'node:test'
+import { getEventListeners } from 'node:events'
 import { build } from 'esbuild'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, tracingEntry } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, tracingEntry } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -102,4 +103,96 @@ test('the bundled worker entry executes tracing before loading its dynamic runti
     const { stdout } = await promisify(execFile)(process.execPath, [output], { timeout: 10_000 })
     assert.equal(stdout.trim(), 'tracing-first')
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+
+function workerMessages() {
+  const listeners = new Set()
+  return {
+    onMessage(listener) { listeners.add(listener) },
+    offMessage(listener) { listeners.delete(listener) },
+    emit(message) { for (const listener of listeners) listener(message) },
+    get listenerCount() { return listeners.size },
+  }
+}
+
+test('development waits for the real worker address before its single HTTP check', async () => {
+  const api = workerMessages(), deadline = new AbortController()
+  const worker = developmentWorkerReady(api)
+  assert.equal(api.listenerCount, 1, 'the listener is installed before compilation starts')
+  let calls = 0
+  const pending = developmentResponse(worker, 'http://localhost:3000', deadline.signal, async (url, init) => {
+    calls++
+    assert.equal(url, 'http://localhost:3000/mikka/api/version')
+    assert.equal(init.signal, deadline.signal)
+    return new Response('ready')
+  })
+  api.emit({ event: 'compiled' })
+  await Promise.resolve()
+  assert.equal(calls, 0, 'compiled is not ready; no early request can exhaust the SDK address grace')
+  api.emit({ address: { host: '127.0.0.1', port: 43001 } })
+  await pending
+  assert.equal(calls, 1)
+  assert.equal(api.listenerCount, 0)
+  assert.equal(getEventListeners(deadline.signal, 'abort').length, 0)
+})
+
+test('a worker ready message arriving before the wait is retained', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api)
+  api.emit({ address: { host: '127.0.0.1', port: 43002 } })
+  await worker.wait(new AbortController().signal)
+  assert.equal(api.listenerCount, 0)
+  worker.dispose()
+})
+
+test('a real worker init error fails immediately without an HTTP retry or raw error disclosure', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api)
+  let calls = 0
+  const pending = developmentResponse(worker, 'http://localhost:3000', new AbortController().signal, async () => { calls++; return new Response('unexpected') })
+  api.emit({ event: 'init-error', error: 'private initialization detail' })
+  await assert.rejects(pending, { code: 'API_DEV_WORKER_INIT_FAILED', message: 'API_DEV_WORKER_INIT_FAILED' })
+  assert.equal(calls, 0)
+  assert.equal(api.listenerCount, 0)
+})
+
+test('worker initialization and HTTP share one deadline and always release listeners', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api), deadline = new AbortController()
+  const entered = Promise.withResolvers()
+  let calls = 0
+  const pending = developmentResponse(worker, 'http://localhost:3000', deadline.signal, async (_url, init) => {
+    calls++
+    assert.equal(init.signal, deadline.signal)
+    entered.resolve()
+    await new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true }))
+    return new Response('unreachable')
+  })
+  api.emit({ address: { host: '127.0.0.1', port: 43003 } })
+  await entered.promise
+  deadline.abort(new Error('same deadline expired'))
+  await assert.rejects(pending, /same deadline expired/)
+  assert.equal(calls, 1)
+  assert.equal(api.listenerCount, 0)
+
+  const otherApi = workerMessages(), waiting = developmentWorkerReady(otherApi), expired = new AbortController()
+  const blocked = waiting.wait(expired.signal)
+  expired.abort()
+  await assert.rejects(blocked, { code: 'API_DEV_STARTUP_TIMEOUT' })
+  assert.equal(otherApi.listenerCount, 0)
+  assert.equal(getEventListeners(expired.signal, 'abort').length, 0)
+  waiting.dispose()
+})
+
+test('worker disposal rejects an outstanding wait and HTTP failure remains fatal', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api)
+  const pending = worker.wait(new AbortController().signal)
+  worker.dispose()
+  await assert.rejects(pending, { code: 'API_DEV_WORKER_CANCELLED' })
+  assert.equal(api.listenerCount, 0)
+  const readyApi = workerMessages(), ready = developmentWorkerReady(readyApi)
+  readyApi.emit({ address: { host: '127.0.0.1', port: 43004 } })
+  let calls = 0
+  await assert.rejects(developmentResponse(ready, 'http://localhost:3000', new AbortController().signal,
+    async () => { calls++; return new Response('unavailable', { status: 503 }) }),
+  { code: 'API_DEV_STARTUP_RESPONSE_INVALID' })
+  assert.equal(calls, 1)
 })
