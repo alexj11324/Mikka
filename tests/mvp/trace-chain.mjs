@@ -69,6 +69,7 @@ async function until(read, timeout = 90_000) {
   while (Date.now() < deadline) {
     assert.ok(!children.some(job => job.startFailed), 'OWNED_PROCESS_START_FAILED')
     assert.ok(!children.some(job => !job.stopping && (job.exitCode !== null || job.signalCode !== null)), 'OWNED_PROCESS_EXITED')
+    assert.ok(!services?.hasFailures(), 'SYNTHETIC_SERVICE_FAILED')
     const value = await read()
     if (value) return value
     await delay(250)
@@ -116,6 +117,12 @@ try {
   await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,$2) ON CONFLICT ("userId") DO UPDATE SET prefix=EXCLUDED.prefix', [ownerId, 'TRCE'])
   const githubAccountId = String(1_000_000 + Math.floor(Math.random() * 1_000_000))
   await pool.query('INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,\'github\',$3,now(),now())', [randomUUID(), githubAccountId, ownerId])
+  // Repository access requires the person's sealed user connection, not only
+  // a GitHub sign-in identity. This token reaches only the fenced loopback stub.
+  checkpoint('github-connection')
+  await import('../../scripts/server-test.mjs')
+  const { saveGitHubConnection } = await import('../../lib/github/connection.ts')
+  await saveGitHubConnection(ownerId, { githubAccountId, githubLogin: `mvp-owner-${githubAccountId}` }, { access_token: 'mikka-local-synthetic-user-token' })
   await pool.query('INSERT INTO repository_settings ("userId","remoteKey","verifyCommand") VALUES ($1,$2,$3)', [ownerId, REPOSITORY_KEY, 'test -f MIKKA_MOCK.md'])
 
   for (const kind of ['success', 'failure']) {

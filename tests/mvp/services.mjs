@@ -340,6 +340,9 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
   return {
     origin: `http://127.0.0.1:${server.address().port}`,
+    // In-process acceptance can fail promptly without reading private requests
+    // or printing assertion messages from the synthetic provider boundary.
+    hasFailures: () => errors.length > 0,
     async close() {
       for (const stream of streams.values()) stream.release()
       server.closeAllConnections()
