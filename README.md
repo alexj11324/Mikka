@@ -413,7 +413,10 @@ follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
 ## Acknowledgements
 
 <p>
-  <a href="https://openai.com/form/codex-for-oss/"><img src="https://openai.com/apple-icon.png" alt="OpenAI logo" width="32" height="32"></a>
+  <a href="https://openai.com/form/codex-for-oss/"><picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI logo" width="32" height="32">
+    </picture></a>
   <strong>OpenAI · Codex for Open Source</strong>
 </p>
 
