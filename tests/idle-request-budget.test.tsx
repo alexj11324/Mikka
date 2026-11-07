@@ -53,6 +53,12 @@ mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, on
 
 const browser = new Window({ url: 'https://mikka.example/', width: 1440, height: 900 })
 const sockets: FakeSocket[] = []
+const presenceGrants = new Map<string, number>()
+const presenceProof = () => {
+  const expiresAt = Date.now() + 300_000, token = `fixture-${expiresAt}.${'a'.repeat(64)}`
+  presenceGrants.set(token, expiresAt)
+  return { token, expiresAt }
+}
 /** A healthy live channel: it opens, says which kinds it serves, answers pings and sends no events. */
 class FakeSocket {
   readyState = 0
@@ -66,9 +72,17 @@ class FakeSocket {
       if (this.readyState !== 0) return
       this.readyState = 1; this.onopen?.()
       this.onmessage?.({ data: JSON.stringify({ type: 'live_ready', version: 1, kinds: LIVE_KINDS }) })
+      if (new URL(url).searchParams.get('presence') === '1') this.onmessage?.({ data: JSON.stringify({ type: 'presence_ready', version: 1 }) })
     })
   }
-  send(value: string) { if (value === 'ping') queueMicrotask(() => this.onmessage?.({ data: 'pong' })) }
+  send(value: string) {
+    if (value === 'ping') { queueMicrotask(() => this.onmessage?.({ data: 'pong' })); return }
+    const command = JSON.parse(value)
+    if (command.type !== 'presence_watch') return
+    const expiresAt = presenceGrants.get(command.token)
+    assert.ok(expiresAt, 'a watch uses the proof from an actual fixture read')
+    queueMicrotask(() => this.onmessage?.({ data: JSON.stringify({ type: 'presence_ack', id: command.id, expiresAt }) }))
+  }
   close() { this.readyState = 3; this.onclose?.() }
 }
 
@@ -187,8 +201,9 @@ Object.assign(fixtures, {
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
   'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
   'agents.listDevices': () => [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }],
-  // The device is online through the gateway (its last HTTP heartbeat is an hour old): presence has no write.
-  'agents.pollDevices': () => ({ devices: [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }], live, presenceFallback: true }),
+  // An online gateway-only device: its acknowledged watch covers expiry and
+  // disconnects without a database heartbeat or a minute fallback read.
+  'agents.pollDevices': () => ({ devices: [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }], live: { ...live, presence: presenceProof() }, presenceFallback: true }),
   'artifacts.getArtifact': () => ({ id: ARTIFACT, kind: 'markdown', title: 'Release notes', latestVersion: 2, runId: RUN, issueId: ISSUE, botId: BOT, shared: false,
     versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })), live }),
   'artifacts.listRunArtifacts': () => [],

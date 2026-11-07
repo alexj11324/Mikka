@@ -76,6 +76,27 @@ test('cached model rechecks binding on each AI SDK step after disconnect', async
   assert.equal(fixture.doStreamCalls.length, 0)
 })
 
+test('backend construction consumes the just-authorized scope while later calls still read access afresh', async () => {
+  const { use, access } = subscriptionFixture('claude_cpa')
+  const fixture = fakeModel()
+  let reads = 0, constructions = 0
+  const model = await resolveSubscriptionModel(use, 'fixture-model', {
+    access: async () => { reads++; return access },
+    model: async (modelId, authorized) => {
+      constructions++
+      assert.equal(modelId, 'fixture-model')
+      assert.deepEqual(authorized, { binding: access.binding, connection: access.connection, backend: access.backend })
+      return fixture
+    },
+  }, () => NOW)
+  assert.equal(reads, 1)
+  access.connection = invalidateSubscriptionConnection(access.connection!, 'disconnected')
+  await assert.rejects(async () => model.doStream({ prompt: [] }), { code: 'disconnected' })
+  assert.equal(reads, 2)
+  assert.equal(constructions, 1)
+  assert.equal(fixture.doStreamCalls.length, 0)
+})
+
 test('existing default provider remains explicit when no subscription was selected', async () => {
   const model = fakeModel()
   assert.equal(await resolveAgentModel(undefined, { defaultModel: () => model }), model)

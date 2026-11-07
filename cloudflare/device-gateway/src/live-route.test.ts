@@ -13,7 +13,8 @@ function gateway() {
   const names: string[] = [], pushed: LiveInvalidation[][] = [], protocols: string[] = []
   const env: GatewayEnv = { GATEWAY_PUSH_SECRET: secret, DEVICE_SESSION: { getByName(name) {
     names.push(name)
-    return { notify: async () => {}, notifyLive: async events => { pushed.push(events) }, status: async () => ({ online: false, lastSeenAt: null }), fetch: async request => { protocols.push(request.headers.get('sec-websocket-protocol')!); return new Response(null) } }
+    return { notify: async () => {}, notifyLive: async events => { pushed.push(events) }, status: async () => ({ online: false, lastSeenAt: null }), fetch: async request => { protocols.push(request.headers.get('sec-websocket-protocol')!); return new Response(null) },
+      watchPresence: async () => ({ accepted: true, changed: false }), unwatchPresence: async () => {}, presenceChanged: async () => [] }
   } } }
   return { names, pushed, protocols, env }
 }
