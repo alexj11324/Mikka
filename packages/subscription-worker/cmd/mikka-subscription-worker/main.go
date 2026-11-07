@@ -81,7 +81,11 @@ func run() error {
 	db.SetMaxOpenConns(3)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if db.PingContext(ctx) != nil {
+	connection, err := db.Conn(ctx)
+	if err != nil {
+		return worker.ErrDatabase
+	}
+	if connection.Close() != nil {
 		return worker.ErrDatabase
 	}
 	var grants worker.SecretStore
