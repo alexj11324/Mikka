@@ -127,3 +127,35 @@ test('the same repositories give the same bytes, whatever order GitHub lists the
   const lines = (await import('./github-context')).repositoryLines(tied, [])
   assert.deepEqual(lines.slice(1), ['- octo/a', '- octo/b'])
 })
+
+test('repository use, push ordering and allowed models cannot invalidate the earlier rules breakpoint', async () => {
+  const { cachedContextLines, promptWithCachedContext } = await import('./context')
+  const { promptOptions, withCacheBreakpoints } = await import('../prompt-cache')
+  const repositories = [
+    { fullName: 'octo/first', pushedAt: '2026-01-02T00:00:00Z' },
+    { fullName: 'octo/second', pushedAt: '2026-01-01T00:00:00Z' },
+  ]
+  const turn = async (repos: typeof repositories, used: string[], models: string) => {
+    const github = await githubContext('alex', { connection: async () => ({ githubLogin: 'octo-dev' }), list: async () => ({ login: 'octo-dev', installationAccounts: ['octo'], repositories: repos }), used: async () => used }, undefined, 'bot-1')
+    const prepared = promptWithCachedContext('RULES', cachedContextLines(github, models), 'remember', '\nLIVE')
+    const messages = promptOptions(prepared).instructions
+    assert.ok(Array.isArray(messages))
+    assert.equal(messages.map(message => message.content).join(''), prepared.instructions)
+    const marked = withCacheBreakpoints([...messages, { role: 'user', content: [{ type: 'text', text: 'test' }] }], 'openaiCompatible')
+    assert.equal(marked[0].content, 'RULES')
+    assert.deepEqual(marked[0].providerOptions?.openaiCompatible?.cache_control, { type: 'ephemeral' })
+    assert.deepEqual(marked[1].providerOptions?.openaiCompatible?.cache_control, { type: 'ephemeral' })
+    assert.equal(marked[2].providerOptions, undefined)
+    return marked
+  }
+  const original = await turn(repositories, [], 'MODELS A')
+  for (const changed of [
+    await turn(repositories, ['octo/first'], 'MODELS A'),
+    await turn(repositories, ['octo/second'], 'MODELS A'),
+    await turn([repositories[0], { ...repositories[1], pushedAt: '2026-01-03T00:00:00Z' }], [], 'MODELS A'),
+    await turn(repositories, [], 'MODELS B'),
+  ]) {
+    assert.deepEqual(changed[0], original[0], 'an explicitly written rules entry remains reusable')
+    assert.notDeepEqual(changed[1], original[1], 'current repository/model facts remain current')
+  }
+})

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest"
+import { readFileSync } from "node:fs"
 import { OfficialCliTimingCollector, OFFICIAL_TIMING_EVENT_LIMIT, startCliTimingCollector } from "./official-cli-timing"
 import { runRuntimeTimings } from "./run-runtime-timing"
 import { runIdHash } from "./tracing"
@@ -41,6 +42,52 @@ it("records Codex numeric strings, status and websocket requests without treatin
   expect(JSON.stringify(receipt)).not.toContain("PRIVATE")
 })
 
+it("keeps unset OTLP timestamps unknown without deduplicating events that have no identity", () => {
+  const collector = new OfficialCliTimingCollector("run", "codex", () => 1000)
+  const values = { "event.name": "codex.api_request", duration_ms: 1 }
+  const untimed = record(values, "0")
+  const { timeUnixNano: _time, ...missing } = untimed
+  collector.accept(batch(untimed, untimed, { ...untimed, timeUnixNano: "000" }, missing,
+    { ...untimed, timeUnixNano: "invalid", observedTimeUnixNano: "1793980800000000000" },
+    record({ ...values, "event.timestamp": "1970-01-01T00:00:00.000Z" }, "0")))
+  const timed = record(values)
+  const sequenced = record({ ...values, "event.sequence": 4 }, "0")
+  collector.accept(batch(timed, timed, sequenced, sequenced))
+  const receipt = collector.finish()
+  expect(receipt.events.map(event => event.eventAt)).toEqual([null, null, null, null, null, null, 1793980800000, null])
+  expect(receipt).toMatchObject({ recordsReceived: 10, duplicates: 2, invalidEvents: 0, truncated: false })
+})
+
+it("reproduces the captured 8e refusal and carries unknown source time through the unchanged acceptance readers", async () => {
+  const { readRuntimeTiming, readOfficialCliTiming, runtimeEvidence } = await import(new URL('../../../scripts/acceptance/cloud-startup-evidence.mjs', import.meta.url).href)
+  const fixture = JSON.parse(readFileSync(new URL('../test/fixtures/codex-8e-runtime-timing.json', import.meta.url), 'utf8'))
+  const binding = { runIdHash: fixture.runIdHash, harness: fixture.harness }
+  expect(runIdHash(fixture.runId)).toBe(binding.runIdHash)
+  const captured = fixture.runtimeTiming
+  expect(readOfficialCliTiming(captured.officialCliTiming, binding)).toBeNull()
+  expect(runtimeEvidence(readRuntimeTiming(captured, binding), { requireOfficial: true }))
+    .toMatchObject({ status: 'unavailable', reason: 'official_provider_timings_missing', extraRemoteCalls: 0 })
+
+  // The production capture contains projected timings, not raw OTLP. This
+  // anonymous envelope models the serializer's documented unset timestamp.
+  const first = captured.officialCliTiming.events[0]
+  expect(first.eventAt).toBe(0)
+  const collector = new OfficialCliTimingCollector(fixture.runId, 'codex', () => first.receivedAt)
+  collector.accept(batch(record({ 'event.name': first.name, duration_ms: String(first.durationMs),
+    'http.response.status_code': first.status, attempt: first.attempt }, '0')))
+  const projected = collector.finish(true).events[0]
+  expect(projected).toEqual({ ...first, eventAt: null })
+  const corrected = structuredClone(captured)
+  corrected.officialCliTiming.events[0] = projected
+  expect(runtimeEvidence(readRuntimeTiming(corrected, binding), { requireOfficial: true }))
+    .toMatchObject({ status: 'passed', extraRemoteCalls: 0, observedProviderEvents: 2,
+      childBusiness: { status: 'observed', childLifecycleComplete: false } })
+  // This is a prospective projection regression, not a rewrite of the failed
+  // production evidence or permission for the strict reader to accept epoch 0.
+  expect(captured.officialCliTiming.events[0].eventAt).toBe(0)
+  expect(readOfficialCliTiming(captured.officialCliTiming, binding)).toBeNull()
+})
+
 it("marks missing, malformed, truncated and duplicate evidence explicitly rather than claiming complete zero calls", () => {
   const empty = new OfficialCliTimingCollector("run", "codex").finish(true)
   expect(empty).toMatchObject({ events: [], collection: "best_effort", flush: "not_confirmed", cliExitObserved: true })
@@ -63,13 +110,13 @@ it("accepts a real loopback JSON export and attaches the bounded receipt to the 
     expect(receiver.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/v1\/logs\/[a-f0-9]{32}$/)
     expect(receiver.args).toContain("otel.log_user_prompt=false")
     const response = await fetch(receiver.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify(batch(record({ "event.name": "codex.api_request", duration_ms: "35", model: "gpt-6-luna" }))) })
+      body: JSON.stringify(batch(record({ "event.name": "codex.api_request", duration_ms: "35", model: "gpt-6-luna" }, "0"))) })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({})
     await receiver.close({ cliExitObserved: true })
     const receipt = run.finish()!
     expect(receipt.officialCliTiming).toMatchObject({ runIdHash: runIdHash("official-receiver-test"), source: "official_cli_otlp",
-      cliExitObserved: true, flush: "not_confirmed", events: [{ name: "codex.api_request", durationMs: 35 }] })
+      cliExitObserved: true, flush: "not_confirmed", events: [{ name: "codex.api_request", durationMs: 35, eventAt: null }] })
   } finally { await receiver.close(); run.close() }
 })
 

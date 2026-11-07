@@ -4,6 +4,7 @@ import { LiveChannel, LIVE_FALLBACK_MS, type LiveRuntime, type LiveSocket, type 
 import { DEVICE_GATEWAY_TICKET_SECONDS } from '../device-gateway-ticket'
 
 import { LIVE_KINDS, type LiveKind } from './events'
+import type { PresenceProof } from './presence'
 
 const task = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
 const other = 'e4ec7f73-0a59-4ad4-8b3c-41f8cd510c6d'
@@ -67,6 +68,161 @@ function fixture() {
     async open() { await settle(); sockets.at(-1)!.open(); await this.advance(100) },
   }
 }
+
+const proof = (f: ReturnType<typeof fixture>, token = 'fixture', lifetime = 300_000): PresenceProof => ({ token: `${token}.${'a'.repeat(64)}`, expiresAt: f.runtime.now() + lifetime })
+const presenceFrames = (socket: Socket) => socket.sent.filter(value => value !== 'ping').map(value => JSON.parse(value) as { type: string; id: string; token?: string })
+const presenceReady = (socket: Socket) => socket.message(JSON.stringify({ type: 'presence_ready', version: 1 }))
+const presenceAck = (socket: Socket, grant: PresenceProof, id = presenceFrames(socket).findLast(frame => frame.type === 'presence_watch')!.id, expiresAt = grant.expiresAt) => socket.message(JSON.stringify({ type: 'presence_ack', id, expiresAt }))
+
+test('presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop', async () => {
+  const f = fixture(), grant = proof(f)
+  f.channel.subscribe('device_list', task, ['devices'], key => { f.reads.push(key) }, { presence: grant })
+  await f.open(); f.reads.length = 0
+  assert.equal(f.channel.keyConnected('devices'), false)
+  presenceReady(f.sockets[0])
+  assert.equal(presenceFrames(f.sockets[0]).length, 1)
+  assert.equal(f.channel.keyConnected('devices'), false)
+  await f.advance(60_000)
+  assert.deepEqual(f.reads, ['devices'])
+  presenceAck(f.sockets[0], grant)
+  assert.equal(f.channel.keyConnected('devices'), true)
+  f.reads.length = 0
+  await f.advance(180_000)
+  assert.deepEqual(f.reads, [])
+  assert.equal(f.ticketCalls(), 1)
+  f.channel.dispose()
+})
+
+test('old Workers, missing and oversized proofs preserve the existing minute fallback', async () => {
+  for (const kind of ['old-worker', 'missing', 'oversized', 'expired'] as const) {
+    const f = fixture()
+    const grant = kind === 'missing' ? null : kind === 'oversized' ? proof(f, 'x'.repeat(2048)) : proof(f, 'fixture', kind === 'expired' ? -1 : 300_000)
+    f.channel.subscribe('thread_list', task, ['threads'], key => { f.reads.push(key) }, { presence: grant })
+    await f.open(); f.reads.length = 0
+    if (kind !== 'old-worker') presenceReady(f.sockets[0])
+    assert.deepEqual(presenceFrames(f.sockets[0]), [])
+    assert.equal(f.channel.keyConnected('threads'), false)
+    await f.advance(60_000)
+    assert.deepEqual(f.reads, ['threads'])
+    f.channel.dispose()
+  }
+})
+
+test('unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage', async () => {
+  const f = fixture(), grant = proof(f)
+  f.channel.subscribe('device_list', task, ['devices'], key => { f.reads.push(key) }, { presence: grant })
+  await f.open(); f.reads.length = 0
+  presenceAck(f.sockets[0], grant, 'unsolicited')
+  assert.equal(f.channel.keyConnected('devices'), false)
+  presenceReady(f.sockets[0])
+  const id = presenceFrames(f.sockets[0])[0].id
+  presenceAck(f.sockets[0], grant, 'wrong-id')
+  presenceAck(f.sockets[0], grant, id, f.runtime.now() - 1)
+  presenceAck(f.sockets[0], grant, id, grant.expiresAt + 1)
+  assert.equal(f.channel.keyConnected('devices'), false)
+  presenceAck(f.sockets[0], grant, id)
+  assert.equal(f.channel.keyConnected('devices'), true)
+  f.sockets[0].message(JSON.stringify({ type: 'presence_unavailable', id }))
+  assert.equal(f.channel.keyConnected('devices'), false)
+  assert.deepEqual(f.reads, [])
+  await f.advance(60_100)
+  assert.deepEqual(f.reads, ['devices'])
+  f.channel.dispose()
+})
+
+test('watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback', async () => {
+  const f = fixture(), grant = proof(f, 'short', 5_000)
+  f.channel.subscribe('device_list', task, ['devices'], key => { f.reads.push(key) }, { presence: grant })
+  await f.open(); presenceReady(f.sockets[0]); presenceAck(f.sockets[0], grant); f.reads.length = 0
+  await f.advance(5_000)
+  assert.equal(f.channel.keyConnected('devices'), false)
+  assert.deepEqual(f.reads, [])
+  assert.equal(f.ticketCalls(), 1)
+  assert.equal(presenceFrames(f.sockets[0]).at(-1)!.type, 'presence_unwatch')
+  await f.advance(59_800)
+  assert.deepEqual(f.reads, [])
+  await f.advance(300)
+  assert.deepEqual(f.reads, ['devices'])
+  assert.equal(f.ticketCalls(), 1)
+  f.channel.dispose()
+})
+
+test('duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open', async () => {
+  const f = fixture(), grant = proof(f)
+  const first = f.channel.subscribe('device_list', task, ['devices'], key => { f.reads.push(key) }, { presence: grant })
+  const second = f.channel.subscribe('device_list', task, ['devices'], key => { f.reads.push(key) }, { presence: grant })
+  f.channel.subscribe('bot_list', task, ['bots'], key => { f.reads.push(key) })
+  await f.open(); presenceReady(f.sockets[0]); presenceAck(f.sockets[0], grant); f.reads.length = 0
+  assert.equal(presenceFrames(f.sockets[0]).length, 1)
+  first()
+  assert.equal(presenceFrames(f.sockets[0]).length, 1)
+  second()
+  assert.equal(presenceFrames(f.sockets[0]).at(-1)!.type, 'presence_unwatch')
+  assert.equal(f.sockets[0].readyState, 1)
+  await f.advance(180_000)
+  assert.deepEqual(f.reads, [])
+  f.channel.dispose()
+})
+
+test('changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read', async () => {
+  const f = fixture(), first = proof(f), next = proof(f, 'next')
+  const handle = f.channel.subscribe('thread_list', task, ['threads'], key => { f.reads.push(key) }, { presence: first })
+  await f.open(); presenceReady(f.sockets[0]); presenceAck(f.sockets[0], first); f.reads.length = 0
+  const oldId = presenceFrames(f.sockets[0])[0].id
+  handle.update({ presence: next })
+  assert.deepEqual(presenceFrames(f.sockets[0]).map(frame => frame.type), ['presence_watch', 'presence_unwatch', 'presence_watch'])
+  assert.equal(f.channel.keyConnected('threads'), false)
+  presenceAck(f.sockets[0], first, oldId)
+  assert.equal(f.channel.keyConnected('threads'), false)
+  presenceAck(f.sockets[0], next)
+  handle.update({ presence: next })
+  assert.equal(presenceFrames(f.sockets[0]).length, 3)
+  assert.equal(f.channel.keyConnected('threads'), true)
+  await f.advance(180_000)
+  assert.deepEqual(f.reads, [])
+  f.channel.dispose()
+})
+
+test('hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement', async () => {
+  const f = fixture(), grant = proof(f)
+  f.channel.subscribe('device_list', task, ['devices'], key => { f.reads.push(key) }, { presence: grant })
+  await f.open(); presenceReady(f.sockets[0]); presenceAck(f.sockets[0], grant); f.reads.length = 0
+  const old = f.sockets[0], oldMessage = old.onmessage!, oldId = presenceFrames(old)[0].id
+  f.visibility(false)
+  assert.equal(f.channel.keyConnected('devices'), false)
+  await f.advance(60_000)
+  assert.deepEqual(f.reads, [])
+  f.visibility(true); await f.open(); f.reads.length = 0
+  Reflect.apply(oldMessage, old, [{ data: JSON.stringify({ type: 'presence_ack', id: oldId, expiresAt: grant.expiresAt }) }])
+  assert.equal(f.channel.keyConnected('devices'), false)
+  presenceReady(f.sockets[1]); presenceAck(f.sockets[1], grant)
+  assert.notEqual(presenceFrames(f.sockets[1])[0].id, oldId)
+  assert.equal(f.channel.keyConnected('devices'), true)
+  f.sockets[1].close(); f.available(false)
+  assert.equal(f.channel.keyConnected('devices'), false)
+  await f.advance(60_100)
+  assert.deepEqual(f.reads, ['devices'])
+  f.channel.dispose()
+})
+
+test('watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription', async () => {
+  const f = fixture(), grants = Array.from({ length: 9 }, (_, i) => proof(f, `proof${i}`))
+  const handles = grants.map((grant, i) => f.channel.subscribe('device_list', task, [`device-${i}`], key => { f.reads.push(key) }, { presence: grant }))
+  await f.open(); presenceReady(f.sockets[0]); f.reads.length = 0
+  const frames = presenceFrames(f.sockets[0])
+  assert.equal(frames.length, 8)
+  for (let i = 0; i < 8; i++) presenceAck(f.sockets[0], grants[i], frames[i].id)
+  assert.equal(f.channel.keyConnected('device-8'), false)
+  await f.advance(60_000)
+  assert.deepEqual(f.reads, ['device-8'])
+  handles[0]()
+  presenceAck(f.sockets[0], grants[8])
+  assert.equal(f.channel.keyConnected('device-8'), true)
+  f.reads.length = 0
+  await f.advance(120_000)
+  assert.deepEqual(f.reads, [])
+  f.channel.dispose()
+})
 
 test('duplicate badges share a connection and one revalidation per SWR key', async () => {
   const f = fixture(), stop = f.subscribe()
@@ -533,6 +689,32 @@ function revisionFixture() {
   return { ...f, urls, ready }
 }
 
+test('one coalesced read requires the highest pushed revision of every entity behind its key', async () => {
+  const f = revisionFixture()
+  const reads: { key: string; required?: Readonly<Record<string, number>>; reuseCompleted?: boolean }[] = []
+  const refresh = (key: string, required?: Readonly<Record<string, number>>, reuseCompleted?: boolean) => { reads.push({ key, required, reuseCompleted }) }
+  f.channel.subscribe('bot_chat', task, ['chat'], refresh, { revisions: { chat: 5 } })
+  f.channel.subscribe('run', other, ['chat'], refresh, { revisions: { chat: 2 } })
+  await f.open()
+  f.sockets[0].message(JSON.stringify({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat', 'run'] }))
+  reads.length = 0
+  for (const rev of [6, 7, 6]) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
+  f.sockets[0].message(JSON.stringify({ kind: 'run', id: other, rev: 3 }))
+  await f.advance(1_000)
+  assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 7, [`run:${other}`]: 3 }, reuseCompleted: true }])
+  reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
+  await f.advance(1_000)
+  assert.deepEqual(reads, [{ key: 'chat', required: undefined, reuseCompleted: false }], 'unversioned events retain their existing read path')
+  for (const revisions of [[6, undefined], [undefined, 6]]) {
+    reads.length = 0
+    for (const rev of revisions) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
+    await f.advance(1_000)
+    assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 6 }, reuseCompleted: false }], 'an unversioned event preserves known requirements but cannot reuse a completed read')
+  }
+  f.channel.dispose()
+})
+
 test('a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one', async () => {
   const f = revisionFixture()
   const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
@@ -589,9 +771,10 @@ test('a revision never skips a key it does not cover, a version 1 Worker, or a k
 
 test('an unconditional push merged with a covered one still reads', async () => {
   const f = revisionFixture()
-  f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
+  const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
   await f.open(); f.ready(2); f.reads.length = 0
   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 6 }))
+  subscription.update({ revisions: { chat: 6 }, minIntervalMs: 2_000 })
   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
   await f.advance(3_000)
   assert.deepEqual(f.reads, ['chat'])

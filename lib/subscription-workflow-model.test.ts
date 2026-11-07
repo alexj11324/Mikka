@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
+import { cacheableInstructions } from './prompt-cache'
 const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
 mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
@@ -47,4 +49,41 @@ test('the same model marks Claude cache breakpoints and leaves a Codex request a
   const codexOptions = { prompt }
   await new SubscriptionWorkflowModel({ ...selection, route: 'codex_cpa' }).doStream(codexOptions)
   assert.equal(calls.at(-1)!.options, codexOptions)
+})
+
+test('the Codex subscription SDK request preserves only prepared stable-system cache hints', async () => {
+  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
+  const prompt = [...system, { role: 'user' as const, content: [{ type: 'text' as const, text: 'fixture-request' }] }]
+  const saved = structuredClone(prompt)
+  const options = { prompt, abortSignal: new AbortController().signal }
+  const turn = await new SubscriptionWorkflowModel({ ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' }).doStream(options)
+  await turn.stream.pipeTo(new WritableStream())
+  const forwarded = calls.at(-1)!.options as typeof options
+  let body: { messages: Record<string, unknown>[] } | undefined
+  const model = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'placeholder', fetch: async (_url, init) => {
+    body = JSON.parse(String(init?.body))
+    return new Response('data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+  } })('gpt-6-luna')
+  const result = await model.doStream(forwarded)
+  await result.stream.pipeTo(new WritableStream())
+  assert.deepEqual(body!.messages.map(message => message.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null], 'codex_stable_cache_hints_missing')
+  assert.deepEqual(body!.messages.map(message => message.content), ['RULES', 'context', 'tail', 'fixture-request'])
+  assert.equal('prompt_cache_options' in body!, false, 'implicit caching remains the default')
+  assert.equal('prompt_cache_key' in body!, false)
+  assert.equal(forwarded.abortSignal, options.abortSignal)
+  assert.deepEqual(prompt, saved)
+})
+
+test('only the supported Codex CPA route maps prepared stable-system hints', async () => {
+  const prompt = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
+  for (const frozen of [
+    { ...selection, modelId: 'gpt-6-luna', route: 'openai_siwc' as const },
+    { ...selection, modelId: 'gpt-5.5', route: 'codex_cpa' as const },
+    { ...selection, modelId: 'gpt-6-unknown', route: 'codex_cpa' as const },
+  ]) {
+    const options = { prompt }
+    const result = await new SubscriptionWorkflowModel(frozen).doStream(options)
+    await result.stream.pipeTo(new WritableStream())
+    assert.equal(calls.at(-1)!.options, options)
+  }
 })

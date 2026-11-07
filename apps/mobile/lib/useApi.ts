@@ -4,6 +4,7 @@ import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 import { apiCache as cache } from './api-cache'
 import { needsForegroundRead } from './api-read-state'
 import { live, useLive, type LiveSpec } from './live'
+import { presenceScope } from './presence-scope'
 
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
@@ -17,7 +18,7 @@ export async function prefetch(path: string) {
 }
 
 /** On signing out: nothing of this account is drawn for the next, and its live connections close. */
-export const clearApiCache = () => { cache.clear(); live.reset() }
+export const clearApiCache = () => { cache.clear(); presenceScope.clear(); live.reset() }
 
 /**
  * Loads `path` once, and lets the screen reload or patch it after a write. It
