@@ -54,7 +54,7 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
   const newest = randomUUID(), peerRun = randomUUID(), oldRun = randomUUID(), peerIssue = randomUUID()
   try {
     for (const user of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
-    for (const id of [agent, runtimeAgent]) await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [id, owner, 'Read fixture', 'codex'])
+    for (const [index, id] of [agent, runtimeAgent].entries()) await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [id, owner, 'Read fixture ' + index, 'codex'])
     for (const bot of botLooks) await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [bot.id, owner, workspace, bot.name])
     await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Peer bot\')', [peerBot, peer, workspace])
     await pool.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Read fixture\')', [runtimeDevice, owner])
