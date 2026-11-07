@@ -12,6 +12,7 @@ import * as repositoryProtocol from '@mikka/protocol/repository'
 import * as subscriptionProtocol from '@mikka/protocol/subscription'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
+import { serverRunFailure } from '../run-failure-details'
 import { ModelAdmissionError } from '../model-admission/contract'
 import * as startupTracing from '../computer/startup-tracing'
 import * as startupDiagnostics from '../computer/startup-diagnostics'
@@ -78,6 +79,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       if(modelDenied&&scope.workspaceId==='task-workspace')throw new ModelAdmissionError('modelRouteDenied')
     }},
     '@/lib/run-assignment-policy':{constrainedAssignmentPolicy,intersectRunPolicy},
+    '@/lib/run-failure-details':{serverRunFailure},
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},

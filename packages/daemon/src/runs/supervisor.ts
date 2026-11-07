@@ -1,3 +1,5 @@
+import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
 // Run supervisor: owns the run state machine
 //   queued -> preparing -> running <-> waiting_input -> finishing -> succeeded
@@ -632,7 +634,7 @@ export class RunSupervisor {
     })
     this.push(assignment.runId, {
       kind: "complete",
-      completion: { stopReason: "error", report: baseReport(error.message) },
+      completion: { stopReason: "error", report: baseReport(error.message), failureDetails: captureRunFailure(error, { runId: assignment.runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) },
     })
     this.disposeMasker(assignment.runId)
     throw error
@@ -916,6 +918,10 @@ export class RunSupervisor {
   /** Serialize Errors before masking so non-enumerable message/stack/cause
    * fields cannot bypass the same dynamic credential set as run output. */
   private logError(runId: string, error: unknown) {
+    // Captured provider exceptions can retain raw SDK causes in memory. Log
+    // only their registered identity and bounded cause fields, never messages.
+    const failure = failureFrom(error)
+    if (failure) return { code: failure.code, ...(failure.detail ? { detail: failure.detail } : {}), causes: failure.causes }
     const masker = this.maskers.get(runId)
     if (!masker) return error
     const seen = new WeakSet<object>()
@@ -941,6 +947,7 @@ export class RunSupervisor {
     stopReason: StopReason,
     error?: string,
     report: HandoffReport = baseReport(error),
+    failureDetails?: RunFailure,
   ) {
     this.active.get(runId)?.toolApproval?.revoke()
     // Report collection and capture uploads can await after the provider's
@@ -1019,9 +1026,13 @@ export class RunSupervisor {
       stopReason,
       ...(error ? { error } : {}),
     })
+    const terminalFailure = state === "failed" && !active?.cancelRequested && !active?.forcedStop
+      ? captureRunFailure(failureDetails ?? new Error(error ?? report.summary), {
+        runId, appVersion: DAEMON_VERSION, sensitiveText: [entry?.assignment.prompt ?? ""],
+      }) : undefined
     this.push(runId, {
       kind: "complete",
-      completion: { stopReason, report },
+      completion: { stopReason, report, ...(terminalFailure ? { failureDetails: terminalFailure } : {}) },
     })
     this.disposeMasker(runId)
     const run = this.active.get(runId)
@@ -1381,6 +1392,7 @@ export class RunSupervisor {
             run.cancelRequested ? run.forcedStop ?? "cancelled" : providerFailure ? "provider_failure" : error instanceof CheckpointRecoveryError ? 'blocked' : "error",
             run.cancelRequested ? undefined : message,
             { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint: checkpoint.checkpoint } : {}) },
+            captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment?.prompt ?? ""] }),
           )
         } catch (finishError) {
           this.deps.log.error(
@@ -1925,7 +1937,7 @@ export class RunSupervisor {
         const checkpoint = await this.saveTerminalCheckpoint(runId, run, capturesSaved)
         if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: checkpoint.checkpoint }
         if (this.stopping) return
-        this.finish(runId, stopReason, error ?? verifyError, report)
+        this.finish(runId, stopReason, error ?? verifyError, report, event.failureDetails)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },
           "run ended",

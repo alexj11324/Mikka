@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { runFailureSchema } from "./run-failure"
 
 export const coordinatorRuntimeSchema = z.discriminatedUnion("harness", [
   z.object({ harness: z.literal("ai_sdk") }).strict(),
@@ -16,13 +17,15 @@ export const nativeCoordinatorJobSchema = z.object({
   context: z.string().min(1).max(500_000),
   tools: z.array(coordinatorToolSpecSchema).max(100),
   expiresAt: z.iso.datetime(),
+  /** Claim response capability; absent on servers with the legacy strict failed command. */
+  failureDetailsVersion: z.literal(1).optional(),
 })
 export type NativeCoordinatorJob = z.infer<typeof nativeCoordinatorJobSchema>
 export const nativeCoordinatorClaimSchema = z.object({ job: nativeCoordinatorJobSchema.nullable() })
 export const nativeCoordinatorCommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("tool"), callId: z.string().min(1).max(200), name: z.string().min(1).max(64), input: z.record(z.string(), z.unknown()) }).strict(),
   z.object({ type: z.literal("complete"), text: z.string().min(1).max(200_000).refine(value => value.trim().length > 0) }).strict(),
-  z.object({ type: z.literal("failed") }).strict(),
+  z.object({ type: z.literal("failed"), failureDetails: runFailureSchema.optional() }).strict(),
 ])
 export type NativeCoordinatorCommand = z.infer<typeof nativeCoordinatorCommandSchema>
 export const nativeCoordinatorToolResultSchema = z.discriminatedUnion("status", [
