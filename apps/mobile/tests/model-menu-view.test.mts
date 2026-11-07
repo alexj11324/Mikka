@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { groupTitle, modelDisplayName, modelMenuLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
+import { groupTag, groupTitle, HOSTED_CHOICE, modelDisplayName, modelMenuLabel, modelSourceLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
 
 const current: ModelMenu['current'] = { id: 'fixture', modelId: 'fixture-model', provider: 'claude', kind: 'subscription', chosen: true, available: false, availability: 'checking', credentialLabel: 'owner@example.test' }
 
@@ -40,4 +40,13 @@ test('a used-up subscription without a fallback never claims it switched to a pa
   assert.match(modelStatusLine(exhausted)?.line ?? '', /额度用完/)
   assert.doesNotMatch(modelStatusLine(exhausted)?.line ?? '', /按 token 计费|改用/)
   assert.equal(modelStatusLine(exhausted)?.change, true)
+})
+
+test('cloud hosted choices identify Mikka Cloud credits while self-hosted and older servers retain their own billing labels', () => {
+  const hosted: ModelMenu['current'] = { id: HOSTED_CHOICE, modelId: '', provider: 'mikka', kind: 'hosted', available: true, chosen: true, hostedSource: 'cloud' }
+  assert.equal(groupTag({ kind: 'hosted', hostedSource: 'cloud', options: [hosted] }), 'Mikka Cloud 额度')
+  assert.equal(groupTag({ kind: 'hosted', hostedSource: 'self-hosted', options: [] }), '自带服务商')
+  assert.equal(groupTag({ kind: 'hosted', options: [] }), '点数')
+  assert.equal(modelMenuLabel(hosted), 'Mikka 默认', 'the composer chip stays compact')
+  assert.equal(modelSourceLabel(hosted), 'Mikka 默认 · Mikka Cloud 额度')
 })

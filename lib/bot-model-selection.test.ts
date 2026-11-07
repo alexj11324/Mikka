@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { before, beforeEach, mock, test } from 'node:test'
+import { after, before, beforeEach, mock, test } from 'node:test'
 import { COORDINATOR_MODEL } from './coordinator/model'
 import type { SubscriptionService } from './subscription-service'
 import type { BotSubscriptionChoice } from './bot-model-choice'
@@ -64,9 +64,17 @@ mock.module(new URL('./abuse/resolve.ts', import.meta.url).href, { namedExports:
 } })
 let freezeBotModel: typeof import('./bot-model-selection')['freezeBotModel']
 let resolveFrozenHostedModel: typeof import('./subscription-model-snapshot')['resolveFrozenHostedModel']
+const savedEdition = process.env.MIKKA_EDITION
 before(async () => {
+  // This fixture exercises the official hosted-points fallback; community
+  // defaults and cloud bindings have separate model/readiness coverage.
+  process.env.MIKKA_EDITION = 'cloud'
   ;({ freezeBotModel } = await import('./bot-model-selection'))
   ;({ resolveFrozenHostedModel } = await import('./subscription-model-snapshot'))
+})
+after(() => {
+  if (savedEdition === undefined) delete process.env.MIKKA_EDITION
+  else process.env.MIKKA_EDITION = savedEdition
 })
 const noSubscription = {
   service: () => { throw new Error('subscription backend must not be constructed') },

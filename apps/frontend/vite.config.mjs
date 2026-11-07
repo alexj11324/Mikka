@@ -8,7 +8,7 @@ import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
 import { sharedStylePlugins } from './scripts/shared-styles.mjs'
 
 function applicationBuild() {
-  const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA
+  const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.MIKKA_BUILD_REVISION ?? process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA
   if (configured !== undefined) return configured
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return '' }
 }
@@ -36,6 +36,8 @@ export async function frontendConfig({ target = 'web', command = 'build', outdir
       // never imports its browser auth forms or third-party script loader.
       'process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '' : ''),
       'process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '' : ''),
+      'process.env.POSTHOG_HOST': JSON.stringify(target === 'web' ? process.env.POSTHOG_HOST ?? '' : ''),
+      'process.env.NEXT_PUBLIC_POSTHOG_HOST': JSON.stringify(target === 'web' ? process.env.POSTHOG_HOST ?? process.env.NEXT_PUBLIC_POSTHOG_HOST ?? '' : ''),
       'process.env.NEXT_PUBLIC_POSTHOG_KEY': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(target === 'web' ? process.env.VERCEL_ENV ?? '' : ''),

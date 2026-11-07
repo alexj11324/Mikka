@@ -25,6 +25,7 @@ const STARTUP_PHASES = new Set(['daemon.adapter.model_report', 'daemon.adapter.a
   'daemon.adapter.auth.context', 'daemon.adapter.auth.access', 'daemon.adapter.auth.token', 'daemon.adapter.auth.native_auth',
   'daemon.adapter.auth.refresh', 'daemon.adapter.auth.broker', 'daemon.adapter.workspace.shadow_clone', 'daemon.adapter.workspace.read_tree',
   'daemon.adapter.cli_init', 'daemon.adapter.account_check', 'daemon.adapter.account_check.account_info', 'daemon.adapter.account_check.login'])
+const PREPARATION_PHASES = new Set([...STARTUP_PHASES, 'daemon.adapter.cli_init.prewarm'])
 const sha = value => createHash('sha256').update(value).digest('hex')
 const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cause } : undefined) }
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
@@ -357,7 +358,7 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
 }
 
-function readStartupTiming(value, record) {
+function readStartupTiming(value, record, names = STARTUP_PHASES) {
   const duration = number => Number.isFinite(number) && number >= 0 && number <= 3_600_000
   const outcome = text => text === 'ok' || text === 'error'
   if (value?.version !== 1 || !/^[a-f0-9]{16}$/.test(value.runIdHash ?? '') || value.runIdHash !== record.runIdHash
@@ -366,13 +367,35 @@ function readStartupTiming(value, record) {
     || !duration(value.ms) || typeof value.truncated !== 'boolean' || !Array.isArray(value.phases) || value.phases.length > 64) return null
   const phases = []
   for (const phase of value.phases) {
-    if (!STARTUP_PHASES.has(phase?.name) || !outcome(phase.outcome) || !duration(phase.ms) || !duration(phase.startMs)
+    if (!names.has(phase?.name) || !outcome(phase.outcome) || !duration(phase.ms) || !duration(phase.startMs)
       || !duration(phase.endMs) || phase.endMs < phase.startMs || phase.endMs > value.ms + 0.01
       || Math.abs(phase.ms - (phase.endMs - phase.startMs)) > 0.01) return null
     phases.push({ name: phase.name, startMs: phase.startMs, endMs: phase.endMs, ms: phase.ms, outcome: phase.outcome })
   }
   return { version: 1, runIdHash: value.runIdHash, harness: value.harness, startedAt: value.startedAt, endedAt: value.endedAt,
     ms: value.ms, outcome: value.outcome, phases, truncated: value.truncated }
+}
+
+function readPreparationTiming(value, record, stage) {
+  if (value?.source !== 'prepared_agent_start' || value.harness !== 'claude_code' || !stage) return null
+  const timing = readStartupTiming(value, record, PREPARATION_PHASES)
+  // The task-owned Promise starts before the stage joins it and settles before
+  // that join returns. Never rebase its earlier intervals onto the stage root.
+  if (!timing || timing.startedAt > stage.startedAt || timing.endedAt > stage.endedAt) return null
+  return { ...timing, source: 'prepared_agent_start' }
+}
+
+/** Both start paths require actual successful CLI initialization. A provided
+ * but invalid/incomplete preparation receipt cannot fall back to old evidence. */
+export function hasStartupInitialization(record) {
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  if (record.startupTimingStatus !== 'complete' || !stage || stage.truncated || stage.outcome !== 'ok') return false
+  const has = (timing, name) => timing.phases.some(phase => phase.name === name && phase.outcome === 'ok')
+  if (record.preparationTimingStatus === undefined || record.preparationTimingStatus === 'unavailable')
+    return record.daemonPreparationTiming === undefined && has(stage, 'daemon.adapter.cli_init')
+  const prepared = record.preparationTimingStatus === 'complete' && readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  return Boolean(prepared && !prepared.truncated && prepared.outcome === 'ok'
+    && has(prepared, 'daemon.adapter.cli_init.prewarm') && has(prepared, 'daemon.adapter.cli_init'))
 }
 
 /** Only post-start provider output counts. Stage/usage/state/status and a bare
@@ -404,6 +427,12 @@ export function observeChunks(record, detail, observedAt) {
           if (timing) record.daemonStartupTiming ??= timing
           record.startupTimingStatus = record.daemonStartupTiming ? (record.daemonStartupTiming.truncated ? 'truncated' : 'complete')
             : data.startupTiming === undefined ? 'unavailable' : 'invalid'
+          if (data.preparationTiming !== undefined) {
+            const preparation = readPreparationTiming(data.preparationTiming, record, timing)
+            if (preparation) record.daemonPreparationTiming ??= preparation
+            record.preparationTimingStatus = record.preparationTimingStatus === 'invalid' || !preparation ? 'invalid'
+              : preparation.truncated ? 'truncated' : 'complete'
+          } else record.preparationTimingStatus ??= 'unavailable'
         }
         if (data.stage === 'agent_start' && data.ok) {
           started = true
@@ -704,7 +733,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
@@ -714,8 +743,8 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
-    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId), requireOfficialTiming: officialTiming === 'enabled',
-    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required'),
+    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
+    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
     stages: [], status: 'running', phase: 'build_pin', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')
@@ -736,8 +765,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'chat_model_selection'
     await chooseSharedChatModel(client, botId, harness)
     record.phase = 'issue_create'
+    const leaseDriver = leaseAudit ? await import('./cloud-lease-audit.mjs') : null
+    const leaseInstructions = leaseDriver ? await leaseDriver.leaseAuditInstructions(sampleId, harness) : ''
     const created = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: {
-      type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.` }] }],
+      type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.\n${leaseInstructions}` }] }],
     } }])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
     await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs }, now)
@@ -747,7 +778,13 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'execution_watch'
-    await watchRun(client, record, timeoutMs, WebSocketImpl, now)
+    await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver ? {
+      observe: detail => {
+        const complete = observeChunks(record, detail, now())
+        record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
+        return complete
+      },
+    } : undefined)
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'build_pin'
@@ -755,8 +792,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'execution_receipt'
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
     if (record.requireAgentAcceptance) assert(record.runtimeTiming?.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'), 'official_agent_acceptance_missing')
-    if (!deviceId && (runtimeEvidenceMode === 'required' || officialTiming === 'enabled')) assert(record.startupTimingStatus === 'complete' && record.daemonStartupTiming?.outcome === 'ok'
-      && record.daemonStartupTiming.phases.some(phase => phase.name === 'daemon.adapter.cli_init'), 'daemon_startup_timing_incomplete')
+    if (!deviceId && (runtimeEvidenceMode === 'required' || officialTiming === 'enabled')) assert(hasStartupInitialization(record), 'daemon_startup_timing_incomplete')
     record.observed = { messageToAgentStartMs: dateValue(record.agentStart.observedAt) - dateValue(record.messageSubmittedAt),
       toolObservedToAgentStartMs: dateValue(record.agentStart.observedAt) - dateValue(record.dispatchObservedAt),
       toolObservedToFirstProviderMs: dateValue(record.firstProviderChunk.observedAt) - dateValue(record.dispatchObservedAt),

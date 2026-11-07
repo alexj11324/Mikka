@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { EventEmitter } from 'node:events'
+import { runFailureSchema } from '@mikka/protocol/run-failure'
+import { EventEmitter, getEventListeners } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import test, { type TestContext } from 'node:test'
 import { setImmediate } from 'node:timers/promises'
@@ -191,6 +192,16 @@ test('private routing rejects foreign/self/third peers and an unavailable writer
 const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires a loopback *_e2e database')
 
+async function waitForGroupAbort(signal: AbortSignal, stop: () => Promise<void>) {
+  const aborted = Promise.withResolvers<void>()
+  const onAbort = () => aborted.resolve()
+  // COMMIT can notify the worker before the Stop caller receives its response.
+  if (signal.aborted) onAbort()
+  else signal.addEventListener('abort', onAbort, { once: true })
+  try { await stop(); await aborted.promise }
+  finally { signal.removeEventListener('abort', onAbort) }
+}
+
 /** Only controls scheduling: every statement and result still comes from PG.
  * The separate normal Stop request must commit before the worker proceeds. */
 function groupQueryBarrier(t: TestContext, conversationId: string, phase: 'selected' | 'publishing') {
@@ -306,7 +317,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(await readFile(new URL('../../drizzle/20261103220300_group_decision_quality.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
-    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)
+    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid, "failureDetails" jsonb)`)
     await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)` )
     // The current active-agent reader resolves public Bot names before its
     // legacy execution-name fallback. Keep those real SQL dependencies present.
@@ -367,9 +378,10 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     releasePending = unblock
     const running = processGroupTurn(scoped,id,blocked); await waiting
     // Match #79 9760e912's existing owner + working + live lease predicate.
-    const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
+    const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId","workspaceId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
     const active = await activeRuns()
     assert.equal(active.length,1); assert.equal(active[0].agentId,a); assert.equal(active[0].kind,'group_chat')
+    assert.equal(active[0].workspaceId, workspaceId, 'task-free status rows inherit the persisted conversation tenant')
     // Exercise the current main reader and HTTP response against the actual bridge row.
     const [{ drizzle }, schema, { listActiveAgents, activeAgentsResponse }] = await Promise.all([import('drizzle-orm/node-postgres'), import('../db/schema'), import('../active-agents')])
     const db = drizzle(scoped, { schema })
@@ -454,7 +466,12 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(`UPDATE group_turns SET status='running',"agentId"=$2,"activeRunId"=$3 WHERE "messageId"=$1`,[interrupted,a,interruptedRun])
     assert.equal(await processGroupTurn(scoped,id,runtime),false)
     assert.equal((await activeRuns()).length,0)
-    assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[interruptedRun])).rows[0].status,'failed')
+    const interruptedState = (await scoped.query('SELECT status,"failureDetails" FROM agent_runs WHERE id=$1',[interruptedRun])).rows[0]
+    assert.equal(interruptedState.status,'failed')
+    const interruptedFailure = runFailureSchema.parse(interruptedState.failureDetails)
+    assert.equal(interruptedFailure.code,'run_failed')
+    assert.equal(interruptedFailure.runId,interruptedRun)
+    assert.equal(interruptedFailure.providerMessage,undefined)
     assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[unrelated])).rows[0].status,'running')
     assert.equal((await scoped.query('SELECT error,"agentId" FROM group_turns WHERE "messageId"=$1',[interrupted])).rows[0].error,'interrupted_generation_not_replayed')
     // An unavailable or uncertain route never silently selects a lead.
@@ -514,10 +531,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const stoppedRoot = await send(id,'stopped mid reply',[a])
     let aborted = false
     assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate(_agent,input) {
-      const stop = await handleGroup(scoped,directory,{...base,userId:'member',resource:'stop',id},true)
-      assert.equal(stop.status,200); assert.ok((stop.body as {stopped:number}).stopped>=1,'stop also cancels recoverable pending judgments')
-      await new Promise<void>(resolve => input.signal?.addEventListener('abort',() => { aborted = true; resolve() },{once:true}))
-      throw input.signal?.reason
+      const signal = input.signal
+      assert.ok(signal)
+      await waitForGroupAbort(signal, async () => {
+        const stop = await handleGroup(scoped,directory,{...base,userId:'member',resource:'stop',id},true)
+        assert.equal(stop.status,200); assert.ok((stop.body as {stopped:number}).stopped>=1,'stop also cancels recoverable pending judgments')
+      })
+      aborted = true
+      throw signal.reason
     }}),true)
     assert.ok(aborted,'the reply in flight is aborted')
     assert.deepEqual((await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[stoppedRoot])).rows[0],{status:'failed',error:'stopped',agentId:null})
@@ -791,6 +812,40 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
         await assertGroupTerminal(scoped, group, root, terminals, { started: 1, settled: 1, aborted: 0 }, startedAt)
       } finally { barrier.release(); await work.catch(() => {}); barrier.restore() }
     })
+
+    await t.test('two conversations owned by the same person persist distinct task-free Run tenants', async () => {
+      const otherWorkspaceId = randomUUID()
+      const otherDirectory: typeof directory = async (w,u,selected=[]) => w === otherWorkspaceId && u === 'owner'
+        && selected.every(member => member.memberType === 'user' ? member.memberId === 'owner' : members.some(agent => agent.id === member.memberId))
+      const created = await handleGroup(scoped,otherDirectory,{...base,body:JSON.stringify({
+        workspaceId:otherWorkspaceId,title:'Other tenant',members:[{memberType:'agent',memberId:a}],
+      })},true)
+      assert.equal(created.status,201)
+      const groupId = (created.body as {id:string}).id
+      const sent = await handleGroup(scoped,otherDirectory,{...base,resource:'messages',id:groupId,body:JSON.stringify({
+        body:'same owner, another persisted tenant',mentions:[{memberType:'agent',memberId:a}],
+      })},true)
+      assert.equal(sent.status,201)
+      const messageId = (sent.body as {id:string}).id
+      let seenRunId: string | undefined
+      assert.equal(await processGroupTurn(scoped,groupId,{...runtime,
+        authorized:(w,u)=>otherDirectory(w,u),
+        async generate(agent,input) {
+          const {rows:[run]}=await scoped.query(`SELECT r.id,r."workspaceId",r."issueId",r."botId" FROM group_turns t
+            JOIN agent_runs r ON r.id=t."activeRunId" WHERE t."messageId"=$1`,[messageId])
+          assert.ok(run)
+          assert.equal(run.workspaceId,otherWorkspaceId)
+          assert.equal(run.issueId,null); assert.equal(run.botId,null)
+          seenRunId=run.id
+          return runtime.generate(agent,input)
+        },
+      }),true)
+      assert.ok(seenRunId)
+      assert.deepEqual((await scoped.query('SELECT "workspaceId",status FROM agent_runs WHERE id=$1',[seenRunId])).rows,
+        [{workspaceId:otherWorkspaceId,status:'succeeded'}])
+      assert.equal((await scoped.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1',[active[0].id])).rows[0].workspaceId,workspaceId)
+    })
+
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })
@@ -810,6 +865,61 @@ test('停止 aborts a reply in flight once the fallback check sees it, and leave
   stop = true
   await assert.rejects(pending, /stopped/)
   assert.equal(await untilStopped(async () => false, { every: 5 }, async () => 'done'), 'done')
+})
+test('group stop fixture observes cancellation delivered before the Stop response returns', async () => {
+  const delivered = Promise.withResolvers<void>(), response = Promise.withResolvers<void>()
+  let wake!: () => void, completed = false, unsubscribed = false, returned = false
+  const pending = untilStopped(async () => true, {
+    reliable: true, subscribe: callback => { wake = callback; return () => { unsubscribed = true } },
+  }, signal => {
+    signal.addEventListener('abort', () => delivered.resolve(), { once: true })
+    return waitForGroupAbort(signal, async () => {
+      wake()
+      await response.promise
+      returned = true
+    }).then(() => { completed = true })
+  })
+  await delivered.promise
+  assert.equal(returned, false, 'the worker receives the committed Stop before its caller gets the response')
+  assert.equal(completed, false, 'cancellation does not bypass the outstanding Stop request')
+  response.resolve()
+  await setImmediate()
+  assert.equal(completed, true, 'a previously delivered abort must not leave the generator waiting forever')
+  await pending
+  assert.equal(unsubscribed, true)
+})
+test('group stop fixture observes an already cancelled signal', async () => {
+  const controller = new AbortController()
+  controller.abort(new Error('stopped'))
+  let completed = false, calls = 0
+  const pending = waitForGroupAbort(controller.signal, async () => { calls++ }).then(() => { completed = true })
+  await setImmediate()
+  assert.equal(completed, true)
+  await pending
+  assert.equal(calls, 1)
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+})
+test('group stop fixture still waits when the Stop response arrives before cancellation', async () => {
+  const returned = Promise.withResolvers<void>()
+  let wake!: () => void, signal!: AbortSignal, completed = false
+  const pending = untilStopped(async () => true, {
+    reliable: true, subscribe: callback => { wake = callback; return () => {} },
+  }, current => {
+    signal = current
+    return waitForGroupAbort(current, async () => { returned.resolve() }).then(() => { completed = true })
+  })
+  await returned.promise
+  await setImmediate()
+  assert.equal(completed, false, 'the Stop response alone is not evidence that the generator was cancelled')
+  wake()
+  await pending
+  assert.equal(completed, true)
+  assert.equal(getEventListeners(signal, 'abort').length, 0)
+})
+test('group stop fixture removes its listener and preserves a failed Stop request', async () => {
+  const controller = new AbortController(), failure = new Error('synthetic Stop failure')
+  await assert.rejects(waitForGroupAbort(controller.signal, async () => { throw failure }), error => error === failure)
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
 })
 test('停止 aborts a reply in flight on the stop push, with no per-second check (#1212)', async () => {
   let stop = false, checks = 0, wake: (() => void) | undefined, subscribed = 0

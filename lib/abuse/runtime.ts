@@ -1,8 +1,9 @@
 import 'server-only'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
+import { isCloudEdition } from '@/lib/edition'
 import { HostedUsageStore } from './store'
-export const hostedUsage = new HostedUsageStore(pool)
+export const hostedUsage = new HostedUsageStore(pool, { metered: isCloudEdition() })
 /**
  * The legacy snapshot lives with workspaces, not in the application's DB.
  * Verification also belongs to the person (decision 2026-10-31-2225): a
@@ -12,6 +13,7 @@ export const hostedUsage = new HostedUsageStore(pool)
  * would find their new personal workspace silently unable to run anything.
  */
 export async function ensureLegacyVerification(workspaceId: string) {
+  if (!hostedUsage.metered) return
   if (
     (
       await workspacePool.query(

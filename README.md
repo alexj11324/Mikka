@@ -29,6 +29,19 @@ Each bot also has a cloud desktop you can watch, take over and hand back.
 Track progress, respond when needed and review results in one place, on the web,
 in the macOS desktop app or in the iOS app.
 
+## Run your own server
+
+Deploy the [self-hosted Docker server](docs/self-hosting.md), then connect the
+official app to its address. The image provides the API, realtime updates,
+daemon gateway, scheduler, migrations and your own model credentials. Its
+default web entry exposes server information and keeps the authentication
+pages needed by the official clients.
+
+The full community workspace UI remains in the public source and still builds,
+but is frozen and disabled by default. Set `MIKKA_COMMUNITY_UI=1` and recreate
+the app container to enable that compatibility UI. The official UI is maintained
+separately; paid UI libraries are not distributed in this repository or image.
+
 ## How Mikka works
 
 - **Bots coordinate. Agents execute.**

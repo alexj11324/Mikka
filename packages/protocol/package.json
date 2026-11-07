@@ -36,6 +36,7 @@
     "./preview": "./src/preview.ts",
     "./profile": "./src/profile.ts",
     "./provider-failure": "./src/provider-failure.ts",
+    "./run-failure": "./src/run-failure.ts",
     "./coded-error": "./src/coded-error.ts",
     "./user-error-codes": "./src/user-error-codes.ts",
     "./quota": "./src/quota.ts",

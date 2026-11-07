@@ -43,24 +43,32 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     }
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
-    const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
-    const dispatch = createFactoryDispatch(pool, store, async (tx, userId, input, botId) => {
-      const runId = randomUUID();
-      await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, fixture[userId].deviceId, input.deviceRepoId, botId]);
-      return { runId };
-    }, { configure: { execute: async () => {} }, freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: "fixture", harness: "codex" })]); } });
-    const questions = createFactoryQuestions(pool, authorize, store, dispatch);
-    const asked = async (kind: string, text: string, options: string[], user = "owner") => {
+    const runtimeForBot = (botId: string | null = null) => {
+      const store = createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent });
+      const dispatch = createFactoryDispatch(pool, store, async (tx, userId, input, scopeBotId) => {
+        const runId = randomUUID();
+        await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId","workspaceId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,(SELECT "workspaceId" FROM issues WHERE id=$3),'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, fixture[userId].deviceId, input.deviceRepoId, scopeBotId]);
+        return { runId };
+      }, { configure: { execute: async () => {} }, freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: "fixture", harness: "codex" })]); } });
+      return { store, dispatch, questions: createFactoryQuestions(pool, authorize, store, dispatch) };
+    };
+    const { store, dispatch, questions } = runtimeForBot();
+    const asked = async (kind: string, text: string, options: string[], user = "owner", botId: string | null = null) => {
       const { agentId, repoId } = fixture[user];
       const issueId = randomUUID(), src = randomUUID(), questionId = randomUUID();
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal',$3,'bound')`, [issueId, user, await seedFixtureWorkspace(pool, user)]);
-      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$3,'user_message',$2,'{"text":"synthetic"}')`, [src, src, user]);
-      const r = await store.route(user, { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
-      const { runId } = await dispatch(user, { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
+      const runtime = botId ? runtimeForBot(botId) : { store, dispatch, questions };
+      const workspaceId = botId
+        ? (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, user])).rows[0]?.workspaceId
+        : await seedFixtureWorkspace(pool, user);
+      assert.ok(workspaceId, "the question fixture must use its actual Bot's tenant");
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal',$3,'bound')`, [issueId, user, workspaceId]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload,"botId") VALUES ($1,$3,'user_message',$2,'{"text":"synthetic"}',$4)`, [src, src, user, botId]);
+      const r = await runtime.store.route(user, { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
+      const { runId } = await runtime.dispatch(user, { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
       await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"sessionId"='session:'||id,"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [runId, kind === "external" ? "blocked" : "asked_human",
         JSON.stringify({ summary: "Synthetic hand-in", openQuestions: [text], question: { questionId, kind, question: text, options } })]);
-      await questions.record(user, runId);
-      return { taskId: r.task.id, runId, questionId };
+      await runtime.questions.record(user, runId);
+      return { taskId: r.task.id, runId, questionId, sourceEventId: src };
     };
     const get = (userId: string | null, query = "") =>
       handleFactoryQuestionList(questions, { actor: userId ? { userId } : null, authorization: null, method: "GET", url: `https://mikka.test/api/factory/questions${query}` });
@@ -315,6 +323,46 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await get("owner", `?taskId=${a.taskId}&runId=${a.runId}`)).status, 422);
       assert.equal((await get("owner", "?runId=nope")).status, 422);
       assert.equal((await get(null)).status, 401);
+    });
+
+    await t.test("public question GETs read the user's named Bots without changing scoped reads or writes", async () => {
+      const firstBot = randomUUID(), secondBot = randomUUID(), foreignBot = randomUUID();
+      for (const [id, user] of [[firstBot, "owner"], [secondBot, "owner"], [foreignBot, "intruder"]])
+        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Question fixture')`, [id, await seedFixtureWorkspace(pool, user), user]);
+      const first = await asked("permission", "Continue the original task?", ["Continue"], "owner", firstBot);
+      const second = await asked("external", "Wait for the external service?", ["Continue"], "owner", secondBot);
+      const foreign = await asked("permission", "Other person's task", ["Continue"], "intruder", foreignBot);
+      const before = await dbHash();
+      const ids = (res: Awaited<ReturnType<typeof get>>) => (res.body as { questions: { questionId: string }[] }).questions.map(q => q.questionId);
+      for (const q of [first, second]) {
+        const byTask = await get("owner", `?taskId=${q.taskId}`);
+        assert.equal(byTask.status, 200, "the collection route must resolve the task's actual Bot");
+        assert.deepEqual(ids(byTask), [q.questionId]);
+        assert.deepEqual(ids(await get("owner", `?runId=${q.runId}`)), [q.questionId]);
+        await assert.rejects(questions.read("owner", q.questionId), { code: "factoryNotFound" }, "scoped detail reads remain scoped");
+        await assert.rejects(questions.list("owner", q.taskId), { code: "factoryNotFound" }, "default lists remain scoped");
+        assert.deepEqual(await questions.pending("owner", q.runId), [], "default pending remains scoped");
+      }
+      const pending = ids(await get("owner"));
+      assert.ok(pending.includes(first.questionId) && pending.includes(second.questionId));
+      assert.ok(!pending.includes(foreign.questionId));
+      assert.equal((await get("intruder", `?taskId=${first.taskId}`)).status, 404);
+      assert.equal((await get("owner", `?taskId=${foreign.taskId}`)).status, 404);
+      assert.deepEqual(ids(await get("owner", `?runId=${foreign.runId}`)), []);
+      const actual = await runtimeForBot(firstBot).questions.read("owner", first.questionId);
+      await assert.rejects(questions.answer({ source: "human", userId: "owner", sessionId: "not-used" }, {
+        reference: actual.reference, answerId: randomUUID(), text: "Continue",
+      }), { code: "factoryNotFound" }, "a user-wide GET does not authorize an unscoped answer");
+      assert.equal(await dbHash(), before, "public GETs and rejected writes changed no rows or sequences");
+
+      await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [first.sourceEventId, secondBot]);
+      assert.equal((await get("owner", `?taskId=${first.taskId}`)).status, 404, "source must still belong to the task's actual Bot");
+      assert.deepEqual(ids(await get("owner", `?runId=${first.runId}`)), []);
+      await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [first.sourceEventId, firstBot]);
+      await pool.query('UPDATE bots SET "ownerId"=$2 WHERE id=$1', [firstBot, "intruder"]);
+      assert.equal((await get("owner", `?taskId=${first.taskId}`)).status, 404, "the task Bot must still belong to the requester");
+      await pool.query('UPDATE bots SET "ownerId"=$2 WHERE id=$1', [firstBot, "owner"]);
+      assert.equal((await get("owner", `?taskId=${first.taskId}`)).status, 200, "restored authorized source reads normally");
     });
   } finally {
     await dropTestDatabase(admin, database, pool);

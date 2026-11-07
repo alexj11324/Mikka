@@ -5,12 +5,12 @@ import { RUN_RECOVERY_DUE_SQL, runRecoveryDueParams } from './run-recovery-due'
 import { ACCOUNT_DELETIONS_DUE_SQL } from './account-deletions-due'
 import { AUDIT_OUTBOX_DUE_SQL, AUDIT_RETENTION_DUE_SQL } from './audit-retention-due'
 
-export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boolean; deletions: boolean; audit: boolean }
+export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boolean; deletions: boolean; audit: boolean; pushReceipts: boolean }
 
 /**
  * The one safety-net check (#1371), every 15 minutes: which event-driven jobs
  * have work already due that no wake or timer picked up. One statement; on an
- * idle database each part reads an empty index or table and all three are false.
+ * idle database each part reads an empty index or table and all are false.
  * - wakes: a pending inbox row whose wake is due and unleased (the
  *   coordinator_events_wake_due_idx partial index), or a turn holding a chat
  *   lease that may have ended without letting go (recoverInterruptedTurns).
@@ -20,6 +20,7 @@ export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boole
  * - deletions: an account deletion, chat file or retired object due for cleanup.
  * - audit: audit events past their retention, or (a second statement, on the workspace
  *   database where the outbox lives) an audit receipt not yet delivered.
+ * - pushReceipts: a due, unleased push receipt whose Workflow wake was lost.
  */
 export async function reconcileDue(pool: Pick<Pool, 'query'>, options: { factoryLifecycle: boolean; workspace?: Pick<Pool, 'query'> }): Promise<ReconcileDue> {
   const { rows } = await pool.query<ReconcileDue>(`SELECT
@@ -29,9 +30,11 @@ export async function reconcileDue(pool: Pick<Pool, 'query'>, options: { factory
     coalesce((SELECT min(at) FROM (${SCHEDULE_DUE_SQL}) s) <= now(), false) AS schedules,
     coalesce((SELECT min(at) FROM (${RUN_RECOVERY_DUE_SQL}) r) <= now() + interval '1 minute', false) AS recovery,
     coalesce((SELECT min(at) FROM (${ACCOUNT_DELETIONS_DUE_SQL}) d) <= now(), false) AS deletions,
-    coalesce((SELECT min(at) FROM (${AUDIT_RETENTION_DUE_SQL}) a) <= now(), false) AS audit`,
+    coalesce((SELECT min(at) FROM (${AUDIT_RETENTION_DUE_SQL}) a) <= now(), false) AS audit,
+    EXISTS (SELECT 1 FROM mobile_push_receipts WHERE (next_check_at<=now() OR created_at<=now()-interval '1 day')
+      AND (lease_until IS NULL OR lease_until<=now())) AS "pushReceipts"`,
   runRecoveryDueParams(options.factoryLifecycle))
-  const due = rows[0] ?? { wakes: false, schedules: false, recovery: false, deletions: false, audit: false }
+  const due = rows[0] ?? { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false }
   if (!due.audit && options.workspace) {
     const outbox = await options.workspace.query<{ due: boolean }>(`SELECT coalesce((SELECT min(at) FROM (${AUDIT_OUTBOX_DUE_SQL}) o) <= now(), false) AS due`)
     due.audit = Boolean(outbox.rows[0]?.due)

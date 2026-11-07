@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { coordinatorRuntimeSchema, nativeCoordinatorJobSchema, type CoordinatorRuntime, type NativeCoordinatorCommand, type NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import { deviceIsOnline } from '../device-presence'
+import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
+import { APP_BUILD } from '../app-build'
+import { credentialMasker, maskDeep } from '../secrets/mask'
 
 export class NativeCoordinatorError extends Error {
   constructor(readonly status: number, message: string) { super(message) }
@@ -56,7 +59,9 @@ export class NativeCoordinatorStore {
       SELECT j.id FROM native_coordinator_turns j,coordinator_sessions s,devices d
       WHERE ${ACTIVE} AND j."userId"=$1 AND j."deviceId"=$2 AND j.status='queued'
       ORDER BY j."createdAt" LIMIT 1 FOR UPDATE OF j SKIP LOCKED) RETURNING payload`, [userId, deviceId])
-    return rows[0] ? nativeCoordinatorJobSchema.parse(rows[0].payload) : null
+    // Negotiate on this response only: rolling upgrades must not rewrite the
+    // durable job or require an additional capability query.
+    return rows[0] ? { ...nativeCoordinatorJobSchema.parse(rows[0].payload), failureDetailsVersion: 1 } : null
   }
 
   private async ownedJob(userId: string, deviceId: string, id: string, client?: PoolClient) {
@@ -78,7 +83,10 @@ export class NativeCoordinatorStore {
           const pending = await client.query("SELECT 1 FROM native_coordinator_tools WHERE \"turnId\"=$1 AND status='pending' LIMIT 1",[id])
           if (pending.rows.length) throw new NativeCoordinatorError(409,'coordinatorToolsPending')
         }
-        await client.query(`UPDATE native_coordinator_turns SET status=$2,reply=$3 WHERE id=$1 AND status='running'`, [id,command.type === 'complete' ? 'completed' : 'failed',command.type === 'complete' ? command.text : null])
+        const failure = command.type === 'failed' ? captureRunFailure(command.failureDetails ? { failureDetails: command.failureDetails } : new Error('nativeCoordinatorFailed'), {
+          runId: id, appVersion: APP_BUILD, provider: job.payload.harness, credential: 'subscription', sensitiveText: [job.payload.context, job.payload.instructions],
+        }) : null
+        await client.query(`UPDATE native_coordinator_turns SET status=$2,reply=$3,"failureDetails"=$4::jsonb WHERE id=$1 AND status='running'`, [id,command.type === 'complete' ? 'completed' : 'failed',command.type === 'complete' ? command.text : null,JSON.stringify(maskDeep(failure, credentialMasker))])
       } else {
         if (job.status !== 'running' || !job.payload.tools.some(tool => tool.name === command.name)) throw new NativeCoordinatorError(403,'coordinatorToolUnavailable')
         const existing = await client.query('SELECT name,input FROM native_coordinator_tools WHERE "turnId"=$1 AND "callId"=$2',[id,command.callId])
@@ -101,12 +109,13 @@ export class NativeCoordinatorStore {
     return rows[0]?.status === 'done' ? { status: 'done' as const, output: rows[0].output } : { status: 'pending' as const }
   }
 
-  async poll(userId: string, holder: string, id: string): Promise<{ status: string; reply: string | null; calls: { callId: string; name: string; input: unknown }[] }> {
-    const { rows } = await this.pool.query(`SELECT j.status,j.reply FROM native_coordinator_turns j,coordinator_sessions s,devices d
+  async poll(userId: string, holder: string, id: string): Promise<{ status: string; reply: string | null; failureDetails?: RunFailure; calls: { callId: string; name: string; input: unknown }[] }> {
+    const { rows } = await this.pool.query(`SELECT j.status,j.reply,j."failureDetails" FROM native_coordinator_turns j,coordinator_sessions s,devices d
       WHERE ${ACTIVE} AND j.id=$1 AND j."userId"=$2 AND j.holder=$3`, [id,userId,holder])
     if (!rows.length) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost')
     const calls = await this.pool.query('SELECT "callId",name,input FROM native_coordinator_tools WHERE "turnId"=$1 AND status=\'pending\' ORDER BY "createdAt","callId"',[id])
-    return { ...rows[0], calls: calls.rows }
+    const failureDetails = readRunFailure(rows[0].failureDetails)
+    return { status: rows[0].status, reply: rows[0].reply, ...(failureDetails ? { failureDetails } : {}), calls: calls.rows }
   }
 
   /** Check inside the executing business step, including every durable retry. */

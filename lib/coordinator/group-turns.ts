@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { serverRunFailure } from '@/lib/run-failure-details'
 
 import { hostedBillingScope } from '@/lib/abuse/context'
 import type { Pool, PoolClient } from 'pg'
@@ -136,7 +137,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     // that judgment with bounded backoff, never an interrupted generation.
     const requeued = await client.query(`UPDATE group_turns SET status='queued',error=NULL,"nextDecisionAt"=NULL WHERE "conversationId"=$1 AND status='failed' AND error='group_judgment_pending' AND "nextDecisionAt"<=now()`,[conversationId])
     // Recover only this group's linked chat runs; never alter daemon/issue runs.
-    const interruptedRuns = await client.query<{ id: string }>(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running' RETURNING id`, [conversationId])
+    const interruptedRuns = await client.query<{ id: string }>(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now(),"failureDetails"=$2::jsonb || jsonb_build_object('runId',id) WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running' RETURNING id`, [conversationId, JSON.stringify(serverRunFailure('interrupted_group_turn', new Date()))])
     for (const row of interruptedRuns.rows) { await runListChanged(client, row.id); await runChanged(client, row.id) }
     const interrupted = await client.query(`UPDATE group_turns SET "activeRunId"=NULL,status='failed',"agentId"=NULL,"botId"=NULL,error='interrupted_generation_not_replayed',trace=trace || '{"status":"failed"}'::jsonb,"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
     // Who is answering shows on the group's page (its messages read's agentStatus).
@@ -283,7 +284,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
               // transcript or group/member IDs enter that shared status contract.
               // Provider calls time out after 20s; the 60s lease bounds stale UI
               // status if the process dies before its finally/recovery path.
-              await client.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,$2,$3,'group_chat','running',now(),now()+interval '60 seconds')`, [runId, root.createdBy, id])
+              await client.query(`INSERT INTO agent_runs (id,"userId","agentId","workspaceId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,$2,$3,$4,'group_chat','running',now(),now()+interval '60 seconds')`, [runId, root.createdBy, id, root.workspaceId])
               await client.query('UPDATE group_turns SET "agentId"=$2,"activeRunId"=$3,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId, id, runId])
               armDueTimerAfterCommit(client, 'run-recovery')
             } else {

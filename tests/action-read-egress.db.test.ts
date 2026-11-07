@@ -49,14 +49,27 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
   const poll = (userId: string): ReturnType<typeof pollTaskRuns> => withActivitySession(userId, () => pollTaskRuns())
   const owner = 'action-runs-' + randomUUID(), peer = 'action-peer-' + randomUUID()
   const agent = randomUUID(), issueIds = Array.from({ length: 201 }, () => randomUUID()).sort()
+  const runtimeAgent = randomUUID(), runtimeDevice = randomUUID(), runtimeRepo = randomUUID(), workspace = randomUUID()
+  const [boundBot, directBot, runtimeBot, peerBot] = Array.from({ length: 4 }, () => randomUUID())
+  const botLooks = [boundBot, directBot, runtimeBot].map((id, index) => ({ id, name: 'Read bot ' + index, color: 'encre', shape: 'cercle' }))
   const newest = randomUUID(), peerRun = randomUUID(), oldRun = randomUUID(), peerIssue = randomUUID()
   try {
     for (const user of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
-    await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [agent, owner, 'Read fixture', 'codex'])
+    await seedFixtureWorkspace(pool, owner, 'personal', workspace)
+    for (const [index, id] of [agent, runtimeAgent].entries()) await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [id, owner, 'Read fixture ' + index, 'codex'])
+    for (const bot of botLooks) await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [bot.id, owner, workspace, bot.name])
+    await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Peer bot\')', [peerBot, peer, workspace])
+    await pool.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Read fixture\')', [runtimeDevice, owner])
+    await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,\'/fixture\',\'https://github.com/mikka-fixture/read.git\',\'main\')', [runtimeRepo, owner, runtimeDevice])
+    await pool.query('INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES($1,$2,$3,\'codex\',$4,$5)', [runtimeBot, workspace, owner, runtimeAgent, runtimeRepo])
     await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") SELECT id,$2,\'Read fixture\',\'{}\',\'todo\',\'normal\',$3,\'bound\' FROM unnest($1::uuid[]) id', [issueIds, owner, await seedFixtureWorkspace(pool, owner)])
     await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES($1,$2,\'Peer\',\'{}\',\'todo\',\'normal\',$3,\'bound\')', [peerIssue, peer, await seedFixtureWorkspace(pool, peer)])
     await pool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt,error,"createdAt","finishedAt") SELECT gen_random_uuid(),$2,id,$3,\'failed\',\'Task fixture\',$4,now()-interval \'1 hour\',now() FROM unnest($1::uuid[]) id', [issueIds, owner, agent, 'subscriptionQuotaReached\n' + 'cause '.repeat(1_000)])
     await pool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt,"createdAt") VALUES($1,$2,$3,$4,\'running\',\'newest\',now()),($5,$6,$9,$4,\'running\',\'peer\',now()),($7,$2,$8,$4,\'running\',\'expired\',now()-interval \'31 days\')', [newest, owner, issueIds[0], agent, peerRun, peer, oldRun, issueIds[1], peerIssue])
+    await pool.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1 OR ("issueId"=$3 AND "userId"=$4)', [newest, directBot, issueIds[1], owner])
+    await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)', [newest, boundBot, workspace, owner])
+    await pool.query('UPDATE agent_runs SET "botId"=$2 WHERE "issueId"=$1 AND "userId"=$3', [issueIds[2], peerBot, owner])
+    await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE "issueId"=$1 AND "userId"=$3', [issueIds[3], runtimeAgent, owner])
     // The pre-change projection on these exact rows supplies a measured byte baseline.
     const baseline = await measured(() => db.selectDistinctOn([agentRuns.issueId], {
       issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
@@ -67,12 +80,15 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
       .where(and(eq(agentRuns.userId, owner), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt}>now()-interval '30 days'`))
       .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200))
     const result = await measured(() => poll(owner))
-    const selected = result.reads.find(read => read.text.startsWith('select distinct on'))
+    const selected = result.reads.find(read => read.text.includes('from (select distinct on'))
     assert.ok(selected)
+    assert.equal(result.reads.filter(read => read.text.includes('from (select distinct on')).length, 1)
+    assert.equal(result.reads.some(read => /from "bots" where/.test(read.text)), false, 'bot looks do not add a separate statement')
     t.diagnostic(JSON.stringify({ read: 'task-runs', rowCount: selected.rows, beforeResultBytes: baseline.reads[0].bytes, resultBytes: selected.bytes, actionBytes: Buffer.byteLength(JSON.stringify(result.value)), fields: selected.fields }))
-    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId: _botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: null })))
+    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: botLooks.find(bot => bot.id === botId) ?? null, failureDetails: null })))
     assert.equal(result.value.items.length, 200)
     assert.equal(result.value.items.find(row => row.issueId === issueIds[0])?.runId, newest)
+    assert.deepEqual(issueIds.slice(0, 4).map(id => result.value.items.find(row => row.issueId === id)?.bot?.id ?? null), [boundBot, directBot, null, runtimeBot], 'binding wins, direct and runtime fallbacks survive, and foreign bots remain private')
     assert.ok(result.value.items.every(row => row.runId !== peerRun && row.runId !== oldRun))
     assert.ok(result.value.items.every(row => row.agentName === 'Codex' && row.harnesses.includes('codex')))
     for (const field of ['agentId', 'error', 'finishedAt']) {
@@ -82,11 +98,34 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
     assert.equal(selected.route, '/actions/task-runs/read')
     assert.deepEqual((await poll(peer)).items.map(row => row.runId), [peerRun])
   } finally {
-    await pool.query('DELETE FROM agent_runs WHERE "agentId"=$1', [agent])
-    await pool.query('DELETE FROM agents WHERE id=$1', [agent])
+    await pool.query('DELETE FROM agent_runs WHERE "agentId"=ANY($1::uuid[])', [[agent, runtimeAgent]])
+    await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agent, runtimeAgent]])
+    await pool.query('DELETE FROM device_repos WHERE id=$1', [runtimeRepo])
+    await pool.query('DELETE FROM devices WHERE id=$1', [runtimeDevice])
+    await pool.query('DELETE FROM bots WHERE id=ANY($1::uuid[])', [[boundBot, directBot, runtimeBot, peerBot]])
     await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[...issueIds, peerIssue]])
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
   }
+})
+
+test('one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows', { skip: !enabled }, async () => {
+  const { sql } = await import('drizzle-orm')
+  const { queryVersion, queryVersionWithExpiry } = await import('../lib/db/query-version')
+  const snapshot = sql`select id, "createdAt" from (values
+    (1, '2020-01-01T00:00:00Z'::timestamptz), (2, '2020-01-02T00:00:00Z'::timestamptz),
+    (3, '2020-01-03T00:00:00Z'::timestamptz)) as bounded(id, "createdAt") order by "createdAt" desc limit 2`
+  const oldVersion = await queryVersion(snapshot)
+  const result = await measured(() => queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+interval '30 days'`))
+  assert.equal(result.value.version, oldVersion, 'adding expiry does not change the hash or its row projection')
+  assert.equal(new Date(result.value.expiresAt!).toISOString(), '2020-02-01T00:00:00.000Z', 'the expiry uses only the same bounded rows')
+  assert.equal(result.reads.length, 1)
+  assert.deepEqual(result.reads[0].fields, ['version', 'expiresAt'])
+  assert.equal(result.reads[0].rows, 1, 'the bounded rows stay inside PostgreSQL')
+  const empty = sql`select 1 as id, now() as "createdAt" where false`
+  const emptyVersion = await queryVersion(empty)
+  const absent = await measured(() => queryVersionWithExpiry(empty, sql`min(snapshot."createdAt")+interval '30 days'`))
+  assert.deepEqual(absent.value, { version: emptyVersion, expiresAt: null })
+  assert.equal(absent.reads.length, 1)
 })
 
 test('task thread lists retain exact titles, summaries and privacy while details retain full errors', { skip: !enabled }, async t => {

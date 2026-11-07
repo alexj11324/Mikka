@@ -1,3 +1,5 @@
+import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
+import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from './run-failure-projection'
 import 'server-only'
 import { runDecisionWarnings, type ProjectDecisionWarning } from './project-decision-warnings'
 import type { ExecutionIdentity } from './execution-identity'
@@ -59,6 +61,8 @@ export interface RunView {
   kind: string
   stopReason: string | null
   error: string | null
+  /** Full diagnostics are owner-only; brief and teammate reads contain only compact fields. */
+  failureDetails?: RunFailure | CompactRunFailure | null
   report: Record<string, unknown> | null
   createdAt: Date
   startedAt: Date | null
@@ -82,7 +86,7 @@ export const runViewColumns = {
   executionIdentity: sql<ExecutionIdentity | null>`${agentRuns.agentDefinition}->'executionIdentity'`,
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
   harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, outcome: agentRuns.outcome, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
-  error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
+  error: agentRuns.error, report: agentRuns.report, failureDetails: agentRuns.failureDetails, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
 }
 
@@ -94,6 +98,7 @@ export const runViewColumns = {
 const { agentProfile: _profile, model: _model, modelSource: _modelSource, executionIdentity: _identity, ...runBriefColumns } = runViewColumns
 const runBriefViewColumns = {
   ...runBriefColumns,
+  failureDetails: runFailureBrief,
   report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`,
   error: sql<string | null>`substring(${agentRuns.error} from '[^\\n]*\\S[^\\n]*')`,
 }
@@ -370,7 +375,8 @@ export async function visibleRuns(reader: IssueReader, input: { issueId?: string
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   const visible = await runVisibilityPredicate(reader, input)
-  const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+  const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns),
+    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       visible,
@@ -382,7 +388,7 @@ export async function visibleRuns(reader: IssueReader, input: { issueId?: string
     ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
   return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
     const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled, deviceOnline: waitDeviceId ? presence.get(waitDeviceId) : undefined })
-    return ownerId === userId ? { ...run, ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
+    return ownerId === userId ? { ...run, failureDetails: input.brief ? readCompactRunFailure(run.failureDetails) : readRunFailure(run.failureDetails), ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
   })
 }
 

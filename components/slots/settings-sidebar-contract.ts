@@ -12,6 +12,8 @@ export type SettingsSidebarProps = {
   admin: boolean
   /** Not (yet) known to be a team workspace: only the account group, 用量 and 计费 (decision 2026-11-01-2310). */
   personal?: boolean
+  billing?: boolean
+  cloudAdmin?: boolean
   /** The second group is named after the current workspace. */
   workspaceName?: string
   selectedTeamId?: string

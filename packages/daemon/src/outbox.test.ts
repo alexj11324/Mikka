@@ -15,6 +15,10 @@ import { DaemonError } from "./errors"
 import { createLogger } from "./log"
 import { Outbox, type OutboxItem } from "./outbox"
 import { MemoryServer, type ServerLink } from "./server-link"
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
+import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+import { daemonTracer } from './tracing'
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 
 const dirs: string[] = []
 function tempDir() {
@@ -50,6 +54,29 @@ const COMPLETE: OutboxItem = {
     },
   },
 }
+
+it('restores each queued run trace after restart without inheriting another run during flushAll', async () => {
+  const directory = tempDir(), observed = new Map<string, Record<string, string>>()
+  const carriers: Record<string, RunTraceContext> = {
+    'run-a': { traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-aaaaaaaaaaaaaaaa-01', runId: 'run-a', sessionId: 'session-a' },
+    'run-b': { traceparent: '00-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-bbbbbbbbbbbbbbbb-01', runId: 'run-b', sessionId: 'session-b' },
+  }
+  for (const id of Object.keys(carriers)) writeFileSync(join(directory, `${id}.jsonl`), `${JSON.stringify(chunk(1))}\n`, { mode: 0o600 })
+  const link = { ...new MemoryServer('d').link(), appendRunChunks: async (runId: string) => {
+    observed.set(runId, daemonTracer.headers()); return { offset: '1' }
+  } } as ServerLink
+  const outbox = new Outbox(directory, link, log, 60_000, undefined, false, runId => carriers[runId])
+  daemonTracer.configure({ endpoint: 'https://us.i.posthog.com/i/v1/traces', projectToken: 'phc_fixture12345', sampleRate: 1 },
+    { exporter: new InMemorySpanExporter(), logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
+  try {
+    await daemonTracer.span('daemon.run', { 'mikka.run_id': 'run-c' }, () => outbox.flushAll(), { root: true,
+      traceContext: { traceparent: '00-cccccccccccccccccccccccccccccccc-cccccccccccccccc-01', runId: 'run-c' } })
+    for (const [id, carrier] of Object.entries(carriers)) {
+      expect(observed.get(id)?.traceparent).toBe(carrier.traceparent)
+      expect(observed.get(id)?.['x-mikka-trace-sessionid']).toBe(carrier.sessionId)
+    }
+  } finally { await outbox.close(); await daemonTracer.shutdown() }
+})
 
 describe("outbox torn lines", () => {
   it("keeps the good prefix, truncates the torn tail before appending", async () => {

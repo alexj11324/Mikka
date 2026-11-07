@@ -1,15 +1,20 @@
 import { waitUntil } from '@vercel/functions'
-import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
+import { CompositePropagator, W3CTraceContextPropagator, ExportResultCode, type ExportResult } from '@opentelemetry/core'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import { BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler, type ReadableSpan, type SpanExporter, type SpanProcessor } from '@opentelemetry/sdk-trace-base'
+import { BatchSpanProcessor, type ReadableSpan, type SpanExporter, type SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
 import { SERVICE_NAME, traceSettings, type TraceEnvironment } from './config'
 import { sanitizeSpan } from './sanitize'
 import { RouteAttributesProcessor, pgRequestHook, pgResponseHook } from './spans'
+import { RunContextPropagator } from './context'
+import { RetainingSpanProcessor, RunSampler } from './sampling'
+import { createLogProvider, StageLogProcessor } from './logs'
+import { flushTelemetry, registerTelemetryFlush } from './flush'
+import type { Logger } from '@opentelemetry/api-logs'
 
 // Node-runtime tracing, started by instrumentation.ts (docs/operations/tracing.md).
 // OpenTelemetry with Next's own request spans plus one span per pg statement,
@@ -52,20 +57,21 @@ export class SafeExporter implements SpanExporter {
  * and the batch timer exports.
  */
 class FlushOnRootEnd implements SpanProcessor {
-  constructor(private readonly flush: () => Promise<void>) {}
+  constructor(private readonly flush: () => Promise<void>, private readonly serverless: boolean) {}
   onStart(): void {}
   onEnd(span: ReadableSpan): void {
-    if (span.parentSpanContext && !span.parentSpanContext.isRemote) return
+    if (!this.serverless) return
+    // Deferred jobs can outlive an ended local request. Their flush is retained too.
+    if (span.parentSpanContext && !span.parentSpanContext.isRemote && !String(span.attributes['mikka.route']).startsWith('after:')) return
     try { waitUntil(this.flush().catch(() => {})) } catch { /* not in a request */ }
   }
   forceFlush(): Promise<void> { return Promise.resolve() }
   shutdown(): Promise<void> { return Promise.resolve() }
 }
 
-export type ProviderOptions = { exporter: SpanExporter; sampleRate: number; environment: TraceEnvironment; version?: string; batch?: { scheduledDelayMillis?: number } }
+export type ProviderOptions = { exporter: SpanExporter; sampleRate: number; environment: TraceEnvironment; version?: string; logger?: Logger; serverless?: boolean; batch?: { scheduledDelayMillis?: number } }
 
-export function createTracerProvider({ exporter, sampleRate, environment, version, batch }: ProviderOptions): NodeTracerProvider {
-  const ratio = new TraceIdRatioBasedSampler(sampleRate)
+export function createTracerProvider({ exporter, sampleRate, environment, version, logger, serverless = process.env.VERCEL === '1', batch }: ProviderOptions): NodeTracerProvider {
   const batcher = new BatchSpanProcessor(exporter, { maxQueueSize: 2048, maxExportBatchSize: 512, scheduledDelayMillis: batch?.scheduledDelayMillis ?? 5_000, exportTimeoutMillis: 10_000 })
   return new NodeTracerProvider({
     resource: resourceFromAttributes({
@@ -74,9 +80,10 @@ export function createTracerProvider({ exporter, sampleRate, environment, versio
       'deployment.environment': environment,
       'deployment.environment.name': environment,
     }),
-    // A caller's traceparent cannot force sampling: remote parents get the same ratio.
-    sampler: new ParentBasedSampler({ root: ratio, remoteParentSampled: ratio, remoteParentNotSampled: ratio }),
-    spanProcessors: [new RouteAttributesProcessor(), batcher, new FlushOnRootEnd(() => batcher.forceFlush())],
+    sampler: new RunSampler(sampleRate),
+    // Logs see the retained span, including the effective rate after a tail
+    // promotion, so APM and native Logs describe the same sampling decision.
+    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush(), flushTelemetry()]) }, serverless)],
   })
 }
 
@@ -102,9 +109,14 @@ export function startTracing(env: Record<string, string | undefined> = process.e
   if (global[started] !== undefined) return global[started]
   const settings = traceSettings(env)
   if (!settings) return (global[started] = null)
+  // Workflow SDK 5 supports durable W3C carrier propagation. Its default
+  // linked mode deliberately splits every delivery; a Mikka run is continuous.
+  process.env.WORKFLOW_TRACE_MODE = 'continuous'
   const exporter = new SafeExporter(new OTLPTraceExporter({ url: settings.endpoint, headers: { Authorization: `Bearer ${settings.token}` }, timeoutMillis: 5_000 }))
-  const provider = createTracerProvider({ exporter, sampleRate: settings.sampleRate, environment: settings.environment, version: settings.version })
-  provider.register()
+  const logs = createLogProvider(settings)
+  registerTelemetryFlush(() => logs.forceFlush({ timeoutMillis: 10_000 }))
+  const provider = createTracerProvider({ exporter, sampleRate: settings.sampleRate, environment: settings.environment, version: settings.version, logger: logs.getLogger('mikka.run'), serverless: env.VERCEL === '1' })
+  provider.register({ propagator: new CompositePropagator({ propagators: [new W3CTraceContextPropagator(), new RunContextPropagator()] }) })
   registerInstrumentations({ tracerProvider: provider, instrumentations: [createPgInstrumentation()] })
   return (global[started] = provider)
 }

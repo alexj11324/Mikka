@@ -1,6 +1,7 @@
 import { after, before, beforeEach, mock, test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
+import { clearFlagCache as clearRealFlagCache, serverFlagEnabled as readRealFlag } from '../posthog-server'
 
 // Every switch in proactive.md § 3 stops the model call: the deployment
 // switch, the PostHog flag (off or unavailable), 记忆 and the daily cap.
@@ -17,12 +18,18 @@ mock.module(new URL('../abuse/model.ts',import.meta.url).href,{namedExports:{
 }})
 mock.module(new URL('../execution-settings.ts',import.meta.url).href,{namedExports:{executionWorkspace:async()=> 'fixture-workspace'}})
 mock.module('ai', { namedExports: { generateText } })
-mock.module('posthog-node', { namedExports: { PostHog: class { getFeatureFlag() { return flag() } capture(message: unknown) { captured.push(message) } async flush() {} } } })
+// Inject the fake at our application boundary: mocking a dual-export SDK's
+// package name alone can miss the import selected by a TypeScript loader.
+const posthog = { getFeatureFlag: async () => flag(), capture(message: unknown) { captured.push(message) }, flush: async () => {} }
+mock.module(new URL('../posthog-server.ts', import.meta.url).href, { namedExports: {
+  clearFlagCache: clearRealFlagCache,
+  serverFlagEnabled: (key: string, userId: string) => readRealFlag(key, userId, { posthog }),
+  serverPostHog: () => posthog,
+} })
 mock.module(new URL('./store.ts', import.meta.url).href, { namedExports: store })
 let extractFacts: typeof import('./extract')['extractFacts']
 let clearFlagCache: typeof import('@/lib/posthog-server')['clearFlagCache']
 before(async () => {
-  process.env.NEXT_PUBLIC_POSTHOG_KEY ??= 'phc_test_only'
   ;({ extractFacts } = await import('./extract'))
   ;({ clearFlagCache } = await import('@/lib/posthog-server'))
 })
@@ -48,11 +55,11 @@ after(() => {
 
 const mail: ExternalNotification = { userId: 'u1', source: 'gmail', externalId: 'm1', matterKey: 'gmail:t1', action: 'read', title: 'Cloudflare security advisory', url: null, actor: 'Cloudflare <noreply@cloudflare.com>', occurredAt: new Date('2026-10-27T10:00:00Z'), required: false, direct: false, fromSelf: false, automated: true, excerpt: 'Update cloudflared to 2026.10.2' }
 
-test('with every switch on, one call writes facts and reports usage without content', async () => {
+test('with every switch on, one call writes facts and leaves generation capture to the model boundary', async () => {
   assert.equal(await extractFacts(mail, 's1'), 1)
   assert.equal(generateText.mock.callCount(), 1)
   assert.deepEqual(store.recordExtractionTokens.mock.calls.at(-1)?.arguments, ['u1', '2026-10-28', 100, 20])
-  assert.equal((captured[0] as { event: string }).event, '$ai_generation')
+  assert.equal(captured.length, 0, 'the extraction no longer emits a duplicate generation event')
   assert.ok(!JSON.stringify(captured).includes('cloudflared'), 'no prompt or answer goes to PostHog')
   // The default model, on its ZeroCat transport (hostedModel picks it).
   assert.deepEqual(hostedCalls,['deepseek/deepseek-v4.1-flash'])

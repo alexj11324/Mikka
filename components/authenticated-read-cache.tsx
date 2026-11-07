@@ -5,6 +5,7 @@ import { SWRConfig, unstable_serialize, useSWRConfig, type Cache, type Key } fro
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import { APP_BUILD } from '@/lib/app-build'
+import { selectedWebServer } from '@/lib/web-connection/selection'
 import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope, type ReadCacheState } from '@/lib/swr/persistent-cache'
 
@@ -17,7 +18,7 @@ export function AuthenticatedReadCache({ ownerId, workspace, build = APP_BUILD, 
   // A pushState to a different workspace must not borrow this one's authority.
   // Its normal reads still work; persistence waits for an authorized server render.
   const scope: ReadCacheScope | null = build && workspace && (!requested || requested === workspace.workspaceId)
-    ? { userId: ownerId, workspaceId: workspace.workspaceId, role: workspace.role, build } : null
+    ? { userId: ownerId, workspaceId: workspace.workspaceId, role: workspace.role, build, server: selectedWebServer() } : null
   const unauthorized = Boolean(build && (!workspace || requested && requested !== workspace.workspaceId))
   return <ReadCacheBoundary key={scope ? readCacheNamespace(scope) : `${ownerId}:${requested ?? ''}:memory`} scope={scope} unauthorized={unauthorized} initialReads={initialReads}>{children}</ReadCacheBoundary>
 }

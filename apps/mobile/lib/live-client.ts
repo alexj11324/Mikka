@@ -5,6 +5,7 @@
 import { LiveChannels } from '../../../lib/live/channels'
 import type { LiveRuntime, LiveSocket, LiveSubscriptionOptions, LiveTicket } from '../../../lib/live/channel'
 import type { LiveKind } from '../../../lib/live/events'
+import { liveSocketUrl } from './server-discovery'
 
 export { LIVE_FALLBACK_MS } from '../../../lib/live/channel'
 export type { LiveKind } from '../../../lib/live/events'
@@ -38,7 +39,7 @@ export const appInFront = (state: string | null | undefined) => state !== 'backg
 export function validTicket(value: unknown): LiveTicket | null {
   if (!value || typeof value !== 'object') return null
   const ticket = value as Partial<LiveTicket>
-  return typeof ticket.url === 'string' && /^wss?:\/\//.test(ticket.url) && typeof ticket.protocol === 'string' && ticket.protocol
+  return liveSocketUrl(ticket.url) && typeof ticket.protocol === 'string' && ticket.protocol
     && typeof ticket.expiresAt === 'number' && Number.isFinite(ticket.expiresAt) ? ticket as LiveTicket : null
 }
 

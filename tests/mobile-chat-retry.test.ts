@@ -12,7 +12,7 @@ mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExport
   json, mobileUser: async () => signedIn, writeAllowed: () => true,
   unauthorized: () => json({ error: 'authRequired' }, 401), forbiddenOrigin: () => json({ error: 'originNotAllowed' }, 403),
 } })
-mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
+mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../lib/db/index.ts', import.meta.url).href, { namedExports: { db: { select: () => ({ from: () => ({ where: () => ({ limit: async () => allowed ? [{ id: BOT }] : [] }) }) }) } } })
 mock.module(new URL('../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: { openChatBotId: async () => BOT } })
 mock.module(new URL('../lib/coordinator/store.ts', import.meta.url).href, { namedExports: {

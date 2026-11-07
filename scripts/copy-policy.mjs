@@ -2,8 +2,9 @@
 // translated (decisions.md 2026-10-31). 「E2B」 names only the provider: the workspace's
 // own E2B API key and E2B's errors and charges.
 
+// Mikka 云服务 names the optional account-backed service, not the cloud machine.
 // A translated brand (「Mikka 云」, 「Mikka 云端」) and the old 「切换到云端」 action.
-export const banned = /mikka[\s_-]*云|切换到云端/i
+export const banned = /mikka[\s_-]*云(?!服务)|切换到云端/i
 // Dated decision log keeps history as written; the policy test holds the negative examples.
 export const allowedPaths = ['docs/design/decisions.md', 'docs/design/decisions', 'scripts/copy-policy.mjs', 'scripts/copy-policy.test.mjs']
 

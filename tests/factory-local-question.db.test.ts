@@ -7,6 +7,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import type { RunPolicy } from '@mikka/protocol/agent-policy'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { isolateCoordinatorWakes } from './support/coordinator-wake'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, {
   namedExports: { invokeDecision: async () => null },
@@ -16,6 +17,7 @@ test('a local Factory question preserves the original Profile, worker definition
   const previous = process.env.MIKKA_BYOS_ENABLED
   process.env.MIKKA_BYOS_ENABLED = '1'
   t.after(() => { if (previous === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previous })
+  const coordinator = await isolateCoordinatorWakes(t)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')
@@ -29,6 +31,7 @@ test('a local Factory question preserves the original Profile, worker definition
   github.install('octo/repo', { contents: 'write', pull_requests: 'write' })
   const owner = await seedUser(pool, 'local-question')
   t.after(async () => {
+    await coordinator.flush()
     github.restore()
     await pool.query('DELETE FROM factory_questions WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM factory_tasks WHERE "userId"=$1', [owner])

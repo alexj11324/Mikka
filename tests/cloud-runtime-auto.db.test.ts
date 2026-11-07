@@ -1,7 +1,8 @@
 // A person's own E2B key is enough for cloud runs: with 运行位置 云端 (decision 2026-11-02-1400), a bot with
 // no cloud runtime gets one when a run is dispatched, once. No key: never the cloud. MIKKA_CLOUD_COMPUTER_TASKS=0 turns it off. Real PostgreSQL;
 // only the E2B calls (waking the computer, starting its worker, creating each thread's own
-// machine) and the start of the thread machine's lifecycle workflow are replaced.
+// machine) and the start of the thread machine's lifecycle workflow are replaced;
+// Coordinator wakes are observed without running a separate inbox consumer.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
@@ -10,6 +11,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
+import { isolateCoordinatorWakes } from './support/coordinator-wake'
 
 mock.module('next-intl/server',{namedExports:{getLocale:async()=> 'en',getTranslations:async()=> (key:string)=> key}})
 mock.module('next/headers',{namedExports:{cookies:async()=>({get:()=>undefined}),headers:async()=>new Headers()}})
@@ -21,6 +23,7 @@ const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true
 test('cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card', { skip: !dbUrl }, async t => {
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   process.env.MIKKA_BYOS_ENABLED = '1'
+  const coordinator = await isolateCoordinatorWakes(t)
   // Every cloud thread runs on its own thread machine; its lifecycle workflow is not started here.
   let lifecycleStarts = 0
   const stageHandoffs: [{userId:string;workspaceId:string},string|null,string][] = []
@@ -67,6 +70,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await ensureBotRuntime(appDb, actor, botId, sandbox as never, deviceId)
   }
   t.after(async () => {
+    await coordinator.flush()
     github.restore()
     botRuntimeProvisioner.provision = realProvision
     threadMachines.restore()

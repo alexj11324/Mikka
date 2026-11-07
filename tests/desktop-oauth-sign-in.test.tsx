@@ -15,7 +15,7 @@ mock.module('next/navigation', { namedExports: { redirect: (url: string) => { th
 mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
 mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 stub('../i18n/navigation.ts', { getPathname: ({ href }: { href: string }) => `/en${href}`, redirect: () => { throw new Error('unexpected locale redirect') }, useRouter: () => router })
-stub('../lib/auth.ts', { auth: { api: { getSession: async () => null } }, oauthCallbackBaseURL: origin, googleEnabled: true, githubEnabled: true })
+stub('../lib/auth.ts', { auth: { api: { getSession: async () => null } }, oauthCallbackBaseURL: origin, googleEnabled: true, githubEnabled: true, githubSignInEnabled: async () => true })
 stub('../lib/email-sign-in.ts', { emailSignInEnabled: async () => false })
 stub('../lib/acceptance.ts', { isAcceptanceEnabled: () => false })
 stub('../app/actions/issues.ts', { listIssues: async () => [], saveIssue: async () => ({}) })

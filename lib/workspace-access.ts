@@ -14,6 +14,10 @@ import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-
 import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
+import { getEdition, type MikkaEdition } from '@/lib/edition'
+import { isServerAdmin } from '@/lib/server-admin'
+import { currentRequestScope } from '@/apps/api/src/context'
+import { workspaceSelection } from '@/lib/workspace-selection'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -37,10 +41,15 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
 
 export async function loadWorkspaceContext(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
   if (requestedId) z.uuid().parse(requestedId)
+  const selection = workspaceSelection(currentRequestScope()?.headers)
+  if (selection.present && !selection.workspaceId) throw new WorkspaceError('workspaceAccessDenied')
   const [user, locale] = await Promise.all([authenticatedUser ?? requireUser(), getLocale().then(workspaceLocale)])
   const patWorkspace = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
-  if (patWorkspace && requestedId && requestedId !== patWorkspace) throw new WorkspaceError('workspaceAccessDenied')
-  const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? '', locale)
+  if (patWorkspace && (requestedId && requestedId !== patWorkspace || selection.workspaceId && selection.workspaceId !== patWorkspace)) throw new WorkspaceError('workspaceAccessDenied')
+  // An explicit business target keeps its existing access check. A supplied
+  // transport selection is exact: inaccessible choices never fall back home.
+  const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale)
+  if (selection.present && !context.choices.some(choice => choice.id === selection.workspaceId)) throw new WorkspaceError('workspaceAccessDenied')
   return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 
@@ -110,9 +119,12 @@ export async function loadWorkspaceSettings(requestedId?: string, authenticatedU
   const live: { live?: ListLiveRead & { homeWorkspaceId: string | null } } = { live: { ownerId: context.currentUserId, workspaceId, homeWorkspaceId: home?.workspaceId ?? null,
     ...(nextExpiry === undefined ? {} : { deadline: { at: new Date(nextExpiry).toISOString(), afterMs: nextExpiry - observedAt } }),
   } }
+  // Optional on the wire for clients that still connect to a pre-edition server.
+  const deployment: { edition?: MikkaEdition; serverAdmin?: boolean } = { edition: getEdition(), serverAdmin: isServerAdmin(context.currentUserId) }
   return {
     ...context,
     ...live,
+    ...deployment,
     members: members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
     invitations: invitations.map(invite => ({ ...invite, createdAt: invite.createdAt.toISOString(), expiresAt: invite.expiresAt.toISOString() })),
   }

@@ -92,6 +92,7 @@ export type DesktopUser = {
 export type DesktopSession = { user: DesktopUser; session: { id: string } }
 export type DesktopFeatures = { flags: Record<string, boolean>; cloudComputer: boolean }
 export type DesktopConfig = {
+  edition?: 'community' | 'cloud'
   googleEnabled: boolean
   githubEnabled: boolean
   emailEnabled: boolean

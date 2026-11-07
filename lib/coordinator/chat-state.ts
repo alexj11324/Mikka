@@ -1,7 +1,8 @@
 import { coordinatorLeaseActive } from './lease'
 import { MAX_WAKE_ATTEMPTS } from './wake-recovery'
+import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 
-type Session = { leaseHolder?: string | null; leaseUntil: Date | null; lastError: string | null; lastErrorAt?: Date | null }
+type Session = { leaseHolder?: string | null; leaseUntil: Date | null; lastError: string | null; lastErrorAt?: Date | null; lastFailure?: unknown }
 type WaitingEvent = {
   kind: string; tier: string | null; wakeAttempts: number
   wakeLeaseUntil: Date | null; wakeLastError: string | null; createdAt?: Date
@@ -15,7 +16,7 @@ export type LastMessage = { role: string; streamId?: string; createdAt?: Date }
  * last turn's own stored failure since that message arrived (decision
  * 2026-11-05-0330: the raw code goes under 详情, never in place of the words).
  */
-export type CoordinatorChatState = { working: boolean; error: string | null; cause?: string }
+export type CoordinatorChatState = { working: boolean; error: string | null; cause?: string; failureDetails?: RunFailure }
 
 /** Whether the turn holding the lease has stored its reply: what follows (finishing the execution, a phone push, releasing the lease) is not work the person waits for. */
 function replied(session: Session | undefined, last: LastMessage | undefined): boolean {
@@ -41,8 +42,9 @@ export function coordinatorChatState(session: Session | undefined, waiting: read
   // (store.wakingEvent), so once its wakes ran out it would otherwise read 回复重试已停止 for good.
   const current = pending.filter(event => !(last?.role === 'assistant' && last.createdAt && event.createdAt && last.createdAt > event.createdAt))
   const failed = current.find(event => event.wakeAttempts < MAX_WAKE_ATTEMPTS || (event.wakeLeaseUntil && event.wakeLeaseUntil > now)) ?? current[0]
-  if (!failed) return { working: false, error: session?.lastError ?? null }
+  const details = session?.lastError ? readRunFailure(session.lastFailure) : null
+  if (!failed) return { working: false, error: session?.lastError ?? null, ...(details ? { failureDetails: details } : {}) }
   const exhausted = failed.wakeAttempts >= MAX_WAKE_ATTEMPTS && (!failed.wakeLeaseUntil || failed.wakeLeaseUntil <= now)
   const cause = causeOf(session, failed)
-  return { working: false, error: exhausted ? 'wake_exhausted' : failed.wakeLastError === 'wake_failed' ? 'wake_failed' : 'wake_start_unconfirmed', ...(cause ? { cause } : {}) }
+  return { working: false, error: exhausted ? 'wake_exhausted' : failed.wakeLastError === 'wake_failed' ? 'wake_failed' : 'wake_start_unconfirmed', ...(cause ? { cause, ...(details ? { failureDetails: details } : {}) } : {}) }
 }

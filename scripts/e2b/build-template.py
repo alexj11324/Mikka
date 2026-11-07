@@ -52,6 +52,14 @@ ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
                           "read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && "
                           "kill -0 \"$mikka_preloaded_pid\" && "
                           "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
+# One deadline includes reading/verifying selected native CLI bytes and the
+# real anonymous catalogue exchange. Never warm files in a separate command.
+# The standalone official-instance installer has no snapshot receipt. Its
+# explicit live probe is separate from the release's completed-receipt gate.
+MODEL_PROBE_COMMAND = ('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; '
+                       'python3 /opt/mikka/worker/scripts/e2b/official-files.py cli-verify '
+                       '/opt/mikka/worker/.mikka-original-cli.json --kind {kind} && '
+                       'exec /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
 
 NPM_RUNTIME_CHECK = r'''export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
 node --input-type=module <<'JS'
@@ -361,8 +369,19 @@ def cleanup_templates(candidates, api_key, request=None):
             if not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
                 raise ValueError('cleanup_name_invalid')
             template_id = candidate.get('templateId')
-            if template_id is not None and (not isinstance(template_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id)):
-                raise ValueError('cleanup_candidate_identity_mismatch')
+            if 'templateId' in candidate:
+                if not isinstance(template_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', template_id):
+                    raise ValueError('cleanup_candidate_identity_mismatch')
+                row['templateId'] = template_id
+                # A missing alias cannot prove that a known candidate was deleted.
+                try:
+                    info = request('GET', '/templates/' + template_id, api_key)
+                except HTTPError as error:
+                    if error.code == 404:
+                        receipts.append({**row, 'status': 'absent'})
+                        continue
+                    raise
+            alias = None
             try:
                 alias = request('GET', '/templates/aliases/' + name, api_key)
             except HTTPError as error:
@@ -371,29 +390,36 @@ def cleanup_templates(candidates, api_key, request=None):
                 if template_id is None:
                     receipts.append({**row, 'status': 'absent'})
                     continue
-                # A report already knows this build's ID. A missing alias
-                # alone does not establish that the recorded image is gone.
+                # The known ID still exists. Its exact recorded name below
+                # can prove ownership even after its alias has disappeared.
             else:
-                resolved = alias.get('templateID')
-                if (not isinstance(resolved, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', resolved)
-                        or (template_id is not None and resolved != template_id)):
+                alias_id = alias.get('templateID')
+                if (not isinstance(alias_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', alias_id)
+                        or (template_id is not None and alias_id != template_id)):
                     raise ValueError('cleanup_candidate_identity_mismatch')
-                template_id = resolved
-            row['templateId'] = template_id
-            try:
-                info = request('GET', '/templates/' + template_id, api_key)
-            except HTTPError as error:
-                if error.code != 404:
+            if template_id is None:
+                # Recover a build that created its alias before writing a report.
+                template_id = alias_id
+                row['templateId'] = template_id
+                try:
+                    info = request('GET', '/templates/' + template_id, api_key)
+                except HTTPError as error:
+                    if error.code == 404:
+                        receipts.append({**row, 'status': 'absent'})
+                        continue
                     raise
-                receipts.append({**row, 'status': 'absent'})
-                continue
             names = (info.get('names') or []) + (info.get('aliases') or [])
-            if name not in names or info.get('isDefault') is True or info.get('templateID') != template_id:
+            # Namespace-qualified names require the independent team-scoped
+            # alias binding. Without an alias, require the exact recorded name.
+            matches_name = (name in names if alias is None else
+                any(isinstance(value, str) and re.fullmatch(r'(?:[^/]+/)?' + re.escape(name), value) for value in names))
+            if (not matches_name
+                    or info.get('isDefault') is True or info.get('templateID') != template_id):
                 raise ValueError('cleanup_candidate_identity_mismatch')
-            if info.get('public') is True:
+            if info.get('public') is True or (alias is not None and alias.get('public') is True):
                 receipts.append({**row, 'status': 'retained_public'})
                 continue
-            if info.get('public') is not False:
+            if info.get('public') is not False or (alias is not None and alias.get('public') is not False):
                 raise ValueError('cleanup_candidate_visibility_unknown')
             request('DELETE', '/templates/' + template_id, api_key)
             try:

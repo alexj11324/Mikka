@@ -42,8 +42,26 @@ export async function linearWebhookNotifications(organizationId: string, payload
 export async function githubWebhookNotifications(event: string, payload: Record<string, unknown>): Promise<ExternalNotification[]> {
   const ids = githubCandidateIds(event, payload)
   if (!ids.length) return []
-  const { rows } = await pool.query<{ userId: string; accountId: string }>('select "userId", "accountId" from account where "providerId" = $1 and "accountId" = any($2)', ['github', ids])
-  return rows.flatMap(row => githubNotification({ userId: row.userId, githubId: row.accountId }, event, payload) ?? [])
+  const result = await pool.query<{ userId: string; accountId: string; cloud_subject: string | null; cloud_workspace_id: string | null }>(`select "userId", "accountId", NULL::text AS cloud_subject, NULL::uuid AS cloud_workspace_id from account where "providerId" = $1 and "accountId" = any($2)
+    union select "userId", "githubAccountId",NULL::text,NULL::uuid from github_connections where "githubAccountId"=any($2)
+    union select i.user_id,i.github_account_id,i.cloud_subject,i.cloud_workspace_id from cloud_github_installations i
+      join cloud_service_bindings b on b.owner='user:'||i.user_id and b.revoked=false and 'github'=any(b.scopes)
+      join cloud_service_registration r on r.server_id=b.server_id
+      where i.github_account_id=any($2)`, ['github', ids])
+  const rows = result.rows.filter(row => !row.cloud_subject)
+  const cloud = result.rows.filter(row => row.cloud_subject)
+  if (cloud.length) {
+    const { cloudClient } = await import('@/lib/cloud-services/runtime')
+    const { CloudServiceError } = await import('@/lib/cloud-services/errors')
+    for (const candidate of cloud) {
+      try {
+        const { token } = await cloudClient.access(candidate.userId, 'github')
+        if (token.subject === candidate.cloud_subject && token.workspaceId === candidate.cloud_workspace_id) rows.push(candidate)
+      } catch (error) { if (!(error instanceof CloudServiceError)) throw error }
+    }
+  }
+  const unique = [...new Map(rows.map(row => [`${row.userId}:${row.accountId}`, row])).values()]
+  return unique.flatMap(row => githubNotification({ userId: row.userId, githubId: row.accountId }, event, payload) ?? [])
 }
 
 /**

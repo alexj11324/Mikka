@@ -18,6 +18,8 @@ import { RepositoryCache } from '../src/repositories'
 import { createRunMailbox } from '../src/run-mailbox'
 import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
+import { runDiagnosticsEnabled } from '../src/run-runtime-timing'
+import { runIdHash } from '../src/tracing'
 import { WorktreeManager } from '../src/worktrees'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
 
@@ -29,7 +31,7 @@ function deferred<T = void>() {
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); cleanupTempDirs() })
 
-async function fixture(options: { cloneFailure?: boolean; legacyCatalogue?: boolean; pendingMailbox?: boolean } = {}) {
+async function fixture(options: { cloneFailure?: boolean; legacyCatalogue?: boolean; pendingMailbox?: boolean; diagnostics?: 'task' | 'host' } = {}) {
   const root = realpathSync(tempDir('mikka-prewarm-supervisor-')), source = await makeRepo(), home = join(root, 'home')
   const stateDir = join(root, 'adapters'); mkdirSync(stateDir); mkdirSync(home)
   const remote = pathToFileURL(options.cloneFailure ? join(root, 'missing.git') : source).href
@@ -39,12 +41,13 @@ async function fixture(options: { cloneFailure?: boolean; legacyCatalogue?: bool
   const assignment: RunAssignment = { runId: randomUUID(), issueId: randomUUID(), deviceId: randomUUID(), repoId: randomUUID(),
     harness: 'claude_code', model: 'claude-haiku-5-5', prompt: 'Complete anonymous task', remoteUrl: remote, baseBranch: 'main',
     leaseExpiresAt: new Date(Date.now() + 600_000).toISOString(),
+    ...(options.diagnostics === 'task' ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
     subscriptionBinding: { bindingId: randomUUID(), ownerId: randomUUID(), workspaceId: randomUUID(), consumerId: randomUUID(), route: 'claude_code_cli' },
     subscriptionLease: { accountId: 'fixture-account', revision: 1, route: 'claude_code_cli', modelId: 'claude-haiku-5-5',
       accessToken: 'synthetic-fixture-only', expiresAt: new Date(Date.now() + 600_000).toISOString() },
     mcp: { url: endpoint.href, token: 'mkw_' + 'x'.repeat(43), mailbox: true,
       ...(!options.legacyCatalogue ? { mailboxCatalogue: { version: 1, transport: 'mikka-stateless-2025-06-18', tools: ['mailbox_inbox'] } } : {}) } }
-  const cloneEntered = deferred(), cloneRelease = deferred(), parked = deferred(), user = deferred()
+  const cloneEntered = deferred(), cloneRelease = deferred(), parked = deferred(), user = deferred(), agentStarted = deferred()
   const mailboxEntered = deferred(), mailboxAborted = deferred()
   const children: ChildProcess[] = [], events: Array<Record<string, unknown>> = [], records: OutboxItem[] = []
   const adapter = new ClaudeAdapter({ stateDir, subscriptionAuth: { accountId: 'fixture-account', automaticRefresh: true,
@@ -66,15 +69,20 @@ async function fixture(options: { cloneFailure?: boolean; legacyCatalogue?: bool
     const prepared = prepareAgentStart(signal, control => adapter.startPrepared(value, { ...claimed.subscriptionBinding!,
       runId: claimed.runId, sessionId: randomUUID(), cwd: value.cwd, deviceId: claimed.deviceId,
       accountId: claimed.subscriptionLease!.accountId, revision: claimed.subscriptionLease!.revision, model: claimed.model!, policyHash: value.policyHash ?? null,
-    }, { ...control, finalOptions: control.finalOptions.then(nativeOptions) }, async () => { await Promise.all(children.map(child => stopGroup(child, 1000))) }))
+    }, { ...control, finalOptions: control.finalOptions.then(nativeOptions) }, async () => { await Promise.all(children.map(child => stopGroup(child, 1000))) }),
+    runDiagnosticsEnabled(claimed.taskEnv, options.diagnostics === 'host') ? { runId: claimed.runId, harness: 'claude_code' } : undefined)
     void prepared.ready.then(() => parked.resolve(), () => undefined)
     return prepared
   })
   const ordinary = vi.fn<NonNullable<SupervisorDeps['startSubscription']>>((_assignment, value) => adapter.start(nativeOptions(value)))
   const methods: string[] = []
   const deps: SupervisorDeps = { journal, worktrees, adapterStateDir: stateDir, log: createLogger({ level: 'silent' }),
+    collectCliTiming: options.diagnostics === 'host',
     adapters: new Map([['claude_code', adapter]]), startSubscription: ordinary, prepareSubscription: prepare,
-    outbox: { push(_runId: string, record: OutboxItem) { records.push(record) }, async compact() {}, lastChunkSeq() { return 0 } } as unknown as SupervisorDeps['outbox'],
+    outbox: { push(_runId: string, record: OutboxItem) {
+      records.push(record)
+      if (record.kind === 'chunk' && record.chunk.type === 'data-run-stage' && record.chunk.data.stage === 'agent_start') agentStarted.resolve()
+    }, async compact() {}, lastChunkSeq() { return 0 } } as unknown as SupervisorDeps['outbox'],
     repository: () => ({ repoId: assignment.repoId, name: 'fixture', path: repositories.pathFor(remote) }),
     baseRef: () => repositories.baseRef(remote, 'main'),
     prepareRepository: async (_claimed, signal) => {
@@ -103,8 +111,31 @@ async function fixture(options: { cloneFailure?: boolean; legacyCatalogue?: bool
   }
   const supervisor = new RunSupervisor(deps)
   cleanups.push(async () => { cloneRelease.resolve(); await supervisor.stop(); await supervisor.idle(); await Promise.all(children.map(child => stopGroup(child, 1000))) })
-  return { supervisor, deps, assignment, worktrees, cloneEntered, cloneRelease, parked, user, children, events, records, prepare, ordinary, methods, mailboxEntered, mailboxAborted }
+  return { supervisor, deps, assignment, worktrees, cloneEntered, cloneRelease, parked, user, agentStarted, children, events, records, prepare, ordinary, methods, mailboxEntered, mailboxAborted }
 }
+
+it.each(['ordinary', 'task', 'host'] as const)('emits the earlier task-owned clock only on the existing opted-in stage (%s)', async diagnostics => {
+  const f = await fixture({ diagnostics: diagnostics === 'ordinary' ? undefined : diagnostics })
+  f.supervisor.start(f.assignment); await f.parked.promise
+  expect(f.records.some(item => item.kind === 'chunk' && item.chunk.type === 'data-run-stage' && item.chunk.data.stage === 'agent_start')).toBe(false)
+  f.cloneRelease.resolve(); await f.agentStarted.promise; await f.user.promise
+  const stages = f.records.flatMap(item => item.kind === 'chunk' && item.chunk.type === 'data-run-stage' ? [item.chunk] : [])
+  expect(stages.map(chunk => [chunk.data.stage, chunk.data.ok])).toEqual([['repository', true], ['worktree', true], ['agent_start', true]])
+  if (diagnostics === 'ordinary') {
+    for (const chunk of stages) expect(Object.keys(chunk.data).sort()).toEqual(['ms', 'ok', 'stage'])
+  } else {
+    const { startupTiming, preparationTiming } = stages[2].data
+    expect(startupTiming).toMatchObject({ runIdHash: runIdHash(f.assignment.runId), outcome: 'ok', phases: [] })
+    expect(preparationTiming).toMatchObject({ source: 'prepared_agent_start', runIdHash: runIdHash(f.assignment.runId), harness: 'claude_code', outcome: 'ok', truncated: false })
+    expect(preparationTiming?.phases).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'daemon.adapter.cli_init.prewarm', outcome: 'ok' }),
+      expect.objectContaining({ name: 'daemon.adapter.cli_init', outcome: 'ok' }),
+    ]))
+    expect(preparationTiming!.startedAt).toBeLessThanOrEqual(startupTiming!.startedAt)
+    expect(preparationTiming!.endedAt).toBeLessThanOrEqual(startupTiming!.endedAt)
+  }
+  await f.supervisor.stop(); await f.supervisor.idle()
+})
 
 it('overlaps the actual native initialize with clone, then joins checkout and passes the complete task exactly once', async () => {
   const f = await fixture(); f.supervisor.start(f.assignment)

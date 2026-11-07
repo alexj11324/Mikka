@@ -2,6 +2,7 @@ import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { withActivitySession } from './fixtures/activity-runtime.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
@@ -64,6 +65,21 @@ test('quiet thread polls return only a version; visible changes and online state
     const foreign = await withActivitySession(peer, () => actions.pollThreads(renamed.version, renamed.positions))
     assert.deepEqual(foreign.items, []); assert.notEqual(foreign.version, renamed.version)
     await assert.rejects(actions.pollThreads(renamed.version), /authRequired/)
+    const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+      providerMessage: 'Private provider response that lists must omit', causes: [{ name: 'APIError' }],
+      runId: ids[2], appVersion: 'test', occurredAt: '2026-11-07T12:00:00.000Z' }
+    await pool.query('UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1', [ids[2], JSON.stringify(failureDetails)])
+    const failureDelta = await measured(() => poll(renamed.version, renamed.positions))
+    assert.notEqual(failureDelta.value.version, renamed.version, 'diagnostic changes without a timestamp invalidate the same snapshot')
+    assert.deepEqual(failureDelta.value.items?.map(row => row.id), [ids[2]])
+    assert.equal(failureDelta.value.items?.[0].failureDetails?.code, 'run_api_key_invalid')
+    assert.doesNotMatch(JSON.stringify(failureDelta.value.items), /Private provider response|APIError/)
+    assert.equal(failureDelta.statements, delta.statements, 'diagnostic deltas keep the existing query count')
+    await pool.query('UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1', [ids[2], JSON.stringify({ ...failureDetails, providerMessage: 'Changed private text only' })])
+    const privateOnly = await poll(failureDelta.value.version, failureDelta.value.positions)
+    assert.ok('unchanged' in privateOnly && privateOnly.unchanged, 'unexposed text does not invalidate a compact list')
+    await pool.query('UPDATE agent_runs SET "failureDetails"=null WHERE id=$1', [ids[2]])
+    assert.equal((await poll(renamed.version, renamed.positions)).items, undefined)
     await pool.query('DELETE FROM agent_runs WHERE id=$1', [ids[0]])
     const deletion = await measured(() => poll(renamed.version, renamed.positions))
     assert.equal(deletion.value.items?.length, 0)

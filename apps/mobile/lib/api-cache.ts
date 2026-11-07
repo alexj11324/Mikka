@@ -2,14 +2,17 @@
 export class ApiCache {
   private generation = 0
   private identity: string | null = null
+  private ownerId: string | null = null
   private values = new Map<string, unknown>()
   context() { return this.generation }
   account() { return this.identity }
+  owner() { return this.ownerId }
   get<T>(path: string): T | null { return (this.values.get(path) as T | undefined) ?? null }
   clear() { this.generation++; this.values.clear() }
-  setIdentity(identity: string | null) {
-    if (this.identity === identity) return
+  setIdentity(identity: string | null, ownerId: string | null = identity) {
+    if (this.identity === identity && this.ownerId === ownerId) return
     this.identity = identity
+    this.ownerId = identity ? ownerId : null
     this.clear()
   }
   commit(context: number, apply: () => void): boolean {

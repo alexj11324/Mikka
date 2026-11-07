@@ -9,7 +9,7 @@ const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', t
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number } } = {}) {
+function stub(options: { installation?: 'allowed' | 'denied'; title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number } } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
   let created = false
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -23,6 +23,7 @@ function stub(options: { title?: string; userId?: number; repository?: 'missing'
     calls.push({ path, method, body, authorization })
     assert.equal(authorization, `Bearer ${token}`, 'every request uses the person\'s own token')
     if (path === '/user') return Response.json({ id: options.userId ?? 456, login: 'new-login' })
+    if (path === '/installation/repositories') return Response.json({ repositories: options.installation === 'allowed' ? [{ id: 789, full_name: 'owner/repo', default_branch: 'trunk' }] : [] })
     if (path === '/repos/owner/repo') return options.repository === 'missing' ? Response.json({}, { status: 404 })
       : Response.json({ id: 789, full_name: options.repository === 'renamed' ? 'owner/other' : 'owner/repo', default_branch: 'trunk' })
     if (path.endsWith('/git/ref/heads/mikka/mik-42')) return Response.json({ object: { sha: options.head ?? commit } })
@@ -59,6 +60,20 @@ test('opens one issue-marked PR on the default branch with the person\'s own tok
   assert.equal(create.body?.head, input.branch)
   assert.equal(create.body?.title, 'MIK-42: Fix redirect')
   assert.ok(String(create.body?.body).endsWith(marker))
+})
+
+test('a host-issued cloud installation token verifies its repository membership without pretending to be a user', async () => {
+  const { calls, fetcher } = stub({ installation: 'allowed' })
+  assert.deepEqual(await openRunPullRequest({ ...input, githubAccountId: undefined, installationId: '99', fetcher }), { url: pr.html_url, state: 'open' })
+  assert.ok(calls.some(call => call.path === '/installation/repositories'))
+  assert.ok(!calls.some(call => call.path === '/user'))
+  assert.equal(calls.filter(call => call.method === 'POST' && call.path.endsWith('/pulls')).length, 1)
+})
+
+test('an installation token that merely reads a public repository cannot publish without installation membership', async () => {
+  const { calls, fetcher } = stub({ installation: 'denied' })
+  await assert.rejects(openRunPullRequest({ ...input, githubAccountId: undefined, installationId: '99', fetcher }), { code: 'github_access_denied' })
+  assert.ok(!calls.some(call => call.method === 'POST'))
 })
 
 test('a created PR carries the line counts GitHub reported; a reply without them stores none', async () => {

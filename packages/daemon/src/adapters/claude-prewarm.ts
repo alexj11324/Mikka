@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import type { Query, SDKUserMessage, SpareProcess } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentSession, PreparedAgentStart, StartOptions } from './types'
+import { daemonTracer, runIdHash, type DaemonPreparationTiming } from '../tracing'
 
 export interface ClaudePreparation {
   signal: AbortSignal
@@ -12,7 +13,8 @@ export interface ClaudePreparation {
 
 /** The supervisor owns this join before starting checkout. An early checkout
  * failure drains the same in-progress start, even if initialization is late. */
-export function prepareAgentStart(signal: AbortSignal, open: (control: ClaudePreparation) => Promise<AgentSession>): PreparedAgentStart {
+export function prepareAgentStart(signal: AbortSignal, open: (control: ClaudePreparation) => Promise<AgentSession>,
+  diagnostics?: { runId: string; harness: 'claude_code' }): PreparedAgentStart {
   const lifetime = new AbortController()
   let accept!: (options: StartOptions) => void, refuse!: (error: unknown) => void
   const finalOptions = new Promise<StartOptions>((resolve, reject) => { accept = resolve; refuse = reject })
@@ -21,7 +23,12 @@ export function prepareAgentStart(signal: AbortSignal, open: (control: ClaudePre
   const ready = new Promise<void>((resolve, reject) => { parked = resolve; failed = reject })
   void ready.catch(() => undefined)
   let consumed = false, closing: Promise<void> | undefined
-  const starting = Promise.resolve().then(() => { lifetime.signal.throwIfAborted(); return open({ signal: lifetime.signal, finalOptions, parked }) })
+  let preparationTiming: DaemonPreparationTiming | undefined
+  const starting = Promise.resolve().then(() => {
+    const work = () => { lifetime.signal.throwIfAborted(); return open({ signal: lifetime.signal, finalOptions, parked }) }
+    return diagnostics ? daemonTracer.preparation({ runIdHash: runIdHash(diagnostics.runId), harness: diagnostics.harness },
+      work, timing => { preparationTiming = timing }) : work()
+  })
   void starting.catch(error => { failed(error); abort() })
   const cancel = () => {
     if (closing) return closing
@@ -39,7 +46,7 @@ export function prepareAgentStart(signal: AbortSignal, open: (control: ClaudePre
   const abort = () => { void cancel().catch(() => undefined) }
   signal.addEventListener('abort', abort, { once: true })
   if (signal.aborted) abort()
-  return { ready, cancel, start(options) {
+  return { ready, cancel, get preparationTiming() { return preparationTiming }, start(options) {
     if (consumed || lifetime.signal.aborted) return Promise.reject(Error('Claude preparation is closed or consumed'))
     consumed = true; accept(options); return starting
   } }

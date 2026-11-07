@@ -1,4 +1,5 @@
 import 'server-only'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
@@ -11,6 +12,37 @@ import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/
 type Reader = string | { id: string; [tokenWorkspace]?: string; [enterprisePrincipal]?: EnterprisePrincipal }
 type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 export type TaskWorkspace = { id: string; kind: 'personal' | 'team' }
+
+type HeldTaskWorkspace = {
+  userId: string; workspaceId: string; tx: WorkspaceTransaction; active: boolean;
+  parent?: HeldTaskWorkspace;
+}
+const taskWorkspaceLease = new AsyncLocalStorage<HeldTaskWorkspace>()
+function leaseActive(lease: HeldTaskWorkspace): boolean {
+  return lease.active && (!lease.parent || leaseActive(lease.parent))
+}
+export type BorrowedTaskWorkspaceMembership = { check(): Promise<void>; close(): Promise<void> }
+
+/** A borrow cannot release the owner transaction or authorize another tenant.
+ * Its fresh read uses the held WS executor; no second pool checkout occurs. */
+export function borrowTaskWorkspaceMembership(userId: string, workspaceId: string): BorrowedTaskWorkspaceMembership | null {
+  const lease = taskWorkspaceLease.getStore()
+  if (!lease || !leaseActive(lease)) return null
+  if (lease.userId !== userId || lease.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  let closed = false
+  const assertActive = () => { if (closed || !leaseActive(lease)) throw new ActionFailureError('workspaceAccessDenied') }
+  return {
+    async check() {
+      assertActive()
+      const [current] = await lease.tx.select({ id: workspaces.id }).from(workspaces)
+        .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+        .where(membership(userId, workspaceId)).limit(1)
+      assertActive()
+      if (!current) throw new ActionFailureError('workspaceAccessDenied')
+    },
+    async close() { closed = true },
+  }
+}
 
 export function taskReaderScope(reader: Reader) {
   const userId = typeof reader === 'string' ? reader : reader.id
@@ -52,7 +84,11 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
     const [member] = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, scope.userId), eq(workspaceMembers.status, 'active'))).for('share')
     if (!member) throw new ActionFailureError('workspaceAccessDenied')
-    return work(workspace, tx)
+    const parent = taskWorkspaceLease.getStore()
+    const lease: HeldTaskWorkspace = { userId: scope.userId, workspaceId, tx, active: true,
+      ...(parent && leaseActive(parent) ? { parent } : {}) }
+    try { return await taskWorkspaceLease.run(lease, () => work(workspace, tx)) }
+    finally { lease.active = false }
   })
 }
 

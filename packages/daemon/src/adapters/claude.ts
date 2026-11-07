@@ -1,3 +1,5 @@
+import { captureRunFailure, failureFrom, type RunFailure, type RunFailureContext } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 // Claude Code adapter (ADR 0003): the user's own signed-in Claude Code, run
 // through `@anthropic-ai/claude-agent-sdk`, one CLI process per session.
 //
@@ -22,6 +24,7 @@ import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 import { daemonTracer, runIdHash } from "../tracing"
+import { ClaudeGenerationMetrics } from './generation-metrics'
 import { prepareClaudeSession, ClaudeProjectSettingsNotClaimable, type ClaudePrewarmBinding, type ClaudePreparation } from './claude-prewarm'
 import { runRuntimeTimings } from '../run-runtime-timing'
 import type { Readable, Writable } from "node:stream"
@@ -304,6 +307,24 @@ function toolResultText(content: unknown): string {
       .slice(-4000)
   }
   return ""
+}
+
+/** Normalize only failed SDK results, before their diagnostics become display strings. */
+export function captureClaudeRunFailure(error: unknown, context: RunFailureContext): RunFailure {
+  if (failureFrom(error) || !error || typeof error !== "object") return captureRunFailure(error, context)
+  const value = error as Record<string, unknown>
+  if (value.type !== "result" || value.is_error !== true) return captureRunFailure(error, context)
+  const candidates = [value.result, ...(Array.isArray(value.errors) ? value.errors : [])]
+  const diagnostic = candidates.find((item): item is string => typeof item === "string" && /^API ?[Ee]rror:\s*[45]\d\d\b/.test(item))
+  const prefix = diagnostic?.match(/^API ?[Ee]rror:\s*([45]\d\d)\s*([\s\S]*)$/)
+  const status = typeof value.api_error_status === "number" ? value.api_error_status : prefix ? Number(prefix[1]) : undefined
+  const terminalCodes: Record<string, string> = { prompt_too_long: "context_window_exceeded", image_error: "invalid_request", model_error: "model_unavailable" }
+  const terminalCode = typeof value.terminal_reason === "string" ? terminalCodes[value.terminal_reason] : undefined
+  const failure = claudeProviderFailure(error as SDKResultMessage, undefined)
+  return captureRunFailure({ provider: "claude", ...(status === undefined ? {} : { status }),
+    ...(terminalCode ?? failure?.code ? { code: terminalCode ?? failure?.code } : {}),
+    ...(prefix ? { message: `API Error: ${prefix[1]} ${prefix[2]}` } : {}), cause: error,
+  }, context)
 }
 
 /**
@@ -594,6 +615,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let results = 0
     let runtimeModel: string | null = null
     let ending = false
+    let failureDetails: RunFailure | undefined
     let lastError: string | undefined
     let providerFailure: ProviderFailure | undefined
     /** The API error the current turn's assistant message carried, if any. */
@@ -626,6 +648,8 @@ export class ClaudeAdapter implements AgentAdapter {
       return child
     }
     const credentialSecrets = [nativeToken, options.credential?.key].filter((value): value is string => Boolean(value && value !== NATIVE_AUTH_PLACEHOLDER))
+    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.apps?.token ?? ""]
+    const capture = (error: unknown) => captureClaudeRunFailure(error, { runId: options.runId, appVersion: DAEMON_VERSION, provider: "claude", credential: options.credential ? "api_key" : "subscription", sensitiveText: [...sensitiveText, ...credentialSecrets] })
     const refreshOptions = externalAuth?.automaticRefresh ? {
       getOAuthToken: async ({ signal }: { signal: AbortSignal }): Promise<string | null> => {
         if (signal.aborted || approval.revoked || ending) return null
@@ -639,8 +663,11 @@ export class ClaudeAdapter implements AgentAdapter {
         return nativeToken
       },
     } : {}
+    const traceContext = options.traceContext ?? daemonTracer.capture()
+    const generations = new ClaudeGenerationMetrics(metrics => daemonTracer.generation(metrics, traceContext))
     const sdkOptions = (context: Pick<RunContext, "worktree" | "tmpDir" | "tempEnv" | "mcpServer">, append: string): Options => ({
         ...refreshOptions,
+        includePartialMessages: daemonTracer.enabled,
         cwd: context.worktree,
         // The official CLI echoes the exact stdin user frame after reading
         // it. Its UUID distinguishes this task from init and resumed history.
@@ -722,6 +749,7 @@ export class ClaudeAdapter implements AgentAdapter {
         if (fixed !== claudePrewarmOptionsKey(finalOptions) || !await approval.checkLive()) throw Error('Claude prepared options changed')
         options = finalOptions
         firstMessage = finalOptions.prompt
+        sensitiveText.push(firstMessage)
         ctx = new RunContext(contextOptions())
         ctx.clearHandoff()
         try {
@@ -759,7 +787,10 @@ export class ClaudeAdapter implements AgentAdapter {
       const processExited = await nativeExit
       await closePrepared?.()
       wipeRunCredentials(runDir)
-      if (event) queue.exit({ ...event, ...(processExited ? {} : { sessionExited: false as const }) })
+      if (event) {
+        const { failureDetails: supplied, ...terminal } = event
+        queue.exit({ ...terminal, ...(event.outcome === "failed" ? { failureDetails: supplied ?? failureDetails ?? capture(new Error("claude_cli_exited_early")) } : {}), ...(processExited ? {} : { sessionExited: false as const }) })
+      }
     }
     const turnEnded = () => {
       const handoff = ctx.readHandoff(log)
@@ -808,6 +839,7 @@ export class ClaudeAdapter implements AgentAdapter {
     void (async () => {
       try {
         for await (const message of session) {
+          generations.observe(message)
           if (
             options.requireSessionResume &&
             "session_id" in message &&
@@ -842,6 +874,7 @@ export class ClaudeAdapter implements AgentAdapter {
             for (const chunk of claudeChunks(message)) queue.chunk(chunk)
           if (message.type !== "result") continue
           results++
+          failureDetails = message.is_error ? capture(message) : undefined
           providerFailure = claudeProviderFailure(message, assistantError)
           if (!message.is_error) quota = undefined
           // stdout and stderr are separate pipes. A result can be delivered
@@ -871,7 +904,11 @@ export class ClaudeAdapter implements AgentAdapter {
         }
         if (!ending) diedEarly(stderrTail())
       } catch (error) {
-        if (!ending) diedEarly(errorMessage(error), claudeProviderException(error))
+        generations.fail()
+        if (!ending) {
+          failureDetails = capture(error)
+          diedEarly(errorMessage(error), claudeProviderException(error))
+        }
       } finally {
         clearTimeout(authTimer)
         spoke(false)
@@ -951,7 +988,7 @@ export class ClaudeAdapter implements AgentAdapter {
     if (mode === "continue" && !(await untilSpoken(spoken))) {
       if (providerFailure) {
         await end(null)
-        throw new ProviderFailureError(providerFailure)
+        throw Object.assign(new ProviderFailureError(providerFailure), { failureDetails })
       }
       if (options.requireSessionResume || externalAuth) {
         await end(null)
@@ -982,6 +1019,7 @@ export class ClaudeAdapter implements AgentAdapter {
           await end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
           throw new Error(SUBSCRIPTION_ERROR)
         }
+        sensitiveText.push(text)
         written++
         prompts.push(text)
       },

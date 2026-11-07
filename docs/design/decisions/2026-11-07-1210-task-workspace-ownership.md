@@ -86,6 +86,45 @@ receipts are retained; their owner or old scope does not choose that binding.
 | Active member becomes suspended | Subsequent content access is denied; a pinned write commits before the membership change |
 | Legacy verified Linear publication | Keep its receipt and explicit sync policy; do not derive tenancy from the old scope |
 
+## Request and delivery boundaries
+
+The optional `x-mikka-workspace-id` header selects the effective workspace of an
+authenticated request. It is not a credential. An explicit malformed, inactive
+or conflicting selection is refused; it does not fall back to another
+workspace. Scoped PAT/OAuth/run credentials retain their server-verified pin.
+The response confirms the accepted workspace so clients can discard responses
+from a previous workspace or account generation.
+
+Every human Factory adapter preserves the full verified user, including native
+session provenance. Workspace/member admission precedes the application
+transaction, and the selected workspace remains fixed through the handler.
+Profile commit checks borrow that exact active membership lease, rather than
+checking out another workspace connection. The collection single-flight key
+includes the verified workspace, and question collections apply their workspace
+predicate before the result cap.
+
+A phone push registration stores its server-verified native session in
+`mobile_push_tokens.sessionId`. The request body cannot supply that session.
+A send rechecks the persisted Bot's owner, workspace and archived state, current
+membership, the receiving session's owner and expiry, and the token's unchanged
+session binding. Membership/session/token locks protect the accepted delivery.
+The paid plan never determines whether these isolation checks apply.
+
+The additive `20261107180002_phone_push_session.sql` migration leaves historical
+session bindings NULL. Those destinations remain inactive until the existing
+native registration endpoint binds them; no user-wide session guess is allowed.
+A cold application launch or signing out and back in re-registers through the
+current client. Its in-memory account/token cache can skip registration on a
+simple foreground transition, so the separate client handoff must ensure that
+a newly verified session is actually registered on the server. No session ID
+or credential needs to be displayed, logged or supplied by the UI.
+
+Provider acceptance and local delivery receipts retain their existing meaning.
+If a send partially succeeds, accepted receipts commit before the provider
+failure is reported; an authorization or SQL failure still rolls back.
+Neither Workspace governance nor Team plans create a second Cloud billing
+ledger or bypass the existing metering of explicit Cloud services.
+
 ## Rollout and recovery
 
 Deployment applies tracked schema migrations through the normal release path.

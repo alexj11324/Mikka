@@ -1,4 +1,5 @@
 import 'server-only'
+import { serverRunFailure } from '../run-failure-details'
 import type { Pool } from 'pg'
 import { factoryAutomaticRuntime } from './automatic-dispatch'
 
@@ -49,9 +50,9 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
 }
 
 export async function failFactoryCloudStage(pool: Pool, actor: Actor, runId: string, message: string) {
-  const { rows: [ended] } = await pool.query(`UPDATE agent_runs r SET status='failed',"stopReason"='device_lost',error=$4,"finishedAt"=now(),"updatedAt"=now()
+  const { rows: [ended] } = await pool.query(`UPDATE agent_runs r SET status='failed',"stopReason"='device_lost',error=$4,"failureDetails"=$5::jsonb,"finishedAt"=now(),"updatedAt"=now()
     WHERE r.id=$1 AND r."userId"=$2 AND r.status='queued' AND EXISTS (
-      SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=$3) RETURNING r.*`, [runId, actor.userId, actor.workspaceId, message])
+      SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=$3) RETURNING r.*`, [runId, actor.userId, actor.workspaceId, message, JSON.stringify(serverRunFailure(runId, new Date()))])
   if (!ended) return
   const [{ db }, { recordCoordinatorEvent }, { runFinishedEvent }, { wakeCoordinator }, { afterRunEnded }] = await Promise.all([
     import('@/lib/db'), import('@/lib/coordinator-event-store'), import('@/lib/coordinator-events'), import('@/lib/coordinator/wake'), import('@/lib/run-completion-effects'),

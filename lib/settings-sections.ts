@@ -6,7 +6,7 @@
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
-  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing'
+  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing' | 'cloud'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
@@ -49,6 +49,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'usage', group: 'workspace', title: 'Usage' },
   // Members see 付款 here (their card designation and credit share); plan, balance and top-ups are admins' (C19).
   { id: 'billing', group: 'workspace', title: 'Billing' },
+  { id: 'cloud', group: 'workspace', title: 'Mikka Cloud' },
 ]
 
 /** Section ids from before v4. Old links open the page that now holds the content. */
@@ -96,6 +97,6 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
  */
 export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit'])
 
-export function visibleSettingsSections({ admin, personal = false }: { admin: boolean; personal?: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)))
+export function visibleSettingsSections({ admin, personal = false, billing = true, cloudAdmin = false }: { admin: boolean; personal?: boolean; billing?: boolean; cloudAdmin?: boolean }): SettingsSectionDef[] {
+  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)) && (billing || s.id !== 'billing') && (cloudAdmin || s.id !== 'cloud'))
 }
