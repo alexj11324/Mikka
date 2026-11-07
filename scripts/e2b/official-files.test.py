@@ -164,6 +164,61 @@ class OfficialFiles(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
             files.validate_receipt(proof, 'claude')
 
+    def test_claude_per_create_root_is_only_permitted_during_finalization(self):
+        # Two official-only creates in run 42329203806 returned these different
+        # CA bytes with mode 0644. The existing 0644 -> 0777 rule was measured
+        # separately; keep both observations distinct while checking composition.
+        original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
+                    'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0,
+                    'sha256': '39092cfcc8ab45433c2f03884bc5e73540f1aec21fcd7b6047d8e1c37b22d488'}
+        baseline = {'version': 1, 'entries': [original]}
+        with patch.object(files, 'entry', return_value=original):
+            installation = files.verify(baseline)
+        for mode in (0o644, 0o777):
+            updated = {**original, 'mode': mode,
+                       'sha256': 'b65c9222bdbe3f7aeecd78ad299a40b9a8440ac718b9102f28799df376cf8643'}
+            with self.subTest(mode=mode), patch.object(files, 'entry', return_value=updated):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                    files.verify(baseline)
+                final = files.verify(baseline, 'claude')
+                self.assertEqual(final['before'], final['after'])
+                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                expected_before = {'sha256': original['sha256']}
+                expected_after = {'sha256': updated['sha256']}
+                if mode != original['mode']:
+                    expected_before['mode'] = original['mode']
+                    expected_after['mode'] = mode
+                self.assertEqual(final['providerChanges'], [{'path': original['path'], 'kind': 'file',
+                                 'before': expected_before, 'after': expected_after}])
+                proof = {**installation, 'finalization': final}
+                self.assertIs(files.validate_receipt(proof, 'claude'), proof)
+                proof['after'] = final['originalAfter']
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(proof, 'claude')
+
+    def test_claude_root_variation_keeps_other_metadata_paths_and_templates_protected(self):
+        original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
+                    'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
+        for field, value in (('uid', 1000), ('gid', 1000), ('mode', 0o666),
+                             ('mode', 0o700), ('kind', 'directory'), ('sha256', 'not-a-digest')):
+            updated = {**original, 'sha256': 'b' * 64, field: value}
+            with self.subTest(field=field, value=value), patch.object(files, 'entry', return_value=updated):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                    files.verify({'version': 1, 'entries': [original]}, 'claude')
+        link = {key: value for key, value in original.items() if key != 'sha256'}
+        link.update(kind='link', mode=0o777, target='/opt/mikka/replacement.crt')
+        with patch.object(files, 'entry', return_value=link):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'claude')
+        for path in ('/usr/local/share/ca-certificates/other.crt', '/usr/local/bin/claude'):
+            before = {**original, 'path': path}
+            with self.subTest(path=path), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                    files.verify({'version': 1, 'entries': [before]}, 'claude')
+        with patch.object(files, 'entry', return_value={**original, 'sha256': 'b' * 64}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'desktop')
+
     def test_an_unreadable_original_directory_cannot_be_silently_skipped(self):
         with tempfile.TemporaryDirectory() as name:
             with patch.object(files.os, 'scandir', side_effect=PermissionError('fixture unreadable directory')):

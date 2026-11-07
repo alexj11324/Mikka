@@ -26,7 +26,8 @@
         "mode": {
           "before": 420,
           "after": 511
-        }
+        },
+        "sha256": "per-boot"
       },
       "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db": {
         "sha256": "per-boot"
