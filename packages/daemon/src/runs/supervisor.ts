@@ -1525,15 +1525,16 @@ export class RunSupervisor {
     }
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
+    const traceContext = daemonTracer.capture()
     const baseOptions = {
-      traceContext: daemonTracer.capture(),
+      traceContext,
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
         ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
       githubEnvironment: run.github?.env,
       onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
       apps: runApps(assignment.mcp),
-      mcp: runMcp(assignment.mcp),
+      mcp: runMcp(assignment.mcp, traceContext),
       runId,
       requireSessionResume: assignment.requireSessionResume,
       kind: assignment.kind,
