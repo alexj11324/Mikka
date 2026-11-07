@@ -53,6 +53,44 @@ test('account and workspace scopes keep their state separate', async () => {
   assert.equal(container.textContent, 'private draft')
 })
 
+test('a retired account or workspace cannot write late results back into window storage', async () => {
+  await renderReader()
+  await act(async () => update('private draft'))
+  const finishPreviousScope = update
+  await renderReader('other-person:other-workspace')
+  browser.sessionStorage.removeItem('mikka:view:v1:person:workspace:draft:thread-a')
+  await act(async () => finishPreviousScope('late response from the previous scope'))
+  assert.equal(container.textContent, '')
+  assert.equal(browser.sessionStorage.getItem('mikka:view:v1:person:workspace:draft:thread-a'), null)
+  await renderReader()
+  assert.equal(container.textContent, '')
+})
+
+test('a result arriving after sign-out cannot restore erased drafts', async () => {
+  await renderReader()
+  await act(async () => update('private draft'))
+  const finishAfterSignOut = update
+  await act(async () => root.render(null))
+  browser.sessionStorage.clear()
+  await act(async () => finishAfterSignOut('late failed submission'))
+  assert.equal(browser.sessionStorage.length, 0)
+  await renderReader()
+  assert.equal(container.textContent, '')
+})
+
+test('StrictMode effect replay leaves the current scope writable and preserves offscreen completions', async () => {
+  const render = (shown: boolean) => act(async () => root.render(<StrictMode><ViewStateProvider scope="person:workspace">{shown ? <Reader id="thread-a" /> : <span />}</ViewStateProvider></StrictMode>))
+  await render(true)
+  await act(async () => update('unsent'))
+  const finishWhileAway = update
+  await render(false)
+  await act(async () => finishWhileAway('failed while another page was open'))
+  await render(true)
+  assert.equal(container.textContent, 'failed while another page was open')
+  await act(async () => update('edited after returning'))
+  assert.equal(container.textContent, 'edited after returning')
+})
+
 test('a new object uses its own initial choice rather than the previous object default', async () => {
   await act(async () => root.render(<ViewStateProvider scope="person:workspace"><Reader id="all-tasks" initial="all" /></ViewStateProvider>))
   assert.equal(container.textContent, 'all')

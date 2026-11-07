@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import { getDeletedIssue, listIssueConnections, setIssueDeleted } from '@/app/actions/issue-operations'
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { CacheReadError } from '@/lib/cache-read-error'
-import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
+import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
 import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
@@ -92,7 +92,21 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
     void waitForCacheHydration(cache).then(() => active ? mutate() : undefined).catch(() => {})
     return () => { active = false }
   }, [cache, id, mutate, props.user.id])
-  if (error) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
+  const unavailable = error instanceof CacheReadError || error instanceof ListReadScopeError || !!readAccessFailure(error)
+  // A refusal retires this mount's authorization; a later transport failure
+  // cannot make its old cached document writable again.
+  useEffect(() => {
+    if (unavailable) { setLoadedId(null); props.onDirty(false) }
+  }, [unavailable, props.onDirty])
+  const backgroundFailed = Boolean(error && data && loadedId === id && !unavailable)
+  const readFailedMessage = t('readFailed'), retryLabel = t('reload')
+  useEffect(() => {
+    const notice = `issue-detail-read-${id}`
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: () => { void mutate() } } })
+    else toast.dismiss(notice)
+    return () => { toast.dismiss(notice) }
+  }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])
+  if (error && !backgroundFailed) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
   if (!data) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.

@@ -1,6 +1,6 @@
 'use client'
 
-import { type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -17,6 +17,8 @@ import { ArtifactKindIcon } from './artifact-card'
 import { openArtifact } from '@/components/workspace/workspace-navigation'
 import { InlineLoadError } from '@/components/load-error'
 import { ResizablePane } from '@/components/ui/resizable-pane'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
+import { toast } from 'sonner'
 
 /** The categories on the left: everything, then one per kind an artifact can be today. */
 type Category = 'all' | ArtifactKind
@@ -39,10 +41,27 @@ export function ArtifactLibrary() {
   const tCommon = useTranslations('Common')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
+  const [accessRejected, setAccessRejected] = useState(false)
   const { data, error, mutate } = useSWR('artifacts', () => listArtifacts())
+  const refused = !!readAccessFailure(error)
+  // A deduplicated retry can finish after this view remounts. SWR clears its
+  // error on success even when the old mount owns the onSuccess callback.
+  useEffect(() => {
+    if (refused) setAccessRejected(true)
+    else if (!error) setAccessRejected(false)
+  }, [refused, error])
+  const visible = refused || error && accessRejected ? undefined : data
+  const backgroundFailed = Boolean(error && visible)
+  const readFailedMessage = t('loadError'), retryLabel = t('retry')
+  useEffect(() => {
+    const notice = 'artifact-library-read'
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: () => { void mutate() } } })
+    else toast.dismiss(notice)
+    return () => { toast.dismiss(notice) }
+  }, [backgroundFailed, mutate, readFailedMessage, retryLabel])
   const [category, setCategory] = useViewState<Category>('artifacts:category', 'all')
-  const scroll = useViewScroll<HTMLElement>(`artifacts:${category}`, !!data)
-  const rows = (data ?? []).filter(item => category === 'all' || item.kind === category)
+  const scroll = useViewScroll<HTMLElement>(`artifacts:${category}`, !!visible)
+  const rows = (visible ?? []).filter(item => category === 'all' || item.kind === category)
   const current = CATEGORIES.find(item => item.id === category)!
   const source = (item: ArtifactListItem) => [item.authorName, item.issueKey].filter(Boolean).join(' · ') || '—'
 
@@ -61,8 +80,8 @@ export function ArtifactLibrary() {
     </ResizablePane>
     {/* The category is already selected on the left, so the table has no second 20px title (R-32). */}
     <section ref={scroll} aria-label={t(`category.${current.label}`)} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
-      {error ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
-        : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-12 w-full" />)}</div>
+      {error && !visible ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
+        : !visible ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-12 w-full" />)}</div>
         : !rows.length ? <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader></Empty>
         : <div className="flex flex-col">
           <div aria-hidden="true" className={cn(COLUMNS, 'h-10 px-2 text-xs text-muted-foreground')}>
