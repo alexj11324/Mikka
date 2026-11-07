@@ -13,20 +13,15 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { API_KEY_PRESETS, apiKeyProtocols, protocolHarness, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
-import { harnessName } from '@/components/labels/entity-labels'
+import { API_KEY_PRESETS, apiKeyProtocols, type ApiKeyProtocol, type ApiKeyProvider } from '@/lib/model-api-key-providers'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { apiKeysKey, readApiKeys, useApiKeys, type ApiKey as Key } from '@/hooks/settings/use-api-keys'
+import { apiKeysKey, readApiKeys, useApiKeyLabels, useApiKeys, type ApiKey as Key } from '@/hooks/settings/use-api-keys'
 
 export { apiKeysKey, readApiKeys }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
 
-type ApiKeysT = ReturnType<typeof useTranslations<'Settings.apiKeys'>>
 /** 「Anthropic、OpenAI 协议 · 可用 Claude Code、Codex」: what a key speaks and which Agents can run it (Harness draft, Alex 2026-11-02). */
-function protocolAgents(t: ApiKeysT, protocols: readonly ApiKeyProtocol[]) {
-  return t('protocolAgents', { protocols: protocols.map(item => t(`protocolName.${item}`)).join('、'), agents: protocols.map(item => harnessName(protocolHarness(item))).join('、') })
-}
 
 function ProviderIcon({ provider }: { provider: ApiKeyProvider }) {
   if (provider === 'anthropic') return <Claude className="size-5 shrink-0 text-brand-claude" />
@@ -50,7 +45,7 @@ export function useApiKeyList(workspaceId: string) {
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)
-  const title = (key: Pick<ApiKeyView, 'provider' | 'name'>) => key.provider === 'custom' ? key.name ?? t('provider.custom') : t(`provider.${key.provider}`)
+  const { title, agents: agentsLine } = useApiKeyLabels()
   const share = (key: Key, shared: boolean) => saveShare(key, shared).finally(() => setSharing(null))
   const remove = (key: Key) => removeKey(key).finally(() => setRemoving(null))
 
@@ -62,9 +57,6 @@ export function useApiKeyList(workspaceId: string) {
     return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
   }
   // An OpenAI-protocol provider without the Responses API serves bot chats only (Codex runs on it).
-  const agentsLine = (key: Key) => key.protocol === 'openai' && !key.responsesApi && key.provider === 'custom'
-    ? t('noResponsesApi', { protocol: t('protocolName.openai') })
-    : protocolAgents(t, apiKeyProtocols(key))
   const rows: ReactNode[] = (data?.keys ?? []).map(key => <div key={key.id} id={`api-key-${key.id}`} className="scroll-mt-20"><SettingRow icon={<ProviderIcon provider={key.provider} />} title={title(key)}
     description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${agentsLine(key)}`}</span>{modelsLine(key)}</>}>
     <span className="flex items-center gap-4">
@@ -141,6 +133,7 @@ export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) 
 
 function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>['add']; onClose: () => void }) {
   const t = useTranslations('Settings.apiKeys')
+  const { protocolAgents } = useApiKeyLabels()
   const commonT = useTranslations('Common')
   const [provider, setProvider] = useState<ApiKeyProvider>('anthropic')
   const [name, setName] = useState('')
@@ -178,7 +171,7 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
                 <RadioGroupItem value={value} />
                 <span className="shrink-0">{t(`provider.${value}`)}</span>
                 <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">
-                  {value === 'custom' ? t('customAgents') : protocolAgents(t, apiKeyProtocols({ provider: value, protocol: 'anthropic' }))}
+                  {value === 'custom' ? t('customAgents') : protocolAgents(apiKeyProtocols({ provider: value, protocol: 'anthropic' }))}
                 </span>
               </Label>)}
             </RadioGroup>
@@ -197,7 +190,7 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
               <FieldLabel id="api-key-protocol-label">{t('protocolLabel')}</FieldLabel>
               <ToggleGroup aria-labelledby="api-key-protocol-label" variant="segment" spacing={0.5} className="grid w-full grid-cols-2" value={[protocol]}
                 onValueChange={values => { const next = values[0]; if (next === 'openai' || next === 'anthropic') setProtocol(next) }}>
-                {(['openai', 'anthropic'] as const).map(value => <ToggleGroupItem key={value} value={value} className="min-w-0 text-xs">{protocolAgents(t, [value])}</ToggleGroupItem>)}
+                {(['openai', 'anthropic'] as const).map(value => <ToggleGroupItem key={value} value={value} className="min-w-0 text-xs">{protocolAgents([value])}</ToggleGroupItem>)}
               </ToggleGroup>
             </Field>
             <Field>
