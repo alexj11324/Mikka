@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "kind": "historical_candidate_closed_readonly_diagnostic",
+  "sourceCommit": "cad613ef0a2c553a94aaf72d44d609c93a603a1b",
+  "workflowRun": 42336625140,
+  "operatorWorkflowRun": 42340265289,
+  "operatorCommit": "91579b902d837e6e37f7c1e32387b52d8ade8e51",
+  "runId": "f879d6cd-bdbd-4e62-9a17-441f1f763a25",
+  "query1": [
+    {
+      "diagnostic": {
+        "runId": "f879d6cd-bdbd-4e62-9a17-441f1f763a25",
+        "status": "failed",
+        "startedAt": "2026-11-07T04:26:38.498147+00:00",
+        "chunkTypes": {
+          "other": 2,
+          "start": 1,
+          "finish": 1,
+          "data-run-stage": 3
+        },
+        "errorBytes": 62,
+        "finishedAt": "2026-11-07T04:26:47.863934+00:00",
+        "errorSha256": "2099dbb3c84d73d27c205b053734139a47837d46e5d3be5d0a89e21e31badbd3",
+        "errorPresent": true,
+        "activeIssueRuns": 0,
+        "deviceRemovedAt": "2026-11-07T04:49:37.273957+00:00",
+        "activeDeviceRuns": 0,
+        "errorPatternMatches": [],
+        "activeBoundDeviceTokens": 0,
+        "activeAssociatedDeviceTokens": 0
+      }
+    }
+  ],
+  "query2": [
+    {
+      "diagnostic": {
+        "runId": "f879d6cd-bdbd-4e62-9a17-441f1f763a25",
+        "finish": [
+          {
+            "at": "2026-11-07T04:26:47.041999+00:00",
+            "seq": 6,
+            "finishReason": "unknown",
+            "actualCodexAck": null,
+            "runtimePresent": true,
+            "runtimeComplete": true,
+            "runtimeTruncated": false
+          }
+        ],
+        "stages": [
+          {
+            "at": "2026-11-07T04:26:46.2906+00:00",
+            "ms": 4609,
+            "ok": true,
+            "seq": 3,
+            "stage": "repository"
+          },
+          {
+            "at": "2026-11-07T04:26:46.589226+00:00",
+            "ms": 69,
+            "ok": true,
+            "seq": 4,
+            "stage": "worktree"
+          },
+          {
+            "at": "2026-11-07T04:26:47.041999+00:00",
+            "ms": 459,
+            "ok": false,
+            "seq": 5,
+            "stage": "agent_start"
+          }
+        ],
+        "errorAsciiOnly": true,
+        "errorPatternMatches": []
+      }
+    }
+  ],
+  "boundaries": {
+    "readOnly": true,
+    "rawErrorContentReturned": false,
+    "promptOrReplyReturned": false,
+    "providerCallsMade": false,
+    "resourceMutationsMade": false,
+    "executionPass": false
+  }
+}

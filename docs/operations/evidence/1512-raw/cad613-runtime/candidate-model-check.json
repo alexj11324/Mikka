@@ -1,0 +1,78 @@
+{
+  "artifactId": 13559393969,
+  "artifactName": "e2b-candidates-42336625140-1",
+  "runId": "42336625140",
+  "runAttempt": "1",
+  "headBranch": "main",
+  "sourceCommit": "cad613ef0a2c553a94aaf72d44d609c93a603a1b",
+  "workerSha": "ecebab7930a0be206fa2d6fcd61db63582f24a67",
+  "archive": {
+    "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/cad613-e2b-42336625140/candidates.zip",
+    "bytes": 46630,
+    "sha256": "0ee3e1c04f108b135406dcd1ae7e47162b9027e7c37ccb63e9a416e778e817cb",
+    "githubDigestMatched": true,
+    "zipCrcValid": true
+  },
+  "candidateReport": {
+    "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/cad613-e2b-42336625140/candidates.json",
+    "bytes": 330698,
+    "sha256": "2f347906740218adc91a35335170c05f4737a31e079a20714ea4823585a624f6",
+    "jsonParsed": true,
+    "identityValid": true,
+    "modelRows": {
+      "desktop": {
+        "harnesses": [
+          "claude_code",
+          "codex"
+        ],
+        "rowSchemaValid": true
+      },
+      "claude": {
+        "harnesses": [
+          "claude_code"
+        ],
+        "rowSchemaValid": true
+      },
+      "codex": {
+        "harnesses": [
+          "codex"
+        ],
+        "rowSchemaValid": true
+      }
+    }
+  },
+  "codex": {
+    "templateId": "ybzhd2fpty2v1gl7cs4m",
+    "buildId": "86b44132-f9f6-43da-b39c-9e1f9210067b",
+    "name": "mikka-cad613ef0a2c-42336625140-1-codex",
+    "preinstalled": true,
+    "installed": true,
+    "catalogueReportedVersion": null,
+    "actualCliVersion": null,
+    "actualCliVersionStatus": "unknown",
+    "models": [
+      "gpt-6.1-sol",
+      "gpt-6-astra",
+      "gpt-6-sol",
+      "gpt-6-luna",
+      "gpt-5.6-sol",
+      "gpt-6.1-terra",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5"
+    ],
+    "modelCount": 9,
+    "defaultModelSlot": "gpt-6.1-sol",
+    "exactTargetSlot": {
+      "slot": "gpt-6-luna",
+      "model": "gpt-6-luna",
+      "name": "GPT-6-Luna"
+    }
+  },
+  "limits": [
+    "Anonymous catalogue receipt, not subscription execution proof.",
+    "Candidate report has no complete original preloaded receipt/CLI binary selection manifest to independently revalidate that earlier binding.",
+    "No directly observed CLI semantic version in this artifact or closed version extraction from existing build-job logs; actual version remains unknown.",
+    "Does not identify the inner cause of adapter_start_failed."
+  ]
+}

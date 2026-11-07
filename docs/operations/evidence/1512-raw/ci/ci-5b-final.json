@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "evidence_type": "github_actions_exact_head_final",
+  "observed_at": "2026-11-07T05:06:55.675Z",
+  "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+  "scope": "historical_pull_request_head_not_production_acceptance",
+  "source": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=5b7d9db8cabb85731c0357ba27c3d8e9b9579645&per_page=100",
+  "summary": {
+    "workflows": 14,
+    "success": 13,
+    "cancelled": 1,
+    "failure": 0
+  },
+  "workflows": [
+    {
+      "id": 42339635821,
+      "name": "Analytics SSR",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635824,
+      "name": "Browser gate",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635788,
+      "name": "CI",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635857,
+      "name": "Cloud computer backend",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635769,
+      "name": "Desktop shell",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 42339635758,
+      "name": "Device gateway",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635837,
+      "name": "E2B additive runtime release",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635764,
+      "name": "E2B subscription custody",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635826,
+      "name": "Local device Node 22",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635855,
+      "name": "Mobile OTA update",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635854,
+      "name": "Read cache API acceptance",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635809,
+      "name": "Site search read contract",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635838,
+      "name": "SSH device backend",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42339635832,
+      "name": "Unattended sandbox acceptance",
+      "head_sha": "5b7d9db8cabb85731c0357ba27c3d8e9b9579645",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "desktop": {
+    "run_id": 42339635769,
+    "source": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42339635769/jobs?per_page=100",
+    "jobs": [
+      {
+        "id": 128304233233,
+        "name": "smoke",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128304233390,
+        "name": "checks",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128304233462,
+        "name": "icon",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128305398603,
+        "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+        "status": "completed",
+        "conclusion": "cancelled"
+      }
+    ]
+  }
+}

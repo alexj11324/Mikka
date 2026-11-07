@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "sourceCommit": "cad613ef0a2c553a94aaf72d44d609c93a603a1b",
+  "runId": "f879d6cd-bdbd-4e62-9a17-441f1f763a25",
+  "closedError": "subscription_hosted_runtime_unavailable (adapter_start_failed)",
+  "code": "subscription_hosted_runtime_unavailable",
+  "detail": "adapter_start_failed",
+  "bytes": 62,
+  "sha256": "2099dbb3c84d73d27c205b053734139a47837d46e5d3be5d0a89e21e31badbd3",
+  "proof": "Exact local CodedError constructor output matches the database-side SHA256 and byte length; no raw error was returned.",
+  "sourceFiles": [
+    "packages/protocol/src/coded-error.ts",
+    "packages/daemon/src/subscription-hosted-runner.ts"
+  ],
+  "underlyingCause": "not_recoverable_from_preserved_receipts_after_private_vm_deletion",
+  "causeWasLoggedTo": "private daemon rotating log only; not collected by the historical validator",
+  "candidateCatalogueCheck": "Exact gpt-6-luna entry exists in the original candidate catalogue; this is not subscription execution proof.",
+  "cleanup": "Provider candidates deleted; exact registered device removed; active runs and valid device tokens observed as zero in a bounded read-only query.",
+  "productionAcceptance": false
+}

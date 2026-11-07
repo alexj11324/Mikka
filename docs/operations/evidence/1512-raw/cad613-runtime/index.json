@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "kind": "historical_failure_and_cleanup_evidence",
+  "sourceCommit": "cad613ef0a2c553a94aaf72d44d609c93a603a1b",
+  "workflowRun": 42336625140,
+  "runAttempt": 1,
+  "originalCandidateArtifact": {
+    "id": 13559393969,
+    "zipBytes": 46630,
+    "zipSha256": "0ee3e1c04f108b135406dcd1ae7e47162b9027e7c37ccb63e9a416e778e817cb"
+  },
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/subscription-diagnostics.json",
+      "bytes": 591,
+      "sha256": "2d5dbd26c5320efd2a74bedc547d5222d43ea66c23c2092f3fa41cb7a8e6a5b9",
+      "gitBlobSha1": "a2fef750a39ba184987d5483bee917656ceba22b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/candidate-diagnostic.json",
+      "bytes": 2671,
+      "sha256": "fe259f9587407ee277c73782f5aff788dea61dfc80c660269d5fa0739e81d866",
+      "gitBlobSha1": "d615c7518351b6c04405fc072fb2b093e29acefa"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/database-diagnostic.json",
+      "bytes": 2393,
+      "sha256": "e33d2573b4cb72edb2c2997ddbee04486a50d44173a12402d8ffb41a8a7e5b88",
+      "gitBlobSha1": "dd81ce428038b9107537efebc0bfb11208674a00"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/database-query-1.sql",
+      "bytes": 3467,
+      "sha256": "2c22a3188141006acdbb2bc4bedd6ad2ef85b46c9cad637ff18c1cd5531bfac7",
+      "gitBlobSha1": "c8ae31b3994af5cd590c10c4294fe1a1d064dfc1"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/database-query-2.sql",
+      "bytes": 2422,
+      "sha256": "4ff075d2066c866a9e5a70aec43a8073aceb900b1d6b1f2f40987303025aab96",
+      "gitBlobSha1": "8b9b78099e9157e0065dc44f961a3ae9c606aa70"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/candidate-model-check.json",
+      "bytes": 2394,
+      "sha256": "c34e15e7c3432152ac4963b75f75e3fab7f2bee617e4c55aece18c84314123fb",
+      "gitBlobSha1": "e09f240da21ceba3526d2684d889d870e910010a"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/closed-error-match.json",
+      "bytes": 1182,
+      "sha256": "7ae7a23284982bc2120a25a1ae75528ed60164b25b442087d33f7ceda39a3c90",
+      "gitBlobSha1": "de2822da6dac4d7cab54eb46b310446b0bb8dd5a"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/README.md",
+      "bytes": 3356,
+      "sha256": "b4aa40fc07e247c87630fb47eb6b1e66f0e78486ac64184bedd8fc54a2a323c6",
+      "gitBlobSha1": "e5534255e00ac086e4d7f2b96a9a65c090fd2ab7"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/ci/ci-5b-final.json",
+      "bytes": 4718,
+      "sha256": "1cde5a80a4d3dfcabac887bac2099d29bd0f1031ca59be65d05d2af5479592e3",
+      "gitBlobSha1": "25459f067b43ba24c20802d7cb84545a5b981593"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/posthog-historical.json",
+      "bytes": 65631,
+      "sha256": "4d0be0705fe3b9785b9cfd2190843a90394f1d277ccb886ef681a25c281340df"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/cad613-runtime/candidates.json",
+      "bytes": 330698,
+      "sha256": "2f347906740218adc91a35335170c05f4737a31e079a20714ea4823585a624f6",
+      "gitBlobSha1": "f6634cb713eecb250848877c33ac39b6951d7b09"
+    }
+  ],
+  "notProductionAcceptance": true
+}
