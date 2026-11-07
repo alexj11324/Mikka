@@ -180,11 +180,19 @@ func TestCodexSubscriptionCacheBreakpointAlignment(t *testing.T) {
 		{"unhinted legacy", func(messages []any) []any { return codexCacheMessages("tail", false) }, 0},
 		{"coincident boundaries", func(messages []any) []any { return append(messages[:1], messages[2:]...) }, 1},
 		{"absent live tail", func(messages []any) []any { return append(messages[:2], messages[3:]...) }, 2},
-		{"three private markers", func(messages []any) []any { objectMap(messages[2])["mikka_cache_breakpoint"] = "stable_system_v1"; return messages }, 0},
-		{"non-string later system", func(messages []any) []any { objectMap(messages[2])["content"] = []any{map[string]any{"type": "text", "text": "tail"}}; return messages }, 0},
+		{"three private markers", func(messages []any) []any {
+			objectMap(messages[2])["mikka_cache_breakpoint"] = "stable_system_v1"
+			return messages
+		}, 0},
+		{"non-string later system", func(messages []any) []any {
+			objectMap(messages[2])["content"] = []any{map[string]any{"type": "text", "text": "tail"}}
+			return messages
+		}, 0},
 		{"empty later system", func(messages []any) []any { objectMap(messages[2])["content"] = ""; return messages }, 0},
 		{"history first", func(messages []any) []any { return append(messages[3:], messages[:3]...) }, 0},
-		{"public part marker is not a private hint", func(messages []any) []any { return []any{map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": "rules", "prompt_cache_breakpoint": map[string]any{"mode": "explicit"}}}}, messages[3]} }, 0},
+		{"public part marker is not a private hint", func(messages []any) []any {
+			return []any{map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": "rules", "prompt_cache_breakpoint": map[string]any{"mode": "explicit"}}}}, messages[3]}
+		}, 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if count := codexCacheMarkerCount(captureCodexCacheRequest(t, "gpt-6-luna", test.mutate(codexCacheMessages("tail", true)))); count != test.want {
