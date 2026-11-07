@@ -38,7 +38,8 @@ export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: cal
 export const claimWorkspacePool = { query() { throw new Error('unexpected raw workspace query in claim fixture') } }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
-const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+const dbSource = `import assert from 'node:assert/strict'
+import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
 
 function query(columns){
   let table
@@ -69,8 +70,26 @@ function update(value){
     return {then(resolve,reject){return once().then(()=>undefined).then(resolve,reject)},returning(){return once()}}
   }}}}
 }
-export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
-export const pool={}
+let checkedOutClient
+export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
+export const pool={connect:async()=>{
+  const p=globalThis.claimResponseProbe
+  assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
+  assert.equal(p.appActive,0)
+  assert.equal(p.locks.at(-1),'workspace_members','Workspace admission precedes APP checkout')
+  p.appActive=1;p.appCheckouts++
+  const client={release(){
+    assert.equal(checkedOutClient,client,'release the exact owning APP client')
+    assert.equal(p.appActive,1)
+    checkedOutClient=undefined;p.appActive=0;p.appReleases++
+  }}
+  checkedOutClient=client
+  return client
+}}
+export async function withDatabaseClient(client,operation){
+  assert.equal(client,checkedOutClient,'bind the exact checked-out APP client')
+  return operation()
+}
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],

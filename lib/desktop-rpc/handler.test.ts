@@ -132,6 +132,15 @@ test('native header adapter preserves browser authority but strips all bearer co
   assert.equal(desktopBearerHeaders(request('fixture.read', [], { cookie: 'browser=1' }))?.has('cookie'), false)
 })
 
+test('signed bearer padding stays trailing and inside the existing total length limit', () => {
+  for (const token of ['a'.repeat(512), 'a'.repeat(511) + '=', 'a'.repeat(510) + '==']) {
+    assert.ok(desktopBearerHeaders(request('fixture.read', [], { authorization: `Bearer ${token}` })))
+  }
+  for (const token of ['a'.repeat(512) + '=', 'a'.repeat(31), 'a'.repeat(32) + '===', 'a'.repeat(32) + '=b']) {
+    assert.equal(desktopBearerHeaders(request('fixture.read', [], { authorization: `Bearer ${token}` })), null)
+  }
+})
+
 test('native bearer requests cannot import another origin or cross-site fetch metadata', async () => {
   const f = fixture()
   for (const headers of [{ origin: 'https://attacker.example' }, { origin: 'null' }, { 'sec-fetch-site': 'cross-site' }] as Record<string, string>[]) {

@@ -3101,7 +3101,6 @@ test(
         const { changeOrder } = await import('../model-order');
         const { workspacePool } = await import('../workspace-db');
         assert.equal(workspacePool.options.connectionString, isolated.toString(), 'membership uses this suite\'s isolated loopback database');
-        let membershipFixture: { userId: string; workspaceId: string } | undefined;
         const taskCreate = threadMachineProvider.create;
         const createdTaskRuns: string[] = [];
         threadMachineProvider.create = async (...args) => {
@@ -3119,7 +3118,6 @@ test(
           await modelDatabase!.run(async () => {
             const userId = `fresh-check-${randomUUID()}`, workspaceId = randomUUID(), botId = randomUUID();
             const actor = { userId, workspaceId }, scope = { ownerId: userId, workspaceId, botId };
-            membershipFixture = { userId, workspaceId };
             // APP and Workspace use independent real pools against this one
             // isolated database, so authority rows are inserted exactly once.
             await db.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
@@ -3262,11 +3260,9 @@ test(
           });
         } finally {
           machines.restore();
-          if (membershipFixture) {
-            await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [membershipFixture.workspaceId]);
-            await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1', [membershipFixture.workspaceId]);
-            await workspacePool.query('DELETE FROM "user" WHERE id=$1', [membershipFixture.userId]);
-          }
+          // This suite retains its isolated database, including the actual
+          // computer bindings. Do not delete their owner as if Workspace rows
+          // still lived alone in a second shared database.
           for (const name of names) { const value = saved.get(name); if (value === undefined) delete process.env[name]; else process.env[name] = value; }
         }
       });
