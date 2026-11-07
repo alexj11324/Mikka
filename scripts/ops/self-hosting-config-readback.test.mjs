@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict'
 import { generateKeyPairSync } from 'node:crypto'
 import test from 'node:test'
-import { BOOLEAN_NAMES, configurationReadback, publicAppConfiguration, runReadback } from './self-hosting-config-readback.mjs'
+import { BOOLEAN_NAMES, configurationReadback, publicAppConfiguration, readbackDiagnostics, runReadback, valueShape } from './self-hosting-config-readback.mjs'
+
+test('representation diagnostics disclose only closed shapes and lengths', () => {
+  assert.deepEqual(valueShape(undefined), { shape: 'unset', length: 0 })
+  assert.deepEqual(valueShape(''), { shape: 'empty', length: 0 })
+  assert.deepEqual(valueShape(' \n'), { shape: 'whitespace', length: 2 })
+  assert.equal(valueShape(' cloud ', ['cloud']).shape, 'trimmed_known_value')
+  assert.equal(valueShape('"cloud"', ['cloud']).shape, 'quoted_known_value')
+  const env = { GITHUB_APP_ID: 'Iv23.fixtureonly12345', GITHUB_APP_PRIVATE_KEY: 'private-not-for-logs', MIKKA_EDITION: 'arbitrary-secret-value' }
+  const diagnostics = readbackDiagnostics(env)
+  assert.equal(diagnostics.GITHUB_APP_ID.shape, 'app_client_id')
+  assert.equal(diagnostics.GITHUB_APP_PRIVATE_KEY.shape, 'invalid_private_key')
+  for (const value of Object.values(env)) assert.ok(!JSON.stringify(diagnostics).includes(value))
+})
 
 test('flags expose only exact enums and distinguish a failed read from an unset value', () => {
   const env = Object.fromEntries([...BOOLEAN_NAMES, 'MIKKA_EDITION'].map(name => [`READ_${name}`, 'success']))
@@ -21,7 +34,7 @@ test('app projection cannot emit extra fields or unvalidated permissions/events'
 
 test('the probe only GETs the fixed GitHub endpoint and never logs credentials or responses', async () => {
   const privateKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
-  const env = { GITHUB_APP_ID: '12345', GITHUB_APP_PRIVATE_KEY: privateKey, READ_GITHUB_APP_ID: 'success', READ_GITHUB_APP_PRIVATE_KEY: 'success',
+  const env = { GITHUB_APP_ID: 'Iv23.fixtureonly12345', GITHUB_APP_PRIVATE_KEY: privateKey, READ_GITHUB_APP_ID: 'success', READ_GITHUB_APP_PRIVATE_KEY: 'success',
     ...Object.fromEntries([...BOOLEAN_NAMES, 'MIKKA_EDITION'].map(name => [`READ_${name}`, 'success'])) }
   const lines = []
   let authorization
