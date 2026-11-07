@@ -102,7 +102,7 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   const readFailedMessage = t('readFailed'), retryLabel = t('reload')
   useEffect(() => {
     const notice = `issue-detail-read-${id}`
-    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: () => { void mutate() } } })
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); void mutate() } } })
     else toast.dismiss(notice)
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])

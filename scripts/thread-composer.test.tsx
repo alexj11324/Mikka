@@ -30,9 +30,9 @@ let readFailure: unknown = null
 let readHold: Promise<void> | null = null
 let changesRead: { state: string; changes?: object } | null = null
 let issueReads = 0
-const notices = new Map<string, { action?: { onClick: () => void } }>()
+const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
 mock.module('sonner', { namedExports: { toast: {
-  error: (_message: string, options: { id: string; action?: { onClick: () => void } }) => { notices.set(options.id, options) },
+  error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
 mock.module('swr', {
@@ -142,7 +142,7 @@ test('a background thread read failure preserves transcript, scroll, composer fo
   const retry = notices.get('issue-thread-read-run-1')?.action
   assert.ok(retry, 'retry belongs to the existing background error notice')
   readFailure = null
-  await act(async () => { retry.onClick(); await new Promise(resolve => setTimeout(resolve, 0)) })
+  await act(async () => { retry.onClick(new Event('click', { cancelable: true })); await new Promise(resolve => setTimeout(resolve, 0)) })
   assert.equal(issueReads, 3)
   assert.equal(notices.size, 0)
   assert.ok(container.querySelector('ol') === history)
