@@ -21,6 +21,7 @@ export const navigationModules = ['components/workspace/workspace-navigation.ts'
 /** file → rule → { count, reason } */
 export const navigationAllowlist = {
   'app/api/desktop/finish/route.ts': { 'navigation/history': { count: 1, reason: 'inline script in the desktop sign-in hand-off page drops its one-time token from the address' } },
+  'app/api/web/complete/route.ts': { 'navigation/history': { count: 1, reason: 'fixed web sign-in completion script removes its one-time code and state before notifying the same-origin opener' } },
   'components/auth/reset-password-form.tsx': { 'navigation/history': { count: 1, reason: 'drops the reset token from the address after reading it' } },
   'components/auth/verify-email-form.tsx': { 'navigation/history': { count: 1, reason: 'drops the verification token from the address after reading it' } },
   'components/billing/balance-section.tsx': { 'navigation/history': { count: 1, reason: 'drops the Stripe return key after showing its result' } },

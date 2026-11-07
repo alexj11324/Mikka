@@ -8,7 +8,7 @@ import { WorkspaceLoading } from '@/components/workspace/workspace-loading'
 import { VersionGuard } from '@/components/version-guard'
 import { PostHogAnalytics } from '@/components/posthog-analytics'
 import { posthogConfig } from '@/lib/posthog-config'
-import { authClient } from '@/lib/auth-client'
+import { authClient, cloudAuthClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { navigate, useLocation, withoutLocale } from '../../../desktop/src/renderer/location'
@@ -16,6 +16,7 @@ import type { DesktopSession } from '../../../desktop/src/renderer/host'
 import type { BootstrapScope } from '../../../desktop/src/renderer/bootstrap'
 import { isDesktopHandoffPage, webAuthentication } from './auth-routing'
 import { watchSessionOwner } from './session-owner'
+import { currentWebServers, subscribeWebServers } from '@/lib/web-connection/browser'
 
 export { authenticatedReturn } from './auth-routing'
 export const platform = 'web' as const
@@ -37,7 +38,14 @@ export function AuthForm(props: ComponentProps<typeof ExistingAuthForm>) {
 export function setSession(_session: DesktopSession | null) {}
 
 export function onSessionChanged(changed: () => void) {
-  return watchSessionOwner(authClient.$store.atoms.session, changed)
+  const stopRemote = subscribeWebServers(changed)
+  const stopIdentities = cloudAuthClient.$store.atoms.session.subscribe(value => {
+    if (!value.isPending && !value.error && value.data?.user.id) void currentWebServers()?.rememberCloudAccounts([value.data.user.id])
+  })
+  const stopCloud = watchSessionOwner(authClient.$store.atoms.session, () => {
+    if (!currentWebServers()?.getActiveAccount()) changed()
+  })
+  return () => { stopRemote(); stopCloud(); stopIdentities() }
 }
 
 export function PlatformExtras() {

@@ -3,6 +3,7 @@ import { authEffectiveTrustedOrigins, authSignInMethods, MOBILE_APP_ORIGIN } fro
 import { BASE_PATH } from './base-path'
 import { getEdition } from './edition'
 import { DESKTOP_RPC_PREVIOUS_VERSION, DESKTOP_RPC_VERSION, UPDATE_REQUIRED } from './desktop-rpc/wire'
+import { WEB_CONNECTION_PROTOCOL, webConnectionEnabled } from './web-connection/policy'
 
 type Environment = Record<string, string | undefined>
 
@@ -20,6 +21,7 @@ export function desktopDiscovery(env: Environment = process.env) {
     minDesktopVersion: minDesktopVersion(env.MIN_CLIENT_VERSION),
     cloud: { connected: false },
     mobileReady: authEffectiveTrustedOrigins(env).includes(MOBILE_APP_ORIGIN),
+    web: { enabled: webConnectionEnabled(env), protocol: { min: WEB_CONNECTION_PROTOCOL, max: WEB_CONNECTION_PROTOCOL } },
   }
 }
 

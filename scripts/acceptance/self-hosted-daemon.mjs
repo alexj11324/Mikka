@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { encode, decode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 import { liveChannelId } from '../../lib/live/scope.ts'
+import { liveSessionIdValid } from '../../lib/live/session-ticket.ts'
 import { presenceReply, PRESENCE_MAX_TOKEN_BYTES } from '../../lib/live/presence.ts'
 
 const ORIGIN = 'http://localhost:3000'
@@ -64,8 +65,10 @@ export function presenceTarget(ticket, live, ownerId, now = Date.now()) {
   const channel = liveChannelId({ ownerId, workspaceId: live.workspaceId })
   check(url.origin === ORIGIN.replace('http:', 'ws:') && url.pathname === `/mikka/v1/live/${channel}/socket`
     && !url.username && !url.password && !url.search && !url.hash, 'PRESENCE_TARGET')
-  check(typeof ticket.protocol === 'string' && /^mikka-ticket-[0-9]+-[a-f0-9]{64}$/.test(ticket.protocol)
-    && Number.isSafeInteger(ticket.expiresAt) && ticket.expiresAt === Number(ticket.protocol.split('-')[2]) * 1000
+  const protocol = /^mikka-live-v2-([0-9]{1,12})\.([A-Za-z0-9_-]{1,342})\.([a-f0-9]{64})$/.exec(ticket.protocol ?? '')
+  const sessionId = protocol ? Buffer.from(protocol[2], 'base64url').toString('utf8') : null
+  check(protocol && liveSessionIdValid(sessionId) && Buffer.from(sessionId).toString('base64url') === protocol[2]
+    && Number.isSafeInteger(ticket.expiresAt) && ticket.expiresAt === Number(protocol[1]) * 1000
     && ticket.expiresAt > now && ticket.expiresAt <= now + 305_000, 'PRESENCE_TICKET')
   url.searchParams.set('revisions', '1'); url.searchParams.set('presence', '1')
   return { url: url.href, protocol: ticket.protocol, proof }

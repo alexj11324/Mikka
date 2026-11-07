@@ -1215,7 +1215,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "d59155ecaec99895f9195e558f921a6235b092d0de553309376b3aa657fa9250"
+      "sourceHash": "846569d41cb1ade9f9449fb2cb2e500eb3389c8a0a3b5f14b57880ffa1dd0880"
     },
     {
       "path": "/mikka/api/mcp",
@@ -1780,6 +1780,51 @@
         "GET"
       ],
       "sourceHash": "c8c7456968162edcb99e61b6054ca2407ef8b73e248ddc29f719a5209c640727"
+    },
+    {
+      "path": "/mikka/api/web/begin",
+      "template": "/api/web/begin",
+      "source": "app/api/web/begin/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "2648e6d5de58ed0a8807a09def881fffdcf8f2a1b932f3dca5f55369fcdf1696"
+    },
+    {
+      "path": "/mikka/api/web/complete",
+      "template": "/api/web/complete",
+      "source": "app/api/web/complete/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "9ae5aa810c6dee2fb27bc30b0b2f40002b32231325fc2318891de3d0ba60a805"
+    },
+    {
+      "path": "/mikka/api/web/exchange",
+      "template": "/api/web/exchange",
+      "source": "app/api/web/exchange/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "5a99e2148cdb7067345ff423a9071f8e9b66e7aef318a663935829faf61154fe"
+    },
+    {
+      "path": "/mikka/api/web/return",
+      "template": "/api/web/return",
+      "source": "app/api/web/return/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "106a56dd995bf58cf963bc5d04402c6d4ce967b56fbff22d14f5ba07784c657c"
+    },
+    {
+      "path": "/mikka/api/web/revoke",
+      "template": "/api/web/revoke",
+      "source": "app/api/web/revoke/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "bc4a3e01effdf4ef88e44029e1fe7cfc221e02848cd21b1c7b6c71f2c8a33681"
     },
     {
       "path": "/mikka/api/webhooks/composio",
