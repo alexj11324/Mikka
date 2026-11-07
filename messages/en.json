@@ -5259,6 +5259,10 @@
     "renderHint": "Retry to reopen the view."
   },
   "HostedSettings": {
+    "account": {
+      "note": "Your account details apply to every workspace you are in.",
+      "pictureHint": "PNG, JPEG or WebP"
+    },
     "models": {
       "defaults": "Defaults",
       "filterLabel": "Filter models",

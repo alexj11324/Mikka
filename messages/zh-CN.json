@@ -5259,6 +5259,10 @@
     "renderHint": "请重试打开页面。"
   },
   "HostedSettings": {
+    "account": {
+      "note": "账户信息对你所在的所有团队都生效。",
+      "pictureHint": "PNG、JPEG 或 WebP"
+    },
     "models": {
       "defaults": "默认",
       "filterLabel": "筛选模型",
