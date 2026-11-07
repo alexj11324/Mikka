@@ -55,6 +55,8 @@ export type BillingPlanState = {
   openPortal: () => void
   /** Stripe Checkout for the team plan. */
   startCheckout: () => void
+  /** Reads the plan again (重试 after a failed read). */
+  reload: () => void
 }
 
 /** V15 计费's plan (admins). */
@@ -83,6 +85,7 @@ export function useBillingPlan(workspaceId: string): BillingPlanState {
   return {
     plan, loading: !billing.data && !billing.error, error: errorCode ? actionError(billing.data?.error) : null, errorCode,
     pending, actionError: error, openPortal: () => void redirect('portal'), startCheckout: () => void redirect('checkout'),
+    reload: () => void billing.mutate(),
   }
 }
 
