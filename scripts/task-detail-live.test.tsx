@@ -475,7 +475,7 @@ test('a live acceptance keeps unsaved title and description, then saves them aga
   await input(bodyElement, 'Unsent description')
   titleElement.setSelectionRange(4, 12)
   accepted(); await emit()
-  await until(() => properties().textContent === 'done:normal', 'external status is adopted while text is dirty')
+  await until(() => properties().textContent === 'done:normal' && activity().includes('changedStatus Issue.status.done'), 'external status and activity are adopted while text is dirty')
   assert.equal(title(), titleElement, 'the task is not remounted')
   assert.equal(description(), bodyElement)
   assert.equal(title().value, 'Unsent title while composing')
