@@ -680,7 +680,7 @@
         "GET"
       ],
       "maxDuration": 300,
-      "sourceHash": "6f74b8d6512b30d9abc28daa3230fcb9d75822b954001c57c8332ea11c2a559c"
+      "sourceHash": "f1055269834dbe7b0591693d0272823d34ca0b7d2c96df5750b6244b371e86d6"
     },
     {
       "path": "/mikka/api/cron/run-recovery",
@@ -690,7 +690,7 @@
         "GET"
       ],
       "maxDuration": 300,
-      "sourceHash": "3397e3729007addac134518d90cf402e3d84d7459db2e09f1d2f632bff685a44"
+      "sourceHash": "fa6111eae1770993c7d2113b13bca26922120c9224959dbfa859beb23d8356d9"
     },
     {
       "path": "/mikka/api/cron/schedules",

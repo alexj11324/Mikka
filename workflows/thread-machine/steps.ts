@@ -1,3 +1,4 @@
+import { withThreadWorkflowAuthority } from '@/lib/enterprise/execution-authority'
 import { RetryableError } from 'workflow'
 
 /** Kept as the provider refresh interval for callers that display deadlines. */
@@ -10,7 +11,7 @@ export async function maintainThreadMachine(actor: { userId: string; workspaceId
     const [{ pool }, { reconcileThreadMachine }] = await Promise.all([
       import('@/lib/db'), import('@/lib/cloud-computer/thread-lifecycle'),
     ])
-    return await reconcileThreadMachine(pool, actor, runId)
+    return await withThreadWorkflowAuthority(actor, runId, () => reconcileThreadMachine(pool, actor, runId))
   } catch (error) {
     const { threadLifecycleErrorKind } = await import('@/lib/cloud-computer/thread-lifecycle-log')
     console.error('Thread machine maintenance unavailable', { runId, name: threadLifecycleErrorKind(error) })

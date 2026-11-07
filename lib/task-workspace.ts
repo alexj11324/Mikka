@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
+import { WorkspaceError } from '@/lib/workspace-error'
 import { actingContext } from '@/lib/activity-actor'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -15,7 +16,7 @@ type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction
 export type TaskWorkspace = { id: string; kind: 'personal' | 'team' }
 
 type HeldTaskWorkspace = {
-  userId: string; workspaceId: string; tx: WorkspaceTransaction; active: boolean;
+  userId: string; workspaceId: string; kind: TaskWorkspace['kind']; tx: WorkspaceTransaction; active: boolean;
   parent?: HeldTaskWorkspace;
 }
 const taskWorkspaceLease = new AsyncLocalStorage<HeldTaskWorkspace>()
@@ -61,14 +62,23 @@ function membership(userId: string, workspaceId?: string) {
   )
 }
 
-/** Read on every operation. Billing and organization roles never grant membership. */
+/** Read on every operation, or reuse only the membership held by this exact
+ * active lease. Enterprise policy and principal are checked on every call. */
 export async function activeTaskWorkspaces(reader: Reader, requestedId?: string): Promise<TaskWorkspace[]> {
   const scope = taskReaderScope(reader)
   if (requestedId && !z.uuid().safeParse(requestedId).success) return []
   if (scope.workspaceId && requestedId && scope.workspaceId !== requestedId) return []
-  const rows = await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind }).from(workspaces)
-    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-    .where(membership(scope.userId, scope.workspaceId ?? requestedId)).orderBy(asc(workspaces.createdAt))
+  const selectedId = scope.workspaceId ?? requestedId
+  const lease = taskWorkspaceLease.getStore()
+  // Other transactions cannot revoke this locked membership until the lease
+  // ends. Only the exact user/tenant can reuse it; an unscoped list still reads
+  // every active tenant. Keep any canonical Enterprise filter after these rows.
+  const rows: TaskWorkspace[] = selectedId && lease && leaseActive(lease)
+    && lease.userId === scope.userId && lease.workspaceId === selectedId
+    ? [{ id: lease.workspaceId, kind: lease.kind }]
+    : await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind }).from(workspaces)
+      .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+      .where(membership(scope.userId, selectedId)).orderBy(asc(workspaces.createdAt))
   return filterEnterpriseWorkspaces(reader, rows)
 }
 
@@ -85,9 +95,20 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
     const [member] = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, scope.userId), eq(workspaceMembers.status, 'active'))).for('share')
     if (!member) throw new ActionFailureError('workspaceAccessDenied')
-    await requireEnterpriseWorkspace(scope.userId, workspaceId, typeof reader === 'string' ? undefined : reader[enterprisePrincipal], tx)
+    try { await requireEnterpriseWorkspace(scope.userId, workspaceId, typeof reader === 'string' ? undefined : reader[enterprisePrincipal], tx) }
+    catch (error) {
+      // This task boundary has one established refusal type for native claims,
+      // quota continuations and human writes. Do not turn a policy refusal into
+      // a fallback or normalize infrastructure/programming errors.
+      if (error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') {
+        const denied = new ActionFailureError('workspaceAccessDenied')
+        denied.cause = error
+        throw denied
+      }
+      throw error
+    }
     const parent = taskWorkspaceLease.getStore()
-    const lease: HeldTaskWorkspace = { userId: scope.userId, workspaceId, tx, active: true,
+    const lease: HeldTaskWorkspace = { userId: scope.userId, workspaceId, kind: workspace.kind, tx, active: true,
       ...(parent && leaseActive(parent) ? { parent } : {}) }
     try { return await taskWorkspaceLease.run(lease, () => work(workspace, tx)) }
     finally { lease.active = false }

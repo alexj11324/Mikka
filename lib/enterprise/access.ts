@@ -8,12 +8,21 @@ import { actingContext } from '@/lib/activity-actor'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { enterprisePrincipal, type EnterprisePrincipal, type EnterpriseReader } from './principal'
 import { enterpriseAccessAllowed, type EnterpriseAccessState } from './access-policy'
+import { currentExecutionAuthority } from './execution-authority'
 export { enterpriseAccessAllowed } from './access-policy'
 
-async function currentPrincipal(userId: string, explicit?: EnterprisePrincipal): Promise<EnterprisePrincipal | undefined> {
+type AccessPrincipal = EnterprisePrincipal | { kind: 'execution'; credentialValid: boolean }
+async function currentPrincipal(userId: string, workspaceId: string, explicit: EnterprisePrincipal | undefined, query: EnterpriseAuthExecutor): Promise<AccessPrincipal | undefined> {
+  // Original human/delegated proof always wins, including when it has expired
+  // or lost SSO assurance. Background work cannot silently replace that actor.
   if (explicit) return explicit
   const acting = actingContext.getStore()
-  if (acting) return acting.userId === userId ? acting.enterprisePrincipal : undefined
+  if (acting && acting.userId !== userId) return undefined
+  if (acting?.enterprisePrincipal) return acting.enterprisePrincipal
+  if (acting?.tokenWorkspaceId && acting.tokenWorkspaceId !== workspaceId) return undefined
+  const execution = await currentExecutionAuthority(userId, workspaceId, query)
+  if (execution !== undefined) return { kind: 'execution', credentialValid: execution }
+  if (acting) return undefined
   const { getSession } = await import('@/lib/session')
   const session = await getSession()
   return session?.user.id === userId ? { kind: 'session', sessionId: session.session.id } : undefined
@@ -38,8 +47,10 @@ async function organizationAccess(userId: string, workspaceId: string, organizat
   const state: EnterpriseAccessState = { ...rows[0], credentialValid: false, sessionAssured: false, breakGlass: false }
   if (state.managedRevoked) return false
   if (!state.enforceSso) return true
-  const principal = await currentPrincipal(userId, explicit)
-  if (principal?.kind === 'session') {
+  const principal = await currentPrincipal(userId, workspaceId, explicit, appExecutor)
+  if (principal?.kind === 'execution') {
+    state.credentialValid = principal.credentialValid
+  } else if (principal?.kind === 'session') {
     const { rows: sessions } = await appExecutor.query<{ assured: boolean; breakGlass: boolean }>(`select
       (s."enterpriseOrganizationId"=$3 and not exists(select 1 from enterprise_saml_session_lineage lineage
         left join session root on root.id=lineage."rootSessionId" and root."userId"=$2 and root."expiresAt">now()

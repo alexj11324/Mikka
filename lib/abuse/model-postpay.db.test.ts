@@ -48,8 +48,8 @@ test('hosted calls check positive balance, debit only after receipts, and resume
     releaseFirst()
     server.closeAllConnections()
     await new Promise<void>(resolve => server.close(() => resolve()))
-    await pool.end()
-    await (await import('../db')).pool.end()
+    const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
@@ -65,7 +65,10 @@ test('hosted calls check positive balance, debit only after receipts, and resume
       } }) }
     },
   }
-  const workspace = randomUUID()
+  // Model admission resolves the real tenant policy before any provider call.
+  const { seedUser, seedWorkspace } = await import('../../tests/support/workspace-admin-db')
+  const userId = await seedUser(pool, 'model-postpay')
+  const workspace = (await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])).id
   await store.verify(workspace, 'cus_synthetic_postpay', `synthetic-${workspace}`)
   await pool.query('UPDATE hosted_allowances SET remaining=1 WHERE "workspaceId"=$1', [workspace])
   const { hostedModel } = await import('./model')
