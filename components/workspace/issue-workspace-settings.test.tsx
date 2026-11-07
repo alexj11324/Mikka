@@ -18,7 +18,8 @@ let user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
 let workspaceId = 'workspace-one'
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
-const botList = { data: { items: [] } }
+const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
+const botList = { data: { items: [bot] } }
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
 mock.module('next-intl', { namedExports: { useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }) } })
@@ -67,7 +68,7 @@ mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, C
 mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty, waitingCount: () => 0 } })
 mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => true, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
-mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open }: { open: boolean }) => open ? <div data-search-open="" /> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
+mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
 mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open }: { open: boolean }) => open ? <div data-new-task-open="" /> : null } })
 let railMounts = 0
 mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSettings, onNavigate }: { onSettings: () => void; onNavigate: (destination: 'chats') => void }) => {
@@ -80,12 +81,12 @@ let useBrowserNotesComposer: typeof import('../browser/browser-notes')['useBrows
 let notes: ReturnType<typeof useBrowserNotes>
 let editDraft: (value: string) => void
 let composerMounts = 0, composerUnmounts = 0
-function Conversation() {
+function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }) {
   notes = useBrowserNotesComposer(true)
-  const [draft, setDraft] = useViewState('settings-fixture:draft', '')
+  const [draft, setDraft] = useViewState(`settings-fixture:${activeBot?.id ?? 'coordinator'}:draft`, '')
   editDraft = setDraft
   useEffect(() => { composerMounts++; return () => { composerUnmounts++ } }, [])
-  return <Textarea aria-label="composer" value={draft} onChange={event => setDraft(event.target.value)} />
+  return <Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} />
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
 mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
@@ -225,6 +226,49 @@ for (const legacy of [false, true]) test(`${legacy ? 'legacy' : 'routed'} Settin
   assert.equal(container.querySelector('[data-settings-section]'), null)
   assert.ok(container.querySelector('[data-search-open]'), 'Settings search shortcut must open the same search as the top-bar button')
   assert.ok(frame() === original)
+  assert.equal(railMounts, 1)
+})
+
+for (const routerFirst of [false, true]) test(`Settings search and repeated Back/Forward restore the addressed bot when the router renders ${routerFirst ? 'before' : 'after'} popstate`, async () => {
+  releaseChunk()
+  const chatHref = `/?workspace=workspace-one&bot=${bot.id}`
+  browser.history.replaceState({}, '', chatHref)
+  await render()
+  const original = { frame: frame(), bar: bar(), rail: rail() }
+  const assertChat = () => {
+    assert.equal(new URLSearchParams(browser.location.search).get('bot'), bot.id)
+    assert.equal(container.querySelector('textarea')?.dataset.chat, 'Ada', 'the visible chat must agree with the bot in the restored address')
+    assert.equal(container.querySelector('textarea')?.value, 'Ada unsent draft')
+  }
+  await act(async () => editDraft('Ada unsent draft'))
+  assertChat()
+  await act(async () => button('settings').click())
+  await render()
+  const settingsHref = `${browser.location.pathname}${browser.location.search}`
+  assert.ok(container.querySelector('[data-settings-section]'))
+  await act(async () => { browser.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })) })
+  await render()
+  assert.equal(browser.location.pathname, '/')
+  assert.ok(container.querySelector('[data-search-open]'))
+  await act(async () => button('dismiss search').click())
+
+  // A router's own history subscription can render the new pathname before
+  // the workspace's popstate listener runs. Deliver both valid event orders;
+  // the real navigation singleton and canonical-address effect remain active.
+  const pop = async (href: string, renderFirst = false) => {
+    browser.history.replaceState({}, '', href)
+    if (renderFirst) await render()
+    await act(async () => { browser.dispatchEvent(new browser.PopStateEvent('popstate')) })
+    await render()
+  }
+  await pop(settingsHref)
+  await pop(chatHref)
+  assertChat()
+  await pop(settingsHref)
+  assert.ok(container.querySelector('[data-settings-section]'))
+  await pop(chatHref, routerFirst)
+  assertChat()
+  assert.ok(frame() === original.frame && bar() === original.bar && rail() === original.rail)
   assert.equal(railMounts, 1)
 })
 
