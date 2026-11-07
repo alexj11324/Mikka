@@ -73,7 +73,7 @@ async function installerDiagnostic() {
       const exitCode = /^exitCode=(-?\d+)$/m.exec(diagnostic)?.[1]
       // stdout may contain a response body. Retain only the command's stderr,
       // with the same credential/fixture redaction as the existing service logs.
-      const marker = '\n--- stderr ---\n', offset = diagnostic.indexOf(marker)
+      const marker = '\n--- stderr ---\n', offset = diagnostic.lastIndexOf(marker)
       const stderr = offset < 0 ? null : sanitized(diagnostic.slice(offset + marker.length))
       return { status: 'captured', exitCode: exitCode === undefined ? null : Number(exitCode),
         stderr: stderr?.slice(0, 4096) ?? null, truncated: stderr !== null && stderr.length > 4096 }
