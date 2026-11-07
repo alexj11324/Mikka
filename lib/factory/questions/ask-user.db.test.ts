@@ -328,7 +328,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     await t.test("public question GETs read the user's named Bots without changing scoped reads or writes", async () => {
       const firstBot = randomUUID(), secondBot = randomUUID(), foreignBot = randomUUID();
       for (const [id, user] of [[firstBot, "owner"], [secondBot, "owner"], [foreignBot, "intruder"]])
-        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Question fixture')`, [id, await seedFixtureWorkspace(pool, user), user]);
+        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)`, [id, await seedFixtureWorkspace(pool, user), user, `Question fixture ${id}`]);
       const first = await asked("permission", "Continue the original task?", ["Continue"], "owner", firstBot);
       const second = await asked("external", "Wait for the external service?", ["Continue"], "owner", secondBot);
       const foreign = await asked("permission", "Other person's task", ["Continue"], "intruder", foreignBot);

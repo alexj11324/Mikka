@@ -11,6 +11,8 @@ import { FactoryError } from "./contract";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool, withDatabaseClient } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
+import { issueTeamAccess } from "@/lib/issue-team-access";
+import { activeTaskWorkspaces, taskReaderScope } from "@/lib/task-workspace";
 import { factoryWorkspaceReader } from './workspace-reader';
 import { lockCliAgentPolicy, prelockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
@@ -31,9 +33,24 @@ import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
 import { readAuthorizedIssue } from "../github/user-access";
 
 // Resolve the effective human tenant; background work uses persisted task authority.
-const authorize: FactoryAuthorize = (userId, issueId, tx) => withDatabaseClient(tx, async () => {
+const authorize: FactoryAuthorize = (userId, issueId, tx, lockedIssue) => withDatabaseClient(tx, async () => {
   // The human entry has already pinned WS/member before this APP transaction.
   // Canonical readers (including Enterprise) must reuse its APP connection.
+  if (lockedIssue) {
+    const reader = await factoryWorkspaceReader(userId);
+    const workspaceId = taskReaderScope(reader).workspaceId;
+    if (workspaceId) {
+      if (lockedIssue.id !== issueId || lockedIssue.deleted !== false || lockedIssue.ownershipState !== 'bound'
+        || lockedIssue.workspaceId !== workspaceId) return false;
+      // The store read this row after acquiring its APP lock. Recheck links and
+      // canonical authorization now; never reuse the route's preflight row.
+      const link = await issueTeamAccess(issueId, userId);
+      const allowed = await activeTaskWorkspaces(reader, workspaceId);
+      return allowed.some(workspace => workspace.id === workspaceId)
+        && (!link.linked || link.workspaceId === workspaceId);
+    }
+    return Boolean(await issueForUser(reader, issueId, false, drizzle(tx)));
+  }
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
   return Boolean(await issueForUser(await factoryWorkspaceReader(userId), issueId, false, drizzle(tx)));
 });

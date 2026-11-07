@@ -38,6 +38,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const coordinator = await isolateCoordinatorWakes(t)
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { withTaskWorkspace } = await import('../lib/task-workspace')
   const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
@@ -350,16 +351,19 @@ test('real Factory admission preserves host scope, policy and transaction owners
     await t.test('caller-owned rollback removes queue, publication, binding and dispatch receipt together', async () => {
       const f = await fixture({ destination: 'selected' })
       const before = await rowsFor(f)
-      const tx = await pool.connect()
       let runId: string | undefined
-      try {
-        await beginFactoryTransaction(tx)
-        const admitted = await dispatch(f, tx)
-        runId = admitted.runId
-        assert.equal((await tx.query('SELECT count(*)::int AS n FROM agent_runs WHERE id=$1', [runId])).rows[0].n, 1)
-        assert.deepEqual(await rowsFor(f), before, 'the host adapter must not commit the caller transaction')
-        await rollbackFactoryTransaction(tx)
-      } finally { try { await rollbackFactoryTransaction(tx) } finally { forgetFactoryTransaction(tx); tx.release() } }
+      // The caller owns both leases: Workspace first, then its APP transaction.
+      await withTaskWorkspace(f.userId, f.workspaceId, async () => {
+        const tx = await pool.connect()
+        try {
+          await beginFactoryTransaction(tx)
+          const admitted = await dispatch(f, tx)
+          runId = admitted.runId
+          assert.equal((await tx.query('SELECT count(*)::int AS n FROM agent_runs WHERE id=$1', [runId])).rows[0].n, 1)
+          assert.deepEqual(await rowsFor(f), before, 'the host adapter must not commit the caller transaction')
+          await rollbackFactoryTransaction(tx)
+        } finally { try { await rollbackFactoryTransaction(tx) } finally { forgetFactoryTransaction(tx); tx.release() } }
+      })
       assert.deepEqual(await rowsFor(f), before)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE id=$1', [runId])).rows[0].n, 0)
       const committed = await dispatch(f)
@@ -415,14 +419,19 @@ test('real Factory admission preserves host scope, policy and transaction owners
       // Plain Node has no Next request scope; the actual Vercel helper starts
       // each supplied promise now, as nested after callbacks may do in production.
       globals[contextKey] = { get: () => ({ waitUntil: (promise: Promise<unknown>) => pending.push(promise) }) }
-      const tx = await pool.connect()
       try {
-        await beginFactoryTransaction(tx)
-        await dispatch(f, tx)
-        assert.equal(pending.length, 0, 'joining admission must not schedule a premature wake')
-        assert.equal((await rowsFor(f)).runs, 0)
-        await rollbackFactoryTransaction(tx)
-        assert.equal(pending.length, 0, 'rolled-back work produces no wake')
+        await withTaskWorkspace(f.userId, f.workspaceId, async () => {
+          const tx = await pool.connect()
+          try {
+            await beginFactoryTransaction(tx)
+            await dispatch(f, tx)
+            assert.equal(pending.length, 0, 'joining admission must not schedule a premature wake')
+            assert.equal((await rowsFor(f)).runs, 0)
+            await rollbackFactoryTransaction(tx)
+            assert.equal(pending.length, 0, 'rolled-back work produces no wake')
+          } finally { try { await rollbackFactoryTransaction(tx) } finally { forgetFactoryTransaction(tx); tx.release() } }
+        })
+        // Both caller leases have ended before a separate admission and its effects.
         const result = await dispatch(f)
         await Promise.all(pending)
         assert.deepEqual(received, [result.runId], 'the transaction owner wakes the daemon exactly once after commit')
@@ -436,7 +445,6 @@ test('real Factory admission preserves host scope, policy and transaction owners
         await dispatch(f)
         assert.equal(pending.length, scheduled, 'strict dispatch replay does not duplicate either notification')
       } finally {
-        try { await rollbackFactoryTransaction(tx) } finally { forgetFactoryTransaction(tx); tx.release() }
         await Promise.allSettled(pending)
         globals[contextKey] = previousContext
         if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL
