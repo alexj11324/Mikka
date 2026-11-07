@@ -48,7 +48,7 @@ jobs:
           secret-name: GITGUARDIAN_API_TOKEN
           recursive: false
           include-imports: false
-      - name: Check existing token against source-scoped pattern settings
-        run: node scripts/ops/gitguardian-37068506.mjs --scoped-rules
+      - name: Read back Mikka-only match range metadata
+        run: node scripts/ops/gitguardian-37068506.mjs --inspect
 
 # Fresh rollout readback, 2026-11-07.

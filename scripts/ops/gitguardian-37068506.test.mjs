@@ -276,7 +276,7 @@ test('occurrence inspection reports only bounded source identifiers, allowed pat
   assert.equal(view.noNextPage, true)
   assert.deepEqual(view.rows[3], { id: 103, incidentMatches: true, repoNumericMatches: true,
     repoNameMatches: true, sourceID: 10, sha: 'c'.repeat(40), filePath: 'docs/example.md', changeType: 'addition',
-    matches: [{ preLineStart: 2, preLineEnd: 2, postLineStart: 13, postLineEnd: 13 }] })
+    matches: [{ preLineStart: 2, preLineEnd: 2, postLineStart: 13, postLineEnd: 13, metadataFields: Object.keys(fourth.matches[0]),indexStart:null,indexEnd:null }] })
   assert.throws(() => validateOccurrences(rows, new Headers()), code('OCCURRENCE_COUNT'))
   assert.throws(() => inspectOccurrences([...rows, fourth, fourth], new Headers()), code('INSPECTION_OCCURRENCE_LIMIT'))
   assert.throws(() => inspectOccurrences(rows, new Headers({ link: '<https://api.gitguardian.com/v1/occurrences/secrets?page=2>; rel="prev next"' })), code('INSPECTION_OCCURRENCE_LIMIT'))
@@ -370,3 +370,5 @@ test('restore only reopens the verified four-occurrence mixed incident and check
 test('scoped rule access readback contains no provider values', async () => {
  const {inspectScopedRules}=await import('./gitguardian-37068506.mjs');const report={};await inspectScopedRules({token:'synthetic',report,fetcher:async(url,init)=>{assert.equal(init.redirect,'error');assert.equal(url,'https://dashboard.gitguardian.com/api/v1/accounts/837165/secret-pattern-exclusions/');return new Response(JSON.stringify([{value:'must-never-log',source_ids:[31236579]}]),{status:200,headers:{'content-type':'application/json'}})}});assert.equal(report.scopedRuleCount,1);assert.ok(!JSON.stringify(report).includes('must-never-log'))
 })
+
+// Public Mikka match ranges may be projected; Cordy match content remains unrequested.
