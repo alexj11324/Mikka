@@ -1505,6 +1505,15 @@
       "sourceHash": "ed8d66c7910ce7c761e16b63b465cdd39afba70ccd2e1761595c8022b3847ce0"
     },
     {
+      "path": "/mikka/api/server",
+      "template": "/api/server",
+      "source": "app/api/server/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "a83d54ed97c9ac9bbda8b2d45043f5be9d3db427f86425039892556941daea9f"
+    },
+    {
       "path": "/mikka/api/settings/[read]",
       "template": "/api/settings/[read]",
       "source": "app/api/settings/[read]/route.ts",

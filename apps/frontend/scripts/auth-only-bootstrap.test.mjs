@@ -42,6 +42,7 @@ const fixtureModules = new Map([
   ['@/components/oauth-consent', 'export const OAuthConsent = () => null;'],
   ['@/components/version-guard', 'export const VersionGuard = () => null;'],
   ['@/components/posthog-analytics', 'export const PostHogAnalytics = () => null;'],
+  ['@/components/plugins/github-settings', `import { createElement, useLayoutEffect } from 'react'; export const GitHubSettings = () => { useLayoutEffect(() => { ${stateAccess}.githubMounts++; }, []); return createElement('div', { 'data-github-handoff': true }); };`],
   ['@/lib/posthog-config', 'export const posthogConfig = { token: "" };'],
   ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } }; export const cloudAuthClient = authClient;`],
   ['@/lib/swr/persistent-cache', `export const clearPersistentReadCaches = async () => { ${stateAccess}.cacheClears++; };`],
@@ -80,10 +81,11 @@ const packet = result => Response.json({ version: 1, ok: true, result })
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return { promise, resolve } }
 let sequence = 0
 
-async function fixture(t, { path = handoff, fetch: fetchResponse, desktopBridge = false } = {}) {
+async function fixture(t, { path = handoff, fetch: fetchResponse, desktopBridge = false, serverDocument } = {}) {
   const window = new Window({ url: `https://app.example${path}` })
   if (desktopBridge) window.mikka = { app: { runtime: 'electron' } }
-  const state = { identity: session(), requests: [], workspaceMounts: 0, cacheClears: 0, listeners: new Set(),
+  if (serverDocument) window.document.documentElement.dataset.mikkaServerPage = serverDocument
+  const state = { identity: session(), requests: [], workspaceMounts: 0, githubMounts: 0, cacheClears: 0, listeners: new Set(),
     subscribe(listener) { this.listeners.add(listener); listener({ data: this.identity, isPending: false }); return () => this.listeners.delete(listener) } }
   const values = { window, document: window.document, navigator: window.navigator, HTMLElement: window.HTMLElement, Node: window.Node,
     MutationObserver: window.MutationObserver, Event: window.Event, IS_REACT_ACT_ENVIRONMENT: true,
@@ -125,6 +127,46 @@ test('a valid system-browser PKCE page reads only the existing session and publi
   assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 1)
   assert.equal(f.state.workspaceMounts, 0)
   assert.equal(f.container.querySelector('[data-auth]').getAttribute('data-owner'), 'owner')
+})
+
+test('a server authentication document preserves the PKCE identity-only boundary', async t => {
+  const f = await fixture(t, { serverDocument: 'authentication' })
+  assert.equal(f.container.querySelector('[data-auth]').getAttribute('data-owner'), 'owner')
+  assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.session'])
+  assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 1)
+  assert.equal(f.state.workspaceMounts, 0)
+  assert.equal(f.state.githubMounts, 0)
+})
+
+test('a signed-in server GitHub document renders only its handoff before and after intent cleanup', async t => {
+  const path = '/mikka/en?section=plugins&app=github'
+  const f = await fixture(t, { path: `${path}&intent=ghi_${'a'.repeat(43)}`, serverDocument: 'github' })
+  assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.bootstrap'])
+  assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 0)
+  assert.ok(f.container.querySelector('[data-github-handoff]'))
+  assert.equal(f.container.querySelector('[data-auth]'), null)
+  assert.equal(f.state.workspaceMounts, 0)
+  await f.navigate(path)
+  assert.ok(f.container.querySelector('[data-github-handoff]'))
+  assert.equal(f.state.githubMounts, 1)
+  assert.equal(f.state.workspaceMounts, 0)
+  assert.equal(f.state.requests.filter(item => item.action === 'desktop.bootstrap').length, 1)
+})
+
+test('a server GitHub document cannot bypass a rejected session', async t => {
+  const f = await fixture(t, { path: '/mikka/en?section=plugins&app=github', serverDocument: 'github',
+    fetch: request => request.action === 'desktop.bootstrap' ? new Response('', { status: 401 }) : undefined })
+  assert.equal(f.container.querySelector('[data-auth]').getAttribute('data-owner'), 'signed-out')
+  assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 1)
+  assert.equal(f.state.githubMounts, 0)
+  assert.equal(f.state.workspaceMounts, 0)
+})
+
+test('the official app without a server document marker keeps its normal workspace route', async t => {
+  const f = await fixture(t, { path: '/mikka/en?section=plugins&app=github' })
+  assert.ok(f.container.querySelector('[data-workspace]'))
+  assert.equal(f.state.workspaceMounts, 1)
+  assert.equal(f.state.githubMounts, 0)
 })
 
 test('leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts', async t => {

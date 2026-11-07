@@ -216,7 +216,7 @@
     "build:app": "node apps/frontend/scripts/build.mjs web && node apps/api/scripts/build.mjs",
     "test:api": "node --import ./tests/support/server-only.mjs --import tsx --test apps/api/src/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/web-connection/*.test.ts lib/agent-image-cache.test.ts && node --test apps/api/build-contract.test.mjs apps/api/runtime/*.test.mjs apps/api/scripts/*.test.mjs scripts/start-app.test.mjs scripts/test-subscription-enrollment-app.test.mjs scripts/release/build-vercel.test.mjs",
     "lint:runtime": "oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs",
-    "test:self-hosting": "node --import ./tests/support/server-only.mjs --import tsx --test lib/edition.test.ts scripts/release/verify-cloud-edition.test.ts && node --test scripts/self-hosted-start.test.mjs"
+    "test:self-hosting": "node --import ./tests/support/server-only.mjs --import tsx --test lib/edition.test.ts lib/server-info.test.ts scripts/release/verify-cloud-edition.test.ts && node --test scripts/self-hosted-start.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/mcp": "2.0.81",
