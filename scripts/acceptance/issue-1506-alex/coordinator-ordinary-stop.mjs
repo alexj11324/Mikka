@@ -24,7 +24,7 @@ const fixedErrors = new Set([...FIXTURE_ERRORS,
   'first_text_missing', 'unexpected_tool', 'stop_request_failed', 'stop_boundary_missed',
   'stop_not_quiescent', 'post_stop_chat_failed', 'live_push_missing', 'live_close_failed',
   'committed_invalid', 'stream_incomplete', 'chat_completion_error', 'reply_failed_or_stopped',
-  'chat_revision_stale', 'stream_replay_unproven', 'reply_not_persisted', 'timeout_invalid',
+  'chat_revision_stale', 'stream_replay_unproven', 'reply_not_persisted', 'timeout_invalid', 'stopped_text_mismatch',
 ])
 const code = error => fixedErrors.has(error?.message) ? error.message : 'acceptance_unexpected_failure'
 const fail = name => { throw new Error(name) }
@@ -64,7 +64,7 @@ export async function runOrdinaryStop({ env = process.env, sessionProvider = ale
       report.initialCursor = initial.cursor
       report.botRef = fixture.botRef
       report.menu = fixture.menu
-      let live, streamController, stopPromise = null, sent = false, streamId = null, error = null, completed = null, started
+      let live, streamController, stopPromise = null, sent = false, streamId = null, error = null, completed = null, liveText = '', started
       const since = () => milliseconds(performance.now() - started)
       const requestStop = trigger => {
         if (stopPromise) return stopPromise
@@ -125,6 +125,7 @@ export async function runOrdinaryStop({ env = process.env, sessionProvider = ale
               }
               if (event.type === 'tool') { void requestStop('unexpected_tool'); fail('unexpected_tool') }
               if (event.type === 'text' || event.type === 'reset') {
+                liveText = event.type === 'text' ? liveText + event.delta : event.text
                 const characters = Array.from(event.type === 'text' ? event.delta : event.text).length
                 report.streamEvents.textCharacters += characters
                 if (report.stop.requested) report.streamEvents.textCharactersAfterStop += characters
@@ -153,6 +154,12 @@ export async function runOrdinaryStop({ env = process.env, sessionProvider = ale
             working: completed.chat.working, activeStream: Boolean(completed.chat.streamRunId),
             ownPersistedItems: ownItems.length, stoppedMarker: ownItems.some(item => item.stopped === true),
             stoppedPosition: ownItems.find(item => item.stopped === true && item.position > initial.cursor && item.position <= completed.committed.through)?.position ?? null }
+          const persistedText = ownItems.filter(item => item.from === 'coordinator' && !item.pending &&
+            item.position > initial.cursor && item.position <= completed.committed.through)
+            .sort((a, b) => a.position - b.position).map(item => typeof item.text === 'string' ? item.text : '').join('')
+          report.textConsistency = { matches: liveText === persistedText,
+            liveCharacters: Array.from(liveText).length, persistedCharacters: Array.from(persistedText).length }
+          if (!report.textConsistency.matches) fail('stopped_text_mismatch')
           report.metrics.postStopChatMs = since()
           report.metrics.stopToObservedIdleMs = milliseconds(report.metrics.postStopChatMs - report.metrics.stopRequestedMs)
           report.metrics.streamClosedMs = since()
