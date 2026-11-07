@@ -4,19 +4,58 @@ on:
     branches: [feat/self-hosting-config-readback-1560]
 permissions:
   contents: read
+  id-token: write
 jobs:
   metadata:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Read only the public app metadata
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read existing official app ID through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read existing official app key through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Read only fixed official app permissions and events
         run: |
           node --input-type=module <<'JS'
-          const response = await fetch('https://api.github.com/apps/mikka-github', {headers:{accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Mikka-self-hosting-review'},redirect:'error',signal:AbortSignal.timeout(15000)});
-          if (!response.ok) { console.log(JSON.stringify({status:response.status,available:false})); process.exitCode=1; }
-          else {
-            const v=await response.json();
-            if(v.slug!=='mikka-github'||!Number.isSafeInteger(v.id)||!v.permissions||!Array.isArray(v.events)) throw Error('APP_METADATA_INVALID');
-            console.log(JSON.stringify({id:v.id,slug:v.slug,owner:v.owner?.login,html_url:v.html_url,permissions:v.permissions,events:v.events,readAt:new Date().toISOString()}));
-          }
+          import { createPrivateKey, sign } from 'node:crypto';
+          try {
+            const appId = process.env.GITHUB_APP_ID;
+            const key = process.env.GITHUB_APP_PRIVATE_KEY;
+            if (!/^[1-9][0-9]*$/.test(appId ?? '') || !key) throw Error('APP_CREDENTIALS_UNAVAILABLE');
+            const b64 = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+            const now = Math.floor(Date.now()/1000);
+            const input = b64({alg:'RS256',typ:'JWT'})+'.'+b64({iat:now-60,exp:now+300,iss:appId});
+            const jwt = input+'.'+sign('sha256',Buffer.from(input),createPrivateKey(key.replaceAll('\\n','\n'))).toString('base64url');
+            console.log('::add-mask::'+jwt);
+            const response = await fetch('https://api.github.com/app', {headers:{authorization:'Bearer '+jwt,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Mikka-self-hosting-review'},redirect:'error',signal:AbortSignal.timeout(15000)});
+            if (!response.ok) { console.log(JSON.stringify({status:response.status,available:false})); process.exitCode=1; }
+            else {
+              const v=await response.json();
+              if(v.slug!=='mikka-github'||String(v.id)!==appId||!v.permissions||!Array.isArray(v.events)) throw Error('APP_METADATA_INVALID');
+              console.log(JSON.stringify({id:v.id,slug:v.slug,owner:v.owner?.login,html_url:v.html_url,permissions:v.permissions,events:v.events,readAt:new Date().toISOString()}));
+            }
+          } catch { console.log(JSON.stringify({available:false,code:'OFFICIAL_APP_METADATA_UNAVAILABLE'})); process.exitCode=1; }
           JS
