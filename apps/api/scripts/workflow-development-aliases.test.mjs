@@ -2,15 +2,27 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import test from 'node:test'
+import test, { after } from 'node:test'
 import { developmentWorkflowAliases, workflowDevelopmentAliases } from '../workflow-development-aliases.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 
 const execute = promisify(execFile)
 const root = resolve(import.meta.dirname, '../../..')
+
+// The SDK uses cwd/.swc for its native plugin cache, not rootDir/workspaceDir.
+// Each Node test worker needs its own cache; parallel writers can truncate a
+// cache file while another process is loading it. Keep this for the whole file.
+const previousCwd = process.cwd()
+const compilerCwd = await mkdtemp(join(tmpdir(), 'mikka-workflow-alias-compiler-'))
+process.chdir(compilerCwd)
+after(async () => {
+  process.chdir(previousCwd)
+  await rm(compilerCwd, { recursive: true, force: true })
+})
 async function directory() {
   await mkdir(join(root, '.cache'), { recursive: true })
   return mkdtemp(join(root, '.cache/workflow-dev-alias-'))

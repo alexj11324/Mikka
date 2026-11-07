@@ -7,7 +7,9 @@ writes.
 
 ## Commands
 
-Node 24 is sufficient; no package installation is required.
+Node 24 is sufficient for the driver and manual-browser helper; no package
+installation is required for those paths. The optional workflow runner browser
+uses the repository's locked Playwright 1.64.1 and its matching Chromium.
 
     node --test scripts/acceptance/run-observability.test.mjs
     node scripts/acceptance/run-observability.mjs
@@ -159,6 +161,56 @@ duplicate message blocks the case. It records the actual persisted chat position
 and locale, then validates the same task/identity/Profile/native-run receipts and
 Artifact as API mode. A late click is reconciled during cleanup; never send after
 the displayed deadline. Unobserved ownership or incomplete cleanup remains blocked.
+
+#### Optional runner Chromium actor
+
+In the existing main-only workflow, explicit execute plus browser-submit=true
+and a single model case selects the runner actor. There is no additional dispatch
+input. The workflow installs pnpm 10.34.3, the frozen dependency lock and Playwright
+1.64.1's Chromium before loading the two existing account secrets. Preflight and
+API execution do not install or launch Chromium. The main/repository guard,
+expected-deployment-sha == GITHUB_SHA check, actual deployed-version gate and
+existing Infisical identity are unchanged.
+
+The helper consumes --runner-browser itself and never forwards it to the driver.
+It requires --execute, --browser-submit, one case, a real GitHub Actions
+workflow_dispatch context, the exact main ref/repository and the matching source SHA. Without this new flag, both the CLI browser
+path and the helper's existing manual-ready comment remain available.
+
+After validating the exact ready object against fixtureTask, the helper posts
+a runner-automatic progress message that explicitly says not to submit manually.
+It starts one independent browser context, signs in through the ordinary email
+form, verifies the current account and exact personal workspace in RAM, selects
+that workspace through the existing menu, and opens New task outside project
+context. It selects Coordinator, Mikka Cloud and the unique marker Profile,
+fills the generated input and clicks Create task once. It neither transfers the
+driver's cookie jar nor sends a task/model request through a separate API.
+A refusal, timeout, ambiguous selection or uncertain click never retries the
+submission. The original driver still observes the actual persisted UI message
+and verifies all task, Factory, native-run and Artifact evidence.
+
+The actor uses a clean context and the fixed official origin; ordinary responses
+verify its selected backend instead of inferring it from the shell version alone.
+The browser process receives only its required environment, without acceptance
+credentials or GitHub tokens. Credentials are used by the runner's form fill and
+are never persisted as storageState. Playwright tracing, screenshots, videos,
+HAR files, page text, console/error text and raw request/response logs are not
+acceptance artifacts.
+
+Driver termination aborts browser preparation, and browser failure requests the
+driver's normal SIGTERM cleanup. The helper keeps draining stdout while the actor
+starts and waits for both owned lifecycles. Browser cleanup uses its own bounded
+deadline after the business signal is aborted. It first closes the owned page to
+stop pending UI actions, then uses the retained context for normal sign-out and
+anonymous-session readback, and closes the context and browser. Cleanup is idempotent; any
+failure makes the workflow fail even if the driver returned zero. A process kill
+that prevents finally from running still cannot guarantee cleanup.
+
+production-run-observability-report/browser-actor.receipt.json contains only
+checked fixture IDs, closed stages/counts and cleanup results. Its independent
+UI submission receipt does not assert PostHog ingestion or Replay availability.
+The workflow uploads only that receipt and the existing report.json. Existing
+PostHog export and actual Replay readback remain separate evidence steps.
 
 Browser mode does not create requestTrace, traceparent, session IDs or replay IDs.
 Its real browser request supplies those through normal application instrumentation.

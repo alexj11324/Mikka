@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { LiveChannel, LIVE_FALLBACK_MS, type LiveRuntime, type LiveSocket, type LiveTicket } from './channel'
 import { DEVICE_GATEWAY_TICKET_SECONDS } from '../device-gateway-ticket'
-import { readBoundary } from '../swr/read-observer'
+import { acceptSWRRead, observeSWRRead, readBoundary, readFresh } from '../swr/read-observer'
 
 import { LIVE_KINDS, type LiveKind } from './events'
 import type { PresenceProof } from './presence'
@@ -250,6 +250,42 @@ test('a supported late subscription uses the continuous ready boundary instead o
   assert.equal(after.length, 1)
   assert.ok(after[0] < began)
   f.channel.dispose()
+})
+
+
+for (const scenario of ['other-kind', 'own-kind', 'reconnect', 'before-open'] as const) test(`a late read keeps exact coverage after ${scenario}`, async () => {
+  const f = fixture(), key = 'late-chat', value = { items: ['authorized'] }
+  const cache = new Map<string, { data: typeof value }>()
+  let requests = 0
+  const commit = async () => {
+    const pending = observeSWRRead(cache, key, async () => { requests++; return value })
+    const data = await pending
+    // The original SWR onSuccess accepts this response, then commits the same
+    // object. Exercise the production read proof without replacing its logic.
+    acceptSWRRead(cache, key, data)
+    cache.set(key, { data })
+    await settle()
+  }
+  f.subscribe()
+  try {
+    if (scenario === 'before-open') await commit()
+    await f.open()
+    if (scenario !== 'before-open') await commit()
+    if (scenario === 'reconnect') {
+      f.sockets[0].close()
+      await f.advance(1_000)
+      await f.open()
+    } else if (scenario !== 'before-open') {
+      f.sockets.at(-1)!.message(JSON.stringify({
+        kind: scenario === 'other-kind' ? 'factory_task' : 'bot_chat', id: other,
+      }))
+    }
+    f.channel.subscribe('bot_chat', other, [key], (_key, _required, _reuse, after) =>
+      readFresh(cache, key, after!, commit, () => true, () => true))
+    await f.advance(100)
+    assert.equal(requests, scenario === 'other-kind' ? 1 : 2,
+      'only a continuously covered read without a matching-kind event can be reused')
+  } finally { f.channel.dispose() }
 })
 
 for (const missing of ['capabilities', 'kind', 'presence'] as const) test(`a late subscription without ${missing} coverage retains its new read boundary`, async () => {
