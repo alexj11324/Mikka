@@ -1,0 +1,83 @@
+name: Issue 1503 bounded handoff PostgreSQL wire comparison
+on:
+  push:
+    branches: [ops/issue-1503-handoff-wire]
+    paths:
+      - .github/workflows/issue1503-handoff-wire.yml
+      - lib/factory/handoff.ts
+      - lib/factory/continuity.db.test.ts
+      - scripts/ops/issue1503/handoff-wire-bytes.mts
+permissions:
+  contents: read
+concurrency:
+  group: issue1503-handoff-wire
+  cancel-in-progress: false
+jobs:
+  handoff:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+      MIKKA_1503_WIRE_JSON: '1'
+      MIKKA_1503_WIRE_REPORT: issue1503-wire-report/handoff-wire-bytes.json
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral isolated-test authentication secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - name: Initialize isolated database with tracked migrations
+        id: db_setup
+        run: pnpm test:e2e:setup
+      - name: Bind isolated environment to the tested revision
+        id: environment
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Verify exact baseline commit objects
+        run: |
+          git cat-file -e c563af107a6cb7aaabce996b1eda9d9b53508a99:lib/factory/handoff.ts
+          git cat-file -e 3465d9a686a827342344cc62e02195a8c5ad435c:lib/factory/handoff.ts
+          mkdir -p issue1503-wire-report
+      - name: Verify bounded handoff semantics on real PostgreSQL
+        id: regression
+        run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 lib/factory/continuity.db.test.ts
+      - name: Compare actual response bytes against unchanged original SELECTs
+        if: ${{ !cancelled() && steps.db_setup.outcome == 'success' && steps.environment.outcome == 'success' }}
+        run: node --import ./scripts/server-test.mjs --import tsx scripts/ops/issue1503/handoff-wire-bytes.mts
+      - name: Retain bounded comparison evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1503-handoff-wire
+          path: issue1503-wire-report
+          retention-days: 7
