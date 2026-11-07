@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { dbUrl, seedAgent, seedBot, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { enterprisePrincipal } from '../lib/enterprise/principal'
 
 type Caller = { id: string; [key: symbol]: string }
 let caller: Caller | null = null
@@ -14,7 +15,7 @@ mock.module('next/headers', { namedExports: { headers: async () => new Headers()
 const removed: string[] = []
 let failRemoval = false
 mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExports: {
-  mobileUser: async () => caller ? { ...caller, name: 'Artifact fixture', email: `${caller.id}@example.invalid`, image: null } : null,
+  mobileUser: async () => caller ? { ...caller, name: 'Artifact fixture', email: `${caller.id}@example.invalid`, image: null, [enterprisePrincipal]: { kind: 'session', sessionId: 'artifact-delete-fixture' } } : null,
   writeAllowed: () => true,
   unauthorized: () => Response.json({ error: 'authRequired' }, { status: 401 }),
   forbiddenOrigin: () => Response.json({ error: 'originNotAllowed' }, { status: 403 }),

@@ -303,7 +303,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from workspace_deletions where id = $1', [shared])).rowCount, 0)
     assert.equal((await pool.query('select 1 from bots where id = $1', [formerBot])).rowCount, 0)
     // The shared workspace keeps its own rows, and her team bot stays there without an owner (「待接管」).
-    assert.deepEqual(await keyedBy(shared), ['bots', 'conversations', 'hosted_allowances', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
+    assert.deepEqual(await keyedBy(shared), ['agent_runs', 'artifacts', 'bots', 'conversations', 'hosted_allowances', 'issues', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
     // Bob's own things are untouched.
     assert.equal((await pool.query('select 1 from issues where id = $1', [bobIssue])).rowCount, 1)
     assert.equal((await pool.query('select 1 from "user" where id = $1', [bob])).rowCount, 1)

@@ -185,6 +185,40 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","runId",text) VALUES($1,$2,$3,\'Denied\')', [randomUUID(), owner, runConflict]), /taskWorkspaceUnresolved/)
       assert.equal((await app.query('SELECT count(*)::int AS total FROM run_messages')).rows[0].total, 1)
     })
+    await t.test('legacy and task-free leases require current persisted tenant membership with no creator bypass', async () => {
+      const { renewRunLeases } = await import('../lib/run-leases')
+      const memberDevice = randomUUID(), memberAgent = randomUUID(), ownerDevice = randomUUID()
+      const memberRun = randomUUID(), taskFreeRun = randomUUID(), creatorRun = randomUUID(), otherTenantRun = randomUUID(), unresolvedRun = randomUUID()
+      for (const [id, userId] of [[memberDevice, member], [ownerDevice, owner]]) {
+        await app.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Legacy tenant lease fixture\')', [id, userId])
+      }
+      await app.query('INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,\'codex\',\'Legacy tenant fixture\')', [memberAgent, member, memberDevice])
+      for (const [id, userId, deviceId, agentId, issueId, tenant] of [
+        [memberRun, member, memberDevice, memberAgent, teamless, alpha],
+        [taskFreeRun, member, memberDevice, memberAgent, null, alpha],
+        [unresolvedRun, member, memberDevice, memberAgent, null, null],
+        [creatorRun, owner, ownerDevice, agent, teamless, alpha],
+        [otherTenantRun, owner, ownerDevice, agent, alternate, beta],
+      ]) {
+        await app.query('INSERT INTO agent_runs(id,"userId","deviceId","agentId","issueId","workspaceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,$6,\'running\',now()+interval \'5 minutes\')', [id, userId, deviceId, agentId, issueId, tenant])
+      }
+      const first = await renewRunLeases(memberDevice, [memberRun, taskFreeRun, unresolvedRun])
+      assert.deepEqual(new Set(Object.keys(first.leases)), new Set([memberRun, taskFreeRun]))
+      assert.deepEqual(first.revoked, [unresolvedRun], 'unproved historical ownership cannot borrow an active personal tenant')
+      await workspace.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, member])
+      const stoppedAt = new Date()
+      const revoked = await renewRunLeases(memberDevice, [memberRun, taskFreeRun], stoppedAt)
+      assert.deepEqual(revoked, { leases: {}, revoked: [memberRun, taskFreeRun] })
+      const stopped = (await app.query('SELECT "stopRequestedAt","leaseExpiresAt","agentDefinition" FROM agent_runs WHERE id=ANY($1::uuid[])', [[memberRun, taskFreeRun]])).rows
+      assert.ok(stopped.every(row => row.agentDefinition === null && row.stopRequestedAt && row.leaseExpiresAt.getTime() === stoppedAt.getTime()))
+      await workspace.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, member])
+      assert.deepEqual((await renewRunLeases(memberDevice, [memberRun, taskFreeRun])).leases, {}, 'restoring membership cannot resume a stopped run implicitly')
+      await workspace.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
+      const ownerBeat = await renewRunLeases(ownerDevice, [creatorRun, otherTenantRun])
+      assert.deepEqual(ownerBeat.revoked, [creatorRun])
+      assert.deepEqual(Object.keys(ownerBeat.leases), [otherTenantRun], 'the same account retains its independent authorized tenant')
+      await workspace.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
+    })
     await t.test('membership is pinned until the app commit and the next read observes suspension', async () => {
       let entered!: () => void, release!: () => void
       const ready = new Promise<void>(resolve => { entered = resolve })

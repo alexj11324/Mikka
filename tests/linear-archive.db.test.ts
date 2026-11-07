@@ -22,7 +22,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   url.pathname = '/' + database
   for (const key of ['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL']) process.env[key] = url.href
   process.env.BETTER_AUTH_SECRET = 'isolated-scope184-archive-auth-fixture'
-  process.env.BETTER_AUTH_URL = 'http://127.0.0.1:31844'
+  process.env.BETTER_AUTH_URL = 'https://scope184-archive.example.invalid'
   process.env.LINEAR_TOKEN_ENCRYPTION_KEY = '1'.repeat(64)
   delete process.env.NEXT_PUBLIC_POSTHOG_KEY
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], { env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20 })
@@ -32,6 +32,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   console.log(`Retained Linear archive database ${database}`)
 
   const external = new Map<string, { id: string; archivedAt: string | null; team: { id: string } }>()
+  const remoteIds = new Map<string, string>()
   let archiveRequests = 0, stateReads = 0, dropResponse = false
   const receiver = createServer(async (request, response) => {
     assert.equal(request.method, 'POST')
@@ -83,26 +84,34 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   await pool.query('insert into agents(id,"userId",harness,name) values($1,$2,\'codex\',\'Archive fixture\')', [agentId, member])
   const [team] = await db.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.id, syncId))
   async function seed() {
-    const id = randomUUID()
-    const remote = { id, identifier: 'MIK-184', title: 'Archive fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }
-    assert.ok(await createAppIssueFromLinear(team, remote))
+    const remoteId = randomUUID()
+    const remote = { id: remoteId, identifier: 'MIK-184', title: 'Archive fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }
+    const imported = await createAppIssueFromLinear(team, remote)
+    assert.ok(imported)
+    const id = imported.id
+    assert.notEqual(id, remoteId, 'the local task has its own stable identity')
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [id, teamId, workspace, owner])
     await pool.query('insert into linear_sync_outbox(id,"issueId","scopeVersion") values($1,$2,1) on conflict do nothing', [randomUUID(), id])
-    external.set(id, { id, archivedAt: null, team: { id: teamId } })
+    external.set(remoteId, { id: remoteId, archivedAt: null, team: { id: teamId } })
+    remoteIds.set(id, remoteId)
     return id
   }
   async function retire(id: string, confirmed = false) {
     const effects: import('../lib/issue-effects').IssueEffect[] = []
-    const before = (await pool.query('select content,revision from issues where id=$1', [id])).rows[0]
+    const before = (await pool.query('select * from issues where id=$1', [id])).rows[0]
+    const original = await (await import('../lib/task-identifier-server')).issueView(before)
     const preview = confirmed ? await actAs(owner, () => actions.previewIssuePersonalScope(id)) : null
     if (confirmed) assert.ok(preview && 'preview' in preview && preview.preview)
     const result = await collectIssueEffects(effects, () => actAs(owner, () => confirmed && preview && 'preview' in preview && preview.preview
       ? actions.confirmIssuePersonalScope({ id, revision: before.revision, confirmation: preview.preview.confirmation })
       : actions.setIssueScope({ id, revision: before.revision, scope: 'personal' })))
     assert.ok('issue' in result && result.issue)
-    assert.equal(result.issue.scope, 'personal')
+    assert.equal(result.issue.scope, before.scope, 'the compatibility label does not transfer a task')
+    assert.equal(result.issue.workspaceId, workspace)
+    assert.equal(result.issue.linearSyncPolicy, 'disabled')
     assert.equal(result.issue.scopeSetBy, 'user')
-    assert.equal(result.issue.identifier, `ALEX-${readIssueMetadata(before.content).number}`)
+    assert.equal(result.issue.identifier, original.identifier, 'disabling Linear preserves the existing Mikka identifier')
+    assert.equal(readIssueMetadata(result.issue.content).number, readIssueMetadata(before.content).number)
     assert.deepEqual(effects, [{ kind: 'sync', issueId: id }])
     return result.issue
   }
@@ -123,7 +132,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1', [issue])).rows[0].n, 0)
   const job = (await pool.query('select * from linear_sync_outbox where "issueId"=$1 and operation=\'archive\'', [issue])).rows[0]
   assert.equal(job.archiveTarget.targetVerified, true)
-  assert.equal(job.archiveTarget.linearIssueId, issue)
+  assert.equal(job.archiveTarget.linearIssueId, remoteIds.get(issue))
   await assert.rejects(pool.query('update linear_sync_outbox set "archiveTarget"=$2 where id=$1', [job.id, { ...job.archiveTarget, linearIssueId: randomUUID() }]), { code: '23514' })
   const oldClaim = await pool.query('update linear_sync_outbox set status=\'processing\',"claimToken"=$2,attempts=attempts+1 where id=$1', [job.id, randomUUID()])
   assert.equal(oldClaim.rowCount, 0, 'old sync workers cannot claim or consume the new archive request')
@@ -133,13 +142,13 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   const unknown = (await pool.query('select * from linear_sync_outbox where id=$1', [job.id])).rows[0]
   assert.equal(unknown.status, 'queued')
   assert.ok(unknown.lastError)
-  assert.equal((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [issue])).rows[0].archivedAt, null)
+  assert.equal((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [remoteIds.get(issue)])).rows[0].archivedAt, null)
   await pool.query('update linear_sync_outbox set "availableAt"=now() where id=$1', [job.id])
   await processLinearIssueOutbox(issue)
   assert.equal(archiveRequests, 1, 'retry reads the applied archive instead of mutating again')
   assert.equal((await pool.query('select status from linear_sync_outbox where id=$1', [job.id])).rows[0].status, 'done')
-  assert.ok((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [issue])).rows[0].archivedAt)
-  assert.equal(await createAppIssueFromLinear(team, { id: issue, identifier: 'MIK-184', title: 'Delayed webhook', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }), null)
+  assert.ok((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [remoteIds.get(issue)])).rows[0].archivedAt)
+  assert.equal(await createAppIssueFromLinear(team, { id: remoteIds.get(issue)!, identifier: 'MIK-184', title: 'Delayed webhook', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }), null)
 
   const denied = await seed()
   await retire(denied, true)

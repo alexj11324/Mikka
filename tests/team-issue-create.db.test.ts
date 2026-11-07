@@ -113,6 +113,9 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const created=await withAfter(()=>actAs(owner,()=>saveIssue({title:'Legacy UI task',content,status:'todo',priority:'normal'})))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     await workspace.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,teamId,workspaceId,owner])
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:created.issue.revision,scope:'workspace'})),{error:'issueNotFound'},'a stale Team link cannot override the persisted personal tenant')
+    assert.equal((await app.query('select "workspaceId" from issues where id=$1',[id])).rows[0].workspaceId,personalWorkspaceId)
+    await workspace.query('delete from mikka_team_issues where "issueId"=$1',[id])
     // The real legacy UI passes only these three fields, no explicit target.
     assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:created.issue.revision,scope:'workspace'})),{error:'issueScopeTeamRequired'})
     const updated=await withAfter(()=>actAs(owner,()=>saveIssue({id,revision:created.issue.revision,title:'Private revised title',content,status:'todo',priority:'normal'})))

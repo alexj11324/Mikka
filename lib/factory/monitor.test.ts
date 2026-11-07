@@ -769,6 +769,7 @@ test(
       await t.test(
         "ten concurrent replays retain one observation and one original logical issue",
         async () => {
+          const issueCountBefore = (await pool.query('SELECT count(*)::int AS n FROM issues')).rows[0].n;
           const results = await Promise.all(
             Array.from({ length: 10 }, () =>
               monitor.consume("owner", first.input),
@@ -823,8 +824,10 @@ test(
                 [issueId],
               )
             ).rows[0].linearIssueId,
-            issueId,
+            linearIssueId,
           );
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM issues')).rows[0].n, issueCountBefore, 'replay keeps the original local task instead of creating a provider-id task');
+          assert.deepEqual((await pool.query('SELECT id FROM issues WHERE id=ANY($1::uuid[])', [[issueId, linearIssueId]])).rows, [{ id: issueId }]);
           assert.equal(
             (await store.read("owner", first.task.id)).task.status,
             "failed",

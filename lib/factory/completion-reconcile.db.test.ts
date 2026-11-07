@@ -590,11 +590,12 @@ test("run completion enters review without the Coordinator; replays do not advan
       const expectedHash = createHash('sha256').update('x'.repeat(84) + '\n').digest('hex');
       const ownerText = `The answered target is exactly 85 bytes, SHA256 ${expectedHash}. Keep all other requirements. token=fixture-private`;
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/home/user/.mikka/bot-workspaces/answered-fixture')`, [deliverableRepo, deviceId]);
-      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3,"questionContinuation"=$4 WHERE id=$1`, [f.runId, deliverableRepo,
-        JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Producer observation: 56 bytes; this report is not a new owner requirement.' }),
-        JSON.stringify({ questionId, originRunId: originId, originSessionId: 's1', requireSessionResume: true })]);
+      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3 WHERE id=$1`, [f.runId, deliverableRepo,
+        JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Producer observation: 56 bytes; this report is not a new owner requirement.' })]);
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId",'stopped','asked_human','s1',"agentDefinition",'Original owner task' FROM agent_runs WHERE id=$1`, [f.runId, originId]);
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [f.runId,
+        JSON.stringify({ questionId, originRunId: originId, originSessionId: 's1', requireSessionResume: true })]);
       await pool.query(`UPDATE factory_attempts SET position=2,ordinal=2,output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId]);
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason)
         VALUES($1,$2,'execute',1,1,'waiting',$3,'s1','Owner answer required')`, [originAttemptId, f.task.id, originId]);

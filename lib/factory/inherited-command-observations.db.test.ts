@@ -96,9 +96,10 @@ test('isolated PG: direct question recovery exposes historical native observatio
       const originId = randomUUID(), originAttemptId = randomUUID(), originalQuestionId = randomUUID(), originalQuestionEventId = randomUUID(), answerId = randomUUID()
       const historyRunId = randomUUID(), historyAttemptId = randomUUID(), recoveryRequestId = randomUUID()
       const recoveryEventId = factoryEventId('question-recover', recoveryRequestId)
-      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'stopped','asked_human','original-native-session',"agentDefinition",'Original question' FROM agent_runs WHERE id=$1`, [producerRunId, originId])
+      // The persisted parent exists before the continuation references it.
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`UPDATE agent_runs SET "worktreePath"=$2,"baseBranch"='main',"startedAt"=now()-interval '126 minutes',"finishedAt"=now()-interval '124 minutes' WHERE id=$1`, [originId, worktreePath])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,status,"stopReason","sessionId","agentDefinition",prompt,"baseBranch","worktreePath","questionContinuation","startedAt","finishedAt")
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'implement','failed','error',"sessionId","agentDefinition",'Synthetic historical command turn',"baseBranch","worktreePath","questionContinuation",now()-interval '122 minutes',now()-interval '121 minutes' FROM agent_runs WHERE id=$1`, [producerRunId, historyRunId])

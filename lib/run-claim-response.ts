@@ -3,8 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { revalidateExecutionIdentity, ExecutionIdentityError } from '@/lib/execution-identity'
 import { agentRuns, devices, issues } from '@/lib/db/schema'
-import { issueTeamAccess } from '@/lib/issue-team-access'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { mayCompleteIssue, withRunWorkspace } from '@/lib/run-completion'
 
 type Run = typeof agentRuns.$inferSelect
 
@@ -15,7 +14,12 @@ type Run = typeof agentRuns.$inferSelect
  * additional database work belongs in the response builder. */
 export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response): Promise<Response | null> {
   for (let attempt = 0; ; attempt++) {
-    try { return await claimResponseTransaction(userId, hint, leaseExpiresAt, respond) }
+    try {
+      const [stored] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
+        .where(and(eq(agentRuns.id, hint.id), eq(agentRuns.userId, userId))).limit(1)
+      if (!stored?.workspaceId) return null
+      return await withRunWorkspace(userId, stored.workspaceId, () => claimResponseTransaction(userId, hint, leaseExpiresAt, respond, stored.workspaceId!))
+    }
     catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error
       const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : null
@@ -26,20 +30,22 @@ export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'i
   }
 }
 
-async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response) {
+async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response, workspaceId: string) {
   return db.transaction(async tx => {
     if (!hint.issueId) return null
     const [issue] = await tx.select().from(issues).where(eq(issues.id, hint.issueId)).for('update')
-    if (!issue || readIssueMetadata(issue.content).deletedAt) return null
+    if (!issue || !await mayCompleteIssue(issue, userId, workspaceId)) return null
     const [row] = await tx.select({ run: agentRuns, enabled: devices.enabled }).from(agentRuns)
       .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
       .where(and(eq(agentRuns.id, hint.id), eq(agentRuns.userId, userId), eq(devices.ownerId, userId)))
       .for('update', { of: agentRuns })
     if (!row?.enabled) return null
     const run = row.run
-    if (run.issueId !== issue.id || run.deviceId !== hint.deviceId || run.agentId !== hint.agentId || run.deviceRepoId !== hint.deviceRepoId || run.status !== 'preparing' || run.stopRequestedAt || !run.leaseExpiresAt || run.leaseExpiresAt.toISOString() !== leaseExpiresAt || run.leaseExpiresAt.getTime() <= Date.now()) return null
-    if (issue.userId !== userId && (issue.scope !== 'workspace' || !(await issueTeamAccess(issue.id, userId)).allowed)) return null
-    try { await revalidateExecutionIdentity(pool, run) }
+    if (run.workspaceId !== workspaceId || run.issueId !== issue.id || run.deviceId !== hint.deviceId || run.agentId !== hint.agentId || run.deviceRepoId !== hint.deviceRepoId || run.status !== 'preparing' || run.stopRequestedAt || !run.leaseExpiresAt || run.leaseExpiresAt.toISOString() !== leaseExpiresAt || run.leaseExpiresAt.getTime() <= Date.now()) return null
+    try {
+      const identity = await revalidateExecutionIdentity(pool, run)
+      if (identity && identity.workspaceId !== workspaceId) return null
+    }
     catch (error) { if (error instanceof ExecutionIdentityError) return null; throw error }
     return respond(run)
   })

@@ -11,6 +11,7 @@ import { assertPersonalMailboxCITarget } from '../scripts/personal-mailbox-ci-ta
 import { loadEnvironment, assertDatabaseIdentity } from '../scripts/test-accounts/environment.mjs'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 import { personalMailboxEnabled } from '../lib/personal-mailbox-config'
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 
 // Mandatory CI-only real PG/handler regression. No schema preparation, model,
 // authentication mock, mailbox migration, retained resources or fixture delete.
@@ -53,7 +54,8 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
     await pool.query('insert into devices(id,"ownerId",name,kind,enabled,"protocolVersion",harnesses) values($1,$2,$3,\'local\',true,$4,$5::jsonb)', [deviceId, owner, 'Mailbox default-off CI', DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents(id,"userId",harness,name,"deviceId") values($1,$2,\'codex\',$3,$4)', [agentId, owner, 'Mailbox default-off CI', deviceId])
     await pool.query('insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)', [repoId, deviceId, owner, repository.key, repository.remoteUrl])
-    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,\'{"type":"doc","content":[]}\',\'todo\',\'normal\',\'personal\')', [issueId, owner, 'Mailbox default-off CI'])
+    const workspaceId = await seedFixtureWorkspace(workspacePool, owner)
+    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId") values($1,$2,$3,\'{"type":"doc","content":[]}\',\'todo\',\'normal\',\'personal\',$4)', [issueId, owner, 'Mailbox default-off CI', workspaceId])
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'No model runs in this test', prompt: 'Fixture', parent: null, executionId: null })
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"agentDefinition") values($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, owner, issueId, agentId, deviceId, repoId, JSON.stringify(definition)])
     await pool.query('insert into device_tokens(id,"userId",name,"tokenHash","lastUsedAt","expiresAt") values($1,$2,$3,$4,now(),now()+interval \'5 minutes\')', [deviceTokenId, owner, 'Mailbox default-off CI', tokenHash(deviceToken)])

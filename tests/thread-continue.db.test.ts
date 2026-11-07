@@ -374,9 +374,22 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.equal((await questionExecutionContinuation(pool, current, producerAttemptId))?.sourceRunId, origin.id)
       const otherWorkspace = await seedWorkspace(pool, b.id, [{ userId: b.id, role: 'admin' }])
       const otherBot = await chatBotId(b.id, null, otherWorkspace.id)
+      const lineage = async () => (await pool.query('SELECT "userId","workspaceId","issueId","continuesRunId","questionContinuation",status FROM agent_runs WHERE id=$1', [next.id])).rows[0]
+      const beforeLineage = await lineage()
+      for (const [label, statement, args] of [
+        ['another owner predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, first.runId]],
+        ['missing question origin', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, randomUUID()]],
+      ] as [string, string, unknown[]][]) {
+        await assert.rejects(pool.query(statement, args), { code: '23514' }, label)
+        assert.deepEqual(await lineage(), beforeLineage, `${label}: the rejected write changes no run authority`)
+        assert.deepEqual(JSON.parse(await producerCommandObservations(pool, current, candidate)), result,
+          `${label}: the admitted same-tenant question evidence stays intact`)
+      }
       const corruptions: [string, string, unknown[]][] = [
-        ['explicit conflicting predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, first.runId]],
-        ['wrong origin payload', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, randomUUID()]],
+        // These rows exist in the same owner/task/tenant. The question receipt
+        // must still reject a self-cycle or an origin other than its real parent.
+        ['explicit conflicting predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, next.id]],
+        ['wrong origin payload', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, next.id]],
         ['missing receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, factoryEventId('question-resume', answered.answerId!)]],
         ['wrong answer fingerprint', `UPDATE factory_questions SET "answerFingerprint"='changed' WHERE id=$1`, [questionId]],
         ['different actual SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [next.id, 'different-native-session']],

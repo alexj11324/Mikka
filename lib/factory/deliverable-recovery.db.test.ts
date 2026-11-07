@@ -91,9 +91,10 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       const blocked = (await store.read('owner', routed.task.id)).task
       assert.equal(blocked.status, 'blocked')
       const originId = randomUUID(), originAttemptId = randomUUID(), originalQuestionId = randomUUID(), originalQuestionEventId = randomUUID(), answerId = randomUUID()
-      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'stopped','asked_human','original-native-session',"agentDefinition",'Original question' FROM agent_runs WHERE id=$1`, [producerRunId, originId])
+      // The persisted parent exists before the continuation references it.
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [producerRunId, originId])
       await pool.query('UPDATE factory_attempts SET position=2,ordinal=2 WHERE id=$1', [producerAttemptId])
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason) VALUES($1,$2,'execute',1,1,'waiting',$3,'original-native-session','Original question')`, [originAttemptId, blocked.id, originId])

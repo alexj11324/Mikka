@@ -76,13 +76,13 @@ test('an issue thread list key reaches every member who can see the issue, after
     }
     const issue = async (workspace: string | null) => {
       const id = randomUUID()
-      await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2)`, [id, workspace ? 'workspace' : 'personal'])
+      await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,$3)`, [id, workspace ? 'workspace' : 'personal', workspace ?? home])
       if (workspace) await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, randomUUID(), workspace])
       return id
     }
     const run = async (issueId: string | null, owner = 'owner') => {
       const id = randomUUID()
-      await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES ($1,$2,$3,$4,'running','Fixture')`, [id, owner, issueId, agents.get(owner)])
+      await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt,"workspaceId") VALUES ($1,$2,$3,$4,'running','Fixture',$5)`, [id, owner, issueId, agents.get(owner), issueId ? null : home])
       return id
     }
     const teamIssue = await issue(team), personalIssue = await issue(null)

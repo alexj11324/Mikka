@@ -22,6 +22,8 @@ import { LiveChannel } from '../live/channel'
 import { liveTicket } from '../live/scope'
 import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
 import { ScheduleError, type Definition } from '../schedules/contract'
+import { actAs } from '../acting-user'
+import { tokenWorkspace } from '../tokens/principal'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = target && disposableDatabase(process.env, target)
@@ -156,7 +158,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
     })
     const closeWeb = web.subscribe('coordinator_session', identity.botId, [identity.botId], () => {})
     controller.signal.addEventListener('abort', closeWeb, { once: true })
-    const promise = request.run(() => readCoordinatorMessages(identity.owner, { waitSeconds: 90 }, controller.signal))
+    const promise = request.run(() => actAs({ id: identity.owner, [tokenWorkspace]: identity.workspaceId }, () => readCoordinatorMessages(identity.owner, { waitSeconds: 90 }, controller.signal)))
     // A later failure still cancels this local waiter; tests never leave a 90s timer.
     void promise.catch(() => {})
     return { controller, promise, open: async () => {
@@ -307,7 +309,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
         await flush()
         await delay(150)
         assert.deepEqual(socket.received, [])
-        const peerRead = await request.run(() => readCoordinatorMessages(peer.owner, {}))
+        const peerRead = await request.run(() => actAs({ id: peer.owner, [tokenWorkspace]: peer.workspaceId }, () => readCoordinatorMessages(peer.owner, {})))
         assert.deepEqual(peerRead.messages.map(value => value.text), ['Private peer reply'])
         await request.run(() => store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Own reply only' }], null, identity.botId))
         const ownRead = await bounded(waiter.promise)

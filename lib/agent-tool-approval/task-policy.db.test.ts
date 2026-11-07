@@ -511,7 +511,7 @@ test('direct machine policy changes stop exactly their admitted scope in the sam
   t.after(async () => { await database.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
   await database.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"workspaceId" uuid);
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"botId" uuid,"issueId" uuid,"deviceId" uuid,
-      "machineAuthority" boolean,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz,cli_policy_hierarchy jsonb)`)
+      "machineAuthority" boolean,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz,cli_policy_hierarchy jsonb,"workspaceId" uuid)`)
   const [wa, wb, ba, bb, aa, ab, ia, ib, ic, ta, tb, pa, pb, device] = Array.from({ length: 14 }, () => randomUUID())
   await database.query('INSERT INTO bots VALUES($1,$2),($3,$4)', [ba, wa, bb, wb])
   const rows = [
@@ -522,8 +522,8 @@ test('direct machine policy changes stop exactly their admitted scope in the sam
     { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: false, status: 'running' },
     { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: true, status: 'completed' },
   ].map(row => ({ ...row, id: randomUUID() }))
-  for (const row of rows) await database.query(`INSERT INTO agent_runs VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL,now()+interval '5 minutes',now(),$9)`,
-    [row.id, row.owner, row.agent, row.bot, row.issue, device, row.direct, row.status, { workspaceId: row.workspace, teamId: row.team, projectId: row.project }])
+  for (const row of rows) await database.query(`INSERT INTO agent_runs VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL,now()+interval '5 minutes',now(),$9,$10)`,
+    [row.id, row.owner, row.agent, row.bot, row.issue, device, row.direct, row.status, { workspaceId: row.workspace, teamId: row.team, projectId: row.project }, row.workspace])
   const cases: [RunPolicyStopScope, number[]][] = [
     [{ kind: 'worker', ownerId: 'a', agentId: aa }, [0, 1]],
     [{ kind: 'agent', ownerId: 'a', botId: ba }, [0]],
