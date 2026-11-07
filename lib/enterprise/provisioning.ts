@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Pool } from 'pg'
 import { looksLikeSecretValue } from '@/lib/audit/events'
-import { organizationAuditRow } from '@/lib/governance/audit'
+import { organizationAuditRow } from '@/lib/governance/audit-events'
 import { deploymentMode } from '@/lib/governance/edition'
 import { GovernanceError } from '@/lib/governance/errors'
 import { resolveEntitlements, type DeploymentMode, type PlanGrant } from '@/lib/governance/policy'
