@@ -101,6 +101,8 @@ export const nativeBrokerContextSchema = z.object({
   expiresAt: z.iso.datetime(),
 }).strict()
 export type NativeBrokerContext = z.infer<typeof nativeBrokerContextSchema>
+/** Opts into catalogue evidence on a prepared lease; older daemons parse a strict object. */
+export const SUBSCRIPTION_MODEL_CATALOGUE_HEADER = 'x-mikka-subscription-model-catalogue'
 /**
  * One device run's short-lived access lease (orchestration.md §6): the
  * access token only, never a refresh grant. The daemon asks again before
@@ -108,6 +110,8 @@ export type NativeBrokerContext = z.infer<typeof nativeBrokerContextSchema>
  */
 export const nativeLeaseSchema = nativeBrokerContextSchema.extend({
   accessToken: z.string().min(1).max(32768).regex(/^[^\r\n\0]+$/),
+  /** The authorized connection's current-epoch catalogue contains this exact modelId. */
+  modelCatalogueVerified: z.literal(true).optional(),
 }).strict()
 export type NativeLease = z.infer<typeof nativeLeaseSchema>
 export interface NativeBrokerRequest { path: string; headers: Record<string,string>; body: unknown }

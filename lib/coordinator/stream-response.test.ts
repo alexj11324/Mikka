@@ -28,6 +28,21 @@ async function project(parts: CoordinatorWorkflowStreamPart[]) {
   return drain(output.pipeThrough(coordinatorTextStream('owner', [])))
 }
 
+test('invalid SDK calls and paired errors stay server-side while the corrected reply commits',async()=>{
+  const events=await project([start(),
+    {type:'tool-call',toolCallId:'bad',toolName:'none',input:{x:'private input'},dynamic:true,invalid:true,error:new Error('private error')} as CoordinatorWorkflowStreamPart,
+    {type:'tool-error',toolCallId:'bad',toolName:'none',input:{x:'private input'},dynamic:true,error:'AI_NoSuchToolError: private error'} as CoordinatorWorkflowStreamPart,
+    boundary('finish-step'),boundary('start-step'),
+    {type:'tool-call',toolCallId:'bad',toolName:'registered',input:{}} as CoordinatorWorkflowStreamPart,
+    {type:'tool-result',toolCallId:'bad',toolName:'registered',input:{},output:{ok:true}} as CoordinatorWorkflowStreamPart,
+    delta('Corrected reply'),committed(),
+  ])
+  assert.deepEqual(events.filter(event=>event.type==='tool').map(event=>[event.name,event.state]),[['registered','running'],['registered','done']])
+  assert.equal(body(events),'Corrected reply')
+  assert.equal(events.at(-1)?.type,'committed')
+  assert.doesNotMatch(JSON.stringify(events),/private|NoSuchTool|none/)
+})
+
 test('text arrives before the turn commits; model internals never leave the stream', async () => {
   const raw = new TransformStream<CoordinatorWorkflowStreamPart, CoordinatorWorkflowStreamPart>()
   const writer = raw.writable.getWriter()

@@ -8,6 +8,8 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
+  model_tool_unavailable: [],
   desktop_client_update_required: [],
   desktop_session_expired: [],
   desktop_session_changed: [],

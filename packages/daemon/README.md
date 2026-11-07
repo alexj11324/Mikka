@@ -1,7 +1,7 @@
 # Mikka daemon
 
 The daemon connects your computer to Mikka and runs threads with your installed
-Claude Code or Codex. Node.js 24 or newer and Git are required. Sign in to the
+Claude Code or Codex. Node.js 22 or newer and Git are required. Sign in to the
 coding CLI and make sure your local Git credentials can read the repositories
 you want to use.
 
