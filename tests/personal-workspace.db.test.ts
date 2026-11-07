@@ -299,20 +299,22 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'un-sharing stops it at once')
     await service.check(use(ownBot, ownBinding))
 
-    // The menu and the resolver read one readiness: a route that does not answer chats is never offered.
+    // Without a PostHog project, shipped subscription routes are available.
+    // The real connection state still fences both the menu and saved choices.
     const settings = new ExecutionSettings(appPool)
-    const saved = { MIKKA_EDITION: process.env.MIKKA_EDITION, MIKKA_BYOS_VALIDATED_MODEL_ROUTES: process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES }
+    const savedRoutes = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
     try {
-      // This part exercises the official cloud rollout ceiling; community
-      // subscriptions deliberately need no Mikka PostHog configuration.
-      process.env.MIKKA_EDITION = 'cloud'
-      process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'codex_cpa'
+      delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+      assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+      assert.equal((await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding))?.connectionId, connection)
+      await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connection])
       assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
       assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
-      process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
+      await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connection])
       assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
     } finally {
-      for (const [name, value] of Object.entries(saved)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+      if (savedRoutes === undefined) delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+      else process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = savedRoutes
     }
   })
 
