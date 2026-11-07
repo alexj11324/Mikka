@@ -131,7 +131,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const readFailedMessage = t('loadFailed'), retryLabel = t('retry')
   useEffect(() => {
     const notice = `issue-thread-read-${runId}`
-    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: () => { void mutate() } } })
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); void mutate() } } })
     else toast.dismiss(notice)
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, runId, mutate, readFailedMessage, retryLabel])
