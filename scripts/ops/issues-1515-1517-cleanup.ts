@@ -80,6 +80,7 @@ try {
     report.emptyConnectionsBefore = ids.length
     // Exercise the exact normal expiry in dry-run too, then ROLLBACK. This
     // exposes extra candidates or skipped locks before any durable cleanup.
+    report.targetDeletionGuards = (await client.query(`SELECT count(*)::int AS n FROM byos_connections c JOIN account_deletion_guards g ON g.\"subjectId\"=c.\"ownerId\" WHERE c.id::text=ANY($1::text[])`,[ids])).rows[0].n
     stage = 'subscription_expire'
     const result = await expireSubscriptionAcquisitions(client)
     stage = 'subscription_validate'
@@ -101,6 +102,13 @@ try {
   } catch (error) {
     report.failedStage = stage
     report.sqlstate = sqlstate(error)
+    const message = error instanceof Error ? error.message : ''
+    report.databaseFailure = message === 'account_deletion_pending' ? 'account_deletion_pending'
+      : message.includes('replica identity') ? 'replica_identity_required'
+      : /record .* is not assigned yet/.test(message) ? 'unassigned_record'
+      : 'unclassified'
+    const routine = (error as { routine?: string })?.routine
+    report.databaseRoutine = typeof routine === 'string' && /^[a-zA-Z0-9_]{1,80}$/.test(routine) ? routine : null
     try { await client.query('ROLLBACK'); report.subscriptionTransactionRolledBack = true }
     catch (rollbackError) { report.subscriptionTransactionRolledBack = false; report.rollbackSqlstate = sqlstate(rollbackError) }
     throw error
