@@ -1,0 +1,60 @@
+name: Issue 1503 official Codex initialize control
+on:
+  push:
+    branches: [ops/issue-1503-official-codex-initialize-control]
+    paths:
+      - .github/workflows/issue1503-official-codex-initialize-control.yml
+      - scripts/ops/issue1503/official-codex-initialize-control.py
+permissions:
+  contents: read
+concurrency:
+  group: issue1503-official-codex-initialize-control
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Install the pinned E2B SDK
+        id: sdk
+        run: |
+          python3 -m venv "$RUNNER_TEMP/e2b"
+          "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Read the existing E2B key
+        id: e2b_key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Compare anonymous initialize with and without exact timing arguments
+        run: |
+          "$RUNNER_TEMP/e2b/bin/python" scripts/ops/issue1503/official-codex-initialize-control.py --output issue1503-codex-initialize-report/official-codex-initialize-control.json
+      - name: Reclaim only this attempt's official control instances
+        if: always() && steps.sdk.outcome == 'success' && steps.e2b_key.outcome == 'success'
+        run: |
+          "$RUNNER_TEMP/e2b/bin/python" scripts/ops/issue1503/official-codex-initialize-control.py --cleanup-only --output issue1503-codex-initialize-report/official-codex-initialize-cleanup.json
+      - name: Preserve bounded initialization and exact ID cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1503-official-codex-initialize-control
+          path: issue1503-codex-initialize-report/*.json
+          if-no-files-found: warn
+          retention-days: 7
