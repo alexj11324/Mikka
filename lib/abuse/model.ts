@@ -140,7 +140,7 @@ export async function hostedModel(
           await reserve(id, args)
           let requestStarted = false
           try {
-            await checkAbuseAlerts()
+            if (hostedUsage.metered !== false) await checkAbuseAlerts()
             let reason = skipZeroCat(), failure: unknown
             let result: Awaited<ReturnType<Model['doGenerate']>> | undefined
             if (zeroCat && !reason) {
@@ -172,8 +172,8 @@ export async function hostedModel(
               result.usage.outputTokens.total ?? 0,
               served === 'gateway' ? gatewayGenerationId(result.providerMetadata) : undefined,
             )
-            await checkAbuseAlerts()
-            if (cost === null)
+            if (hostedUsage.metered !== false) await checkAbuseAlerts()
+            if (hostedUsage.metered !== false && cost === null)
               throw new PaidResourceError('usage_cost_unavailable')
             return result
           } catch (error) {
@@ -187,7 +187,7 @@ export async function hostedModel(
           await reserve(id, args)
           let requestStarted = false
           try {
-            await checkAbuseAlerts()
+            if (hostedUsage.metered !== false) await checkAbuseAlerts()
             let reason = skipZeroCat(), failure: unknown
             let opened: { result: Awaited<ReturnType<Model['doStream']>>; reader: ReadableStreamDefaultReader<StreamPart>; buffered: StreamPart[] } | undefined
             if (zeroCat && !reason) {
@@ -278,8 +278,8 @@ export async function hostedModel(
                         served === 'gateway' ? gatewayGenerationId(chunk.providerMetadata) ?? generationId : undefined,
                       )
                       finished = true
-                      await checkAbuseAlerts()
-                      if (cost === null)
+                      if (hostedUsage.metered !== false) await checkAbuseAlerts()
+                      if (hostedUsage.metered !== false && cost === null)
                         throw new PaidResourceError('usage_cost_unavailable')
                     }
                     if (!consumerCancelled) controller.enqueue(chunk)

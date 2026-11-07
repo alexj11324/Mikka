@@ -13,7 +13,7 @@ import { createApiHandler } from '../src/application'
 import { requireRequestScope } from '../src/context'
 import { after } from '../compat/server'
 import { vercelRequestAuthority } from '../request-authority-module.mjs'
-import { withVercelRequestAuthority } from './request-authority'
+import { withNodeRequestAuthority, withVercelRequestAuthority } from './request-authority'
 import authorityPlugin from '../plugins/request-authority'
 import securityHeadersPlugin from '../plugins/security-headers'
 
@@ -197,12 +197,29 @@ test('deployment-local Workflow ingress retains its own HTTPS URL, raw body and 
 
 test('legacy domain remains a fixed redirect without reaching application data', { timeout: 10_000 }, async () => {
   let invoked = false
-  await withHttpApplication({ fetch: withVercelRequestAuthority(() => { invoked = true; return new Response('unreachable') }, { origin: 'https://app.aspectlylabs.com' }) }, async send => {
+  await withHttpApplication({ fetch: withVercelRequestAuthority(() => { invoked = true; return new Response('unreachable') }, { origin: 'https://app.aspectlylabs.com', legacyHost: 'mikka.aspectlylabs.com' }) }, async send => {
     const result = await send({ host: 'mikka.aspectlylabs.com', 'x-forwarded-host': 'mikka.aspectlylabs.com', origin: undefined }, '/settings?section=account')
     assert.equal(result.status, 308)
     assert.equal(result.headers.location, 'https://app.aspectlylabs.com/mikka/settings?section=account')
     assert.equal(invoked, false)
   })
+})
+
+test('self-hosted Node accepts only its configured HTTPS authority behind a proxy', { timeout: 10_000 }, async () => {
+  const application = api()
+  await withHttpApplication({ fetch: withNodeRequestAuthority(request => application.fetch(request), { origin }) }, async send => {
+    assert.equal((await send()).status, 200)
+    assert.equal((await send({ host: 'other.example.test', 'x-forwarded-host': 'other.example.test' })).status, 400)
+    assert.equal((await send({ 'x-forwarded-host': 'other.example.test' })).status, 400)
+    assert.equal((await send({ 'x-forwarded-proto': 'http' })).status, 400)
+    assert.equal((await send({ origin: 'https://other.example.test' })).status, 403)
+  })
+  for (const value of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+    assert.doesNotThrow(() => withNodeRequestAuthority(() => new Response(), { origin: value }))
+  }
+  for (const value of ['http://network.example.test', 'http://127.0.0.1.attacker.test', 'http://10.0.0.5:3000']) {
+    assert.throws(() => withNodeRequestAuthority(() => new Response(), { origin: value }))
+  }
 })
 
 test('authority registration is Vercel-production-only and configuration cannot contain arbitrary URL parts', async () => {

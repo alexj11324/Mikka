@@ -2,7 +2,19 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import { oAuthProxy } from 'better-auth/plugins'
-import { authOAuthProxyOptions, authTrustedOrigins, resolveAppOrigin } from './auth-config'
+import { authOAuthProxyOptions, authTrustedOrigins as configuredAuthTrustedOrigins, resolveAppOrigin } from './auth-config'
+
+// Existing hosted behavior remains strict; a community deployment is tested separately.
+const authTrustedOrigins = (env: Record<string, string | undefined>) => configuredAuthTrustedOrigins({ MIKKA_EDITION: 'cloud', ...env })
+
+test('community production permits its exact loopback origin without allowing cleartext network origins', () => {
+  for (const origin of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+    assert.deepEqual(configuredAuthTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: origin }), [origin])
+  }
+  for (const origin of ['http://example.com', 'http://localhost.attacker.com', 'http://10.0.0.5:3000']) {
+    assert.throws(() => configuredAuthTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: origin }))
+  }
+})
 
 const hub = 'https://app.aspectlylabs.com'
 const preview = 'https://mikka-preview.example.com'

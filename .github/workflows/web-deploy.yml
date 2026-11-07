@@ -175,6 +175,11 @@ jobs:
             echo "::error::Private UI dependency installation failed; private diagnostics withheld."
             exit 1
           fi
+      - name: Verify the official runtime stays on the cloud edition
+        if: steps.skip.outputs.skip != 'true'
+        run: node --import tsx scripts/release/verify-cloud-edition.ts
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
       - name: Build (runs migrations last, as the Vercel build did)
         if: steps.skip.outputs.skip != 'true'
         run: node scripts/release/build-vercel.mjs

@@ -1,5 +1,6 @@
 import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
 import { isLoopbackHost } from '@/lib/loopback'
+import { isCloudEdition } from '@/lib/edition'
 
 type AuthEnvironment = Record<string, string | undefined>
 
@@ -14,7 +15,7 @@ function httpsOrigin(value: string, allowLoopback = false) {
   const url = new URL(value)
   const loopback = allowLoopback && url.protocol === 'http:' && isLoopbackHost(url.hostname)
   if ((url.protocol !== 'https:' && !loopback) || url.username || url.password || url.pathname !== '/' || url.search || url.hash || url.hostname === '*') {
-    throw new Error('Auth origins must be HTTPS (or HTTP loopback in development/CI) without credentials, paths, queries or fragments')
+    throw new Error('Auth origins must be HTTPS (or HTTP loopback in community/development/CI) without credentials, paths, queries or fragments')
   }
   return url.origin
 }
@@ -25,7 +26,7 @@ function httpsOrigin(value: string, allowLoopback = false) {
  * is on and every configured database is a loopback *_e2e database.
  */
 function loopbackAllowed(env: AuthEnvironment) {
-  return env.NODE_ENV === 'development' || env.CI === 'true' || localTestAccountsMode(env)
+  return !isCloudEdition(env) || env.NODE_ENV === 'development' || env.CI === 'true' || localTestAccountsMode(env)
 }
 
 export function authTrustedOrigins(env: AuthEnvironment) {
