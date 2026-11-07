@@ -102,7 +102,7 @@ test('checkpoint recovery availability persists through the actual authenticated
       const id = randomUUID(), issueId = randomUUID(), cloudDevice = randomUUID(), cloudAgent = randomUUID()
       const actor = { userId, workspaceId: randomUUID() }, sandboxId = `checkpoint-fixture-${randomUUID()}`
       await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES ($1,$2,'Checkpoint retirement fixture','cloud')`, [cloudDevice, userId])
-      await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Unstarted checkpoint fixture')`, [cloudAgent, userId, cloudDevice])
+      await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [cloudAgent, userId, cloudDevice, `Unstarted checkpoint fixture ${id}`])
       await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Checkpoint retirement','{"type":"doc","content":[]}','doing','normal','personal')`, [issueId, userId])
       await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","issueId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,'running',now()+interval '5 minutes')`, [id, userId, cloudAgent, cloudDevice, issueId])
       await pool.query(`INSERT INTO thread_machines("runId","ownerId","workspaceId","issueId","sandboxId","snapshotId","operationId",state,"deviceId")

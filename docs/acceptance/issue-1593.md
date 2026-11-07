@@ -320,6 +320,17 @@ replaced receipt or no receipt, and preserve the uploaded bytes and history.
 These database cases require the follow-up head's CI; they were not executed
 against a local database in this interactive environment.
 
+CI `42370351852/1` on `d3b8234` then exercised that boundary in PostgreSQL.
+The current-receipt case reached one acknowledged kill, `ended` and a null
+sandbox, but its immediate replay exposed a completed reconciliation claim
+still retained by the retirement write. The fix releases only that completed
+claim in the existing owner/workspace/epoch/sandbox-fenced success update,
+after provider acknowledgement; failed deletion and pending creation keep
+their recovery deadlines. The two negative cases also needed distinct agent
+fixture names to satisfy the existing owner/name unique key. Their full
+GREEN result remains required on the corrected head; the earlier failure is
+not reported as a passing suite.
+
 The guarded provider driver also strengthens `end-idempotence`. Its same
 single disposable VM contains a known Git base and a real changed file. The
 file must survive actual pause/resume, and its actual Git diff goes through
@@ -345,7 +356,9 @@ Task and deliver committed live invalidations without starting compute.
 Duplicate events cannot create another run or provider action. Provider and
 live transports are explicit fixtures. Existing signed-webhook admission and
 the full adjacent-stage Factory dispatch/handoff tests provide the other
-controlled boundaries. The new joint database case also awaits exact-head CI.
+controlled boundaries. The new joint case passed in `d3b8234` CI's
+`test:factory-approval-db` suite (52/52, no skips). The final corrected head
+must still pass its complete CI before merge.
 
 ### Main-only acceptance delivery
 
