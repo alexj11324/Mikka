@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { cp, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, mkdir, readFile, realpath, rm, symlink, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -233,4 +233,108 @@ test('lifecycle reads only the attested primary metric socket, with bounded clos
       /LIFECYCLE_QUERY_COUNTER_RUNTIME_MISMATCH/)
   }
   assert.equal(calls, completedCalls, 'a mismatched counter must not be queried')
+})
+
+const rpcWindows = Object.fromEntries(['nativeLogin', 'webLogin', 'startup-bundled', 'startup-hosted'].map((name, index) =>
+  [name, { status: 'complete', total: { startedAt: new Date(2000 + index * 2000).toISOString(), finishedAt: new Date(3000 + index * 2000).toISOString() } }]))
+const rpcEvent = (id, milliseconds, complete = false, extra = {}) => ({
+  msg: complete ? 'api_request' : 'api_request_started', timestamp: new Date(milliseconds).toISOString(),
+  invocationId: '00000000-0000-4000-8000-' + String(id).padStart(12, '0'),
+  route: '/api/desktop/rpc', method: 'POST',
+  ...(complete ? { rpcAction: 'preferences.getPreferences', status: 200 } : {}), ...extra,
+})
+
+async function rpcLogFixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-lifecycle-rpc-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const revision = 'a'.repeat(40), origin = 'http://localhost:3000', runtimePath = join(directory, 'processes.json')
+  const log = join(directory, 'bundled-' + revision.slice(0, 12) + '-44.log')
+  const descriptor = { revision, origin, bundled: { ...counterIdentity, port: 3000, socket: '/tmp/mikka-bundled-44.sock', log } }
+  await writeFile(runtimePath, JSON.stringify(descriptor), { mode: 0o600 })
+  const counter = await createLifecycleQueryCounter({ revision, origin, runtimePath }, {
+    httpRequest() { throw new Error('RPC diagnostics must not query the API or metrics socket') },
+  })
+  return { log, descriptor, runtimePath, counter, write: events => writeFile(log, events.map(event => JSON.stringify(event)).join('\n') + '\n', { mode: 0o600 }) }
+}
+
+test('RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields', async t => {
+  const f = await rpcLogFixture(t), secret = 'PRIVATE_RPC_CONTENT_CANARY'
+  const completed = rpcEvent(1, 2500, true, { userIdHash: secret, requestId: secret, error: secret, body: secret, arguments: [secret] })
+  await f.write([
+    completed, rpcEvent(1, 2000), completed, rpcEvent(1, 2000),
+    rpcEvent(2, 1999), rpcEvent(2, 2000, true),
+    rpcEvent(3, 2999), rpcEvent(3, 3000, true),
+    rpcEvent(4, 3000), rpcEvent(4, 3100, true),
+    rpcEvent(5, 4000, false, { route: '/api/rpc' }), rpcEvent(5, 4500, true, { route: '/api/rpc' }),
+    rpcEvent(6, 6000), rpcEvent(6, 6500, true),
+    rpcEvent(7, 8000, false, { route: '/api/rpc' }), rpcEvent(7, 8500, true, { route: '/api/rpc' }),
+    rpcEvent(8, 2100, true, { route: '/api/other', rpcAction: 'private.canary', body: secret }),
+  ])
+  const result = await f.counter.rpcActions(rpcWindows)
+  assert.equal(result.status, 'complete')
+  assert.equal(result.duplicateRecords, 2)
+  const native = result.windows.nativeLogin.actions[0]
+  assert.deepEqual(native, { route: '/api/desktop/rpc', rpcAction: 'preferences.getPreferences',
+    startedInWindow: 2, completedInWindow: 2, crossesStart: 1, crossesEnd: 1,
+    completionNotObserved: 0, completionWithoutStart: 0, statusCounts: [{ status: 200, count: 3 }] })
+  for (const name of ['webLogin', 'startup-bundled', 'startup-hosted']) {
+    assert.equal(result.windows[name].status, 'complete')
+    assert.equal(result.windows[name].actions[0].startedInWindow, 1)
+    assert.equal(result.windows[name].actions[0].completedInWindow, 1)
+  }
+  const text = JSON.stringify(result)
+  for (const value of [secret, completed.invocationId, 'userIdHash', 'requestId', 'private.canary', 'arguments']) assert.equal(text.includes(value), false)
+})
+
+test('RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts', async t => {
+  const f = await rpcLogFixture(t)
+  await f.write([
+    rpcEvent(1, 2100),
+    rpcEvent(2, 2500, true),
+    rpcEvent(3, 2200), rpcEvent(3, 2300, true), rpcEvent(3, 2300, true, { status: 500 }),
+    rpcEvent(4, 2300), rpcEvent(4, 2400, true, { rpcAction: 'PRIVATE ACTION CANARY' }),
+  ])
+  const result = await f.counter.rpcActions(rpcWindows)
+  assert.equal(result.status, 'incomplete')
+  assert.equal(result.conflictingInvocations, 1)
+  assert.ok(result.reasons.includes('unpaired_requests'))
+  assert.ok(result.reasons.includes('invalid_request_record'))
+  const native = result.windows.nativeLogin.actions
+  assert.equal(native.reduce((sum, row) => sum + row.startedInWindow, 0), 2)
+  assert.equal(native.reduce((sum, row) => sum + row.completionNotObserved, 0), 1)
+  assert.equal(native.reduce((sum, row) => sum + row.completionWithoutStart, 0), 1)
+  assert.equal(native.some(row => row.statusCounts.some(status => status.status === 500)), false)
+  assert.equal(JSON.stringify(result).includes('PRIVATE ACTION CANARY'), false)
+})
+
+test('RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls', async t => {
+  const f = await rpcLogFixture(t)
+  for (const [prepare, reason] of [
+    [() => rm(f.log, { force: true }), 'log_missing'],
+    [() => writeFile(f.log, '{"msg":"api_request","private":"TRUNCATED_CANARY"', { mode: 0o600 }), 'log_partial_line'],
+    [() => truncate(f.log, 16 * 1024 * 1024 + 1), 'log_size_limit'],
+  ]) {
+    await prepare()
+    const result = await f.counter.rpcActions(rpcWindows)
+    assert.equal(result.status, 'incomplete')
+    assert.deepEqual(result.reasons, [reason])
+    for (const window of Object.values(result.windows)) {
+      assert.equal(window.status, 'unavailable')
+      assert.equal(window.actions, undefined)
+    }
+    assert.equal(JSON.stringify(result).includes('TRUNCATED_CANARY'), false)
+  }
+})
+
+test('RPC diagnostics accept only the descriptor-bound primary log and complete measured windows', async t => {
+  const f = await rpcLogFixture(t)
+  await f.write([rpcEvent(1, 2000), rpcEvent(1, 2500, true)])
+  const partial = await f.counter.rpcActions({ nativeLogin: rpcWindows.nativeLogin })
+  assert.equal(partial.windows.webLogin.status, 'unavailable')
+  const other = await createLifecycleQueryCounter({ revision: f.descriptor.revision, origin: f.descriptor.origin, runtimePath: f.runtimePath }, {
+    read: async () => JSON.stringify({ ...f.descriptor, bundled: { ...f.descriptor.bundled, log: join(dirname(f.log), 'foreign.log') } }),
+  })
+  const mismatched = await other.rpcActions(rpcWindows)
+  assert.deepEqual(mismatched.reasons, ['log_binding_mismatch'])
+  assert.equal(mismatched.windows.nativeLogin.actions, undefined)
 })

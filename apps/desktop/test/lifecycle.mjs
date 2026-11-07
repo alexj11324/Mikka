@@ -509,6 +509,7 @@ try {
   if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(error => { passed = false; cleanupErrors.push(error) })
   evidence.accountObservation = releaseObserver?.read() ?? { observed: false }
   releaseObserver?.restore()
+  if (queryCounter && evidence.queryCounts) evidence.queryCounts.rpcActions = await queryCounter.rpcActions(evidence.queryCounts.windows)
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'lifecycle.json'), `${JSON.stringify(evidence, null, 2)}\n`)

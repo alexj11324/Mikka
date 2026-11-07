@@ -347,6 +347,17 @@ paired values and investigate repeated RPC actions; screenshot counts or unit
 test success do not supply the missing measurement. This adds no long idle run
 and no latency pass/fail threshold.
 
+After the existing samples and cleanup, `queryCounts.rpcActions` reads at most
+16 MiB of that primary API's existing private log once. It pairs request starts
+and completions in memory, then retains only the two RPC routes, registered-action
+shapes, HTTP status counts and window counts. `startedInWindow` counts requests
+whose start is in the half-open measurement window; completions, confirmed
+crossings and missing boundaries are separate and must not be added together.
+These are RPC invocations, not per-action SQL counts. The raw log, internal IDs
+and user hashes are never copied to the artifact. Missing, oversized, truncated,
+invalid or unpaired records explicitly make this diagnosis incomplete; unavailable
+windows do not become zero counts.
+
 ### Changing them
 
 `scripts/ops/posthog-observability.mjs` holds the dashboard, its insights
