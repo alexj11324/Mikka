@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
-import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot, seedAgent } from '../../tests/support/workspace-admin-db'
 import type { OrderEntry, OrderHarness } from '@/lib/model-order-plan'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import type { DecisionAnswer } from '@/lib/coordinator/decision'
@@ -74,6 +74,125 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($2::text),false) WHERE id=ANY($1::uuid[])`,
       [[claude, exactClaude, codex, foreignSource], new Date().toISOString()])
     await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+  })
+
+  await t.test('fixed Profile source filtering matches the complete catalogue on real rows and keeps its source lock', async t => {
+    const who = await person('fixed-entry-owner'), payor = await person('fixed-entry-payor'), unrelated = await person('fixed-entry-unrelated')
+    for (const member of [payor, unrelated]) {
+      await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,'Fixed entry fixture',$3,'member','active')`, [who.workspaceId, member.ownerId, `${member.ownerId}@example.invalid`])
+      await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [member.ownerId, who.workspaceId])
+    }
+    const own = await subscribe(who, 'codex', ['fixed-entry-model', 'unrelated-model'])
+    const shared = await subscribe(payor, 'codex', ['fixed-entry-model', 'unrelated-model'])
+    await subscribe(who, 'claude', ['unrelated-model'])
+    await subscribe(unrelated, 'codex', ['unrelated-model'])
+    const { sealSecret } = await import('../secrets/crypto')
+    const keys: string[] = []
+    for (const owner of [who, payor, unrelated]) {
+      const id = randomUUID(), sealed = sealSecret('synthetic-fixed-entry-key', ['model_api_key', id, owner.ownerId].join('\0'), { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
+      await pool.query(`INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models,"responsesApi") VALUES ($1,$2,'deepseek','openai',$3,$4,$5,'fake','["fixed-entry-model","unrelated-model"]',true)`, [id, owner.ownerId, sealed.ciphertext, sealed.iv, sealed.keyVersion])
+      if (owner !== who) await pool.query('INSERT INTO model_api_key_shares ("keyId","workspaceId") VALUES ($1,$2)', [id, who.workspaceId])
+      keys.push(id)
+    }
+    const selected = (source: OrderEntry['source']) => {
+      const entry: OrderEntry = { id: randomUUID(), harness: 'codex', model: 'fixed-entry-model', source }
+      const definition = profiles.parseAgentProfile({ name: 'Exact source fixture', harness: 'codex', model: { mode: 'fixed', harness: 'codex', model: entry.model, source } })
+      return { profileId: randomUUID(), version: 1, digest: profiles.agentProfileDigest(definition, []), name: definition.name, source: 'explicit' as const, reason: 'explicit', scope: who, definition, skills: [], instructions: '', targetEntry: entry }
+    }
+    const ownSelection = selected({ kind: 'subscription', connectionId: own }), sharedSelection = selected({ kind: 'subscription', connectionId: shared })
+    const ownKey = selected({ kind: 'api_key', keyId: keys[0] }), sharedKey = selected({ kind: 'api_key', keyId: keys[1] })
+    const healthAgentId = await seedAgent(pool, who.ownerId)
+    const outcome = async (operation: () => Promise<void>) => {
+      try { await operation(); return { ok: true } } catch (error) {
+        if (!(error instanceof profiles.AgentProfileError)) throw error
+        return { code: error.code, detail: error.detail }
+      }
+    }
+    const inspect = async (selection: typeof ownSelection, full: boolean) => {
+      const statements: { text: string; rows: number }[] = []
+      const measured = { query: async (text: string, params?: unknown[]) => {
+        const result = await pool.query(text, params); statements.push({ text, rows: result.rows.length }); return result
+      } } as unknown as Pick<Pool, 'query'>
+      const result = await outcome(() => full ? profiles.assertFrozenModelTarget(measured, who, selection.targetEntry) : profiles.assertProfileTarget(measured, who, selection))
+      return { result, statements }
+    }
+    let providerCalls = 0
+    const fetch = globalThis.fetch
+    globalThis.fetch = async () => { providerCalls++; throw new Error('fixed target must not call a provider') }
+    try {
+      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['shared subscription', sharedSelection, 7], ['own key', ownKey, 6], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
+        const original = await inspect(selection, true), fixed = await inspect(selection, false)
+        assert.deepEqual(original.result, { ok: true }); assert.deepEqual(fixed.result, original.result)
+        assert.equal(fixed.statements.length, expectedQueries)
+        assert.ok(fixed.statements.length < original.statements.length)
+        if (selection.targetEntry.source.kind === 'subscription') {
+          assert.equal(fixed.statements.some(row => row.text.includes('FROM model_api_keys WHERE') || row.text.includes('FROM model_api_key_shares s')), false)
+          assert.deepEqual(fixed.statements.filter(row => row.text.includes('WITH choices AS')).map(row => row.rows), [1])
+        } else assert.equal(fixed.statements.some(row => row.text.includes('WITH choices AS')), false)
+        assert.equal(providerCalls, 0)
+        t.diagnostic(JSON.stringify({ name, appQueryInvocations: { full: original.statements.length, selected: fixed.statements.length }, providerCalls, workspaceMembershipTransactionsCounted: false }))
+      })
+      const compare = async (selection: typeof ownSelection, expected: 'accepted' | 'denied' = 'denied') => {
+        const original = await inspect(selection, true), fixed = await inspect(selection, false)
+        assert.deepEqual(fixed.result, original.result)
+        assert.equal(original.result.ok === true, expected === 'accepted')
+        assert.equal(providerCalls, 0)
+      }
+      for (const [name, sql, params, restore, restoreParams] of [
+        ['paused', 'UPDATE byos_connections SET paused=true WHERE id=$1', [own], 'UPDATE byos_connections SET paused=false WHERE id=$1', [own]],
+        ['removed', 'UPDATE byos_connections SET "removedAt"=now() WHERE id=$1', [own], 'UPDATE byos_connections SET "removedAt"=NULL WHERE id=$1', [own]],
+        ['epoch', 'UPDATE byos_connections SET epoch=2 WHERE id=$1', [own], 'UPDATE byos_connections SET epoch=1 WHERE id=$1', [own]],
+        ['binding route', "UPDATE byos_bindings SET route='codex_cli' WHERE \"connectionId\"=$1", [own], "UPDATE byos_bindings SET route='codex_cpa' WHERE \"connectionId\"=$1", [own]],
+        ['catalogue model removed', 'UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '1', models: ['unrelated-model'] })], 'UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '1', models: ['fixed-entry-model', 'unrelated-model'] })]],
+        ['quota', 'UPDATE byos_connections SET quota=$2 WHERE id=$1', [own, JSON.stringify(quota('codex', 1))], 'UPDATE byos_connections SET quota=$2 WHERE id=$1', [own, JSON.stringify(quota('codex'))]],
+      ] as const) await t.test(`same own subscription denial: ${name}`, async () => {
+        await pool.query(sql, [...params]); try { await compare(ownSelection) } finally { await pool.query(restore, [...restoreParams]) }
+      })
+      await t.test('a stale catalogue revision retains the original binding fallback', async () => {
+        await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '0', models: ['unrelated-model'] })])
+        try { await compare(ownSelection, 'accepted') } finally { await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '1', models: ['fixed-entry-model', 'unrelated-model'] })]) }
+      })
+      await t.test('the shared owner must still be an active member', async () => {
+        await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [who.workspaceId, payor.ownerId])
+        try { await compare(sharedSelection) } finally { await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [who.workspaceId, payor.ownerId]) }
+      })
+      await t.test('withdrawn subscription or key shares cannot be replaced by another same-model source', async () => {
+        await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [payor.ownerId, who.workspaceId])
+        await pool.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1 AND "workspaceId"=$2', [keys[1], who.workspaceId])
+        try { await compare(sharedSelection); await compare(sharedKey) } finally {
+          await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [payor.ownerId, who.workspaceId])
+          await pool.query('INSERT INTO model_api_key_shares ("keyId","workspaceId") VALUES ($1,$2)', [keys[1], who.workspaceId])
+        }
+      })
+      await t.test('the admin share switch refuses others without refusing own sources', async () => {
+        await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [who.workspaceId])
+        try { await compare(sharedSelection); await compare(sharedKey); await compare(ownSelection, 'accepted'); await compare(ownKey, 'accepted') }
+        finally { await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [who.workspaceId]) }
+      })
+      for (const [field, value, original] of [['modelsError', 'invalid', null], ['responsesApi', false, true], ['models', JSON.stringify(['unrelated-model']), JSON.stringify(['fixed-entry-model', 'unrelated-model'])]] as const) await t.test(`same API-key refusal: ${field}`, async () => {
+        await pool.query(`UPDATE model_api_keys SET "${field}"=$2 WHERE id=$1`, [keys[0], value])
+        try { await compare(ownKey) } finally { await pool.query(`UPDATE model_api_keys SET "${field}"=$2 WHERE id=$1`, [keys[0], original]) }
+      })
+      for (const selection of [ownSelection, ownKey]) await t.test(`the selected ${selection.targetEntry.source.kind} retains durable provider-health evidence`, async () => {
+        const entry = selection.targetEntry, id = randomUUID()
+        const binding = (await pool.query('SELECT id FROM byos_bindings WHERE "connectionId"=$1 AND "modelId"=$2', [own, entry.model])).rows[0]
+        await pool.query('UPDATE model_api_keys SET "updatedAt"=now()-interval \'1 hour\' WHERE id=$1', [keys[0]])
+        await pool.query(`INSERT INTO agent_runs (id,"userId","agentId",status,"stopReason","agentDefinition",report,"startedAt","finishedAt")
+          VALUES ($1,$2,$3,'failed','provider_failure',$4,$5,now()-interval '1 second',now())`,
+        [id, who.ownerId, healthAgentId, JSON.stringify({ harness: entry.harness, executionIdentity: { workspaceId: who.workspaceId },
+          ...(entry.source.kind === 'subscription' ? { subscription: { bindingId: binding.id, modelId: entry.model } } : { apiKey: { keyId: entry.source.keyId, model: entry.model } }) }),
+        JSON.stringify({ providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } })])
+        try { await compare(selection) } finally { await pool.query('DELETE FROM agent_runs WHERE id=$1', [id]) }
+      })
+      await t.test('the same FOR SHARE lock still prevents a concurrent source disconnect', async () => {
+        const holding = await pool.connect(), writer = await pool.connect()
+        try {
+          await holding.query('BEGIN'); await writer.query('BEGIN'); await writer.query("SET LOCAL lock_timeout='100ms'")
+          await profiles.assertProfileTarget(holding, who, ownSelection)
+          await assert.rejects(writer.query('UPDATE byos_connections SET paused=true WHERE id=$1', [own]), { code: '55P03' })
+        } finally { await holding.query('ROLLBACK'); await writer.query('ROLLBACK'); holding.release(); writer.release() }
+      })
+    } finally { globalThis.fetch = fetch }
   })
 
   await t.test('default dispatch survives a 21-second catalogue wait before final membership admission', { timeout: 45_000 }, async () => {
