@@ -5286,6 +5286,7 @@
     "otherWorkspace": "Another workspace"
   },
   "HostedSettings": {
+    "back": "Back",
     "general": {
       "iconHint": "PNG, JPEG, WebP or GIF, up to 200 KB"
     },
