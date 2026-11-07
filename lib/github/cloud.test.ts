@@ -5,7 +5,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 let ownApp = false, cloudEdition = false, binding: { revoked: boolean; scopes: string[] } | null = null, legacyCalls = 0
 let cache = [{ installation_id: '99', account_id: '42', account_login: 'owner', account_type: 'User', github_account_id: '42' }]
 const calls: { userId: string; scope: string; path: string; input?: Record<string, unknown> }[] = []
-const native = `ghs_${'x'.repeat(36)}`
+let native = `ghs_${'x'.repeat(36)}`
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: {
   async query(sql: string) { return { rows: sql.includes('cloud_service_bindings') ? binding ? [binding] : [] : cache, rowCount: 1 } },
   async connect() { return { async query() { return { rows: [], rowCount: 1 } }, release() {} } },
@@ -36,6 +36,20 @@ test('cloud task preparation returns the native token and repository installatio
   assert.equal(result.token, native); assert.equal(result.installationId, '99'); assert.equal(result.githubAccountId, '42')
   assert.equal(legacyCalls, 0)
   assert.deepEqual(calls, [{ userId: 'local-user', scope: 'github', path: '/v1/github/installation-token', input: { installationId: '99', repositories: ['repo'] } }])
+})
+
+test('native installation tokens remain opaque Bearer credentials, including long JWT-shaped responses', async () => {
+  const original = native
+  try {
+    for (const token of [`${'a'.repeat(900)}.${'b'.repeat(900)}.signature_-`, 'opaque~credential+/==']) {
+      native = token
+      assert.equal((await runtime.githubMachineCredential('local-user', { remoteKey: 'v2/github.com/owner/repo' })).token, token)
+    }
+    for (const token of ['short', 'a'.repeat(8193), 'valid-token\r\nInjected: unsafe', 'credential with spaces']) {
+      native = token
+      await assert.rejects(runtime.githubMachineCredential('local-user', { remoteKey: 'v2/github.com/owner/repo' }), { code: 'cloud_unavailable' })
+    }
+  } finally { native = original }
 })
 
 test('unconnected installation and Mikka Cloud itself retain environment-backed user credentials', async () => {

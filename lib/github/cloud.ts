@@ -70,7 +70,9 @@ async function installations(userId: string): Promise<{ installations: Installat
 async function mint(userId: string, installationId: string, repositories?: string[]) {
   const result = await cloudJson(userId, '/v1/github/installation-token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ installationId, ...(repositories ? { repositories } : {}) }) })
   const expires = typeof result.expiresAt === 'string' ? Date.parse(result.expiresAt) : NaN
-  if (typeof result.token !== 'string' || !/^[A-Za-z0-9_]{20,512}$/.test(result.token) || !Number.isFinite(expires) || expires <= Date.now() || expires > Date.now() + 65 * 60_000) throw protocol()
+  // Installation credentials are opaque (RFC 6750 b64token), not a fixed
+  // ghs_ prefix/length. Preserve the header-safe alphabet and bounded size.
+  if (typeof result.token !== 'string' || result.token.length < 20 || result.token.length > 8192 || !/^[A-Za-z0-9._~+/-]+=*$/.test(result.token) || !Number.isFinite(expires) || expires <= Date.now() || expires > Date.now() + 65 * 60_000) throw protocol()
   return { token: result.token, expiresAt: new Date(expires), installationId }
 }
 
