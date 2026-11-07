@@ -23,6 +23,52 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 // Never follow one automatically or turn an expected 302/303 into fetch error.
 const manualRedirect = (url, init) => fetch(url, { ...init, redirect: 'manual' })
 
+// Production keeps these non-secret location selectors in its live deployment.
+// Their effective access project and the normal custody identity decide the read.
+export async function readProductionAccessLocation(read) {
+  const project = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
+  const { envs } = await read('/v10/projects/' + project + '/env')
+  check(Array.isArray(envs), 'SOURCE_CONFIG_METADATA')
+  const keys = ['MIKKA_BYOS_INFISICAL_PROJECT', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT', 'MIKKA_BYOS_ACCESS_INFISICAL_PATH', 'MIKKA_BYOS_ACCESS_INFISICAL_PROJECT']
+  const values = {}
+  for (const key of keys) {
+    const rows = envs.filter(row => row.key === key && row.target?.includes('production') && !row.gitBranch)
+    check(rows.length <= 1 && (rows.length === 1 || key === 'MIKKA_BYOS_ACCESS_INFISICAL_PROJECT'), 'SOURCE_CONFIG_' + key)
+    if (rows.length) values[key] = (await read('/v1/projects/' + project + '/env/' + encodeURIComponent(rows[0].id))).value
+  }
+  const location = { project: values.MIKKA_BYOS_ACCESS_INFISICAL_PROJECT || values.MIKKA_BYOS_INFISICAL_PROJECT,
+    environment: values.MIKKA_BYOS_INFISICAL_ENVIRONMENT, path: values.MIKKA_BYOS_ACCESS_INFISICAL_PATH }
+  check(UUID.test(location.project) && /^[a-zA-Z0-9_-]{1,32}$/.test(location.environment ?? '')
+    && /^\/[a-zA-Z0-9/_-]{1,200}$/.test(location.path ?? ''), 'SOURCE_CONFIG_SCOPE')
+  return location
+}
+
+export async function readAuthorizedProjection({ location, name, clientId, clientSecret, report, fetcher = fetch }) {
+  check(UUID.test(location?.project ?? '') && /^[a-zA-Z0-9_-]{1,32}$/.test(location?.environment ?? '')
+    && /^\/[a-zA-Z0-9/_-]{1,200}$/.test(location?.path ?? '') && /^mikka-byos-[a-f0-9-]{36}$/.test(name ?? '')
+    && typeof clientId === 'string' && clientId.length > 0 && typeof clientSecret === 'string' && clientSecret.length > 0, 'SOURCE_PROJECTION_SCOPE')
+  const request = async (operation, path, init) => {
+    let response
+    try { response = await fetcher('https://app.infisical.com' + path, { ...init, redirect: 'error', signal: AbortSignal.timeout(20000) }) }
+    catch { throw Error('COMMUNITY_SOURCE_PROJECTION_NETWORK') }
+    ;(report.sourceRequests ??= []).push({ operation, status: response.status })
+    check(response.ok, 'SOURCE_PROJECTION_HTTP_' + response.status)
+    let value; try { value = await response.json() } catch { throw Error('COMMUNITY_SOURCE_PROJECTION_BODY') }
+    return value
+  }
+  const login = await request('existing_custody_login', '/api/v1/auth/universal-auth/login', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId, clientSecret }) })
+  check(login.tokenType === 'Bearer' && typeof login.accessToken === 'string' && login.accessToken.length > 0, 'SOURCE_IDENTITY')
+  const query = new URLSearchParams({ projectId: location.project, environment: location.environment, secretPath: location.path,
+    type: 'shared', version: '1', viewSecretValue: 'true', expandSecretReferences: 'false', includeImports: 'false' })
+  const result = await request('authorized_access_projection', '/api/v4/secrets/' + name + '?' + query, {
+    method: 'GET', headers: { authorization: 'Bearer ' + login.accessToken } })
+  const secret = result.secret
+  check(secret?.secretKey === name && secret.version === 1 && !secret.secretValueHidden
+    && typeof secret.secretValue === 'string' && secret.secretValue.length > 0 && Buffer.byteLength(secret.secretValue) <= 32768, 'SOURCE_PROJECTION_SCHEMA')
+  return secret.secretValue
+}
+
 // Metadata only, kept outside artifacts so an independent always() step can
 // remove exactly this run's access leaves and VMs after a driver timeout.
 export function cleanupScope(value, run) {
@@ -102,7 +148,7 @@ export async function runCommunity(env = process.env) {
   const revision = (await execute('git', ['rev-parse', 'HEAD'], { cwd: source })).stdout.trim()
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
   const report = { kind: 'real-community-subscriptions', revision, cases: [], cleanup: {}, stage: 'source', status: 'failed',
-    credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
+    sourceRequests: [], credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
   const name = 'mikka-community-' + env.GITHUB_RUN_ID
   const databasePassword = randomBytes(24).toString('hex'), key = randomBytes(32).toString('base64')
   const devPath = '/release-selfhost-' + env.GITHUB_RUN_ID
@@ -140,13 +186,20 @@ export async function runCommunity(env = process.env) {
     const expectedWorker = (await execute('python3', ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', revision], { cwd: source })).stdout.trim()
     check(expectedWorker === sourceConfig.workerSha, 'WORKER_VERSION')
     report.publicBuild = (await cloud.json('/api/version')).build
-    check(report.publicBuild === revision, 'PUBLIC_VERSION')
+    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION]
+    check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
+    report.sharedControlPlaneCompatibility = 'A23_to_9ea_protected_paths_byte_identical'
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
     await privatePool.query('BEGIN READ ONLY')
     // The normal account API must expose the source before its exact metadata
     // can be read. No production row is inserted or modified.
     const choices = (await cloud.json('/api/workspace')).choices
     check(Array.isArray(choices), 'WORKSPACES')
+    const { api: vercelApi } = await import(pathToFileURL(source + '/scripts/e2b/publish-template-env.mjs'))
+    const productionLocation = await readProductionAccessLocation(path => vercelApi(path, { token: env.VERCEL_TEAM_TOKEN }))
+    const [legacyPath, legacyEnvironment] = await Promise.all([secret('/vercel', 'MIKKA_BYOS_ACCESS_INFISICAL_PATH'), secret('/vercel', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT')])
+    report.sourceConfiguration = { origin: 'existing_vercel_production', accessProjectMatchesLegacy: productionLocation.project === PROJECT,
+      accessPathMatchesLegacy: productionLocation.path === legacyPath, environmentMatchesLegacy: productionLocation.environment === legacyEnvironment }
     const sources = []
     const providers = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([provider, harness, model]) => {
       const receipt = { harness, model, status: 'failed', cleanup: {} }; report.cases.push(receipt)
@@ -167,8 +220,13 @@ export async function runCommunity(env = process.env) {
       check(UUID.test(row.id) && /^mikka-byos-[a-f0-9-]{36}$/.test(row.accessSecretName) && /^[a-f0-9]{64}$/.test(row.accessDigest), 'CONNECTION_METADATA')
       // Path/environment are the existing runtime configuration, never a
       // guessed canonical-grant path. Only the immutable access leaf is read.
-      const [sourcePath, sourceEnvironment] = await Promise.all([secret('/vercel', 'MIKKA_BYOS_ACCESS_INFISICAL_PATH'), secret('/vercel', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT')])
-      const raw = await secret(sourcePath, row.accessSecretName, sourceEnvironment, false)
+      Object.assign(source.receipt, { sourceConnectionHash: sha(row.id).slice(0, 16), sourceCredentialVersion: Number(row.credentialVersion), sourceAccessNameHash: sha(row.accessSecretName).slice(0, 16) })
+      if (report.sourceConfiguration.accessProjectMatchesLegacy && report.sourceConfiguration.accessPathMatchesLegacy && report.sourceConfiguration.environmentMatchesLegacy) {
+        try { await secret(legacyPath, row.accessSecretName, legacyEnvironment, false); source.receipt.actionsOidcProjectionStatus = 200 }
+        catch (error) { const match = /^COMMUNITY_INFISICAL_(\d{3})$/.exec(error?.message ?? ''); source.receipt.actionsOidcProjectionStatus = match ? Number(match[1]) : 'OTHER' }
+      }
+      const raw = await readAuthorizedProjection({ location: productionLocation, name: row.accessSecretName,
+        clientId: custodyId, clientSecret: custodySecret, report })
       Object.assign(source, { row, raw, selectedWorkspace }); sources.push(source)
     })
     await privatePool.query('COMMIT'); await privatePool.end(); privatePool = undefined
@@ -228,7 +286,16 @@ export async function runCommunity(env = process.env) {
     check(link && new URL(link).origin === origin, 'VERIFICATION_LINK')
     const verified = await community.request(new URL(link).pathname.replace('/mikka', '') + new URL(link).search)
     check(verified.status === 302, 'VERIFICATION')
-    await community.json('/api/auth/sign-in/email', post({ email, password })); sessions.push(community)
+    const nativeLogin = await community.request('/api/auth/sign-in/email', post({ email, password }))
+    check(nativeLogin.ok, 'NATIVE_LOGIN')
+    const nativeBearer = nativeLogin.headers.get('set-auth-token'); await nativeLogin.body?.cancel(); sessions.push(community)
+    check(typeof nativeBearer === 'string' && nativeBearer.length >= 32 && nativeBearer.length <= 512, 'NATIVE_BEARER')
+    const nativeRpc = await fetch(origin + '/mikka/api/desktop/rpc', { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
+      headers: { origin, authorization: 'Bearer ' + nativeBearer, 'content-type': 'application/json', 'x-mikka-client': 'desktop', 'x-mikka-desktop-protocol': '1' },
+      body: JSON.stringify({ version: 1, action: 'agents.listAgents', args: [] }) })
+    check(nativeRpc.ok && (await nativeRpc.json()).ok === true, 'NATIVE_RPC')
+    report.nativeSession = { signedBearerAccepted: true, cookiesSent: false, status: nativeRpc.status, action: 'agents.listAgents', hasSignaturePadding: nativeBearer.endsWith('=') }
+
     const own = (await community.json('/api/auth/get-session')).user
     check(own.email === email && own.emailVerified === true, 'COMMUNITY_IDENTITY')
     const workspace = (await community.json('/api/workspace')).workspace
@@ -380,7 +447,8 @@ export async function runCommunity(env = process.env) {
       }
     }
     check(report.cases.length === 2 && report.cases.every(c => c.status === 'passed' && c.cleanup.vmStopped && c.cleanup.deviceRemoved), 'BOTH_THREADS')
-    check((await cloud.json('/api/version')).build === report.publicBuild, 'PUBLIC_CHANGED')
+    report.publicFinalBuild = (await cloud.json('/api/version')).build
+    check(sharedBuilds.includes(report.publicFinalBuild), 'PUBLIC_CHANGED')
     check(JSON.stringify(await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })) === JSON.stringify(sourceConfig), 'WORKER_CHANGED')
     report.status = 'passed'
   } catch (error) { report.code = /^COMMUNITY_[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_FAILED'; report.causeCode = ['ENOTFOUND', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(error?.cause?.code) ? error.cause.code : 'OTHER' }

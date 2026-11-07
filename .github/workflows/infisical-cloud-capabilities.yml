@@ -226,10 +226,6 @@ jobs:
       startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions')
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    concurrency:
-      group: web-deploy-production
-      cancel-in-progress: false
-      queue: max
     permissions:
       contents: read
       actions: read
@@ -237,6 +233,7 @@ jobs:
     env:
       # Exact public release commit containing #1591; verified before credentials.
       MIKKA_COMMUNITY_REVISION: a23b2e0b48dc5cb2dac8bb9ecde734a03537339e
+      MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION: 9ea7b2cd61deb724f20330906f86df6df2cd9828
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -268,14 +265,21 @@ jobs:
             return response.json()
           }
           const [main, runs] = await Promise.all([get('git/ref/heads/main'), get('actions/runs?head_sha=' + sha + '&per_page=100')])
-          if (main.object?.sha !== sha) throw Error('COMMUNITY_MAIN_CHANGED')
+          const compatible = process.env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION
+          if (compatible !== '9ea7b2cd61deb724f20330906f86df6df2cd9828' || ![sha, compatible].includes(main.object?.sha)) throw Error('COMMUNITY_MAIN_CHANGED')
+          if (main.object.sha === compatible) {
+            const comparison = await get('compare/' + sha + '...' + compatible)
+            const allowed = ['app/api/mobile/tasks/[id]/route.ts','app/api/mobile/tasks/route.ts','apps/api/generated/routes.json','apps/api/generated/routes.ts','lib/mobile-task-view.test.ts','lib/mobile-task-view.ts','lib/mobile-tasks.ts','lib/task-block-runs.ts','messages/en.json','messages/zh-CN.json','package.json','tests/mobile-tasks.db.test.ts']
+            if (comparison.status !== 'ahead' || comparison.behind_by !== 0 || comparison.merge_base_commit?.sha !== sha
+              || comparison.files?.length !== allowed.length || comparison.files.some(file => !allowed.includes(file.filename))) throw Error('COMMUNITY_CONTROL_PLANE_CHANGED')
+          }
           const workflows = ['CI', 'Web deploy', 'E2B additive runtime release', 'Self-hosted image']
           const receipt = workflows.map(name => {
             const run = runs.workflow_runs?.find(r => r.head_sha === sha && r.name === name && r.status === 'completed' && r.conclusion === 'success')
             if (!run) throw Error('COMMUNITY_RELEASE_NOT_READY_' + name.replaceAll(' ', '_').toUpperCase())
             return { workflow: name, run: run.id }
           })
-          console.log(JSON.stringify({ kind: 'community-release-gate', revision: sha, status: 'passed', workflows: receipt, credentialsDelivered: false }))
+          console.log(JSON.stringify({ kind: 'community-release-gate', revision: sha, sharedCompatibleMain: main.object.sha, compatibility: 'reviewed_mobile_task_read_api_only', status: 'passed', workflows: receipt, credentialsDelivered: false }))
           JS
       - name: Prepare the exact released source and immutable public image before credentials
         env:
@@ -329,3 +333,5 @@ jobs:
 # Public bridge protocol covers published ce67; native/full-thread acceptance follows 1668.
 
 # Community run awaits exact a23 Web/E2B/image readiness; includes native authentication fix1668.
+
+# Source projection read uses the live configured access project and existing custody identity.

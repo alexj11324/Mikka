@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, independentProviders } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -67,3 +67,43 @@ test('a failed provider source or fixture preserves the independent bound model 
 // Apple readback JWT scope includes the exact fixed build filters and sparse fields; no native redispatch.
 
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
+
+
+test('access source uses the actual production configuration and its distinct access project without reading unrelated values', async () => {
+  const publicProject = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
+  const values = { MIKKA_BYOS_INFISICAL_PROJECT: '11111111-1111-4111-8111-111111111111', MIKKA_BYOS_ACCESS_INFISICAL_PROJECT: '22222222-2222-4222-8222-222222222222', MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'prod', MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/actual-access' }
+  const calls = [], rows = Object.keys(values).map((key, i) => ({ id: 'config'+i, key, target: ['production'] }))
+  rows.push({ id: 'never-read-private', key: 'PRIVATE_APPLICATION_SECRET', target: ['production'] })
+  const location = await readProductionAccessLocation(async path => {
+    calls.push(path)
+    if (path === '/v10/projects/'+publicProject+'/env') return { envs: rows }
+    const row = rows.find(r => path === '/v1/projects/'+publicProject+'/env/'+r.id)
+    assert.ok(row && row.key in values)
+    return { value: values[row.key] }
+  })
+  assert.deepEqual(location, { project: values.MIKKA_BYOS_ACCESS_INFISICAL_PROJECT, environment: 'prod', path: '/actual-access' })
+  assert.equal(calls.length, 5); assert.ok(calls.every(path => !path.includes('never-read-private')))
+})
+
+test('source projection reuses the normal custody identity for exactly one immutable access leaf and never exports its bearer', async () => {
+  const calls = [], report = { sourceRequests: [] }, name = 'mikka-byos-33333333-3333-4333-8333-333333333333'
+  const location = { project: '22222222-2222-4222-8222-222222222222', environment: 'prod', path: '/actual-access' }
+  const value = 'synthetic-access-only'
+  const raw = await readAuthorizedProjection({ location, name, clientId: 'existing-custody', clientSecret: 'synthetic-custody-secret', report,
+    fetcher: async (url, init) => {
+      const u = new URL(url); calls.push({ path: u.pathname, method: init.method })
+      assert.equal(u.origin, 'https://app.infisical.com'); assert.equal(init.redirect, 'error')
+      if (u.pathname === '/api/v1/auth/universal-auth/login') {
+        assert.deepEqual(JSON.parse(init.body), { clientId: 'existing-custody', clientSecret: 'synthetic-custody-secret' })
+        return Response.json({ accessToken: 'synthetic-derived-bearer', tokenType: 'Bearer' })
+      }
+      assert.equal(u.pathname, '/api/v4/secrets/'+name)
+      assert.equal(u.searchParams.get('projectId'), location.project); assert.equal(u.searchParams.get('secretPath'), location.path)
+      assert.equal(u.searchParams.get('version'), '1'); assert.equal(u.searchParams.get('expandSecretReferences'), 'false')
+      assert.equal(init.headers.authorization, 'Bearer synthetic-derived-bearer')
+      return Response.json({ secret: { secretKey: name, version: 1, secretValue: value } })
+    } })
+  assert.equal(raw, value); assert.equal(calls.length, 2)
+  for (const secret of [value, 'synthetic-derived-bearer', 'synthetic-custody-secret']) assert.ok(!JSON.stringify(report).includes(secret))
+  await assert.rejects(readAuthorizedProjection({ location, name: 'canonical-grant', report, fetcher: () => assert.fail('must not request') }), /SOURCE_PROJECTION_SCOPE/)
+})

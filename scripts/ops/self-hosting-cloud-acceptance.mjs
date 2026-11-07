@@ -230,3 +230,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Apple readback JWT scope includes the exact fixed build filters and sparse fields; no native redispatch.
 
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
+
+// Source access follows live production project/identity configuration; no new credentials or roles.

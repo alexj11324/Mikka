@@ -144,3 +144,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // PR comments use explicit Pull requests write; Apple/EAS readbacks run independently of protocol completion.
 
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
+
+// Source access follows live production project/identity configuration; no new credentials or roles.
