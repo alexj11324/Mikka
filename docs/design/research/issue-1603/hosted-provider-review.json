@@ -1,0 +1,211 @@
+{
+  "observedAt": "2026-11-07 11:47:20 UTC",
+  "worktree": "/tmp/issue1603-hosted-provider-fix",
+  "base": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+  "patch": {
+    "path": "/tmp/issue1603-hosted-provider-fix.patch",
+    "sha256": "d9c388513c2d146487e79e7b2fa21f0faaed9cf07b2855c01f1df7368f50857c",
+    "bytes": 13253,
+    "changedFiles": [
+      "components/workspace/issue-workspace.tsx",
+      "components/workspace/issue-workspace-settings.test.tsx"
+    ],
+    "productBlob": "083e26f8f997b5ab7a237ee9f29d223bf8f88b59",
+    "testBlob": "ccbef14655b0c9984b12bf87a1ba9022e0d603bc"
+  },
+  "requirement": {
+    "issue": "https://github.com/alexj11324/Mikka/issues/1603",
+    "groups": [
+      "B: stable shell and navigation",
+      "C: interaction state and security boundaries"
+    ],
+    "hostedDesign": "https://github.com/alexj11324/Mikka/pull/1629",
+    "designDecision": "docs/design/decisions/2026-11-06-2000-hosted-ui-overlay.md",
+    "designInterpretation": "A distinct hosted settings appearance and sidebar are intentional. The shared providers' loss of pending user state is separate and is not required by the visual slot contract."
+  },
+  "fixedOverlayContext": {
+    "sha": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "settingsFrameBlob": "07b32276b4987a0ab9c16f246295e6042eed651d",
+    "ownsSettingsFrame": true,
+    "privateSourceModified": false,
+    "privateSourcePublished": false
+  },
+  "finding": {
+    "id": "hosted-settings-provider-state",
+    "status": "reproduced-and-locally-fixed",
+    "rootCause": "The hosted Settings early-return branch replaced the entire ComputerAgentsProvider and BrowserNotesProvider subtree. Their in-memory state was recreated on returning to the workspace.",
+    "minimalReproduction": [
+      "Seed one browser annotation and one computer-thread registry entry while chatting.",
+      "Unmount the registering card so it cannot reconstruct its historical entry.",
+      "Enter Settings using OWN_SETTINGS_FRAME=true and let its content chunk resolve.",
+      "Return to chats within the same owner and workspace."
+    ],
+    "redObservation": {
+      "duringSettings": {
+        "notes": null,
+        "hasComposer": null,
+        "computerRun": null
+      },
+      "after": {
+        "draft": "hosted unsent draft",
+        "notes": [],
+        "computerRun": null
+      }
+    },
+    "greenObservation": {
+      "duringSettings": {
+        "notes": 1,
+        "hasComposer": false,
+        "computerRun": "fixture-computer-run"
+      },
+      "after": {
+        "draft": "hosted unsent draft",
+        "notes": [
+          [
+            1,
+            "keep hosted annotation"
+          ]
+        ],
+        "computerRun": "fixture-computer-run"
+      }
+    },
+    "triage": {
+      "occurrenceEstimate": 4,
+      "impactEstimate": 7,
+      "product": 28,
+      "scale": "1-10 engineering estimates; not measured production frequency",
+      "rationale": "An ordinary hosted Settings round trip deterministically discards pending browser annotations and the computer-thread registry when these features are in use. Pending annotations are unsent user input; the separately scoped text draft remains.",
+      "estimateRevision": {
+        "previousSnapshotEstimate": {
+          "occurrenceEstimate": 4,
+          "impactEstimate": 5,
+          "rationale": "Deterministic loss on an ordinary Settings round trip when these pending features are in use; pending user annotations disappear, while the separately scoped text draft remains."
+        },
+        "reason": "The final issue register weights loss of unsent annotations as input loss; root requested the common issue estimate 4 x 7 = 28. This changes the estimate, not the measured red/green observations."
+      }
+    }
+  },
+  "implementation": {
+    "summary": "Place the existing ComputerAgentsProvider and BrowserNotesProvider around both visual-frame branches under the existing SignOutBoundary and authenticated/view-state scope.",
+    "keeps": [
+      "OWN_SETTINGS_FRAME=true semantics and hosted frame props",
+      "Default AppFrame path and layout",
+      "Authentication/cache/live/view-state boundaries",
+      "No new polling, data storage, mutation, styling, or private UI changes"
+    ],
+    "productDiff": "8 changed lines, shared-provider placement only"
+  },
+  "verification": {
+    "red": {
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern='hosted Settings preserves' components/workspace/issue-workspace-settings.test.tsx",
+      "exitCode": 1,
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "log": "/tmp/issue1603-hosted-provider-red.log",
+      "failure": "Expected pending annotation and historical computer registry entry; observed [] and null, with draft preserved."
+    },
+    "focusedGreen": {
+      "exitCode": 0,
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "log": "/tmp/issue1603-hosted-provider-green.log"
+    },
+    "existingEntry": {
+      "name": "test:view-state",
+      "execution": "The exact Node command from the existing package.json script, using locked shared dependencies without invoking pnpm auto-install.",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx components/workspace/issue-workspace-settings.test.tsx components/workspace/board-view-state.test.tsx",
+      "exitCode": 0,
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "log": "/tmp/issue1603-hosted-provider-view-state-node.log"
+    },
+    "typecheck": {
+      "command": "./node_modules/.bin/tsrs --noEmit",
+      "exitCode": 0,
+      "log": "/tmp/issue1603-hosted-provider-typecheck-final.log"
+    },
+    "lint": {
+      "command": "./node_modules/.bin/oxlint --deny-warnings components/workspace/issue-workspace.tsx components/workspace/issue-workspace-settings.test.tsx",
+      "exitCode": 0,
+      "log": "/tmp/issue1603-hosted-provider-lint-direct.log"
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    "independentReview": {
+      "agent": "/root/evidence_review",
+      "result": "No blocking findings; product and tests read, no extra tests or edits."
+    },
+    "coverageBoundary": "Annotations are independently checked across owner and workspace changes. Registry owner retirement is checked directly; the subsequent workspace check starts with an already empty registry. The unchanged keyed scope is shared by both providers.",
+    "runtimeBoundary": "Node + Happy DOM with real public IssueWorkspace, BrowserNotesProvider and ComputerAgentsProvider; data leaves and the hosted visual-slot contract are fixtures. No browser, server, database, model or production business actions were used in this regression."
+  },
+  "coldLoadingReview": {
+    "status": "static-review-only",
+    "facts": [
+      "The hosted SettingsFrame slot is imported synchronously.",
+      "SettingsRouteContent and SettingsView use WorkspaceContentLoading as their dynamic fallback, inside the frame's children.",
+      "The official private SettingsFrame has one children insertion and no next/dynamic or Suspense usage.",
+      "The public WindowBar being replaced is intentional visual design, not evidence of an additional state-loss defect."
+    ],
+    "manualNext": "Delay the Settings content chunk for 8 seconds in the new production build and verify the hosted navigation remains while only its content area shows the placeholder.",
+    "additionalNavigationObservation": "The current private frame does not consume the contract's onBrowser callback; do not assume the old globe control is available. Verify actual reachable browser entry before deciding whether it is a design or capability gap."
+  },
+  "currentMainReview": {
+    "base": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "head": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "aheadCommits": 38,
+    "changedFiles": 88,
+    "intersectionWith156Batch": [
+      "components/settings/settings-shell.tsx",
+      "components/workspace/issue-workspace.tsx",
+      "package.json"
+    ],
+    "unchangedSecurityAndNavigationFiles": [
+      "app/api/workspace/switcher/route.ts",
+      "lib/settings-navigation.ts",
+      "components/authenticated-read-cache.tsx",
+      "lib/hooks/view-state.tsx",
+      "components/version-guard.tsx"
+    ],
+    "backendRouteOrActionOrMigrationChanges": false
+  },
+  "deploymentRisk": {
+    "runId": 42364868968,
+    "jobId": 128380699741,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42364868968",
+    "observed": "Build failure; upload and public verification skipped.",
+    "compatibility": "Older private overlay 53d does not export the new OWN_SETTINGS_FRAME contract. This is a confirmed compatibility issue, not a claim that it is the only cause of the withheld build failure.",
+    "requiredClosure": "The combined new public source plus official e290 overlay must build successfully and receive normal exact-source CI/deploy/runtime acceptance."
+  },
+  "mergeRisk": {
+    "current": "medium pending combined build/CI and runtime UI acceptance",
+    "alignment": "good",
+    "impact": "small: transient UI providers only",
+    "verification": "unit red/green, 30-case existing entry, root typecheck, targeted lint; real hosted runtime pending",
+    "rollbackCost": "low: no persistent data or schema changes",
+    "errorDetection": "dedicated regression distinguishes annotation/registry loss from intentional frame replacement"
+  },
+  "remoteMutations": false,
+  "historicalDeploymentEvidence": {
+    "path": "/tmp/issue1603-final-release-watch.json",
+    "sha256": "5eac202c488c024aedf7c5bc154148bba17cf9e05fca9f54d1f3e79547f22303",
+    "source": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "immutable": true,
+    "currentProductionClaim": false
+  },
+  "publicationContext": {
+    "preparedAtUtc": "2026-11-07T11:57:22.887332+00:00",
+    "originalSnapshotSha256": "85106ff9551428bdf25802dba0367d067c38d547371f29ccb5efe44e47c9f359",
+    "combinedPullRequest": "https://github.com/alexj11324/Mikka/pull/1637",
+    "combinedCandidateHead": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "combinedCandidateTree": "d45d992a4103ce3b144eae1575204e250a94e812",
+    "combinedCandidateBase": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "statusAtPreparation": "Draft candidate; exact-candidate CI, new production-build UI, merge and final production acceptance pending",
+    "versionBoundary": "The original local checks and observations retain their recorded source version; they are not relabeled as checks run on the combined GitHub candidate.",
+    "historicalImages": "Existing integrated/ images remain bound to 5a752a50eb74c22681cd7dd8511ff6d2e58fc46f with overlay ac5980696802f188a81124a8a3f2513be2d14e9e."
+  }
+}

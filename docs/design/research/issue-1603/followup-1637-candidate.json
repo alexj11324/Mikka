@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "preparedAtUtc": "2026-11-07T11:57:22.887332+00:00",
+  "pullRequest": {
+    "number": 1637,
+    "url": "https://github.com/alexj11324/Mikka/pull/1637",
+    "draft": true,
+    "merged": false,
+    "head": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "tree": "d45d992a4103ce3b144eae1575204e250a94e812",
+    "base": "1edbeca687119eb0ef71f209ac3d411fbc85b888"
+  },
+  "candidateMetadataProvenance": "Root GitHub creation/readback handoff supplied exact head, tree and base; this documentation-only task did not repeat a GitHub API read or mutate refs.",
+  "changedFiles": 16,
+  "localFixEvidence": [
+    {
+      "defect": 18,
+      "name": "Persistent read-error Retry action lifetime",
+      "base": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+      "evidence": "toast-fix-evidence.json",
+      "red": {
+        "tests": 8,
+        "pass": 0,
+        "fail": 8
+      },
+      "green": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0
+      },
+      "status": "Minimally fixed and locally verified; included in draft candidate"
+    },
+    {
+      "defect": 19,
+      "name": "Hosted Settings drops browser notes and computer registry",
+      "base": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+      "evidence": "hosted-provider-review.json",
+      "red": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1
+      },
+      "focusedGreen": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0
+      },
+      "existingViewStateEntry": {
+        "tests": 30,
+        "pass": 30,
+        "fail": 0
+      },
+      "countingBoundary": "The 10 Settings tests are included in the 30-test view-state entry, not an additional 40 unique tests.",
+      "status": "Minimally fixed and locally verified; included in draft candidate"
+    }
+  ],
+  "baseAdvanceReview": {
+    "evidence": "main-1ed-review.json",
+    "from": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "to": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "commits": 15,
+    "changedFiles": 49,
+    "onlySharedPath": "package.json",
+    "mainChangedScript": "test:project-decisions",
+    "patchChangedScript": "test:artifacts",
+    "semanticConflict": false,
+    "lockfileUnchanged": true,
+    "boundary": "The source review covers overlap and affected UI paths. It does not certify all new main behavior or replace exact-candidate CI."
+  },
+  "gatesAtSnapshot": {
+    "exactCandidateCi": "PENDING",
+    "combinedProductionBuildAndRuntimeBinding": "PENDING",
+    "newManualUiWithCurrentHostedOverlay": "PENDING",
+    "mergeAndActualTreeReadback": "PENDING",
+    "finalProductionDeploymentReadback": "PENDING",
+    "designatedSmokeAccountProductionAcceptance": "PENDING"
+  },
+  "expectedHostedOverlay": {
+    "sha": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "status": "Reviewed compatible overlay; actual new build/served binding must be recorded by runtime before acceptance."
+  },
+  "historicalBoundary": {
+    "mainBatchMerge": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+    "switcherFixMerge": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "historical26efReleaseEvidence": [
+      "followup-main-ci.json",
+      "followup-release-evidence.json",
+      "followup-vercel-binding.json"
+    ],
+    "existingImageSource": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "existingImageOverlay": "ac5980696802f188a81124a8a3f2513be2d14e9e",
+    "imagesRelabeled": false,
+    "productionSmokeCompleted": false
+  },
+  "riskEstimates": {
+    "scale": "1-10 engineering estimates",
+    "defect18": {
+      "occurrence": 4,
+      "impact": 5,
+      "product": 20
+    },
+    "defect19": {
+      "occurrence": 4,
+      "impact": 7,
+      "product": 28
+    }
+  },
+  "copiedSnapshotSha256BeforePublicationAnnotations": {
+    "toast-fix-evidence.json": "906cb2d82231c8c675b9bee1d9d0e973c960aa2f0d8221847182cde323f78b10",
+    "hosted-provider-review.json": "85106ff9551428bdf25802dba0367d067c38d547371f29ccb5efe44e47c9f359",
+    "main-1ed-review.json": "2f7dae53e068f499500cdaf8470cf6ae142ff1a203484c90e0799f4d94298b77"
+  },
+  "privacy": {
+    "containsCredentials": false,
+    "containsEmails": false,
+    "containsRawFixtureIds": false,
+    "privateUiSourcePublished": false,
+    "liveModelsRunByLocalRegressions": false
+  },
+  "documentationTaskMutations": {
+    "localEvidenceDocumentsOnly": true,
+    "productFiles": false,
+    "github": false,
+    "notion": false,
+    "manifest": "Not refreshed; root owns the final upload manifest."
+  }
+}

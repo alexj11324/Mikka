@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "defect": 18,
+  "recordedAtUtc": "2026-11-07T11:42:20.723338+00:00",
+  "scope": "Retry action lifetime on persistent background-read and connection error toasts",
+  "source": {
+    "base": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "previousBaseline": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "mainAdvanced": true,
+    "fetchSucceeded": true,
+    "targetProductFilesUnchangedBetweenBaselines": true,
+    "worktree": "/tmp/issue1603-toast-repro",
+    "state": "Uncommitted isolated patch; not a new GitHub commit or production build"
+  },
+  "patch": {
+    "path": "/tmp/issue1603-toast-fix.patch",
+    "bytes": 40027,
+    "sha256": "1a7a8d1e8da9d806eb610721883f1f3d4d84c063ab5594e6a50461cd86ff9fc4",
+    "changedFiles": [
+      "apps/desktop/src/renderer/app.tsx",
+      "components/artifacts/artifact-library.test.tsx",
+      "components/artifacts/artifact-library.tsx",
+      "components/artifacts/artifact-viewer-continuity.test.tsx",
+      "components/artifacts/artifact-viewer.tsx",
+      "components/workspace/group-chat-continuity.test.tsx",
+      "components/workspace/group-chat-view.tsx",
+      "components/workspace/issue-thread-panel.tsx",
+      "components/workspace/task-detail.tsx",
+      "components/workspace/thread-column.tsx",
+      "package.json",
+      "scripts/task-detail-live.test.tsx",
+      "scripts/thread-composer.test.tsx",
+      "tests/read-retry-toasts.test.tsx"
+    ],
+    "productFiles": [
+      "apps/desktop/src/renderer/app.tsx",
+      "components/artifacts/artifact-library.tsx",
+      "components/artifacts/artifact-viewer.tsx",
+      "components/workspace/group-chat-view.tsx",
+      "components/workspace/issue-thread-panel.tsx",
+      "components/workspace/task-detail.tsx",
+      "components/workspace/thread-column.tsx"
+    ],
+    "productChange": "Seven existing action callbacks synchronously call event.preventDefault(), then call the original mutate/retry. Existing effect cleanup still dismisses only after the failure condition clears or the component unmounts.",
+    "testChange": "Six test files: one new real Sonner/React/SWR regression file, plus existing callback fixtures supplied with a cancelable Event. Added the new regression to the existing test:artifacts entrypoint.",
+    "outOfScopeChanges": {
+      "layout": false,
+      "cachePolicy": false,
+      "authorizationClassification": false,
+      "polling": false,
+      "dependencies": false,
+      "schema": false,
+      "providerStructure": false
+    }
+  },
+  "rootCause": "Sonner 1.7.4 action buttons call the handler and then delete the toast unless default is prevented. A still-failing read retains the boolean failure state, so the existing error effect does not recreate the removed recovery control.",
+  "redGreen": {
+    "baselineMainRecheck": {
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern='regression: a still-failing Retry' components/artifacts/issue1603-toast-repro.test.tsx",
+      "exitCode": 1,
+      "tests": 1,
+      "fail": 1
+    },
+    "allPathsRed": {
+      "exitCode": 1,
+      "tests": 8,
+      "pass": 0,
+      "fail": 8,
+      "failure": "All eight failed at the missing in-place recovery action assertion, after a real retry read."
+    },
+    "allPathsGreen": {
+      "exitCode": 0,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "paths": [
+        "ArtifactLibrary",
+        "ArtifactViewer detail",
+        "ArtifactViewer current-version text",
+        "IssueThreadPanel detail",
+        "ThreadColumn lookup",
+        "TaskDetail",
+        "GroupChatView history",
+        "ConnectionStatus via actual App and SessionApplication"
+      ]
+    },
+    "assertions": [
+      "Initial content loaded through real SWR, or the actual App bootstrap lifecycle.",
+      "The actual installed Sonner action button starts another read.",
+      "A continued failure leaves the same content node and a reachable Retry button.",
+      "A second Retry that succeeds dismisses the notice and preserves the content node.",
+      "Unexpected network request count is zero."
+    ],
+    "finalHarnessNotes": "After the initial all-path red/green, the test harness used the existing Textarea primitive and a runtime URL import for the separately typed renderer; final test:artifacts and full typecheck/lint were rerun. No product behavior was changed during those harness adaptations."
+  },
+  "verification": [
+    {
+      "command": "pnpm test:artifacts",
+      "exitCode": 0,
+      "tests": 48,
+      "pass": 48,
+      "fail": 0,
+      "skipped": 0,
+      "log": "toast-artifacts-final.log"
+    },
+    {
+      "command": "pnpm test:groups",
+      "exitCode": 0,
+      "tests": 91,
+      "pass": 90,
+      "fail": 0,
+      "skipped": 1,
+      "skip": "Existing Postgres17 migration/history/pagination/membership/privacy integration test; no database was provisioned by this component task.",
+      "log": "toast-groups.log"
+    },
+    {
+      "command": "pnpm test:issue-readonly-dom",
+      "exitCode": 0,
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0,
+      "log": "toast-task-dom.log"
+    },
+    {
+      "command": "NODE_OPTIONS=--max-old-space-size=4096 pnpm typecheck",
+      "exitCode": 0,
+      "scope": "Full existing root tsrs, API tsrs and frontend tsc command.",
+      "log": "toast-typecheck-final.log"
+    },
+    {
+      "command": "pnpm exec oxlint --deny-warnings <all 13 changed TS/TSX files>",
+      "exitCode": 0,
+      "log": "toast-lint-final.log"
+    },
+    {
+      "command": "pnpm lint:ui",
+      "exitCode": 0,
+      "businessFiles": 2875,
+      "interactionFiles": 502,
+      "errors": 0,
+      "log": "toast-ui-policy-final.log"
+    },
+    {
+      "command": "node scripts/error-cause-policy.mjs",
+      "exitCode": 0,
+      "log": "toast-error-policy.log"
+    },
+    {
+      "command": "node scripts/polling-policy.mjs",
+      "exitCode": 0,
+      "log": "toast-polling-policy.log"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "risk": {
+    "occurrence": 4,
+    "impact": 5,
+    "product": 20,
+    "scale": "1-10 engineering estimates, not measured frequency",
+    "consequence": "A continuing failure removes the visible error and immediate in-place retry; stale content remains. Later automatic recovery/navigation/reload remain possible. No permanent deadlock, data-loss, or authorization-bypass claim."
+  },
+  "review": {
+    "reviewer": "final_ci",
+    "mode": "read-only product diff, real Sonner implementation, new eight-path test and red/green logs",
+    "result": "No implementation blocker reported; final harness adaptations are typing/primitive reuse only."
+  },
+  "limitations": [
+    "Node/Happy DOM does not prove geometric overlap, pointer hit-testing, hover expansion, modal keyboard flow or native behavior.",
+    "No new browser, database, Docker or live-model runtime was started by this task.",
+    "New production-build UI evidence is pending root/runtime ownership and must be bound to the final combined candidate and current hosted overlay.",
+    "Old 5a screenshots and prior production evidence retain their original versions.",
+    "No GitHub branch/PR/merge or other external write was performed."
+  ],
+  "logs": {
+    "toast-repro-f722-red.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-repro-f722-red.log",
+      "sha256": "c8111ada627ed1b85fb1126ed7e89f4c52c636f72aa58c1ee03244642457da87"
+    },
+    "toast-seven-paths-red.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-seven-paths-red.log",
+      "sha256": "035dd20191e65f09114d60e007866e1ecf89175394270f2557f71f751dfd7a41"
+    },
+    "toast-seven-paths-green.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-seven-paths-green.log",
+      "sha256": "da7f304c14696236cf8f5e54ee30254bb1febdca2e17f1e04e62b38999f5bf85"
+    },
+    "toast-artifacts-final.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-artifacts-final.log",
+      "sha256": "3c879f79931c97baaaf5da985220f45b680cf4da5254bea67e5ed15001badfd3"
+    },
+    "toast-groups.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-groups.log",
+      "sha256": "0cadcc6e48a2016022484dc1899b16ebf05ae0b13273de4078a0e01c098fd2a5"
+    },
+    "toast-task-dom.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-task-dom.log",
+      "sha256": "736f8146ac89635e775162a88da0d1f49fac219ee3ba70105209bbd46036c1c9"
+    },
+    "toast-typecheck-final.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-typecheck-final.log",
+      "sha256": "615b23f09af0eb74595d7680850fbf92994ccccdd87cbd1fefa0fbd74e04d990"
+    },
+    "toast-lint-final.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "toast-ui-policy-final.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-ui-policy-final.log",
+      "sha256": "8f7ac34726a08beb51c2e55052ec39e53b65f7ffaee8b65f81103f62e0b9765f"
+    },
+    "toast-error-policy.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-error-policy.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "toast-polling-policy.log": {
+      "path": "/tmp/issue1603-toast-repro/toast-polling-policy.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "finalFileSha256": {
+    "apps/desktop/src/renderer/app.tsx": "43903d35852e0b20eddc00c2d3d167fab1b1e3e0a1292f185b4e4ced3a1c15b1",
+    "components/artifacts/artifact-library.test.tsx": "6e467a1f7b9f3539a7363c0e98b416ceac5986daec2259dce7a7f2b68e65e8a0",
+    "components/artifacts/artifact-library.tsx": "95376a0e467f757263dce910955407ae7951545b89652586ce4ea6938ae96b84",
+    "components/artifacts/artifact-viewer-continuity.test.tsx": "5bee8da33930c82efcd322f9f5f6396bbcdaaa17b2e8d05ce58a3e7911d93e8d",
+    "components/artifacts/artifact-viewer.tsx": "10f2160c0a35bdadd5de21c365165e21b3eed26ec92f8377107eba4354ba9b49",
+    "components/workspace/group-chat-continuity.test.tsx": "ff4e0cf2586314cd2aa90fbf7b912ee44fc8d349779f94c29048e4a0d37961bf",
+    "components/workspace/group-chat-view.tsx": "593ad67adc0ab4853d40857552448321e629b25ab357b8ae3b8a9ca64a0563d9",
+    "components/workspace/issue-thread-panel.tsx": "7b3aa66854733d86f5abcb27d5bef01b5ac45b631928e246a08638b142ef346a",
+    "components/workspace/task-detail.tsx": "1dbd824d2576b90a6a7e1bce1c89f977c9fc5155c185dadf088e9c4526940a3d",
+    "components/workspace/thread-column.tsx": "3a4ea3b0e37e205f174f7e6cf02385a0bc285439d6ef0ebcbb6cae2d89246d41",
+    "package.json": "2fb0437a964a42c0b2e93e0d4d83c41fb63190735d041e5b99685076981415e7",
+    "scripts/task-detail-live.test.tsx": "d25cda0f0f1b3cd6fde52b70946ce622132ffe51559cc4d8a2a87dcc7151d994",
+    "scripts/thread-composer.test.tsx": "e5b49b6d866f4b4cb09f2387c623c12ce61a574c7c9fd531a76f800eb394c46b",
+    "tests/read-retry-toasts.test.tsx": "61620d9946981a6a0175cada8d3af0ec4803debbb0ff55fab43703edef3fcc01"
+  },
+  "publicationContext": {
+    "preparedAtUtc": "2026-11-07T11:57:22.887332+00:00",
+    "originalSnapshotSha256": "906cb2d82231c8c675b9bee1d9d0e973c960aa2f0d8221847182cde323f78b10",
+    "combinedPullRequest": "https://github.com/alexj11324/Mikka/pull/1637",
+    "combinedCandidateHead": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "combinedCandidateTree": "d45d992a4103ce3b144eae1575204e250a94e812",
+    "combinedCandidateBase": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "statusAtPreparation": "Draft candidate; exact-candidate CI, new production-build UI, merge and final production acceptance pending",
+    "versionBoundary": "The original local checks and observations retain their recorded source version; they are not relabeled as checks run on the combined GitHub candidate.",
+    "historicalImages": "Existing integrated/ images remain bound to 5a752a50eb74c22681cd7dd8511ff6d2e58fc46f with overlay ac5980696802f188a81124a8a3f2513be2d14e9e."
+  }
+}

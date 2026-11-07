@@ -1,0 +1,386 @@
+{
+  "observedAt": "2026-11-07 11:49:56 UTC",
+  "base": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+  "head": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+  "pullRequest": "https://github.com/alexj11324/Mikka/pull/1627",
+  "comparison": {
+    "status": "ahead",
+    "aheadBy": 15,
+    "behindBy": 0,
+    "totalCommits": 15,
+    "changedFileCount": 49
+  },
+  "overlap": {
+    "combinedPatchFiles": 16,
+    "sharedPaths": [
+      "package.json"
+    ],
+    "mainPackageScriptKeysChanged": [
+      "test:project-decisions"
+    ],
+    "toastPackageScriptKeysChanged": [
+      "test:artifacts"
+    ],
+    "semanticConflict": false,
+    "existingNonOverlappingPatchFileBlobsIdentical": 14,
+    "newTestFile": "tests/read-retry-toasts.test.tsx",
+    "lockfileIdentical": true
+  },
+  "uiImpact": {
+    "directReactOrSettingsOrToastChanges": false,
+    "authenticatedReadCacheNavigationOrViewStateChanges": false,
+    "migrationsAdded": false,
+    "conclusion": "No direct code overlap changes the seven Retry handlers or the two shared provider lifetimes. The f722 focused red/green source evidence remains applicable to those unchanged files; it does not certify the entire new main tree."
+  },
+  "actualServerDiffReview": [
+    {
+      "path": "app/api/mcp/route.ts",
+      "change": "Moves record_decision tool metadata into a shared RECORD_DECISION_TOOL constant. The handler still obtains the Mikka-issued run identity and passes its token to the existing decision writer.",
+      "boundary": "No generic OAuth decision writer was added. Ordinary UI read handlers were not changed by this diff."
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "change": "Adds canonical decision and mailbox catalogues to the existing authorized run claim, and computes a diagnostic environment inside authorizedClaimResponse using its fresh run.",
+      "boundary": "The final authorization fence, private/no-store response, run credentials and normal route authority remain in place."
+    },
+    {
+      "path": "lib/computer/startup-diagnostics.ts",
+      "change": "Optionally enables startup timing only for a valid operator window lasting at most 24 hours and a matching read-only cloud run, requester/workspace/bot/repository/harness/subscription binding.",
+      "boundary": "Returns the original task environment when conditions fail; no new authority, database operation or persisted task flag."
+    },
+    {
+      "path": "packages/protocol/src/device.ts and mailbox.ts",
+      "change": "Adds bounded canonical catalogue schemas as optional claim fields.",
+      "boundary": "The metadata describes existing tool definitions and is not an authorization grant. Runtime compatibility is left to the new-head normal CI/release validation."
+    }
+  ],
+  "daemonScope": {
+    "changed": true,
+    "summary": "Hosted startup preparation/prewarming, repository preparation, mailbox catalogue use and diagnostic timing change future worker startup behavior.",
+    "reviewBoundary": "No additional daemon tests or broad daemon review were run for this UI patch. The parent is creating a new combined source on 1ed and will run its normal CI and production build."
+  },
+  "frozenPatches": [
+    {
+      "path": "/tmp/issue1603-toast-fix.patch",
+      "sha256": "1a7a8d1e8da9d806eb610721883f1f3d4d84c063ab5594e6a50461cd86ff9fc4"
+    },
+    {
+      "path": "/tmp/issue1603-hosted-provider-fix.patch",
+      "sha256": "d9c388513c2d146487e79e7b2fa21f0faaed9cf07b2855c01f1df7368f50857c"
+    }
+  ],
+  "releaseRequirement": "Use the new combined source with the official compatible e290 overlay, complete exact-head CI and production build/deployment, and run the already selected narrow UI acceptance. Do not overwrite moving main from the older f722 worktree.",
+  "mutations": {
+    "code": false,
+    "refs": false,
+    "workflows": false,
+    "external": false
+  },
+  "files": [
+    {
+      "path": "app/api/mcp/route.ts",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 7
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "status": "modified",
+      "additions": 13,
+      "deletions": 4
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "status": "modified",
+      "additions": 98,
+      "deletions": 8
+    },
+    {
+      "path": "lib/computer/startup-diagnostics.ts",
+      "status": "added",
+      "additions": 42,
+      "deletions": 0
+    },
+    {
+      "path": "lib/computer/startup-tracing.test.ts",
+      "status": "modified",
+      "additions": 33,
+      "deletions": 0
+    },
+    {
+      "path": "lib/project-map/http.db.test.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "lib/project-map/mcp-tool.test.ts",
+      "status": "added",
+      "additions": 27,
+      "deletions": 0
+    },
+    {
+      "path": "lib/project-map/mcp-tool.ts",
+      "status": "added",
+      "additions": 22,
+      "deletions": 0
+    },
+    {
+      "path": "lib/self-improvement/benchmark-claim.test.ts",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude-prewarm.ts",
+      "status": "added",
+      "additions": 203,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "status": "modified",
+      "additions": 85,
+      "deletions": 16
+    },
+    {
+      "path": "packages/daemon/src/adapters/types.ts",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+      "status": "modified",
+      "additions": 53,
+      "deletions": 14
+    },
+    {
+      "path": "packages/daemon/src/agents/run-apps.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "status": "modified",
+      "additions": 39,
+      "deletions": 17
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 20
+    },
+    {
+      "path": "packages/daemon/src/mcp-http-timing.test.ts",
+      "status": "modified",
+      "additions": 54,
+      "deletions": 2
+    },
+    {
+      "path": "packages/daemon/src/mcp-http-timing.ts",
+      "status": "modified",
+      "additions": 33,
+      "deletions": 13
+    },
+    {
+      "path": "packages/daemon/src/official-cli-timing.ts",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 4
+    },
+    {
+      "path": "packages/daemon/src/run-mailbox.ts",
+      "status": "modified",
+      "additions": 18,
+      "deletions": 8
+    },
+    {
+      "path": "packages/daemon/src/run-repository.ts",
+      "status": "added",
+      "additions": 28,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/src/run-runtime-timing.ts",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "status": "modified",
+      "additions": 167,
+      "deletions": 69
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "status": "modified",
+      "additions": 41,
+      "deletions": 12
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "packages/daemon/test/claude-prewarm-adapter.test.ts",
+      "status": "added",
+      "additions": 119,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/claude-prewarm.test.ts",
+      "status": "added",
+      "additions": 210,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-prewarm.mjs",
+      "status": "added",
+      "additions": 96,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-subscription.mjs",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 9
+    },
+    {
+      "path": "packages/daemon/test/mailbox-catalogue.test.ts",
+      "status": "added",
+      "additions": 99,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/mailbox-preparation.test.ts",
+      "status": "modified",
+      "additions": 32,
+      "deletions": 12
+    },
+    {
+      "path": "packages/daemon/test/mcp-http-observation.test.ts",
+      "status": "modified",
+      "additions": 103,
+      "deletions": 8
+    },
+    {
+      "path": "packages/daemon/test/policy-repository.test.ts",
+      "status": "added",
+      "additions": 198,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/prewarm-preparation.test.ts",
+      "status": "added",
+      "additions": 162,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/run-diagnostics.test.ts",
+      "status": "added",
+      "additions": 82,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/runs.test.ts",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 6
+    },
+    {
+      "path": "packages/daemon/test/subscription-hosted-runner.test.ts",
+      "status": "modified",
+      "additions": 43,
+      "deletions": 1
+    },
+    {
+      "path": "packages/protocol/src/device.test.ts",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "packages/protocol/src/device.ts",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "packages/protocol/src/mailbox.ts",
+      "status": "modified",
+      "additions": 9,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+      "status": "modified",
+      "additions": 43,
+      "deletions": 7
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup-report.mjs",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 3
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup-report.test.mjs",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "status": "modified",
+      "additions": 55,
+      "deletions": 19
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "status": "modified",
+      "additions": 180,
+      "deletions": 6
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "status": "modified",
+      "additions": 28,
+      "deletions": 2
+    },
+    {
+      "path": "scripts/e2b/build-template.test.py",
+      "status": "modified",
+      "additions": 47,
+      "deletions": 0
+    }
+  ],
+  "publicationContext": {
+    "preparedAtUtc": "2026-11-07T11:57:22.887332+00:00",
+    "originalSnapshotSha256": "2f7dae53e068f499500cdaf8470cf6ae142ff1a203484c90e0799f4d94298b77",
+    "combinedPullRequest": "https://github.com/alexj11324/Mikka/pull/1637",
+    "combinedCandidateHead": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "combinedCandidateTree": "d45d992a4103ce3b144eae1575204e250a94e812",
+    "combinedCandidateBase": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "statusAtPreparation": "Draft candidate; exact-candidate CI, new production-build UI, merge and final production acceptance pending",
+    "versionBoundary": "The original local checks and observations retain their recorded source version; they are not relabeled as checks run on the combined GitHub candidate.",
+    "historicalImages": "Existing integrated/ images remain bound to 5a752a50eb74c22681cd7dd8511ff6d2e58fc46f with overlay ac5980696802f188a81124a8a3f2513be2d14e9e."
+  }
+}
