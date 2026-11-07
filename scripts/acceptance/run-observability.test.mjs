@@ -21,8 +21,8 @@ function inventory() {
 const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archivedAt: null, name: 'PRIVATE_PROFILE_NAME',
   description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
   skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
-function fixture({ failure, profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value } = {}) {
-  const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set()
+function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value } = {}) {
+  const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set(), machineEnds = new Set()
   const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
   if (profileBusy) profiles.set(existingProfile.id, structuredClone(existingProfile))
   let current = { ...original }, closed = 0, liveClosed = 0, fallback = paidFallback || failure === 'paid_fallback', concurrentEdit = false
@@ -49,6 +49,7 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
       { position: 11 + index * 2, from: 'person', text: value.prompt },
       { position: 12 + index * 2, from: 'coordinator', text: 'PRIVATE_RESPONSE', streamId: 'wrun_abcdefghijklmnop' + index + ':1' },
     ]).concat(foreignMessages), sources: Object.fromEntries(submissions.map(value => [value.issueId, { kind: 'issue', id: value.issueId }])) })
+  const threads = () => [...baselineRuns, ...submissions.flatMap(value => value.runs)].map(runId => ({ id: runId, status: 'done' }))
   async function fetchImpl(input, init = {}) {
     const url = new URL(input), method = init.method ?? 'GET', body = init.body ? JSON.parse(init.body) : undefined
     assert.equal(url.origin, ORIGIN)
@@ -75,7 +76,7 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
     }
     if (path === '/api/coordinator/messages') return response(chat())
     if (path === '/api/settings/workspace-bots') return response({ bots: [{ status: 'idle', runningThreads: failure === 'busy' ? 1 : 0 }] })
-    if (path === '/api/mobile/threads') return response({ threads: submissions.flatMap(value => value.runs.map(runId => ({ id: runId, status: 'done' }))) })
+    if (path === '/api/mobile/threads') return response({ threads: threads() })
     if (path === '/api/mobile/tasks') return response({ tasks: submissions.map(value => ({ id: value.issueId, title: value.marker })) })
     if (path === '/api/issues/search') return response({ items: submissions.map(value => ({ id: value.issueId, revision: 1, updatedAt: '2026-11-06T00:00:00.000Z' })), nextCursor: null, truncated: false })
     if (path === '/api/mobile/model' && method === 'GET') {
@@ -158,7 +159,31 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
       const found = submissions.find(value => value.issueId === args[0]); assert.ok(found)
       return response({ ok: true, result: encode({ issue: { id: found.issueId, userId: ownerId, title: found.marker } }) })
     }
-    if (path === '/api/mobile/bots/' + botId) return response({ threads: submissions.flatMap(value => value.runs.map(runId => ({ id: runId, status: 'done' }))) })
+    if (path === '/api/mobile/bots/' + botId) return response({ threads: threads() })
+    if (/^\/api\/threads\/[^/]+\/machine$/.test(path)) {
+      const runId = path.split('/')[3], { submission } = runData(runId)
+      assert.equal(method, 'POST'); assert.deepEqual(body, { action: 'end' })
+      assert.ok(accepted.has(submission.taskId) || cancelled.has(submission.taskId), 'machines end only after the Factory task settles')
+      assert.equal(machineEnds.has(runId), false, 'an uncertain end is not blindly repeated')
+      machineEnds.add(runId)
+      if (runId === submissions[0].runs[0]) {
+        if (machineFailure === 'timeout') throw new DOMException('PRIVATE_MACHINE_TIMEOUT', 'TimeoutError')
+        if (['missing', 'missing_scope', 'missing_ended', 'missing_invalid'].includes(machineFailure)) return response({ error: 'Thread unavailable' }, 404)
+        if (machineFailure === 'conflict') return response({ error: 'Thread creation cleanup pending' }, 409)
+        if (machineFailure === 'unavailable') return response({ error: 'PRIVATE_PROVIDER_FAILURE' }, 503)
+        if (machineFailure === 'invalid') return new Response('PRIVATE_INVALID_MACHINE_RESPONSE')
+        if (machineFailure === 'wrong_id') return response({ runId: id(999), state: 'ended' })
+        if (machineFailure === 'wrong_state') return response({ runId, state: 'paused' })
+        if (machineFailure === 'wrong_status') return response({ runId, state: 'ended' }, 202)
+      }
+      return response({ runId, state: 'ended' })
+    }
+    if (/^\/api\/mobile\/threads\/[^/]+\/machine$/.test(path)) {
+      const runId = path.split('/')[4]; runData(runId)
+      assert.equal(method, 'GET'); assert.ok(machineEnds.has(runId))
+      return response(machineFailure === 'missing_invalid' ? {} : { machine: machineFailure === 'missing_ended'
+        ? { kind: 'cloud', state: 'ended', cloud: null } : null })
+    }
     if (path === '/api/factory/tasks') {
       const found = submissions.find(value => value.issueId === url.searchParams.get('issueId'))
       return response({ tasks: found ? [{ id: found.taskId, stage: 'approval', candidateId: found.candidateId, candidateSha: null,
@@ -194,6 +219,7 @@ function fixture({ failure, profileBusy = false, paidFallback = false, flowVersi
     if (/^\/api\/runs\/[^/]+\/evidence$/.test(path)) {
       const { run, submission } = runData(path.split('/')[3])
       if (failure === 'wrong_model') run.model = 'unexpected-private-model'
+      if (machineFailure === 'missing_scope' && machineEnds.has(run.id)) run.executionIdentity.requester = 'PRIVATE_OTHER_OWNER'
       return response({ run, artifacts: [{ id: submission.artifactId, title: submission.marker + '.txt', latestVersion: 1,
         url: '/mikka/api/artifacts/' + submission.artifactId + '/versions/1/download' }], captures: [] })
     }
@@ -294,6 +320,41 @@ test('two executed cases retain exact native receipts, restore model/profile sta
   assert.equal(data.state.accepted.size, 2); assert.equal(data.state.cancelled.size, 0)
   assert.equal(data.calls.filter(value => value.method === 'DELETE' && !value.path.includes('/agent-profiles/')).length, 0)
   safe(report)
+})
+test('successful terminal runs close only their own machines and retain task evidence', async () => {
+  const baselineRuns = [id(900)], data = fixture({ baselineRuns }), report = await run(data, true)
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  const cleanup = report.cases[0].cleanup, own = data.submissions[0].runs
+  assert.equal(cleanup.ownRunsStopped, true); assert.equal(cleanup.ownMachinesEnded, true)
+  assert.deepEqual(cleanup.machines, own.map(runId => ({ runId, status: 'ended' })))
+  assert.deepEqual(data.calls.filter(call => call.path.startsWith('/mikka/api/threads/')).map(call => call.path),
+    own.map(runId => '/mikka/api/threads/' + runId + '/machine'))
+  assert.equal(data.calls.some(call => call.path.includes(baselineRuns[0])), false)
+  assert.equal(data.calls.some(call => call.path.endsWith('/stop')), false, 'successful native runs are already terminal')
+  assert.equal(cleanup.evidence, 'retained'); assert.equal(data.state.cancelled.size, 0); safe(report)
+})
+test('a missing machine requires a fresh owned run and an explicit null machine read', async () => {
+  const data = fixture({ machineFailure: 'missing' }), report = await run(data, true)
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  const runId = data.submissions[0].runs[0], endIndex = data.calls.findIndex(call => call.path === '/mikka/api/threads/' + runId + '/machine')
+  assert.deepEqual(data.calls.slice(endIndex + 1, endIndex + 3).map(call => call.path),
+    ['/mikka/api/runs/' + runId + '/evidence', '/mikka/api/mobile/threads/' + runId + '/machine'])
+  assert.deepEqual(report.cases[0].cleanup.machines.map(value => value.status), ['not_created', 'ended'])
+  assert.equal(report.cases[0].cleanup.ownMachinesEnded, true); safe(report)
+})
+test('machine failures never turn a completed task green and do not prevent closing another owned machine', async () => {
+  for (const machineFailure of ['conflict', 'unavailable', 'timeout', 'invalid', 'wrong_id', 'wrong_state', 'wrong_status',
+    'missing_scope', 'missing_ended', 'missing_invalid']) {
+    const data = fixture({ machineFailure }), report = await run(data, true)
+    const result = report.cases[0], cleanup = result.cleanup
+    assert.equal(report.status, 'blocked', machineFailure); assert.equal(result.code, 'cleanup_incomplete', JSON.stringify(report))
+    assert.equal(result.acceptanceStatus, 'runtime_verified'); assert.equal(cleanup.state, 'incomplete')
+    assert.equal(cleanup.ownRunsStopped, true); assert.equal(cleanup.ownMachinesEnded, false)
+    assert.deepEqual(cleanup.machines.map(value => value.status), ['failed', 'ended'])
+    assert.equal(data.calls.filter(call => call.path.startsWith('/mikka/api/threads/')).length, 2)
+    assert.equal(cleanup.profileArchived, true); assert.equal(cleanup.modelRestored, true)
+    assert.equal(report.sessionClosed, true); safe(report)
+  }
 })
 test('legacy Factory tasks still require review and verify before the normal deliverable acceptance', async () => {
   const data = fixture({ flowVersion: 1 }), report = await run(data, true)

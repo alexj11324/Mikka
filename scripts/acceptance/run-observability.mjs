@@ -467,6 +467,14 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     const issueIds = new Set(), runIds = new Set(), proofs = new Map(), workflowIds = new Set()
     const { title, content, input } = fixture
     const expectedMessages = new Map(browserSubmit ? ['en', 'zh-CN'].map(locale => [browserSubmissionText(input, locale), locale]) : [[input, 'api']])
+    function ownRun(found, runId) {
+      const run = found?.run, identity = run?.executionIdentity
+      check(run?.id === runId && !baseline.threads.has(runId) && run.botId === botId && issueIds.has(run.issueId)
+        && run.agentProfile?.profileId === fixture.profileId && identity?.requester === ownerId
+        && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId && identity.botOwner === ownerId
+        && identity.botId === botId && identity.workspaceId === workspaceId && nativeStatuses.has(run.status), 'run_scope')
+      return run
+    }
     async function inspect(cleanup = false) {
       const [chat, page] = await Promise.all([read('/api/coordinator/messages', { cleanup: true }), read('/api/mobile/bots/' + botId, { cleanup: true })])
       check(Array.isArray(chat?.items) && Array.isArray(page?.threads), 'response_invalid')
@@ -522,10 +530,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       }
       for (const runId of runIds) {
         const found = await read('/api/runs/' + runId + '/evidence', { cleanup: true })
-        const run = found?.run, identity = run?.executionIdentity
-        check(run?.id === runId && run.botId === botId && issueIds.has(run.issueId) && run.agentProfile?.profileId === fixture.profileId
-          && identity?.requester === ownerId && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId
-          && identity.botOwner === ownerId && identity.botId === botId && identity.workspaceId === workspaceId && nativeStatuses.has(run.status), 'run_scope')
+        const run = ownRun(found, runId)
         if (cleanup) proofs.set(runId, { ...(proofs.get(runId) ?? { runId }), status: run.status })
         else proofs.set(runId, runProof(found, { item, ownerId, workspaceId, botId, issueId: [...issueIds][0], profileId: fixture.profileId }))
       }
@@ -539,7 +544,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     }
     async function end() {
       const cleanup = result.cleanup = { state: 'complete', profileArchived: !profileCreated, modelRestored: !modelTouched,
-        evidence: 'retained', ownRunsStopped: !submitted && !browserWaiting }
+        evidence: 'retained', ownRunsStopped: !submitted && !browserWaiting, ownMachinesEnded: !submitted && !browserWaiting, machines: [] }
       try {
         // Reconcile a real click whose push raced the wait deadline or abort.
         if (browserWaiting) {
@@ -547,6 +552,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           if (!submitted) {
             check(runIds.size === 0 && issueIds.size === 0, 'cleanup_incomplete')
             cleanup.ownRunsStopped = true
+            cleanup.ownMachinesEnded = true
           }
         }
         if (submitted) {
@@ -573,6 +579,29 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           }
         }
       } catch (error) { cleanup.state = 'incomplete'; cleanup.stopError = publicFailure(error) }
+      if (submitted && cleanup.ownRunsStopped) {
+        // Terminal runs can still own paused sandboxes. End only the exact runs
+        // just checked above; a DB state of "ended" alone is not a kill receipt.
+        for (const runId of runIds) {
+          const receipt = { runId, status: 'failed' }
+          cleanup.machines.push(receipt)
+          try {
+            const ended = await request('/api/threads/' + runId + '/machine', { body: { action: 'end' }, cleanup: true })
+            const value = await ended.json().catch(() => null)
+            if (ended.status === 404 && value?.error === 'Thread unavailable') {
+              const found = await read('/api/runs/' + runId + '/evidence', { cleanup: true })
+              check(nativeTerminal.has(ownRun(found, runId).status), 'cleanup_incomplete')
+              const location = await read('/api/mobile/threads/' + runId + '/machine', { cleanup: true })
+              check(location?.machine === null, 'cleanup_incomplete')
+              receipt.status = 'not_created'
+            } else {
+              check(ended.status === 200 && value?.runId === runId && value.state === 'ended', 'cleanup_incomplete')
+              receipt.status = 'ended'
+            }
+          } catch (error) { cleanup.state = 'incomplete'; receipt.error = publicFailure(error) }
+        }
+        cleanup.ownMachinesEnded = cleanup.machines.every(value => value.status !== 'failed')
+      }
       // Never invalidate a running check by archiving its profile, or replace
       // a concurrent user's model setting. A failed cleanup remains visible.
       if (cleanup.ownRunsStopped && profileCreated) {
@@ -599,7 +628,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
         } catch (error) { cleanup.state = 'incomplete'; cleanup.modelError = publicFailure(error) }
       }
       live?.close()
-      if (!cleanup.ownRunsStopped || !cleanup.profileArchived || !cleanup.modelRestored) cleanup.state = 'incomplete'
+      if (!cleanup.ownRunsStopped || !cleanup.ownMachinesEnded || !cleanup.profileArchived || !cleanup.modelRestored) cleanup.state = 'incomplete'
       if (cleanup.state !== 'complete') { result.acceptanceStatus = result.status; result.status = 'blocked'; result.code = 'cleanup_incomplete' }
     }
     try {

@@ -188,6 +188,12 @@ not account content.
 Task, thread and Artifact receipts are retained for PostHog correlation. On
 completion or failure the driver cancels its own unfinished Factory task and
 stops its own active threads. A genuinely accepted deliverable remains accepted.
+Once its runs and Factory task are terminal, it ends each of those runs' machines
+through the normal API, including machines left by successful runs. `cleanup.machines`
+records `ended` only for HTTP 200 with the exact run ID and state, or `not_created`
+after HTTP 404 plus a fresh owned terminal run and an explicit null machine read.
+Reading state `ended` alone is not a kill receipt. Any failed end keeps
+`ownMachinesEnded` false and cleanup incomplete; other owned machines are still closed.
 The driver archives its temporary Profile only after work is quiet,
 and restores the original explicit composer choice. It compares that setting
 before restoration and does not overwrite a concurrent edit. The current API
