@@ -333,3 +333,5 @@ test('only the exact previously observed extra occurrence can disclose a validat
     assert.throws(() => inspectOccurrences([invalid], new Headers()), code('INSPECTION_EXTRA_SOURCE_FORMAT'))
   }
 })
+
+// Fresh rollout readback, 2026-11-07.

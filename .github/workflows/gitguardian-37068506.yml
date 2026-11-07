@@ -50,3 +50,5 @@ jobs:
           include-imports: false
       - name: Identify only the previously observed extra occurrence source, without any mutation
         run: node scripts/ops/gitguardian-37068506.mjs --inspect
+
+# Fresh rollout readback, 2026-11-07.
