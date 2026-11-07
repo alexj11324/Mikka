@@ -394,16 +394,29 @@ export function observeChunks(record, detail, observedAt) {
     && (!record.requireTerminal || (detail.thread?.id === record.runId && TERMINAL.has(record.lastStatus))))
 }
 
+/** The public detail keeps the original run's status separate from later
+ * attempts. Only this server-resolved chain can supply cleanup targets. */
+function cleanupAttempts(detail, runId) {
+  const attempts = detail.thread?.attempts
+  assert(detail.thread?.id === runId && Array.isArray(attempts) && attempts.length > 0
+    && attempts.every(attempt => UUID.test(attempt?.runId ?? '') && typeof attempt.status === 'string')
+    && new Set(attempts.map(attempt => attempt.runId)).size === attempts.length
+    && attempts.some(attempt => attempt.runId === runId), 'cleanup_scope_mismatch')
+  return attempts
+}
+
 /** One live owner channel per server-reported scope. Reads happen on pushes,
  * once on connection (to cover the opening race), and once at the deadline. */
-async function watchRun(client, record, timeoutMs, WebSocketImpl, now, terminalOnly = false) {
+async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cleanupRunIds) {
   const sockets = new Map(), timers = new Set()
+  const watchedRunIds = new Set([record.runId])
   let closed = false, reading = false, dirty = false, settle
   const outcome = new Promise((resolve, reject) => { settle = { resolve, reject } })
   const observed = detail => {
-    if (!terminalOnly) return observeChunks(record, detail, now())
-    assert(detail.thread?.id === record.runId, 'cleanup_scope_mismatch')
-    return TERMINAL.has(detail.thread.status)
+    if (!cleanupRunIds) return observeChunks(record, detail, now())
+    const attempts = cleanupAttempts(detail, record.runId)
+    for (const attempt of attempts) { cleanupRunIds.add(attempt.runId); watchedRunIds.add(attempt.runId) }
+    return attempts.every(attempt => TERMINAL.has(attempt.status))
   }
   const later = (work, ms) => { const timer = setTimeout(() => { timers.delete(timer); work() }, ms); timers.add(timer); return timer }
   const reject = error => { if (!closed) settle.reject(error) }
@@ -432,7 +445,7 @@ async function watchRun(client, record, timeoutMs, WebSocketImpl, now, terminalO
         if (!Array.isArray(value.kinds) || !value.kinds.includes('thread') || !value.kinds.includes('run')) return failLive('live_capability_missing')
         kick(); return
       }
-      if ((['thread', 'run'].includes(value.kind) && value.id === record.runId)
+      if ((['thread', 'run'].includes(value.kind) && watchedRunIds.has(value.id))
         || (value.kind === 'issue_threads' && value.id === record.issueId)) kick()
     }
     socket.onopen = () => {
@@ -450,8 +463,8 @@ async function watchRun(client, record, timeoutMs, WebSocketImpl, now, terminalO
         record.detailReads = (record.detailReads ?? 0) + 1
         record.runCreatedAt ??= detail.thread?.createdAt ?? null
         if (observed(detail)) { settle.resolve(); return }
-        if (!terminalOnly && TERMINAL.has(record.lastStatus)) fail('ended_before_execution_proof')
-        const scopes = [...new Set((detail.live?.runs ?? []).filter(run => run.id === record.runId).map(run => run.workspaceId))]
+        if (!cleanupRunIds && TERMINAL.has(record.lastStatus)) fail('ended_before_execution_proof')
+        const scopes = [...new Set((detail.live?.runs ?? []).filter(run => watchedRunIds.has(run.id)).map(run => run.workspaceId))]
         assert(scopes.length && scopes.every(id => UUID.test(id ?? '')), 'live_scope_missing')
         for (const scope of scopes) await connect(scope)
       } while (dirty && !closed)
@@ -460,7 +473,7 @@ async function watchRun(client, record, timeoutMs, WebSocketImpl, now, terminalO
   later(() => {
     void client.rpc('agents.getIssueThread', [record.issueId, record.runId]).then(detail => {
       if (observed(detail)) settle.resolve()
-      else fail(terminalOnly ? 'cleanup_terminal_timeout' : 'execution_timeout')
+      else fail(cleanupRunIds ? 'cleanup_terminal_timeout' : 'execution_timeout')
     }).catch(reject)
   }, timeoutMs)
   kick()
@@ -533,25 +546,32 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
         binding: { taskId: item.id, revision: snapshot.task.revision }, eventId: randomUUID(), action: 'cancel', reason: '测试 1505 startup measurement complete; stop only this test task.' }))
     }
   })
-  for (const runId of runIds) {
+  // A normal stop on the original run also stops its later attempts. Keep any
+  // discovered child IDs for failure recovery without issuing duplicate stops.
+  const initialRunIds = [...runIds]
+  for (const runId of initialRunIds) {
     const stopped = await step(`runStopped_${runId}`, async () => {
+      const ended = detail => {
+        if (target !== 'device') return TERMINAL.has(detail.thread?.status)
+        const attempts = cleanupAttempts(detail, runId)
+        for (const attempt of attempts) runIds.add(attempt.runId)
+        return attempts.every(attempt => TERMINAL.has(attempt.status))
+      }
       const detail = await client.rpc('agents.getIssueThread', [record.issueId, runId])
-      if (target === 'device') assert(detail.thread?.id === runId, 'cleanup_scope_mismatch')
-      if (TERMINAL.has(detail.thread?.status)) return
+      if (ended(detail)) return
       try { await client.rpc('agents.stopRun', [runId]) }
       catch (error) {
         // Completion racing a stop legitimately returns runChainEnded (409).
         // Confirm the owned run ended; never swallow an unrelated stop error.
         const latest = await client.rpc('agents.getIssueThread', [record.issueId, runId])
-        if (target === 'device') assert(latest.thread?.id === runId, 'cleanup_scope_mismatch')
-        if (!TERMINAL.has(latest.thread?.status)) throw error
+        if (!ended(latest)) throw error
         return
       }
       // A local device cannot be removed while any run is live. An accepted
       // stop only records stopRequestedAt; wait for the daemon's real terminal
       // update using the same owner live channel as execution observation.
       if (target === 'device') await watchRun(client, { issueId: record.issueId, runId },
-        Math.min(timeoutMs, 60000), WebSocketImpl, now, true)
+        Math.min(timeoutMs, 60000), WebSocketImpl, now, runIds)
     })
     if (target === 'device' && !stopped) runsEnded = false
     if (target === 'cloud') await step(`machineEnded_${runId}`, () => client.json(`/api/threads/${runId}/machine`, post({ action: 'end' }), 120000))

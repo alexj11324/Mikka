@@ -44,6 +44,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   const deadline = Date.now() + wait * 1000
   // Listen before the first read: a write committed during any read wakes the next wait at once.
   const push = wait > 0 ? await deviceWorkSubscription(deviceId, caller.tokenId) : null
+  let timedOut = false
   try {
     while (!request.signal.aborted) {
       push?.reset()
@@ -58,7 +59,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
       // Memory only: a release published mid-poll ends it once this instance's cache has it.
       if (knownRelease) releases = cachedDaemonVersions() ?? releases
       const news = check.deviceCommand !== null || (knownRelease !== null && newerDaemonRelease(releases, knownRelease))
-      if (commands.length > 0 || queued.length > 0 || news || Date.now() >= deadline) {
+      if (commands.length > 0 || queued.length > 0 || news || timedOut || Date.now() >= deadline) {
         noteLogOutcome(commands.length > 0 || queued.length > 0 || news ? 'work' : 'empty')
         return NextResponse.json({
           commands,
@@ -68,7 +69,9 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
         })
       }
       // One unlocked read per wait. It does not take the credential lock; a revoked credential fails that read before any message text is loaded (lib/device-revocation.db.test.ts).
-      if (push && !push.lost) await push.next(Math.max(50, deadline - Date.now()), request.signal)
+      // A deadline timer can finish just before Date.now reaches the same ms.
+      // Its next read is final even then; only a notification starts another wait.
+      if (push && !push.lost) timedOut = await push.next(Math.max(50, deadline - Date.now()), request.signal) === 'timeout'
       else await sleep(Math.min(longPollIdleCheck.ms, Math.max(50, deadline - Date.now())), request.signal)
     }
   } finally { push?.close() }

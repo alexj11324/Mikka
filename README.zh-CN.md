@@ -261,10 +261,10 @@ Mikka 目前处于早期体验阶段。请发送邮件至 [mikka@aspectlylabs.co
 ## 致谢
 
 <p>
-  <a href="https://openai.com/form/codex-for-oss/"><picture>
+  <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
       <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标志" width="32" height="32">
-    </picture></a>
+    </picture>
   <strong>OpenAI · Codex for Open Source</strong>
 </p>
 
