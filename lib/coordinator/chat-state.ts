@@ -7,8 +7,8 @@ type WaitingEvent = {
   wakeLeaseUntil: Date | null; wakeLastError: string | null; createdAt?: Date
 }
 
-/** The last stored message: its role and, for a reply, the turn round that wrote it (`<lease holder>:<round>`). */
-export type LastMessage = { role: string; streamId?: string }
+/** The last stored message: its role, for a reply the turn round that wrote it (`<lease holder>:<round>`), and when it was stored. */
+export type LastMessage = { role: string; streamId?: string; createdAt?: Date }
 
 /**
  * `error` is what the line says; `cause`, when the line is a wake code, is the
@@ -36,7 +36,11 @@ export function coordinatorChatState(session: Session | undefined, waiting: read
   if (pending.some(event => event.wakeAttempts === 0 || (event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now))) {
     return { working: true, error: session?.lastError ?? null }
   }
-  const failed = pending.find(event => event.wakeAttempts < MAX_WAKE_ATTEMPTS || (event.wakeLeaseUntil && event.wakeLeaseUntil > now)) ?? pending[0]
+  // A reply stored after a waiting row answered the chat since: that row's failed wakes are not the chat's
+  // current state. An untriaged runtime row (tier null, not the person's) is never taken by a turn
+  // (store.wakingEvent), so once its wakes ran out it would otherwise read 回复重试已停止 for good.
+  const current = pending.filter(event => !(last?.role === 'assistant' && last.createdAt && event.createdAt && last.createdAt > event.createdAt))
+  const failed = current.find(event => event.wakeAttempts < MAX_WAKE_ATTEMPTS || (event.wakeLeaseUntil && event.wakeLeaseUntil > now)) ?? current[0]
   if (!failed) return { working: false, error: session?.lastError ?? null }
   const exhausted = failed.wakeAttempts >= MAX_WAKE_ATTEMPTS && (!failed.wakeLeaseUntil || failed.wakeLeaseUntil <= now)
   const cause = causeOf(session, failed)
