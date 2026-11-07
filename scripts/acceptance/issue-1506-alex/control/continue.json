@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "enabled": false,
-  "phase": "cache-live",
-  "expectedSha": null,
+  "enabled": true,
+  "phase": "cache",
+  "expectedSha": "c594da2b81aac8ff466a94e5050839513a002b0e",
   "fixtureRunKey": "acme-1506-20261106",
   "workspaceId": "0a700222-137b-4bca-b86d-a74b8fdffc21",
   "fixtureReceipt": "receipts/fixtures-ready-42286389783.json",
   "fixtureReceiptSha256": "aa58d54fee5826627696a0d1328cb0acaab2707f1d4254aa15f1b6ae420fb9fe",
-  "cacheTurns": 2,
+  "cacheTurns": 3,
   "liveTabs": 3,
   "delayOneReturnedResult": false,
   "groupBoundary": "responding_bot"
