@@ -8,7 +8,7 @@ import { db } from '@/lib/db'
 import { awaitTurnHolder, TURN_START_WAIT_MS } from '@/lib/coordinator/turn-holder'
 import { bots, coordinatorSessions } from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
-import { coordinatorTextStream } from '@/lib/coordinator/stream-response'
+import { coordinatorTextStream, COORDINATOR_STREAM_PROJECTION_VERSION } from '@/lib/coordinator/stream-response'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
@@ -56,13 +56,16 @@ async function handleGET(request: Request) {
   if (!runId && !expected && params.get('wait') === '1') runId = await waitForTurn(session.user.id, botId)
   if (!runId?.startsWith('wrun_') || expected && expected !== runId) return new Response(null, { status: 204 })
   const fingerprints = await credentialChatFingerprints(session.user.id)
-  const streamKey = createHash('sha256').update(JSON.stringify([runId, fingerprints])).digest('hex')
+  const streamKey = createHash('sha256').update(JSON.stringify([runId, fingerprints, COORDINATOR_STREAM_PROJECTION_VERSION])).digest('hex')
   const offset = z.coerce.number().int().min(0).max(1_000_000).safeParse(params.get('after') ?? 0)
   if (!offset.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
   // A changed masking policy changes chunk boundaries: replay safely instead of skipping under a stale cursor.
   const after = request.headers.get('x-mikka-stream-key') === streamKey ? offset.data : 0
   const run = getRun<unknown>(runId)
-  const reader = run.getReadable<CoordinatorWorkflowStreamPart>().pipeThrough(coordinatorTextStream(session.user.id, fingerprints)).getReader()
+  const projection = coordinatorTextStream(session.user.id, fingerprints, {
+    onTiming: timing => console.info(JSON.stringify({ msg: 'coordinator_stream_projection_timing', ...timing })),
+  })
+  const reader = run.getReadable<CoordinatorWorkflowStreamPart>().pipeThrough(projection).getReader()
   const encoder = new TextEncoder()
   let cancelled = false
   let sequence = 0
@@ -79,13 +82,14 @@ async function handleGET(request: Request) {
           return
         }
       } catch {
+        projection.reportTerminal(2)
         if (!cancelled) {
           controller.enqueue(encoder.encode('{"type":"error"}\n'))
           controller.close()
         }
       }
     },
-    async cancel(reason) { cancelled = true; await reader.cancel(reason) },
+    async cancel(reason) { cancelled = true; projection.reportTerminal(4); await reader.cancel(reason) },
   })
   return new Response(body, { headers: {
     'Content-Type': 'application/x-ndjson; charset=utf-8',
