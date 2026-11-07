@@ -615,7 +615,7 @@ test('provider policy preserves task tenancy and independent membership gates on
         await tx.query('begin')
         await assert.rejects(factoryStore.lockForDispatch(member,binding(memberTask),randomUUID(),tx),denied)
       } finally { await tx.query('rollback');tx.release() }
-      assert.deepEqual((await factoryStore.listForIssue(member,id)).tasks,[])
+      await assert.rejects(factoryStore.listForIssue(member,id),denied)
       assert.deepEqual(await counts(),before)
       assert.equal((await factoryStore.route(owner,ownerRoute)).task.id,ownerTask.id)
     } finally { await setMembership(member,'active') }
@@ -1037,7 +1037,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     assert.ok(provider.requests.length>calls)
     assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
   })
-  await scopeSubtest(t, 'blocked workspace reservation cannot let an incoming snapshot clear later diagnostics',async()=>{
+  await scopeSubtest(t, 'retired reservations cannot trigger incoming lookups or clear later diagnostics',async()=>{
     const id=randomUUID();await seed(id,id,false)
     const remoteId=randomUUID(),reservation=randomUUID()
     await pool.query('insert into linear_issue_publications (id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId") values ($1,$2,$3,$4,1,$5)',[reservation,id,owner,sync,remoteId])
@@ -1053,8 +1053,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     assert.deepEqual((await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0],snapshot)
     assert.equal((await pool.query('select "lastError" from linear_team_syncs where id=$1',[sync])).rows[0].lastError,'preserved-blocked-diagnostic')
     assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
-    assert.ok(provider.requests.length>calls)
-    assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
+    assert.equal(provider.requests.length,calls,'the retained retired identity is rejected before any provider lookup')
   })
   await scopeSubtest(t, 'a genuinely new remote task still imports through the authorized team and clears its diagnostic',async()=>{
     const id=randomUUID();provider.issues.set(id,remote(id))

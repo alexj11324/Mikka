@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import test from 'node:test'
+import type { PoolClient } from 'pg'
 import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
 
 const url = process.env.E2E_DATABASE_URL
@@ -59,7 +60,32 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const {actAs}=await import('../lib/acting-user')
   const {tokenWorkspace}=await import('../lib/tokens/principal')
   const {agentActor,userActor}=await import('../lib/activity-actor')
-  const {workspaceDb}=await import('../lib/workspace-db')
+  const {workspacePool}=await import('../lib/workspace-db')
+  // Inject at the actual PostgreSQL commit boundary. workspaceDb deliberately
+  // owns transaction dispatch, so replacing its method does not reach the
+  // pinned client used by an authoritative workspace transaction.
+  function injectWorkspaceCommit(hooks: { beforeBegin?: () => void; afterCommit?: () => void | Promise<void> }) {
+    const originals = new Map<PoolClient, PoolClient['query']>()
+    const acquire = (client: PoolClient) => {
+      if (originals.has(client)) return
+      const original = client.query
+      originals.set(client, original)
+      client.query = ((...args: unknown[]) => {
+        const statement = args[0]
+        const text = typeof statement === 'string' ? statement : statement && typeof statement === 'object' && 'text' in statement && typeof statement.text === 'string' ? statement.text : ''
+        if (/^\s*begin(?:\s|$)/i.test(text)) hooks.beforeBegin?.()
+        const result: unknown = Reflect.apply(original, client, args)
+        if (!/^\s*commit(?:\s|$)/i.test(text)) return result
+        assert.ok(result && typeof result === 'object' && 'then' in result && typeof result.then === 'function', 'Drizzle COMMIT must use the promise query API')
+        return Promise.resolve(result).then(async value => { await hooks.afterCommit?.(); return value })
+      }) as PoolClient['query']
+    }
+    workspacePool.on('acquire', acquire)
+    return () => {
+      workspacePool.off('acquire', acquire)
+      for (const [client, original] of originals) client.query = original
+    }
+  }
   const {db}=await import('../lib/db')
   const {teamIssueCreateRequests}=await import('../lib/db/schema')
   const {createIssueForUserInTransaction}=await import('../lib/issue-create')
@@ -168,9 +194,11 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const created=await withAfter(()=>saveIssue({workspaceId,title:'Existing task lost response',content,status:'todo',priority:'normal'}))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
-    const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>}, original=target.transaction
     let mode:'lost'|'unavailable'|'normal'='lost'
-    target.transaction=async (...args:unknown[])=>{if(mode==='unavailable') throw new Error('synthetic unavailable');const result=await original.apply(workspaceDb,args);if(mode==='lost'){mode='unavailable';throw new Error('synthetic lost response')}return result}
+    const restore=injectWorkspaceCommit({
+      beforeBegin:()=>{if(mode==='unavailable') throw new Error('synthetic unavailable')},
+      afterCommit:()=>{if(mode==='lost'){mode='unavailable';throw new Error('synthetic lost response')}},
+    })
     try {
       assert.deepEqual(await promoteIssueToTeam(request),{error:'teamIssueRetry',requestId:request.requestId})
       assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'workspace',linearSyncBlocked:true})
@@ -179,7 +207,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       mode='normal';const result=await promoteIssueToTeam(request);assert.ok('issue' in result && result.issue);assert.equal(result.issue.id,id);assert.equal(result.issue.scope,'workspace')
       assert.equal((await workspace.query('select count(*)::int n from team_issue_promotion_receipts where "requestId"=$1',[request.requestId])).rows[0].n,1)
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
-    } finally {target.transaction=original}
+    } finally {restore()}
   })
   await scopeSubtest(t, 'lost app promotion response with unavailable reconciliation reports unknown and replays once',async()=>{
     testGlobals.teamCreateTestUser=owner
@@ -205,15 +233,14 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const created=await withAfter(()=>saveIssue({workspaceId,title:'Existing revoked promotion',content,status:'todo',priority:'normal'}))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
-    const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>},original=target.transaction
     let first=true
-    target.transaction=async (...args:unknown[])=>{const value=await original.apply(workspaceDb,args);if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}return value}
+    const restore=injectWorkspaceCommit({afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
     try {
       assert.deepEqual(await promoteIssueToTeam(request),{error:'teamIssueAccessDenied',requestId:request.requestId})
       assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'workspace',linearSyncBlocked:true})
       assert.equal(await issueForUser(revoked,id),null);assert.ok(await issueForUser(racer,id))
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
-    } finally {target.transaction=original}
+    } finally {restore()}
   })
   await scopeSubtest(t, 'MCP creation requires a verified workspace and ignores spoofed scope or team context',async()=>{
     const {createIssue}=await import('../lib/mcp/actions')
@@ -424,18 +451,14 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   })
   await scopeSubtest(t, 'lost workspace commit response retries one request and preserves workspace visibility throughout completion',async()=>{
     const value=input(teamId)
-    const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>}
-    const original=target.transaction
     let mode:'lost'|'unavailable'|'normal'='lost'
     // Throw only after the real first workspace transaction has committed.
     // The next attempt simulates an unavailable workspace recheck without
-    // changing or deleting a fixture; restoring the method permits recovery.
-    target.transaction=async (...args:unknown[])=>{
-      if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')
-      const result=await original.apply(workspaceDb,args)
-      if(mode==='lost') {mode='unavailable';throw new Error('synthetic lost commit response')}
-      return result
-    }
+    // changing or deleting a fixture; restoring normal commits permits recovery.
+    const restore=injectWorkspaceCommit({
+      beforeBegin:()=>{if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')},
+      afterCommit:()=>{if(mode==='lost') {mode='unavailable';throw new Error('synthetic lost commit response')}},
+    })
     try {
       assert.deepEqual(await query(owner,value),{error:'teamIssueRetry',requestId:value.requestId})
       const row=(await app.query('select i.id,i.scope,i."linearSyncBlocked" from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
@@ -450,7 +473,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       const recovered=await query(owner,value);assert.ok('issue' in recovered && recovered.issue);assert.equal(recovered.issue.id,row.id);assert.equal(recovered.issue.scope,'workspace')
       assert.equal((await app.query('select count(*)::int n from team_issue_create_requests where "requestId"=$1',[value.requestId])).rows[0].n,1)
       assert.equal((await workspace.query('select count(*)::int n from team_issue_create_receipts where "requestId"=$1',[value.requestId])).rows[0].n,1)
-    } finally {target.transaction=original}
+    } finally {restore()}
   })
   await scopeSubtest(t, 'a durable receipt with an absent relation is not restored on retry',async()=>{
     // Construct the state after a later removal without deleting any fixture.
@@ -471,13 +494,10 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const lostOwner=`team-lost-owner-${randomUUID()}`,value=input(teamId)
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[lostOwner,`${lostOwner}@example.invalid`])
     await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,lostOwner,`${lostOwner}@example.invalid`])
-    const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>},original=target.transaction
     let once=true
-    target.transaction=async (...args:unknown[])=>{
-      const result=await original.apply(workspaceDb,args)
+    const restore=injectWorkspaceCommit({afterCommit:()=>{
       if(once) {once=false;throw new Error('synthetic lost commit response')}
-      return result
-    }
+    }})
     try {
       assert.deepEqual(await query(lostOwner,value),{error:'teamIssueRetry',requestId:value.requestId})
       const row=(await app.query('select i.id,i.scope from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
@@ -486,7 +506,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await app.query('select scope from issues where id=$1',[row.id])).rows[0].scope,'workspace')
       assert.equal(await issueForUser(lostOwner,row.id),null);assert.ok(await issueForUser(racer,row.id))
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
-    } finally {target.transaction=original}
+    } finally {restore()}
   })
   await scopeSubtest(t, 'revocation between association and completion revokes creator access without moving the task',async()=>{
     await workspace.query('insert into team184_controls ("teamId",pause) values ($1,true)',[raceTeam])

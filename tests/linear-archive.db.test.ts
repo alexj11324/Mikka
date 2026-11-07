@@ -167,6 +167,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   const promoted = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: created.issue.id, revision: created.issue.revision, teamId, expectedTeamId: null })
   assert.ok('issue' in promoted && promoted.issue)
   const pendingIssue = created.issue.id, pendingSync = randomUUID(), pendingPublication = randomUUID(), pendingRemote = randomUUID()
+  await pool.query('update linear_team_syncs set active=false where id=$1', [syncId])
   await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName",active,"workspaceId") values($1,$2,$3,\'OLD\',\'Unresolved fixture\',true,$4)', [pendingSync, owner, randomUUID(), workspace])
   await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,$5,$6,true)', [pendingPublication, pendingIssue, owner, pendingSync, promoted.issue.scopeVersion, pendingRemote])
   await pool.query('update linear_team_syncs set active=false where id=$1', [pendingSync])
