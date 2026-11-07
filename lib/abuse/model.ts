@@ -70,7 +70,8 @@ export async function hostedModel(
   if (isZeroCatModel(modelId) && selfHostedDefaultModelConfig()) {
     if (provider) throw new ModelAdmissionError('modelRouteDenied')
     const billing = hostedBillingScope.getStore()
-    return selfHostedDefaultModel({ workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) })
+    const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
+    return observedModel(selfHostedDefaultModel(scope), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
   }
   await withSharedCredits(workspaceId, canUseMikkaPaid)
   const zeroCat = isZeroCatModel(modelId)
