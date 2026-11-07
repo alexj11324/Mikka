@@ -46,6 +46,8 @@ jobs:
       contents: read
       id-token: write
     env:
+      # This public deployment selector is not a credential. Community images still default to community.
+      MIKKA_EDITION: cloud
       VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
       VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
       VERCEL_CLI: vercel@65.4.0

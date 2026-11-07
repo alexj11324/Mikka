@@ -2,10 +2,10 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isCloudEdition } from '../../lib/edition'
 
-/** Refuse the rollout until both the Infisical job environment and Vercel's
+/** Refuse the rollout until both the official build environment and Vercel's
  * actual production runtime agree. Never print the environment inventory. */
 export async function verifyCloudEdition(env: Record<string, string | undefined> = process.env, read: typeof fetch = fetch) {
-  if (!isCloudEdition(env)) throw new Error('webDeploy:infisicalCloudEditionRequired')
+  if (!isCloudEdition(env)) throw new Error('webDeploy:buildCloudEditionRequired')
   const { VERCEL_TOKEN: token, VERCEL_PROJECT_ID: project, VERCEL_ORG_ID: team } = env
   if (!token || !project || !team) throw new Error('webDeploy:editionVerificationConfigurationRequired')
   const api = async (path: string) => {
@@ -23,7 +23,7 @@ export async function verifyCloudEdition(env: Record<string, string | undefined>
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  try { await verifyCloudEdition(); console.log('Infisical and Vercel production both select the cloud edition') }
+  try { await verifyCloudEdition(); console.log('Official build and Vercel production both select the cloud edition') }
   catch (error) {
     console.error(/^webDeploy:[A-Za-z0-9:]+$/.test((error as Error)?.message ?? '') ? (error as Error).message : 'webDeploy:editionVerificationFailed')
     process.exitCode = 1
