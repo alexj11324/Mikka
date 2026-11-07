@@ -5,6 +5,7 @@ import { NavigationResponse } from '../compat/navigation'
 import { allowedMethods, routeMatcher, routerPath, type ApiRoute } from './routes'
 import { createRequestScope, requireRequestScope, runRequestScope } from './context'
 import { trailingSlashRedirect } from '../runtime/http-policy.mjs'
+import type { PrepareWebTransport, WebTransport } from '../../../lib/web-connection/transport'
 
 type Trace = { run<T>(work: () => T): T; finish(status: number, error?: unknown): void }
 type TraceFactory = (request: Request, route: string) => Trace
@@ -13,7 +14,7 @@ const failure = (status: number) => Response.json({ error: status === 404 ? 'Not
 
 /** Hono owns route dispatch; H3 owns real Node/Web-stream disposal. Neither
  * resolving a handler nor Nitro's onResponse means the body has finished. */
-export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = noTrace) {
+export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = noTrace, prepareWebTransport?: PrepareWebTransport) {
   const matchers = routes.map(routeMatcher)
   const router = new Hono({ strict: true })
   for (const route of routes) {
@@ -47,7 +48,6 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
     const original = event.req
     const canonical = trailingSlashRedirect(original)
     if (canonical) return canonical
-    const scope = createRequestScope(original)
     let template = '/unmatched', result: Response | undefined, caught: unknown
     try {
       const path = new URL(original.url).pathname
@@ -56,6 +56,11 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
         if (found) { template = found.route.template; break }
       }
     } catch { return failure(400) }
+    const prepared = await prepareWebTransport?.(original, template)
+    if (prepared instanceof Response) return prepared
+    const transport: WebTransport | null = prepared ?? null
+    const request = transport?.request ?? original
+    const scope = createRequestScope(request)
     const trace = beginTrace(original, template)
     // Register before work/output: Node and Vercel retain the entire lifetime,
     // including tasks registered during handler execution and nested after().
@@ -64,8 +69,8 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
       trace.finish(result?.status ?? 500, caught ?? reason)
       return scope.after.finish()
     })
-    return runRequestScope(scope, () => trace.run(async () => {
-      try { result = await router.fetch(original) }
+    const dispatch = () => runRequestScope(scope, () => trace.run(async () => {
+      try { result = await router.fetch(request) }
       catch (error) {
         if (error instanceof NavigationResponse) {
           result = error.location ? new Response(null, { status: error.status, headers: { location: error.location } }) : failure(error.status)
@@ -77,8 +82,10 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
       }
       const headers = new Headers(result.headers)
       requireRequestScope().cookies.commit(headers)
-      return new Response(result.body, { status: result.status, statusText: result.statusText, headers })
+      const response = new Response(result.body, { status: result.status, statusText: result.statusText, headers })
+      return transport ? transport.response(response) : response
     }))
+    return transport ? transport.run(dispatch) : dispatch()
   })
   return app
 }
