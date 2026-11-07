@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "kind": "decision-mcp-trace-sandbox-cleanup",
+  "sessionId": "sbx_AbuZwFfuBsafHAuEppCvq1FNFm1l",
+  "stopResponse": {
+    "status": "stopped",
+    "requestedStopAt": "2026-11-07T23:37:07.307Z",
+    "stoppedAt": "2026-11-07T23:37:07.631Z"
+  },
+  "independentGet": {
+    "status": "stopped",
+    "stoppedAt": "2026-11-07T23:37:07.631Z",
+    "routes": 0
+  },
+  "resources": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 900000,
+    "durationMs": 662834,
+    "activeCpuDurationMs": 61488,
+    "networkMode": "deny-all",
+    "persistent": false
+  },
+  "beforeStop": {
+    "node": "v24.22.1",
+    "platform": "Linux",
+    "architecture": "x86_64",
+    "workerProcessesRemaining": 0,
+    "ownedBridgeDirsRemaining": 0,
+    "ownedDecisionDirsRemaining": 0
+  },
+  "productionRequests": 0,
+  "modelCalls": 0,
+  "activeResources": 0
+}

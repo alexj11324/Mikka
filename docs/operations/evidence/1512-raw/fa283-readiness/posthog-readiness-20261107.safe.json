@@ -1,0 +1,768 @@
+{
+  "schema_version": 1,
+  "kind": "issue1512_read_only_posthog_readiness",
+  "prepared_at_utc": "2026-11-07T23:27:40Z",
+  "configuration_reads_observation_window_utc": [
+    "2026-11-07T23:05:03Z",
+    "2026-11-07T23:22:24Z"
+  ],
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "project_id": 670821,
+  "region": "US",
+  "posthog_conversation_id": "01a1b694-e84e-7821-89c0-1fd14c866b83",
+  "production_acceptance": {
+    "status": "not_run",
+    "real_case_count_reported_by_parent": 0,
+    "actual_runtime_ids": [],
+    "overallAcceptance": null
+  },
+  "source_context": {
+    "new_main_reported_by_parent": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "candidate_reviewed": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "new_main_source_review_owner": "root/daemon_impl",
+    "evidence_sources": [
+      {
+        "name": "production-evidence-query-templates.json",
+        "git_blob_sha": "07f2013526784be3bff29fd23073f5320a980cf3",
+        "utf8_bytes": 58165,
+        "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+        "commit": "d50353e8bd9cc77bc183a0a1c3d0de4d330ac255",
+        "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/production-evidence-query-templates.json"
+      },
+      {
+        "name": "normalize-posthog-metadata.md",
+        "git_blob_sha": "07f2b6ed95a0d004af24abc864368b651db55ebc",
+        "utf8_bytes": 8328,
+        "sha256": "08b674f22523094d74397c818be77600ea73eaed64e9386211d78e6c778780d3",
+        "commit": "d50353e8bd9cc77bc183a0a1c3d0de4d330ac255",
+        "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/normalize-posthog-metadata.md"
+      },
+      {
+        "name": "reconcile-production-evidence.md",
+        "git_blob_sha": "352be1f9838575ef2b5945da56f4289acee927e0",
+        "utf8_bytes": 10635,
+        "sha256": "0f408644e8b8cff18f64605ff89412678ffc0552d17a07c66bc7b7c0506e69fe",
+        "commit": "d50353e8bd9cc77bc183a0a1c3d0de4d330ac255",
+        "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/reconcile-production-evidence.md"
+      }
+    ],
+    "code_sources": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "git_blob_sha": "f83fe9042319ae5d3db6fc98a584fa46e51c83c5",
+        "utf8_bytes": 9483,
+        "sha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4",
+        "reviewed_commit": "f3336eec99a9d8439668d516677c5389a95a7326",
+        "new_main_equivalence": "not_checked_in_this_subtask"
+      },
+      {
+        "path": "scripts/ops/posthog-export-evidence.mjs",
+        "git_blob_sha": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e",
+        "utf8_bytes": 11762,
+        "sha256": "94282fae71b089bfe7154b907c1ebd45fc5c352e16c3369e184b64a1374b8045",
+        "reviewed_commit": "f3336eec99a9d8439668d516677c5389a95a7326",
+        "new_main_equivalence": "not_checked_in_this_subtask"
+      },
+      {
+        "path": "scripts/ops/posthog-replay-evidence.mjs",
+        "git_blob_sha": "fe28b5927b8df35d42bce2984a95dcfdd50e6965",
+        "utf8_bytes": 13579,
+        "sha256": "4df87f17ee6175a0b3498652f9af4ac61afec35dea022c116d81050396a0bddf",
+        "reviewed_commit": "f3336eec99a9d8439668d516677c5389a95a7326",
+        "new_main_equivalence": "not_checked_in_this_subtask"
+      }
+    ]
+  },
+  "scouts": [
+    {
+      "source_command": "call scout-config-list {\"search\":\"signals-scout-apm\"}",
+      "source_text_sha256": "4d6677fd0731dd9b8a8408ddda099d010fc6052ce4dc3030ab99f93a4db83c13",
+      "returned_count": 1,
+      "fields": {
+        "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+        "skill_name": "signals-scout-apm",
+        "display_name": "Mikka APM regression scout",
+        "enabled": true,
+        "status": "active",
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "pause_reason": null,
+        "precheck_disabled": false,
+        "precheck_query_source": "skill_default",
+        "last_precheck_at": "2026-11-07T06:58:30.571703Z",
+        "last_precheck_outcome": "run",
+        "last_precheck_row_count": 1,
+        "last_run_at": "2026-11-07T06:30:00Z",
+        "consecutive_failure_count": 0,
+        "output_destinations": {
+          "slack": null,
+          "webhook": null,
+          "inbox": true
+        }
+      },
+      "actor_profile_omitted": true
+    },
+    {
+      "source_command": "call scout-config-list {\"search\":\"signals-scout-ai-observability\"}",
+      "source_text_sha256": "8c2192671ece3eab299e588b1cc3de29312f3c9341c9d8bbfe77015da7556e17",
+      "returned_count": 1,
+      "fields": {
+        "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+        "skill_name": "signals-scout-ai-observability",
+        "display_name": "Mikka AI observability scout",
+        "enabled": true,
+        "status": "active",
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "pause_reason": null,
+        "precheck_disabled": false,
+        "precheck_query_source": "skill_default",
+        "last_precheck_at": "2026-11-07T07:47:10.721056Z",
+        "last_precheck_outcome": "skip",
+        "last_precheck_row_count": 0,
+        "last_run_at": "2026-11-07T07:30:00Z",
+        "consecutive_failure_count": 0,
+        "output_destinations": {
+          "slack": null,
+          "webhook": null,
+          "inbox": true
+        }
+      },
+      "actor_profile_omitted": true
+    }
+  ],
+  "notebook": {
+    "source_command": "call notebooks-get {\"short_id\":\"C9vQAc1L\"}",
+    "source_text_sha256": "31da6fa238feb9de9e3b8673e7efea5ac89261586c97b7f7b4eba4ee86218e09",
+    "notebook_id": "C9vQAc1L",
+    "title": "Mikka 运行时间线 · #1512",
+    "version": 15,
+    "url": "https://us.posthog.com/project/670821/notebooks/C9vQAc1L",
+    "kernel": {
+      "status": "stopped",
+      "cpu_cores": 1,
+      "memory_gb": 2,
+      "idle_timeout_seconds": 3600
+    },
+    "variables": [
+      {
+        "name": "run_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "thread_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "task_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "trace_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "lookback_hours",
+        "type": "number",
+        "value": 24
+      }
+    ],
+    "sql_cell_count": 3,
+    "python_cell_count": 0,
+    "sql_cells": [
+      {
+        "node_id": "8f15f2e8-8c0b-4505-b0d7-e6150c8d5cb3",
+        "cell_type": "sql",
+        "dataframe_name": "recent_runtime_traces",
+        "code": "SELECT\n    formatDateTime(toTimeZone(min(timestamp), 'UTC'), '%Y-%m-%d %H:%i:%S') AS started_utc,\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    arrayStringConcat(groupUniqArray(service_name), ', ') AS services,\n    arrayStringConcat(groupUniqArrayIf(attributes['mikka.run_id'], notEmpty(coalesce(attributes['mikka.run_id'], ''))), ', ') AS run_ids,\n    arrayStringConcat(groupUniqArrayIf(attributes['mikka.thread_id'], notEmpty(coalesce(attributes['mikka.thread_id'], ''))), ', ') AS thread_ids,\n    arrayStringConcat(groupUniqArrayIf(attributes['mikka.task_id'], notEmpty(coalesce(attributes['mikka.task_id'], ''))), ', ') AS task_ids,\n    count() AS observed_spans,\n    countIf(status_code = 2) AS error_spans,\n    round(dateDiff('millisecond', min(timestamp), max(end_time)), 2) AS observed_elapsed_ms\nFROM posthog.trace_spans\nWHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n  AND service_name IN ('mikka-web', 'mikka-daemon')\nGROUP BY trace_id\nORDER BY min(timestamp) DESC\nLIMIT 40",
+        "code_utf8_bytes": 1036,
+        "code_sha256": "08a86412357564d773b33a2a53e234f534664f3c4b2bf6724230ee69df608ad6",
+        "status": "done",
+        "depends_on": [],
+        "dependents": [],
+        "last_run_metadata": {
+          "status": "done",
+          "finished_at": "2026-11-06T19:43:08.934656Z",
+          "row_count": 40
+        }
+      },
+      {
+        "node_id": "3f5a1c64-b0de-4a32-be51-341666af8a79",
+        "cell_type": "sql",
+        "dataframe_name": "runtime_span_timeline",
+        "code": "WITH matched_traces AS (\n    SELECT DISTINCT trace_id\n    FROM posthog.trace_spans\n    WHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND (\n          ({run_id} != '' AND coalesce(attributes['mikka.run_id'], '') = {run_id})\n          OR ({thread_id} != '' AND coalesce(attributes['mikka.thread_id'], '') = {thread_id})\n          OR ({task_id} != '' AND coalesce(attributes['mikka.task_id'], '') = {task_id})\n          OR ({trace_id} != '' AND trace_id = base64Encode(unhex({trace_id})))\n      )\n    LIMIT 100\n)\nSELECT\n    formatDateTime(toTimeZone(timestamp, 'UTC'), '%Y-%m-%d %H:%i:%S') AS started_utc,\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    lower(hex(base64Decode(span_id))) AS span_id_hex,\n    lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n    service_name,\n    name AS stage,\n    dateDiff('millisecond', min(timestamp) OVER (PARTITION BY trace_id), timestamp) AS offset_ms,\n    round(duration_nano / 1000000, 2) AS duration_ms,\n    status_code,\n    is_root_span,\n    attributes['mikka.run_id'] AS run_id,\n    attributes['mikka.thread_id'] AS thread_id,\n    attributes['mikka.task_id'] AS task_id,\n    attributes['mikka.workflow_run_id'] AS workflow_run_id,\n    attributes['mikka.error.code'] AS error_code,\n    attributes['error.type'] AS error_type,\n    attributes['sessionId'] AS session_id\nFROM posthog.trace_spans\nWHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND trace_id IN (SELECT trace_id FROM matched_traces)\nORDER BY timestamp, duration_nano DESC\nLIMIT 2000",
+        "code_utf8_bytes": 1702,
+        "code_sha256": "3b151c0b6157266b6082873247d752133b799824eb61c48df5d45366d1073222",
+        "status": "done",
+        "depends_on": [],
+        "dependents": [],
+        "last_run_metadata": {
+          "status": "done",
+          "finished_at": "2026-11-06T19:43:11.424491Z",
+          "row_count": 0
+        }
+      },
+      {
+        "node_id": "3c4b2757-6de2-4d50-bfe8-0b6991b68b00",
+        "cell_type": "sql",
+        "dataframe_name": "runtime_logs",
+        "code": "WITH matched_traces AS (\n    SELECT DISTINCT trace_id\n    FROM posthog.trace_spans\n    WHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND (\n          ({run_id} != '' AND coalesce(attributes['mikka.run_id'], '') = {run_id})\n          OR ({thread_id} != '' AND coalesce(attributes['mikka.thread_id'], '') = {thread_id})\n          OR ({task_id} != '' AND coalesce(attributes['mikka.task_id'], '') = {task_id})\n          OR ({trace_id} != '' AND trace_id = base64Encode(unhex({trace_id})))\n      )\n    LIMIT 100\n)\nSELECT\n    formatDateTime(toTimeZone(timestamp, 'UTC'), '%Y-%m-%d %H:%i:%S') AS logged_utc,\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    lower(hex(base64Decode(span_id))) AS span_id_hex,\n    service_name,\n    severity_text,\n    if(body IN ('mikka.stage.completed', 'mikka.stage.failed'), body, '') AS event_name,\n    attributes['mikka.stage'] AS stage,\n    toFloatOrNull(attributes['mikka.duration_ms']) AS duration_ms,\n    attributes['mikka.run_id'] AS run_id,\n    attributes['mikka.thread_id'] AS thread_id,\n    attributes['mikka.task_id'] AS task_id,\n    attributes['mikka.workflow_run_id'] AS workflow_run_id,\n    attributes['mikka.error.code'] AS error_code,\n    attributes['error.type'] AS error_type\nFROM logs\nWHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND trace_id IN (SELECT trace_id FROM matched_traces)\nORDER BY timestamp\nLIMIT 1000",
+        "code_utf8_bytes": 1564,
+        "code_sha256": "d81f0259ddb5f9e7118830913f5d66300d5db8c1167c79c9f0ffeb25ca4bac5f",
+        "status": "done",
+        "depends_on": [],
+        "dependents": [],
+        "last_run_metadata": {
+          "status": "done",
+          "finished_at": "2026-11-06T19:43:13.869304Z",
+          "row_count": 0
+        }
+      }
+    ],
+    "limitations": [
+      "Existing done statuses are historical executions, not production acceptance for new actual IDs.",
+      "No cell was executed or variable changed by this read-only preparation.",
+      "SQL matches only mikka-web/mikka-daemon, has no environment predicate, uses a relative lookback and bounded row limits; it is a usability entry, not exhaustive evidence."
+    ]
+  },
+  "capability_schema_projections": [
+    {
+      "tool": "scout-config-list",
+      "source_text_sha256": "520ded1003d72509a0ba7b347e5dbac8d0f8b1ea97fca45b2fd7f410f60f4e8c",
+      "read_only": true,
+      "required": [],
+      "input_properties_projection": {
+        "search": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tags": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "tool": "notebooks-get",
+      "source_text_sha256": "c4d6cead973c77513305d406578e1ab91271705aa9f611c693fcd5c045411724",
+      "read_only": true,
+      "required": [
+        "short_id"
+      ],
+      "input_properties_projection": {
+        "short_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "tool": "notebooks-set-variables",
+      "source_text_sha256": "db4509683f10dd976fbfe0818263979f01521adb3fd8ef23fffaf58201346b85",
+      "read_only": false,
+      "required": [
+        "notebook_id",
+        "variables"
+      ],
+      "input_properties_projection": {
+        "notebook_id": {
+          "type": "string"
+        },
+        "variables": {
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "date"
+                ]
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "tool": "notebooks-run-cell",
+      "source_text_sha256": "8ca0f18bbd19e597c7196b55f367729089456af8d590b4ec6896559f3cca3e95",
+      "read_only": false,
+      "required": [
+        "notebook_id",
+        "node_id"
+      ],
+      "input_properties_projection": {
+        "notebook_id": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "tool": "notebooks-run-cell-result",
+      "source_text_sha256": "810585b65b05da014000291d017105fc9e8065e8f92cb41235e17b2a128afd26",
+      "read_only": true,
+      "required": [
+        "run_id",
+        "short_id"
+      ],
+      "input_properties_projection": {
+        "run_id": {
+          "type": "string"
+        },
+        "short_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "tool": "notebooks-run-status",
+      "source_text_sha256": "bd35fadfacc6553b5bc813f3c730edaeae3379dcafb93b673cae8ac22f6496fd",
+      "read_only": false,
+      "required": [
+        "notebook_id",
+        "run_id"
+      ],
+      "input_properties_projection": {
+        "notebook_id": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "tool": "notebooks-configure-compute",
+      "source_text_sha256": "149fe4865badfbd15fcb9de5980b5075de7a5e0717146fa97673562e8bbb75bf",
+      "read_only": false,
+      "required": [
+        "short_id"
+      ],
+      "input_properties_projection": {
+        "short_id": {
+          "type": "string"
+        },
+        "cpu_cores": {
+          "type": "number"
+        },
+        "memory_gb": {
+          "type": "number"
+        },
+        "idle_timeout_seconds": {
+          "type": "number"
+        }
+      }
+    },
+    {
+      "tool": "execute-sql",
+      "source_text_sha256": "66bfcf5b6e2cc18ffcb307428adf802560011c12acbb8f9d91f354ed46474d16",
+      "read_only": true,
+      "required": [
+        "query"
+      ],
+      "input_properties_projection": {
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "type": "string"
+        },
+        "truncate": {
+          "default": true,
+          "type": "boolean"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "sendRawQuery": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "tool": "generate-app-url",
+      "source_text_sha256": "1f0979963a0b845ecbc5781e86e9fda7b7b60455e2915d4ace9d1ea3d38b682d",
+      "read_only": true,
+      "required": [
+        "url"
+      ],
+      "input_properties_projection": {
+        "url": {
+          "type": "string",
+          "selected_confirmed_paths": [
+            "/ai-observability/traces/{id}",
+            "/dashboard/{id}",
+            "/insights/{id}",
+            "/notebooks/{shortId}",
+            "/replay/{id}",
+            "/tracing",
+            "/logs"
+          ]
+        },
+        "params": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "tool": "vision-scanners-inline-scan",
+      "source_text_sha256": "443f9ecc49fab2854e5c5191f482e11de4813375ac250f170a47241ac6832f9c",
+      "read_only": false,
+      "required": [
+        "session_ids"
+      ],
+      "input_properties_projection": {
+        "built_in": {
+          "type": "string",
+          "enum": [
+            "summarize_recording"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "scanner_type": {
+          "type": "string",
+          "enum": [
+            "monitor",
+            "classifier",
+            "scorer",
+            "summarizer",
+            "experiment"
+          ]
+        },
+        "scanner_config": {},
+        "model": {
+          "default": "gemini-3-flash-preview",
+          "type": "string",
+          "enum": [
+            "gemini-3.5-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-3.8-flash"
+          ]
+        },
+        "session_ids": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "tool": "vision-scanners-observations-list",
+      "source_text_sha256": "f8e39b1ea351bbbb99c87f5125c781e78b4f34ab6cc57ef43ec4429e67c37685",
+      "read_only": true,
+      "required": [
+        "scanner_id"
+      ],
+      "input_properties_projection": {
+        "scanner_id": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "tool": "vision-observations-list",
+      "source_text_sha256": "2f8f648c5cf934cc40c75b8b79702ca1a50149e80dee885be4f6fece7458d688",
+      "read_only": true,
+      "required": [
+        "session_id"
+      ],
+      "input_properties_projection": {
+        "session_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    {
+      "tool": "vision-observations-get",
+      "source_text_sha256": "e5840f32eed81b9d6a92b04d910759dea8c59141f7c6355e58fc79c0a4fa5b0d",
+      "read_only": true,
+      "required": [
+        "id"
+      ],
+      "input_properties_projection": {
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "tool": "vision-quota-get",
+      "source_text_sha256": "53ebc6e22b39c6e11395777e77203199e549698f8f178d6017f4919beb66ecea",
+      "read_only": true,
+      "required": [],
+      "input_properties_projection": {}
+    }
+  ],
+  "future_execution_contract": {
+    "template_query_count": 14,
+    "clusters": {
+      "Logs": [
+        "posthog.trace_spans",
+        "logs"
+      ],
+      "Default": [
+        "events",
+        "raw_session_replay_events"
+      ]
+    },
+    "cross_cluster_joins_allowed": false,
+    "id_encodings": {
+      "apm_and_logs": "base64",
+      "analytics": "hex"
+    },
+    "normalization": "Exact reversible conversion; retain original physical UUID and logical IDs.",
+    "window": "Actual UTC start inclusive/end exclusive, normally <=1 hour, fixed across pages/snapshots; document true runtime duration before widening.",
+    "paginated_queries": [
+      "lookup_trace_by_ids",
+      "span_timeline",
+      "generation_receipts",
+      "safe_native_logs",
+      "apm_generation_spans",
+      "native_generation_collection"
+    ],
+    "page_size": 500,
+    "offset_step": 500,
+    "final_page": "Actual response with fewer than 500 rows; exact-multiple totals require a subsequent empty page.",
+    "independent_lookup_count": "lookup_trace_count, one aggregate row, no LIMIT",
+    "stable_snapshots": 2,
+    "stability": "Both complete normalized rowsets and independent counts, not only totals; supply every discovered trace.",
+    "response_capture": "Preserve exact execute-sql request and original MCP result JSON before normalization; no copied/reconstructed table.",
+    "execute_sql_args": "query, truncate:false, optional context; no connectionId or sendRawQuery.",
+    "truncation": {
+      "normalizer_value": null,
+      "interpretation": "truncate:false concerns large cell values, not rowset completeness."
+    },
+    "reconciler_consumed_trace_tables": [
+      "span_timeline",
+      "trace_integrity",
+      "safe_native_logs",
+      "capture_summary",
+      "apm_generation_spans",
+      "native_generation_collection",
+      "generation_receipts",
+      "ai_capture_summary"
+    ],
+    "separately_required_checks": [
+      "tail_error_retention",
+      "source_correlation",
+      "apm_session_links",
+      "replay_correlation"
+    ],
+    "supplemental_distribution": {
+      "file": "supplemental-service-environment.prepared.sql",
+      "execution_status": "not_executed",
+      "future_reads": "One bounded query per actual trace near the final stable snapshot; repeat only to investigate a concrete late-ingestion discrepancy.",
+      "initial_service_or_environment_filter": false,
+      "closed_service_classes": [
+        "mikka-web",
+        "mikka-daemon",
+        "missing",
+        "other"
+      ],
+      "closed_environment_classes": [
+        "production",
+        "preview",
+        "staging",
+        "development",
+        "test",
+        "missing",
+        "other"
+      ],
+      "columns": [
+        "service_class",
+        "environment_class",
+        "span_rows"
+      ],
+      "maximum_groups": 28,
+      "sql_limit": 32,
+      "acceptance_checks": [
+        "Unique enum pair; nonnegative safe integer count.",
+        "Sum span_rows equals corresponding trace_integrity.span_rows and is positive.",
+        "Unknown/missing/nonproduction/out-of-contract service groups block completeness pending new-source review; never silently drop them."
+      ],
+      "limitations": [
+        "Not accepted by the existing 14-query pinned normalizer.",
+        "Actual response schema and SQL execution not yet validated.",
+        "Cannot discover a wholly separate orphan trace outside the fixed actual trace ID."
+      ]
+    }
+  },
+  "native_export": {
+    "native_kind": "Saved dashboard or insight PNG via official exports API",
+    "supported_mcp_png_tool_found": false,
+    "workflow": ".github/workflows/run-trace-acceptance.yml",
+    "mode": "export",
+    "required_dispatch_ref": "refs/heads/main",
+    "timeout_minutes": 8,
+    "target_binding": "Positive existing dashboard/insight ID; verify its actual trace and fixed window before export.",
+    "code_sha_binding": "EXPECTED_DEPLOYMENT_SHA must equal GITHUB_SHA before runner key loading; public served-version check is a separate ops transport gate.",
+    "credential_handling": "Runner-only Infisical prod:/platform POSTHOG_PERSONAL_API_KEY; no credential read by this readiness.",
+    "required_scopes": [
+      "export:write",
+      "export:read"
+    ],
+    "actual_scope_validation": "unknown",
+    "create": "One POST /api/projects/670821/exports/ with dashboard or insight and export_format:image/png; do not blindly retry a lost POST response.",
+    "get": "Bounded export status polling and same-origin content GET with redirects rejected.",
+    "file_checks": "PNG format/signature/IHDR/IEND/dimensions, 32 MiB limit, bytes and SHA256.",
+    "visual_check": "Actual exported PNG must be viewed for correct case/window and missing/cropped content; header/hash checks do not prove content.",
+    "artifact_name_template": "run-trace-posthog-<workflow_run_id>",
+    "artifact_retention_days": 7,
+    "exported_now": false,
+    "limitations": [
+      "No arbitrary URL/Notebook/APM waterfall direct export.",
+      "Reviewed source is f333 candidate, not an independent proof of new main or deployed source equivalence."
+    ]
+  },
+  "replay": {
+    "metadata_helper": "scripts/ops/posthog-replay-evidence.mjs",
+    "helper_requests": 3,
+    "helper_proof_scope": "one_recording_segment",
+    "helper_trace_correlation": "requires_apm_match",
+    "helper_playback_verified": false,
+    "future_visual_contract_file": "replay-playback-masking.prepared.json",
+    "scanner_called": false,
+    "quota_queried": false,
+    "recordings_or_observations_fetched": false,
+    "custom_response_schema_enforced_by_api": false,
+    "actual_output_shape": "unknown",
+    "persistent_text_policy": "Only exact closed boolean/unknown fields and allowlisted metadata; no input/message transcription, summary_line, raw scanner_result, event.data or citations."
+  },
+  "source_guidance": {
+    "official_skills_loaded": [
+      "posthog:signals-scout-apm",
+      "posthog:signals-scout-ai-observability",
+      "posthog:investigating-replay"
+    ],
+    "discovery": "PostHog MCP learn searches and tool info used; capabilities reused after schema discovery.",
+    "business_knowledge_check": "Attempted once; tool not enabled. Continued with authoritative skills/docs.",
+    "documentation_sources": [
+      "https://posthog.com/docs/ai-observability/self-driving",
+      "https://posthog.com/docs/api/exports",
+      "https://posthog.com/docs/api/notebooks-2",
+      "https://posthog.com/docs/model-context-protocol/tools",
+      "https://posthog.com/docs/session-replay/snapshot-api",
+      "https://posthog.com/docs/data-warehouse/surfaces/mcp"
+    ]
+  },
+  "resources_and_mutations": {
+    "application_model_invocations": 0,
+    "scout_runs": 0,
+    "vision_scans": 0,
+    "notebook_cell_runs": 0,
+    "notebook_variables_changed": 0,
+    "notebook_compute_started": 0,
+    "sandboxes_created": 0,
+    "posthog_config_mutations": 0,
+    "other_owned_scouts_touched": 0,
+    "git_ref_mutations": 0,
+    "existing_notebook_kernel_observed": "stopped",
+    "persistence": "Unreferenced Git blobs only; root will archive into its evidence branch.",
+    "next_action": "Finish subtask; no periodic queries. Await actual production IDs if parent delegates a follow-up."
+  },
+  "artifacts": [
+    {
+      "name": "supplemental-service-environment.prepared.sql",
+      "git_blob_sha": "efb4a6dd764729d8b7db9afee3f39ed913af092d",
+      "utf8_bytes": 1294,
+      "sha256": "0992dc661c46dc0f21713031275d4fba4324fc0b3fdbe593851f218bccfeddaa",
+      "raw_blob_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/efb4a6dd764729d8b7db9afee3f39ed913af092d",
+      "readback_exact_match": true
+    },
+    {
+      "name": "replay-playback-masking.prepared.json",
+      "git_blob_sha": "b6113a736d577d78034028e2f2743eab0d346d1d",
+      "utf8_bytes": 5525,
+      "sha256": "c3a1e2769f4fb3ef92e6c3826eb80076af86e16f78441c0b403a671196167e03",
+      "raw_blob_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/b6113a736d577d78034028e2f2743eab0d346d1d",
+      "readback_exact_match": true
+    },
+    {
+      "name": "production-posthog-handoff.zh-CN.md",
+      "git_blob_sha": "900e3b703fd713d2807289909d1577f7603343cc",
+      "utf8_bytes": 11413,
+      "sha256": "f9149cc345e01d96e5e3594fe89e1197503f360c47894fb5ecbb7712ac120be4",
+      "raw_blob_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/900e3b703fd713d2807289909d1577f7603343cc",
+      "readback_exact_match": true
+    }
+  ],
+  "explicit_unknowns": [
+    "Actual new-deployment IDs and final span/phase sets.",
+    "Actual production responses for lookup_trace_count and the supplemental distribution SQL.",
+    "Two-snapshot stability and upstream delivery completeness.",
+    "Exporter key scopes, saved target scope, actual PNG render and visual inspection.",
+    "Actual recording playback, masking, scanner result shape and observed coverage."
+  ],
+  "privacy": "Scout actor profiles omitted; source response hashes retain provenance without publishing profiles. No prompt/output/event-body/raw-properties data was retrieved by this readiness."
+}

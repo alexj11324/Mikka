@@ -1,0 +1,42 @@
+[
+  {
+    "path": "packages/daemon/src/agents/run-apps.ts",
+    "blob": "652dfd2a75b4bee5a5f6905facd1a3e281988048",
+    "bytes": 2170
+  },
+  {
+    "path": "packages/daemon/src/runs/supervisor.ts",
+    "blob": "664c0ba0e358c4daa31af278164d06f2e15f4f0b",
+    "bytes": 100299
+  },
+  {
+    "path": "packages/daemon/src/agents/run-context.ts",
+    "blob": "093409ce0aceb8f67dc3506e597e3cf1fa3718b1",
+    "bytes": 30406
+  },
+  {
+    "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+    "blob": "ce72e79a933115267294eb72beb8ce20a3b5ad31",
+    "bytes": 2554
+  },
+  {
+    "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+    "blob": "396e31084823ff0629cdbe930187741ae3f211ec",
+    "bytes": 50016
+  },
+  {
+    "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+    "blob": "ac701fb183d21de2097b612bea92ace25eeca2e4",
+    "bytes": 2210
+  },
+  {
+    "path": "packages/daemon/test/project-decisions.test.ts",
+    "blob": "ec8f889e119b5d21fafe4bbe1a0f3640a9862e42",
+    "bytes": 6628
+  },
+  {
+    "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+    "blob": "745b9ba1b105bccd641dea6a1cd2fbf23a4a9bd2",
+    "bytes": 6262
+  }
+]

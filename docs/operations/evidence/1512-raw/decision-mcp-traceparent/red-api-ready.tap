@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: Decision backend HTTP preserves its daemon parent at the API boundary (flags 01)
+not ok 1 - Decision backend HTTP preserves its daemon parent at the API boundary (flags 01)
+  ---
+  duration_ms: 63.478141
+  type: 'test'
+  location: '/tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/apps/api/runtime/request-trace.test.ts:1:1103'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        {
+          baggage: undefined,
+    +     traceparent: undefined
+    -     traceparent: '00-11111111111111111111111111111111-2222222222222222-01'
+        }
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      traceparent: '00-11111111111111111111111111111111-2222222222222222-01'
+  actual:
+    0:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/apps/api/runtime/request-trace.test.ts:49:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: Decision backend HTTP preserves its daemon parent at the API boundary (flags 00)
+not ok 2 - Decision backend HTTP preserves its daemon parent at the API boundary (flags 00)
+  ---
+  duration_ms: 19.694872
+  type: 'test'
+  location: '/tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/apps/api/runtime/request-trace.test.ts:1:1103'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        {
+          baggage: undefined,
+    +     traceparent: undefined
+    -     traceparent: '00-11111111111111111111111111111111-2222222222222222-00'
+        }
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      traceparent: '00-11111111111111111111111111111111-2222222222222222-00'
+  actual:
+    0:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/apps/api/runtime/request-trace.test.ts:49:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 552.821806

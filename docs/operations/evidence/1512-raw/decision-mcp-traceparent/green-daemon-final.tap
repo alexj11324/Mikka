@@ -1,0 +1,49 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/packages/daemon[39m
+
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22madvertises the actual complete catalogue before binding and refuses every unbound call[32m 31[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mbinds once through a real isolated worker and uses the original handoff handler[32m 134[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mfailed context validation permanently consumes binding and drains its worker[32m 70[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mrevokes an in-flight business call without blocking the SDK event loop[32m 102[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mkeeps a blocking Git handler outside the daemon loop and kills its owned process group[33m 3082[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mlate-bound SDK workers keep distinct captured parents and cannot rebind to another run[32m 196[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mthe SDK backend drops a missing carrier while preserving business authority[32m 94[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mthe SDK backend drops a malformed carrier while preserving business authority[32m 94[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mthe SDK backend drops a zero-trace carrier while preserving business authority[32m 99[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-bridge.test.ts[2m > [22mthe SDK backend drops a zero-parent carrier while preserving business authority[32m 93[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio gets the canonical worker schema and records directly, preserving exact retries without a handoff file[32m 111[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio reports revoked authority without falling back to repository storage[32m 89[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22man unbound local stdio server does not advertise or execute a decision writer[32m 66[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mclaimed task MCP authority exists without app connections and rejects generic OAuth or untrusted URLs[32m 1[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio carries only its captured run parent through catalogue and record requests[32m 181[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a missing carrier without inheriting another run or rejecting business work[32m 90[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a malformed carrier without inheriting another run or rejecting business work[32m 86[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a zero-trace carrier without inheriting another run or rejecting business work[32m 90[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a zero-parent carrier without inheriting another run or rejecting business work[32m 91[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a newline carrier without inheriting another run or rejecting business work[32m 89[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a flags-width carrier without inheriting another run or rejecting business work[32m 89[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mstdio drops a flags-case carrier without inheriting another run or rejecting business work[32m 90[2mms[22m[39m
+ [32m✓[39m test/project-decisions.test.ts[2m > [22mthe host ignores assignment telemetry and a trace carrier never supplies task authority[32m 68[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mkeeps every canonical field identical through the real stdio and official SDK transports[32m 118[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22madvertises only real static metadata and refuses all unbound or mid-bind tool work[32m 20[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mretains the same handoff, capture bounds and repository selection handlers after one binding[32m 24[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22muses the original business fetch, exact bound bearer and canonical claim catalogue without discovery or fallback storage[32m 42[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mrefuses a missing catalogue once without a remote discovery request[32m 15[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mrefuses a malformed catalogue once without a remote discovery request[32m 11[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mrefuses a changed catalogue once without a remote discovery request[32m 12[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mdrains a failed real path binding and never admits a replacement task[32m 11[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mnever transfers a bound backend to a second run or reads later mutated context values[32m 20[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mrefuses new work after local predicate revocation without contacting a server[32m 10[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mrefuses new work after local signal revocation without contacting a server[32m 10[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mrechecks a local lease before an already queued call dispatches[32m 11[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mcloses and drains a unbound backend without permitting later activation[32m 9[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mcloses and drains a binding backend without permitting later activation[32m 10[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22maborts and drains a real held HTTP response body before closing the bound context[32m 24[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mkeeps existing stdio EOF graceful while the original response body is still pending[32m 101[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts[2m > [22mdoes not expose mutable catalogue references or start business work during static metadata construction[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m40 passed[39m[22m[90m (40)[39m
+[2m   Start at [22m 23:34:58
+[2m   Duration [22m 7.58s[2m (tests 77%, import 19%, transform 4%)[22m
+

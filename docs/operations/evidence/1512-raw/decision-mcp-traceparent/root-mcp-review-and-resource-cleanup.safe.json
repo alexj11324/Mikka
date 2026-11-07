@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-decision-mcp-frozen-source-review",
+  "checkedAt": "2026-11-07 23:43:17 UTC",
+  "base": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "result": "no_source_blocker",
+  "hashes": {
+    "checkedAt": "2026-11-07 23:41:45 UTC",
+    "totalPaths": 46,
+    "uniqueBlobs": 43,
+    "verified": 43,
+    "failures": []
+  },
+  "productFiles": 6,
+  "testFiles": 3,
+  "canonicalApiTestIncluded": true,
+  "canonicalApiCommand": "node --import ./tests/support/server-only.mjs --import tsx --test apps/api/src/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/agent-image-cache.test.ts lib/web-connection/*.test.ts",
+  "decisions": [
+    "One captured daemon context supplies run options and host-only MCP metadata.",
+    "stdio explicitly overwrites the carrier, including absence; SDK binds through its existing private claim context.",
+    "The dependency-free child rejects malformed/all-zero IDs; missing carrier omits telemetry without denying authorized business.",
+    "Existing authorization, endpoint, signal, redirect handling, body and lifetime behavior remain unchanged.",
+    "No database request, model request, SDK, baggage, tracestate or timer is added."
+  ],
+  "limits": [
+    "The HTTP API test uses actual extraction but a synthetic handler; production auth/DB is not proven here.",
+    "Direct oxlint inspected one API test because daemon paths are ignored; complete normal CI is still required for this next patch.",
+    "The frozen source patch has not been published to the PR or production."
+  ],
+  "sandbox": {
+    "id": "sbx_AbuZwFfuBsafHAuEppCvq1FNFm1l",
+    "rootIndependentGet": {
+      "session": {
+        "id": "sbx_AbuZwFfuBsafHAuEppCvq1FNFm1l",
+        "runtime": "node22",
+        "architecture": "amd64",
+        "requestedAt": 1794093964777,
+        "startedAt": 1794093964797,
+        "requestedStopAt": 1794094627307,
+        "stoppedAt": 1794094627631,
+        "status": "stopped",
+        "duration": 662834,
+        "vcpus": 1,
+        "memory": 2048,
+        "timeout": 900000,
+        "region": "iad1",
+        "cwd": "/vercel",
+        "workloadType": "sandbox",
+        "createdAt": 1794093964777,
+        "updatedAt": 1794093964805,
+        "interactivePort": 26661,
+        "networkPolicy": {
+          "mode": "deny-all"
+        },
+        "activeCpuDurationMs": 61488,
+        "networkTransfer": {
+          "ingress": 249605105,
+          "egress": 1091402
+        },
+        "sourceSandboxName": "issue1512-mcp-trace-20261107",
+        "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+      },
+      "routes": []
+    }
+  }
+}

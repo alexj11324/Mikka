@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "kind": "decision-mcp-trace-propagation-review",
+  "observedAt": "2026-11-07T23:20:05.608Z",
+  "repository": "alexj11324/Mikka",
+  "source": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "tree": "219a51ff8ae1a0ad70ef448abfb037be0f1f1e16",
+  "mode": "source-only",
+  "executedTests": 0,
+  "productionReads": 0,
+  "openedResources": 0,
+  "changedSource": false,
+  "changedRefs": false,
+  "conclusion": {
+    "projectDecisionMcpParentPropagation": "missing-existing-gap",
+    "new047Regression": false,
+    "decisionModelPathMustBeDistinguished": true,
+    "productionAcceptance": false
+  },
+  "paths": {
+    "projectDecisionMcp": [
+      {
+        "path": "packages/daemon/src/agents/run-context.ts",
+        "lines": [
+          249,
+          289
+        ],
+        "finding": "RunContext emits URL, token, optional catalogue and observation URL through stdio environment or bound SDK context. It does not carry RunTraceContext."
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-bridge.ts",
+        "lines": [
+          62,
+          82
+        ],
+        "finding": "Child is forked with only PATH/HOME, execArgv empty; private bind IPC has no trace carrier."
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-worker.mjs",
+        "lines": [
+          16,
+          32
+        ],
+        "finding": "Worker binds shared backend then invokes handle. No tracer or propagation layer is installed."
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+        "lines": [
+          336,
+          350
+        ],
+        "finding": "Fixed decision endpoint fetch has auth/content/accept/protocol headers only. observeMcpHttp is a loopback metadata observer, not trace propagation."
+      },
+      {
+        "path": "apps/api/runtime/request-trace.ts",
+        "lines": [
+          16,
+          46
+        ],
+        "finding": "Ingress extracts W3C headers from ROOT_CONTEXT. x-mikka-trace metadata is accepted only for /v1 routes. No run token trace lookup occurs here."
+      },
+      {
+        "path": "lib/mcp/worker.ts",
+        "lines": [
+          52,
+          104
+        ],
+        "finding": "verifyRunToken authorizes a live token and returns bounded identity metadata; workerRun extracts run/user/bot/issue. Neither restores trace context."
+      },
+      {
+        "path": "lib/mcp/tool-lifetime.ts",
+        "lines": [
+          5,
+          28
+        ],
+        "finding": "Tool wrapper retains already-started work, with no new parent extraction."
+      },
+      {
+        "path": "app/api/mcp/route.ts",
+        "finding": "record_decision invokes recordProjectDecision using authenticated run token authority."
+      },
+      {
+        "path": "lib/project-map/decisions.ts",
+        "lines": [
+          93,
+          213
+        ],
+        "finding": "Operation validates authority/evidence and persists project decisions. It does not call the Decision model or restore a stored run trace."
+      }
+    ],
+    "decisionModel": [
+      {
+        "path": "packages/daemon/src/server-link-http.ts",
+        "lines": [
+          182,
+          189
+        ],
+        "finding": "Actual daemon Decision model endpoint is /v1/runs/:runId/decision through the common HTTP call."
+      },
+      {
+        "path": "packages/daemon/src/server-link-http.ts",
+        "lines": [
+          269,
+          304
+        ],
+        "finding": "Common send starts daemon span and injects daemonTracer.headers into Mikka request."
+      },
+      {
+        "path": "app/v1/runs/[runId]/decision/route.ts",
+        "lines": [
+          20,
+          42
+        ],
+        "finding": "Normal device/run authorization then invokes coordinator decide under billing scope; ingress already extracts W3C."
+      },
+      {
+        "path": "lib/coordinator/decide.ts",
+        "lines": [
+          53,
+          81
+        ],
+        "finding": "Every actual gateway request is inside observeAiRequest operation decision."
+      },
+      {
+        "path": "lib/tracing/ai.ts",
+        "lines": [
+          95,
+          108,
+          205,
+          211
+        ],
+        "finding": "AI generation span uses current parent and binds request work to that span. This static audit does not independently prove active daemon run context for every caller."
+      }
+    ]
+  },
+  "minimalRepair": {
+    "implementation": "Pass the already host-captured baseOptions.traceContext, sanitized by existing protocol helper, into both stdio and late-bound SDK MCP contexts. At only the bound decision endpoint, send canonical traceparent. Preserve existing auth and fixed-method checks. For any additional bounded run metadata, explicitly address the /api/mcp ingress allowlist; do not assume its current /v1-only reader will preserve it.",
+    "avoid": [
+      "No model/tool input propagation",
+      "No token-based trace authority",
+      "No server DB lookup solely to reconstruct parent",
+      "No additional tracer/exporter in MCP child",
+      "No global arbitrary fetch instrumentation"
+    ],
+    "verification": [
+      "Real shared-backend outgoing headers for stdio and SDK paths",
+      "API ingress same trace ID and expected parent from sanitized carrier",
+      "Malformed/missing carrier leaves business authorization and behavior unchanged",
+      "No propagation of arbitrary headers, credentials or baggage"
+    ]
+  },
+  "services": [
+    {
+      "path": "lib/tracing/config.ts",
+      "lines": [
+        6,
+        13,
+        16,
+        50,
+        62
+      ],
+      "service": "mikka-web",
+      "environment": "production only when VERCEL_ENV=production; daemon settings preserve that value"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "lines": [
+        74,
+        84
+      ],
+      "finding": "Web resource uses SERVICE_NAME and both deployment.environment fields."
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "lines": [
+        26,
+        187,
+        208
+      ],
+      "service": "mikka-daemon",
+      "environment": "settings.environment, default production",
+      "finding": "One resource shared by daemon traces and logs; no new prewarm service."
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "lines": [
+        15,
+        36
+      ],
+      "finding": "Configures daemon tracer before withContext(config.traceContext), then starts anonymous candidate inside that scope."
+    }
+  ],
+  "limitations": [
+    "No production traces queried",
+    "No calls or resources created",
+    "No claim of automatic acceptance from source inspection",
+    "This finding concerns Project Decision MCP persistence; it is not evidence of lost Decision model generation events"
+  ],
+  "sourceReads": [
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "bytes": 50016,
+      "sha256": "3b01a5f08352fda26f00379d814fdc66f0cb6e27ced78851a948606b568b84e5",
+      "gitBlob": "396e31084823ff0629cdbe930187741ae3f211ec"
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "bytes": 30406,
+      "sha256": "1f8889ce18c3fac982835121ba6d4cc213ab8337d5805f335b47b33e9f62eaff",
+      "gitBlob": "093409ce0aceb8f67dc3506e597e3cf1fa3718b1"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-bridge.ts",
+      "bytes": 4777,
+      "sha256": "d9306f88f52e48f13bca81fbc32c7f4b99ce71fa01e8a9bec5bd47c80339a795",
+      "gitBlob": "c10d98d47f482b5b0c0dec2eef1fb370a686457e"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-worker.mjs",
+      "bytes": 1753,
+      "sha256": "4062acb492715b5a3b603a58290c1479b23fc0f0bbc8dece7cd0b95a075c9eb5",
+      "gitBlob": "2ec93fd50826074d8b2ce049fc5f9cb191b75509"
+    },
+    {
+      "path": "app/api/mcp/route.ts",
+      "bytes": 21276,
+      "sha256": "870359781ddfee56f9baf7fff232b2573ca3daf9e8c27743e76e0cf475d2a012",
+      "gitBlob": "9212f61fc09d65d374dfc641e7aaa1a599976aac"
+    },
+    {
+      "path": "lib/mcp/worker.ts",
+      "bytes": 6321,
+      "sha256": "5cb16979cf336e299bc73587aa2bcb21fb58d4994633c66937d60c3db41e34a7",
+      "gitBlob": "beb350f68a9c276e18acb80af34e23cee84d9111"
+    },
+    {
+      "path": "lib/mcp/tool-lifetime.ts",
+      "bytes": 1605,
+      "sha256": "8f817e28e4ed1a4ed8fe1f7788e18ae71f4f89acf5f03318c51813010be009d5",
+      "gitBlob": "6127d5181082876e27738d744397734978317309"
+    },
+    {
+      "path": "lib/project-map/decisions.ts",
+      "bytes": 20155,
+      "sha256": "b78a9bfb69b67216acb631a953d5ebfdcd59017ffcae598621543fa7bc08c977",
+      "gitBlob": "399db1426d1c0a1fb61b841df7796e70755ec285"
+    },
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "bytes": 2883,
+      "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9",
+      "gitBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+    },
+    {
+      "path": "packages/daemon/src/server-link-http.ts",
+      "bytes": 27193,
+      "sha256": "eca7aae81fa23255f748ad32ed970ccc2099b5ec4799ba79e60d9caf61dc0caf",
+      "gitBlob": "ed282904dd1c3ce9867c923f5170a8dfb5539a4e"
+    },
+    {
+      "path": "app/v1/runs/[runId]/decision/route.ts",
+      "bytes": 3115,
+      "sha256": "4fef1c992e2883384c6fac677713da1d6998d8f71a196f7e5bda70d23b6fb7d5",
+      "gitBlob": "7c5eec6109eb9f450261c8e5e9751aea9840c83e"
+    },
+    {
+      "path": "lib/coordinator/decide.ts",
+      "bytes": 9512,
+      "sha256": "962d891b4fd2fad00a8399e453c3ca15186bda43b41ea30fc4cf42b534ae2fb8",
+      "gitBlob": "a9bde5aa50fa60e3c69354878a2ce93a46985fff"
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "bytes": 13617,
+      "sha256": "202630a776f9b9d543bd6581cc4b3be70b304fcdc22431fa9a990f985f4658b4",
+      "gitBlob": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f"
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "bytes": 3376,
+      "sha256": "b26acae1c89e8a74a6aae8769ffbab32af72c72250b239711b0786f160f65856",
+      "gitBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483"
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "bytes": 27152,
+      "sha256": "98bd16f0b3c0d6f91e10134c266b646f9fd670732a5441530c5e849c2d32282f",
+      "gitBlob": "22bb17d133ec07305228881e9152fa6d2b649268"
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "bytes": 3361,
+      "sha256": "077ed431890173d9a69836ef5133f1036aa32a7201ee51d5c08c94779ad61cb2",
+      "gitBlob": "d28096723689e17950e7ea6ef3db68959aeea0db"
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "bytes": 5523,
+      "sha256": "eb882501a08c02178edb4d2bd1293316923f5bca18210bbac43081f41fdb3acc",
+      "gitBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530"
+    }
+  ]
+}

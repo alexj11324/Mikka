@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "kind": "issue1512_browser_replay_presubmit_source_review",
+  "reviewed_commit": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "reviewed_at_utc": "2026-11-07T23:37:07Z",
+  "review_scope": "Read current immutable source only; no browser, PostHog state query/config change, replay start, model call or test run.",
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "git_blob_sha": "163ab8697bd91613a9acde23653dd8abbbfb3823",
+      "utf8_bytes": 22402,
+      "sha256": "5e342db8e2335568418daf25c4248c687c61f598020bca5169b85b606a1e6bf2",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.mjs"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "git_blob_sha": "ae7c2cc9c72fa11e13c09721bfe24629362ea26c",
+      "utf8_bytes": 2100,
+      "sha256": "550beb415d322af712f4b518799541964f68b97bc0574e913c86c5b21b232f4c",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/instrumentation-client.ts"
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "git_blob_sha": "9529e8f563ef43d3e7c1eedd992165626eb86085",
+      "utf8_bytes": 3166,
+      "sha256": "2357cf1e09032fb2fca2cea0068b01e9ee4e5274bd06317310a905351b2b38a2",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/lib/analytics-policy.ts"
+    },
+    {
+      "path": "lib/posthog-config.ts",
+      "git_blob_sha": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "utf8_bytes": 358,
+      "sha256": "cd149157b6e4f2ed3c524e512274b9181858889a1dceca8eab5f38d429560545",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/lib/posthog-config.ts"
+    },
+    {
+      "path": "components/posthog-analytics.tsx",
+      "git_blob_sha": "ec8e61fce490e9504ae8358ac087dcf31a92e2c3",
+      "utf8_bytes": 1556,
+      "sha256": "d463baa5e929f67a211a8df0b966863dee5c39370d92ecb54f337b15213965a8",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/components/posthog-analytics.tsx"
+    },
+    {
+      "path": "app/[locale]/layout.tsx",
+      "git_blob_sha": "67f7767493cc2ae13569bfb89b266d4c63e5f522",
+      "utf8_bytes": 3112,
+      "sha256": "782ad61d7e323423e02c36484234585f95ecd8edc289e3c26235bcea759c9e08",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/app/[locale]/layout.tsx"
+    },
+    {
+      "path": "packages/protocol/src/analytics-client.ts",
+      "git_blob_sha": "cc4bd80409e61f538b4bef00f07f28630d8c1b52",
+      "utf8_bytes": 4058,
+      "sha256": "db68469fbe8ae7e2afe08120558c2b154cc3b634bdc4b67f72c0078d43bf38f6",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/packages/protocol/src/analytics-client.ts"
+    },
+    {
+      "path": "package.json",
+      "git_blob_sha": "277d2f0d3e79789011564f0ed2d4f8616f3ca159",
+      "utf8_bytes": 77827,
+      "sha256": "32ffe8f7ed1805676c5bfa4b92ae40f8269cc6b5663f89f0bc73cb4d0a1381fc",
+      "url": "https://github.com/alexj11324/Mikka/blob/fa2830e0576233d8de54f72eec56ec74b4ca95d1/package.json"
+    }
+  ],
+  "result": {
+    "before_paid_submit_posthog_session_proven": false,
+    "before_paid_submit_replay_started_proven": false,
+    "browser_actor_blob_equals_prior_163ab869": true,
+    "web_app_explicit_consent_branch_found": false,
+    "web_app_explicit_replay_feature_flag_branch_found": false,
+    "runtime_remote_recording_policy": "unknown_not_queried",
+    "runtime_sdk_loaded_or_recording_state": "unknown_not_executed"
+  },
+  "findings": [
+    {
+      "file": "scripts/acceptance/run-observability-browser.mjs",
+      "lines": [
+        59,
+        67,
+        264,
+        267,
+        331,
+        348
+      ],
+      "fact": "normalSession is ordinary auth /api/auth/get-session, not PostHog. The final submit gate checks fresh browser, login/workspace/profile, official backend response and source revision; no PostHog, Replay, recording or analytics-session check exists."
+    },
+    {
+      "file": "instrumentation-client.ts",
+      "lines": [
+        10,
+        16,
+        31,
+        46,
+        51,
+        54
+      ],
+      "fact": "SDK init is conditional on posthogConfig.token. Local config opts into recording availability (disable_session_recording:false), sampleRate:1, input/text/attribute masking, blocked sensitive media/contenteditable, headers/body/console disabled. The loaded callback only registers safe properties and a capture sink; it publishes no readiness proof."
+    },
+    {
+      "file": "lib/analytics-policy.ts",
+      "lines": [
+        13,
+        19,
+        26,
+        38
+      ],
+      "fact": "Replay URL/request metadata is sanitized; $snapshot explicitly survives with only token/distinct/session/window/lib/snapshot keys. Other events use a narrow allowlist. This path does not contain a consent or Replay feature-flag gate."
+    },
+    {
+      "file": "lib/posthog-config.ts",
+      "lines": [
+        2,
+        6
+      ],
+      "fact": "Public build token comes from NEXT_PUBLIC_POSTHOG_KEY with empty-string fallback. Ingestion host chooses POSTHOG_HOST, then NEXT_PUBLIC_POSTHOG_HOST, then US default. Presence/correct deployment values were not queried."
+    },
+    {
+      "file": "app/[locale]/layout.tsx",
+      "lines": [
+        60,
+        63
+      ],
+      "fact": "PostHogAnalytics mounts only when posthogConfig.token is truthy; no consent UI or Replay feature flag wraps it in this layout."
+    },
+    {
+      "file": "components/posthog-analytics.tsx",
+      "lines": [
+        17,
+        33
+      ],
+      "fact": "Waits for auth resolution, handles reset/identify, tags smoke accounts test_account:true, sends sanitized pageview and reloads flags. No Replay-specific feature-flag gate or smoke-account exclusion appears in this Web path."
+    },
+    {
+      "file": "packages/protocol/src/analytics-client.ts",
+      "lines": [
+        1,
+        3,
+        51,
+        79
+      ],
+      "fact": "A separate SDK-independent desktop/phone analytics helper has enabled opt-in/out control. The inspected Web bootstrap/layout/component does not import this helper; it is not evidence of a consent gate in this real browser actor's path."
+    },
+    {
+      "file": "package.json",
+      "fact": "Web posthog-js dependency is pinned to 1.438.13; exact runtime/public API behavior was not inferred from an uninspected SDK implementation."
+    }
+  ],
+  "narrow_recommendation": [
+    "Add one bounded, fail-closed readiness condition immediately before the existing single paid Create task click.",
+    "Use the real browser's initialized SDK/current session and actual recording-start state; if a small bridge is needed, expose only a read-only safe status and actual session identity from the existing client callback. Do not inject storage/IDs, opt in, force-start recording, or assume an ESM SDK is available as window.posthog.",
+    "Require a genuine recording-start observation and, where available through closed metadata, a successful snapshot transport acknowledgement for the same current session. Never treat merely allocating/reading an ID or a pageview as Replay-start proof; do not inspect snapshot payload.",
+    "Record only closed readiness booleans, actual opaque session ID, bounded timestamps and a closed failure code. Unavailable/unready/unknown must abort before submitClicks becomes 1 and use existing cleanup.",
+    "Keep the scope to this actor/client readiness seam; no consent framework, project configuration change, generalized browser framework or historical replay fabrication is proposed."
+  ],
+  "remaining_limits": [
+    "Source config is not evidence that the production key, SDK script, remote recording policy or upload transport is currently functioning.",
+    "A startup/transport receipt still does not prove native playback or masking; final Replay visual verification remains required.",
+    "No actual PostHog session ID was fetched, synthesized or copied in this review."
+  ],
+  "mutations": {
+    "application_code": 0,
+    "posthog_configuration": 0,
+    "recording_start": 0,
+    "model_calls": 0,
+    "tests": 0,
+    "git_refs": 0
+  }
+}

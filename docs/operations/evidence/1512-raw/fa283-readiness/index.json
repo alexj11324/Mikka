@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-fa283-ci-mcp-repair-and-production-readiness",
+  "createdAt": "2026-11-07 23:44:17 UTC",
+  "parentEvidence": "68019638da54753f22ad130b7f8eecdb5c8d5167",
+  "candidate": {
+    "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "main": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "actualCanonicalCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "ci": {
+      "run": 42424187095,
+      "status": "completed",
+      "conclusion": "success",
+      "jobsSucceeded": 11,
+      "oidcNormalSkip": 1
+    },
+    "desktop": {
+      "run": 42424186827,
+      "macJob": 128560760688,
+      "reportedFinalJobConclusion": "success",
+      "budgetRawRecovery": "pending",
+      "noBudgetPassClaimAtThisSnapshot": true
+    }
+  },
+  "mcpRepair": {
+    "frozenUnreferencedSourceFiles": 9,
+    "review": "root and independent final review found no source blocker",
+    "oldDaemon": {
+      "passed": 20,
+      "failed": 3
+    },
+    "oldActualHttpApi": {
+      "passed": 0,
+      "failed": 2
+    },
+    "newDaemon": {
+      "passed": 43,
+      "failed": 0
+    },
+    "newActualHttpApi": {
+      "passed": 2,
+      "failed": 0
+    },
+    "lintScope": "one new API test; daemon paths excluded by existing ignore",
+    "sandbox": "stopped; root independently read back",
+    "publishedToProductRef": false,
+    "productionAccepted": false
+  },
+  "browserReplay": {
+    "sourceGapConfirmed": true,
+    "fix": "in progress; required before paid real browser submission",
+    "actualPlaybackAndMasking": "not yet proven"
+  },
+  "posthog": {
+    "scouts": "two enabled and active; fixed metadata readback only",
+    "notebook": "stopped kernel, historical cells only",
+    "actualCaseQueriesExecuted": false
+  },
+  "productionModelCalls": 0,
+  "issueClosed": false,
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/src/agents/run-apps.ts",
+      "bytes": 2419,
+      "sha256": "d2d45f84b533e1f5e9ca2ca923909db5151fff6197577532e316feaf4a82b5cb",
+      "blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/src/runs/supervisor.ts",
+      "bytes": 100337,
+      "sha256": "d4eb4e7695e117b3df4230957e52fbe3cc0cf9dd2af279b2ab1abd957a52529d",
+      "blob": "be6dfe96d511232ca4d758b432ca7045df4be65e"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/src/agents/run-context.ts",
+      "bytes": 30602,
+      "sha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3",
+      "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/src/agents/mikka-mcp.mjs",
+      "bytes": 2621,
+      "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21",
+      "blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "bytes": 50533,
+      "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+      "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+      "bytes": 2313,
+      "sha256": "823a45716a7ef2afd86ac5b6e8fc6d3bc7ec61f932e2566e44481727a85a0fa9",
+      "blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/test/project-decisions.test.ts",
+      "bytes": 10477,
+      "sha256": "8b7df551d1a194a358c24fa3f83a9a9c225fbbab9891752bfb01e1566c0d2c8a",
+      "blob": "8f3c58b4adaf8698428a4caf38e11288907110dc"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/packages/daemon/test/mikka-mcp-bridge.test.ts",
+      "bytes": 11020,
+      "sha256": "2b988d110fc38fba5324f67edda588dac54511609ecf9e3aaaab4f4c49ca5c51",
+      "blob": "81dc17cc151b67b155ab062148d3639112f3ed39"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/apps/api/runtime/request-trace.test.ts",
+      "bytes": 4338,
+      "sha256": "18f00c59d779e192a814ab18fad5c8c8ba870e5671194bd627f051526d2bd359",
+      "blob": "e20f58e68b374845b2f72af02706a668f52728f8"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/install.log",
+      "bytes": 944,
+      "sha256": "8b560c64ee36565cddcbd901916e446cf3ab1266e03f548d2995a6d61d98290a",
+      "blob": "107677443802bfcbbb488bf30a62e308a7d8dd24"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/install-retry.log",
+      "bytes": 217,
+      "sha256": "765ef6ae87f0d3f007f4ddd4758d727bf2761334f4faa8caad1834c27dde897a",
+      "blob": "304df18abe6fd1618c49e39c238b59ec21d577fa"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/install-complete.log",
+      "bytes": 67,
+      "sha256": "707fc9263923eae5d2a1c071477c05b70c6c3d9f10ebccd3f065bf7fa008f599",
+      "blob": "d3ed312906fa6ffb51b8aa7a834862de3268f8ac"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/install-semver.log",
+      "bytes": 50,
+      "sha256": "ffa4a6694fdbeba230ee44cd60715f6c8e2e9fa38fb71a8a64ba6e9e5dacc6a5",
+      "blob": "62e1323f542822f92336ca8f8843014f9a225e27"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-daemon.tap",
+      "bytes": 1554,
+      "sha256": "b41166998f0c889814e675d6fb9049489709587f2aa33c8b334d1f12445084e8",
+      "blob": "6a5db49356ea7a18beab0f1c122dbbf575f4927f"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-api.tap",
+      "bytes": 2602,
+      "sha256": "aed348a5ea00a01b76cda2aadae63562812b91bf2744f19b5cb0965ffbb0eca9",
+      "blob": "5ffc4c56e22b681be888c3fe62417450245091c1"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-results.json",
+      "bytes": 181,
+      "sha256": "3a3622b9944329338a1033452105311651960e458fddd5d30fa04d77efe413d3",
+      "blob": "4c505b71a251e77f2d73f4f17438869e9c399f9a"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-daemon-ready.tap",
+      "bytes": 1579,
+      "sha256": "6a7b76535540ac48a3b138908a5591521cac8b5401e338b556d8597b111ccbb0",
+      "blob": "46d8ff88eaafab533fa9276f7317b97b0b938b8c"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-api-ready.tap",
+      "bytes": 2603,
+      "sha256": "6e423bb30df8ac20c8cfc5f8cd6b2c1117d46fb8db2a67a643ae8d2f9e2ccb31",
+      "blob": "764f199cacc7af3ed26f87771b3e4858d580e3d2"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-ready-results.json",
+      "bytes": 193,
+      "sha256": "21f9d1238867faf0d0d781aac7e308dd40b595556fd8ef2d59d0c4bac7bf7aaf",
+      "blob": "77193e574a09623bff303d2468e66144c9b438ad"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-daemon-final.tap",
+      "bytes": 8115,
+      "sha256": "d26c057d31092d31f38bd5252e9e133807acbbcf128be709a61f74a555874224",
+      "blob": "d308acb97fdd0ede4b6172cc4a8671eafd2642b9"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-api-final.tap",
+      "bytes": 2602,
+      "sha256": "95600a84e9f188804027154e7869ba55004b4060d9a0c26146d2edcf6816fae6",
+      "blob": "7ca07a9ecbfa3ce5420ca34ff95d89fa95b0fb9b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/red-final-results.json",
+      "bytes": 193,
+      "sha256": "8fece449779858c7ef711820d6e27cd3eaca5fd811338ab6613617ac18c4f2b8",
+      "blob": "652c93b957337a306bbbb116d68b7b3bfb328947"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-daemon.tap",
+      "bytes": 10906,
+      "sha256": "78e887a73147877f0814cb1f9441924e1f8aca88210a8841ca018588c71ba5bc",
+      "blob": "41de75ae68e2c61fd509cb775447a7fa6338bf85"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-api.tap",
+      "bytes": 2603,
+      "sha256": "a341684d6010e173165e1fff76573734d6c95bc39e6ac16419f5cd74520f037d",
+      "blob": "f24487c71a14d89043a90dd0cbef7c470724d054"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-results.json",
+      "bytes": 186,
+      "sha256": "8d819e275b42d24980ff2f98c71067b206c4966a346a75dad41cbd59c4b287f2",
+      "blob": "a10af90db452a2c13f9d793fab9a1958fa3ffbaf"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-daemon-final.tap",
+      "bytes": 6972,
+      "sha256": "18de4c970f8f7d62ef8d66acefb8dcb6764be9fbd5992914ca387469356eefee",
+      "blob": "d00233cb04657d3850d2854f0909f4efb7fad787"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-api-final.tap",
+      "bytes": 582,
+      "sha256": "625b854ba872a27a81e9bb1ab215674f1211be931c8f638700cf8725cab5e7ef",
+      "blob": "121fc9dfc5830c866ca543ac4b89ab05f10e5371"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-final-results.json",
+      "bytes": 196,
+      "sha256": "b1d50a47235113a2b5a2ae7e33380e077f9749df24a82c889df2b3f7a4bc2004",
+      "blob": "cd458912050be98daf8a32397c620fe985922e37"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/green-daemon-frozen.tap",
+      "bytes": 7449,
+      "sha256": "f3238d6d419acdf2abe8a4d6a2da549644debba3a097c4f66f6f0bea0a776f1d",
+      "blob": "dad88257e8af5f9dd17df48e8eb63ae1b45471ab"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/frozen-results.json",
+      "bytes": 225,
+      "sha256": "2cd30fb4146dcf56f5449ab36059cced54ee1297f17d39e8e5224e854cc6a55e",
+      "blob": "6e77f1b5d204a5c2d78669c7af232fea6f6e23f9"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/lint.log",
+      "bytes": 88,
+      "sha256": "82de42e3d1e6700c3dafdf83a5ad22b39a56d7326776844810132fe972f35f00",
+      "blob": "5a9c71c788c11a30b631300f1cbf49535ea48fbd"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/lint-frozen.log",
+      "bytes": 88,
+      "sha256": "e596c821fdf136cac96c3e1ea4081c29398d61b3b9a3a19420bead91766db4eb",
+      "blob": "b8618bffb8cf59a75efded3e3eff8d86f0f39134"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/patch-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/syntax-backend.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/syntax-stdio.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/validation-results.json",
+      "bytes": 264,
+      "sha256": "808d92617e97381a8ed3a3775808af931b448184f0186e63a9ca63b7ba56ac6a",
+      "blob": "22204be3b7477bba1bffb8247326e7c7f28fb2fc"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/base-verification.json",
+      "bytes": 1145,
+      "sha256": "2eee23fad867f3acb88dc5f75d460a23e500918dd45eb1edd97c919ce92d62bd",
+      "blob": "d601bb19707fd7bb7ebe7924e29fdd549cb25c43"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/source-manifest.json",
+      "bytes": 2022,
+      "sha256": "dd42d850a5bc927da720195d21d90fea2162e3eed302cb59f6e82e0fd307b0a5",
+      "blob": "6ddc6a77039b3b360cf4db1b38c7288108b8ab61"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/source.diff",
+      "bytes": 23985,
+      "sha256": "a6634cb4909bcb53cda24ac9aeda6ab4652bf156586e227f622862b9721b42f0",
+      "blob": "8c1bf70e11f2ade655fe761ade547c2d0305023a"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/deps/package.json",
+      "bytes": 560,
+      "sha256": "2dbe6701f41cd62f311ed87a27d171206af23cabce81d5fe130a23c54f98be04",
+      "blob": "6d4abe95db319815465fa2868184c565a7d7d432"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/runtime.json",
+      "bytes": 177,
+      "sha256": "3795136fece6bb9c2e2fe44699ba2094bdcf3176d8911206b5dd053d38c78a9d",
+      "blob": "fbb6bcea669b21f559ea4ebde086ac05ae20eb36"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/resource-cleanup.json",
+      "bytes": 861,
+      "sha256": "d963deb1a82b336f8c0cf9784d8b0f19412531ad9aa66e497f79ad7100f2dbaa",
+      "blob": "093d12a0f5173cc257e6513eae50886be8c6e4a0"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/unapplied-command-failure.json",
+      "bytes": 477,
+      "sha256": "69096f57328889a277bbb8c6f25cbabe1d0d1497aa0643b29d97a889a70fa66e",
+      "blob": "6418f838dc659a02d16d58c8eef4870ecc90ad65"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/prior-source-audit.json",
+      "bytes": 10645,
+      "sha256": "87a61c2424b3a8d55b85062a8a745e51b7a0c5f540b0015f1d349352172de074",
+      "blob": "0c855908db3913584152ff8ae2efd25f336a3131"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/decision-mcp-traceparent-source-validation.json",
+      "bytes": 17485,
+      "sha256": "74675af3fc4fc6131724f13ab42cbcad1d7cf22f87e403043335749fcce9c36b",
+      "blob": "15710aa58725d29971b66c2535d6ffeefbd9fc93"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/index.json",
+      "bytes": 10299,
+      "sha256": "a6b93df2c0b3f411bc5c58b9fbf979a591556f2e34973b5dd6c0a41e47e449d2",
+      "blob": "bb34e03601bd6e4dec4657005c1419954fb6ee79"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/independent-mcp-review.json",
+      "bytes": 7968,
+      "sha256": "b5e111552f204307c98315a372a5ec0d8e447e0a19f1abf1a25443a40e6257d3",
+      "blob": "c0802b8c123665a4d14eeecb701ab8f0bd37228b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/decision-mcp-traceparent/root-mcp-review-and-resource-cleanup.safe.json",
+      "bytes": 2616,
+      "sha256": "a43d6d8947830689d9f61776f91e1c5738dbd122e199d541e1b3572e216de98b",
+      "blob": "a999f029db451b3aa53da389806ca88c1e2fdd53"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/posthog-readiness-20261107.safe.json",
+      "bytes": 30076,
+      "sha256": "cdf0c010e0c3924f8adfa03fb69c22fef50f8631c6af3ec2d1c0d28940c53cdc",
+      "blob": "811d3b3e5dbe01cf1bc43e57e619f80ab72c4453"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/supplemental-service-environment.prepared.sql",
+      "bytes": 1294,
+      "sha256": "0992dc661c46dc0f21713031275d4fba4324fc0b3fdbe593851f218bccfeddaa",
+      "blob": "efb4a6dd764729d8b7db9afee3f39ed913af092d"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/replay-playback-masking.prepared.json",
+      "bytes": 5525,
+      "sha256": "c3a1e2769f4fb3ef92e6c3826eb80076af86e16f78441c0b403a671196167e03",
+      "blob": "b6113a736d577d78034028e2f2743eab0d346d1d"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/production-posthog-handoff.zh-CN.md",
+      "bytes": 11413,
+      "sha256": "f9149cc345e01d96e5e3594fe89e1197503f360c47894fb5ecbb7712ac120be4",
+      "blob": "900e3b703fd713d2807289909d1577f7603343cc"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/browser-replay-presubmit-source-review-fa283.safe.json",
+      "bytes": 8355,
+      "sha256": "75d19cfe5d7b04d027c4c21d2f0bf8dd6190b6ee0ee34c5fc0e920de62c04bb0",
+      "blob": "d02a92698954b885649454e6814b626a86662d6d"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/fa283-canonical-ci.safe.json",
+      "bytes": 4728,
+      "sha256": "55877b6477b09def317e451f1bb012871106c215e1bc70efff67bcc3168f1bb4",
+      "blob": "e82773414e1da1c601e4204a1bd98faa41030657"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/fa283-targeted-db-receipt.json",
+      "bytes": 6864,
+      "sha256": "ebde5726af9145d6d9897db9680cb87a9b7d27b272abf81584cfa4a2ac21f5a7",
+      "blob": "3ae6ccde3011d1238d445a07b2d5ac07600bfc34"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/fa283-readiness/main047-web-guard.safe.json",
+      "bytes": 937,
+      "sha256": "e5a48f54e9e765e97a1fdb6935bd1c4145229d0a996569b94984163c5773da33",
+      "blob": "254b49f5030af10220d219e05f471d192b463b6a"
+    }
+  ],
+  "filesWithoutIndex": 57,
+  "totalBytesWithoutIndex": 412551,
+  "claims": "CI, source tests, readiness and cleanup are distinct from production acceptance. Earlier failures and nonacceptance attempts are retained."
+}

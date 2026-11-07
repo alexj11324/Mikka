@@ -1,0 +1,56 @@
+[
+  {
+    "path": "packages/daemon/src/agents/run-apps.ts",
+    "bytes": 2419,
+    "sha256": "d2d45f84b533e1f5e9ca2ca923909db5151fff6197577532e316feaf4a82b5cb",
+    "blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b"
+  },
+  {
+    "path": "packages/daemon/src/runs/supervisor.ts",
+    "bytes": 100337,
+    "sha256": "d4eb4e7695e117b3df4230957e52fbe3cc0cf9dd2af279b2ab1abd957a52529d",
+    "blob": "be6dfe96d511232ca4d758b432ca7045df4be65e"
+  },
+  {
+    "path": "packages/daemon/src/agents/run-context.ts",
+    "bytes": 30602,
+    "sha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3",
+    "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+  },
+  {
+    "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+    "bytes": 2621,
+    "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21",
+    "blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f"
+  },
+  {
+    "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+    "bytes": 50533,
+    "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+    "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2"
+  },
+  {
+    "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+    "bytes": 2313,
+    "sha256": "823a45716a7ef2afd86ac5b6e8fc6d3bc7ec61f932e2566e44481727a85a0fa9",
+    "blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa"
+  },
+  {
+    "path": "packages/daemon/test/project-decisions.test.ts",
+    "bytes": 10477,
+    "sha256": "8b7df551d1a194a358c24fa3f83a9a9c225fbbab9891752bfb01e1566c0d2c8a",
+    "blob": "8f3c58b4adaf8698428a4caf38e11288907110dc"
+  },
+  {
+    "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+    "bytes": 11020,
+    "sha256": "2b988d110fc38fba5324f67edda588dac54511609ecf9e3aaaab4f4c49ca5c51",
+    "blob": "81dc17cc151b67b155ab062148d3639112f3ed39"
+  },
+  {
+    "path": "apps/api/runtime/request-trace.test.ts",
+    "bytes": 4338,
+    "sha256": "18f00c59d779e192a814ab18fad5c8c8ba870e5671194bd627f051526d2bd359",
+    "blob": "e20f58e68b374845b2f72af02706a668f52728f8"
+  }
+]

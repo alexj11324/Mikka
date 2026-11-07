@@ -1,0 +1,22 @@
+[
+  {
+    "name": "lint",
+    "exit": 0,
+    "bytes": 88
+  },
+  {
+    "name": "diff-check",
+    "exit": 1,
+    "bytes": 0
+  },
+  {
+    "name": "syntax-backend",
+    "exit": 0,
+    "bytes": 0
+  },
+  {
+    "name": "syntax-stdio",
+    "exit": 0,
+    "bytes": 0
+  }
+]

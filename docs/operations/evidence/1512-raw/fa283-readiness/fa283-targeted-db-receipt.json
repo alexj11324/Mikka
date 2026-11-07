@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "kind": "fa283-canonical-db-targets",
+  "run": 42424187095,
+  "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "actualCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "postgres": [
+    {
+      "kind": "pg2",
+      "jobId": 128558894818,
+      "actualCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+      "postgresVersions": [
+        "PostgreSQL 17.11"
+      ],
+      "selection": {
+        "shard": "2/4",
+        "total": 70,
+        "scripts": [
+          "test:account-db",
+          "test:agent-tool-approval-db",
+          "test:bot-chats-db",
+          "test:cloud-backend-db",
+          "test:coordinator-issue-create-db",
+          "test:credentials-db",
+          "test:execution-settings-db",
+          "test:factory-check-independence-db",
+          "test:github-connections-db",
+          "test:live-db",
+          "test:onboarding-db",
+          "test:personal-mailbox-default-off-db",
+          "test:relation-cycle",
+          "test:schedules-db",
+          "test:self-improvement-unit",
+          "test:skill-semantic-db",
+          "test:visibility-db",
+          "test:workspace-migration-db"
+        ]
+      },
+      "raw": {
+        "bytes": 951946,
+        "sha256": "f85c61d76ef3439ae8438475635c9dfb41ae246eebde6e6211f8b44743c6efce"
+      },
+      "cleanup": [
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "kind": "pg3",
+      "jobId": 128558894748,
+      "actualCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+      "postgresVersions": [
+        "PostgreSQL 17.11"
+      ],
+      "selection": {
+        "shard": "3/4",
+        "total": 70,
+        "scripts": [
+          "test:active-agents",
+          "test:approved-writes-db",
+          "test:bot-threads-db",
+          "test:cloud-services-db",
+          "test:coordinator-issue-tools-db",
+          "test:desktop-auth",
+          "test:factory",
+          "test:factory-checks-db",
+          "test:group-turns",
+          "test:local-repository-migration-db",
+          "test:ops-db",
+          "test:plugins-db",
+          "test:run-dispatch",
+          "test:scope-detachment-db",
+          "test:session-mailbox-db",
+          "test:suggestion-artifact-db",
+          "test:web-auth-db"
+        ]
+      },
+      "raw": {
+        "bytes": 1772193,
+        "sha256": "36d6510da60be698fe53963cfc3ed0f77be83a12166ee45298162599ec765d7e"
+      },
+      "cleanup": [
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "kind": "pg4",
+      "jobId": 128558894778,
+      "actualCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+      "postgresVersions": [
+        "PostgreSQL 17.11"
+      ],
+      "selection": {
+        "shard": "4/4",
+        "total": 70,
+        "scripts": [
+          "test:activity-actor-db",
+          "test:artifact-migration-db",
+          "test:captures-db",
+          "test:computer-db",
+          "test:coordinator-native",
+          "test:device-enrollment-db",
+          "test:factory-all-dispatch-db",
+          "test:factory-monitor-db",
+          "test:groups",
+          "test:migration-steps-db",
+          "test:pat-api-db",
+          "test:preview-driver",
+          "test:run-publication-db",
+          "test:secrets-db",
+          "test:settings-activity-db",
+          "test:test-accounts-db",
+          "test:worker-authorization-db"
+        ]
+      },
+      "raw": {
+        "bytes": 429515,
+        "sha256": "14af1909c4cbdd42f169689e264f71086c004cc106a142ff43ff7a99fdf6c118"
+      },
+      "cleanup": [
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "script": "test:execution-settings-db",
+      "counts": [
+        "ℹ tests 4",
+        "ℹ suites 0",
+        "ℹ pass 4",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ],
+      "outcomes": [
+        {
+          "name": "bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "name": "mobile model API keeps normal selection and authenticates every temporary branch",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "name": "catalogue reads deduplicate in PostgreSQL, page without losing microseconds, and retain exact saved bindings",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "name": "execution settings: migration replay, CRUD, ordering, owner and workspace boundaries",
+          "passed": 1,
+          "failed": 0
+        }
+      ],
+      "canonicalGroupSha256": "79bf0ade95a99ed6b1c83748c75d1a8af25b1cdd1d0e0ce680b6104b3bba41b1",
+      "postGroupOkMarkerWithinThreeLines": 0,
+      "passBasis": "Canonical TAP counts and targeted case lines, with the job's Required DB suites and Stop containers steps completed/success; the optional trailing-marker probe is not used."
+    },
+    {
+      "script": "test:desktop-auth",
+      "counts": [
+        "ℹ tests 61",
+        "ℹ suites 0",
+        "ℹ pass 61",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ tests 3",
+        "ℹ suites 0",
+        "ℹ pass 3",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ tests 11",
+        "ℹ suites 0",
+        "ℹ pass 11",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ tests 44",
+        "ℹ suites 0",
+        "ℹ pass 44",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ],
+      "outcomes": [
+        {
+          "name": "full original web read and cached native RPC have identical queries, PostgreSQL bytes and data",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "name": "both fresh policies perform a DB check, and a missing cache does not duplicate that check",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "name": "cookie-only, foreign, tampered and obsolete cache values cannot choose a different identity",
+          "passed": 1,
+          "failed": 0
+        }
+      ],
+      "canonicalGroupSha256": "ed33e383dd7c3e426bf5af3f775f2f7c397a968101be9abf3244428ef345c522",
+      "postGroupOkMarkerWithinThreeLines": 0,
+      "passBasis": "Canonical TAP counts and targeted case lines, with the job's Required DB suites and Stop containers steps completed/success; the optional trailing-marker probe is not used."
+    }
+  ],
+  "production": false,
+  "rawLogsPersisted": false
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "green-daemon-frozen",
+    "exit": 0,
+    "elapsedMs": 8699
+  },
+  {
+    "name": "lint-frozen",
+    "exit": 0,
+    "elapsedMs": 64
+  },
+  {
+    "name": "patch-check",
+    "exit": 0,
+    "elapsedMs": 4
+  }
+]

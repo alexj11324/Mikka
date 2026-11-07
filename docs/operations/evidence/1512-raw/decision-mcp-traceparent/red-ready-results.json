@@ -1,0 +1,14 @@
+[
+  {
+    "name": "red-daemon-ready",
+    "exit": 1,
+    "elapsedMs": 2026,
+    "bytes": 1579
+  },
+  {
+    "name": "red-api-ready",
+    "exit": 1,
+    "elapsedMs": 622,
+    "bytes": 2603
+  }
+]

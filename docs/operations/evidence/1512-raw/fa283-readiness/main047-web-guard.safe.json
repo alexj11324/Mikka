@@ -1,0 +1,25 @@
+{
+  "kind": "main047-web-deployment-source-verification",
+  "run": 42423535129,
+  "job": 128556860597,
+  "raw": {
+    "bytes": 365291,
+    "sha256": "f1daa7d9b93387f7dc9969210cfa1612ca799eefaa68c3899ac1bef3e54bee2c"
+  },
+  "checkout": [
+    "2026-11-07T23:10:05.5518003Z 0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "2026-11-07T23:10:06.0466343Z 0479675e188efeac341b207d8616c4d7b9d4ee23"
+  ],
+  "publicVersionStep": [],
+  "rawLogsPersisted": false,
+  "publicVersionStepMetadata": [
+    {
+      "name": "Verify the public production version before releasing the deployment queue",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:30:35Z",
+      "completedAt": "2026-11-07T23:30:36Z"
+    }
+  ],
+  "scope": "The exact-source job and public-version guard succeeded at 23:30:36 UTC. This is historical deployment evidence, not a current live response or a future runtime template acceptance."
+}

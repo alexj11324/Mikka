@@ -1,0 +1,369 @@
+--- a/packages/daemon/src/agents/run-apps.ts
++++ b/packages/daemon/src/agents/run-apps.ts
+@@ -3,6 +3,7 @@
+ // never Composio: the server holds the credentials and owns allow/ask/deny.
+ // The bearer is the run's own token, which stops working when the run ends.
+ import type { RunAssignment } from '@mikka/protocol'
++import { runTraceHeaders, type RunTraceContext } from '@mikka/protocol/trace-context'
+ import { trustedServerEndpoint } from '../trusted-endpoint'
+ 
+ export interface RunApps {
+@@ -12,13 +13,15 @@
+ }
+ 
+ /** The host-issued task MCP authority is independent of connected apps. */
+-export interface RunMcp { url: string; token: string; decisionCatalogue?: NonNullable<RunAssignment['mcp']>['decisionCatalogue'] }
+-export function runMcp(mcp: RunAssignment['mcp']): RunMcp | undefined {
++export interface RunMcp { url: string; token: string; decisionCatalogue?: NonNullable<RunAssignment['mcp']>['decisionCatalogue']; traceparent?: string }
++export function runMcp(mcp: RunAssignment['mcp'], traceContext?: RunTraceContext): RunMcp | undefined {
+   if (!mcp) return undefined
+   let url: URL
+   try { url = new URL(mcp.url) } catch { return undefined }
+   if (!/\/api\/mcp\/?$/.test(url.pathname) || !trustedServerEndpoint(url) || !/^mkw_[A-Za-z0-9_-]{43}$/.test(mcp.token)) return undefined
+-  return { url: url.toString(), token: mcp.token, ...(mcp.decisionCatalogue ? { decisionCatalogue: mcp.decisionCatalogue } : {}) }
++  const traceparent = runTraceHeaders(traceContext).traceparent
++  return { url: url.toString(), token: mcp.token, ...(mcp.decisionCatalogue ? { decisionCatalogue: mcp.decisionCatalogue } : {}),
++    ...(traceparent ? { traceparent } : {}) }
+ }
+ 
+ const TOOLKIT = /^[a-z][a-z0-9_]{0,63}$/
+--- a/packages/daemon/src/runs/supervisor.ts
++++ b/packages/daemon/src/runs/supervisor.ts
+@@ -1525,15 +1525,16 @@
+     }
+     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
+       (name, value) => this.addCredential(runId, name, value))
++    const traceContext = daemonTracer.capture()
+     const baseOptions = {
+-      traceContext: daemonTracer.capture(),
++      traceContext,
+       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
+       github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
+         ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
+       githubEnvironment: run.github?.env,
+       onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
+       apps: runApps(assignment.mcp),
+-      mcp: runMcp(assignment.mcp),
++      mcp: runMcp(assignment.mcp, traceContext),
+       runId,
+       requireSessionResume: assignment.requireSessionResume,
+       kind: assignment.kind,
+--- a/packages/daemon/src/agents/run-context.ts
++++ b/packages/daemon/src/agents/run-context.ts
+@@ -246,8 +246,11 @@
+ }
+ 
+ function decisionMcpEnvironment(mcp: RunContextOptions['mcp']): Record<string, string> {
+-  return mcp ? { MIKKA_DECISION_MCP_URL: mcp.url, MIKKA_DECISION_MCP_TOKEN: mcp.token,
+-    ...(mcp.decisionCatalogue ? { MIKKA_DECISION_MCP_CATALOGUE: JSON.stringify(mcp.decisionCatalogue) } : {}) } : {}
++  // Override any inherited parent even when this run has no tracing carrier.
++  return { MIKKA_DECISION_MCP_TRACEPARENT: mcp?.traceparent ?? '', ...(mcp ? {
++    MIKKA_DECISION_MCP_URL: mcp.url, MIKKA_DECISION_MCP_TOKEN: mcp.token,
++    ...(mcp.decisionCatalogue ? { MIKKA_DECISION_MCP_CATALOGUE: JSON.stringify(mcp.decisionCatalogue) } : {}),
++  } : {}) }
+ }
+ 
+ function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'worktree' | 'handoffFile' | 'capturesDir' | 'tmpDir'>): McpServerSpec {
+@@ -281,7 +284,7 @@
+     ...(options.factoryCheck && (!options.factoryCheck.reportOnly || options.factoryCheck.inferCommand) ? {
+       factoryVerify: { cwd: files.worktree, command: options.verifyCommand ?? null, infer: options.factoryCheck.inferCommand },
+     } : {}),
+-    ...(options.mcp ? { decisionUrl: options.mcp.url, decisionToken: options.mcp.token,
++    ...(options.mcp ? { decisionUrl: options.mcp.url, decisionToken: options.mcp.token, decisionTraceparent: options.mcp.traceparent,
+       ...(options.mcp.decisionCatalogue ? { decisionCatalogue: JSON.stringify(options.mcp.decisionCatalogue) } : {}) } : {}),
+     ...(options.mcpHttpObservationUrl ? { observationUrl: options.mcpHttpObservationUrl } : {}),
+     env,
+--- a/packages/daemon/src/agents/mikka-mcp.mjs
++++ b/packages/daemon/src/agents/mikka-mcp.mjs
+@@ -30,6 +30,7 @@
+   artifactRoot: value('--factory-artifacts'), repositoryRoot: value('--repository-selection'),
+   decisionUrl: process.env.MIKKA_DECISION_MCP_URL, decisionToken: process.env.MIKKA_DECISION_MCP_TOKEN,
+   decisionCatalogue: process.env.MIKKA_DECISION_MCP_CATALOGUE,
++  decisionTraceparent: process.env.MIKKA_DECISION_MCP_TRACEPARENT,
+   observationUrl: process.env.MIKKA_MCP_HTTP_OBSERVATION_URL, env: process.env,
+ })
+ const send = response => { if (response) process.stdout.write(JSON.stringify(response) + '\n') }
+--- a/packages/daemon/src/agents/mikka-mcp-backend.mjs
++++ b/packages/daemon/src/agents/mikka-mcp-backend.mjs
+@@ -331,6 +331,11 @@
+   // conversation or credential is ever written to the handoff or worktree.
+   const decisionMcpUrl = config.decisionUrl
+   const decisionMcpToken = config.decisionToken
++  // Match protocol/trace-context's W3C validator in this dependency-free child.
++  // Only the host-bound carrier is used; env and tool arguments cannot replace it.
++  const parent = config.decisionTraceparent
++  const decisionTraceparent = typeof parent === 'string' && /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/.test(parent)
++    && parent.slice(3, 35) !== '0'.repeat(32) && parent.slice(36, 52) !== '0'.repeat(16) ? parent : undefined
+   const decisionMcpAvailable = Boolean(decisionMcpUrl && /^mkw_[A-Za-z0-9_-]{43}$/.test(decisionMcpToken ?? ''))
+   let decisionRpcId = 0
+   async function decisionRpc(operation, method, params) {
+@@ -345,7 +350,8 @@
+     try {
+       response = await fetch(decisionMcpUrl, {
+         method: 'POST', redirect: 'error', signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(20_000)]),
+-        headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18' },
++        headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18',
++          ...(decisionTraceparent ? { traceparent: decisionTraceparent } : {}) },
+         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+       })
+       observed.headers(response.status)
+--- a/packages/daemon/src/agents/mikka-mcp-backend.d.mts
++++ b/packages/daemon/src/agents/mikka-mcp-backend.d.mts
+@@ -26,6 +26,8 @@
+   decisionUrl?: string
+   decisionToken?: string
+   decisionCatalogue?: string
++  /** Host-bound telemetry only; never task authority or tool input. */
++  decisionTraceparent?: string
+   observationUrl?: string
+   env?: Record<string, string | undefined>
+ }
+--- a/packages/daemon/test/project-decisions.test.ts
++++ b/packages/daemon/test/project-decisions.test.ts
+@@ -5,7 +5,8 @@
+ import { tmpdir } from 'node:os'
+ import { join } from 'node:path'
+ import { createInterface } from 'node:readline'
+-import { MCP_SERVER_SCRIPT } from '../src/agents/run-context'
++import { MCP_SERVER_SCRIPT, prepareRunContextFiles } from '../src/agents/run-context'
++import type { RunTraceContext } from '@mikka/protocol/trace-context'
+ import { runMcp } from '../src/agents/run-apps'
+ 
+ type Result = { tools?: { name: string; inputSchema: unknown }[]; content?: { type: string; text: string }[]; isError?: boolean }
+@@ -15,15 +16,16 @@
+ const token = 'mkw_' + 'A'.repeat(43)
+ const schema = { type: 'object', properties: { idempotencyKey: { type: 'string' } }, required: ['idempotencyKey'], additionalProperties: false }
+ 
+-async function fixture(authority = true) {
++async function fixture(authority = true, tracing?: { carrier?: RunTraceContext; inherited?: string }) {
+   const directory = mkdtempSync(join(tmpdir(), 'mikka-decision-'))
+-  const requests: { authorization?: string; method: string; params: { name?: string; arguments?: unknown } }[] = []
++  const requests: { authorization?: string; traceparent?: string; baggage?: string; method: string; params: { name?: string; arguments?: unknown } }[] = []
+   let denied = false, writes = 0
+   const server = createServer(async (incoming, outgoing) => {
+     const chunks: Buffer[] = []
+     for await (const chunk of incoming) chunks.push(Buffer.from(chunk))
+     const request = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+-    requests.push({ authorization: incoming.headers.authorization, method: request.method, params: request.params })
++    requests.push({ authorization: incoming.headers.authorization, traceparent: incoming.headers.traceparent as string | undefined,
++      baggage: incoming.headers.baggage as string | undefined, method: request.method, params: request.params })
+     if (denied) { outgoing.writeHead(401); outgoing.end('not authorized'); return }
+     const result = request.method === 'tools/list'
+       ? { tools: [{ name: 'record_decision', inputSchema: schema }, { name: 'report', inputSchema: schema }] }
+@@ -39,8 +41,15 @@
+   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+   const address = server.address()
+   if (!address || typeof address !== 'object') throw new Error('test server unavailable')
+-  const child = spawn(process.execPath, [MCP_SERVER_SCRIPT, '--handoff', join(directory, 'handoff.json')], {
+-    env: { PATH: process.env.PATH, ...(authority ? { MIKKA_DECISION_MCP_URL: 'http://127.0.0.1:' + address.port + '/mikka/api/mcp', MIKKA_DECISION_MCP_TOKEN: token } : {}) },
++  const url = 'http://127.0.0.1:' + address.port + '/mikka/api/mcp'
++  const spec = tracing ? prepareRunContextFiles({ harness: 'codex', worktree: directory,
++    runDir: join(directory, 'run'), privateDir: directory,
++    mcp: authority ? runMcp({ url, token }, tracing.carrier) : undefined }).mcpServer() : {
++    command: process.execPath, args: [MCP_SERVER_SCRIPT, '--handoff', join(directory, 'handoff.json')],
++    env: authority ? { MIKKA_DECISION_MCP_URL: url, MIKKA_DECISION_MCP_TOKEN: token } : {},
++  }
++  const child = spawn(spec.command, spec.args, {
++    env: { PATH: process.env.PATH, MIKKA_DECISION_MCP_TRACEPARENT: tracing?.inherited, ...spec.env },
+     stdio: ['pipe', 'pipe', 'pipe'],
+   })
+   const pending = new Map<number, (value: Reply) => void>()
+@@ -106,3 +115,49 @@
+   expect(runMcp({ ...mcp, url: 'https://user:password@mikka.example/mikka/api/mcp' })).toBeUndefined()
+   expect(runMcp({ ...mcp, url: 'https://mikka.example/api/other' })).toBeUndefined()
+ })
++
++const firstParent = '00-11111111111111111111111111111111-1111111111111111-01'
++const secondParent = '00-22222222222222222222222222222222-2222222222222222-00'
++
++test('stdio carries only its captured run parent through catalogue and record requests', async () => {
++  const carrier = { traceparent: firstParent }
++  const first = await fixture(true, { carrier, inherited: secondParent })
++  const second = await fixture(true, { carrier: { traceparent: secondParent }, inherited: firstParent })
++  carrier.traceparent = secondParent
++  const input = { idempotencyKey: 'trace-fixture', traceparent: secondParent, baggage: 'private-canary' }
++  await Promise.all([first.call('tools/list'), second.call('tools/list')])
++  await first.call('tools/call', { name: 'record_decision', arguments: input })
++  await second.call('tools/call', { name: 'record_decision', arguments: { idempotencyKey: 'other-run' } })
++  expect(first.requests.map(request => request.traceparent)).toEqual([firstParent, firstParent])
++  expect(second.requests.map(request => request.traceparent)).toEqual([secondParent, secondParent])
++  expect([...first.requests, ...second.requests].every(request => request.authorization === 'Bearer ' + token && request.baggage === undefined)).toBe(true)
++  expect(first.requests[1].params.arguments).toEqual(input)
++})
++
++test.each([
++  ['missing', undefined],
++  ['malformed', { traceparent: 'private-canary' }],
++  ['zero-trace', { traceparent: '00-' + '0'.repeat(32) + '-1111111111111111-01' }],
++  ['zero-parent', { traceparent: '00-' + '1'.repeat(32) + '-' + '0'.repeat(16) + '-01' }],
++  ['newline', { traceparent: firstParent + '\r\nprivate-canary: x' }],
++  ['flags-width', { traceparent: firstParent.slice(0, -2) + '001' }],
++  ['flags-case', { traceparent: firstParent.slice(0, -2) + 'FF' }],
++] as const)('stdio drops a %s carrier without inheriting another run or rejecting business work', async (_kind, carrier) => {
++  const f = await fixture(true, { carrier, inherited: secondParent })
++  await f.call('tools/list')
++  const reply = await f.call('tools/call', { name: 'record_decision', arguments: { idempotencyKey: 'no-trace', traceparent: firstParent } })
++  expect(reply.result?.isError).not.toBe(true)
++  expect(f.requests).toHaveLength(2)
++  expect(f.requests.every(request => request.traceparent === undefined && request.authorization === 'Bearer ' + token)).toBe(true)
++})
++
++test('the host ignores assignment telemetry and a trace carrier never supplies task authority', async () => {
++  const mcp = { url: 'https://mikka.example/mikka/api/mcp', token, traceparent: secondParent }
++  expect(runMcp(mcp)).toEqual({ url: mcp.url, token })
++  expect(runMcp(mcp, { traceparent: firstParent, runId: 'opaque-run', sessionId: 'opaque-session' }))
++    .toEqual({ url: mcp.url, token, traceparent: firstParent })
++  const f = await fixture(false, { carrier: { traceparent: firstParent }, inherited: secondParent })
++  expect((await f.call('tools/list')).result?.tools?.some(tool => tool.name === 'record_decision')).toBe(false)
++  expect((await f.call('tools/call', { name: 'record_decision', arguments: {} })).error?.code).toBe(-32602)
++  expect(f.requests).toEqual([])
++})
+--- a/packages/daemon/test/mikka-mcp-bridge.test.ts
++++ b/packages/daemon/test/mikka-mcp-bridge.test.ts
+@@ -5,6 +5,8 @@
+ import { join } from 'node:path'
+ import { tmpdir } from 'node:os'
+ import { prepareMikkaMcpBridge } from '../src/agents/mikka-mcp-bridge'
++import { prepareRunContextFiles, runMcpBackendContext } from '../src/agents/run-context'
++import { runMcp } from '../src/agents/run-apps'
+ 
+ const sdkRequire = createRequire(createRequire(import.meta.url).resolve('@anthropic-ai/claude-agent-sdk'))
+ const { Client } = sdkRequire('@modelcontextprotocol/sdk/client/index.js')
+@@ -93,3 +95,68 @@
+   await expect(call).rejects.toThrow()
+   await bridge.close()
+ }, 10000)
++
++const firstParent = '00-11111111111111111111111111111111-1111111111111111-01'
++const secondParent = '00-22222222222222222222222222222222-2222222222222222-00'
++async function tracedBridge(parent?: string) {
++  const f = fixture(), requests: { traceparent?: string; authorization?: string; baggage?: string; params: unknown }[] = []
++  const server = createServer(async (request, response) => {
++    const chunks: Buffer[] = []
++    for await (const chunk of request) chunks.push(Buffer.from(chunk))
++    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
++    requests.push({ traceparent: request.headers.traceparent as string | undefined, authorization: request.headers.authorization,
++      baggage: request.headers.baggage as string | undefined, params: body.params })
++    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
++      jsonrpc: '2.0', id: body.id, result: { content: [{ type: 'text', text: 'recorded' }] },
++    }))
++  })
++  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
++  cleanups.push(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) })
++  const address = server.address()
++  if (!address || typeof address === 'string') throw Error('fixture listener')
++  const options = { harness: 'claude_code' as const, worktree: f.root, runDir: join(f.root, 'run'), privateDir: f.root,
++    mcp: runMcp({ url: `http://127.0.0.1:${address.port}/api/mcp`, token: 'mkw_' + 'A'.repeat(43),
++      decisionCatalogue: JSON.parse(catalogue) }, parent ? { traceparent: parent } : undefined) }
++  const files = prepareRunContextFiles(options)
++  const context = runMcpBackendContext(options, files, { PATH: process.env.PATH, MIKKA_DECISION_MCP_TRACEPARENT: secondParent })
++  const bridge = prepareMikkaMcpBridge({ captures: true, decisionCatalogue: catalogue }), client = await connect(bridge)
++  return { ...f, bridge, client, context, requests }
++}
++
++it('late-bound SDK workers keep distinct captured parents and cannot rebind to another run', async () => {
++  const first = await tracedBridge(firstParent), second = await tracedBridge(secondParent)
++  // Catalogue preparation carries no run authority and makes no business call.
++  await first.client.listTools()
++  expect(first.requests).toEqual([])
++  await first.bridge.bind(first.context, first.authority)
++  await second.bridge.bind(second.context, second.authority)
++  first.context.decisionTraceparent = secondParent
++  const input = { idempotencyKey: 'bound-run', traceparent: secondParent, baggage: 'private-canary' }
++  await first.client.callTool({ name: 'record_decision', arguments: input })
++  await second.client.callTool({ name: 'record_decision', arguments: { idempotencyKey: 'other-run' } })
++  expect(first.requests.map(request => request.traceparent)).toEqual([firstParent])
++  expect(second.requests.map(request => request.traceparent)).toEqual([secondParent])
++  expect(first.requests[0].params).toEqual({ name: 'record_decision', arguments: input })
++  expect([...first.requests, ...second.requests].every(request => request.authorization === 'Bearer mkw_' + 'A'.repeat(43) && request.baggage === undefined)).toBe(true)
++  await expect(first.bridge.bind(second.context, second.authority)).rejects.toThrow()
++  first.lifetime.abort()
++  await expect(first.client.callTool({ name: 'record_decision', arguments: { idempotencyKey: 'revoked' } })).rejects.toThrow()
++  expect(first.requests).toHaveLength(1)
++})
++
++it.each(['missing', 'malformed', 'zero-trace', 'zero-parent', 'newline', 'flags-width', 'flags-case'] as const)('the SDK backend drops a %s carrier while preserving business authority', async kind => {
++  const f = await tracedBridge()
++  // Exercise the child boundary independently of the host sanitizer.
++  f.context.decisionTraceparent = kind === 'missing' ? undefined : kind === 'malformed' ? 'private-canary'
++    : kind === 'newline' ? firstParent + '\r\nprivate-canary: x'
++      : kind === 'flags-width' ? firstParent.slice(0, -2) + '001'
++        : kind === 'flags-case' ? firstParent.slice(0, -2) + 'FF'
++    : kind === 'zero-trace' ? '00-' + '0'.repeat(32) + '-1111111111111111-01'
++      : '00-' + '1'.repeat(32) + '-' + '0'.repeat(16) + '-01'
++  await f.bridge.bind(f.context, f.authority)
++  const reply = await f.client.callTool({ name: 'record_decision', arguments: { idempotencyKey: 'without-parent', traceparent: firstParent } })
++  expect(reply.isError).not.toBe(true)
++  expect(f.requests).toHaveLength(1)
++  expect(f.requests[0].traceparent).toBeUndefined()
++  expect(f.requests[0].authorization).toBe('Bearer mkw_' + 'A'.repeat(43))
++})
+--- /dev/null
++++ b/apps/api/runtime/request-trace.test.ts
+@@ -0,0 +1,66 @@
++import assert from 'node:assert/strict'
++import { createServer } from 'node:http'
++import { after, before, test } from 'node:test'
++import { context, propagation, trace } from '@opentelemetry/api'
++import { W3CTraceContextPropagator } from '@opentelemetry/core'
++import { AlwaysOnSampler, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
++import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
++import { createMikkaMcpBackend } from '../../../packages/daemon/src/agents/mikka-mcp-backend.mjs'
++import { beginRequestTrace } from './request-trace'
++
++const memory = new InMemorySpanExporter()
++const provider = new NodeTracerProvider({ sampler: new AlwaysOnSampler(), spanProcessors: [new SimpleSpanProcessor(memory)] })
++before(() => provider.register({ propagator: new W3CTraceContextPropagator() }))
++after(async () => { await provider.shutdown(); trace.disable(); context.disable(); propagation.disable() })
++const catalogue = JSON.stringify({ version: 1, tool: { name: 'record_decision', title: 'Record decision',
++  description: 'Synthetic tracing fixture', inputSchema: { type: 'object', properties: {}, additionalProperties: false } } })
++
++for (const flags of ['01', '00']) test(`Decision backend HTTP preserves its daemon parent at the API boundary (flags ${flags})`, async () => {
++  memory.reset()
++  const parent = `00-11111111111111111111111111111111-2222222222222222-${flags}`
++  const observed: { traceparent: string | undefined; baggage: string | undefined }[] = []
++  const server = createServer(async (incoming, response) => {
++    const chunks: Buffer[] = []
++    for await (const chunk of incoming) chunks.push(Buffer.from(chunk))
++    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
++    observed.push({ traceparent: incoming.headers.traceparent as string | undefined, baggage: incoming.headers.baggage as string | undefined })
++    const request = new Request('https://mikka.test/api/mcp', { method: 'POST', headers: {
++      ...(incoming.headers.traceparent ? { traceparent: String(incoming.headers.traceparent) } : {}),
++      authorization: String(incoming.headers.authorization ?? ''),
++    } })
++    const active = beginRequestTrace(request, '/api/mcp')
++    active.run(() => trace.getTracer('mcp-fixture').startSpan('record_decision').end())
++    active.finish(200)
++    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
++      jsonrpc: '2.0', id: body.id, result: { content: [{ type: 'text', text: 'recorded' }] },
++    }))
++  })
++  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
++  const address = server.address()
++  assert.ok(address && typeof address !== 'string')
++  const backend = createMikkaMcpBackend({ handoffFile: '/unused-synthetic-handoff', decisionUrl: `http://127.0.0.1:${address.port}/api/mcp`,
++    decisionToken: 'mkw_' + 'A'.repeat(43), decisionCatalogue: catalogue, decisionTraceparent: parent,
++    env: { MIKKA_DECISION_MCP_TRACEPARENT: 'private-canary' } })
++  try {
++    const result = await backend.handle({ jsonrpc: '2.0', id: 1, method: 'tools/call',
++      params: { name: 'record_decision', arguments: { traceparent: 'private-canary', baggage: 'private-canary' } } })
++    assert.equal(result.error, undefined)
++    assert.notEqual(result.result?.isError, true)
++    assert.deepEqual(observed, [{ traceparent: parent, baggage: undefined }])
++    await provider.forceFlush()
++    const spans = memory.getFinishedSpans(), request = spans.find(span => span.name === 'POST /api/mcp')
++    const tool = spans.find(span => span.name === 'record_decision')
++    assert.ok(request && tool)
++    assert.equal(request.spanContext().traceId, parent.slice(3, 35))
++    assert.equal(request.parentSpanContext?.spanId, parent.slice(36, 52))
++    assert.equal(request.parentSpanContext?.traceFlags, Number.parseInt(flags, 16))
++    assert.equal(tool.spanContext().traceId, request.spanContext().traceId)
++    assert.equal(tool.parentSpanContext?.spanId, request.spanContext().spanId)
++    assert.equal(JSON.stringify(spans.map(span => span.attributes)).includes('private-canary'), false)
++    assert.equal(JSON.stringify(spans.map(span => span.attributes)).includes('mkw_'), false)
++  } finally {
++    await backend.close()
++    server.closeAllConnections()
++    await new Promise<void>(resolve => server.close(() => resolve()))
++  }
++})

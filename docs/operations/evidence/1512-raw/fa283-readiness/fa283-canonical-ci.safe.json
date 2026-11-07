@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "kind": "fa283-canonical-ci-completed",
+  "observedAt": "2026-11-07 23:43:17 UTC",
+  "run": {
+    "id": 42424187095,
+    "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-11-07T23:23:53Z"
+  },
+  "actualCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "jobs": [
+    {
+      "id": 128558810611,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:12:39Z",
+      "completedAt": "2026-11-07T23:12:52Z"
+    },
+    {
+      "id": 128558894738,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:15:13Z",
+      "completedAt": "2026-11-07T23:17:52Z"
+    },
+    {
+      "id": 128558894748,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:14:19Z",
+      "completedAt": "2026-11-07T23:19:09Z"
+    },
+    {
+      "id": 128558894752,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:14:49Z",
+      "completedAt": "2026-11-07T23:18:49Z"
+    },
+    {
+      "id": 128558894754,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:15:24Z",
+      "completedAt": "2026-11-07T23:18:49Z"
+    },
+    {
+      "id": 128558894766,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:15:31Z",
+      "completedAt": "2026-11-07T23:22:16Z"
+    },
+    {
+      "id": 128558894770,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:15:51Z",
+      "completedAt": "2026-11-07T23:23:33Z"
+    },
+    {
+      "id": 128558894778,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:15:18Z",
+      "completedAt": "2026-11-07T23:18:51Z"
+    },
+    {
+      "id": 128558894818,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:16:06Z",
+      "completedAt": "2026-11-07T23:19:57Z"
+    },
+    {
+      "id": 128558895522,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T23:12:52Z",
+      "completedAt": "2026-11-07T23:12:52Z"
+    },
+    {
+      "id": 128560541194,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:23:32Z",
+      "completedAt": "2026-11-07T23:23:34Z"
+    },
+    {
+      "id": 128561385522,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:23:50Z",
+      "completedAt": "2026-11-07T23:23:53Z"
+    }
+  ],
+  "targetedDbReceipt": "3ae6ccde3011d1238d445a07b2d5ac07600bfc34",
+  "core": {
+    "run": 42424187095,
+    "job": 128558894770,
+    "actualCheckout": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "raw": {
+      "bytes": 932132,
+      "sha256": "76ea0dba7565da16681afd31b1f7f0799b6722e8dc093c0d9a4e60534aa8ea42"
+    },
+    "targets": [
+      {
+        "name": "implicit default preflight requires server absence evidence and never writes a preference",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "name": "implicit default restores absence with the stored binding and revision, not the catalogue option",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "name": "implicit default never overwrites a preference created after preflight",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "name": "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "name": "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "name": "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+        "passed": 1,
+        "failed": 0
+      }
+    ],
+    "perFileCountClaimed": false,
+    "rawLogsPersisted": false
+  },
+  "scope": "Canonical CI only. macOS Native run remains separate and has no final budget result at this snapshot. No production model acceptance."
+}

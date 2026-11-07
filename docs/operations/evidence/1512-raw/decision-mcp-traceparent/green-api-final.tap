@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: Decision backend HTTP preserves its daemon parent at the API boundary (flags 01)
+ok 1 - Decision backend HTTP preserves its daemon parent at the API boundary (flags 01)
+  ---
+  duration_ms: 56.638921
+  type: 'test'
+  ...
+# Subtest: Decision backend HTTP preserves its daemon parent at the API boundary (flags 00)
+ok 2 - Decision backend HTTP preserves its daemon parent at the API boundary (flags 00)
+  ---
+  duration_ms: 17.00412
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 496.982235

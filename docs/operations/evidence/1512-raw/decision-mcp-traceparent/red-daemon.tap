@@ -1,0 +1,28 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/packages/daemon[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/mikka-mcp-bridge.test.ts[2m [ test/mikka-mcp-bridge.test.ts ][22m
+[41m[1m FAIL [22m[49m test/project-decisions.test.ts[2m [ test/project-decisions.test.ts ][22m
+[31m[1mError[22m: Cannot find package 'ai' imported from /tmp/issue1512-mcp-trace/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/packages/protocol/src/relay.ts[39m
+[36m [2m❯[22m ../protocol/src/relay.ts:[2m7:1[22m[39m
+    [90m  5|[39m // record. Every envelope carries `v`; unknown versions are refused.
+    [90m  6|[39m // Message content is AI SDK UIMessage / UIMessageChunk (see `runEvent…
+    [90m  7|[39m import {
+    [90m   |[39m [31m^[39m
+    [90m  8|[39m   asSchema,
+    [90m  9|[39m   safeValidateUIMessages,
+[90m [2m❯[22m ../protocol/src/index.ts:[2m18:1[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'ERR_MODULE_NOT_FOUND' }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 23:31:37
+[2m   Duration [22m 1.57s[2m (worker 97%, environment 3%)[22m
+

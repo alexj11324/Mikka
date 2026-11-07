@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-decision-mcp-carrier-independent-review",
+  "reviewedAt": "2026-11-07T23:42:00Z",
+  "base": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "result": "no_blocking_finding",
+  "mode": {
+    "readOnlySourceReview": true,
+    "testsRerun": false,
+    "newResources": false,
+    "productionRequests": 0,
+    "gitRefsMutated": false
+  },
+  "reviewedInputs": {
+    "sourceManifest": {
+      "gitBlob": "6ddc6a77039b3b360cf4db1b38c7288108b8ab61",
+      "bytes": 2022,
+      "sha256": "dd42d850a5bc927da720195d21d90fea2162e3eed302cb59f6e82e0fd307b0a5"
+    },
+    "sourceDiff": {
+      "gitBlob": "8c1bf70e11f2ade655fe761ade547c2d0305023a",
+      "bytes": 23985,
+      "sha256": "a6634cb4909bcb53cda24ac9aeda6ab4652bf156586e227f622862b9721b42f0"
+    },
+    "implementationReceipt": {
+      "bytes": 17485,
+      "sha256": "74675af3fc4fc6131724f13ab42cbcad1d7cf22f87e403043335749fcce9c36b",
+      "gitBlob": "15710aa58725d29971b66c2535d6ffeefbd9fc93"
+    },
+    "implementationIndex": {
+      "bytes": 10299,
+      "sha256": "a6b93df2c0b3f411bc5c58b9fbf979a591556f2e34973b5dd6c0a41e47e449d2",
+      "gitBlob": "bb34e03601bd6e4dec4657005c1419954fb6ee79"
+    }
+  },
+  "sources": [
+    {
+      "path": "packages/daemon/src/agents/run-apps.ts",
+      "bytes": 2419,
+      "sha256": "d2d45f84b533e1f5e9ca2ca923909db5151fff6197577532e316feaf4a82b5cb",
+      "blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "bytes": 100337,
+      "sha256": "d4eb4e7695e117b3df4230957e52fbe3cc0cf9dd2af279b2ab1abd957a52529d",
+      "blob": "be6dfe96d511232ca4d758b432ca7045df4be65e"
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "bytes": 30602,
+      "sha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3",
+      "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+      "bytes": 2621,
+      "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21",
+      "blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "bytes": 50533,
+      "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+      "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+      "bytes": 2313,
+      "sha256": "823a45716a7ef2afd86ac5b6e8fc6d3bc7ec61f932e2566e44481727a85a0fa9",
+      "blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa"
+    },
+    {
+      "path": "packages/daemon/test/project-decisions.test.ts",
+      "bytes": 10477,
+      "sha256": "8b7df551d1a194a358c24fa3f83a9a9c225fbbab9891752bfb01e1566c0d2c8a",
+      "blob": "8f3c58b4adaf8698428a4caf38e11288907110dc"
+    },
+    {
+      "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+      "bytes": 11020,
+      "sha256": "2b988d110fc38fba5324f67edda588dac54511609ecf9e3aaaab4f4c49ca5c51",
+      "blob": "81dc17cc151b67b155ab062148d3639112f3ed39"
+    },
+    {
+      "path": "apps/api/runtime/request-trace.test.ts",
+      "bytes": 4338,
+      "sha256": "18f00c59d779e192a814ab18fad5c8c8ba870e5671194bd627f051526d2bd359",
+      "blob": "e20f58e68b374845b2f72af02706a668f52728f8"
+    }
+  ],
+  "findings": [
+    {
+      "boundary": "host_capture",
+      "result": "preserved",
+      "evidence": [
+        "packages/daemon/src/runs/supervisor.ts",
+        "packages/daemon/src/agents/run-apps.ts"
+      ],
+      "detail": "One daemonTracer capture supplies both the existing run context and runMcp; assignment metadata cannot supply the carrier. Trusted URL and bearer validation are unchanged."
+    },
+    {
+      "boundary": "stdio_cross_run",
+      "result": "preserved",
+      "evidence": [
+        "packages/daemon/src/agents/run-context.ts",
+        "packages/daemon/src/agents/mikka-mcp.mjs"
+      ],
+      "detail": "Each MCP child receives its own explicit traceparent or an empty override. A missing carrier cannot inherit another run's tracing parent."
+    },
+    {
+      "boundary": "sdk_preinitialization",
+      "result": "preserved",
+      "evidence": [
+        "packages/daemon/src/agents/run-context.ts",
+        "packages/daemon/src/agents/mikka-mcp-backend.mjs"
+      ],
+      "detail": "The carrier enters private bind context after claim, not the immutable anonymous creation environment or fingerprint. Existing one-bind and live-authority checks remain."
+    },
+    {
+      "boundary": "child_validation",
+      "result": "preserved",
+      "detail": "The dependency-free child matches the protocol W3C v00 lowercase validation and rejects zero IDs. Only a validated primitive from config is captured; environment and tool arguments cannot replace it."
+    },
+    {
+      "boundary": "http_privacy",
+      "result": "preserved",
+      "detail": "Only traceparent is added to the existing fixed Decision MCP HTTP fetch. Authorization, body, redirect rejection and timeout remain unchanged. No baggage or run/session/user metadata is added."
+    },
+    {
+      "boundary": "actual_api_topology",
+      "result": "demonstrated_locally",
+      "detail": "The actual beginRequestTrace function receives HTTP traceparent, preserves trace/parent IDs and remote flags 01 and 00, and parents a child span. This synthetic handler does not exercise production token authorization or DB persistence."
+    }
+  ],
+  "validation": {
+    "sourceBytesShaAndGitBlobVerified": 9,
+    "actualRawResults": [
+      {
+        "path": "red-daemon-final.tap",
+        "gitBlob": "d308acb97fdd0ede4b6172cc4a8671eafd2642b9",
+        "passed": 20,
+        "failed": 3,
+        "exit": 1
+      },
+      {
+        "path": "red-api-final.tap",
+        "gitBlob": "7ca07a9ecbfa3ce5420ca34ff95d89fa95b0fb9b",
+        "passed": 0,
+        "failed": 2,
+        "skipped": 0,
+        "exit": 1
+      },
+      {
+        "path": "green-daemon-frozen.tap",
+        "gitBlob": "dad88257e8af5f9dd17df48e8eb63ae1b45471ab",
+        "passed": 43,
+        "failed": 0,
+        "exit": 0
+      },
+      {
+        "path": "green-api-final.tap",
+        "gitBlob": "121fc9dfc5830c866ca543ac4b89ab05f10e5371",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "exit": 0
+      }
+    ],
+    "directNegativeCases": [
+      "missing",
+      "malformed",
+      "zero trace ID",
+      "zero parent ID",
+      "newline",
+      "three-character flags",
+      "uppercase flags"
+    ],
+    "preservedControls": [
+      "distinct real stdio children",
+      "distinct SDK isolated workers",
+      "no business call before bind",
+      "rebind refused",
+      "revocation refused",
+      "poisoned inherited parent omitted",
+      "tool argument and mutable context cannot change parent",
+      "original business bearer preserved"
+    ],
+    "lint": {
+      "exit": 0,
+      "filesActuallyLinted": 1,
+      "scope": "new API test; daemon paths are ignored by existing lint configuration",
+      "gitBlob": "b8618bffb8cf59a75efded3e3eff8d86f0f39134"
+    },
+    "syntax": {
+      "files": 2,
+      "exit": 0
+    },
+    "patchCheck": {
+      "exit": 0
+    },
+    "fullTypes": "not_run_in_this_review_or_isolated_validation",
+    "independentReviewDoesNotRerunTests": true
+  },
+  "cleanup": {
+    "evidenceGitBlob": "093d12a0f5173cc257e6513eae50886be8c6e4a0",
+    "observedFromFrozenReceipt": {
+      "sandboxStatus": "stopped",
+      "independentGetStatus": "stopped",
+      "stoppedAt": "2026-11-07T23:37:07.631Z",
+      "remainingWorkerProcesses": 0,
+      "remainingOwnedFixtureDirectories": 0
+    },
+    "reviewerCreatedResources": 0
+  },
+  "limits": [
+    "Local W3C transport and extraction proof does not replace actual production Decision MCP trace evidence.",
+    "Final daemon/API typechecks and broader integration remain normal CI gates.",
+    "No source, test or remote branch was edited by this independent review."
+  ]
+}

@@ -1,0 +1,19 @@
+npm error code ERESOLVE
+npm error ERESOLVE unable to resolve dependency tree
+npm error
+npm error While resolving: undefined@undefined
+npm error Found: @opentelemetry/api@1.10.0
+npm error node_modules/@opentelemetry/api
+npm error   @opentelemetry/api@"1.10.0" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error peer @opentelemetry/api@">=1.0.0 <1.10.0" from @opentelemetry/core@2.12.0
+npm error node_modules/@opentelemetry/core
+npm error   @opentelemetry/core@"2.12.0" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /vercel/.npm/_logs/2026-11-07T23_26_20_490Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /vercel/.npm/_logs/2026-11-07T23_26_20_490Z-debug-0.log

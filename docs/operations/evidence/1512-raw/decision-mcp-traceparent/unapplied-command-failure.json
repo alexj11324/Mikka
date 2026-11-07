@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "test-support-command-failure",
+  "phase": "source-upload-before-application",
+  "code": "command_failed",
+  "reason": "argument_list_too_long",
+  "httpStatus": 400,
+  "sourceApplied": false,
+  "followingFiles": "green-daemon.tap and green-api.tap ran the unchanged base and are not successful validation",
+  "recovery": "Split exact UTF-8 source transfer into bounded arguments; application exit 0 and source hashes independently verified"
+}
