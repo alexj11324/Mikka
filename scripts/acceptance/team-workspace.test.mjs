@@ -72,8 +72,24 @@ function fixture(options = {}) {
     jar.receive(url, response.headers)
     return response.json()
   }
-  return { requests, run: () => selectTeamWorkspace({ ownerId: OWNER, json }) }
+  return { requests, run: onSelected => selectTeamWorkspace({ ownerId: OWNER, json, onSelected }) }
 }
+
+test('the private selection callback runs once only after all team and session fences pass', async () => {
+  const f = fixture(), selected = []
+  const report = await f.run(value => {
+    assert.equal(f.requests.at(-1).path, '/mikka/api/auth/get-session')
+    selected.push(value)
+  })
+  assert.deepEqual(selected, [{ workspaceId: TEAM, adminId: ADMIN }])
+  assert.deepEqual(report, await fixture().run())
+  for (const options of [{ noTeams: true }, { noAdmin: true }, { multipleMatches: true },
+    { dropCookie: true }, { adminChanged: true }, { membershipChanged: true }, { sessionChanged: true }]) {
+    let calls = 0
+    await assert.rejects(fixture(options).run(() => { calls++ }), TeamWorkspaceError)
+    assert.equal(calls, 0)
+  }
+})
 
 test('multiple active teams select only the unique policy admin match with normal cookies', async () => {
   for (const role of ['member', 'admin']) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** #1505: real, normal-session repository dispatch. No provider tokens or DB access.
  *
- * ACME_DEMO_EMAIL / ACME_DEMO_PASSWORD come from the existing prod:/ identity.
+ * SMOKE_OWNER_EMAIL / SMOKE_OWNER_PASSWORD come from the existing prod:/ identity.
  * The Coordinator is the public repository-dispatch entry. Its tool stream has
  * no server timestamp (tool.at is a text offset), so a live report deliberately
  * remains unaligned until the operator supplies the matching dispatch_timing
@@ -12,6 +12,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
+import { selectTeamWorkspace } from './team-workspace.mjs'
+import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MODELS = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' }
@@ -71,7 +73,7 @@ export function parseOptions(args, env = process.env) {
   }
   if (options.alignReport) { assert(options.dispatchTimings, 'dispatch_timings_required'); return options }
   for (const key of ['runs', 'maxStartupMs', 'timeoutMs']) options[key] = Number(options[key])
-  assert(UUID.test(options.workspace ?? ''), 'workspace_required')
+  assert(!options.workspace || UUID.test(options.workspace), 'workspace_invalid')
   assert(['both', 'claude_code', 'codex'].includes(options.harness), 'harness_invalid')
   assert(['baseline', 'acceptance', 'candidate'].includes(options.mode), 'mode_invalid')
   options.runtimeEvidence ??= options.mode === 'acceptance' ? 'required' : 'optional'
@@ -155,6 +157,67 @@ export function createSessionClient(origin, fetchImpl = fetch) {
     return value?.ok === true && 'data' in value ? value.data : value
   }
   return { request, json, rpc, clear: () => cookies.clear() }
+}
+
+/** Only the authorized shared test account is accepted; there is no owner-login fallback. */
+export function smokeAcceptanceAccount(env) {
+  const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
+  assert(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'smoke_account_required')
+  return { email, password }
+}
+
+/** Keep trusted IDs in memory. The caller restores the original normal session
+ * workspace even if a later membership/session fence rejects the selection. */
+export async function selectAcceptanceTeam(client, { ownerId, workspace }, rememberOriginal) {
+  const initial = await client.json('/api/workspace')
+  assert(typeof ownerId === 'string' && ownerId.length > 0 && initial.currentUserId === ownerId
+    && UUID.test(initial.workspace?.id ?? '') && initial.choices?.some(choice => choice.id === initial.workspace.id), 'workspace_identity_mismatch')
+  rememberOriginal(initial.workspace.id)
+  let selected
+  const evidence = await selectTeamWorkspace({ ownerId, json: (path, body) => {
+    assert(path.startsWith('/mikka/api/'), 'foreign_origin')
+    return client.json(path.slice('/mikka'.length), body === undefined ? undefined : {
+      ...post(body), headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' },
+    })
+  }, onSelected: value => { selected = value } })
+  assert(selected && (!workspace || workspace === selected.workspaceId), 'workspace_identity_mismatch')
+  return { ...selected, ownerId, evidence }
+}
+
+export async function restoreAcceptanceWorkspace(client, ownerId, workspaceId) {
+  const restored = await client.rpc('workspace.switchWorkspace', [workspaceId])
+  assert(restored.workspaceId === workspaceId, 'workspace_restore_failed')
+  const current = await client.json('/api/workspace'), session = await client.json('/api/auth/get-session')
+  assert(current.currentUserId === ownerId && current.workspace?.id === workspaceId && session.user?.id === ownerId, 'workspace_restore_failed')
+}
+
+export async function acceptanceBot(client, botId, fixtureId) {
+  let created = false
+  if (!botId) {
+    const value = await client.rpc('bots.createBot', [{ name: `测试1505 ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
+    assert(UUID.test(value.id ?? ''), 'bot_create_failed')
+    botId = value.id; created = true
+  }
+  assert(UUID.test(botId), 'bot_invalid')
+  // This normal GET only returns bots owned by this session in its selected workspace.
+  const bot = await client.json(`/api/bots/${botId}`)
+  assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+  return { botId, created, retention: 'retained_no_delete_api' }
+}
+
+async function chooseSharedChatModel(client, botId, harness) {
+  const provider = harness === 'codex' ? 'codex' : 'claude'
+  const menu = await client.rpc('execution-settings.getBotModelMenu', [botId])
+  const matches = (menu.groups ?? []).filter(group => group.kind === 'subscription' && group.provider === provider
+    && typeof group.owner === 'string' && group.owner.trim().length > 0).flatMap(group => group.options ?? [])
+    .filter(option => option.provider === provider && option.modelId === MODELS[harness] && UUID.test(option.id ?? ''))
+  assert(matches.length === 1, 'shared_chat_model_ambiguous')
+  const chosen = await client.rpc('execution-settings.chooseBotModel', [botId, matches[0].id]), current = chosen.current
+  // A successful shared choice creates a bot binding; catalogue de-duplication
+  // may expose that clone's ID on readback. The frozen run proves the source.
+  assert(current?.kind === 'subscription' && current.chosen === true && UUID.test(current.id ?? '') && current.fallback === undefined
+    && current.provider === provider && current.modelId === MODELS[harness]
+    && (current.available === true || current.availability === 'checking'), 'shared_chat_model_unavailable')
 }
 
 function readDispatchOutput(output) {
@@ -417,7 +480,7 @@ function safeIdentity(identity) {
     subscriptionAccess: identity.resourceBindings?.filter(resource => resource.kind === 'subscription').map(resource => resource.access) ?? [] }
 }
 
-async function subscriptionProof(client, record) {
+async function subscriptionProof(client, record, scope, profile) {
   const evidence = await client.json(`/api/runs/${record.runId}/evidence`), run = evidence.run
   assert(run?.id === record.runId && run.issueId === record.issueId && run.harness === record.harness
     && run.model === MODELS[record.harness] && run.credentialType === 'subscription'
@@ -428,8 +491,26 @@ async function subscriptionProof(client, record) {
   assert(UUID.test(device?.id ?? '') && identity.billingAccount?.model?.kind === 'subscription'
     && (record.placement.kind === 'cloud' ? identity.billingAccount?.runtime?.kind === 'e2b'
       : device.id === record.placement.deviceId), 'execution_device_mismatch')
+  const subscriptions = identity.resourceBindings.filter(resource => resource.kind === 'subscription')
+  const subscription = subscriptions[0], payer = identity.billingAccount.model
+  assert(identity.version === 1 && identity.requester === scope.ownerId && identity.executionPrincipal === scope.ownerId
+    && identity.botId === scope.botId && identity.botOwner === scope.ownerId && identity.outputOwner === scope.ownerId
+    && identity.workspaceId === scope.workspaceId && identity.personalResourcePolicy === 'requester_only'
+    && device.ownerId === scope.ownerId && device.access === 'owner'
+    && identity.billingAccount.runtime.ownerId === scope.ownerId
+    && identity.billingAccount.runtime.resourceId === (record.placement.kind === 'cloud' ? scope.ownerId : device.id)
+    && subscriptions.length === 1 && UUID.test(subscription?.id ?? '')
+    && subscription.ownerId === scope.adminId && subscription.access === 'workspace_share'
+    && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
+    && payer.ownerId === scope.adminId && payer.resourceId === subscription.id
+    && run.agentProfile.version === profile.version && run.agentProfile.digest === profile.digest && run.agentProfile.source === 'explicit',
+  'shared_subscription_identity_mismatch')
   record.execution = { harness: run.harness, model: run.model, credentialType: run.credentialType,
-    deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity) }
+    deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity),
+    sharedScope: { verified: true, requesterHash: sha(scope.ownerId).slice(0, 16), payerHash: sha(scope.adminId).slice(0, 16),
+      workspaceHash: scope.evidence.teamWorkspaceHash, connectionHash: sha(profile.model.source.connectionId).slice(0, 16),
+      bindingHash: sha(subscription.id).slice(0, 16), connectionRevision: subscription.revision,
+      profileVersion: profile.version, profileDigest: profile.digest, access: 'workspace_share' } }
 }
 
 export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now } = {}) {
@@ -489,13 +570,15 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
  * {request, json, rpc}, a dedicated test Bot and an authorized fixed Profile.
  * Profiles, account sessions and candidate devices remain the caller's scope.
  * Returns sanitized evidence even on failure, after cleaning only this issue. */
-export async function runSubscriptionCase({ client, botId, profileId, harness, model = MODELS[harness],
+export async function runSubscriptionCase({ client, botId, profileId, profile, scope, harness, model = MODELS[harness],
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
   now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
+  assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
+    && UUID.test(scope.workspaceId ?? '') && profile?.id === profileId && /^[a-f0-9]{64}$/.test(profile.digest ?? ''), 'shared_scope_required')
   assert(Object.hasOwn(MODELS, harness) && model === MODELS[harness], 'model_invalid')
   assert(repository === REPOSITORY && titlePrefix.includes('测试') && titlePrefix.length <= 80, 'fixture_scope_invalid')
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
@@ -512,9 +595,12 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
   try {
     await pin()
     const identity = await client.json('/api/auth/get-session')
-    assert(identity.user?.email?.toLowerCase() === 'alex@acme.aspectlylabs.com', 'session_identity_mismatch')
+    assert(identity.user?.id === scope.ownerId && isSmokeAccountEmail(identity.user.email), 'session_identity_mismatch')
+    const workspace = await client.json('/api/workspace')
+    assert(workspace.currentUserId === scope.ownerId && workspace.workspace?.id === scope.workspaceId, 'workspace_identity_mismatch')
     const bot = await client.json(`/api/bots/${botId}`)
     assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+    await chooseSharedChatModel(client, botId, harness)
     const created = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: {
       type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.` }] }],
     } }])
@@ -522,9 +608,9 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
     await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs }, now)
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
-    await subscriptionProof(client, record)
+    await subscriptionProof(client, record, scope, profile)
     await watchRun(client, record, timeoutMs, WebSocketImpl, now)
-    await subscriptionProof(client, record)
+    await subscriptionProof(client, record, scope, profile)
     await pin()
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
     if (record.requireAgentAcceptance) assert(record.runtimeTiming?.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'), 'official_agent_acceptance_missing')
@@ -549,19 +635,18 @@ export async function runSubscriptionCase({ client, botId, profileId, harness, m
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
   readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }) } = {}) {
-  const email = env.ACME_DEMO_EMAIL, password = env.ACME_DEMO_PASSWORD
-  assert(email?.toLowerCase() === 'alex@acme.aspectlylabs.com' && password, 'acme_account_required')
+  const { email, password } = smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
   const report = { schemaVersion: 1, issue: 1505, fixtureId, startedAt: iso(now()), mode: options.mode,
-    origin: options.origin, workspaceId: options.workspace, repository: REPOSITORY, requestedStrategy: options.strategy,
+    origin: options.origin, repository: REPOSITORY, requestedStrategy: options.strategy,
     strategyEvidence: 'operator_label_requires_template_or_pool_log_evidence', revision: options.revision ?? null,
     target: options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
     timingMethod: 'dispatch_run_entry to later of agent_start database receipt and actual official task acceptance; missing entry boundary is legacy lower-bound evidence only',
     executionGate: options.runtimeEvidence === 'required' ? 'later_of_agent_start_and_actual_official_cli_acceptance' : 'legacy_agent_start_actual_ack_unavailable',
     samples: [], cleanup: { errors: [] }, status: 'running' }
   const profiles = new Map()
-  let botId = options.botId, loggedIn = false, testBotValidated = false, timingVariableId
+  let botId = options.botId, loggedIn = false, testBotValidated = false, timingVariableId, scope, originalWorkspaceId, ownerId
   const pin = async () => {
     const { build } = await client.json('/api/version')
     assert(typeof build === 'string' && build.length <= 200, 'build_missing')
@@ -581,43 +666,46 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     const login = await client.request('/api/auth/sign-in/email', post({ email, password, rememberMe: false }))
     assert(login.ok, 'sign_in_failed'); loggedIn = true
     const identity = await client.json('/api/auth/get-session')
-    assert(identity.user?.email?.toLowerCase() === email.toLowerCase(), 'session_identity_mismatch')
+    assert(identity.user?.email?.toLowerCase() === email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'session_identity_mismatch')
+    ownerId = identity.user.id
     report.accountHash = sha(identity.user.id).slice(0, 16)
-    await client.rpc('workspace.switchWorkspace', [options.workspace])
+    scope = await selectAcceptanceTeam(client, { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
+    report.team = scope.evidence
     if (options.officialTiming === 'enabled') {
-      const listed = await client.rpc('workspace-secrets.listSecrets', [options.workspace])
+      const listed = await client.rpc('workspace-secrets.listSecrets', [scope.workspaceId])
       assert(Array.isArray(listed.secrets) && !listed.secrets.some(item => item.name === 'CLOUD_STARTUP_TIMING'), 'timing_variable_exists')
       const created = await client.rpc('workspace-secrets.createSecret', [{ name: 'CLOUD_STARTUP_TIMING', kind: 'env', value: '1',
-        note: `测试1505 ${fixtureId}`, scope: { type: 'repository', repository: REPOSITORY } }, options.workspace])
+        note: `测试1505 ${fixtureId}`, scope: { type: 'repository', repository: REPOSITORY } }, scope.workspaceId])
       assert(UUID.test(created.id ?? ''), 'timing_variable_create_failed')
       timingVariableId = created.id
       report.officialTiming = { enabled: true, variableId: timingVariableId, scope: 'acceptance_repository_only' }
     }
-    if (!botId) {
-      const bot = await client.rpc('bots.createBot', [{ name: `测试1505 ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
-      assert(UUID.test(bot.id ?? ''), 'bot_create_failed'); botId = bot.id
-      report.createdBotId = botId
-      report.botRetention = 'dedicated test Bot retained; no public Bot deletion API'
-    }
-    const bot = await client.json(`/api/bots/${botId}`)
-    assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+    const fixture = await acceptanceBot(client, botId, fixtureId)
+    botId = fixture.botId
+    if (fixture.created) report.createdBotId = botId
+    report.botRetention = fixture.retention
+    scope.botId = botId
     testBotValidated = true
     report.botId = botId
-    const order = await client.rpc('model-order.getModelOrder', [options.workspace])
+    const order = await client.rpc('model-order.getModelOrder', [scope.workspaceId])
     const harnesses = options.harness === 'both' ? ['claude_code', 'codex'] : [options.harness]
     for (const harness of harnesses) {
       try {
-        const candidate = order.candidates?.find(item => item.harness === harness && item.model === MODELS[harness]
+        const candidates = (order.candidates ?? []).filter(item => item.harness === harness && item.model === MODELS[harness]
           && item.source?.kind === 'subscription' && UUID.test(item.source.connectionId ?? ''))
-        assert(candidate, 'subscription_model_missing')
-        const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: options.workspace, requestId: randomUUID(), profile: {
+        assert(candidates.length === 1 && candidates[0].credentialOwnerId === scope.adminId, 'shared_subscription_model_missing_or_ambiguous')
+        const candidate = candidates[0]
+        const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
           name: `测试1505 ${fixtureId.slice(0, 8)} ${harness}`, description: 'Temporary startup measurement', enabled: true,
           harness, model: { mode: 'fixed', harness, model: MODELS[harness], source: candidate.source }, effort: 'low', roles: [],
           instructions: 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
         } }))
-        assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version), 'profile_create_failed')
+        assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version) && created.profile.version > 0, 'profile_create_failed')
         profiles.set(harness, created.profile)
-      } catch (error) { profiles.set(harness, { error: safeError(error) }) }
+        assert(/^[a-f0-9]{64}$/.test(created.profile.digest ?? '') && created.profile.harness === harness
+          && created.profile.model?.mode === 'fixed' && created.profile.model.harness === harness && created.profile.model.model === MODELS[harness]
+          && created.profile.model.source?.kind === 'subscription' && created.profile.model.source.connectionId === candidate.source.connectionId, 'profile_source_mismatch')
+      } catch (error) { profiles.set(harness, { ...profiles.get(harness), error: safeError(error) }) }
     }
     for (let index = 0; index < options.runs; index++) {
       const harness = harnesses[index % harnesses.length], sampleId = `${fixtureId.slice(0, 8)}_${index + 1}`
@@ -626,7 +714,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         report.samples.push({ sampleId, harness, status: 'failed', error: profile.error, cleanup: { status: 'passed', errors: [] } })
         continue
       }
-      const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, harness, sampleId,
+      const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
         sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl })
       report.samples.push(sample)
       if (['startup_build_mismatch', 'startup_build_changed', 'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error)) {
@@ -639,16 +727,20 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
   finally {
     if (loggedIn) {
       if (timingVariableId) {
-        try { await client.rpc('workspace-secrets.deleteSecret', [{ id: timingVariableId }, options.workspace]); report.officialTiming.cleaned = true }
+        try { await client.rpc('workspace-secrets.deleteSecret', [{ id: timingVariableId }, scope.workspaceId]); report.officialTiming.cleaned = true }
         catch (error) { report.cleanup.errors.push({ step: 'timing_variable_delete', id: timingVariableId, code: safeError(error) }) }
       }
       for (const profile of profiles.values()) if (profile.id) {
-        try { await client.json(`/api/factory/agent-profiles/${profile.id}`, { ...post({ workspaceId: options.workspace, version: profile.version }), method: 'DELETE' }) }
+        try { await client.json(`/api/factory/agent-profiles/${profile.id}`, { ...post({ workspaceId: scope.workspaceId, version: profile.version }), method: 'DELETE' }) }
         catch (error) { report.cleanup.errors.push({ step: 'profile_archive', id: profile.id, code: safeError(error) }) }
       }
       if (testBotValidated) {
         try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]) }
         catch (error) { report.cleanup.errors.push({ step: 'stop_test_bot', code: safeError(error) }) }
+      }
+      if (originalWorkspaceId) {
+        try { await restoreAcceptanceWorkspace(client, ownerId, originalWorkspaceId); report.cleanup.workspaceRestored = true }
+        catch (error) { report.cleanup.errors.push({ step: 'workspace_restore', code: safeError(error) }) }
       }
       try { const response = await client.request('/api/auth/sign-out', post({})); assert(response.ok, 'sign_out_failed') }
       catch (error) { report.cleanup.errors.push({ step: 'sign_out', code: safeError(error) }) }
@@ -717,7 +809,7 @@ export function alignServerTimings(report, timings) {
   return report
 }
 
-const HELP = `Cloud startup acceptance (#1505)\n\nNormal live run (ACME_DEMO_EMAIL/PASSWORD in environment):\n  node scripts/acceptance/cloud-startup.mjs --workspace UUID --runs 6 --harness both --mode baseline --strategy official --output report.json\n\nProduction acceptance also requires --expected-build BUILD --revision COMMIT.\n--expected-worker-sha HASH --expected-worker-source COMMIT uses VERCEL_TEAM_TOKEN for read-only configuration pins before and after each run. Actual runtime SHA requires the corresponding startup log evidence.\n--strategy official|derived|pool|combined is an operator label, not template proof.\n--mode candidate --runs 1 --harness codex --device-id UUID --agent-id UUID validates a candidate's normal subscription path; it is not cloud latency acceptance.\n\nOffline alignment after extracting matching dispatch_timing logs:\n  node scripts/acceptance/cloud-startup.mjs --align-report report.json --dispatch-timings timings.json --output aligned.json\n\nOptions: --origin HTTPS_ORIGIN --bot-id UUID --timeout-ms 240000 --max-startup-ms 5000\nNo login credentials, cookies, provider output, or live tickets are written.\n`
+const HELP = `Cloud startup acceptance (#1505)\n\nNormal live run (SMOKE_OWNER_EMAIL/PASSWORD in environment, verified shared team selected automatically):\n  node scripts/acceptance/cloud-startup.mjs --runs 6 --harness both --mode baseline --strategy official --output report.json\n\nProduction acceptance also requires --expected-build BUILD --revision COMMIT.\n--expected-worker-sha HASH --expected-worker-source COMMIT uses VERCEL_TEAM_TOKEN for read-only configuration pins before and after each run. Actual runtime SHA requires the corresponding startup log evidence.\n--strategy official|derived|pool|combined is an operator label, not template proof.\n--mode candidate --runs 1 --harness codex --device-id UUID --agent-id UUID validates a candidate's normal subscription path; it is not cloud latency acceptance.\n\nOffline alignment after extracting matching dispatch_timing logs:\n  node scripts/acceptance/cloud-startup.mjs --align-report report.json --dispatch-timings timings.json --output aligned.json\n\nOptions: --origin HTTPS_ORIGIN --workspace UUID (optional verified-team pin) --bot-id UUID --timeout-ms 240000 --max-startup-ms 5000\nNo login credentials, cookies, provider output, or live tickets are written.\n`
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   let output

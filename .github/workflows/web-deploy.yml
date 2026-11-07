@@ -26,9 +26,9 @@ on:
       runtime-template-ids:
         type: string
         default: '{}'
-      runtime-release-evidence:
+      runtime-release-evidence-artifact-id:
         type: string
-        default: '{}'
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -120,6 +120,13 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
+      - name: Read the exact accepted runtime release receipt
+        if: inputs.runtime-refresh == true && inputs.runtime-release-evidence-artifact-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ inputs.runtime-release-evidence-artifact-id }}
+          path: ${{ runner.temp }}/runtime-release
+          merge-multiple: true
       - name: Publish the verified additive runtime pair inside the deployment queue
         if: inputs.runtime-refresh == true
         run: node scripts/e2b/publish-template-env.mjs
@@ -131,7 +138,7 @@ jobs:
           SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
           MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
           TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
-          RUNTIME_RELEASE_EVIDENCE: ${{ inputs.runtime-release-evidence }}
+          RUNTIME_RELEASE_EVIDENCE_FILE: ${{ runner.temp }}/runtime-release/release.json
       # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
       # Infisical source Vercel production is synced from; the next step fills only
       # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.

@@ -23,7 +23,11 @@ on:
       - 'scripts/e2b/validate-template-subscriptions.mjs'
       - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/acceptance/cloud-startup.mjs'
+      - 'scripts/acceptance/cloud-startup.test.mjs'
       - 'scripts/acceptance/cloud-startup-evidence.mjs'
+      - 'scripts/acceptance/team-workspace.mjs'
+      - 'scripts/acceptance/team-workspace.test.mjs'
+      - 'lib/smoke-account.ts'
       - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
       - 'scripts/release/build-vercel.mjs'
@@ -59,7 +63,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
+      - name: Install only the offline gate test dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/runtime-gate-tests" --ignore-scripts --no-audit --no-fund 'tsx@4.23.15' '@opentelemetry/sdk-trace-base@2.12.0'
+          ln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules
+      - run: node --import tsx --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 scripts/e2b/official-files.test.py
       - run: python3 scripts/e2b/cleanup-template-candidates.test.py
@@ -149,12 +157,8 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      release-evidence: ${{ steps.publish.outputs.release-evidence }}
+      release-evidence-artifact-id: ${{ steps.release-report.outputs.artifact-id }}
       template-ids: ${{ steps.publish.outputs.template-ids }}
-    env:
-      # Existing ACME-owned workspace and dedicated test Bot, never a real task.
-      MIKKA_ACCEPTANCE_WORKSPACE_ID: de300001-ece6-4021-8214-c986ea306bde
-      MIKKA_ACCEPTANCE_BOT_ID: bc925088-d87f-47b8-a786-c1c317ac005f
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -192,7 +196,7 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /
-          secret-name: ACME_DEMO_EMAIL
+          secret-name: SMOKE_OWNER_EMAIL
           include-imports: false
       - name: Read the authorized acceptance account password
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
@@ -203,17 +207,17 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /
-          secret-name: ACME_DEMO_PASSWORD
+          secret-name: SMOKE_OWNER_PASSWORD
           include-imports: false
+      - name: Read the exact build's complete candidate receipt
+        if: needs.validate.outputs.candidate-report-artifact-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.validate.outputs.candidate-report-artifact-id }}
+          path: ${{ runner.temp }}/runtime-candidates
+          merge-multiple: true
       - name: Require real Claude Code and Codex subscriptions on the private candidates
-        run: |
-          node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
-          import { writeFileSync } from 'node:fs'
-          writeFileSync(process.argv[2], process.env.CANDIDATE_REPORT, { mode: 0o600 })
-          JS
-          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
-        env:
-          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+        run: node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/runtime-candidates/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
       - name: Preserve closed subscription gate diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -231,10 +235,18 @@ jobs:
           import { readFileSync, appendFileSync } from 'node:fs'
           const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
           const ids = Object.fromEntries(Object.entries(report.templates).map(([kind, row]) => [kind, row.templateId]))
-          appendFileSync(process.env.GITHUB_OUTPUT, `release-evidence=${JSON.stringify(report)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
+          appendFileSync(process.env.GITHUB_OUTPUT, `template-ids=${JSON.stringify(ids)}\n`)
           JS
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Preserve the complete published runtime receipt
+        id: release-report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-runtime-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release.json
+          if-no-files-found: error
+          retention-days: 7
   publish:
     needs: [validate, await-web, subscriptions]
     permissions:
@@ -246,7 +258,7 @@ jobs:
       runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
       runtime-template-models: ${{ needs.validate.outputs.template-models }}
       runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
-      runtime-release-evidence: ${{ needs.subscriptions.outputs.release-evidence }}
+      runtime-release-evidence-artifact-id: ${{ needs.subscriptions.outputs.release-evidence-artifact-id }}
   cleanup:
     needs: [check, validate, await-web, subscriptions, publish]
     if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.check.outputs.changed == 'true'
@@ -274,15 +286,25 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
+      - name: Read this build's candidate receipt when available
+        id: candidate-report
+        if: needs.validate.outputs.candidate-report-artifact-id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.validate.outputs.candidate-report-artifact-id }}
+          path: ${{ runner.temp }}/runtime-candidates
+          merge-multiple: true
       - name: Close this attempt's instances and remove only its private candidates
         run: |
-          python3 - <<'PY'
-          import os,pathlib
-          pathlib.Path(os.environ['RUNNER_TEMP'],'cleanup-candidates.json').write_text(os.environ.get('CANDIDATE_REPORT') or '{}')
-          PY
-          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py --report "$RUNNER_TEMP/cleanup-candidates.json" --output "$RUNNER_TEMP/release-cleanup.json"
+          args=()
+          if [ "$CANDIDATE_DOWNLOAD_OUTCOME" = success ]; then args+=(--report "$RUNNER_TEMP/runtime-candidates/candidates.json"); fi
+          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/release-cleanup.json"
         env:
-          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+          CANDIDATE_DOWNLOAD_OUTCOME: ${{ steps.candidate-report.outcome }}
+      - name: Fail a missing expected receipt after bounded cleanup
+        if: steps.candidate-report.outcome == 'failure'
+        run: exit 1
       - name: Preserve release cleanup receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

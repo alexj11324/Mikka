@@ -102,6 +102,11 @@ export function runtimeConfigurationSha(configuration, { allowLegacy = false } =
 
 export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, sourceCommit, models }) {
   if (releaseEvidence?.sourceCommit !== sourceCommit || releaseEvidence?.workerSha !== sourceSha) fail('runtime_release_source_invalid')
+  const scope = releaseEvidence.acceptanceScope
+  if (scope?.account !== 'shared_smoke' || scope.team?.teamWorkspaceConfirmed !== true || scope.team.teamAdminMembershipVerified !== true
+    || scope.workspaceRestored !== true || !/^[a-f0-9]{64}$/.test(scope.team.teamWorkspaceHash ?? '')
+    || !/^[a-f0-9]{16}$/.test(scope.requesterHash ?? '') || !/^[a-f0-9]{16}$/.test(scope.payerHash ?? '')
+    || scope.requesterHash === scope.payerHash) fail('runtime_release_shared_scope_invalid')
   for (const kind of Object.keys(TEMPLATE_ENV)) {
     const row = releaseEvidence.templates?.[kind], proof = row?.conservation
     if (row?.templateId !== templates[kind] || row?.baseTemplate !== kind || row?.preinstalled !== true
@@ -111,6 +116,12 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
   }
   for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
     const row = releaseEvidence.subscriptionAcceptance?.[kind]
+    const shared = row?.sharedScope
+    if (shared?.verified !== true || shared.access !== 'workspace_share' || shared.requesterHash !== scope.requesterHash
+      || shared.payerHash !== scope.payerHash || shared.workspaceHash !== scope.team.teamWorkspaceHash
+      || !['connectionHash', 'bindingHash'].every(key => /^[a-f0-9]{16}$/.test(shared[key] ?? ''))
+      || !/^(0|[1-9][0-9]*)$/.test(shared.connectionRevision ?? '')
+      || !Number.isInteger(shared.profileVersion) || shared.profileVersion < 1 || !/^[a-f0-9]{64}$/.test(shared.profileDigest ?? '')) fail(`runtime_release_shared_scope_invalid ${kind}`)
     const ack = row?.agentAcceptance, authorization = row?.runtimeAuthorization, tool = row?.toolEvidence
     if (row?.status !== 'passed' || row?.templateId !== templates[kind] || row?.sourceCommit !== sourceCommit || row?.workerSha !== sourceSha
       || row?.harness !== harness || row?.model !== model || row?.credentialRoute !== 'subscription' || row?.replyVerified !== true
@@ -197,12 +208,20 @@ export async function publish({ token, githubToken, templates, sourceSha, source
   return { changed, requiresWebBuild: true, sourceCommit, workerSha: sourceSha }
 }
 
+/** Full conservation/model receipts can exceed execve's per-environment-value
+ * limit. Read the immutable workflow artifact without trimming any evidence. */
+export function readReleaseEvidenceFile(file) {
+  if (typeof file !== 'string' || !file) fail('runtime_release_file_required')
+  try { return JSON.parse(readFileSync(file, 'utf8')) }
+  catch { fail('runtime_release_file_invalid') }
+}
+
 if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--current')) {
   console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
   const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, githubToken: process.env.GITHUB_TOKEN, templates, sourceSha: process.env.SOURCE_SHA,
     sourceCommit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, models: JSON.parse(process.env.TEMPLATE_MODELS ?? '{}'),
-    releaseEvidence: JSON.parse(process.env.RUNTIME_RELEASE_EVIDENCE ?? 'null') })
+    releaseEvidence: readReleaseEvidenceFile(process.env.RUNTIME_RELEASE_EVIDENCE_FILE) })
   console.log(JSON.stringify({ event: 'official_runtime_env_verified', ...result }))
 }

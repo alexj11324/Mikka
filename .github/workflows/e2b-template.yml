@@ -7,8 +7,8 @@ on:
         value: ${{ jobs.build.outputs.source-sha }}
       template-models:
         value: ${{ jobs.build.outputs.template-models }}
-      candidate-report:
-        value: ${{ jobs.build.outputs.candidate-report }}
+      candidate-report-artifact-id:
+        value: ${{ jobs.build.outputs.candidate-report-artifact-id }}
 permissions:
   contents: read
 jobs:
@@ -22,7 +22,7 @@ jobs:
     outputs:
       source-sha: ${{ steps.build.outputs.source-sha }}
       template-models: ${{ steps.build.outputs.template-models }}
-      candidate-report: ${{ steps.build.outputs.candidate-report }}
+      candidate-report-artifact-id: ${{ steps.candidate-report.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -67,8 +67,16 @@ jobs:
             models[kind] = row.models
             console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)
           }
-          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\ncandidate-report=${JSON.stringify(report)}\n`)
+          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\n`)
           JS
+      - name: Preserve the complete private candidate receipt
+        id: candidate-report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-private-candidates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidates.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Close leftover probes and failed private builds
         if: always() && steps.e2b-key.outcome == 'success'
         run: |
