@@ -17,8 +17,8 @@ test('PG17: independent clients serialize rotating refresh and protect callback 
   const pool = new Pool({ connectionString: url, options: `-c search_path=${schema},public`, max: 5 })
   t.after(async () => { await pool.end(); await bootstrap.query(`DROP SCHEMA ${schema} CASCADE`); await bootstrap.end() })
   await pool.query('CREATE TABLE "user" (id text PRIMARY KEY)')
-  await pool.query(await readFile(new URL('../../drizzle/20261107130100_cloud_service_client.sql', import.meta.url), 'utf8'))
-  await pool.query(await readFile(new URL('../../drizzle/20261107130300_cloud_push.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261107173100_cloud_service_client.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261107173300_cloud_push.sql', import.meta.url), 'utf8'))
   await pool.query('INSERT INTO "user" VALUES ($1),($2)', ['person', 'other'])
   const env = { BETTER_AUTH_URL: 'https://self.example', WORKSPACE_SECRETS_KEY: randomBytes(32).toString('base64') }
   const serverId = randomUUID(), secret = `mcs_${randomBytes(32).toString('base64url')}`, teamKey = `mkc_${randomBytes(32).toString('base64url')}`, replacementTeamKey = `mkc_${randomBytes(32).toString('base64url')}`

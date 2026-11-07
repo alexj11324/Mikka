@@ -20,7 +20,7 @@ test('GitHub App registration enforces server authority, session binding and sin
     await pool.end()
   })
   await pool.query(`CREATE SCHEMA ${schema}`)
-  await pool.query(readFileSync(new URL('../drizzle/20261107130000_server_github_app.sql', import.meta.url), 'utf8'))
+  await pool.query(readFileSync(new URL('../drizzle/20261107173000_server_github_app.sql', import.meta.url), 'utf8'))
   const admin = await seedUser(pool, 'github-app-admin'), other = await seedUser(pool, 'github-app-other')
   users.push(admin, other)
   const origin = 'https://selfhost.example'
