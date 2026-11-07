@@ -46,7 +46,7 @@ jobs:
       - name: Snapshot the exact production runtime pair using GET only
         run: node scripts/ops/issue1503/runtime-snapshot.mjs
         env:
-          MIKKA_EXPECTED_RUNTIME_SOURCE: ${{ inputs.expected_runtime_source || '' }}
+          MIKKA_EXPECTED_RUNTIME_SOURCE: ${{ inputs.expected_runtime_source || 'f811448d805e7baa7b032fd6ae62d991f59966c8' }}
       - name: Preserve the closed runtime metadata receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
