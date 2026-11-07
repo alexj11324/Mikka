@@ -166,11 +166,11 @@ export function markdown(report) {
   lines.push('', '| Sample | Phase | Endpoint 类别 | Shared | Started | Completed | Errors | 请求到响应头总秒数 |', '|---|---|---|---|---:|---:|---:|---:|')
   for (const sample of report.samples) for (const item of sample.runtimeTiming?.counts ?? [])
     lines.push(`| ${sample.sampleId} | ${item.phase} | ${item.endpoint} | ${item.shared} | ${item.started} | ${item.completed} | ${item.errors} | ${seconds(item.ms)} |`)
-  lines.push('', '### MCP 子进程业务请求观测', '', 'decision_catalogue 和 decision_record 是目录/决策业务请求，不计为额外权限检查。只列实收的物理发送；子进程未收到 close 时终态未知，CLI 自行重启的世代总量也未知。generationCoverage=unverified、allFirstPartyHttpComplete=false；未观测世代的请求总数是 unavailable。宿主声明的远程 MCP 应用必须为 0；CLI 自行从 HOME、项目或插件载入的网络连接不在这份全局计数承诺中。',
-    '', '| Sample | 已观测 / 已关闭 child | 目录 / 决策 / pending | 已观测配对完整 | child 终态完整 | 宿主远程 MCP 数 | 证据状态 |', '|---|---:|---:|---|---|---:|---|')
+  lines.push('', '### MCP 子进程业务请求观测', '', 'decision_catalogue 和 decision_record 是目录/决策业务请求，不计为额外权限检查。v3 另列与 claim 元数据 SHA256 一致的本地目录就绪，不能把缺失观测当成零请求。只列实收的物理发送；子进程未收到 close 时终态未知，CLI 自行重启的世代总量也未知。generationCoverage=unverified、allFirstPartyHttpComplete=false；未观测世代的请求总数是 unavailable。宿主声明的远程 MCP 应用必须为 0；CLI 自行从 HOME、项目或插件载入的网络连接不在这份全局计数承诺中。',
+    '', '| Sample | 已观测 / 已关闭 child | 目录 / 决策 / pending | claim 本地目录 | 已观测配对完整 | child 终态完整 | 宿主远程 MCP 数 | 证据状态 |', '|---|---:|---:|---:|---|---|---:|---|')
   for (const sample of report.samples) {
     const child = sample.runtimeEvidence?.childBusiness
-    lines.push(`| ${sample.sampleId} | ${child?.observedChildren ?? 'unavailable'} / ${child?.closedChildren ?? 'unavailable'} | ${child?.observedCatalogueSends ?? 'unavailable'} / ${child?.observedDecisionSends ?? 'unavailable'} / ${child?.pendingObservedSends ?? 'unavailable'} | ${child?.observedComplete ?? 'unavailable'} | ${child?.childLifecycleComplete ?? 'unavailable'} | ${child?.remoteMcpServerCount ?? 'unavailable'} | ${child?.status ?? 'unavailable'}${child?.reason ? `: ${child.reason}` : ''} |`)
+    lines.push(`| ${sample.sampleId} | ${child?.observedChildren ?? 'unavailable'} / ${child?.closedChildren ?? 'unavailable'} | ${child?.observedCatalogueSends ?? 'unavailable'} / ${child?.observedDecisionSends ?? 'unavailable'} / ${child?.pendingObservedSends ?? 'unavailable'} | ${child?.observedPreparedCatalogues ?? 'unavailable'} | ${child?.observedComplete ?? 'unavailable'} | ${child?.childLifecycleComplete ?? 'unavailable'} | ${child?.remoteMcpServerCount ?? 'unavailable'} | ${child?.status ?? 'unavailable'}${child?.reason ? `: ${child.reason}` : ''} |`)
   }
   lines.push('', '请求相对真实 ACK 的时间仅为同 VM 墙钟差，保留正负值，不用于 5 秒门槛。耗时为子进程从 fetch 发送到响应头返回或异常的单调时钟间隔，不含后续正文读取或 JSON-RPC 解析。',
     '', '| Sample / child.request | 业务操作 | UTC start | UTC end | 耗时秒 | start 相对 ACK 秒 | Outcome |', '|---|---|---|---|---:|---:|---|')

@@ -233,7 +233,7 @@ export async function createHostedBotRunner(host: {
         if (runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming)) {
           try {
             cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
-              remoteMcpServerCount: options.apps?.apps.length ?? 0 })
+              remoteMcpServerCount: options.apps?.apps.length ?? 0, decisionCatalogue: options.mcp?.decisionCatalogue })
           } catch { /* Missing observation is unavailable evidence, not a business or authorization failure. */ }
           assertOpen()
         }

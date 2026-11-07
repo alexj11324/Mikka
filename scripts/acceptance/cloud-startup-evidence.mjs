@@ -16,10 +16,12 @@ const MCP_OPERATIONS = new Set(['decision_catalogue', 'decision_record'])
  * generations can be complete; the official CLI's whole generation inventory
  * is not observable here and must never be inferred from an empty receipt. */
 export function readMcpHttpTiming(value, record) {
-  if (![1, 2].includes(value?.version) || value.source !== 'mikka_mcp_physical_fetch' || value.scope !== 'observed_mikka_mcp_children'
+  if (![1, 2, 3].includes(value?.version) || value.source !== 'mikka_mcp_physical_fetch' || value.scope !== 'observed_mikka_mcp_children'
     || value.generationCoverage !== 'unverified' || value.allFirstPartyHttpComplete !== false
     || !Number.isInteger(value.remoteMcpServerCount) || value.remoteMcpServerCount < 0 || value.remoteMcpServerCount > 64
-    || value.childPathAuditVersion !== 1 || value.runIdHash !== record.runIdHash || value.harness !== record.harness
+    || value.childPathAuditVersion !== (value.version === 3 ? 2 : 1)
+    || value.version === 3 && !(value.expectedCatalogueSha256 === null || typeof value.expectedCatalogueSha256 === 'string' && /^[a-f0-9]{64}$/.test(value.expectedCatalogueSha256))
+    || value.runIdHash !== record.runIdHash || value.harness !== record.harness
     || !/^[a-f0-9]{16}$/.test(value.runIdHash ?? '') || !['claude_code', 'codex'].includes(value.harness)
     || !epoch(value.startedAt) || !epoch(value.endedAt) || value.endedAt < value.startedAt
     || value.expectedChildren !== 1 || !count(value.observedChildren) || value.observedChildren > 8
@@ -34,8 +36,18 @@ export function readMcpHttpTiming(value, record) {
       || !(child.closedAt === null || epoch(child.closedAt) && child.closedAt >= child.startedAt && child.closedAt <= value.endedAt)
       || !['lastSequence', 'sent', 'completed', 'lost'].every(key => count(child[key])) || child.lastSequence < 1
       || child.completed > child.sent) return null
+    let catalogue
+    if (value.version === 3) {
+      catalogue = child.catalogue
+      if (catalogue !== null && (!catalogue || typeof catalogue !== 'object' || Array.isArray(catalogue)
+        || Object.keys(catalogue).length !== 3 || Object.keys(catalogue).some(key => !['source', 'sha256', 'readyAt'].includes(key))
+        || catalogue.source !== 'claim' || value.expectedCatalogueSha256 === null || catalogue.sha256 !== value.expectedCatalogueSha256
+        || !epoch(catalogue.readyAt) || catalogue.readyAt < child.startedAt || catalogue.readyAt > (child.closedAt ?? value.endedAt))) return null
+      if (catalogue !== null) catalogue = { source: 'claim', sha256: catalogue.sha256, readyAt: catalogue.readyAt }
+    }
     children.push({ child: child.child, startedAt: child.startedAt, closedAt: child.closedAt,
-      lastSequence: child.lastSequence, sent: child.sent, completed: child.completed, lost: child.lost })
+      lastSequence: child.lastSequence, sent: child.sent, completed: child.completed, lost: child.lost,
+      ...(value.version === 3 ? { catalogue } : {}) })
   }
   if (children.filter(child => child.closedAt !== null).length !== value.closedChildren) return null
   for (const request of value.requests) {
@@ -49,7 +61,7 @@ export function readMcpHttpTiming(value, record) {
         : !epoch(request.endedAt) || request.endedAt < request.startedAt || request.endedAt > (child.closedAt ?? value.endedAt)
           || !ms(request.durationMs) || request.outcome !== (request.status >= 200 && request.status < 300 ? 'ok' : 'error'))) return null
     let body
-    if (value.version === 2) {
+    if (value.version >= 2) {
       if (!Object.hasOwn(request, 'body')) return null
       body = request.body
       if (body !== null) {
@@ -65,13 +77,14 @@ export function readMcpHttpTiming(value, record) {
     seen.add(key)
     requests.push({ child: request.child, sequence: request.sequence, operation: request.operation,
       startedAt: request.startedAt, endedAt: request.endedAt, durationMs: request.durationMs, status: request.status, outcome: request.outcome,
-      ...(value.version === 2 ? { body } : {}) })
+      ...(value.version >= 2 ? { body } : {}) })
   }
   const matched = children.every(child => {
       const sent = requests.filter(request => request.child === child.child).sort((a, b) => a.sequence - b.sequence)
       return sent.length === child.sent && child.completed === sent.filter(request => request.outcome !== 'pending').length
         && child.lastSequence === 1 + child.sent + child.completed + (child.closedAt === null ? 0 : 1)
           + sent.filter(request => request.body != null).length
+          + (child.catalogue ? 1 : 0)
         && sent.every((request, index) => request.sequence === index + 1)
   })
   const complete = value.observedChildren >= value.expectedChildren && value.rejectedEvents === 0 && !value.truncated
@@ -79,7 +92,8 @@ export function readMcpHttpTiming(value, record) {
   const lifecycleComplete = complete && value.closedChildren === value.observedChildren
   if (value.observedComplete && !complete || value.childLifecycleComplete && !lifecycleComplete) return null
   return { version: value.version, source: value.source, scope: value.scope, generationCoverage: 'unverified',
-    allFirstPartyHttpComplete: false, remoteMcpServerCount: value.remoteMcpServerCount, childPathAuditVersion: 1,
+    allFirstPartyHttpComplete: false, remoteMcpServerCount: value.remoteMcpServerCount, childPathAuditVersion: value.childPathAuditVersion,
+    ...(value.version === 3 ? { expectedCatalogueSha256: value.expectedCatalogueSha256 } : {}),
     runIdHash: value.runIdHash, harness: value.harness, startedAt: value.startedAt, endedAt: value.endedAt,
     expectedChildren: 1, observedChildren: value.observedChildren, closedChildren: value.closedChildren,
     observedComplete: value.observedComplete && complete, childLifecycleComplete: value.childLifecycleComplete && lifecycleComplete,
@@ -98,6 +112,7 @@ export function mcpBusinessEvidence(value, record) {
     observedComplete: timing.observedComplete, childLifecycleComplete: timing.childLifecycleComplete,
     observedPhysicalSends: timing.requests.length,
     observedCatalogueSends: timing.requests.filter(request => request.operation === 'decision_catalogue').length,
+    observedPreparedCatalogues: timing.children.filter(child => child.catalogue !== undefined && child.catalogue !== null).length,
     observedDecisionSends: timing.requests.filter(request => request.operation === 'decision_record').length,
     pendingObservedSends: timing.requests.filter(request => request.outcome === 'pending').length }
   if (timing.remoteMcpServerCount !== 0) return { ...base, status: 'unavailable', reason: 'remote_mcp_scope_uncovered' }
@@ -108,10 +123,14 @@ export function mcpBusinessEvidence(value, record) {
     if (requests.length !== child.sent || requests.filter(request => request.outcome !== 'pending').length !== child.completed
       || child.lastSequence !== 1 + child.sent + child.completed + (child.closedAt === null ? 0 : 1)
         + requests.filter(request => request.body != null).length
+        + (child.catalogue ? 1 : 0)
       || requests.some((request, index) => request.sequence !== index + 1))
       return { ...base, status: 'unavailable', reason: 'mcp_http_sequence_invalid' }
   }
-  if (!timing.requests.some(request => request.operation === 'decision_catalogue' && request.outcome !== 'pending'))
+  if (timing.expectedCatalogueSha256 && base.observedCatalogueSends !== 0)
+    return { ...base, status: 'unavailable', reason: 'mcp_prepared_catalogue_conflict' }
+  if (!timing.requests.some(request => request.operation === 'decision_catalogue' && request.outcome !== 'pending')
+    && !timing.children.some(child => child.catalogue?.sha256 === timing.expectedCatalogueSha256 && timing.expectedCatalogueSha256))
     return { ...base, status: 'unavailable', reason: 'mcp_catalogue_observation_missing' }
   return { ...base, status: 'observed' }
 }

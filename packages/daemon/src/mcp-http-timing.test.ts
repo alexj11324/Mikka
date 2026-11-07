@@ -4,12 +4,28 @@ import { RunRuntimeTimings } from './run-runtime-timing'
 import { runIdHash } from './tracing'
 
 const child = 'a'.repeat(32)
-const event = (type: string, sequence: number, fields: Record<string, unknown> = {}) => ({ version: 2, child, type,
+const event = (type: string, sequence: number, fields: Record<string, unknown> = {}) => ({ version: 3, child, type,
   sequence, at: 1000, lost: 0, ...fields })
 const start = () => event('child_start', 1)
 const begin = (sequence = 2, request = 1) => event('request_start', sequence, { request, operation: 'decision_catalogue' })
 const end = (sequence = 3, request = 1) => event('request_end', sequence, { request, status: 200, outcome: 'ok', durationMs: 3.25 })
 const collector = (remote = 0) => new McpHttpTimingCollector('private-run', 'codex', remote, () => 1000)
+
+it('binds local catalogue readiness to the exact claim metadata without inventing a physical send', () => {
+  const hash = 'b'.repeat(64)
+  const value = new McpHttpTimingCollector('private-run', 'codex', 0, () => 1000, hash)
+  expect(value.accept(start())).toBe(true)
+  expect(value.accept(event('catalogue_ready', 2, { source: 'claim', sha256: 'c'.repeat(64) }))).toBe(false)
+  expect(value.accept(event('catalogue_ready', 2, { source: 'claim', sha256: hash, schema: 'PRIVATE_SCHEMA' }))).toBe(false)
+  expect(value.accept(event('catalogue_ready', 2, { source: 'claim', sha256: hash }))).toBe(true)
+  expect(value.accept(event('catalogue_ready', 3, { source: 'claim', sha256: hash }))).toBe(false)
+  expect(value.accept(event('child_close', 3, { sent: 0, completed: 0 }))).toBe(true)
+  expect(value.finish()).toMatchObject({ version: 3, expectedCatalogueSha256: hash, requests: [],
+    children: [{ lastSequence: 3, sent: 0, completed: 0, catalogue: { source: 'claim', sha256: hash, readyAt: 1000 } }],
+    observedComplete: false, rejectedEvents: 3, allFirstPartyHttpComplete: false })
+  const absent = collector(); absent.accept(start())
+  expect(absent.accept(event('catalogue_ready', 2, { source: 'claim', sha256: hash }))).toBe(false)
+})
 
 it('keeps response headers separate from the later body completion without counting a second send', () => {
   const value = new McpHttpTimingCollector('private-run', 'codex', 0, () => 1010)
@@ -18,7 +34,7 @@ it('keeps response headers separate from the later body completion without count
   expect(value.accept({ ...end(), at: 1010 })).toBe(true)
   expect(value.accept(event('request_body_end', 4, { request: 1, at: 1010, durationMs: 8.25, outcome: 'read' }))).toBe(true)
   expect(value.accept(event('child_close', 5, { at: 1010, sent: 1, completed: 1 }))).toBe(true)
-  expect(value.finish()).toMatchObject({ version: 2, observedComplete: true, childLifecycleComplete: true,
+  expect(value.finish()).toMatchObject({ version: 3, observedComplete: true, childLifecycleComplete: true,
     children: [{ sent: 1, completed: 1, lastSequence: 5 }],
     requests: [{ endedAt: 1010, durationMs: 3.25, status: 200, outcome: 'ok',
       body: { endedAt: 1010, durationMs: 8.25, outcome: 'read' } }] })
@@ -122,6 +138,6 @@ it('records the configured host remote MCP count and preserves host-only scope w
   expect(noChild).not.toHaveProperty('mcpHttpTiming')
   const observation = runtime.begin('private-run', 'device', 'codex')
   runtime.attachMcpHttpTiming('private-run', collector(2).finish())
-  expect(observation.finish()?.mcpHttpTiming).toMatchObject({ remoteMcpServerCount: 2, childPathAuditVersion: 1 })
+  expect(observation.finish()?.mcpHttpTiming).toMatchObject({ remoteMcpServerCount: 2, childPathAuditVersion: 2 })
   expect(() => collector(-1)).toThrow('mcp_observation_scope_invalid')
 })

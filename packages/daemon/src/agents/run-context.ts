@@ -392,7 +392,8 @@ export class RunContext {
 
   /** Kept in child-process environments; never in a repository or handoff file. */
   decisionMcpEnv(): Record<string, string> {
-    return this.options.mcp ? { MIKKA_DECISION_MCP_URL: this.options.mcp.url, MIKKA_DECISION_MCP_TOKEN: this.options.mcp.token } : {}
+    return this.options.mcp ? { MIKKA_DECISION_MCP_URL: this.options.mcp.url, MIKKA_DECISION_MCP_TOKEN: this.options.mcp.token,
+      ...(this.options.mcp.decisionCatalogue ? { MIKKA_DECISION_MCP_CATALOGUE: JSON.stringify(this.options.mcp.decisionCatalogue) } : {}) } : {}
   }
 
   mcpServer(): McpServerSpec {

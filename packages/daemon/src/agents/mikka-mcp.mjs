@@ -28,7 +28,7 @@ import { request as httpRequest } from 'node:http'
 // missing terminal events must remain unknown in the host's receipt.
 function observeMcpHttp(endpoint) {
   const ignored = { headers: () => {}, body: () => {} }
-  const disabled = { begin: () => ignored, close: () => {} }
+  const disabled = { begin: () => ignored, catalogue: () => {}, close: () => {} }
   if (typeof endpoint !== 'string' || !/^http:\/\/127\.0\.0\.1:\d{1,5}\/v1\/mcp-http\/[a-f0-9]{32}$/.test(endpoint)) return disabled
   try { if (new URL(endpoint).port === '' || Number(new URL(endpoint).port) > 65535) return disabled } catch { return disabled }
   const child = randomUUID().replaceAll('-', '')
@@ -64,14 +64,15 @@ function observeMcpHttp(endpoint) {
     } catch { request?.destroy(); settled(false) }
   }
   function emit(type, fields = {}) {
-    const event = { version: 2, child, type, sequence: ++sequence, at: Date.now(), ...fields }
-    // Up to three events per request, plus child start/close. Overflow is a known loss;
+    const event = { version: 3, child, type, sequence: ++sequence, at: Date.now(), ...fields }
+    // Up to three events per request, plus child start/catalogue/close. Overflow is a known loss;
     // it cannot turn into a complete zero-request observation.
-    if (sequence > 386) { loss(); return }
+    if (sequence > 387) { loss(); return }
     queue.push(event); queueMicrotask(pump)
   }
   emit('child_start')
   return {
+    catalogue(sha256) { emit('catalogue_ready', { source: 'claim', sha256 }) },
     begin(operation) {
       if (closed || !['decision_catalogue', 'decision_record'].includes(operation)) { loss(); return ignored }
       const request = ++sent, started = performance.now()
@@ -133,8 +134,36 @@ async function decisionRpc(operation, method, params) {
   return envelope.result
 }
 let decisionToolPromise
+const preparedDecisionCatalogue = process.env.MIKKA_DECISION_MCP_CATALOGUE
+function readPreparedDecisionCatalogue(raw) {
+  if (Buffer.byteLength(raw) > 32_768) throw new Error('decision_catalogue_size')
+  const catalogue = JSON.parse(raw)
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const exact = (value, keys) => object(value) && Object.keys(value).length === keys.length && Object.keys(value).every(key => keys.includes(key))
+  const tool = catalogue?.tool
+  if (!exact(catalogue, ['version', 'tool']) || catalogue.version !== 1
+    || !exact(tool, ['name', 'title', 'description', 'inputSchema', 'annotations']) || tool.name !== 'record_decision'
+    || typeof tool.title !== 'string' || !tool.title.length || tool.title.length > 200
+    || typeof tool.description !== 'string' || !tool.description.length || tool.description.length > 2000
+    || !object(tool.inputSchema) || tool.inputSchema.type !== 'object'
+    || !exact(tool.annotations, ['idempotentHint']) || tool.annotations.idempotentHint !== true)
+    throw new Error('decision_catalogue_invalid')
+  return tool
+}
 async function decisionTools() {
   if (!decisionMcpAvailable) return []
+  if (preparedDecisionCatalogue !== undefined) {
+    // Malformed supplied metadata never triggers a second remote lookup. Old
+    // servers omit the field and retain their original tools/list path below.
+    try {
+      if (!decisionToolPromise) {
+        const tool = readPreparedDecisionCatalogue(preparedDecisionCatalogue)
+        decisionObserver.catalogue(createHash('sha256').update(preparedDecisionCatalogue).digest('hex'))
+        decisionToolPromise = Promise.resolve([tool])
+      }
+      return await decisionToolPromise
+    } catch { return [] }
+  }
   // Use the server's canonical schema rather than a separately maintained copy.
   decisionToolPromise ??= decisionRpc('decision_catalogue', 'tools/list', {}).then(result =>
     Array.isArray(result.tools) ? result.tools.filter(tool => tool.name === 'record_decision' && tool.inputSchema?.type === 'object') : [])

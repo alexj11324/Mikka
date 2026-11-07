@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { alignServerTimings, cleanupCase, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
   startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
-import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
+import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -42,6 +42,34 @@ const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', windo
     cliExitObserved: true, batches: 1, recordsReceived: 1, duplicates: 0, rejectedBatches: 0, invalidEvents: 0, ignoredRecords: 0, truncated: false,
     events: [{ name: `${sample.harness}.api_request`, kind: 'provider', receivedAt: epoch + 4900, eventAt: epoch + 4000,
       durationMs: 1000, model: models[sample.harness], outcome: 'ok', status: 200, attempt: 1, sequence: 2 }] } })
+
+test('v3 requires an exact observed claim catalogue before accepting zero physical startup sends', () => {
+  const record = runtimeTiming({ runId: 'catalogue', harness: 'codex' })
+  const value = record.mcpHttpTiming
+  value.version = 3; value.childPathAuditVersion = 2; value.expectedCatalogueSha256 = 'b'.repeat(64); value.requests = []
+  Object.assign(value.children[0], { sent: 0, completed: 0, lastSequence: 2,
+    catalogue: { source: 'claim', sha256: value.expectedCatalogueSha256, readyAt: epoch + 2200 } })
+  const parsed = readMcpHttpTiming(value, record)
+  assert.ok(parsed)
+  assert.equal(mcpBusinessEvidence(parsed, record).status, 'observed')
+  assert.equal(mcpBusinessEvidence(parsed, record).observedPhysicalSends, 0)
+  assert.equal(mcpBusinessEvidence(parsed, record).observedPreparedCatalogues, 1)
+  assert.equal(mcpBusinessEvidence(parsed, record).allFirstPartyHttpComplete, false)
+  for (const mutate of [row => { delete row.children[0].catalogue }, row => { row.expectedCatalogueSha256 = null },
+    row => { row.children[0].catalogue.sha256 = 'c'.repeat(64) }, row => { row.children[0].catalogue.text = 'PRIVATE' },
+    row => { row.children[0].catalogue.readyAt = epoch }, row => { row.children[0].lastSequence = 1 },
+    row => { row.childPathAuditVersion = 1 }]) {
+    const invalid = structuredClone(value); mutate(invalid)
+    assert.notEqual(mcpBusinessEvidence(invalid, record).status, 'observed')
+  }
+  const absent = structuredClone(value)
+  absent.children[0].catalogue = null; absent.children[0].lastSequence = 1
+  assert.equal(mcpBusinessEvidence(absent, record).reason, 'mcp_catalogue_observation_missing')
+  const conflict = structuredClone(value), old = runtimeTiming({ runId: 'catalogue', harness: 'codex' }).mcpHttpTiming.requests[0]
+  conflict.requests = [{ ...old, body: null }]
+  Object.assign(conflict.children[0], { sent: 1, completed: 1, lastSequence: 4 })
+  assert.equal(mcpBusinessEvidence(conflict, record).reason, 'mcp_prepared_catalogue_conflict')
+})
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
   wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
