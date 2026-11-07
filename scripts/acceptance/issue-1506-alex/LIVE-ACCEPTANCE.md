@@ -10,7 +10,7 @@
 
 内容基准为本地 batch commit `aaecbdba0472af1a4ad921913267118741e74f1a`，包含 #1538 presence client 和 main #1501 的 Coordinator 组件。十个源码文件的 SHA256 逐一固定，新增 `lib/live/presence.ts`，更新 `channel.ts`、`hooks/use-live-key.tsx` 和 `coordinator-chat.tsx` 的哈希；其余六项保持原值。
 
-发布用 `LIVE_SOURCE_COMMIT` 和未来 continuation workflow 的 source checkout 均固定为本次明确输入的 application source commit `a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9`，tree 为 `1fc41beaa8fa5c06e0af34ccd85cd52e160125b7`。十个文件已逐一核对该 Git commit 的实际 blob；本地内容基准 aaec 仅保留为审查来源。源码加载同时校验文件哈希和 checkout 的实际 Git HEAD，不能给另一提交的字节贴上新版本标签。本文件仅记录准备核验的源码；实际生产应用 SHA 仍是另一个验收输入，目前未赋值；最终部署确认、文件一致性确认后，才可填写并启用现有 control。
+发布用 `LIVE_SOURCE_COMMIT` 和未来 continuation workflow 的 source checkout 均固定为本次明确输入的 application source commit `efb95d951ddbeca1af04bc80d011ccbc2a9f0188`，tree 为 `fd7fb13f41c5a87df865f539d498b32e3a4fb83b`。十个文件已逐一核对该 Git commit 的实际 blob；本地内容基准 aaec 仅保留为审查来源。源码加载同时校验文件哈希和 checkout 的实际 Git HEAD，不能给另一提交的字节贴上新版本标签。本文件仅记录准备核验的源码；实际生产应用 SHA 仍是另一个验收输入，目前未赋值；最终部署确认、文件一致性确认后，才可填写并启用现有 control。
 
 Node 24 的 `stripTypeScriptTypes(..., {mode:'transform'})` 将八个纯 TypeScript 模块编译到临时目录；唯一文本转换是给相对 import 补 `.mjs` 后缀。实际加载的运行类是 `LiveChannel`、`TabShare`、`PersistentReadCache`，并使用原版 `coversLiveRevisions` / `heldRevision`。没有复制、删改、简化这些产品算法。`hooks/use-live-key.tsx` 和 Coordinator 组件用于 hash/protocol 核对，不在 Node 中渲染 React。
 

@@ -1,5 +1,5 @@
 {
-  "sourceBase": "a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9",
+  "sourceBase": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
   "clientPatchSha256": "163b70b7604fcd4fb8a64c5961b13422a1df223f7437c2c0b1c381693f52b570",
   "hashes": {
     "lib/live/channel.ts": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
@@ -16,5 +16,5 @@
     "packages/protocol/src/device.ts": "3132ce40b92c2a3fe26f658dcd246337d182cfc6b7f0d7e1f3f2ade2811c2acd",
     "packages/protocol/src/daemon.ts": "8fa7015227c26b46c871166b6bacbc45f37fd1a0e031c514efa258a1115afaff"
   },
-  "sourceTree": "1fc41beaa8fa5c06e0af34ccd85cd52e160125b7"
+  "sourceTree": "fd7fb13f41c5a87df865f539d498b32e3a4fb83b"
 }

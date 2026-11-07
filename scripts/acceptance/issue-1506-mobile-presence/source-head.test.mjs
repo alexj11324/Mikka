@@ -14,9 +14,9 @@ const mobilePins = JSON.parse(readFileSync(new URL('./source-hashes.json', impor
 test('both after loaders bind the actual remote application HEAD and tree as well as every product blob', async () => {
   const after = preparePresenceSource(sourceRoot), mobile = await prepareMobilePresenceSource(sourceRoot)
   try {
-    assert.equal(after.sourceBase, 'a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9')
+    assert.equal(after.sourceBase, 'efb95d951ddbeca1af04bc80d011ccbc2a9f0188')
     assert.equal(mobile.sourceCommit, after.sourceBase)
-    assert.equal(after.sourceTree, '1fc41beaa8fa5c06e0af34ccd85cd52e160125b7')
+    assert.equal(after.sourceTree, 'fd7fb13f41c5a87df865f539d498b32e3a4fb83b')
     assert.equal(mobile.sourceTree, after.sourceTree)
     assert.deepEqual(after.hashes, afterPins.hashes)
     assert.deepEqual(mobile.hashes, mobilePins.hashes)

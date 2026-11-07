@@ -59,7 +59,7 @@ jobs:
       - name: Check out the exact final client and mobile API source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9
+          ref: efb95d951ddbeca1af04bc80d011ccbc2a9f0188
           path: presence-source
           persist-credentials: false
       - name: Verify exact sources and fixture boundaries without network

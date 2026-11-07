@@ -4,7 +4,7 @@ This driver has not been executed in production. It sends no model prompt, insta
 
 ## Exact source and execution
 
-The after source is the explicitly supplied application commit `a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9`, tree `1fc41beaa8fa5c06e0af34ccd85cd52e160125b7`. This disabled repin output is not production deployment evidence. Both after loaders require that checkout HEAD/tree and each pinned file's SHA-256. The 13 web/core and 16 mobile/API source entries were checked directly against those Git blobs. Node 24 strips TypeScript and adds relative `.mjs` import suffixes; no product algorithm is rewritten. The serving application's exact SHA is separately checked before fixture work and after cleanup. A different source checkout commit is rejected, even with identical pinned files.
+The after source is the explicitly supplied application commit `efb95d951ddbeca1af04bc80d011ccbc2a9f0188`, tree `fd7fb13f41c5a87df865f539d498b32e3a4fb83b`. This disabled repin output is not production deployment evidence. Both after loaders require that checkout HEAD/tree and each pinned file's SHA-256. The 13 web/core and 16 mobile/API source entries were checked directly against those Git blobs. Node 24 strips TypeScript and adds relative `.mjs` import suffixes; no product algorithm is rewritten. The serving application's exact SHA is separately checked before fixture work and after cleanup. A different source checkout commit is rejected, even with identical pinned files.
 
 Required inputs are the existing `ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD`, `MIKKA_ACCEPTANCE_SHA` (exact serving application commit), `MIKKA_PRESENCE_RUN_KEY` (unique lowercase nonce, at most 33 characters), `MIKKA_PRESENCE_SOURCE_ROOT` (the exact pinned Git checkout), and optionally `MIKKA_PRESENCE_REPORT_DIR`. `MIKKA_PRESENCE_MODE` is `baseline` or `after` (default). The runner uses the existing formal OIDC/Infisical path. Never copy secrets into these scripts, receipts or shell output.
 
@@ -30,8 +30,8 @@ This is API/core/transport acceptance, not a production React render, rendered m
 The isolated offline suite validates identity boundaries, no raw credential reporting, exact fixture cleanup, lost registration responses, receipt-bound re-enrollment, actual three-worker core state/reads, rejection of support-only readiness, and three actual old consumers each reading once on a virtual minute. Its WebSocket/clock fixtures cannot stand in for production evidence. The frozen manifest records the actual final test count.
 
 ```sh
-MIKKA_PRESENCE_SOURCE_ROOT=/absolute/a1902d7/checkout \
-MIKKA_MOBILE_PRESENCE_SOURCE_ROOT=/absolute/a1902d7/checkout \
+MIKKA_PRESENCE_SOURCE_ROOT=/absolute/efb95d9/checkout \
+MIKKA_MOBILE_PRESENCE_SOURCE_ROOT=/absolute/efb95d9/checkout \
 MIKKA_PRESENCE_BASELINE_SOURCE_ROOT=/absolute/2f84230/checkout \
 node --test scripts/acceptance/issue-1212-presence/presence.test.mjs \
   scripts/acceptance/issue-1212-presence/presence-baseline-diagnostics.test.mjs \

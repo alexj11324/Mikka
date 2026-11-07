@@ -11,7 +11,7 @@ import { stripTypeScriptTypes } from 'node:module'
 export const LIVE_SOURCE_CONTENT_BASE = 'aaecbdba0472af1a4ad921913267118741e74f1a'
 // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
 // until the separately verified production application SHA is supplied.
-export const LIVE_SOURCE_COMMIT = 'a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9'
+export const LIVE_SOURCE_COMMIT = 'efb95d951ddbeca1af04bc80d011ccbc2a9f0188'
 export const LIVE_SOURCE_HASHES = Object.freeze({
   'lib/live/channel.ts': 'd68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7',
   'lib/live/tab-share.ts': '38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f',
@@ -22,7 +22,7 @@ export const LIVE_SOURCE_HASHES = Object.freeze({
   'lib/swr/cache-policy.ts': 'abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f',
   'lib/swr/indexed-db.ts': 'a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809',
   'hooks/use-live-key.tsx': 'd5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397',
-  'components/coordinator/coordinator-chat.tsx': '16a648b12638649bd630ddeb5f8f02ea154318ccbb737329d43afe7f7c690361',
+  'components/coordinator/coordinator-chat.tsx': 'f0bb1d01bc52fc801187c47564e0b247f99ec92b8548ebcd99f841765d6ffad9',
 })
 
 export function prepareLiveSource(sourceRoot, { sourceBase = LIVE_SOURCE_COMMIT } = {}) {

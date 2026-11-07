@@ -12,7 +12,7 @@ The adapter adds **exactly three finite ordinary thread GETs in setup**: valid h
 
 ## Validation and evidence
 
-`source-hashes.json` pins all 11 changed runtime files and five existing dependencies from the explicitly supplied application commit `a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9`, tree `1fc41beaa8fa5c06e0af34ccd85cd52e160125b7`. The loader requires both this exact Git identity and all 16 blob hashes, verified directly against Git objects; this disabled repin output is not production deployment evidence. `source.mjs` transforms the actual product `PresenceScopeCache`, `ApiCache` and closed presence-payload parser; no client algorithm is reimplemented.
+`source-hashes.json` pins all 11 changed runtime files and five existing dependencies from the explicitly supplied application commit `efb95d951ddbeca1af04bc80d011ccbc2a9f0188`, tree `fd7fb13f41c5a87df865f539d498b32e3a4fb83b`. The loader requires both this exact Git identity and all 16 blob hashes, verified directly against Git objects; this disabled repin output is not production deployment evidence. `source.mjs` transforms the actual product `PresenceScopeCache`, `ApiCache` and closed presence-payload parser; no client algorithm is reimplemented.
 
 The adapter checks the existing normal session's build, owner, owned disabled fixture and real home. The real client proof holder must accept the existing ticket's home receipt. Positive response owner/home, full returned-device set, each device's shown online state and fixture-online state must match the grant payload. Grant expiry must be no later than the home proof and live ticket; at least one minute of original ticket life is required before beginning. Absent/tampered proofs must return ordinary successful data with `live.workspaceId === null` and `live.presence === null`, preserving the same device set.
 
@@ -23,7 +23,7 @@ Reports contain fixed booleans, counts, durations, source hashes and short owner
 ## Offline verification
 
 ```sh
-MIKKA_MOBILE_PRESENCE_SOURCE_ROOT=/absolute/a1902d7-checkout \
+MIKKA_MOBILE_PRESENCE_SOURCE_ROOT=/absolute/efb95d9-checkout \
   node --test scripts/acceptance/issue-1506-mobile-presence/mobile-api-setup.test.mjs
 ```
 
