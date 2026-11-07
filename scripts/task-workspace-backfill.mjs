@@ -143,7 +143,11 @@ async function backfillDerivedResources(application, workspace) {
         const existing = await lockWorkspaces(tenant, candidates)
         app = await application.connect()
         await app.query('BEGIN')
-        const { rows: resources } = await app.query(`${resourceQuery} ORDER BY ${kind === 'run' ? 'r' : kind === 'factory' ? 'f' : 'a'}.id FOR UPDATE OF ${kind === 'run' ? 'r' : kind === 'factory' ? 'f' : 'a'}`, [ids])
+        await app.query(`SELECT id FROM ${table} WHERE id=ANY($1::uuid[]) AND "workspaceId" IS NULL ORDER BY id FOR UPDATE`, [ids])
+        // A joined locking SELECT can retain source rows from its snapshot
+        // while it waits for the resource. Start a new statement after the
+        // lock is acquired so computer/task/Bot evidence is actually fresh.
+        const { rows: resources } = await app.query(resourceQuery, [ids])
         for (const row of resources) {
           if (!sameRows(observed.filter(previous => previous.id === row.id), [row])) continue
           const proofs = ['task','bot','frozen','computer','run'].filter(source => row[source]).map(source => ({ workspaceId: row[source], source, sourceId: row.id }))
