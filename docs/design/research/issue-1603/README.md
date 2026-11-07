@@ -2,9 +2,9 @@
 
 > **2026-11-07 更新：** 主批次 #1619 与第 17 项补修 #1626 已 merge；`26ef4de1` 的历史主干 CI 12/12、Web deploy、Vercel READY、HTTP 200、source/build `26ef4de1` 与官方 overlay `53d30a3` 已独立核实，见[主干 CI](followup-main-ci.json)、[发布证据](followup-release-evidence.json)、[Vercel 绑定](followup-vercel-binding.json)。这些是历史发布事实，生产域名随后随其他 PR 前移，不代表新补修已部署。
 
-> **当前新增修复与测试补正：** 第 18 项持续失败 Retry 丢失局部恢复入口、第 19 项 hosted Settings 往返丢失待发送批注／电脑线程 registry，均已最小修复并完成本地红绿回归，整合进入 [PR #1637](https://github.com/alexj11324/Mikka/pull/1637)。候选 head `b73e477934f9fa803ea971837e37c6011db15839`、tree `64f017ef52b2b7e42055ac305158ae71b4c87a7d`、创建时 base `1edbeca687119eb0ef71f209ac3d411fbc85b888`。**精确候选 CI、官方 overlay 的新生产模式构建、35-read API 与本次所列 UI 复验已完成；本快照尚未 merge，最终部署及指定 SMOKE 生产验收 PENDING**，见[组合候选状态](followup-1637-candidate.json)。先前 main `dab5439b315a9b236697ba7b89f5578c3d6b8e6c` 的独立增量审查已记录；main 随后又前移至 `b527…`，[最新增量审查](b73-main-b527-advance-audit.json)已完成，预期联合树为 fa0d02cab2a760544f4d7d2991f1be0f6585fd70，实际 merge 待回读，不把候选结果改标为新 main。
+> **当前状态：19 项确认缺陷的修复全部已 merge。** 第 18／19 项随 [PR #1637](https://github.com/alexj11324/Mikka/pull/1637) 于 **2026-11-07 12:48:11 UTC** 合并为 `8fffe80c9827913541a3a824b3813326dd1f2ae8`；parents 为最终 main `b5271361bbef8a619e06d472a58a03925dc6489f` 与已测 head `b73e477934f9fa803ea971837e37c6011db15839`，实际 tree `fa0d02cab2a760544f4d7d2991f1be0f6585fd70` 与独立预测一致，见[最终合并回读](b73-final-merge-verification.json)。候选创建时 base 仍是 `1edbeca687119eb0ef71f209ac3d411fbc85b888`；[b527 增量审查](b73-main-b527-advance-audit.json)及旧 dab 快照各自保留。本地构建／API／UI 仍绑定 b73＋e290，**正式部署及指定 SMOKE 生产验收 PENDING**，见[候选与合并状态](followup-1637-candidate.json)。
 
-**当前结论：已确认 19 项缺陷，前 17 项已在 [#1619](https://github.com/alexj11324/Mikka/pull/1619)／[#1626](https://github.com/alexj11324/Mikka/pull/1626) 合并，第 18／19 项的最小修复已进入 #1637，并完成 b73 的本次定向 UI 复验。** 第 18 项在 `f7225f3e` 基底的真实 React／SWR／Sonner 上为 **8 red → 8 green**；第 19 项真实 provider 红绿后通过 **Settings 10/10、view-state 30/30**（10 项包含在 30 项中）。旧 `6b4a3eb` 因漏传一个测试点击事件而 CI 失败，b73 仅补该测试 3 处适配，本地完整 `test:issues` **404/404**；[旧失败](final-ui-ci-6b4-failure.json)与[测试补正](event-fixture-review.json)分开保留。[b73 CI](b73-ci-audit.json)为 **8 个 workflow success、31 checks 中 24 success／7 合法 skip，4 项 required 全部 success**。新 UI 共 149 条原始操作、14 张入选原始 PNG，实际完成 hosted Settings 批注／草稿连续性、Library 持续失败 Retry、Viewer 真正按钮键盘失败／恢复、工作区隔离与退出清理，见[新 UI 摘要](b73-ui-summary.json)。Library 后续恢复属于既有自动读取重试；LI 误按图已排除，默认折叠 toast 的重叠限制保留。历史 156b／5a／9005 证据各自绑定原版本。**Issue #1603 尚未完成，不能据本地通过或历史发布记录关闭。**
+**当前结论：19 项确认缺陷均已完成最小修复，并分别在 [#1619](https://github.com/alexj11324/Mikka/pull/1619)、[#1626](https://github.com/alexj11324/Mikka/pull/1626)、[#1637](https://github.com/alexj11324/Mikka/pull/1637) 合并。** 第 18／19 项的 b73 定向 UI 与实际 merge 回读均已完成。 第 18 项在 `f7225f3e` 基底的真实 React／SWR／Sonner 上为 **8 red → 8 green**；第 19 项真实 provider 红绿后通过 **Settings 10/10、view-state 30/30**（10 项包含在 30 项中）。旧 `6b4a3eb` 因漏传一个测试点击事件而 CI 失败，b73 仅补该测试 3 处适配，本地完整 `test:issues` **404/404**；[旧失败](final-ui-ci-6b4-failure.json)与[测试补正](event-fixture-review.json)分开保留。[b73 CI](b73-ci-audit.json)的 **12:27:27 UTC 快照**为 8 个 workflow success、31 checks 中 24 success／7 合法 skip；Ready 后 **12:48:09.689 UTC 最终门禁**为 32 checks 中 25 success／7 skip，4 项 required 全部 success，见[合并回执](b73-final-merge-verification.json)。新增的是 Ready 后成功的 Browser 占位检查，不改写早先 31 项快照，也不把占位检查当作实际 UI。新 UI 共 149 条原始操作、14 张入选原始 PNG，实际完成 hosted Settings 批注／草稿连续性、Library 持续失败 Retry、Viewer 真正按钮键盘失败／恢复、工作区隔离与退出清理，见[新 UI 摘要](b73-ui-summary.json)。Library 后续恢复属于既有自动读取重试；LI 误按图已排除，默认折叠 toast 的重叠限制保留。历史 156b／5a／9005 证据各自绑定原版本。**Issue #1603 尚未完成，不能据本地通过或历史发布记录关闭。**
 
 本目录记录本地生产模式应用的实际浏览器操作、截图和 HTTP 验收。截图来自隔离测试数据；它们不代表生产共享账号验收、原生桌面应用验收或 iOS 验收。
 
@@ -20,7 +20,8 @@
 | 第 17 项服务端误分类后续修复 | `26ef4de15129e22503e152258ee9cb2e4aeae8bd` | #1626 于 08:13:42 UTC 合并；parents 为 `efb95d95` 与修复 head `6ccb50d7`；树 `9cec7cc5dee0fe71eff576e3f84136ca51ed3def` 与通过 CI 的候选树一致。 | [本地 red→green 与范围](switcher-followup-evidence.json)、[4 项 required CI](switcher-ci-review.json)、[实际合并回读](followup-merge-verification.json)。26ef 的[历史发布](followup-release-evidence.json)已核实；无新本地 UI 运行，不替代最终指定账号验收。 |
 | 第 18／19 项单项本地修复 | 基底 `f7225f3eb1e38762dfdecde0395792c85b81ec22` 加各自冻结补丁 | Retry 的 7 个回调／8 条真实路径；hosted Settings 的共同 provider 生存期。两个补丁不重叠。 | [Retry 红绿与检查](toast-fix-evidence.json)、[provider 红绿与审查](hosted-provider-review.json)。单项类型检查与测试均绑定 f722 加相应补丁，不等于整合候选 CI 或生产构建。 |
 | 第 18／19 项首个组合候选（已被替代） | `6b4a3eb599179b3032e1717fc047d25284c25a9b` | #1637 初始 16 文件；tree `d45d992a4103ce3b144eae1575204e250a94e812`，base 1edbeca6。 | [旧 CI 失败简版](final-ui-ci-6b4-failure.json)：Integration 的 test:issues 零参调用触发 preventDefault TypeError，required UI policy 汇总随之失败。未据此汇总 ARM64 或全部工作流结果。 |
-| 第 18／19 项当前组合候选 | `b73e477934f9fa803ea971837e37c6011db15839` | #1637；parent 为 6b4a3eb，创建时 base `1edbeca687119eb0ef71f209ac3d411fbc85b888`，tree `64f017ef52b2b7e42055ac305158ae71b4c87a7d`，共 17 文件。 | [候选状态](followup-1637-candidate.json)、[精确 CI](b73-ci-audit.json)、[构建与运行绑定](final5-b73-build-receipt.json)、[35-read API](b73-api-evidence.json)及[149 条操作的新 UI 摘要](b73-ui-summary.json)。图库 `b73/` 为 14 张入选 PNG；overlay e290220f。merge／最终部署／指定生产验收 **PENDING**。 |
+| 第 18／19 项已合并候选 | `b73e477934f9fa803ea971837e37c6011db15839` | #1637；parent 为 6b4a3eb，创建时 base `1edbeca687119eb0ef71f209ac3d411fbc85b888`，tree `64f017ef52b2b7e42055ac305158ae71b4c87a7d`，共 17 文件。 | [候选状态](followup-1637-candidate.json)、[精确 CI](b73-ci-audit.json)、[构建与运行绑定](final5-b73-build-receipt.json)、[35-read API](b73-api-evidence.json)及[149 条操作的新 UI 摘要](b73-ui-summary.json)。图库 `b73/` 为 14 张入选 PNG；overlay e290220f。已 merge 为 8fffe80c；正式部署／指定生产验收 **PENDING**。 |
+| 第 18／19 项实际 GitHub merge | `8fffe80c9827913541a3a824b3813326dd1f2ae8` | #1637 于 12:48:11 UTC 合并；parents 为 b5271361＋b73e477，tree `fa0d02cab2a760544f4d7d2991f1be0f6585fd70`。 | [实际合并回读与 Ready 门禁](b73-final-merge-verification.json)：parent／tree／原提交 ancestry 全部符合预期。该实际 merge 不把旧 b73 本地产物改标成新构建；正式部署与指定 SMOKE 验收待完成。 |
 
 基线、`9005` 和候选 `156b` 构建使用官方 overlay `2cbb930e409ccc247f7692abc9e2dd1152a571fe`；本地整合 `5a752a50` 使用 `ac5980696802f188a81124a8a3f2513be2d14e9e`；新增 `b73e477` 使用 `e290220f8beac1e52f7b33cb097cc24f55b96d48`。三组源码／overlay 组合分别记录。已验证的应用路径为 Vite 前端与 Nitro 服务端；“生产模式构建”指本地构建运行方式，不表示访问生产域名。
 
@@ -30,7 +31,7 @@
 
 | 要求 | 实际运行／动态回归证据（各自绑定版本） | 源码／组件证据 | 当前判断与尚待工作 |
 | --- | --- | --- | --- |
-| **A：固定基线、逐路径检查、真实问题记录** | 基线、9005、156b API、5a 整合 UI、f722 单项红绿及 b73 新运行分别绑定版本。b73 有 149 条原始操作、102 条脱敏选摘、14 张入选图与实际 close。 | 19 项确认缺陷均有根因与最小修复；前 17 项已 merge，第 18／19 项在 #1637。b73 精确 CI、构建／API／定向 UI 已完成。 | **实际 merge／tree 回读、最终部署及指定 SMOKE 生产验收 PENDING。** dab5439b 审查属于先前快照；后续 b527… 的[最新增量](b73-main-b527-advance-audit.json)已审，实际 merge/tree 待回读，不改标旧结果。 |
+| **A：固定基线、逐路径检查、真实问题记录** | 基线、9005、156b API、5a 整合 UI、f722 单项红绿及 b73 新运行分别绑定版本。b73 有 149 条原始操作、102 条脱敏选摘、14 张入选图与实际 close。 | 19 项确认缺陷均有根因与最小修复；19 项均已在 #1619／#1626／#1637 merge。b73 精确 CI、构建／API／定向 UI 已完成。 | **实际 merge／tree 回读完成；正式部署及指定 SMOKE 生产验收 PENDING。** dab5439b 审查属于先前快照；后续 b527… 的[最新增量](b73-main-b527-advance-audit.json)已审，实际 merge/tree 已与最新预测核对一致，不改标旧结果。 |
 | **B：稳定外层框架、局部 loading/error** | b73 #19–29 实际 hosted Settings chunk 延迟 8 秒、命中 1 次，Back to app 后文字草稿／批注保留；Artifact 错误与恢复 #63／#72／#77／#95／#122 中三外壳节点保持同一。 | 第 19 项只把真实 BrowserNotes／ComputerAgents providers 提到两个视觉 frame 的共同父层，保留 OWN_SETTINGS_FRAME=true；Settings 10/10、view-state 30/30。 | 新 hosted 冷加载和批注连续性已有实际证据。独立 SettingsFrame 属既定设计，不要求它与 AppFrame 同节点；实际电脑 registry 保留仍由真实 provider 组件回归证明，未执行电脑／模型会话。 |
 | **B：地址、Back/Forward 与内容保持一致** | 5a #27–36 修复历史错位并保留 Ada 草稿／scroll340。b73 #42–48 重新进入 hosted Settings 后实际 Back→Forward→Back，URL 与 app／Settings 一致，两个批注与文字草稿保留；到 #128 普通 main documentRequests=1。 | `b7a73ab1` 修复 no-op 地址清理提前消费历史查询；两种事件顺序组件回归；第 19 项补共同 provider 生存期。 | 两轮实际证据各自成立。b73 较早 #37–38 的第一次 Back 落在 app，不冒称那一步已到 Settings。 |
 | **C：后台更新与普通失败不破坏在读内容** | 5a 所列聊天／任务／线程／群聊／Artifact 503 记录保留。b73 Library 真指针 Retry 继续失败仍保留列表与按钮；Viewer 确认 BUTTON 后 Enter，错误持续时按钮保留，清故障后再 Enter 则通知消失，文档／输入／scroll 节点、草稿、选区和 scroll650 保留。 | 第 18 项 7 个回调同步 preventDefault，8 条真实路径 red→green；成功仍由原 effect dismiss。#1626 的未知错误分类修复独立保留。 | 本次 b73 所列 UI 路径通过。Library 清故障后由既有自动读取重试恢复，后续受拦截的指针尝试不算成功点击；故障计数含自动重试，不称每次点击仅 1 读。 |
@@ -47,12 +48,24 @@
 | 第 18 项，f722 加 Retry 补丁 | 8 条路径全部在真实缺失 Retry 断言处红灯，再 8/8 绿灯；`test:artifacts` 48/48（包含新增 8 项）、`test:groups` 90 pass／1 既有 DB skip、`test:issue-readonly-dom` 28/28；完整 root／API／frontend typecheck、定向 lint、UI／error／polling policy 通过 | **本地修复验证完成**；未启新浏览器、DB 或 live model。详见 [toast-fix-evidence.json](toast-fix-evidence.json)。 |
 | 第 19 项，f722 加 provider 补丁 | 实际 IssueWorkspace＋真实 providers 的精确红灯显示文字草稿在、批注 `[]`、registry `null`；修复后 Settings 10/10、既有 view-state 命令 30/30；root `tsrs --noEmit` 与两文件 lint 通过 | **本地修复验证完成**；10 项已包含在 30 项中。hosted frame 使用 slot fixture，未把它当成私有 overlay 的浏览器验收。详见 [hosted-provider-review.json](hosted-provider-review.json)。 |
 | 6b 加测试事件适配的本地验证 | `thread-open-without-task` 红灯 13 项中 12 pass／1 fail；只补两个 action 类型和一次 Event 参数。完整 `pnpm test:issues` **404/404，11 个 block，0 skip／fail**；oxlint／diff check exit 0 | [测试补正证据](event-fixture-review.json)记录 b73 的精确文件 blob；该本地入口结果不等于新 head CI，未修改 7 个产品回调。 |
-| 当前组合候选 b73e477，创建时 base 1edbeca6 | [CI 审计](b73-ci-audit.json)：8 workflows success，31 checks 为 24 success／7 合法 skip，4 required 全部 success，真实 Apple Silicon packaged acceptance 成功。[新构建](final5-b73-build-receipt.json)：官方 e290220f、完整 `pnpm build` 含类型检查 exit 0，177.87 秒，source／compiled／served 一致 | **精确候选门禁与本地运行绑定完成**。CI 的 browser placeholder 和历史命名的 DB aggregate 不当作实际 UI；先前 dab5439b 的 ops 增量已审；随后 b527… 的[最新增量](b73-main-b527-advance-audit.json)已由两份独立审查确认，预测树 fa0d02ca 无冲突。 |
-| b73 新 API／UI 与剩余发布门禁 | [35 次 API 读取](b73-api-evidence.json) pass、独立租约干净释放；[新 UI](b73-ui-summary.json) 149 条原始记录、14 张入选图，hosted Settings／Retry／scope／logout 所列场景及 manual close 完成 | **本次列出的本地 UI 范围完成；merge、最终部署与指定生产验收 PENDING。** 旧 5a 图库、26ef 历史发布和 Node 单测不替代这些剩余门禁。 |
+| 已合并候选 b73e477，创建时 base 1edbeca6 | [12:27:27 CI 审计](b73-ci-audit.json)：8 workflows success，31 checks 为 24 success／7 合法 skip，4 required 全部 success，真实 Apple Silicon packaged acceptance 成功。[新构建](final5-b73-build-receipt.json)：官方 e290220f、完整 `pnpm build` 含类型检查 exit 0，177.87 秒，source／compiled／served 一致 | **精确候选门禁与本地运行绑定完成**。CI 的 browser placeholder 和历史命名的 DB aggregate 不当作实际 UI；先前 dab5439b 的 ops 增量已审；随后 b527… 的[最新增量](b73-main-b527-advance-audit.json)已由两份独立审查确认，预测树 fa0d02ca 无冲突，随后已与实际 merge 树核对一致。 |
+| b73 新 API／UI 与剩余发布门禁 | [35 次 API 读取](b73-api-evidence.json) pass、独立租约干净释放；[新 UI](b73-ui-summary.json) 149 条原始记录、14 张入选图，hosted Settings／Retry／scope／logout 所列场景及 manual close 完成 | **所列本地 UI 与实际 merge 回读完成；正式部署与指定生产验收 PENDING。** 旧 5a 图库、26ef 历史发布和 Node 单测不替代这些剩余门禁。 |
 
 **旧 CI 失败与补正边界。** 在 `6b4a3eb` 上，[Integration unit checks](https://github.com/alexj11324/Mikka/actions/runs/42369927744/job/128395857429) 的 `pnpm test:issues` 于 `scripts/thread-open-without-task.test.tsx:103` 零参调用 action，导致 `event.preventDefault()` 读取 undefined；[required UI policy 汇总](https://github.com/alexj11324/Mikka/actions/runs/42369927744/job/128398381913)因该失败派生为 failure，没有观察到第二个独立产品错误。遗漏源于本地初轮验证未包含该既有入口。新 head 只修测试事件适配，保留真实 Sonner 所要求的产品回调；旧 head 失败和之后跳过的步骤不改记为通过，ARM64／全部工作流不在该简版中给最终总结果。新 head 的独立 [b73 CI 审计](b73-ci-audit.json)现已完成，旧失败仍保留为该旧版本的事实。
 
 第 18 项发生 **4 × 影响 5 = 20**：继续失败会失去可见错误及即时重试，但内容保留，后续自动恢复／导航仍可能工作，不称永久死锁。第 19 项发生 **4 × 影响 7 = 28**：hosted Settings 往返会丢未发送批注及电脑线程 registry，独立文字草稿未丢失。两者均为 1–10 工程估计，以[缺陷登记](defect-register.md)为准；最小修复不扩大布局、缓存、轮询或权限策略。
+
+## #1637 最终合并与两次 CI 快照
+
+[最终合并回执](b73-final-merge-verification.json)于 **12:48:21.321 UTC** 回读实际 merge `8fffe80c9827913541a3a824b3813326dd1f2ae8`：合并时刻 **12:48:11 UTC**，parents 为 `b5271361bbef8a619e06d472a58a03925dc6489f` 与 `b73e477934f9fa803ea971837e37c6011db15839`，tree 为 `fa0d02cab2a760544f4d7d2991f1be0f6585fd70`。与独立 merge-tree 预测及原 ancestry 均一致。至此 19 项确认缺陷的修复全部已 merge；issue 仍保持 open，正式部署与指定账号生产验收尚未完成。
+
+| 快照时刻（UTC） | 精确对象与状态 | 使用边界 |
+| --- | --- | --- |
+| 12:27:27 | b73 候选 CI：8 workflows success；31 checks＝24 success＋7 合法 skip；4 required 成功。 | [原 CI 审计](b73-ci-audit.json)保留原计数与原 Browser 占位 check，不事后改成 32。 |
+| 12:48:09.689 | Ready 后最终 guard：head b73、main b527、非 draft、clean／mergeable；32 checks＝25 success＋7 skip；4 required 成功。新 Browser check 为 `128407529192`。 | [合并前 guard](b73-final-merge-verification.json)确认最新门禁；新增 Browser 仍是占位检查，实际 UI 由 final5 独立证明。 |
+| 12:48:11／12:48:21.321 | 实际 merge 8fffe80c／独立回读，tree fa0、parents b527＋b73 均匹配。 | 合并事实已完成；不等于该新 merge 的 main CI、正式部署或指定 SMOKE 生产验收已完成。 |
+
+合并前发布的本地证据固定在 `2564f1c865ff292ff84a7694872ca16cf9613057`。后续更新添加合并／部署回执，不修改该已发布快照里的原始 UI、图库或历史失败。b527 的新增 checkpoint／daemon 等行为仍遵守[独立增量审查](b73-main-b527-advance-audit.json)范围，不能声称被 b73 的本地产物覆盖；实际 merged-head CI／Web／worker 发布门禁另验。
 
 ## b73 / final5 的新构建 UI 实测
 
@@ -70,7 +83,7 @@
 
 **操作失误如实保留。** 初次把真实 `div role=navigation` 写成 `nav` 造成 locator 超时；hover 零高 toast 容器失败，改为实际前排 toast 后成功；LI 上的 Enter 未触发 Retry。这些失败尝试部分未写入只记录成功操作的 JSONL，来自操作方回执，不能伪装成产品失败或通过。默认折叠栈仍有几何重叠及后排指针拦截；本轮证明了所列 hover／modal 键盘路径和输入恢复，未声称所有 error toast／composer 都无遮挡。15 张原始 PNG 中 **14 张**由 root 逐张视觉复核并入选，`viewer-keyboard-failed-retry-retained.png` 原件保留且排除；哈希、尺寸、Git blob 与原序号见[新图库清单](b73-ui-gallery.json)。
 
-**合并版本边界。** #1637 创建时 base 为 1edbeca6；先前 main `dab5439b315a9b236697ba7b89f5578c3d6b8e6c`（#1639）的 4 个外部 PostHog 文档／ops／SQL／测试增量，已有[独立审查及双向差异证明](b73-main-advance-audit.json)，应用、构建、依赖、workflow 或 overlay 无变化。`f8c9e68e805c2b0bdd917cde78940063cf56cfa4` 仅为 **main 保持 dab 时的历史预测树**；main 随后又前移至 `b527…`，[最新增量审查](b73-main-b527-advance-audit.json)已完成，预期联合树为 fa0d02cab2a760544f4d7d2991f1be0f6585fd70；实际 merge/tree 仍待回读，不能把 f8 写成最终合并树。本次构建与 UI 仍绑定 b73＋e290；实际 merge、最终部署及指定 SMOKE 账号验收另记。
+**合并版本边界。** #1637 创建时 base 为 1edbeca6；先前 main `dab5439b315a9b236697ba7b89f5578c3d6b8e6c`（#1639）的 4 个外部 PostHog 文档／ops／SQL／测试增量，已有[独立审查及双向差异证明](b73-main-advance-audit.json)，应用、构建、依赖、workflow 或 overlay 无变化。`f8c9e68e805c2b0bdd917cde78940063cf56cfa4` 仅为 **main 保持 dab 时的历史预测树**；main 随后又前移至 `b527…`，[最新增量审查](b73-main-b527-advance-audit.json)已完成，预期联合树为 fa0d02cab2a760544f4d7d2991f1be0f6585fd70；[实际 merge 回读](b73-final-merge-verification.json)确认 8fffe80c 的 parents 为 b527＋b73、tree 为 fa0，均与预测一致，f8 仍仅为旧 dab 快照。本次构建与 UI 仍绑定 b73＋e290；实际 merge 已独立记录；正式部署及指定 SMOKE 账号验收仍待完成。
 
 官方 overlay 随后前移到 `ca99cf4719a890c214d187c146c07406ffebfba2`；[独立版本边界记录](b73-overlay-advance-audit.json)确认 e290→ca99 仅 release workflow／README 两文件变化，应用源码、运行 assets、依赖锁与 slot 导出均无变化。本轮产物和图片仍是 **b73＋e290**，未声称本地重构建 ca99；生产发布必须核对实际 source／build／官方 overlay。
 
@@ -203,7 +216,7 @@ button "Send comment" [disabled]
 
 **历史根因已确认，服务端分类已在 #1626 合并修复。** 本地 `5a752a50` 当时的 [route](../../../../app/api/workspace/switcher/route.ts) catch-all 将 `getApiSession`／`loadWorkspaceSwitcher` 的任意异常统一返回 403，包括未知数据库／连接异常。客户端 [SettingsReadError](../../../../lib/settings-data.ts)保留 403；[readAccessFailure](../../../../lib/swr/persistent-cache.ts)据此按 workspace 拒绝使 provider 失效，[AuthenticatedReadCache](../../../../components/authenticated-read-cache.tsx)增加 generation 并 refresh，退役子树。后续修复保留无会话 401 与真实 `WorkspaceError` 403，将其他异常返回 500／`workspaceReadFailed`，所有分支 `private, no-store`，日志仅错误类。**真实 403 继续拒绝旧私有内容，客户端安全策略没有放宽。** 当次服务端 403 与旧路径相符，普通 500 本身不触发这条失效规则；该次具体 throw 及精确重建时刻仍未被补写为已知。
 
-**第 17 项状态：FIXED AND MERGED。** [本地证据](switcher-followup-evidence.json)记录既有 `pnpm test:settings-backend` 的 34 项先 32 pass／2 fail（未知错误实际返回 403，而预期 500），修复后 34/34 pass；完整类型检查、lint、error-cause policy 与 diff check 通过。两个修改文件在本地基底 `156b` 与实际主批次 merge `efb95d95` 的原始 blob 相同，仅将该两文件补丁接到真实 merge 之上。[后续 CI](switcher-ci-review.json)的 4 项 required check 全部 success，共 17 项为 16 success／1 conditional skip；[#1626 合并回读](followup-merge-verification.json)确认实际 merge `26ef4de1` 的树与 CI head `6ccb50d7` 一致。该服务端后续修复没有新本地 UI 运行；26ef 的历史部署版本已在[发布证据](followup-release-evidence.json)与[Vercel 绑定](followup-vercel-binding.json)核实。新增第 18／19 项候选的合并部署和指定 SMOKE 生产验收仍 PENDING。
+**第 17 项状态：FIXED AND MERGED。** [本地证据](switcher-followup-evidence.json)记录既有 `pnpm test:settings-backend` 的 34 项先 32 pass／2 fail（未知错误实际返回 403，而预期 500），修复后 34/34 pass；完整类型检查、lint、error-cause policy 与 diff check 通过。两个修改文件在本地基底 `156b` 与实际主批次 merge `efb95d95` 的原始 blob 相同，仅将该两文件补丁接到真实 merge 之上。[后续 CI](switcher-ci-review.json)的 4 项 required check 全部 success，共 17 项为 16 success／1 conditional skip；[#1626 合并回读](followup-merge-verification.json)确认实际 merge `26ef4de1` 的树与 CI head `6ccb50d7` 一致。该服务端后续修复没有新本地 UI 运行；26ef 的历史部署版本已在[发布证据](followup-release-evidence.json)与[Vercel 绑定](followup-vercel-binding.json)核实。第 18／19 项已随 #1637 merge；正式部署和指定 SMOKE 生产验收仍 PENDING。
 
 环境恢复后重新登记 `frameAfterTransport/barAfterTransport/railAfterTransport`，后续 Plugins／Artifact／群聊普通失败按新基线比较；明确群聊 403 后再登记 `AfterSecurity`。旧 detached 输入对象保留 value 不能单独证明新 live input 已恢复；本页只用后续实际 live input 观测证明 Ada 和任务评论草稿恢复，不把旧对象值冒充新输入验证。
 
@@ -268,10 +281,11 @@ API 会话的 clean release 不能代替之后人工 UI 会话的清理。旧人
 - [x] **final5 临时计算停机。** [独立回执](final5-runtime-cleanup.json)确认 app／controller／relay／原 Medium 及 broker 已停止；两租约 released、created=0、cleaned=76、retained=7，保留 session active=0。broker 为主动 SIGINT 后真实 exit 1，不把所有进程写成 exit 0；最终精确进程匹配为 0。
 - [x] **前 17 项 GitHub 合并与回读。** [#1619](batch-merge-verification.json) 实际 merge `efb95d95`；[#1626](followup-merge-verification.json) 实际 merge `26ef4de1`。最新 main 的独立变化已在 [93724 复核](final-main-93724.json)中评估，合并 parent／tree 与候选关系已核实。
 - [x] **历史 26ef 发布与绑定。** [主干 CI](followup-main-ci.json)、[Web 发布](followup-release-evidence.json)及[Vercel source／build 绑定](followup-vercel-binding.json)已核实；不据此推定后来移动的生产域名仍服务该版本。
-- [ ] **PENDING：#1637 合并与最终部署。** 当前 draft head 为 b73e477；需要门禁通过后的实际 merge parent／tree 回读，以及生产实际服务包含新修复的目标版本。
+- [x] **#1637 已 merge 并独立回读。** 12:48:11 UTC 实际 merge 为 8fffe80c，parents b527＋b73、tree fa0 与预测一致；Ready 后最终 guard 为 25 success＋7 skip，4 required 全部成功，见[合并回执](b73-final-merge-verification.json)。
+- [ ] **PENDING：实际 merge 的正式部署。** 核对 merged-head CI／Web／worker 门禁与生产实际 source／build／官方 overlay；本地 b73 的 UI 证据保持原版本。
 - [ ] **PENDING：指定 SMOKE 账号生产验收。** 部署版本确认后，以 issue 指定且已有授权的 SMOKE 账号、正确工作区和真实任务验收；本地 fixture、较早主干部署及 API 报告不替代该步骤。
 
-历史 5a 手动 UI 图库 `integrated/` 保持绑定本地整合 `5a752a50`／overlay `ac598069`。本轮新增 `b73/` 为精确 b73／e290 的 14 张入选原始 PNG；两轮不互相改标。前 17 项 GitHub merge 已有独立回执；第 18／19 项 #1637 的实际 merge、最终部署及生产验收仍待完成。
+历史 5a 手动 UI 图库 `integrated/` 保持绑定本地整合 `5a752a50`／overlay `ac598069`。本轮新增 `b73/` 为精确 b73／e290 的 14 张入选原始 PNG；两轮不互相改标。全部 19 项修复已有 GitHub merge 回执；第 18／19 项 #1637 的实际 merge 为 8fffe80c。正式部署及指定生产验收仍待完成。
 
 ## 9. 图片索引
 
@@ -404,7 +418,7 @@ CI 中名为 `Production build and browser interactions` 的 job 是数据库分
 
 [本地 API 首轮失败](156b-local-api-attempt-1.json)与[后续 `156b` API 成功重跑](156b-api-evidence.json)分别保留。临时传输中已确认的官方 WSS 五分钟会话续接缺口已处理，成功重跑保持同一进程、同一 PostgreSQL 连接且不重放 stdin；旧失败日志没有保留 `1008` close code，因此仍不能断言这就是首轮 PG 连接中断的已证实根因。
 
-**历史 5a 手动 UI 与清理保持原版本；前 17 项已合并，第 18／19 项已在 #1637 完成本地红绿、b73 精确 CI／构建／API 与所列定向 UI，manual close 也已完成。实际 merge／tree 回读、最终部署及指定 SMOKE 生产验收仍 PENDING。** 新图和旧图独立归档，折叠 toast 及操作失误的限制保留；具体根因与修复见[问题登记](defect-register.md)。
+**历史 5a 手动 UI 与清理保持原版本；19 项确认缺陷的修复均已 merge。** 第 18／19 项完成本地红绿、b73 精确 CI／构建／API、定向 UI 和实际 merge 8fffe80c 回读；manual close 与临时资源停机也完成。**正式部署及指定 SMOKE 生产验收仍 PENDING。** 新图和旧图独立归档，折叠 toast 及操作失误的限制保留；具体根因与修复见[问题登记](defect-register.md)。
 
 
 ## 附加机器可读审计
@@ -424,4 +438,4 @@ CI 中名为 `Production build and browser interactions` 的 job 是数据库分
 
 第17项switcher错误分类已实现为独立 [#1626](https://github.com/alexj11324/Mikka/pull/1626)，head `6ccb50d7aad25eef0275af76fd8f137e9eb3faed`，parent为实际efb merge；仅2文件。既有settings-backend入口32/34红→34/34绿，完整typecheck、lint和独立review通过，见[后续修复证据](switcher-followup-evidence.json)。随后 4 项 required CI 全部成功，已于 08:13:42 UTC merge 为 `26ef4de1`，实际树与 CI 候选树一致，见[合并回读](followup-merge-verification.json)；历史发布亦已核实。本地原图仍绑定 5a/ac598，不补写成该 SHA 新 UI 运行。
 
-第 18／19 项当前在 #1637（b73e477），本快照未 merge；本地红绿、精确 CI、新构建与运行绑定、35 次 API 读取、定向 UI 和人工清理已完成。错误 toast 栈仍有默认折叠重叠，实际 hover／模态 BUTTON 键盘重试与输入恢复已独立实测；LI 误步不记为验收。实际 merge／tree 回读、最终部署及指定 SMOKE 账号生产验收仍 PENDING。
+第 18／19 项已随 #1637 于 12:48:11 UTC merge 为 `8fffe80c9827913541a3a824b3813326dd1f2ae8`，parents b527＋b73、实际 tree fa0 与预测一致，见[最终回执](b73-final-merge-verification.json)。12:27:27 的 b73 CI 是 31 checks／24 success＋7 skip；12:48:09.689 Ready 后 guard 为 32 checks／25 success＋7 skip，两次快照分开保留，4 required 均成功。错误 toast 默认折叠重叠、LI 误步及旧版本边界继续保留。正式部署、merged-head 门禁和指定 SMOKE 生产验收仍 PENDING；不据完成 merge 关闭 issue。

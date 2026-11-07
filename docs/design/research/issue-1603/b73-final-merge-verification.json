@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T12:48:21.321Z",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1637,
+  "url": "https://github.com/alexj11324/Mikka/pull/1637",
+  "mergeMethod": "merge",
+  "mergeSha": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "mergedAt": "2026-11-07T12:48:11Z",
+  "head": "b73e477934f9fa803ea971837e37c6011db15839",
+  "parents": [
+    "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "b73e477934f9fa803ea971837e37c6011db15839"
+  ],
+  "tree": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+  "mainAtReadback": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "expectedTreeMatches": true,
+  "expectedParentsMatch": true,
+  "originalAncestryPreserved": true,
+  "guard": {
+    "checkedAt": "2026-11-07T12:48:09.689Z",
+    "head": "b73e477934f9fa803ea971837e37c6011db15839",
+    "main": "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "mergeable": true,
+    "mergeableState": "clean",
+    "draft": false,
+    "required": [
+      {
+        "name": "UI policy (strict)",
+        "app": 15368,
+        "id": 128401467487,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Production build and browser interactions",
+        "app": 15368,
+        "id": 128401141959,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "GitGuardian Security Checks",
+        "app": 46505,
+        "id": 128399044440,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Browser tests (before merge)",
+        "app": 15368,
+        "id": 128407529192,
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "checkCount": 32,
+    "success": 25,
+    "skipped": 7,
+    "expectedTree": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+    "evidenceCommit": "2564f1c865ff292ff84a7694872ca16cf9613057"
+  },
+  "immutableLocalEvidenceCommit": "2564f1c865ff292ff84a7694872ca16cf9613057",
+  "productionDeployment": "PENDING",
+  "designatedSmokeProductionAcceptance": "PENDING",
+  "issueState": "OPEN"
+}
