@@ -17,6 +17,8 @@ test('untrusted execution cannot start a release',()=>{assert.throws(()=>assertE
 // Only the exact closed PR316 Preview sync can be reused; production syncs are not retargeted.
 // Production protocol registration follows an established, publicly reachable receiver.
 // DNS propagation diagnostics retain only fixed network causes and HTTP status.
+// Business receipts attest both deployed sources before and after exact cleanup.
+// Hosted metering sends one fixed Flash request after the existing model-policy guard; no paid retries.
 
 // Installation inventory uses the documented account view.
 

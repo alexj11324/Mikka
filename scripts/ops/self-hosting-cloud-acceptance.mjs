@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 
 const PUBLIC = 'https://app.aspectlylabs.com'
@@ -27,12 +27,19 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
   let cookie = '', registration, tunnel, receiver, closed = false, resolveDelivery
   const deliveries = []
   report.checks = {}; report.cleanup = {}; report.businessAcceptanceComplete = false
+  report.applicationSecretValuesRequested = true; report.secretValuesRemainInRunner = true
+  const deployment = async () => {
+    const response = await fetcher('https://api.vercel.com/v9/projects/prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc?teamId=team_C7lwxVVvnUicFli6112mvxpv', { headers: { authorization: 'Bearer ' + env.VERCEL_TEAM_TOKEN }, redirect: 'error', signal: AbortSignal.timeout(15000) })
+    check(response.ok, 'VERSION'); const project = await response.json(), deployed = project.targets?.production
+    check(project.id === 'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc' && deployed?.readyState === 'READY' && /^[a-f0-9]{40}$/.test(deployed.meta?.githubCommitSha ?? ''), 'VERSION')
+    return { id: deployed.id, source: deployed.meta.githubCommitSha }
+  }
   const cloudOrigin = env.MIKKA_CLOUD_ACCEPTANCE_PUBLIC === '1' ? PUBLIC : PRIVATE
   report.cloudRoute = cloudOrigin === PUBLIC ? 'public_bridge' : 'private_backend'
   const request = async (operation, origin, path, { method = 'GET', body, bearer, csrf, form, github = false } = {}) => {
     check([PUBLIC, PRIVATE, 'https://api.github.com'].includes(origin), 'IDENTITY')
     let response
-    try { response = await fetcher(origin + path, { method, redirect: 'manual', signal: AbortSignal.timeout(30000), headers: {
+    try { response = await fetcher(origin + path, { method, redirect: 'manual', signal: AbortSignal.timeout(operation === 'hosted_metering_call' ? 90000 : 30000), headers: {
       origin: PUBLIC, ...(origin === PUBLIC || origin === PRIVATE ? cookie ? { cookie } : {} : {}),
       ...(body ? { 'content-type': form ? 'application/x-www-form-urlencoded' : 'application/json' } : {}),
       ...(bearer ? { authorization: 'Bearer ' + bearer } : {}), ...(csrf ? { 'x-csrf-token': csrf } : {}),
@@ -46,6 +53,7 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
   }
   const form = (operation, path, body) => json(operation, path, { method: 'POST', body, form: true })
   try {
+    report.privateDeployment = await deployment()
     const login = await request('business_login', PUBLIC, '/mikka/api/auth/sign-in/email', { method: 'POST', body: { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD } })
     check(login.ok, 'LOGIN'); cookie = login.headers.getSetCookie().map(s => s.split(';', 1)[0]).join('; '); await login.body?.cancel()
     const identity = await (await request('business_identity', PUBLIC, '/mikka/api/auth/get-session?disableCookieCache=true')).json()
@@ -152,10 +160,47 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
     check(invalid, 'GITHUB_REVOKE'); report.checks.githubNativeRevocation = true
+
+    // A separate normal consent selects the existing shared billing workspace;
+    // it never switches the account's active workspace under another owner's run.
+    const billingChoices = context.workspaces.filter(w => w.kind === 'team' && w.name === 'Acme Inc.')
+    check(billingChoices.length === 1, 'CONTEXT')
+    const billingWorkspace = billingChoices[0], billingVerifier = randomBytes(32).toString('base64url'), billingState = randomBytes(24).toString('base64url')
+    const billingQuery = new URLSearchParams({ response_type: 'code', client_id: registration.serverId, redirect_uri: registration.redirectUri, scope: 'models', state: billingState, code_challenge: sha(billingVerifier), code_challenge_method: 'S256' })
+    const billingConsent = await request('metering_consent', cloudOrigin, PREFIX + '/oauth/authorize?' + billingQuery)
+    check(billingConsent.ok, 'CONSENT'); const billingBoot = /<script[^>]*id="cloud-bootstrap"[^>]*>([\s\S]*?)<\/script>/.exec(await billingConsent.text()); check(billingBoot, 'CONSENT')
+    const billingModel = JSON.parse(billingBoot[1]).model
+    check(billingModel.workspaces?.some(w => w.id === billingWorkspace.id), 'CONTEXT')
+    const billingApprove = await request('metering_approve', cloudOrigin, PREFIX + '/oauth/authorize', { method: 'POST', form: true, body: { request_id: billingModel.requestId, csrf_token: billingModel.csrfToken, workspace_id: billingWorkspace.id, approve: 'true' } })
+    check(billingApprove.status === 302, 'CALLBACK'); const billingCallback = new URL(billingApprove.headers.get('location'))
+    check(billingCallback.origin === origin && billingCallback.searchParams.get('state') === billingState, 'CALLBACK')
+    const billingToken = await form('metering_exchange', '/oauth/token', { ...credentials, grant_type: 'authorization_code', code: billingCallback.searchParams.get('code'), code_verifier: billingVerifier, redirect_uri: registration.redirectUri })
+    check(billingToken.workspace_id === billingWorkspace.id, 'PERSONAL_SCOPE')
+    const hostedModel = 'deepseek/deepseek-v4.1-flash'
+    execFileSync(process.execPath, ['scripts/assert-test-model.mjs', hostedModel], { stdio: 'pipe' })
+    const completion = await request('hosted_metering_call', cloudOrigin, PREFIX + '/v1/models/chat/completions', { method: 'POST', bearer: billingToken.access_token, body: { model: hostedModel, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 16, stream: false } })
+    const result = await completion.json()
+    report.metering = { status: completion.status, serverId: registration.serverId, authorizationWorkspaceHash: createHash('sha256').update(billingWorkspace.id).digest('hex').slice(0, 16), model: hostedModel, attempts: 1, trialAllowed: false }
+    if (completion.ok) {
+      check(result.model === hostedModel && Number.isSafeInteger(result.usage?.total_tokens) && result.usage.total_tokens > 0, 'HTTP_SCHEMA')
+      report.metering.completionReturned = true; report.metering.usage = { inputTokens: result.usage.prompt_tokens, outputTokens: result.usage.completion_tokens, totalTokens: result.usage.total_tokens }; report.metering.ledgerVerification = 'pending_read_only_receipt'
+    } else {
+      report.metering.code = ['cloud_quota_exhausted', 'cloud_unavailable', 'cloud_access_denied', 'cloud_rate_limited'].includes(result.code) ? result.code : 'OTHER'
+      report.metering.completionReturned = false
+    }
     report.result = 'cloud_protocol_verified'
+  } catch (error) {
+    report.failure = acceptanceCode(error); throw error
   } finally {
     if (registration) { try { await form('own_server_cleanup', '/v1/servers/revoke', { client_id: registration.serverId, client_secret: registration.serverSecret }); report.cleanup.ownServerRevoked = true } catch { report.cleanup.ownServerRevoked = false } }
     if (cookie) { try { const out = await request('business_logout', PUBLIC, '/mikka/api/auth/sign-out', { method: 'POST', body: {} }); report.cleanup.ownSessionSignedOut = out.ok; await out.body?.cancel() } catch { report.cleanup.ownSessionSignedOut = false } }
     closed = true; tunnel?.kill('SIGTERM'); receiver?.closeAllConnections(); receiver?.close()
+    try {
+      const current = await deployment()
+      report.cleanup.privateSourceUnchanged = JSON.stringify(current) === JSON.stringify(report.privateDeployment)
+      const currentPublic = await (await request('business_final_version', PUBLIC, '/mikka/api/version')).json()
+      report.cleanup.publicSourceUnchanged = currentPublic.build === report.publicVersion
+    } catch { report.cleanup.sourcesVerified = false }
+    if (!report.failure) check(report.cleanup.ownServerRevoked && report.cleanup.ownSessionSignedOut && report.cleanup.privateSourceUnchanged && report.cleanup.publicSourceUnchanged, 'CLEANUP')
   }
 }
