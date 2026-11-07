@@ -11,6 +11,7 @@ permissions:
 concurrency:
   group: production-smoke-owner-acceptance
   cancel-in-progress: false
+  queue: max
 jobs:
   delivery:
     if: github.repository == 'alexj11324/Mikka'
@@ -64,7 +65,7 @@ jobs:
         env:
           NODE_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 0c12a8064c1ab350c9739fa4c6ad84129f8a12a4
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: a23b2e0b48dc5cb2dac8bb9ecde734a03537339e
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: claude_code
           MIKKA_1503_CODEX_QUESTION: '0'
@@ -83,7 +84,7 @@ jobs:
         env:
           NODE_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 0c12a8064c1ab350c9739fa4c6ad84129f8a12a4
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: a23b2e0b48dc5cb2dac8bb9ecde734a03537339e
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: codex
           MIKKA_1503_CODEX_QUESTION: '1'
