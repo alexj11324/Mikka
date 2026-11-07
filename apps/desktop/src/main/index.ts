@@ -25,6 +25,7 @@ import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
 import { BundledAuth } from './bundled-auth'
+import { notifyBundledSessionChange } from './bundled-session-change'
 import { BundledLive } from './bundled-live'
 import { BundledViewer } from './bundled-viewer'
 import { registerBundledBridge } from './bundled-bridge'
@@ -564,19 +565,19 @@ async function start(): Promise<void> {
       target: directory.target(),
       targetChanged: url => directory.follow(url),
       describe: url => { const known = directory.info(url); return { url: known.url, cloud: directory.isCloud(url), name: known.name } },
-      changed: () => {
+      changed: change => {
         bundledLive?.closeAll()
         bundledViewer?.closeAll()
         if (reloadForServer()) return
-        for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.sessionChanged)
+        notifyBundledSessionChange(webContents.getAllWebContents(), mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null, PAGE_URL, change)
       },
       scopeChanged: () => { bundledLive?.closeAll(); bundledViewer?.closeAll() },
-      returned: next => {
+      returned: async next => {
         if (!mainWindow || mainWindow.isDestroyed()) return
         if (mainWindow.isMinimized()) mainWindow.restore()
         mainWindow.show(); mainWindow.focus()
         const path = next === '/' ? '/mikka' : next === '/mikka' || next.startsWith('/mikka/') || next.startsWith('/mikka?') ? next : `/mikka${next}`
-        void mainWindow.loadURL(`${RENDERER_ORIGIN}${path}`)
+        await mainWindow.loadURL(`${RENDERER_ORIGIN}${path}`)
       },
     })
     // Open the first backend socket while the OS keychain and local renderer

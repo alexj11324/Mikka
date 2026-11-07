@@ -309,6 +309,7 @@ try {
       web: 'the same email authentication, then a new actual Chromium context and the same workspace selection',
       externalOAuthChallenge: false, sessionCache: 'normal signed-cookie cache, no manual flush; cache hits are not measured',
       comparable: false, comparisonBasis: 'common ordinary authentication and same usable workspace; native includes its additional PKCE transport',
+      order: 'short Web context closes first; native and hosted retain the final ordinary login through the unchanged lifecycle checks',
       protocolPhases: 'native handoff overlaps automatic renderer navigation; these concurrent queries are not falsely separated',
       accountAndWorkspace: 'same leased owner and existing seeded fixture', locale: 'zh-CN' },
     startup: { samples: 'first pair only from the unchanged five-pair lifecycle sequence',
@@ -323,24 +324,10 @@ try {
   fixtures = await createParityFixtures(scope, { includePeerCoordinator: true })
   nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
-  let run = await launch('bundled')
-  application = run.app
-  await waitForBundledRootDocument(run.page)
-  const nativeLogin = await beginQueryWindow('nativeLogin', { client: 'bundled-electron', phase: 'ordinary-login-to-usable-workspace' })
-  await scope.owner.reauthenticate()
-  await checkpointQueryWindow(nativeLogin, 'common-email-authentication')
-  ownerEmail = (await nativeSignIn(run.app, run.page)).user.email
-  await checkpointQueryWindow(nativeLogin, 'native-pkce-and-automatic-renderer-to-public-session')
-  mark('prepare-bundled-workspace')
-  assert.equal(await selectFixture(run.page), 'zh-CN')
-  await checkpointQueryWindow(nativeLogin, 'workspace-selection-to-usable', true)
-  await prepareNativeDevice(run, 'bundled')
-  await recordNativeState(run.page, 'authenticated-profile', 'bundled')
-  await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
-  await close(run.app); application = null
-
-  // One short real Web login on the existing browser and lease, after the
-  // native process/service has drained. No provider challenge or model work.
+  // The real multi-session plugin revokes the earlier same-account session
+  // when this cookie jar signs in again. PKCE retains that browser session,
+  // so finish and close the short Web comparison before creating the native
+  // profile used by every unchanged lifecycle check. No additional login.
   mark('measure-web-login')
   const webLogin = await beginQueryWindow('webLogin', { client: 'chromium', phase: 'ordinary-login-to-usable-workspace' })
   await scope.owner.reauthenticate()
@@ -353,8 +340,24 @@ try {
     await checkpointQueryWindow(webLogin, 'web-navigation-to-dom-content-loaded')
     assert.equal(await selectFixture(webPage), 'zh-CN')
     await checkpointQueryWindow(webLogin, 'workspace-selection-to-usable', true)
-    evidence.queryCounts.login.comparable = true
   } finally { await webContext.close() }
+
+  let run = await launch('bundled')
+  application = run.app
+  await waitForBundledRootDocument(run.page)
+  const nativeLogin = await beginQueryWindow('nativeLogin', { client: 'bundled-electron', phase: 'ordinary-login-to-usable-workspace' })
+  await scope.owner.reauthenticate()
+  await checkpointQueryWindow(nativeLogin, 'common-email-authentication')
+  ownerEmail = (await nativeSignIn(run.app, run.page)).user.email
+  await checkpointQueryWindow(nativeLogin, 'native-pkce-and-automatic-renderer-to-public-session')
+  mark('prepare-bundled-workspace')
+  assert.equal(await selectFixture(run.page), 'zh-CN')
+  await checkpointQueryWindow(nativeLogin, 'workspace-selection-to-usable', true)
+  evidence.queryCounts.login.comparable = true
+  await prepareNativeDevice(run, 'bundled')
+  await recordNativeState(run.page, 'authenticated-profile', 'bundled')
+  await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
+  await close(run.app); application = null
 
   run = await launch('hosted')
   application = run.app

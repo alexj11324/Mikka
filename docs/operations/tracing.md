@@ -331,6 +331,11 @@ same seeded workspace and composer are usable. This measures ordinary business
 login, not a new Google/GitHub OAuth challenge. Native handoff can overlap its
 automatic renderer loading, so the receipt keeps that overlapping segment
 together instead of inventing separate totals.
+The short Web comparison finishes and closes before native authentication.
+Better Auth's multi-session plugin replaces an earlier same-account session
+in that browser cookie jar, and the PKCE handoff retains that session. Keeping
+native authentication last preserves its ordinary session for the subsequent
+bundled and hosted lifecycle checks without an extra login or relaxed expiry.
 
 Startup counts come from the first pair of the unchanged five-pair lifecycle:
 bundled Electron versus the preserved hosted Web renderer in the same compiled
@@ -357,6 +362,13 @@ These are RPC invocations, not per-action SQL counts. The raw log, internal IDs
 and user hashes are never copied to the artifact. Missing, oversized, truncated,
 invalid or unpaired records explicitly make this diagnosis incomplete; unavailable
 windows do not become zero counts.
+The same log snapshot also groups calls by the existing authentication, handoff
+and workspace-selection checkpoint intervals. Closed phase names and contiguous
+boundaries are validated before reporting those groups; they add no request or
+database read. These groups distinguish a handoff read from a required workspace
+authorization read, without assigning guessed SQL counts to either. A missing
+startup window keeps the overall report incomplete while independently complete
+login records retain their own status.
 
 ### Changing them
 

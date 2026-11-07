@@ -9,6 +9,11 @@ const fields = ['pid', 'startedAt', 'endedAt', 'instrumentedClients', 'queryCall
   'pgProtocolReceiveBytes', 'pgProtocolSendBytes', 'activeConnections', 'closedConnections', 'unknownReadings']
 const cumulative = ['queryCalls', 'pgProtocolReceiveBytes', 'pgProtocolSendBytes', 'closedConnections', 'unknownReadings']
 const rpcWindowNames = ['nativeLogin', 'webLogin', 'startup-bundled', 'startup-hosted']
+const rpcPhases = {
+  nativeLogin: ['common-email-authentication', 'native-pkce-and-automatic-renderer-to-public-session', 'workspace-selection-to-usable'],
+  webLogin: ['common-email-authentication', 'web-navigation-to-dom-content-loaded', 'workspace-selection-to-usable'],
+  'startup-bundled': ['launch-to-usable'], 'startup-hosted': ['launch-to-usable'],
+}
 const maxLogBytes = 16 * 1024 * 1024
 const rpcBoundary = {
   assignment: 'requests belong to the half-open window [startedAt, finishedAt) containing their api_request_started timestamp',
@@ -16,6 +21,7 @@ const rpcBoundary = {
   overlap: 'completedInWindow includes carried-in requests; crossesStart/crossesEnd are confirmed by paired receipts and are not additive',
   statusCounts: 'observed completions of requests intersecting the window, including completions after its end',
   unknown: 'completionNotObserved means no completion in this one log snapshot, not proof the request is still running; without a start its window remains unknown',
+  segments: 'closed measurement phases partition a completed window; starts belong to one phase, while completions and crossings remain separate non-additive observations',
 }
 
 function unavailableRpcActions(reason) {
@@ -25,6 +31,28 @@ function unavailableRpcActions(reason) {
 
 function logTime(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ? Date.parse(value) : NaN
+}
+
+function actionsInInterval(records, from, to) {
+  if (from === to) return []
+  const actions = new Map()
+  for (const { start, complete } of records) {
+    if (start ? start.at >= to || (complete && complete.at < from) : complete.at < from || complete.at >= to) continue
+    const route = (start ?? complete).route, rpcAction = complete?.rpcAction ?? null
+    const key = route + ' ' + (rpcAction ?? '')
+    const row = actions.get(key) ?? { route, rpcAction, startedInWindow: 0, completedInWindow: 0,
+      crossesStart: 0, crossesEnd: 0, completionNotObserved: 0, completionWithoutStart: 0, statusCounts: new Map() }
+    if (start && start.at >= from) row.startedInWindow++
+    if (complete && complete.at >= from && complete.at < to) row.completedInWindow++
+    if (start && complete && start.at < from) row.crossesStart++
+    if (start && complete && complete.at >= to) row.crossesEnd++
+    if (!complete) row.completionNotObserved++
+    if (!start) row.completionWithoutStart++
+    if (complete) row.statusCounts.set(complete.status, (row.statusCounts.get(complete.status) ?? 0) + 1)
+    actions.set(key, row)
+  }
+  return [...actions.values()].map(row => ({ ...row, statusCounts: [...row.statusCounts].sort(([a], [b]) => a - b).map(([status, count]) => ({ status, count })) }))
+    .sort((a, b) => a.route.localeCompare(b.route) || (a.rpcAction ?? '').localeCompare(b.rpcAction ?? ''))
 }
 
 // The server owns these two JSON-line shapes. Retain only closed request
@@ -71,6 +99,7 @@ function projectRpcActions(text, windows) {
     if (!start || !complete) reasons.add('unpaired_requests')
     records.push(record)
   }
+  const recordsIncomplete = reasons.size > 0
   const measured = {}
   for (const name of rpcWindowNames) {
     const window = windows[name], from = logTime(window?.total?.startedAt), to = logTime(window?.total?.finishedAt)
@@ -79,27 +108,28 @@ function projectRpcActions(text, windows) {
       reasons.add('query_window_incomplete')
       continue
     }
-    const actions = new Map()
-    for (const { start, complete } of records) {
-      if (start ? start.at >= to || (complete && complete.at < from) : complete.at < from || complete.at >= to) continue
-      const route = (start ?? complete).route, rpcAction = complete?.rpcAction ?? null
-      const key = route + ' ' + (rpcAction ?? '')
-      const row = actions.get(key) ?? { route, rpcAction, startedInWindow: 0, completedInWindow: 0,
-        crossesStart: 0, crossesEnd: 0, completionNotObserved: 0, completionWithoutStart: 0, statusCounts: new Map() }
-      if (start && start.at >= from) row.startedInWindow++
-      if (complete && complete.at >= from && complete.at < to) row.completedInWindow++
-      if (start && complete && start.at < from) row.crossesStart++
-      if (start && complete && complete.at >= to) row.crossesEnd++
-      if (!complete) row.completionNotObserved++
-      if (!start) row.completionWithoutStart++
-      if (complete) row.statusCounts.set(complete.status, (row.statusCounts.get(complete.status) ?? 0) + 1)
-      actions.set(key, row)
+    const measuredWindow = measured[name] = { status: recordsIncomplete ? 'incomplete' : 'complete',
+      startedAt: window.total.startedAt, finishedAt: window.total.finishedAt, actions: actionsInInterval(records, from, to) }
+    if (window.segments !== undefined) {
+      let boundary = from
+      const valid = Array.isArray(window.segments) && window.segments.length === rpcPhases[name].length
+        && window.segments.every((segment, index) => {
+          const start = logTime(segment?.startedAt), end = logTime(segment?.finishedAt)
+          if (segment?.phase !== rpcPhases[name][index] || start !== boundary || !Number.isFinite(end) || end < start || end > to) return false
+          boundary = end
+          return true
+        }) && boundary === to
+      if (valid) {
+        measuredWindow.segmentStatus = recordsIncomplete ? 'incomplete' : 'complete'
+        measuredWindow.segments = window.segments.map(segment => ({ phase: segment.phase,
+          startedAt: segment.startedAt, finishedAt: segment.finishedAt,
+          actions: actionsInInterval(records, logTime(segment.startedAt), logTime(segment.finishedAt)) }))
+      } else {
+        measuredWindow.segmentStatus = 'unavailable'
+        reasons.add('query_segments_invalid')
+      }
     }
-    measured[name] = { status: 'complete', startedAt: window.total.startedAt, finishedAt: window.total.finishedAt,
-      actions: [...actions.values()].map(row => ({ ...row, statusCounts: [...row.statusCounts].sort(([a], [b]) => a - b).map(([status, count]) => ({ status, count })) }))
-        .sort((a, b) => a.route.localeCompare(b.route) || (a.rpcAction ?? '').localeCompare(b.rpcAction ?? '')) }
   }
-  if (reasons.size) for (const window of Object.values(measured)) if (window.status === 'complete') window.status = 'incomplete'
   return { version: 1, status: reasons.size ? 'incomplete' : 'complete', reasons: [...reasons],
     duplicateRecords, conflictingInvocations, boundary: rpcBoundary, windows: measured }
 }

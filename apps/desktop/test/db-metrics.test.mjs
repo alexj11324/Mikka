@@ -338,3 +338,43 @@ test('RPC diagnostics accept only the descriptor-bound primary log and complete 
   assert.deepEqual(mismatched.reasons, ['log_binding_mismatch'])
   assert.equal(mismatched.windows.nativeLogin.actions, undefined)
 })
+
+test('RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable', async t => {
+  const f = await rpcLogFixture(t)
+  await f.write([rpcEvent(1, 2100), rpcEvent(1, 2301, true, { rpcAction: 'desktop.bootstrap' }),
+    rpcEvent(2, 2300), rpcEvent(2, 2399, true, { rpcAction: 'desktop.bootstrap' }),
+    rpcEvent(3, 1999), rpcEvent(3, 2050, true, { rpcAction: 'desktop.bootstrap' })])
+  const nativeLogin = { ...rpcWindows.nativeLogin, segments: [
+    { phase: 'common-email-authentication', startedAt: new Date(2000).toISOString(), finishedAt: new Date(2000).toISOString() },
+    { phase: 'native-pkce-and-automatic-renderer-to-public-session', startedAt: new Date(2000).toISOString(), finishedAt: new Date(2300).toISOString() },
+    { phase: 'workspace-selection-to-usable', startedAt: new Date(2300).toISOString(), finishedAt: new Date(3000).toISOString() },
+  ] }
+  const result = await f.counter.rpcActions({ nativeLogin })
+  assert.equal(result.status, 'incomplete', 'missing startup measurements remain incomplete globally')
+  assert.equal(result.windows.nativeLogin.status, 'complete', 'a separate missing window does not invalidate paired login records')
+  assert.equal(result.windows.nativeLogin.segmentStatus, 'complete')
+  const [auth, handoff, workspace] = result.windows.nativeLogin.segments
+  assert.deepEqual(auth.actions, [])
+  assert.equal(handoff.actions[0].startedInWindow, 1)
+  assert.equal(handoff.actions[0].crossesEnd, 1)
+  assert.equal(workspace.actions[0].startedInWindow, 1)
+  assert.equal(workspace.actions[0].crossesStart, 1)
+  assert.equal(workspace.actions[0].completedInWindow, 2)
+  assert.equal(result.windows.nativeLogin.actions[0].startedInWindow, 2)
+})
+
+test('RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases', async t => {
+  const f = await rpcLogFixture(t)
+  await f.write([rpcEvent(1, 2000), rpcEvent(1, 2500, true)])
+  for (const segments of [
+    [{ phase: 'PRIVATE_PHASE_CANARY', startedAt: new Date(2000).toISOString(), finishedAt: new Date(3000).toISOString() }],
+    [{ phase: 'launch-to-usable', startedAt: new Date(2001).toISOString(), finishedAt: new Date(3000).toISOString() }],
+    [{ phase: 'launch-to-usable', startedAt: new Date(2000).toISOString(), finishedAt: new Date(3001).toISOString() }],
+  ]) {
+    const result = await f.counter.rpcActions({ 'startup-bundled': { ...rpcWindows.nativeLogin, segments } })
+    assert.equal(result.windows['startup-bundled'].segmentStatus, 'unavailable')
+    assert.equal(result.windows['startup-bundled'].segments, undefined)
+    assert.ok(result.reasons.includes('query_segments_invalid'))
+    assert.equal(JSON.stringify(result).includes('PRIVATE_PHASE_CANARY'), false)
+  }
+})
