@@ -132,3 +132,5 @@ test('Apple API denial preserves the action/status and does not parse or expose 
  assert.deepEqual(report.requests, [{ operation: 'apple_existing_build', status: 403 }])
  assert.ok(!JSON.stringify(report).includes('never-return'))
 })
+
+// Final release checkpoint: public ce67; production execution follows private main READY.

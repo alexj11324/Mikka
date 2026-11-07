@@ -215,8 +215,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      # Replaced by the exact released #1591 merge SHA before dispatch.
-      MIKKA_COMMUNITY_REVISION: PENDING_PUBLIC_CLOUD_RELEASE
+      # Exact public release commit containing #1591; verified before credentials.
+      MIKKA_COMMUNITY_REVISION: ce67afe931e9b9d6e7b0d346a62aa4d9751195c8
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
