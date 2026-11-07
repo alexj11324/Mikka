@@ -60,8 +60,8 @@ jobs:
         run: node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs --self-test
       - name: Exercise the real fresh Coordinator welcome through the normal account
         env:
-          APPLICATION_SHA: bcf82a2e058779fc308a8eea19d036fb5b9467e7
-          ACCEPTANCE_CASES: claude-d
+          APPLICATION_SHA: f7225f3eb1e38762dfdecde0395792c85b81ec22
+          ACCEPTANCE_CASES: all
         run: MIKKA_OPS_DEPENDENCIES="$RUNNER_TEMP/issue1515-diagnostic" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
