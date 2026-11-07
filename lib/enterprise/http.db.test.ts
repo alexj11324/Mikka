@@ -65,7 +65,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   const keys = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const wrongKeys = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const jwk = { ...keys.publicKey.export({ format: 'jwk' }), kid: 'fixture', use: 'sig', alg: 'RS256' }
-  const codes = new Map<string, { redirect: string; challenge: string; mode: string }>()
+  const codes = new Map<string, { redirect: string; challenge: string; mode: string; subject: string; email: string }>()
+  let oidcIdentity = { subject, email }
   let mode = 'valid'
   let idpOrigin = '', appOrigin = ''
   let samlIdp: {
@@ -82,7 +83,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const url = new URL(incoming.url!, idpOrigin)
       if (url.pathname === '/authorize') {
         const code = randomUUID()
-        codes.set(code, { redirect: url.searchParams.get('redirect_uri')!, challenge: url.searchParams.get('code_challenge')!, mode })
+        codes.set(code, { redirect: url.searchParams.get('redirect_uri')!, challenge: url.searchParams.get('code_challenge')!, mode, ...oidcIdentity })
         const callback = new URL(url.searchParams.get('redirect_uri')!)
         callback.searchParams.set('code', code); callback.searchParams.set('state', url.searchParams.get('state')!)
         outgoing.writeHead(302, { location: callback.href }); outgoing.end(); return
@@ -98,7 +99,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
         const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'fixture' })).toString('base64url')
         const now = Math.floor(Date.now() / 1000)
         const claims = Buffer.from(JSON.stringify({ iss: grant.mode === 'issuer' ? 'https://wrong.example.invalid' : idpOrigin,
-          aud: 'mikka-fixture', sub: subject, email, email_verified: true, name: 'Enterprise fixture', iat: now,
+          aud: 'mikka-fixture', sub: grant.subject, email: grant.email, email_verified: true, name: 'Enterprise fixture', iat: now,
           exp: grant.mode === 'expired' ? now - 3600 : now + 300 })).toString('base64url')
         const signature = sign('RSA-SHA256', Buffer.from(`${header}.${claims}`), grant.mode === 'signature' ? wrongKeys.privateKey : keys.privateKey).toString('base64url')
         outgoing.setHeader('content-type', 'application/json'); outgoing.end(JSON.stringify({ access_token: randomBytes(24).toString('hex'), token_type: 'Bearer', expires_in: 300, id_token: `${header}.${claims}.${signature}` })); return
@@ -205,8 +206,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const { url } = await response.json() as { url: string }
     return { url, jar }
   }
-  async function oidcLogin() {
-    const { url, jar } = await startSso()
+  async function oidcLogin(jar = new Cookies()) {
+    const { url } = await startSso(providerId, jar)
     const consent = await fetch(url, { redirect: 'manual' })
     const callback = await fetch(consent.headers.get('location')!, { headers: { cookie: jar.header() }, redirect: 'manual' })
     jar.take(callback)
@@ -279,6 +280,51 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal(Number((await pool.query('select count(*) from session where "enterpriseProviderId"=$1', [providerId])).rows[0].count), before)
       assert.equal((await session(oidcCookies))?.user.id, userId)
     } finally { await pool.query(`alter table mikka_organization_audit_events drop constraint "${constraint}"`) }
+  })
+  await t.test('a same-email personal account requires fresh explicit one-use consent before a signed OIDC identity can bind', async () => {
+    const { startIdentityLink } = await import('./management')
+    const existingId = randomUUID(), existingEmail = `${randomUUID()}@${oidcDomain}`, linkedSubject = `existing-${randomUUID()}`
+    await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Existing personal profile\',$2,true,now(),now())', [existingId, existingEmail])
+    const created = await requestScim('Users', 'POST', { schemas: [SCIM_USER], externalId: linkedSubject, userName: existingEmail, active: true })
+    assert.equal(created.status, 201)
+    const pending = (await created.json()).id
+    const freshSession = async (id: string, userEmail: string) => {
+      const sessionId = randomUUID()
+      await pool.query('insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, randomUUID(), id])
+      return { user: { id, email: userEmail }, session: { id: sessionId } }
+    }
+    const jarWith = (ticket: string) => { const jar = new Cookies(); jar.values.set('mikka-sso-link', ticket); return jar }
+    const assertUnlinked = async () => {
+      assert.equal((await pool.query('select "userId" from enterprise_scim_user where id=$1', [pending])).rows[0].userId, null)
+      assert.equal((await pool.query('select count(*) from enterprise_identity where "providerId"=$1 and subject=$2', [providerId, linkedSubject])).rows[0].count, '0')
+    }
+    const consenting = await freshSession(existingId, existingEmail)
+    oidcIdentity = { subject: linkedSubject, email: existingEmail }
+    try {
+      assert.equal(await session((await oidcLogin()).jar), null, 'matching verified email is not account-link authority')
+      await assertUnlinked()
+      await pool.query('update session set "createdAt"=now()-interval \'10 minutes\' where id=$1', [consenting.session.id])
+      await assert.rejects(startIdentityLink(consenting, providerId), error => (error as { detail?: string }).detail === 'access_denied')
+      await pool.query('update session set "createdAt"=now() where id=$1', [consenting.session.id])
+      const stranger = await freshSession(adminId, `${adminId}@fixture.example.invalid`)
+      assert.equal(await session((await oidcLogin(jarWith(await startIdentityLink(stranger, providerId)))).jar), null)
+      const expired = await startIdentityLink(consenting, providerId)
+      await pool.query('update enterprise_link_ticket set "expiresAt"=now()-interval \'1 second\' where id=$1', [identityTokenHash(expired)])
+      assert.equal(await session((await oidcLogin(jarWith(expired))).jar), null)
+      const revoked = await freshSession(existingId, existingEmail)
+      const revokedTicket = await startIdentityLink(revoked, providerId)
+      await pool.query('delete from session where id=$1', [revoked.session.id])
+      assert.equal(await session((await oidcLogin(jarWith(revokedTicket))).jar), null)
+      await assertUnlinked()
+      const ticket = await startIdentityLink(consenting, providerId)
+      const linked = await oidcLogin(jarWith(ticket))
+      assert.equal((await session(linked.jar))?.user.id, existingId)
+      assert.equal((await pool.query('select "userId" from enterprise_scim_user where id=$1', [pending])).rows[0].userId, existingId)
+      assert.equal((await pool.query('select count(*) from enterprise_link_ticket where id=$1', [identityTokenHash(ticket)])).rows[0].count, '0')
+      assert.equal((await pool.query('select name from "user" where id=$1', [existingId])).rows[0].name, 'Existing personal profile')
+      assert.equal((await pool.query('select role from mikka_organization_members where "organizationId"=$1 and "userId"=$2', [organizationId, existingId])).rows[0].role, 'member')
+      assert.equal((await pool.query('select count(*) from mikka_workspace_members where "userId"=$1', [existingId])).rows[0].count, '0', 'linking identity cannot create Workspace membership')
+    } finally { oidcIdentity = { subject, email } }
   })
   await t.test('SAML signs an actual assertion, validates the SP request, and rejects replay/tampering', async () => {
     mode = 'valid'

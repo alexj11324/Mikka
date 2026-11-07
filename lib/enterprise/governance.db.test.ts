@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { verifyAuditExport } from '../audit/integrity'
@@ -84,6 +85,27 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     }
     assert.equal((await pool.query('select count(*) from mikka_workspace_entitlements where "workspaceId"=$1', [wsA])).rows[0].count, '0')
     assert.equal((await pool.query('select plan from mikka_organization_entitlements where "organizationId"=$1', [organizationId])).rows[0].plan, 'enterprise')
+  })
+  await t.test('the operator CLI previews, applies once and refuses bound Workspace grants without printing rejected input', async () => {
+    const grant = { organizationId, expectedPlan: 'enterprise', plan: 'enterprise', source: 'cloud', seatLimit: 3,
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(), reason: 'correction', operator: 'cli-fixture' }
+    const invoke = (script: 'organization-plan' | 'team-plan', input: unknown, args: string[] = []) => spawnSync(process.execPath,
+      ['--conditions=react-server', '--import', 'tsx', `scripts/${script}.mjs`, ...args],
+      { cwd: new URL('../..', import.meta.url), env: process.env, encoding: 'utf8', input: typeof input === 'string' ? input : JSON.stringify(input), timeout: 15_000, maxBuffer: 65_536 })
+    const before = Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'entitlement.changed\'', [organizationId])).rows[0].count)
+    const preview = invoke('organization-plan', grant)
+    assert.equal(preview.status, 0, preview.stderr); assert.equal(JSON.parse(preview.stdout).applied, false)
+    assert.equal((await pool.query('select "seatLimit" from mikka_organization_entitlements where "organizationId"=$1', [organizationId])).rows[0].seatLimit, 2)
+    const applied = invoke('organization-plan', grant, ['--apply'])
+    assert.equal(applied.status, 0, applied.stderr); assert.equal(JSON.parse(applied.stdout).after.activeHumanLimit, 3)
+    const repeated = invoke('organization-plan', grant, ['--apply'])
+    assert.equal(repeated.status, 0, repeated.stderr); assert.equal(JSON.parse(repeated.stdout).changed, false)
+    assert.equal(Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'entitlement.changed\'', [organizationId])).rows[0].count), before + 1)
+    const malformed = invoke('organization-plan', '"fixture-private-input')
+    assert.equal(malformed.status, 1); assert.equal(malformed.stdout, ''); assert.ok(!malformed.stderr.includes('fixture-private-input'))
+    const bound = invoke('team-plan', { workspaceId: wsA, expectedPlan: 'free', plan: 'pro', source: 'cloud', seatLimit: 20, expiresAt: null, reason: 'evaluation', operator: 'cli-fixture' }, ['--apply'])
+    assert.equal(bound.status, 1); assert.match(bound.stderr, /workspace_attached/); assert.equal(bound.stdout, '')
+    assert.equal((await pool.query('select count(*) from mikka_workspace_entitlements where "workspaceId"=$1', [wsA])).rows[0].count, '0')
   })
   await t.test('identity configuration keeps its audit intent through Workspace-store failure and retries exactly once', async () => {
     const constraint = `enterprise_audit_fixture_${randomUUID().replaceAll('-', '')}`
