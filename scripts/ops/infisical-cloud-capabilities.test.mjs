@@ -105,7 +105,7 @@ test('denied login never reads error content or attempts an alternative identity
   assert.equal(canceled, true)
 })
 
-test('metadata transport permits only the six fixed GETs and never follows redirects', async () => {
+test('metadata transport permits only the nine fixed GETs and never follows redirects', async () => {
   const calls = [], requests = []
   const client = metadataClient(fixtureCredential, requests, async (url, options) => {
     calls.push(url)
@@ -120,7 +120,7 @@ test('metadata transport permits only the six fixed GETs and never follows redir
   for (const invalid of ['secrets', '/api/v3/secrets/raw', 'create_sync', 'rotate_credentials', 'constructor', '__proto__']) {
     assert.throws(() => client(invalid), code('API_ROUTE'))
   }
-  assert.equal(calls.length, 6)
+  assert.equal(calls.length, 9)
 })
 
 test('rule evidence distinguishes absent grants, conditional grants and denies without pretending to evaluate CASL', () => {
@@ -142,7 +142,7 @@ test('rule evidence distinguishes absent grants, conditional grants and denies w
   assert.ok(admin.capabilities.every(row => row.grantRules === 1 && row.grantAbsent === false))
 })
 
-test('the six endpoint projections expose only the requested closed capability evidence', async () => {
+test('the endpoint projections expose only the requested closed capability evidence', async () => {
   const fixture = responses(), called = []
   const result = await inspect(async operation => {
     called.push(operation)
@@ -213,3 +213,19 @@ test('URL-shape diagnostics use only closed categories and do not permit untrust
 })
 
 // Fresh rollout readback, 2026-11-07.
+
+// Project query context and legacy sync metadata must not be mistaken for absence.
+test('legacy private project destinations count without the newer scope discriminator', () => {
+ const row = { projectId: TARGET.project, destination: 'vercel', connection: { name: TARGET.connection }, destinationConfig: { app: TARGET.privateVercelProject, env: 'production' } }
+ const result = projectMetadata('project_vercel_syncs', {secretSyncs:[row]}, {})
+ assert.equal(result.privateProductionSyncCount,1)
+ assert.equal(result.legacyProjectScopeCount,1)
+})
+
+test('project-context connection and folder responses are projected without credential contents', () => {
+ const ctx = {orgId}
+ const available = projectMetadata('available_project_connections', {appConnections:[{id:connectionId,name:TARGET.connection,app:'vercel',projectId:null,orgId}]},ctx)
+ assert.equal(available.targetAvailableForConnect,true)
+ assert.equal(projectMetadata('prod_folders',{folders:[{relativePath:'/mikka-cloud-production'}]},{}).privateSourcePresent,true)
+ assert.equal(projectMetadata('prod_folders',{folders:[]},{}).privateSourcePresent,false)
+})

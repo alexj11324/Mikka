@@ -34,7 +34,7 @@ jobs:
         run: node --test scripts/ops/infisical-cloud-capabilities.test.mjs
       - name: Verify the reviewed branch and three-file change before authentication
         run: node scripts/ops/infisical-cloud-capabilities.mjs --preflight
-      - name: Inspect six fixed metadata routes with the existing OIDC identity
+      - name: Compare organization and project connection scope with source metadata
         run: node scripts/ops/infisical-cloud-capabilities.mjs --inspect
 
 # Fresh rollout readback, 2026-11-07.

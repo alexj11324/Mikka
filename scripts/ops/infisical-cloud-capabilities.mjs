@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/infisical-cloud-capabilities',
-  base: 'f59e2813242cbd98d615584dd4f4c96219dcc0ec',
+  base: '4edc2366192c0654bdb3afe4b8554956abfa5f4e',
   identity: '2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', audience: 'mikka-infisical',
   project: '89850d6a-f020-4936-863e-df77380dfe40',
   connection: 'mikka-team-vercel-native-sync',
@@ -23,6 +23,9 @@ export const GET_ROUTES = Object.freeze({
   project_permission_audit: `/api/v1/projects/${TARGET.project}/memberships/identities/${TARGET.identity}/permissions/audit?includeFolderPermissions=true`,
   known_connection: `/api/v1/app-connections/vercel/connection-name/${TARGET.connection}`,
   available_org_connections: '/api/v1/app-connections/vercel/available',
+  available_project_connections: `/api/v1/app-connections/vercel/available?projectId=${TARGET.project}`,
+  known_project_connection: `/api/v1/app-connections/vercel/connection-name/${TARGET.connection}?projectId=${TARGET.project}`,
+  prod_folders: `/api/v2/folders?projectId=${TARGET.project}&environment=prod&path=%2F&recursive=true`,
   project_vercel_syncs: `/api/v1/secret-syncs/vercel?projectId=${TARGET.project}`,
 })
 const CAPABILITIES = [
@@ -177,16 +180,16 @@ export function projectMetadata(operation, data, context) {
       roles: membership.roles.map(row => ({ role: roleName(row.role), temporary: row.isTemporary === true })) }
   }
   if (operation === 'project_permission_audit') return permissionEvidence(data)
-  if (operation === 'known_connection') {
+  if (['known_connection', 'known_project_connection'].includes(operation)) {
     const connection = data?.appConnection
     requireThat(connection?.name === TARGET.connection && connection.app === 'vercel' && connection.method === 'api-token'
-      && uuid(connection.id) && connection.projectId == null, 'CONNECTION_SCOPE')
+      && uuid(connection.id) && (operation === 'known_connection' ? connection.projectId == null : connection.projectId === TARGET.project), 'CONNECTION_SCOPE')
     requireThat(object(connection.credentials) && Object.keys(connection.credentials).length === 0, 'CONNECTION_NOT_SANITIZED')
     context.connectionId = connection.id
     return { knownNameMatches: true, connectionId: connection.id, organizationScoped: true,
       organizationMatches: context.orgId ? connection.orgId === context.orgId : null, credentialsEmpty: true }
   }
-  if (operation === 'available_org_connections') {
+  if (['available_org_connections', 'available_project_connections'].includes(operation)) {
     requireThat(Array.isArray(data?.appConnections) && data.appConnections.length <= 200, 'AVAILABLE_SCHEMA')
     const matches = data.appConnections.filter(row => row?.name === TARGET.connection && row.app === 'vercel' && row.projectId == null)
     requireThat(matches.length <= 1 && matches.every(row => uuid(row.id) && !Object.hasOwn(row, 'credentials')
@@ -198,12 +201,23 @@ export function projectMetadata(operation, data, context) {
     requireThat(Array.isArray(data?.secretSyncs) && data.secretSyncs.length <= 200
       && data.secretSyncs.every(row => row?.projectId === TARGET.project && row.destination === 'vercel'), 'SYNC_SCOPE')
     const matched = data.secretSyncs.filter(row => row.connection?.name === TARGET.connection)
-    const privateSyncs = matched.filter(row => row.destinationConfig?.scope === 'project' && row.destinationConfig.app === TARGET.privateVercelProject)
+    const privateSyncs = matched.filter(row => row.destinationConfig?.scope !== 'team' && row.destinationConfig?.app === TARGET.privateVercelProject)
     return { totalCount: data.secretSyncs.length, knownConnectionSyncCount: matched.length,
       privateProjectSyncCount: privateSyncs.length,
       privateProductionSyncCount: privateSyncs.filter(row => row.destinationConfig?.env === 'production').length,
       teamScopeSyncCount: matched.filter(row => row.destinationConfig?.scope === 'team').length,
-      unknownScopeSyncCount: matched.filter(row => !['project', 'team'].includes(row.destinationConfig?.scope)).length }
+      unknownScopeSyncCount: matched.filter(row => !['project', 'team', undefined].includes(row.destinationConfig?.scope)).length,
+      legacyProjectScopeCount: matched.filter(row => row.destinationConfig?.scope === undefined && typeof row.destinationConfig?.app === 'string').length,
+      directPrivateAppMatches: matched.filter(row => row.destinationConfig?.app === TARGET.privateVercelProject).length,
+      destinationSummary: matched.map(row => ({
+        scope: ['project', 'team'].includes(row.destinationConfig?.scope) ? row.destinationConfig.scope : row.destinationConfig?.scope == null ? 'legacy_or_absent' : 'OTHER',
+        app: row.destinationConfig?.app === TARGET.privateVercelProject ? 'private' : row.destinationConfig?.app === 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH' ? 'public' : 'OTHER',
+        environment: ['production', 'preview', 'development'].includes(row.destinationConfig?.env) ? row.destinationConfig.env : 'OTHER',
+      })) }
+  }
+  if (operation === 'prod_folders') {
+    requireThat(Array.isArray(data?.folders) && data.folders.length <= 500, 'FOLDERS_SCHEMA')
+    return { returnedCount: data.folders.length, privateSourcePresent: data.folders.some(row => row.relativePath === '/mikka-cloud-production' || row.path === '/mikka-cloud-production') }
   }
   throw new GuardError('API_ROUTE')
 }
