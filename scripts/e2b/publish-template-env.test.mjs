@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { assertConservation, currentWorkerSha, pairEnv, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { assertConservation, currentWorkerSha, pairEnv, publish, releaseInputs, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { packCandidates, packRelease } from './release-handoff.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
@@ -123,6 +126,48 @@ test('verified versioned templates, worker and previous release go to production
   assert.deepEqual(writes[0].body.map(row => [row.key, row.value, row.target]), Object.entries({ ...STORED, MIKKA_CLOUD_RUNTIME_PREVIOUS: JSON.stringify({ version: 1, configuration: OLD_STORED }) }).map(([key, value]) => [key, value, ['production']]))
   assert.equal(fake.calls.filter(call => call.path.includes('/env/id-')).length, 13, 'read current configuration and verify new configuration plus rollback receipt')
   assert.doesNotMatch(fake.logs.join('\n'), /fixture-model|vercel-fixture|github-read-fixture/)
+})
+
+test('a complete large artifact reaches the unchanged publication gates without a report environment variable', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'e2b-publish-artifact-')); t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const candidate = structuredClone(EVIDENCE); delete candidate.subscriptionAcceptance
+  const certificates = JSON.parse(readFileSync(new URL('./e2b-certificate-relinks.json', import.meta.url)))
+  for (const [kind, row] of Object.entries(candidate.templates)) {
+    delete row.public; delete row.buildStatus
+    row.name = `mikka-${COMMIT.slice(0, 12)}-123456-1-${kind}`
+    row.conservation.finalization.providerChanges = certificates.filter(cert => cert.templates.includes(kind)).map(cert => ({
+      path: cert.path, kind: 'file', before: { kind: 'file', sha256: cert.sha256, target: null },
+      after: { kind: 'link', sha256: null, target: cert.target }, resolvedSha256: cert.sha256,
+    }))
+  }
+  const candidateFile = join(dir, 'candidates.json'), candidateDir = join(dir, 'candidates'), releaseFile = join(dir, 'release.json'), releaseDir = join(dir, 'release')
+  writeFileSync(candidateFile, JSON.stringify(candidate))
+  const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_SHA: COMMIT, GITHUB_RUN_ID: '123456', GITHUB_RUN_ATTEMPT: '1' }
+  const initial = packCandidates(candidateFile, candidateDir, env)
+  const releaseEvidence = structuredClone(candidate)
+  for (const row of Object.values(releaseEvidence.templates)) Object.assign(row, { public: true, buildStatus: 'ready' })
+  releaseEvidence.subscriptionAcceptance = structuredClone(EVIDENCE.subscriptionAcceptance)
+  const candidateEnv = { ...env, RUNTIME_REPORT_SHA256: initial.manifest.reportSha256, RUNTIME_WORKER_SHA: SHA, RUNTIME_TEMPLATE_IDS: JSON.stringify(TEMPLATES) }
+  for (const missingAcceptance of [false, true]) {
+    const report = structuredClone(releaseEvidence)
+    if (missingAcceptance) delete report.subscriptionAcceptance.codex
+    const bytes = JSON.stringify(report); assert.ok(Buffer.byteLength(bytes) > 128 * 1024)
+    writeFileSync(releaseFile, bytes)
+    const final = packRelease(releaseFile, releaseDir, candidateDir, candidateEnv)
+    const input = releaseInputs({ ...env, GITHUB_RUN_ATTEMPT: '2', RUNTIME_RELEASE_DIRECTORY: releaseDir,
+      RUNTIME_REPORT_SHA256: final.manifest.reportSha256, RUNTIME_CANDIDATE_REPORT_SHA256: initial.manifest.reportSha256,
+      SOURCE_SHA: SHA, MIKKA_CLOUD_WORKER_SOURCE_COMMIT: COMMIT,
+      DESKTOP_TEMPLATE_ID: TEMPLATES.desktop, CLAUDE_TEMPLATE_ID: TEMPLATES.claude, CODEX_TEMPLATE_ID: TEMPLATES.codex })
+    assert.deepEqual(input.releaseEvidence, report)
+    const fake = fixture()
+    if (missingAcceptance) {
+      await assert.rejects(fake.run(input), /runtime_release_subscription_missing codex/)
+      assert.equal(fake.calls.length, 0, 'file handoff cannot bypass the existing real-subscription gate')
+    } else {
+      assert.equal((await fake.run(input)).requiresWebBuild, true)
+      assert.equal(fake.calls.filter(call => call.method === 'POST').length, 1)
+    }
+  }
 })
 
 test('runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy', async () => {
