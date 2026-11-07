@@ -376,8 +376,8 @@ start command 在模板构建末尾执行，ready command 成功后保存文件�
 
 ### 2026-11-07：统一发布后的后续验证边界
 
-#1658 的固定 head 6d7d993a 已纳入统一发布 #1615 的集成分支；源码集成不代表
-主线发布或 5 秒验收完成。后续查询优化以该批次为基底，保留其完整 run failure、
+#1658 的固定 head 6d7d993a 已随统一发布 #1615 正常合入 main 4672c418；
+源码合并不代表生产发布或 5 秒验收完成。后续查询优化以该批次为基底，保留其完整 run failure、
 continuous tracing、critical request sampling、授权与撤销行为，不用旧版本整文件
 覆盖。额外限定窗口 sampler 方案未采用，因为统一批次已提供原生 critical 采样；
 后续先验证实际部署的链路覆盖，不增加第二套 claim 授权或采样入口。
@@ -386,3 +386,25 @@ continuous tracing、critical request sampling、授权与撤销行为，不用�
 组合的 Claude 三次及 Codex 三次完整 dispatch-to-agent 均不超过 5000 ms，且原有
 官方文件守恒、真实订阅和清理门槛均通过，才可关闭 #1505。匿名 CLI 初始化对照
 只用于判断文件预读取假设，不能替代这项生产验收。
+
+### 生产函数区域与数据库区域证据
+
+后续候选在原 production-only Web deploy 的 prebuilt 上传参数加入
+`--regions cle1`，普通 main 与 runtime paired Web 共用该上传入口；不改社区发行版、
+独立 cloud backend、数据库或 E2B 区域。Vercel CLI 65.4.0 的实际 prebuilt
+上传实现已核对会发送该参数。[官方区域表](https://vercel.com/docs/regions) 将
+`cle1` 映射到 AWS us-east-2，匹配当前 Neon production 项目的控制面区域；
+既有配套部署的控制面区域为 `iad1`。
+
+此前 PgInstrumentation 0.76.0 使用 `server.address`，原脱敏器会删除该字段，
+所以历史 span 不能证明实际运行时数据库主机与上述 Neon endpoint 的对应关系。
+不把项目元数据或 build-time URL 当成历史 runtime 证明。后续仅从现有 PostgreSQL
+span 的主机属性派生闭式 `mikka.db_peer_region`，只识别 Neon 的 aws-us-east-1 /
+aws-us-east-2；端点、账号、URL、口令和原始 `server.address` 仍不导出。
+未知地址、非 PostgreSQL 及调用者自带的区域标签不作为区域证据。没有新增 SQL、
+主机探测、轮询或授权请求。
+
+该部署位置变更是待实测的延迟优化，不预先计算节省毫秒。发布后同时核对实际
+READY 部署/函数区域、公共版本，以及本次真实任务 trace 的数据库区域与各段时间；
+若实际 placement 不符或完整耗时恶化，就通过普通后继 PR 恢复原部署参数。
+5 秒门槛、原始起止点、六样本分母及官方双订阅门槛保持不变。
