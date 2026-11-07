@@ -8,7 +8,7 @@ import { createRotationStore } from './rotate-github-token-store.mjs'
 import { rotationLifetime } from './rotate-github-token.mjs'
 
 const WORKSPACE_ID = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
-export const SOURCE_FIXTURE_SHA256 = 'd8379ac824e0a813cec76cbabed93cd3430e4af3a4a4411a30e271a311deb21c'
+export const SOURCE_FIXTURE_SHA256 = '74521b8edce0cce2cfed3edb433e0c979a659dc9ea65153faa985d49841816c3'
 const MIN_SOURCE_MS = 600_000
 const hash = value => createHash('sha256').update(value).digest('hex')
 const fail = code => { throw new Error('issue1503_github_source_' + code) }
