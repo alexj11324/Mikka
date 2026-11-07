@@ -64,6 +64,35 @@ test('daemon evidence queries only the owned run hash and expiry interval and re
   for (const results of [[[1, 0, 0]], [['1', 1, 0]], [[1, 1, 0], [1, 1, 0]]])
     await assert.rejects(readDaemonRenewal(sample, { env, fetchImpl: async () => Response.json({ results }) }), /lease_audit_trace_invalid/)
 })
+
+test('plugin collection keeps natural renewal unverified until matching external spans arrive', async () => {
+  const applicationSha = 'a'.repeat(40)
+  const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch',
+    GITHUB_SHA: applicationSha, APPLICATION_SHA: applicationSha, DAEMON_RENEWAL_EVIDENCE: 'posthog_plugin' }
+  for (const status of ['renewed', 'outside_natural_window', 'renewal_failed']) {
+    const report = await runLeaseAudit(env, {
+      readRenewal: () => assert.fail('plugin mode must not request a local or runner PostHog key'),
+      runStartup: async () => ({ status: 'candidate_subscription_proved', cleanup: { errors: [] }, samples: ['claude_code', 'codex'].map(harness => ({
+        runId, harness, requestedModel: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5',
+        status: 'execution_proved_awaiting_server_timing', cleanup: { status: 'passed' },
+        leaseAudit: { ...valid, status }, requireReplyAfterTool: true, replyVerifiedAfterTool: true, lastStatus: 'completed',
+        runtimeTiming: { complete: true, truncated: false, counts: [{ endpoint: 'credential_refresh', started: 1, completed: 1, errors: 0 }] },
+      })) }),
+    })
+    assert.equal(report.status, status === 'renewed' ? 'awaiting_posthog_plugin' : 'blocked')
+    assert.equal(report.requiredExternalEvidence.projectId, 670821)
+    for (const sample of report.samples) {
+      assert.equal(sample.naturalRenewalVerified, false)
+      const input = { ...sample, leaseAudit: sample.lease }
+      assert.equal(naturalRenewalEvidence(input), false)
+      const daemonRenewal = { source: 'posthog_daemon_refresh_span', runIdHash: createHash('sha256').update(runId).digest('hex').slice(0, 16),
+        harness: sample.harness, started: 1, completed: 1, errors: 0 }
+      assert.equal(naturalRenewalEvidence({ ...input, daemonRenewal }), status === 'renewed')
+      assert.equal(naturalRenewalEvidence({ ...input, daemonRenewal: { ...daemonRenewal, errors: 1 } }), false)
+      assert.equal(naturalRenewalEvidence({ ...input, daemonRenewal, replyVerifiedAfterTool: false }), false)
+    }
+  }
+})
 test('lease receipt accepts only the exact owned run and closed tool output fields', () => {
   const receipt = leaseAuditReceipt(chunks({ ...valid, accessToken: 'PRIVATE_TOKEN', credential: 'PRIVATE_DEVICE' }), runId, 'codex')
   assert.equal(receipt.status, 'renewed')
