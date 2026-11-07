@@ -25,22 +25,22 @@ jobs:
       actions: read
       id-token: write
     env:
-      ACCEPTANCE_SOURCE_COMMIT: 6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a
-      ACCEPTANCE_SOURCE_TREE: 15017013716b71640bac10686115776b511c639d
-      EXPECTED_APP_COMMIT: d75bee79966ff55c881e9f96b73ce51a98fb290c
-      EXPECTED_DEPLOYMENT_ID: dpl_61wk7f6f45GWWeKAo7fvgVEiyaAC
-      EXPECTED_WORKER_SHA: 2a681021ca9abc8ab99e2fabc3204da8335c7440
-      EXPECTED_WORKER_SOURCE: d75bee79966ff55c881e9f96b73ce51a98fb290c
-      EXPECTED_TEMPLATE_DESKTOP: s6swykcsuo8f0b6eu81w
-      EXPECTED_TEMPLATE_CLAUDE: bz7ndr3h9ebhtrmo4kzm
-      EXPECTED_TEMPLATE_CODEX: y8izpijfajwxhegmfia8
+      ACCEPTANCE_SOURCE_COMMIT: e33e3a91d4011efbe768b11b428a5d152ede744a
+      ACCEPTANCE_SOURCE_TREE: b2e36d3351654fceec59fe138a55de31cb155df9
+      EXPECTED_APP_COMMIT: 0479675e188efeac341b207d8616c4d7b9d4ee23
+      EXPECTED_DEPLOYMENT_ID: dpl_G1NrxfpoUdzz99BsQQ8UQEqKGW59
+      EXPECTED_WORKER_SHA: fe20477b6b42416f6a53fbbd2a7efc1c9cfb1dea
+      EXPECTED_WORKER_SOURCE: 0479675e188efeac341b207d8616c4d7b9d4ee23
+      EXPECTED_TEMPLATE_DESKTOP: p2pjujpb74f7fi53ze7y
+      EXPECTED_TEMPLATE_CLAUDE: e8853ntj54nfz72gdvia
+      EXPECTED_TEMPLATE_CODEX: k34g6jozduq3in302l1j
       ACCEPTANCE_STRATEGY: derived
       EXPECTED_DIAGNOSTIC_BOT_ID: fdeea45f-8cb2-450a-96a4-d9a682f71482
-      EXPECTED_DIAGNOSTIC_ENV_ID: QcozBsITe0pKk1vw
-      EXPECTED_DIAGNOSTIC_VALUE_SHA256: f2baf7a7b15e4622d18219f038edeb7589fd8d7f59244a2468568e6ff8f521d0
-      EXPECTED_DIAGNOSTIC_EXPIRES_AT: 2026-11-07T17:45:00.280Z
-      DIAGNOSTIC_HELPER_COMMIT: e33f18f4a210391d3e14f15364a4d7db2d8565a2
-      DIAGNOSTIC_HELPER_SHA256: a2bbe3fa092dcae61123b0669b532189d5ba8f1bbc888dcc12ff5976285b36dc
+      EXPECTED_DIAGNOSTIC_ENV_ID: ZLpt0i7CTNlk5XFR
+      EXPECTED_DIAGNOSTIC_VALUE_SHA256: 6242c4c368f5805f6bcb3538559b5b30b851c4ee0622823f16c03bf8044814b3
+      EXPECTED_DIAGNOSTIC_EXPIRES_AT: 2026-11-08T01:25:23.422Z
+      DIAGNOSTIC_HELPER_COMMIT: a9c61594f8294f748cb23130f61779d03f1f2080
+      DIAGNOSTIC_HELPER_SHA256: 266bed08ab45c16f6b7e88c33d7254835e9ba9e51296099be976f3168cb5396c
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -62,8 +62,8 @@ jobs:
           // BEGIN UPSTREAM RELEASE WAIT GUARD
           // Read-only external GitHub metadata. No application, account, database, or VM I/O.
           const UPSTREAM_RELEASE = Object.freeze({
-            repository: 'alexj11324/Mikka', runId: 42388793981, runAttempt: 1,
-            sourceCommit: 'd75bee79966ff55c881e9f96b73ce51a98fb290c',
+            repository: 'alexj11324/Mikka', runId: 42423534091, runAttempt: 1,
+            sourceCommit: '0479675e188efeac341b207d8616c4d7b9d4ee23',
             event: 'push', branch: 'main', path: '.github/workflows/e2b-official-runtime.yml',
           })
           const UPSTREAM_JOBS = Object.freeze(['test', 'check', 'validate / build', 'await-web',
@@ -265,6 +265,18 @@ jobs:
           const deployment=await api(`/v13/deployments/${env.EXPECTED_DEPLOYMENT_ID}`,{token:env.VERCEL_TEAM_TOKEN});
           assert.equal(deployment.readyState,'READY');assert.equal(deployment.target,'production');
           assert.equal(deployment.gitSource?.sha??deployment.meta?.githubCommitSha,commit,'deployment_source_mismatch');
+          // Insert immediately after the existing READY/production/source checks.
+          // This copies only already-read public metadata. Failure is diagnostic-only.
+          try {
+            const { writeFile } = await import('node:fs/promises');
+            const { join } = await import('node:path');
+            const regions = Array.isArray(deployment.regions) && deployment.regions.length <= 64 &&
+              deployment.regions.every(value => typeof value === 'string' && /^[a-z]{3}[1-9][0-9]?$/.test(value))
+              ? deployment.regions : null;
+            await writeFile(join(env.RUNNER_TEMP, 'issue1505-deployment-regions.json'),
+              JSON.stringify({ deploymentId: /^dpl_[A-Za-z0-9]+$/.test(deployment.id ?? '') ? deployment.id : null,
+                sourceCommit: commit, regions }) + '\n', { mode: 0o600 });
+          } catch { console.log('function_regions_metadata_handoff_unavailable'); }
           const client=createSessionClient('https://app.aspectlylabs.com');
           assert.equal((await client.json('/api/version')).build,commit,'public_build_mismatch');client.clear();
           const end=new Date(),start=new Date(end.getTime()-60000);
@@ -274,6 +286,97 @@ jobs:
             order:'desc',limit:1,filter:`deploymentId:"${env.EXPECTED_DEPLOYMENT_ID}" AND environment:production AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`}});
           assert.ok(Array.isArray(logs.events)&&typeof logs.pagination?.hasMore==='boolean','logs_contract_invalid');
           console.log(JSON.stringify({productionReadyTuple:'verified',build:commit,deploymentId:env.EXPECTED_DEPLOYMENT_ID,release,logs:'accepted'}));
+          JS
+      # Insert after the existing exact production preflight and before dispatch.
+      # This is supplementary evidence; it never changes formal verdict.
+      - name: Record function deployment regions (diagnostic only)
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdir, readFile, writeFile } from 'node:fs/promises';
+          import { join } from 'node:path';
+          import { api } from './scripts/ops/deployment-regression.mjs';
+          // Diagnostic only. No acceptance decision, application request or database access.
+          const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+          const deploymentId = value => typeof value === 'string' && /^dpl_[A-Za-z0-9]+$/.test(value)
+          const sourceCommit = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
+          const regionList = value => Array.isArray(value) && value.length > 0 && value.length <= 64 &&
+            value.every(region => typeof region === 'string' && /^[a-z]{3}[1-9][0-9]?$/.test(region))
+            ? [...new Set(value)].sort() : null
+          const functionPath = value => typeof value === 'string' && value.length > 0 && value.length <= 1024 &&
+            /^[A-Za-z0-9_./[\]()+@:-]+$/.test(value) ? value : null
+          
+          function projectFunctionRegions({ expectedDeploymentId, expectedAppCommit, deployment, builds }) {
+            const matched = object(deployment) && deployment.deploymentId === expectedDeploymentId &&
+              deployment.sourceCommit === expectedAppCommit
+            const result = {
+              version: 1, diagnosticOnly: true, evidenceKind: 'function_deployment_placement',
+              deploymentId: deploymentId(expectedDeploymentId) ? expectedDeploymentId : null,
+              expectedAppCommit: sourceCommit(expectedAppCommit) ? expectedAppCommit : null,
+              deploymentRegions: matched ? regionList(deployment.regions) : null,
+              deploymentRegionsSource: matched ? 'existing_verified_preflight_get' : null,
+              status: 'unknown', reason: 'builds_unavailable', functions: [],
+              buildCount: null, lambdaCount: 0, malformedCount: 0,
+              allLambdaFunctionsOnlyInCle1: null,
+              invocationRegion: 'unknown', databaseEndpointMapping: 'unknown',
+            }
+            if (!object(builds) || !Array.isArray(builds.builds) || builds.builds.length > 1024) return result
+            result.buildCount = builds.builds.length
+            for (const build of builds.builds) {
+              if (!object(build) || !Array.isArray(build.output)) { result.malformedCount++; continue }
+              for (const output of build.output) {
+                if (!object(output) || typeof output.type !== 'string') { result.malformedCount++; continue }
+                if (output.type !== 'lambda') continue
+                const path = functionPath(output.path)
+                const deployedTo = object(output.lambda) ? regionList(output.lambda.deployedTo) : null
+                result.functions.push({ path, deployedTo })
+                if (path === null || deployedTo === null) result.malformedCount++
+              }
+            }
+            result.lambdaCount = result.functions.length
+            if (!result.lambdaCount) { result.reason = 'lambda_outputs_unavailable'; return result }
+            result.status = result.malformedCount ? 'partial' : 'observed'
+            result.reason = result.malformedCount ? 'function_output_incomplete' : null
+            result.allLambdaFunctionsOnlyInCle1 = result.malformedCount ? null :
+              result.functions.every(row => row.deployedTo.length === 1 && row.deployedTo[0] === 'cle1')
+            return result
+          }
+          
+          async function collectFunctionRegions({ expectedDeploymentId, expectedAppCommit, deployment, token, api }) {
+            const base = projectFunctionRegions({ expectedDeploymentId, expectedAppCommit, deployment })
+            if (!deploymentId(expectedDeploymentId) || !sourceCommit(expectedAppCommit)) {
+              return { ...base, reason: 'pin_invalid', requestCount: 0, httpStatus: null }
+            }
+            if (typeof token !== 'string' || !token) return { ...base, reason: 'token_unavailable', requestCount: 0, httpStatus: null }
+            try {
+              // Existing api() adds teamId, forbids redirects, and applies its 20-second signal.
+              // This is the only new request. No retry or second deployment GET.
+              const builds = await api('/v11/deployments/' + expectedDeploymentId + '/builds', { token })
+              return { ...projectFunctionRegions({ expectedDeploymentId, expectedAppCommit, deployment, builds }),
+                requestCount: 1, httpStatus: null }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : ''
+              const status = /^vercel_api_http_([1-5][0-9]{2})$/.exec(message)?.[1]
+              const reason = status ? 'http_error' : message === 'vercel_api_response_invalid' ? 'response_invalid' : 'request_unavailable'
+              return { ...base, reason, requestCount: 1, httpStatus: status ? Number(status) : null }
+            }
+          }
+          
+          let deployment;
+          try { deployment = JSON.parse(await readFile(join(process.env.RUNNER_TEMP, 'issue1505-deployment-regions.json'), 'utf8')); }
+          catch { /* A missing/malformed local handoff leaves deploymentRegions unknown. */ }
+          const report = await collectFunctionRegions({
+            expectedDeploymentId: process.env.EXPECTED_DEPLOYMENT_ID,
+            expectedAppCommit: process.env.EXPECTED_APP_COMMIT,
+            deployment, token: process.env.VERCEL_TEAM_TOKEN, api,
+          });
+          report.observedAt = new Date().toISOString();
+          await mkdir('acceptance-results', { recursive: true });
+          await writeFile('acceptance-results/function-regions.json', JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+          // Do not print the original builds response, request headers or environment.
+          console.log(JSON.stringify({ event: 'function_regions_observed', status: report.status,
+            reason: report.reason, lambdaCount: report.lambdaCount, requestCount: report.requestCount }));
           JS
       - name: Accept three fresh repository starts on each official subscription
         run: |
@@ -424,7 +527,7 @@ jobs:
             values['daemon.adapter.preparation'] = prepared ? prepared.ms : null
             if (prepared) for (const name of new Set(prepared.phases.map(phase => phase.name)))
               values[name.replace('daemon.adapter.', 'daemon.preparation.')] = formalUnionMs(prepared.phases.filter(phase => phase.name === name))
-            const initialization = initialized ? { source: prepared ? 'prepared_agent_start' : 'adapter_start',
+            const initialization = initialized ? { source: prepared ? prepared.source : 'adapter_start',
               phase: 'daemon.adapter.cli_init', ms: prepared
                 ? formalUnionMs(prepared.phases.filter(phase => phase.name === 'daemon.adapter.cli_init' && phase.outcome === 'ok'))
                 : values['daemon.adapter.cli_init'] } : null
@@ -432,6 +535,7 @@ jobs:
             const bootstrap = own.filter(log => log.stage === 'cloud.sandbox.bootstrap' && formalInterval(log))
             return { status: missing.length ? 'incomplete' : 'complete', missing, valuesMs: values,
               initialization, preparation: prepared ? { source: prepared.source, startedAt: prepared.startedAt,
+                claimAuthentication: prepared.claimAuthentication ?? null, observedAuthSource: prepared.observedAuthSource ?? null,
                 endedAt: prepared.endedAt, ms: prepared.ms, durationRule: 'independent_origin_overlaps_checkout_and_late_adapter_do_not_sum' } : null,
               dispatchStartFinishRecords: dispatch.length,
               installation: { expectedBranch: 'derived_template_no_bootstrap_call', observedBootstrapRecords: bootstrap.length,
@@ -582,8 +686,8 @@ jobs:
             for (const pin of report.versionPins ?? []) lines.push(`| ${pin.sequence} | ${pin.startedAt ?? 'unavailable'} | ${pin.finishedAt ?? 'unavailable'} | ${pin.deploymentId ?? 'unavailable'} | ${pin.workerRelease?.workerSha ?? 'unavailable'} | ${pin.status}${pin.reason ? `: ${pin.reason}` : ''} |`)
             lines.push('', '## 必要阶段完整性', '', '以下只要求本轮全新仓库任务的正常派生模板路径。安装/旧 VM 升级/question recovery 不属于必需阶段。父子与并行时长重叠，不能跨行相加；claim 凭据准备与 assignment_context / credentials_wait 尤其如此。',
               '', '预热收据使用独立的预热起点：daemon.adapter.preparation 与 daemon.preparation.* 含等待 checkout 的时间，可与 repository 和晚期 adapter.start 重叠，不能相加。相同阶段只在各自收据内取区间并集；早期 cli_init 不写入晚期 daemon.adapter.cli_init。两条路径都必须由固定 checkout 的 hasStartupInitialization 验证真实成功的 cli_init；缺失或无效收据不补 0，也不回退掩盖。',
-              '', '| Sample | 初始化证据来源 | cli_init 秒 | 预热开始 UTC | 预热结束 UTC | 预热总秒 |', '|---|---|---:|---|---|---:|')
-            for (const sample of formal.cases) lines.push(`| ${sample.sampleId} | ${sample.stages.initialization?.source ?? 'unavailable'} | ${formalSeconds(sample.stages.initialization?.ms)} | ${sample.stages.preparation ? new Date(sample.stages.preparation.startedAt).toISOString() : 'unavailable'} | ${sample.stages.preparation ? new Date(sample.stages.preparation.endedAt).toISOString() : 'unavailable'} | ${formalSeconds(sample.stages.preparation?.ms)} |`)
+              '', '| Sample | 初始化证据来源 | Claim 认证来源 | 官方观测认证来源 | cli_init 秒 | 预热开始 UTC | 预热结束 UTC | 预热总秒 |', '|---|---|---|---|---:|---|---|---:|')
+            for (const sample of formal.cases) lines.push(`| ${sample.sampleId} | ${sample.stages.initialization?.source ?? 'unavailable'} | ${sample.stages.preparation?.claimAuthentication ?? 'unavailable'} | ${sample.stages.preparation?.observedAuthSource ?? 'unavailable'} | ${formalSeconds(sample.stages.initialization?.ms)} | ${sample.stages.preparation ? new Date(sample.stages.preparation.startedAt).toISOString() : 'unavailable'} | ${sample.stages.preparation ? new Date(sample.stages.preparation.endedAt).toISOString() : 'unavailable'} | ${formalSeconds(sample.stages.preparation?.ms)} |`)
             const stageNames = [...new Set(formal.cases.flatMap(sample => Object.keys(sample.stages.valuesMs)))].sort()
             lines.push('', `| 阶段（秒） | ${formal.cases.map(sample => sample.sampleId).join(' | ')} |`, `|---|${formal.cases.map(() => '---:|').join('')}`)
             for (const name of stageNames) lines.push(`| ${name} | ${formal.cases.map(sample => formalSeconds(sample.stages.valuesMs[name])).join(' | ')} |`)
@@ -725,6 +829,7 @@ jobs:
             acceptance-results/cloud-startup-acceptance.json
             acceptance-results/cloud-startup-acceptance.md
             acceptance-results/diagnostic-window-cleanup.json
+            acceptance-results/function-regions.json
             ${{ runner.temp }}/issue1505-upstream-release-wait.json
           if-no-files-found: warn
           retention-days: 7
