@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, realpathSync, renameSync } from 'node:fs'
 import { createServer, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { afterEach, expect, it, vi } from 'vitest'
-import { MCP_SERVER_SCRIPT, RunContext } from '../src/agents/run-context'
+import { MCP_SERVER_SCRIPT, prepareRunContextFiles, RunContext, type RunContextOptions } from '../src/agents/run-context'
 import { McpHttpTimingCollector } from '../src/mcp-http-timing'
 import { startCliTimingCollector } from '../src/official-cli-timing'
 import { runRuntimeTimings } from '../src/run-runtime-timing'
@@ -282,8 +283,14 @@ it('preserves immediate SIGTERM and reports an in-flight fetch as pending withou
 
 it.each(['claude_code', 'codex'] as const)('puts the host observation URL only in the %s Mikka MCP child environment', async harness => {
   const url = `http://127.0.0.1:43210/v1/mcp-http/${'a'.repeat(32)}`
-  const ctx = new RunContext({ harness, worktree: await makeRepo(), runDir: tempDir(), privateDir: tempDir(), machineEnvironment: true,
-    mcp: { url: 'https://mikka.example.invalid/api/mcp', token: syntheticToken, decisionCatalogue: preparedCatalogue }, mcpHttpObservationUrl: url })
+  const worktree = join(realpathSync(tempDir()), 'checkout')
+  const options: RunContextOptions = { harness, worktree, runDir: tempDir(), privateDir: tempDir(), machineEnvironment: true,
+    mcp: { url: 'https://mikka.example.invalid/api/mcp', token: syntheticToken, decisionCatalogue: preparedCatalogue }, mcpHttpObservationUrl: url }
+  const early = prepareRunContextFiles(options)
+  expect(existsSync(worktree)).toBe(false)
+  renameSync(await makeRepo(), worktree)
+  const ctx = new RunContext(options)
+  expect(early.mcpServer()).toEqual(ctx.mcpServer())
   expect(ctx.mcpServer().env.MIKKA_MCP_HTTP_OBSERVATION_URL).toBe(url)
   expect(ctx.decisionMcpEnv()).not.toHaveProperty('MIKKA_MCP_HTTP_OBSERVATION_URL')
   expect(ctx.tempEnv()).not.toHaveProperty('MIKKA_MCP_HTTP_OBSERVATION_URL')

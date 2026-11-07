@@ -81,6 +81,7 @@ import type {
   AgentReport,
   AgentSession,
   StartOptions,
+  PreparedAgentStart,
   ExitEvent,
 } from "../adapters/types"
 import { runStageChunk, runStateChunk, type RunChunk, type RunStage } from "../chunks"
@@ -124,6 +125,8 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  /** Hosted fresh Claude only: no task frame before start consumes final options. */
+  prepareSubscription?(assignment: RunAssignment, options: StartOptions, signal: AbortSignal): PreparedAgentStart
   /** The task VM prepares its actual API key and starts the official CLI directly. */
   startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
@@ -218,6 +221,9 @@ interface ActiveRun {
   mailboxClosing?: Promise<void>
   /** Only a fresh hosted claim's read-only clone/fetch overlaps entry policy. */
   repositoryPreparing?: { abort: AbortController; done: Promise<void>; allowEffects(): void; refuseEffects(reason: unknown): void }
+  sessionPreparing?: Promise<PreparedAgentStart>
+  prewarmAbort?: AbortController
+  preparedClosing?: Promise<void>
   session: AgentSession | null
   /** Event consumption ended; cancellation grace cannot cover host publication. */
   sessionEnded?: boolean
@@ -431,12 +437,23 @@ export class RunSupervisor {
     return run.mailboxClosing
   }
 
+  private closePrepared(run: ActiveRun): Promise<void> {
+    if (!run.sessionPreparing) return Promise.resolve()
+    if (!run.preparedClosing) run.preparedClosing = run.sessionPreparing.then(value => value.cancel(), () => undefined)
+    run.prewarmAbort?.abort()
+    // Preparation may still be joining the mailbox. Abort that dependency
+    // before draining it; the mailbox finalizer still owns its close result.
+    run.mailboxAbort?.abort()
+    return run.preparedClosing
+  }
+
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(runId: string, run: ActiveRun): Promise<void> {
     run.cancelRequested = true
-    // No CLI exists for speculative repository preparation; abort and reap
-    // its Git child immediately instead of borrowing the session kill grace.
+    // Read-ahead Git has its own lifetime and stops immediately, without
+    // borrowing the native session's cancellation grace.
     run.repositoryPreparing?.abort.abort()
+    run.prewarmAbort?.abort()
     run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
     // leave a mailbox usable during the CLI's cancellation grace period.
@@ -1341,7 +1358,9 @@ export class RunSupervisor {
       .catch(async (error: unknown) => {
         run.repositoryPreparing?.refuseEffects(error)
         run.repositoryPreparing?.abort.abort()
-        await run.repositoryPreparing?.done.catch(() => undefined)
+        // Start both drains before joining: a native preparation can still
+        // be waiting on its mailbox while the Git child is being reaped.
+        await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run)])
         run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "run failed")
@@ -1364,7 +1383,7 @@ export class RunSupervisor {
       })
       .finally(async () => {
         run.repositoryPreparing?.abort.abort()
-        await run.repositoryPreparing?.done.catch(() => undefined)
+        await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run)])
         run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
@@ -1448,6 +1467,21 @@ export class RunSupervisor {
       const current = this.deps.journal.get(runId)
       assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
     }
+    const prepareGate = async (worktree?: string) => {
+      if (run.toolApproval) return run.toolApproval
+      const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
+        () => this.deps.prepareRunToolApproval!(assignment, preparationSignal, checkMailbox, worktree))
+      run.toolApproval = toolApproval
+      // Register before an adapter can attach its cancellation callback. Keep
+      // a known local lease revocation before SIGTERM/SDK close races an exit.
+      toolApproval?.onRevoke(() => {
+        if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
+          && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
+          this.forceStop(runId, run, 'device_lost')
+        }
+      })
+      return toolApproval
+    }
     if (assignment.mcp?.mailbox === true && this.deps.prepareRunMailbox) {
       const abort = run.mailboxAbort = new AbortController()
       const signal = AbortSignal.any([preparationSignal, abort.signal])
@@ -1462,6 +1496,68 @@ export class RunSupervisor {
     }
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
+    const baseOptions = {
+      // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
+      github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
+        ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
+      githubEnvironment: run.github?.env,
+      onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
+      apps: runApps(assignment.mcp),
+      mcp: runMcp(assignment.mcp),
+      runId,
+      requireSessionResume: assignment.requireSessionResume,
+      kind: assignment.kind,
+      factoryCheck: assignment.factoryCheck,
+      verifyCommand: assignment.verifyCommand,
+      env: buildChildEnv({
+        adapterAllow: adapter.envAllow,
+        runId,
+      }),
+      log,
+      networkAllow: repo.networkAllow,
+      policy: assignment.policy,
+      policyHash: assignment.policySnapshot?.payload.policyHash,
+      skills: assignment.skills,
+      skillReceipt: assignment.skillReceipt,
+      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
+        const current = this.deps.journal.get(runId)
+        if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
+          current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
+        if (current.runtime.observedModel === observedModel && (!current.execution || current.execution.observedModel === observedModel)) return
+        this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
+          ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
+        })
+      } : undefined,
+      fixture: assignment.fixture,
+      model: assignment.model,
+      effort: assignment.effort,
+      // In memory only: the adapter hands it to the run's CLI environment.
+      credential: assignment.modelCredential,
+    }
+    const prewarm = this.deps.prepareSubscription && assignment.harness === 'claude_code'
+      && assignment.subscriptionBinding && assignment.subscriptionLease && !assignment.modelCredential
+      && !entry.sessionId && !entry.worktree && !assignment.continuesRunId && !assignment.resumeSessionId
+      && !assignment.requireSessionResume && !assignment.resumeFrom
+      && (!assignment.github || Boolean(assignment.github.token))
+      && (assignment.mcp?.mailbox !== true || assignment.mcp.mailboxCatalogue !== undefined)
+    if (prewarm) {
+      const abort = run.prewarmAbort = new AbortController()
+      const signal = AbortSignal.any([preparationSignal, abort.signal])
+      run.sessionPreparing = Promise.resolve().then(async () => {
+        const mailbox = await run.mailboxPreparing
+        signal.throwIfAborted(); checkMailbox()
+        const toolApproval = await prepareGate()
+        signal.throwIfAborted(); checkMailbox()
+        if (!toolApproval) throw Error('Run tool approval unavailable')
+        const guarded = mailbox && { tools: mailbox.tools, close: () => mailbox.close(), request: async (body: unknown, signal?: AbortSignal) => {
+          if (!await toolApproval.checkLive()) throw Error('Run tool approval unavailable')
+          return mailbox.request(body, signal)
+        } }
+        return this.deps.prepareSubscription!(assignment, { ...baseOptions, cwd: this.deps.worktrees.pathFor(runId),
+          mailbox: guarded, toolApproval, prompt: assignment.prompt }, signal)
+      })
+      void run.sessionPreparing.catch(() => undefined)
+    }
     if (this.stopping || run.cancelRequested) {
       run.repositoryPreparing?.abort.abort()
       await run.repositoryPreparing?.done.catch(() => undefined)
@@ -1540,6 +1636,7 @@ export class RunSupervisor {
         throw new Error("Check assignment is missing its read-only policy")
       await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
     }
+    const preparedSession = await run.sessionPreparing
     let mailbox = await (run.mailboxPreparing ?? this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox))
     run.mailbox = mailbox
     // A STOP/lease transition may win the handshake's final Promise handoff.
@@ -1547,17 +1644,7 @@ export class RunSupervisor {
     if (this.stopping) return
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
-    const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
-      () => this.deps.prepareRunToolApproval!(assignment, run.abort.signal, checkMailbox, worktree))
-    run.toolApproval = toolApproval
-    // Register before an adapter can attach its cancellation callback. Keep
-    // a known local lease revocation before SIGTERM/SDK close races an exit.
-    toolApproval?.onRevoke(() => {
-      if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
-        && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
-        this.forceStop(runId, run, 'device_lost')
-      }
-    })
+    const toolApproval = await prepareGate(worktree)
     if (mailbox && toolApproval) {
       const original = mailbox
       mailbox = { tools: original.tools, close: () => original.close(), request: async (body, signal) => {
@@ -1582,48 +1669,9 @@ export class RunSupervisor {
       prompt = await materializeChatFiles(prompt, directory, download)
       if (followUp) followUp = await materializeChatFiles(followUp, directory, download)
     }
-    const options = {
-      // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
-      github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
-        ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
-      githubEnvironment: run.github?.env,
-      onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
-      apps: runApps(assignment.mcp),
-      mcp: runMcp(assignment.mcp),
-      toolApproval,
-      runId,
-      requireSessionResume: assignment.requireSessionResume,
-      kind: assignment.kind,
-      factoryCheck: assignment.factoryCheck,
-      verifyCommand: assignment.verifyCommand,
-      cwd: worktree,
-      env: buildChildEnv({
-        adapterAllow: adapter.envAllow,
-        runId,
-      }),
-      log,
-      networkAllow: repo.networkAllow,
-      gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
-      policy: assignment.policy,
-      policyHash: assignment.policySnapshot?.payload.policyHash,
-      skills: assignment.skills,
-      skillReceipt: assignment.skillReceipt,
-      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
-        const current = this.deps.journal.get(runId)
-        if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
-          current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
-        if (current.runtime.observedModel === observedModel && (!current.execution || current.execution.observedModel === observedModel)) return
-        this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
-          ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
-        })
-      } : undefined,
-      fixture: assignment.fixture,
-      model: assignment.model,
-      effort: assignment.effort,
-      mailbox,
-      // In memory only: the adapter hands it to the run's CLI environment.
-      credential: assignment.modelCredential,
-    }
+    const options = { ...baseOptions, cwd: worktree, toolApproval, mailbox,
+      gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId) }
+
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
     // A follow-up run goes on with the earlier run's conversation, sending
@@ -1670,7 +1718,9 @@ export class RunSupervisor {
     let session: AgentSession
     if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
-      session = await this.stage(runId, "agent_start", async () => assignment.modelCredential && this.deps.startCredential
+      session = await this.stage(runId, "agent_start", async () => preparedSession
+      ? await preparedSession.start({ ...options, prompt })
+      : assignment.modelCredential && this.deps.startCredential
       ? await this.deps.startCredential(assignment,{...options,prompt})
       : assignment.subscriptionBinding
       ? this.deps.startSubscription
