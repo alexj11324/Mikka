@@ -1,4 +1,5 @@
 name: Issue 1503 read-only runtime snapshot
+# Capture the current a65 tuple before the 0c12 runtime publication.
 on:
   push:
     branches: [ops/issue-1503-runtime-snapshot]
