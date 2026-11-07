@@ -1,0 +1,67 @@
+name: Read one Codex runtime evidence
+
+on:
+  push:
+    branches: ['ops/codex-runtime-evidence-8e309-20261107']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+
+jobs:
+  read:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/codex-runtime-evidence-8e309-20261107' &&
+      github.actor == 'alexj11324' && github.actor_id == '183887963' && github.run_attempt == 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the fixed actor, branch, parent and three-file change before credentials
+        run: |
+          node --test scripts/ops/codex-runtime-evidence-diagnostic.test.mjs
+          node scripts/ops/codex-runtime-evidence-diagnostic.mjs --guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Read the existing smoke email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing smoke password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read the fixed run and close only this diagnostic session
+        run: node scripts/ops/codex-runtime-evidence-diagnostic.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
