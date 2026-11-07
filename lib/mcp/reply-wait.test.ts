@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { REPLY_FALLBACK_MS, waitForReply, type ReplyRead } from './reply-wait'
+import { REPLY_FALLBACK_MS, waitForReply, type ReplyObserver, type ReplyRead } from './reply-wait'
 
 const flush = async () => { for (let n = 0; n < 8; n++) await Promise.resolve() }
 function deferred<T>() {
@@ -187,4 +187,96 @@ test('an authoritative read failure cleans up its subscription', async () => {
     deadline: Date.now() + 90_000, subscribe: events.subscribe,
   }), /database unavailable/)
   assert.equal(events.disposed, 1)
+})
+
+test('a complete healthy observer does not reconcile at 15 seconds; the deadline still reads fresh', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 5_000_000 })
+  const controller = new AbortController(), finals: boolean[] = []
+  let disposed = 0
+  const pending = waitForReply(async final => {
+    finals.push(final)
+    return final ? { done: true, value: 'deadline state' } : { done: false }
+  }, { deadline: Date.now() + 90_000, signal: controller.signal,
+    subscribe: () => ({ lost: false, close() { disposed++ } }),
+  })
+  void pending.catch(() => {})
+  try {
+    await flush()
+    for (let n = 0; n < 5; n++) { t.mock.timers.tick(15_000); await flush() }
+    assert.deepEqual(finals, [false], 'healthy committed notification coverage replaces the five reconciliation reads')
+    t.mock.timers.tick(15_000)
+    assert.equal(await pending, 'deadline state')
+    assert.deepEqual(finals, [false, true])
+    assert.equal(disposed, 1)
+  } finally { controller.abort(); await pending.catch(() => {}) }
+})
+
+test('reported connection loss wakes immediately, then keeps the original 15-second fallback without spinning', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 6_000_000 })
+  let changed = () => {}, lost = false, reads = 0, available = false, disposed = 0
+  const pending = waitForReply(async () => {
+    reads++
+    return available ? { done: true, value: 'fallback reply' } : { done: false }
+  }, { deadline: Date.now() + 90_000, subscribe: next => {
+    changed = next
+    return { get lost() { return lost }, close() { disposed++ } }
+  } })
+  await flush()
+  t.mock.timers.tick(1_000)
+  lost = true; changed()
+  await flush()
+  assert.equal(reads, 2, 'loss immediately requests a fresh authorization read')
+  t.mock.timers.tick(REPLY_FALLBACK_MS - 1)
+  await flush()
+  assert.equal(reads, 2, 'sticky lost is not a zero-delay polling loop')
+  available = true
+  t.mock.timers.tick(1)
+  assert.equal(await pending, 'fallback reply')
+  assert.equal(reads, 3)
+  assert.equal(disposed, 1)
+})
+
+test('abort during asynchronous LISTEN setup returns immediately and closes its late subscriber', async () => {
+  const setup = deferred<ReplyObserver>(), controller = new AbortController()
+  let reads = 0, disposed = 0, setupSignal: AbortSignal | undefined
+  const pending = waitForReply(async () => { reads++; return { done: false } }, {
+    deadline: Date.now() + 90_000, signal: controller.signal,
+    subscribe: (_changed, signal) => { setupSignal = signal; return setup.promise },
+  })
+  const cancelled = assert.rejects(pending, /setup cancelled/)
+  controller.abort(new Error('setup cancelled'))
+  await cancelled
+  assert.equal(reads, 0)
+  assert.equal(setupSignal?.aborted, true)
+  setup.resolve({ lost: false, close() { disposed++ } })
+  await flush()
+  assert.equal(disposed, 1)
+  assert.equal(reads, 0)
+})
+
+test('the deadline cannot be extended by establishing LISTEN and still performs its final fresh read', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 7_000_000 })
+  const setup = deferred<ReplyObserver>(), finals: boolean[] = []
+  let setupSignal: AbortSignal | undefined, disposed = 0
+  const pending = waitForReply(async final => {
+    finals.push(final); return { done: true, value: 'deadline' }
+  }, { deadline: Date.now() + 1_000, subscribe: (_changed, signal) => { setupSignal = signal; return setup.promise } })
+  await flush()
+  assert.deepEqual(finals, [])
+  t.mock.timers.tick(1_000)
+  assert.equal(await pending, 'deadline')
+  assert.deepEqual(finals, [true])
+  assert.equal(setupSignal?.aborted, true)
+  setup.resolve({ lost: false, close() { disposed++ } })
+  await flush()
+  assert.equal(disposed, 1)
+})
+
+test('asynchronous setup failure preserves the cause and performs no unauthorized read', async () => {
+  let reads = 0
+  const cause = new Error('fixture setup error')
+  await assert.rejects(waitForReply(async () => { reads++; return { done: false } }, {
+    deadline: Date.now() + 90_000, subscribe: async () => { throw cause },
+  }), error => error === cause)
+  assert.equal(reads, 0)
 })

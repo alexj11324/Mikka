@@ -11,11 +11,12 @@
 export const COORDINATOR_PRESENTATION_PREAMBLE = `Presentation:
 
 Mikka renders a reply whose first line is \`root = Stack(...)\` as OpenUI Lang, a declarative UI language, and any other reply as Markdown. Choose by the shape of the content, not its length:
-- Conversation, a short answer, a confirmation, a status update or a question back: plain text.
+- Conversation, a short answer, a confirmation, a status update or an open-ended question: plain text.
+- When the person asks for clickable options, a single-choice or multiple-choice question, or to choose one directly: OpenUI, BeQuestions. Also use it for a necessary decision with known options or a tool's result.card. Do not add unsolicited choice cards.
 - Several places, sights, hotels, restaurants or products, recommended or listed: OpenUI, a BeCardGrid of BeImageCard, one card per item, with TextContent before or after for anything the cards do not say.
 - A history, timeline or anything in periods or stages: OpenUI, Steps with one StepsItem per period or stage, with TextContent around it for the narrative.
 - A comparison of options or attributes: BeTable. Numbers across categories: BarChart; over time: LineChart. Figures: BeStat. A takeaway: BeAlert.
-In an OpenUI reply all prose goes in TextContent (Markdown is allowed inside its string); nothing is written outside OpenUI statements.`
+An OpenUI reply starts immediately with \`root = Stack(...)\`: no opening or closing code fence, language label or prefacing sentence. All prose goes in TextContent (Markdown is allowed inside its string); nothing is written outside OpenUI statements.`
 
 /** Kept short: OpenUI's generated sections already cover syntax, hoisting, streaming and verification. */
 export const COORDINATOR_PRESENTATION_RULES = [
@@ -29,6 +30,8 @@ export const COORDINATOR_PRESENTATION_RULES = [
 
 /** One example per shape the defaults name; the topics differ from the cases in coordinator-presentation.test.ts. */
 export const COORDINATOR_PRESENTATION_EXAMPLES = [
+  `root = Stack([choice])
+choice = BeQuestions("你希望从仓库概况和最近任务中选择一项继续查看。", [{id:"next", title:"先看哪一项？", options:[{value:"repositories", label:"仓库概况"}, {value:"tasks", label:"最近任务"}]}])`,
   `root = Stack([intro, cards, tips])
 intro = TextContent("杭州值得去的三处：湖、寺和老街。")
 cards = BeCardGrid([lake, temple, street])

@@ -3,7 +3,7 @@ import { mock, test } from 'node:test'
 import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
-import { cacheableInstructions } from './prompt-cache'
+import { cacheableInstructions, withCacheBreakpoints } from './prompt-cache'
 const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
 mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
@@ -51,31 +51,66 @@ test('the same model marks Claude cache breakpoints and leaves a Codex request a
   assert.equal(calls.at(-1)!.options, codexOptions)
 })
 
-test('the Codex subscription SDK request preserves only prepared stable-system cache hints', async () => {
-  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
-  const prompt = [...system, { role: 'user' as const, content: [{ type: 'text' as const, text: 'fixture-request' }] }]
-  const saved = structuredClone(prompt)
-  const options = { prompt, abortSignal: new AbortController().signal }
-  const turn = await new SubscriptionWorkflowModel({ ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' }).doStream(options)
-  await turn.stream.pipeTo(new WritableStream())
-  const forwarded = calls.at(-1)!.options as typeof options
-  let body: { messages: Record<string, unknown>[] } | undefined
+type StreamOptions = Parameters<SubscriptionWorkflowModel['doStream']>[0]
+async function compatibleWire(options: StreamOptions) {
+  let body: { messages: Record<string, unknown>[]; [key: string]: unknown } | undefined
+  let requests = 0
   const model = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'placeholder', fetch: async (_url, init) => {
+    requests++
     body = JSON.parse(String(init?.body))
     return new Response('data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
   } })('gpt-6-luna')
-  const result = await model.doStream(forwarded)
+  const result = await model.doStream(options)
   await result.stream.pipeTo(new WritableStream())
-  assert.deepEqual(body!.messages.map(message => message.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null], 'codex_stable_cache_hints_missing')
-  assert.deepEqual(body!.messages.map(message => message.content), ['RULES', 'context', 'tail', 'fixture-request'])
-  assert.equal('prompt_cache_options' in body!, false, 'implicit caching remains the default')
-  assert.equal('prompt_cache_key' in body!, false)
-  assert.equal(forwarded.abortSignal, options.abortSignal)
-  assert.deepEqual(prompt, saved)
+  assert.equal(requests, 1, 'one serialization/transport attempt, without fallback')
+  assert.ok(body)
+  return body
+}
+
+test('the Codex subscription SDK request keeps the dynamic system tail after history without cache fields', async () => {
+  const system = cacheableInstructions('RULEScontexttail', 12, 5) as StreamOptions['prompt']
+  const user = { role: 'user' as const, content: [{ type: 'text' as const, text: 'fixture-request' }] }
+  const assistant = { role: 'assistant' as const, content: [{ type: 'text' as const, text: 'fixture-reply 🦊' }] }
+  const tools: StreamOptions['prompt'] = [
+    { role: 'assistant', content: [
+      { type: 'tool-call', toolCallId: 'fixture-call-1', toolName: 'fixture_lookup', input: { key: 'one' } },
+      { type: 'tool-call', toolCallId: 'fixture-call-2', toolName: 'fixture_lookup', input: { key: 'two' } },
+    ] },
+    { role: 'tool', content: [
+      { type: 'tool-result', toolCallId: 'fixture-call-1', toolName: 'fixture_lookup', output: { type: 'json', value: { value: 'one' } } },
+      { type: 'tool-result', toolCallId: 'fixture-call-2', toolName: 'fixture_lookup', output: { type: 'text', value: 'two' } },
+    ] },
+  ]
+  for (const history of [[user], [user, assistant, user], [user, assistant], [user, ...tools], [user, ...tools, assistant]]) {
+    const prompt = [...system, ...history]
+    const saved = structuredClone(prompt)
+    const options: StreamOptions = { prompt, abortSignal: new AbortController().signal, tools: [
+      { type: 'function', name: 'fixture_lookup', description: 'Read one fixture', inputSchema: { type: 'object', properties: { key: { type: 'string' } } } },
+      { type: 'function', name: 'fixture_second', description: 'Read another fixture', inputSchema: { type: 'object', properties: {} } },
+    ] }
+    const before = await compatibleWire(options)
+    const priorCalls = calls.length
+    const turn = await new SubscriptionWorkflowModel({ ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' }).doStream(options)
+    await turn.stream.pipeTo(new WritableStream())
+    assert.equal(calls.length, priorCalls + 1, 'the frozen model is resolved once per call')
+    const forwarded = calls.at(-1)!.options as typeof options
+    const body = await compatibleWire(forwarded)
+    assert.deepEqual(body.messages, [...before.messages.slice(0, 2), ...before.messages.slice(3), before.messages[2]], 'codex_dynamic_tail_still_in_initial_system_prefix')
+    assert.deepEqual({ ...body, messages: [] }, { ...before, messages: [] }, 'no model, tool, cache, session or TTL options change')
+    assert.equal(body.messages.at(-1)?.role, 'system')
+    assert.equal(body.messages.at(-1)?.content, 'tail')
+    assert.equal(JSON.stringify(body).includes('mikka_cache_breakpoint'), false)
+    assert.equal(JSON.stringify(body).includes('prompt_cache_breakpoint'), false)
+    assert.equal('prompt_cache_options' in body, false, 'implicit caching remains the default')
+    assert.equal('prompt_cache_key' in body, false)
+    assert.equal(forwarded.abortSignal, options.abortSignal)
+    assert.deepEqual(calls.at(-1)!.selection, { ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' })
+    assert.deepEqual(prompt, saved)
+  }
 })
 
-test('only the supported Codex CPA route maps prepared stable-system hints', async () => {
-  const prompt = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
+test('only the supported Codex CPA route moves the prepared tail; Claude, API-key and native paths keep their contracts', async () => {
+  const prompt: StreamOptions['prompt'] = [...cacheableInstructions('RULEScontexttail', 12, 5) as StreamOptions['prompt'], { role: 'user', content: [{ type: 'text', text: 'fixture-request' }] }]
   for (const frozen of [
     { ...selection, modelId: 'gpt-6-luna', route: 'openai_siwc' as const },
     { ...selection, modelId: 'gpt-5.5', route: 'codex_cpa' as const },
@@ -85,5 +120,13 @@ test('only the supported Codex CPA route maps prepared stable-system hints', asy
     const result = await new SubscriptionWorkflowModel(frozen).doStream(options)
     await result.stream.pipeTo(new WritableStream())
     assert.equal(calls.at(-1)!.options, options)
+  }
+  for (const [frozen, key] of [
+    [selection, 'openaiCompatible'],
+    [{ type: 'api_key', keyId: id(5), ownerId: selection.ownerId, consumerId: selection.consumerId, workspaceId: selection.workspaceId, modelId: 'claude-haiku-5-5' }, 'anthropic'],
+  ] as const) {
+    const result = await new SubscriptionWorkflowModel(frozen).doStream({ prompt })
+    await result.stream.pipeTo(new WritableStream())
+    assert.deepEqual(calls.at(-1)!.options, { prompt: withCacheBreakpoints(prompt, key) })
   }
 })

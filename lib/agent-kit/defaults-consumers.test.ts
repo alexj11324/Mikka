@@ -6,16 +6,20 @@ const owner = 'synthetic-owner', bot = '10000000-0000-4000-8000-000000000001'
 const profile = builtinAgentDefinition({computerEnabled: true})
 const calls: {name: string; args: unknown[]}[] = []
 let enabled = true
+let scopeError: Error | null = null
+let recovery: {failureCases: boolean; revision: number; revisionId: string} | null = null
 const record = (name: string, ...args: unknown[]) => calls.push({name, args})
 const forbidden = () => { throw Error('No model, database or native device in default-consumer test') }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, {namedExports})
 stub('./service.ts', {
   agentKitEnabled: () => enabled,
   agentKitDefaults: () => { record('defaults'); return profile },
-  agentScope: async (...args: unknown[]) => { record('scope', ...args); return {ownerId: owner, botId: args[1], workspaceId: null} },
+  agentScope: async (...args: unknown[]) => { record('scope', ...args); if(scopeError)throw scopeError; return {ownerId: owner, botId: args[1], workspaceId: null} },
   agentKitStore: {
     active: async (...args: unknown[]) => { record('active', ...args); return {definition: args[1], version: 1} },
     beginExecution: async (...args: unknown[]) => { record('begin', ...args); return null },
+    failExecutionByKey: async (...args: unknown[]) => { record('recover', ...args); return recovery },
+    propose: async (...args: unknown[]) => { record('propose', ...args) },
   },
 })
 stub('../auth.ts', {auth: {api: {getSession: async () => ({user: {id: owner}})}}})
@@ -63,4 +67,28 @@ test('disabled API and execution paths never initialize a version or touch scope
     assert.equal(await steps.beginAgentExecution(owner, coordinatorBot, 'synthetic-holder', 0, {harness: 'ai_sdk'}), null)
     assert.equal(calls.length, 0)
   } finally { enabled = true }
+})
+
+test('preparation recovery scopes the existing key afresh and reuses only its stored failure-hook facts', async () => {
+  enabled=false;recovery={failureCases:true,revision:7,revisionId:'10000000-0000-4000-8000-000000000007'}
+  try {
+    calls.length=0
+    await steps.failAgentPreparation(owner,coordinatorBot,'synthetic-holder',3)
+    assert.deepEqual(calls.map(call=>call.name),['scope','recover','defaults','propose'])
+    assert.deepEqual(calls[0].args,[owner,coordinatorBot])
+    const scope={ownerId:owner,botId:coordinatorBot,workspaceId:null}
+    assert.deepEqual(calls[1].args,[scope,'synthetic-holder:3'])
+    assert.deepEqual(calls.find(call=>call.name==='propose')?.args,[scope,7,recovery.revisionId,profile])
+    recovery=null;calls.length=0
+    await steps.failAgentPreparation(owner,coordinatorBot,'synthetic-holder',4)
+    assert.deepEqual(calls.map(call=>call.name),['scope','recover'],'a key that never committed creates no definition or proposal')
+  } finally { enabled=true;recovery=null }
+})
+
+test('revoked current scope refuses preparation recovery before any store or proposal call', async () => {
+  scopeError=new Error('agentScopeNotFound');calls.length=0
+  try {
+    await assert.rejects(steps.failAgentPreparation(owner,coordinatorBot,'synthetic-holder',0),error=>error===scopeError)
+    assert.deepEqual(calls.map(call=>call.name),['scope'])
+  } finally { scopeError=null }
 })

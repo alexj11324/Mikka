@@ -4,7 +4,7 @@ import { SubscriptionRefusal } from '@mikka/protocol/subscription'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
 import { agentKitEnabled, agentKitStore, agentScope, agentKitDefaults } from '@/lib/agent-kit/service'
-import { AgentKitError, type AgentExecution } from '@/lib/agent-kit/store'
+import { AgentKitError, type AgentExecution, type AgentScope } from '@/lib/agent-kit/store'
 import type { ToolOutcome } from '@/lib/agent-kit/instrument'
 import type { FailureCode } from '@/lib/agent-kit/improvement'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
@@ -23,6 +23,15 @@ async function refusalIsFinal<T>(work: Promise<T>): Promise<T> {
 export async function beginAgentExecution(userId: string, botId: string, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution | null> {
   'use step'
   if (!agentKitEnabled()) return null
+  return reserveAgentExecution(userId,botId,holder,round,runtime)
+}
+/** The hosted composite reuses its run's durable setting on every preparation attempt. */
+export async function beginPreparedAgentExecution(userId: string, botId: string, holder: string, round: number, runtime: Extract<CoordinatorRuntime, { harness: 'ai_sdk' }>, enabled: boolean): Promise<AgentExecution | null> {
+  'use step'
+  if (!enabled) return null
+  return reserveAgentExecution(userId,botId,holder,round,runtime)
+}
+async function reserveAgentExecution(userId: string, botId: string, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution> {
   const scope = await agentScope(userId,botId)
   const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
   const { personalPlugins } = await import('@/lib/plugins/runtime')
@@ -57,6 +66,16 @@ export async function finishAgentExecution(userId: string, botId: string, execut
   if (!executionId) return
   const scope = await agentScope(userId,botId)
   const finished = await agentKitStore.finishExecution(scope,executionId,failure ? 'failed' : 'completed',failure)
+  await proposeAfterFinish(scope,finished)
+}
+/** Called only after the combined preparation has exhausted its ordinary step retries. */
+export async function failAgentPreparation(userId: string, botId: string, holder: string, round: number) {
+  'use step'
+  const scope = await agentScope(userId,botId)
+  const finished = await agentKitStore.failExecutionByKey(scope,`${holder}:${round}`)
+  if (finished) await proposeAfterFinish(scope,finished)
+}
+async function proposeAfterFinish(scope: AgentScope, finished: { failureCases: boolean; revision: number; revisionId: string }) {
   if (!finished.failureCases) return
   // A stable revision key yields at most one automatic guidance candidate, never activation.
   try {

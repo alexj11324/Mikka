@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createParser } from '@openuidev/lang-core'
-import { createAgentLibrary } from '@/lib/agent-ui-catalog'
+import { agentComponentCatalog, createAgentLibrary } from '@/lib/agent-ui-catalog'
 import { isOpenUI } from '@/lib/openui-lang'
 import { makeSnapshot } from '@/lib/agent-kit/definition'
 import { builtinAgentDefinition } from '@/lib/agent-kit/builtin'
@@ -78,10 +78,31 @@ test('every Coordinator path carries the generated presentation block exactly on
 test('the block is OpenUI generateSystemPrompt output with a Markdown-or-OpenUI preamble', () => {
   assert.match(presentation, /^Presentation:\n/)
   assert.match(presentation, /Choose by the shape of the content, not its length/)
-  assert.match(presentation, /Conversation, a short answer, a confirmation, a status update or a question back: plain text/)
+  assert.match(presentation, /Conversation, a short answer, a confirmation, a status update or an open-ended question: plain text/)
   assert.doesNotMatch(presentation, /Prefer a natural text reply for a simple exchange/)
   assert.doesNotMatch(presentation, /Your ENTIRE response must be valid openui-lang/)
   for (const section of ['## Syntax Rules', '## Component Signatures', '## Hoisting & Streaming (CRITICAL)', '## Examples', '## Final Verification']) assert.ok(presentation.includes(section), section)
+})
+
+test('the generated examples include a complete bare single-choice question', () => {
+  const examples = presentation.slice(presentation.indexOf('## Examples'), presentation.indexOf('## Important Rules')).split('\n\n')
+  const example = examples.find(block => block.startsWith('root = ') && block.includes('BeQuestions('))
+  assert.ok(example, 'the Coordinator has a complete choice example, beyond the component signature')
+  assert.match(example, /^root = Stack\(/)
+  assert.doesNotMatch(example, /^\s*(?:`{3}|~{3})/m)
+  const result = parse(example)
+  assert.ok(result.root)
+  assert.deepEqual([result.meta.errors, result.meta.unresolved, result.meta.orphaned, result.meta.incomplete], [[], [], [], false])
+  const children = result.root.props.children
+  assert.ok(Array.isArray(children))
+  assert.equal(children.length, 1)
+  assert.equal(children[0].typeName, 'BeQuestions')
+  const { questions } = agentComponentCatalog.BeQuestions.props.parse(children[0].props)
+  assert.equal(questions.length, 1)
+  assert.notEqual(questions[0]!.multiple, true)
+  const options = questions[0]!.options
+  assert.ok(options && options.length >= 2 && options.length <= 4)
+  assert.ok(options.every(option => option.action === undefined), 'ordinary choices continue the conversation without a setup action')
 })
 
 for (const item of cases) {
