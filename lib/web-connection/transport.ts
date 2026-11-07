@@ -11,7 +11,7 @@ const exposedHeaders = [
   'x-mikka-stream-key', 'x-mikka-stream-reset', 'x-mikka-stream-run', 'x-mikka-observed-at', 'x-mikka-viewer',
 ]
 const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
-const publicPaths = new Set(['/api/desktop/discovery', '/api/version', '/api/web/begin', '/api/web/exchange'])
+const publicPaths = new Set(['/api/desktop/discovery', '/api/server', '/api/version', '/api/web/begin', '/api/web/exchange'])
 const blockedPaths = /^\/api\/(?:auth(?:\/|$)|rpc$|cron(?:\/|$)|webhooks(?:\/|$)|desktop\/(?:begin|return|exchange|finish)(?:\/|$)|web\/(?:return|complete)(?:\/|$))/
 const bearer = /^Bearer [A-Za-z0-9_.%~+/-]{32,512}$/
 
