@@ -1,5 +1,5 @@
 name: Issue 1503 read-only runtime snapshot
-# Capture the current 0c12 runtime pair before the next e8d0 runtime publication.
+# Capture the published e8d0 runtime pair and its preserved previous d760 configuration.
 on:
   push:
     branches: [ops/issue-1503-runtime-snapshot]
@@ -47,7 +47,7 @@ jobs:
       - name: Snapshot the exact production runtime pair using GET only
         run: node scripts/ops/issue1503/runtime-snapshot.mjs
         env:
-          MIKKA_EXPECTED_RUNTIME_SOURCE: ${{ inputs.expected_runtime_source || '0c12a8064c1ab350c9739fa4c6ad84129f8a12a4' }}
+          MIKKA_EXPECTED_RUNTIME_SOURCE: ${{ inputs.expected_runtime_source || 'ce67afe931e9b9d6e7b0d346a62aa4d9751195c8' }}
       - name: Preserve the closed runtime metadata receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
