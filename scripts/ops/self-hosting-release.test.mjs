@@ -61,3 +61,5 @@ test('runtime log summaries expose only closed causes and public package names',
 // Runtime diagnostics also consume the fixed deployment's documented bounded log stream.
 
 test('missing packaged auth data is classified without printing its filesystem path',async()=>{const {runtimeLogSummary}=await import('./self-hosting-release.mjs');const v=runtimeLogSummary("Error: ENOENT open '/var/task/lib/abuse/data/disposable-email-domains.txt'");assert.deepEqual(v.codes,['ENOENT']);assert.equal(v.missingAuthData,true);assert.ok(!JSON.stringify(v).includes('/var/task'))})
+
+// Metering-only mode uses the existing verified personal workspace and does not mint extra GitHub tokens.

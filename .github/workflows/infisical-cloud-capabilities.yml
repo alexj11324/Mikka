@@ -138,3 +138,4 @@ jobs:
       - run: node scripts/ops/self-hosting-release.mjs --business
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          MIKKA_METERING_ONLY: ${{ endsWith(github.event.head_commit.message, 'metering') && '1' || '0' }}

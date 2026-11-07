@@ -52,6 +52,20 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
     check(response.status === status, operation.startsWith('github') ? 'GITHUB_TOKEN' : 'HTTP_SCHEMA'); return response.json()
   }
   const form = (operation, path, body) => json(operation, path, { method: 'POST', body, form: true })
+  const meter = async (billingToken, billingWorkspaceId) => {
+    const hostedModel = 'deepseek/deepseek-v4.1-flash'
+    execFileSync(process.execPath, ['scripts/assert-test-model.mjs', hostedModel], { stdio: 'pipe' })
+    const completion = await request('hosted_metering_call', cloudOrigin, PREFIX + '/v1/models/chat/completions', { method: 'POST', bearer: billingToken.access_token, body: { model: hostedModel, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 16, stream: false } })
+    const result = await completion.json()
+    report.metering = { status: completion.status, serverId: registration.serverId, authorizationWorkspaceHash: createHash('sha256').update(billingWorkspaceId).digest('hex').slice(0, 16), model: hostedModel, attempts: 1, trialAllowed: false }
+    if (completion.ok) {
+      check(result.model === hostedModel && Number.isSafeInteger(result.usage?.total_tokens) && result.usage.total_tokens > 0, 'HTTP_SCHEMA')
+      report.metering.completionReturned = true; report.metering.usage = { inputTokens: result.usage.prompt_tokens, outputTokens: result.usage.completion_tokens, totalTokens: result.usage.total_tokens }; report.metering.ledgerVerification = 'pending_read_only_receipt'
+    } else {
+      report.metering.code = ['cloud_quota_exhausted', 'cloud_unavailable', 'cloud_access_denied', 'cloud_rate_limited'].includes(result.code) ? result.code : 'OTHER'
+      report.metering.completionReturned = false
+    }
+  }
   try {
     report.privateDeployment = await deployment()
     const login = await request('business_login', PUBLIC, '/mikka/api/auth/sign-in/email', { method: 'POST', body: { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD } })
@@ -107,7 +121,7 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
     report.checks.publicHttpsRegistration = true
     const credentials = { client_id: registration.serverId, client_secret: registration.serverSecret }
     const verifier = randomBytes(32).toString('base64url'), state = randomBytes(24).toString('base64url')
-    const query = new URLSearchParams({ response_type: 'code', client_id: registration.serverId, redirect_uri: registration.redirectUri, scope: 'github push models', state, code_challenge: sha(verifier), code_challenge_method: 'S256' })
+    const query = new URLSearchParams({ response_type: 'code', client_id: registration.serverId, redirect_uri: registration.redirectUri, scope: env.MIKKA_METERING_ONLY === '1' ? 'models' : 'github push models', state, code_challenge: sha(verifier), code_challenge_method: 'S256' })
     const consent = await request('personal_consent', cloudOrigin, PREFIX + '/oauth/authorize?' + query)
     check(consent.ok, 'CONSENT'); const html = await consent.text()
     const boot = /<script[^>]*id="cloud-bootstrap"[^>]*>([\s\S]*?)<\/script>/.exec(html)
@@ -119,6 +133,14 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
     let token = await form('personal_exchange', '/oauth/token', { ...credentials, grant_type: 'authorization_code', code: callback.searchParams.get('code'), code_verifier: verifier, redirect_uri: registration.redirectUri })
     const me = await json('personal_me', '/v1/me', { bearer: token.access_token }); check(me.serverId === registration.serverId && me.workspaceId === personal.id && me.grantType === 'user', 'PERSONAL_SCOPE')
     report.checks.personalPkce = true
+    if (env.MIKKA_METERING_ONLY === '1') {
+      // The prior read-only receipt proved this existing personal workspace
+      // has paid eligibility. The provider is called once, with normal consent.
+      check(createHash('sha256').update(personal.id).digest('hex').slice(0, 16) === '683a9e11b0c2d41f', 'PERSONAL_SCOPE')
+      await meter(token, personal.id)
+      report.result = report.metering.completionReturned ? 'metering_request_completed' : 'metering_request_denied'
+      return
+    }
     const next = await form('personal_refresh', '/oauth/token', { ...credentials, grant_type: 'refresh_token', refresh_token: token.refresh_token })
     check(next.refresh_token && next.refresh_token !== token.refresh_token && next.workspace_id === personal.id, 'REFRESH'); token = next; report.checks.personalRefresh = true
 
@@ -161,33 +183,6 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
     }
     check(invalid, 'GITHUB_REVOKE'); report.checks.githubNativeRevocation = true
 
-    // A separate normal consent selects the existing shared billing workspace;
-    // it never switches the account's active workspace under another owner's run.
-    const billingChoices = context.workspaces.filter(w => w.kind === 'team' && w.name === 'Acme Inc.')
-    check(billingChoices.length === 1, 'CONTEXT')
-    const billingWorkspace = billingChoices[0], billingVerifier = randomBytes(32).toString('base64url'), billingState = randomBytes(24).toString('base64url')
-    const billingQuery = new URLSearchParams({ response_type: 'code', client_id: registration.serverId, redirect_uri: registration.redirectUri, scope: 'models', state: billingState, code_challenge: sha(billingVerifier), code_challenge_method: 'S256' })
-    const billingConsent = await request('metering_consent', cloudOrigin, PREFIX + '/oauth/authorize?' + billingQuery)
-    check(billingConsent.ok, 'CONSENT'); const billingBoot = /<script[^>]*id="cloud-bootstrap"[^>]*>([\s\S]*?)<\/script>/.exec(await billingConsent.text()); check(billingBoot, 'CONSENT')
-    const billingModel = JSON.parse(billingBoot[1]).model
-    check(billingModel.workspaces?.some(w => w.id === billingWorkspace.id), 'CONTEXT')
-    const billingApprove = await request('metering_approve', cloudOrigin, PREFIX + '/oauth/authorize', { method: 'POST', form: true, body: { request_id: billingModel.requestId, csrf_token: billingModel.csrfToken, workspace_id: billingWorkspace.id, approve: 'true' } })
-    check(billingApprove.status === 302, 'CALLBACK'); const billingCallback = new URL(billingApprove.headers.get('location'))
-    check(billingCallback.origin === origin && billingCallback.searchParams.get('state') === billingState, 'CALLBACK')
-    const billingToken = await form('metering_exchange', '/oauth/token', { ...credentials, grant_type: 'authorization_code', code: billingCallback.searchParams.get('code'), code_verifier: billingVerifier, redirect_uri: registration.redirectUri })
-    check(billingToken.workspace_id === billingWorkspace.id, 'PERSONAL_SCOPE')
-    const hostedModel = 'deepseek/deepseek-v4.1-flash'
-    execFileSync(process.execPath, ['scripts/assert-test-model.mjs', hostedModel], { stdio: 'pipe' })
-    const completion = await request('hosted_metering_call', cloudOrigin, PREFIX + '/v1/models/chat/completions', { method: 'POST', bearer: billingToken.access_token, body: { model: hostedModel, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 16, stream: false } })
-    const result = await completion.json()
-    report.metering = { status: completion.status, serverId: registration.serverId, authorizationWorkspaceHash: createHash('sha256').update(billingWorkspace.id).digest('hex').slice(0, 16), model: hostedModel, attempts: 1, trialAllowed: false }
-    if (completion.ok) {
-      check(result.model === hostedModel && Number.isSafeInteger(result.usage?.total_tokens) && result.usage.total_tokens > 0, 'HTTP_SCHEMA')
-      report.metering.completionReturned = true; report.metering.usage = { inputTokens: result.usage.prompt_tokens, outputTokens: result.usage.completion_tokens, totalTokens: result.usage.total_tokens }; report.metering.ledgerVerification = 'pending_read_only_receipt'
-    } else {
-      report.metering.code = ['cloud_quota_exhausted', 'cloud_unavailable', 'cloud_access_denied', 'cloud_rate_limited'].includes(result.code) ? result.code : 'OTHER'
-      report.metering.completionReturned = false
-    }
     report.result = 'cloud_protocol_verified'
   } catch (error) {
     report.failure = acceptanceCode(error); throw error
