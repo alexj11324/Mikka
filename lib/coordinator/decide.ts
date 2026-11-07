@@ -1,6 +1,7 @@
 import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
+import { isCloudEdition } from '@/lib/edition'
 import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
 import { observeAiRequest, type AiMetadata } from '@/lib/tracing/ai'
@@ -25,7 +26,9 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   'use step'
   if (signal?.aborted) return null
   // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
-  const key = (await gatewayAuth())?.token
+  const key = DECISIONS_URL === 'https://ai-gateway.vercel.sh/v1/decisions'
+    ? process.env.DECISIONS_API_KEY || (await gatewayAuth())?.token
+    : process.env.DECISIONS_API_KEY || process.env.AI_GATEWAY_API_KEY
   if (!key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
@@ -67,7 +70,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
         const cost = gatewayCost(receipt.provider_metadata)
         report({ usage: decisionTokenUsage(receipt.usage), totalCostUsd: cost === null ? null : cost / 1_000_000 })
         await usage.hostedUsage.settle(callId,cost,0,0,gatewayGenerationId(receipt.provider_metadata))
-        await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
+        if (isCloudEdition()) await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
       }
       const answers = validatedAnswers(payload, requestedQuestions)
       const judgment: AiMetadata = {}

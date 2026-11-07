@@ -70,9 +70,11 @@ test('page-only locale and legacy redirects retain query while machine paths nev
 test('security projection preserves body stream, raw cookies, status and route-specific headers', async () => {
   let cancelled = false
   const response = new Response(new ReadableStream({ cancel() { cancelled = true } }), { status: 206, headers: { 'content-range': 'bytes 0-9/50', 'referrer-policy': 'no-referrer' } })
+  response.crossws = { upgrade() { throw new Response(null, { status: 400 }) } }
   response.headers.append('set-cookie', 'a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT')
   response.headers.append('set-cookie', 'b=; Max-Age=0; Path=/mikka')
   const secured = applySecurityHeaders(request('/mikka/api/stream'), response)
+  assert.equal(secured.crossws, response.crossws)
   assert.equal(secured.body, response.body); assert.equal(secured.status, 206)
   assert.equal(secured.headers.get('content-range'), 'bytes 0-9/50')
   assert.equal(secured.headers.get('referrer-policy'), 'no-referrer')

@@ -80,7 +80,7 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   const user = await getUser()
   const userId = user.id
   const bot = await ownBot(user, botId)
-  const enabled = coordinatorEnabled()
+  const enabled = await coordinatorEnabled(user.id, bot.id)
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginOwnerListRead(userId, [], [{ kind: 'bot_chat', id: bot.id }])
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
@@ -113,7 +113,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   // Each request is authorized on its own: the session and its ownership of this bot.
   const user = await getUser()
   const bot = await ownBot(user, botId)
-  const enabled = coordinatorEnabled()
+  const enabled = await coordinatorEnabled(user.id, bot.id)
   const parsed = versionSchema.safeParse(known)
   const proof = continuationSchema.safeParse(continuation)
   const previous = proof.success && proof.data ? { ...proof.data,
@@ -252,7 +252,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     }
     if (taskSubmission && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
     // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
-    if (taskSubmission && !coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
+    if (taskSubmission && !await coordinatorEnabled(userId, bot.id)) throw new ActionFailureError('coordinatorUnavailable')
     if (taskSubmission && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
     if (destination.data?.kind === 'device') {
       const [device] = await db.select({ id: devices.id }).from(devices)
@@ -290,7 +290,7 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
-    if (!coordinatorEnabled()) return { queued: false }
+    if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
@@ -316,7 +316,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
-    if (!coordinatorEnabled()) return { queued: false as const, reason: 'unavailable' as const }
+    if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) {
       afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
@@ -340,12 +340,12 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
     const userId = await getUserId()
     const id = z.uuid().safeParse(suggestionId)
     if (!id.success) throw new ActionFailureError('validationGeneric')
-    if (!coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
     try {
       await db.transaction(async tx => {
         const claimed = await claimSuggestion(userId, id.data, tx)
         const item = claimed ?? await readClaimedSuggestion(userId, id.data, tx)
         if (!item) throw new ActionFailureError('suggestionNotFound')
+        if (!await coordinatorEnabled(userId, item.botId)) throw new ActionFailureError('coordinatorUnavailable')
         const text = suggestionMessage({ source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, actor: item.actor, url: item.url })
         // The suggestion stored its Coordinator bot row when it was made (null only on an older one).
         if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id, botId: item.botId })

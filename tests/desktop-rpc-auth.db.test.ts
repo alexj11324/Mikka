@@ -20,7 +20,7 @@ test('native RPC verifies real bearer sessions, tenant membership, expiry and on
   const userIds: string[] = [], workspaceIds = [randomUUID(), randomUUID()]
   const states: string[] = []
   const mocks: { restore(): void }[] = []
-  const origin = 'http://127.0.0.1:3030'
+  const origin = 'https://self-hosted-desktop.example.test'
   try {
     const [{ betterAuth }, { bearer, oneTimeToken }, fresh, desktopAuth, schema] = await Promise.all([
       import('better-auth'), import('better-auth/plugins'), import('../lib/fresh-session'), import('../lib/desktop-auth-server'), import('../lib/db/schema'),

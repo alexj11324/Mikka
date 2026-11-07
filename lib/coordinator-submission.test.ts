@@ -199,15 +199,26 @@ let suggestion: SuggestionRow | null = null
 const dismissed: string[] = []
 let dismissError: Error | null = null
 let transactionTail: Promise<unknown> = Promise.resolve()
+async function transaction(run: (tx: unknown) => Promise<unknown>) {
+  const state = current, rows = structuredClone([...state.rows]), dismissedBefore = [...dismissed]
+  try { return await run(state.executor) }
+  catch (error) {
+    state.rows.clear()
+    for (const [key, value] of rows) state.rows.set(key, value)
+    dismissed.splice(0, dismissed.length, ...dismissedBefore)
+    throw error
+  }
+}
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'synthetic-browser-session' } } : null } } } })
-  // A transaction runs on the same in-memory executor; the real one rolls back when the callback throws.
+  // Match the real transaction: a readiness refusal after claiming the actual
+  // suggestion bot rolls back both the dismissal and any inserted message.
   mock.module('@/lib/execution-settings', { namedExports: { executionWorkspace: async (owner: string, botId: string) => { assert.equal(owner, userId); assert.equal(botId, COORDINATOR_BOT); return PROFILE_WORKSPACE } } })
   mock.module('@/lib/db', { namedExports: { pool: { async query(sql: string, params: string[]) {
     assert.match(sql, /SELECT \* FROM factory_agent_profiles WHERE id=\$1 AND "ownerId"=\$2 AND "workspaceId"=\$3/)
     const row = profileRows.get(params[0])
     return { rows: row?.ownerId === params[1] && row.workspaceId === params[2] ? [structuredClone(row)] : [] }
-  } }, db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => run(current.executor)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
+  } }, db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => transaction(run)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
   mock.module('@/lib/suggestions/store', { namedExports: {
     readClaimedSuggestion: async (owner: string, id: string) => owner === 'owner' && suggestion?.id === id ? suggestion : null,
     claimSuggestion: async (owner: string, id: string) => {

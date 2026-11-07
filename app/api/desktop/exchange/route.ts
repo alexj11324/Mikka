@@ -3,7 +3,7 @@ import { and, eq, gt, isNotNull, isNull } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
-import { desktopAuthCode, desktopAuthState, desktopAuthVerifier } from '@/lib/desktop-auth'
+import { desktopAuthCode, desktopAuthState, desktopAuthVerifier, desktopSameOriginRequest } from '@/lib/desktop-auth'
 import { sha256Hex, verifierMatches } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
 import { auth } from '@/lib/auth'
@@ -20,8 +20,7 @@ const noStore = { 'Cache-Control': 'no-store' }
  * first attempt, right or wrong, so a code cannot be guessed against.
  */
 async function handlePOST(request: Request) {
-  const origin = request.headers.get('origin')
-  if (origin && origin !== new URL(request.url).origin) return new NextResponse(null, { status: 403 })
+  if (!desktopSameOriginRequest(request)) return new NextResponse(null, { status: 403 })
   let body: unknown
   try {
     body = await request.json()

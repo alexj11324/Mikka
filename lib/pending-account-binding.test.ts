@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from './db/commit-effects'
 
 let row: Record<string, unknown> = {}
 let selected = 'account-a'
@@ -8,7 +10,11 @@ let actionError: string | null = null
 let toolTags: string[] | undefined = ['important', 'openWorldHint']
 const calls: unknown[][] = []
 const reviews: unknown[][] = []
+const client = { query: async () => ({ rows: [], command: 'SELECT' }) } as unknown as PoolClient
+observeCommitEffects(client)
+const liveEffects: Array<() => Promise<unknown>> = []
 const db = {
+  session: { client },
   $count: async () => 0,
   select: () => ({ from: () => ({ where: () => ({ limit: async () => [row] }) }) }),
   insert: () => ({ values: async (value: Record<string, unknown>) => { row = { status: 'pending', ...value } } }),
@@ -19,6 +25,8 @@ const db = {
 }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./db/index.ts', { db, pool: {} })
+stub('./live/scope.ts', { liveGatewayConfig: () => ({ url: 'https://live.example.invalid', secret: 'test-only-live-transport' }) })
+stub('./live/notify.ts', { scheduleLive: (work: () => Promise<unknown>) => { liveEffects.push(work) }, sendLiveInvalidations: async () => {} })
 stub('./composio.ts', {
   getComposio: () => ({}),
   resolveActionAccount: async (_userId: string, _action: string, requested?: string) => ({ accountId: requested ?? selected, accounts: [] }),
@@ -40,10 +48,11 @@ let store: typeof import('./pending-action-store'), actions: typeof import('./pe
 before(async () => { store = await import('./pending-action-store'); actions = await import('./pending-actions') })
 
 test('proposal freezes the account used to read the event, and approval uses it after default changes', async () => {
-  selected = 'account-a'; calls.length = 0
+  selected = 'account-a'; calls.length = 0; liveEffects.length = 0
   await store.proposeAction('u', 'update_calendar_event', { event_id: 'e', summary: 'new' })
   assert.equal(row.connectedAccountId, 'account-a')
   assert.equal(calls[0][3], 'account-a')
+  assert.equal(liveEffects.length, 1, 'the committed proposal registers its real live invalidation')
   selected = 'account-b'
   await actions.decidePendingAction('u', String(row.id), true)
   assert.equal(calls[1][3], 'account-a')

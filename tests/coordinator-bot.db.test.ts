@@ -1,33 +1,51 @@
 // The Coordinator is an ordinary bot row (lib/coordinator/coordinator-bot.ts).
-// Real PostgreSQL: its older chat (stored with no bot) moves onto that row
-// once, safely twice, and everything new is keyed by the row's id.
+// Real PostgreSQL: older unattributed chat/history moves onto that row once,
+// safely twice; admitted executions retain their frozen null-Bot authority.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { PoolClient } from 'pg'
 import type { ModelMessage } from 'ai'
+import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { ALLOWED_MODEL, seedAllowedModel } from './support/allowed-model'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { isolateCoordinatorWakes } from './support/coordinator-wake'
 
 const SECRET = 'isolated-ci-coordinator-backfill-fixture-key-0000'
 
 test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const previousSecret = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET = SECRET
+  const wakes = await isolateCoordinatorWakes(t)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { observePoolCommits } = await import('../lib/db/commit-effects')
+  observePoolCommits(pool)
   const bots = await import('../lib/coordinator/coordinator-bot')
   const store = await import('../lib/coordinator/store')
   const { preserveMessageSources } = await import('../lib/coordinator/message-safety')
   const { promptMessages } = await import('../lib/coordinator/context')
+  const { factoryStore } = await import('../lib/factory/server')
   const users: string[] = []
   t.after(async () => {
+    await wakes.flush()
     if (previousSecret === undefined) delete process.env.BETTER_AUTH_SECRET
     else process.env.BETTER_AUTH_SECRET = previousSecret
     for (const statement of [
       'DELETE FROM coordinator_messages WHERE "userId" = ANY($1)', 'DELETE FROM coordinator_sessions WHERE "userId" = ANY($1)',
+      'DELETE FROM factory_tasks WHERE "userId" = ANY($1)',
+      'DELETE FROM byos_native_runs WHERE "runId" IN (SELECT id FROM agent_runs WHERE "userId" = ANY($1))',
+      'DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)',
       'DELETE FROM coordinator_events WHERE "userId" = ANY($1)', 'DELETE FROM agent_runs WHERE "userId" = ANY($1)',
       'DELETE FROM agents WHERE "userId" = ANY($1)', 'DELETE FROM issues WHERE "userId" = ANY($1)',
+      'DELETE FROM devices WHERE "ownerId" = ANY($1)',
+      'DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', 'DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)',
+      'DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', 'DELETE FROM byos_connections WHERE "ownerId" = ANY($1)',
+      'DELETE FROM repository_settings WHERE "userId" = ANY($1)', 'DELETE FROM github_repository_installations WHERE "userId" = ANY($1)',
+      'DELETE FROM account WHERE "userId" = ANY($1)',
       'DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', 'DELETE FROM chat_preferences WHERE "userId" = ANY($1)',
       'DELETE FROM user_schedules WHERE owner_id = ANY($1)', 'DELETE FROM agent_kit_heads WHERE owner_id = ANY($1)',
       'DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', 'DELETE FROM bot_desktops WHERE "ownerId" = ANY($1)', 'DELETE FROM bots WHERE "ownerId" = ANY($1)',
@@ -47,6 +65,42 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   }
   const messageRows = (userId: string) => pool.query<{ botId: string | null; position: number; text: string }>(
     `SELECT "botId",position,message->>'content' AS text FROM coordinator_messages WHERE "userId"=$1 ORDER BY "botId" NULLS FIRST,position`, [userId])
+  const sourceEvent = async (userId: string, payload: Record<string, unknown> = { text: 'Synthetic owner request' }) => {
+    const id = randomUUID()
+    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,"deliveredAt") VALUES($1,$2,'user_message',$3,$4,now())`, [id, userId, `backfill:${id}`, JSON.stringify(payload)])
+    return id
+  }
+  const route = (userId: string, issueId: string, sourceEventId: string, tx?: PoolClient) => factoryStore.route(userId, {
+    issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic backfill scope regression',
+  }, tx)
+  const waitBlockedBy = async (pid: number) => {
+    for (let attempt = 0; attempt < 300; attempt++) {
+      if ((await pool.query('SELECT exists(SELECT 1 FROM pg_stat_activity WHERE $1::int=any(pg_blocking_pids(pid))) AS blocked', [pid])).rows[0].blocked) return
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    assert.fail('the real competing transaction must wait for the held source event')
+  }
+  // Pause a real migration between SQL statements; every lock/update still
+  // executes against PostgreSQL, on a separate connection from the writer.
+  const pausedBackfill = async (userId: string, coordinator: { botId: string; workspaceId: string }, after: string, allowEarlyDeferral = false) => {
+    const tx = await pool.connect()
+    const pid = Number((await tx.query('SELECT pg_backend_pid() AS pid')).rows[0].pid)
+    let entered!: () => void, resume!: () => void
+    const reached = new Promise<void>(resolve => { entered = resolve })
+    const held = new Promise<void>(resolve => { resume = resolve })
+    const originalQuery = tx.query, release = tx.release, query = tx.query.bind(tx)
+    tx.query = (async (text: string, values?: unknown[]) => {
+      const result = await query(text, values)
+      if (text.startsWith(after)) { entered(); await held }
+      return result
+    }) as PoolClient['query']
+    tx.release = () => { tx.query = originalQuery; tx.release = release; release.call(tx) }
+    const result = bots.backfillCoordinatorChat({ connect: async () => tx } as Pick<import('pg').Pool, 'connect'>, userId, coordinator)
+    // Observe rejections immediately while the assertion waits for a lock.
+    const settled = result.then(() => null, error => error as Error)
+    if (!allowEarlyDeferral) await Promise.race([reached, result.then(() => { throw new Error('backfill did not reach its pause') })])
+    return { pid, resume, settled, reached }
+  }
 
   await t.test('existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing', async () => {
     const p = await person('backfill')
@@ -151,6 +205,334 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     assert.equal((await pool.query('SELECT kind FROM mikka_workspaces WHERE id=$1', [coordinator.workspaceId])).rows[0].kind, 'personal')
     assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [run])).rows, [{ botId: coordinator.botId }])
     assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [run])).rows, [{ botId: coordinator.botId }])
+  })
+
+  await t.test('real null-Bot admission retains frozen identity, Factory family and repository authority after backfill', async () => {
+    const beforeEnv = { byos: process.env.MIKKA_BYOS_ENABLED, edition: process.env.MIKKA_EDITION }
+    process.env.MIKKA_BYOS_ENABLED = '1'
+    process.env.MIKKA_EDITION = 'cloud'
+    const { overrideDeploymentSwitch } = await import('../lib/deployment-switches')
+    overrideDeploymentSwitch('factoryRouting', true)
+    overrideDeploymentSwitch('factoryLifecycle', true)
+    const github = githubAppStub()
+    try {
+      const p = await person('frozen-backfill')
+      const repo = 'mikka-ci/coordinator-backfill'
+      const account = String(9_800_000 + Math.floor(Math.random() * 100_000))
+      github.install(repo, { contents: 'write', pull_requests: 'write' })
+      github.allowWriter(repo, account)
+      await connectGitHub(github, p.id, account, [repo])
+      await pool.query('INSERT INTO repository_settings("userId","remoteKey",push) VALUES($1,$2,$3)', [p.id, normalizeRepository(repo).key,
+        JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: p.id, approvedAt: new Date().toISOString() })])
+      const deviceId = randomUUID(), agentId = await seedAgent(pool, p.id)
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,'Synthetic backfill device','local',true,now())`, [deviceId, p.id])
+      await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
+      await seedAllowedModel(pool, p.id, { workspaceId: p.workspaceId, deviceIds: [deviceId] })
+      const issueId = await seedIssue(pool, p.id)
+      const eventId = await sourceEvent(p.id, { text: 'Synthetic task; no model or machine is invoked', taskDestination: { kind: 'device', deviceId } })
+      const { queueTaskRun } = await import('../lib/factory/queue-local')
+      const { queueRun } = await import('../lib/agent-runs')
+      const { executionIdentityForRun } = await import('../lib/execution-identity')
+      const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
+      const queued = await queueTaskRun(p.id, { issueId, agentId, repo, model: ALLOWED_MODEL, requestKey: `frozen:${randomUUID()}` }, null, undefined, eventId)
+      const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
+      const identity = await executionIdentityForRun(pool, queued.runId, p.id)
+      assert.equal(identity?.botId, null, 'the real queue freezes null; this is not a rewritten Bot fixture')
+      assert.equal(original.agentDefinition.repositoryAdmission.requestEventId, eventId)
+      assert.equal(await acceptedEventStillMatches(original.agentDefinition.repositoryAdmission, null), true)
+      const task = (await pool.query(`SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1`, [queued.runId])).rows[0]
+      // A terminal run can still be continued. Its historical sibling and old
+      // request epoch must stay in the task's scope even without an identity.
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [queued.runId])
+      const sibling = await seedRun(pool, { userId: p.id, agentId, issueId })
+      const previousEpoch = await sourceEvent(p.id)
+      await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason,output)
+        VALUES($1,$2,'execute',2,2,'passed',$3,'Synthetic historical attempt',$4)`, [randomUUID(), task.id, sibling, JSON.stringify({ requestEpoch: previousEpoch })])
+      // One owner message may start more than one task. Moving only the other
+      // task would leave it referring to the retained null-Bot source.
+      const sharedIssue = await seedIssue(pool, p.id)
+      const shared = (await route(p.id, sharedIssue, eventId)).task
+      const sharedRun = await seedRun(pool, { userId: p.id, agentId, issueId: sharedIssue })
+      await pool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [shared.attemptId, sharedRun])
+      const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+      const { runFinishedEvent } = await import('../lib/coordinator-events')
+      const { db } = await import('../lib/db')
+      await recordCoordinatorEvent(db, runFinishedEvent({ id: queued.runId, userId: p.id, botId: null, issueId, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
+      // Plain queueRun has no Factory/source-event link. Its own frozen key
+      // alone must be sufficient to retain the null-Bot execution domain.
+      const directIssue = await seedIssue(pool, p.id)
+      const direct = await queueRun(p.id, { issueId: directIssue, agentId, repo, model: ALLOWED_MODEL, requestKey: `direct:${randomUUID()}` }, null)
+      const directIdentity = await executionIdentityForRun(pool, direct.runId, p.id)
+      assert.equal(directIdentity?.botId, null)
+      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "runId"=$1', [direct.runId])).rowCount, 0)
+      const malformed = await seedRun(pool, { userId: p.id, agentId })
+      const malformedSource = await sourceEvent(p.id)
+      await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [malformed, JSON.stringify({ executionIdentity: null, repositoryAdmission: { requestEventId: malformedSource } })])
+      await assert.rejects(executionIdentityForRun(pool, malformed, p.id), { name: 'ExecutionIdentityError' })
+
+      const legacyIssue = await seedIssue(pool, p.id), legacyEvent = await sourceEvent(p.id)
+      const legacyTask = (await route(p.id, legacyIssue, legacyEvent)).task
+      const legacyRun = await seedRun(pool, { userId: p.id, agentId, issueId: legacyIssue })
+      await pool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [legacyTask.attemptId, legacyRun])
+      const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+      assert.deepEqual(await executionIdentityForRun(pool, queued.runId, p.id), identity)
+      assert.deepEqual(await executionIdentityForRun(pool, direct.runId, p.id), directIdentity)
+      assert.deepEqual((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0].agentDefinition, original.agentDefinition, 'the complete frozen snapshot is untouched')
+      assert.equal(await acceptedEventStillMatches(original.agentDefinition.repositoryAdmission, null), true)
+      assert.deepEqual((await pool.query('SELECT DISTINCT "botId" FROM agent_runs WHERE id=ANY($1::uuid[])', [[queued.runId, direct.runId, sibling, sharedRun, malformed]])).rows, [{ botId: null }])
+      assert.deepEqual((await pool.query('SELECT DISTINCT "botId" FROM coordinator_events WHERE id=ANY($1::uuid[]) OR "runId"=$2', [[eventId, previousEpoch, malformedSource], queued.runId])).rows, [{ botId: null }])
+      assert.deepEqual((await pool.query('SELECT id,"botId","sourceEventId" FROM factory_tasks WHERE id=$1', [task.id])).rows, [{ id: task.id, botId: null, sourceEventId: eventId }])
+      const reader = await pool.connect()
+      try {
+        // Match the real Factory GET transaction: authorization still takes
+        // the issue's shared scope lock even when task/source reads do not.
+        await reader.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
+        assert.equal((await factoryStore.readTask(reader, p.id, shared.id)).botId, null)
+      } finally { await reader.query('ROLLBACK'); reader.release() }
+      await assert.rejects(executionIdentityForRun(pool, malformed, p.id), { name: 'ExecutionIdentityError' })
+      for (const [table, id] of [['agent_runs', legacyRun], ['coordinator_events', legacyEvent], ['factory_tasks', legacyTask.id]]) {
+        assert.deepEqual((await pool.query(`SELECT "botId" FROM ${table} WHERE id=$1`, [id])).rows, [{ botId: coordinator.botId }], 'unrelated unfrozen history still moves')
+      }
+      // A completion arriving after backfill stays with the original run too.
+      await recordCoordinatorEvent(db, runFinishedEvent({ id: sibling, userId: p.id, botId: null, issueId, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
+      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [sibling])).rows, [{ botId: null }])
+    } finally {
+      github.restore()
+      overrideDeploymentSwitch('factoryRouting', undefined)
+      overrideDeploymentSwitch('factoryLifecycle', undefined)
+      if (beforeEnv.byos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = beforeEnv.byos
+      if (beforeEnv.edition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = beforeEnv.edition
+    }
+  })
+
+  for (const kind of ['computer', 'group'] as const) await t.test(`an unfrozen ${kind} run retains its Factory family and ordinary retry`, async () => {
+    const p = await person(`bound-${kind}`), agentId = await seedAgent(pool, p.id)
+    const issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
+    const task = (await route(p.id, issueId, eventId)).task
+    const runId = await seedRun(pool, { userId: p.id, agentId, issueId, status: 'failed' })
+    await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [runId, JSON.stringify({ schemaVersion: 1, definitionDigest: 'synthetic-legacy', harness: 'codex' })])
+    if (kind === 'computer') {
+      const computerBot = await seedBot(pool, p.workspaceId, p.id)
+      await pool.query('INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)', [runId, p.id, p.workspaceId, computerBot])
+    } else await pool.query(`UPDATE agent_runs SET kind='group_chat' WHERE id=$1`, [runId])
+    await pool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [task.attemptId, runId])
+    const blocked = await factoryStore.apply(p.id, { taskId: task.id, revision: task.revision }, randomUUID(), {
+      action: 'finish', status: 'blocked', reason: 'Synthetic unclaimed startup failure', evidence: [], output: {},
+    })
+    const previousEpoch = await sourceEvent(p.id), sibling = await seedRun(pool, { userId: p.id, agentId, issueId })
+    await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason,output)
+      VALUES($1,$2,'execute',2,2,'passed',$3,'Synthetic historical attempt',$4)`, [randomUUID(), task.id, sibling, JSON.stringify({ requestEpoch: previousEpoch })])
+    const ordinary = await seedRun(pool, { userId: p.id, agentId })
+    const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
+    const { db } = await import('../lib/db')
+    await recordCoordinatorEvent(db, runFinishedEvent({ id: runId, userId: p.id, botId: null, issueId, kind: kind === 'group' ? 'group_chat' : 'implement', status: 'failed', stopReason: 'device_lost' }))
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+    assert.deepEqual((await pool.query('SELECT DISTINCT "botId" FROM agent_runs WHERE id=ANY($1::uuid[])', [[runId, sibling]])).rows, [{ botId: null }])
+    assert.deepEqual((await pool.query('SELECT DISTINCT "botId" FROM coordinator_events WHERE id=ANY($1::uuid[]) OR "runId"=$2', [[eventId, previousEpoch], runId])).rows, [{ botId: null }])
+    assert.deepEqual((await pool.query('SELECT "botId","sourceEventId" FROM factory_tasks WHERE id=$1', [task.id])).rows, [{ botId: null, sourceEventId: eventId }])
+    assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [ordinary])).rows, [{ botId: coordinator.botId }])
+    const retried = await factoryStore.apply(p.id, { taskId: task.id, revision: blocked.task.revision }, randomUUID(), { action: 'retry', reason: 'Retry the retained original execution domain' })
+    assert.equal(retried.task.botId, null)
+    assert.equal(retried.task.sourceEventId, eventId)
+    assert.equal(retried.task.status, 'pending')
+    assert.notEqual(retried.task.attemptId, task.attemptId)
+  })
+
+  await t.test('a publication holding its issue cannot deadlock with the backfill run lock', { timeout: 10_000 }, async () => {
+    const p = await person('publication-before-backfill'), agentId = await seedAgent(pool, p.id), issueId = await seedIssue(pool, p.id)
+    const runId = await seedRun(pool, { userId: p.id, agentId, issueId })
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const writer = await pool.connect()
+    let migration: Awaited<ReturnType<typeof pausedBackfill>> | undefined
+    let runLock: Promise<Error | null> | undefined
+    try {
+      await writer.query('BEGIN')
+      // Publication/completion lock issue -> run; the real scope trigger also
+      // takes an issue SHARE lock when a migration only changes the botId.
+      await writer.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [issueId])
+      migration = await pausedBackfill(p.id, coordinator, 'SELECT id FROM agent_runs', true)
+      const first = await Promise.race([migration.reached.then(() => 'run-locked'), migration.settled.then(() => 'deferred')])
+      runLock = writer.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE', [runId]).then(() => null, error => error as Error)
+      if (first === 'run-locked') await waitBlockedBy(migration.pid)
+      migration.resume()
+      assert.equal(await runLock, null, 'the issue holder must not become a deadlock victim')
+      assert.equal((await migration.settled as Error & { code?: string })?.code, '55P03', 'migration defers instead of waiting behind its run lock')
+      await writer.query('COMMIT')
+    } finally {
+      migration?.resume()
+      await migration?.settled
+      await runLock
+      await writer.query('ROLLBACK')
+      writer.release()
+    }
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+    assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [runId])).rows, [{ botId: coordinator.botId }])
+  })
+
+  await t.test('migration first holds the issue through its run update; real publication continues after commit', { timeout: 10_000 }, async () => {
+    const p = await person('backfill-before-publication'), agentId = await seedAgent(pool, p.id), issueId = await seedIssue(pool, p.id)
+    const runId = await seedRun(pool, { userId: p.id, agentId, issueId })
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const migration = await pausedBackfill(p.id, coordinator, 'SELECT i.id FROM issues i')
+    const { prepareRunPublication } = await import('../lib/run-publications')
+    const publication = prepareRunPublication({ id: runId, userId: p.id, issueId, baseBranch: null }, 'https://github.com/mikka-ci/backfill-lock.git')
+    const settled = publication.then(value => ({ value }), error => ({ error }))
+    try {
+      await waitBlockedBy(migration.pid)
+      migration.resume()
+      assert.equal(await migration.settled, null)
+      const result = await settled
+      if ('error' in result) throw result.error
+      assert.ok(result.value.pushBranch)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [runId])).rows, [{ botId: coordinator.botId }])
+    } finally { migration.resume(); await migration.settled; await settled }
+  })
+
+  await t.test('a run committed after issue locking retains its family until the next pass', { timeout: 10_000 }, async () => {
+    const p = await person('late-issue-run'), agentId = await seedAgent(pool, p.id), issueId = await seedIssue(pool, p.id)
+    const oldRun = await seedRun(pool, { userId: p.id, agentId, issueId })
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const migration = await pausedBackfill(p.id, coordinator, 'SELECT i.id FROM issues i')
+    let lateRun!: string, lateEvent!: string, lateTask!: string
+    try {
+      const lateIssue = await seedIssue(pool, p.id)
+      lateEvent = await sourceEvent(p.id)
+      const task = (await route(p.id, lateIssue, lateEvent)).task
+      lateTask = task.id
+      lateRun = await seedRun(pool, { userId: p.id, agentId, issueId: lateIssue })
+      await pool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [task.attemptId, lateRun])
+      migration.resume()
+      assert.equal(await migration.settled, null)
+    } finally { migration.resume(); await migration.settled }
+    for (const [table, id] of [['agent_runs', lateRun], ['coordinator_events', lateEvent], ['factory_tasks', lateTask]]) {
+      assert.deepEqual((await pool.query(`SELECT "botId" FROM ${table} WHERE id=$1`, [id])).rows, [{ botId: null }])
+    }
+    assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [oldRun])).rows, [{ botId: coordinator.botId }])
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+    for (const [table, id] of [['agent_runs', lateRun], ['coordinator_events', lateEvent], ['factory_tasks', lateTask]]) {
+      assert.deepEqual((await pool.query(`SELECT "botId" FROM ${table} WHERE id=$1`, [id])).rows, [{ botId: coordinator.botId }])
+    }
+  })
+
+  await t.test('a retired teammate run stays in its original domain without blocking unrelated history', async () => {
+    const owner = await person('retired-issue-owner'), actor = await person('retired-issue-teammate')
+    const agentId = await seedAgent(pool, actor.id), issueId = randomUUID()
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
+      VALUES($1,$2,'Synthetic retired task','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner.id])
+    const runId = await seedRun(pool, { userId: actor.id, agentId, issueId })
+    const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
+    const { db } = await import('../lib/db')
+    await recordCoordinatorEvent(db, runFinishedEvent({ id: runId, userId: actor.id, botId: null, issueId, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
+    await pool.query(`UPDATE issues SET scope='personal' WHERE id=$1`, [issueId])
+    await assert.rejects(pool.query('UPDATE agent_runs SET "updatedAt"=now() WHERE id=$1', [runId]), { code: '23514' }, 'the real scope trigger still rejects updates to this retired run')
+    const ordinary = await seedRun(pool, { userId: actor.id, agentId })
+    const coordinator = await bots.coordinatorBot(actor.id, null, { backfill: false })
+    await bots.backfillCoordinatorChat(appPool, actor.id, coordinator)
+    assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [runId])).rows, [{ botId: null }])
+    assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [runId])).rows, [{ botId: null }])
+    assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [ordinary])).rows, [{ botId: coordinator.botId }])
+  })
+
+  await t.test('an in-flight null-Bot route defers migration; its unfrozen history moves after commit', { timeout: 10_000 }, async () => {
+    const p = await person('route-before-backfill'), issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const writer = await pool.connect()
+    try {
+      await writer.query('BEGIN')
+      const pending = (await route(p.id, issueId, eventId, writer)).task
+      await assert.rejects(bots.backfillCoordinatorChat(appPool, p.id, coordinator), { code: '55P03' }, 'NOWAIT defers rather than deadlocking against the producer')
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: null }])
+      await writer.query('COMMIT')
+      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [pending.id])).rows, [{ botId: coordinator.botId }])
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
+    } finally { await writer.query('ROLLBACK'); writer.release() }
+  })
+
+  await t.test('migration first fences a stale source validation before it can create a null-Bot task', { timeout: 10_000 }, async () => {
+    const p = await person('backfill-before-route'), issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const migration = await pausedBackfill(p.id, coordinator, 'SELECT id FROM coordinator_events')
+    const pending = route(p.id, issueId, eventId).then(() => null, error => error as Error & { code: string })
+    try {
+      await waitBlockedBy(migration.pid)
+      migration.resume()
+      assert.equal(await migration.settled, null)
+      assert.equal((await pending)?.code, 'factorySourceMismatch', 'the FOR SHARE predicate is rechecked after the source is moved')
+      assert.equal((await pool.query('SELECT 1 FROM factory_tasks WHERE "userId"=$1', [p.id])).rowCount, 0)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
+    } finally { migration.resume(); await migration.settled; await pending }
+  })
+
+  await t.test('a task committed between migration lock statements keeps its source until the next pass', { timeout: 10_000 }, async () => {
+    const p = await person('late-route'), issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const migration = await pausedBackfill(p.id, coordinator, 'SELECT id FROM factory_tasks')
+    try {
+      const late = (await route(p.id, issueId, eventId)).task
+      migration.resume()
+      assert.equal(await migration.settled, null)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [late.id])).rows, [{ botId: null }])
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: null }])
+      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [late.id])).rows, [{ botId: coordinator.botId }])
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
+    } finally { migration.resume(); await migration.settled }
+  })
+
+  await t.test('a completion committed after the event lock keeps its legacy run until both can move', { timeout: 10_000 }, async () => {
+    const p = await person('late-completion'), agentId = await seedAgent(pool, p.id)
+    const runId = await seedRun(pool, { userId: p.id, agentId })
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    const migration = await pausedBackfill(p.id, coordinator, 'SELECT id FROM coordinator_events')
+    const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
+    const { db } = await import('../lib/db')
+    try {
+      await recordCoordinatorEvent(db, runFinishedEvent({ id: runId, userId: p.id, botId: null, issueId: null, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
+      migration.resume()
+      assert.equal(await migration.settled, null)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [runId])).rows, [{ botId: null }])
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [runId])).rows, [{ botId: null }])
+      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+      assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [runId])).rows, [{ botId: coordinator.botId }])
+      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [runId])).rows, [{ botId: coordinator.botId }])
+    } finally { migration.resume(); await migration.settled }
+  })
+
+  await t.test('a chat writer holding its session cannot deadlock against the migration chat lock', { timeout: 10_000 }, async () => {
+    const p = await person('session-before-chat-lock')
+    const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+    await pool.query('INSERT INTO coordinator_sessions("userId","botId",memory) VALUES($1,$2,\'\') ON CONFLICT DO NOTHING', [p.id, coordinator.botId])
+    const writer = await pool.connect()
+    let migration: Awaited<ReturnType<typeof pausedBackfill>> | undefined
+    let chatLock: Promise<Error | null> | undefined
+    try {
+      await writer.query('BEGIN')
+      assert.equal((await writer.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2 FOR UPDATE', [p.id, coordinator.botId])).rowCount, 1)
+      migration = await pausedBackfill(p.id, coordinator, 'SELECT id FROM agent_runs')
+      // The exact session -> chat order used by appendMessages. Migration
+      // already owns chat and must not wait in reverse for the session row.
+      chatLock = writer.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat:${p.id}:${coordinator.botId}`]).then(() => null, error => error as Error)
+      await waitBlockedBy(migration.pid)
+      migration.resume()
+      assert.equal((await migration.settled as Error & { code: string })?.code, '55P03')
+      assert.equal(await chatLock, null, 'deferral releases the chat lock without PostgreSQL choosing a deadlock victim')
+    } finally {
+      migration?.resume()
+      await migration?.settled
+      await chatLock
+      await writer.query('ROLLBACK')
+      writer.release()
+    }
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
   })
 
   await t.test('model choice goes through the ordinary bot path', async () => {

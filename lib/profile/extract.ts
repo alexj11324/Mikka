@@ -2,6 +2,7 @@ import 'server-only'
 import { generateText } from 'ai'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { zeroCatConfig } from '@/lib/abuse/zerocat'
+import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { extractionPrompt, factInput, parseFacts } from './facts'
@@ -30,7 +31,7 @@ export async function extractFacts(notification: ExternalNotification, suggestio
   'use step'
   const { hostedModel, admitHostedModel } = await import('@/lib/abuse/model')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  if (!profileEnabled() || (!zeroCatConfig() && !await gatewayAuth())) return 0
+  if (!profileEnabled() || (!selfHostedDefaultModelConfig() && !zeroCatConfig() && !await gatewayAuth())) return 0
   try {
     if (!await profileEntitled(notification.userId) || !await memoryEnabled(notification.userId)) return 0
     const workspaceId=await executionWorkspace(notification.userId,null)

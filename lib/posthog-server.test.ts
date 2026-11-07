@@ -30,6 +30,16 @@ test('an unavailable PostHog reads off: no client, an error or a timeout', async
   assert.equal(await serverFlagEnabled('mikka-proactive-profile', 'u1', { posthog: fake(() => new Promise(() => {})).posthog, timeoutMs: 10 }), false)
 })
 
+test('without a project, deployed subscription routes work and billing or experiments stay off', async () => {
+  clearFlagCache()
+  for (const key of ['mikka-byos-subscription-chat', 'mikka-byos-subscription-native', 'mikka-cloud-computer']) {
+    assert.equal(await serverFlagEnabled(key, 'community-user', { posthog: null }), true, key)
+  }
+  for (const key of ['mikka-computer-billing', 'mikka-email-sign-in-off', 'mikka-computer-tab-off', 'mikka-proactive-research', 'mikka-upcoming-administration']) {
+    assert.equal(await serverFlagEnabled(key, 'community-user', { posthog: null }), false, key)
+  }
+})
+
 test('a flag value is reused for a few minutes per person and key', async () => {
   clearFlagCache()
   const client = fake(async () => true)

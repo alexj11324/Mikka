@@ -2,6 +2,7 @@ import 'server-only'
 import { generateText } from 'ai'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { zeroCatConfig } from '@/lib/abuse/zerocat'
+import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
 import { and, eq, sql } from 'drizzle-orm'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
@@ -35,7 +36,7 @@ export async function writeActionTitles(userId: string, items: readonly ActionTi
   'use step'
   const { hostedModel, admitHostedModel } = await import('@/lib/abuse/model')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  if (!items.length || (!zeroCatConfig() && !await gatewayAuth())) return
+  if (!items.length || (!selfHostedDefaultModelConfig() && !zeroCatConfig() && !await gatewayAuth())) return
   try {
     const locale = await personLocale(userId)
     const workspaceId=await executionWorkspace(userId,null)

@@ -1,6 +1,6 @@
 import 'server-only'
 import { PostHog } from 'posthog-node'
-import { gatedFeatureEnabled } from '@/lib/feature-flags'
+import { gatedFeatureEnabled, productionFlagDefault } from '@/lib/feature-flags'
 import { posthogConfig } from '@/lib/posthog-config'
 import { registerTelemetryFlush } from '@/lib/tracing/flush'
 import { safeErrorAttributes } from '@mikka/protocol/tracing'
@@ -10,7 +10,7 @@ import { safeErrorAttributes } from '@mikka/protocol/tracing'
 // the Mikka user id (components/posthog-analytics.tsx). POSTHOG_SECRET_KEY, a
 // project secret or personal API key, lets flags be evaluated locally from
 // polled definitions; without it each uncached check asks PostHog. Without the
-// project key there is no client: every flag reads off and nothing is sent.
+// project key there is no client: shipped production defaults apply and nothing is sent.
 
 /** How long a person's flag value is reused before PostHog is asked again. */
 export const FLAG_CACHE_MS = 5 * 60_000
@@ -44,13 +44,14 @@ const flagCache = new Map<string, { enabled: boolean; at: number }>()
 /**
  * Whether the person's flag is exactly true, cached for FLAG_CACHE_MS so the
  * ingest and cron paths do not ask PostHog per message. Fails closed: no
- * client, an error, a timeout or any other value reads off. Never throws.
+ * configured client error, timeout or nonboolean answer reads off. An installation
+ * without a project uses the explicit production defaults. Never throws.
  */
 export async function serverFlagEnabled(key: string, userId: string, { posthog = serverPostHog(), now = Date.now(), timeoutMs = FLAG_TIMEOUT_MS }: { posthog?: ServerPostHog | null; now?: number; timeoutMs?: number } = {}): Promise<boolean> {
   const cacheKey = `${key}|${userId}`
   const cached = flagCache.get(cacheKey)
   if (cached && now - cached.at < FLAG_CACHE_MS) return cached.enabled
-  let enabled = false
+  let enabled = posthog ? false : productionFlagDefault(key)
   if (posthog) {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {

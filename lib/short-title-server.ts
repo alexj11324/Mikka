@@ -3,6 +3,7 @@ import { generateText } from 'ai'
 import { and, eq, isNull } from 'drizzle-orm'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { zeroCatConfig } from '@/lib/abuse/zerocat'
+import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
@@ -24,7 +25,7 @@ const SHORT_TITLE_TIMEOUT_MS = 10_000
  */
 export async function writeShortTitle(issueId: string, ownerId: string): Promise<void> {
   try {
-    if (!zeroCatConfig() && !await gatewayAuth()) return
+    if (!selfHostedDefaultModelConfig() && !zeroCatConfig() && !await gatewayAuth()) return
     const [task] = await db.select({ title: issues.title, content: issues.content, shortTitle: issues.shortTitle }).from(issues)
       .where(and(eq(issues.id, issueId), eq(issues.userId, ownerId))).limit(1)
     if (!task || task.shortTitle) return

@@ -1,4 +1,5 @@
 /** One global switch: never evaluate this flag against a person or team. */
+import { posthogConfig } from '../posthog-config'
 export const LINEAR_SYNC_FLAG = 'mikka-linear-sync'
 export const LINEAR_SYNC_DISTINCT_ID = 'mikka-linear-sync-service'
 export const LINEAR_SYNC_FLAG_CACHE_MS = 30_000
@@ -25,7 +26,7 @@ export function createLinearSyncGate({
       try {
         return await Promise.race([
           (async (): Promise<LinearSyncState> => {
-            const response = await (fetcher ?? globalThis.fetch)('https://us.i.posthog.com/flags?v=2', {
+            const response = await (fetcher ?? globalThis.fetch)(`${posthogConfig.apiHost}/flags?v=2`, {
               method: 'POST',
               headers: { 'content-type': 'application/json', 'user-agent': 'posthog-node/mikka-linear-sync' },
               body: JSON.stringify({ api_key: token, distinct_id: LINEAR_SYNC_DISTINCT_ID }),
