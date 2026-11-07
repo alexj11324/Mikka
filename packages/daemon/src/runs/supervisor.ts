@@ -1048,10 +1048,14 @@ export class RunSupervisor {
    * shows which stage it reached. The stage's own result or error passes
    * through unchanged.
    */
-  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>): Promise<T> {
+  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>, prepared?: PreparedAgentStart): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
     let startupTiming: DaemonStartupTiming | undefined
+    const preparationTiming = () => {
+      const timing = this.active.get(runId)?.runtimeTiming && prepared?.preparationTiming
+      return timing?.runIdHash === attributes['mikka.run.id_hash'] && timing.harness === attributes['mikka.harness'] ? timing : undefined
+    }
     try {
       const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
         this.active.get(runId)?.runtimeTiming ? { onStartupTiming: timing => { startupTiming = timing } } : undefined)
@@ -1060,12 +1064,12 @@ export class RunSupervisor {
       // duration, but produce no speculative stage/user message before it.
       if (reportAfter) await reportAfter
       if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
-      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming))
+      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming, preparationTiming()))
       return value
     } catch (error) {
       const elapsed = performance.now() - started
       if (reportAfter) await reportAfter
-      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming))
+      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming, preparationTiming()))
       throw error
     }
   }
@@ -1758,7 +1762,7 @@ export class RunSupervisor {
             continueSession,
             requireSessionResume: assignment.requireSessionResume,
           })
-        })())
+        })(), undefined, preparedSession)
     } catch (error) {
       if (assignment.skillReceipt) this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
       throw error

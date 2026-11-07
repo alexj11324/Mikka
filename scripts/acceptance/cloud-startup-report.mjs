@@ -133,6 +133,15 @@ function perSamplePhases(sample) {
     for (const name of new Set(daemon.phases.map(phase => phase.name)))
       phases.set(name, union(daemon.phases.filter(phase => phase.name === name).map(phase => [phase.startMs,phase.endMs])))
   }
+  const preparation = sample.daemonPreparationTiming
+  if (preparation) {
+    // Its intervals have their own origin and overlap checkout and the later
+    // stage. Keep a separate series; neither root is added to the other.
+    phases.set('daemon.adapter.preparation', preparation.ms)
+    for (const name of new Set(preparation.phases.map(phase => phase.name)))
+      phases.set(name.replace('daemon.adapter.', 'daemon.preparation.'),
+        union(preparation.phases.filter(phase => phase.name === name).map(phase => [phase.startMs,phase.endMs])))
+  }
   return phases
 }
 
@@ -145,7 +154,7 @@ export function markdown(report) {
   for (const sample of report.samples) lines.push(`| ${sample.sampleId} | ${sample.harness} | ${sample.timing?.dispatchBoundary ?? 'legacy_dispatch_body'} | \`${sample.runId ?? 'unavailable'}\` | ${seconds(sample.timing?.dispatchToAgentStartMs)} | ${seconds(sample.timing?.dispatchToExecutionStartMs)} | ${seconds(sample.timing?.dispatchToFirstProviderChunkMs)} | ${sample.cleanup?.status ?? 'unavailable'} | ${eligibleSample(sample) ? '有效单样本' : sample.error ?? '不完整，排除'} |`)
   lines.push('', '### 分组统计', '', '| Harness | n | agent_start median / max | 首 provider/tool chunk median / max |', '|---|---:|---:|---:|')
   for (const group of report.summary?.groups ?? []) lines.push(`| ${group.harness} | ${group.samples} | ${seconds(group.dispatchToAgentStart.medianMs)} / ${seconds(group.dispatchToAgentStart.maxMs)} | ${seconds(group.dispatchToFirstProviderChunk.medianMs)} / ${seconds(group.dispatchToFirstProviderChunk.maxMs)} |`)
-  lines.push('', '### 启动分段', '', '父子阶段和并行阶段会重叠，不能跨行求和。claim.native_credentials / github_credentials 与 assignment_context / credentials_wait 也可能重叠。相同 daemon 阶段在一轮内取区间并集；同名串行 server 阶段合计。缺失值不补零；小样本不计算 P95。')
+  lines.push('', '### 启动分段', '', '父子阶段和并行阶段会重叠，不能跨行求和。claim.native_credentials / github_credentials 与 assignment_context / credentials_wait 也可能重叠。daemon.adapter.preparation 及 daemon.preparation.* 使用独立的预热起点；准备总时间包含等待 checkout，与 repository 和后来的 adapter.start 重叠，不能相加。相同 daemon 阶段在一轮内取各自收据的区间并集；同名串行 server 阶段合计。缺失值不补零；小样本不计算 P95。')
   for (const harness of new Set(report.samples.map(sample => sample.harness))) {
     const samples = report.samples.filter(sample => sample.harness === harness && eligibleSample(sample)), maps = samples.map(perSamplePhases)
     if (!samples.length) continue
