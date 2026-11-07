@@ -672,13 +672,22 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     scope = await selectAcceptanceTeam(client, { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
     report.team = scope.evidence
     if (options.officialTiming === 'enabled') {
-      const listed = await client.rpc('workspace-secrets.listSecrets', [scope.workspaceId])
-      assert(Array.isArray(listed.secrets) && !listed.secrets.some(item => item.name === 'CLOUD_STARTUP_TIMING'), 'timing_variable_exists')
-      const created = await client.rpc('workspace-secrets.createSecret', [{ name: 'CLOUD_STARTUP_TIMING', kind: 'env', value: '1',
-        note: `测试1505 ${fixtureId}`, scope: { type: 'repository', repository: REPOSITORY } }, scope.workspaceId])
-      assert(UUID.test(created.id ?? ''), 'timing_variable_create_failed')
-      timingVariableId = created.id
-      report.officialTiming = { enabled: true, variableId: timingVariableId, scope: 'acceptance_repository_only' }
+      if (options.mode === 'candidate') {
+        assert(UUID.test(options.deviceId ?? '') && UUID.test(options.agentId ?? ''), 'candidate_target_invalid')
+        // acceptance-daemon opts in through the trusted host; the real CLI/MCP
+        // receipt still gates success. The runner closes its per-run collector,
+        // and this path owns no workspace variable requiring admin deletion.
+        report.officialTiming = { enabled: true, source: 'trusted_host', scope: 'candidate_device', variableCreated: false, cleaned: true }
+      } else {
+        const listed = await client.rpc('workspace-secrets.listSecrets', [scope.workspaceId])
+        assert(listed?.role === 'admin', 'timing_variable_cleanup_forbidden')
+        assert(Array.isArray(listed.secrets) && !listed.secrets.some(item => item.name === 'CLOUD_STARTUP_TIMING'), 'timing_variable_exists')
+        const created = await client.rpc('workspace-secrets.createSecret', [{ name: 'CLOUD_STARTUP_TIMING', kind: 'env', value: '1',
+          note: `测试1505 ${fixtureId}`, scope: { type: 'repository', repository: REPOSITORY } }, scope.workspaceId])
+        assert(UUID.test(created.id ?? ''), 'timing_variable_create_failed')
+        timingVariableId = created.id
+        report.officialTiming = { enabled: true, variableId: timingVariableId, scope: 'acceptance_repository_only' }
+      }
     }
     const fixture = await acceptanceBot(client, botId, fixtureId)
     botId = fixture.botId

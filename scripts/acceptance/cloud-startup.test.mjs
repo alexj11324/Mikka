@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { alignServerTimings, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
 import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
+import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const workspace = id(1), botId = id(2), deviceId = id(3), agentId = id(4)
@@ -42,7 +43,8 @@ const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', windo
       durationMs: 1000, model: models[sample.harness], outcome: 'ok', status: 200, attempt: 1, sequence: 2 }] } })
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
-  wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false } = {}) {
+  wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
+  workspaceRole = 'member', timingSecret = false } = {}) {
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
   let chosenModel
@@ -92,7 +94,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       if (path === '/api/workspace') {
         const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? personalWorkspace)
         return json({ currentUserId: ownerId, workspace: { id: selected, kind: selected === workspace ? 'team' : 'personal' },
-          role: selected === workspace ? 'member' : 'admin', choices: [{ id: personalWorkspace, kind: 'personal' }, { id: workspace, kind: 'team' }],
+          role: selected === workspace ? workspaceRole : 'admin', choices: [{ id: personalWorkspace, kind: 'personal' }, { id: workspace, kind: 'team' }],
           members: selected === workspace ? [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] : [] })
       }
       if (path === `/api/bots/${botId}`) return json({ id: botId, name: badBot ? 'Other real work' : '测试1505 fixture' })
@@ -106,13 +108,17 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
             { headers: { 'set-cookie': `mikka-workspace=${args[0]}; Path=/` } })
         }
         if (action === 'bots.createBot') return rpc({ id: botId, name: args[0].name })
-        if (action === 'workspace-secrets.listSecrets') return rpc({ secrets: [], role: 'owner' })
+        if (action === 'workspace-secrets.listSecrets') return rpc({ secrets: timingSecret ? [{ id: id(701), name: 'CLOUD_STARTUP_TIMING' }] : [], role: workspaceRole })
         if (action === 'workspace-secrets.createSecret') {
+          assert.ok(secretActionAllowed(workspaceRole, 'secret.create', [{ scopeType: 'repository' }]))
           assert.equal(args[0].name, 'CLOUD_STARTUP_TIMING'); assert.equal(args[0].value, '1')
           assert.deepEqual(args[0].scope, { type: 'repository', repository: 'alexj11324/Mikka-handoff' })
           return rpc({ id: id(700), name: args[0].name })
         }
-        if (action === 'workspace-secrets.deleteSecret') { assert.equal(args[0].id, id(700)); return rpc({ id: id(700) }) }
+        if (action === 'workspace-secrets.deleteSecret') {
+          assert.ok(secretActionAllowed(workspaceRole, 'secret.delete'))
+          assert.equal(args[0].id, id(700)); return rpc({ id: id(700) })
+        }
         if (action === 'model-order.getModelOrder') {
           const candidates = Object.entries(models).map(([harness, model], index) => ({ harness, model, provider: harness === 'codex' ? 'codex' : 'claude',
             credentialOwnerId: wrongSource ? ownerId : adminId, source: { kind: 'subscription', connectionId: id(50 + index) } }))
@@ -432,7 +438,7 @@ test('child evidence rejects foreign identity, fake completeness, malformed sequ
 
 test('direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup', async () => {
   for (const extraAuth of [false, true]) {
-    const io = fixture({ runtime: true, extraAuth })
+    const io = fixture({ runtime: true, extraAuth, workspaceRole: 'admin' })
     const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
     assert.equal(report.status, extraAuth ? 'failed' : 'awaiting_server_timings', JSON.stringify(report))
     assert.ok(report.samples.every(sample => sample.runtimeEvidence?.status === (extraAuth ? 'failed' : 'passed')))
@@ -442,6 +448,67 @@ test('direct diagnostics use and delete only this test repository variable, and 
     assert.equal(io.calls.filter(call => call.init.body?.includes('workspace-secrets.deleteSecret')).length, 1)
     assert.doesNotMatch(JSON.stringify(report), /PRIVATE/)
   }
+})
+
+test('member candidate diagnostics use the trusted host without reading or writing workspace secrets', async () => {
+  for (const harness of ['claude_code', 'codex']) for (const timingSecret of [false, true]) {
+    const io = fixture({ candidate: true, runtime: true, timingSecret })
+    const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', harness,
+      '--device-id', deviceId, '--agent-id', agentId, '--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+    assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_host', scope: 'candidate_device', variableCreated: false, cleaned: true })
+    assert.ok(report.samples.every(sample => sample.requireOfficialTiming && sample.requireRuntimeReceipt
+      && sample.runtimeEvidence?.status === 'passed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('trusted candidate timing still refuses missing official CLI or MCP observations', async () => {
+  for (const field of ['officialCliTiming', 'mcpHttpTiming']) {
+    const io = fixture({ candidate: true, runtime: true })
+    io.onDetail = (_sample, detail) => {
+      for (const item of detail.chunks) if (item.chunk?.messageMetadata?.mikkaRuntimeTiming) delete item.chunk.messageMetadata.mikkaRuntimeTiming[field]
+    }
+    const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
+      '--device-id', deviceId, '--agent-id', agentId, '--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.samples[0].error, 'startup_runtime_evidence_failed')
+    assert.equal(report.samples[0].cleanup.status, 'passed')
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  }
+})
+
+test('trusted candidate timing cannot claim a host without a pinned device and agent', async () => {
+  const io = fixture({ candidate: true, runtime: true })
+  const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
+    '--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_candidate_target_invalid')
+  assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+})
+
+test('member cloud diagnostics fail before creating any variable they cannot delete', async () => {
+  const io = fixture({ runtime: true })
+  const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_timing_variable_cleanup_forbidden')
+  assert.equal(io.calls.filter(call => call.init.body?.includes('workspace-secrets.listSecrets')).length, 1)
+  assert.equal(io.calls.some(call => /workspace-secrets\.(create|replace|delete)Secret/.test(call.init.body ?? '')), false)
+  assert.equal(io.calls.some(call => call.init.body?.includes('bots.createBot') || call.path === '/api/factory/agent-profiles'), false)
+  assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+})
+
+test('admin diagnostics preserve an existing timing variable without replacing or deleting it', async () => {
+  const io = fixture({ runtime: true, workspaceRole: 'admin', timingSecret: true })
+  const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_timing_variable_exists')
+  assert.equal(io.calls.some(call => /workspace-secrets\.(create|replace|delete)Secret/.test(call.init.body ?? '')), false)
+  assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
 })
 
 test('candidate gate checks frozen device and marker without representing itself as cloud latency acceptance', async () => {
