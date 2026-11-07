@@ -12,8 +12,88 @@ spec = importlib.util.spec_from_file_location('official_files', Path(__file__).w
 files = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(files)
 
+ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
+# Desktop: official-only control artifact 13538924302, controls.desktop.created.
+# Claude: d63 runtime 42326876749 / job 128264238545 fresh-conservation failure.
+# The Claude failure is not by itself an official-only control or release pass.
+ROOT_CA_ROTATIONS = {
+    'desktop': ('7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9',
+                '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'),
+    'claude': ('fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862',
+               '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'),
+}
+
 
 class OfficialFiles(unittest.TestCase):
+    def test_measured_exact_root_ca_rotation_requires_finalization_and_strict_installation(self):
+        for kind, (before_sha, after_sha) in ROOT_CA_ROTATIONS.items():
+            for after_mode in (0o644, 0o777):
+                with self.subTest(kind=kind, mode=after_mode):
+                    original = {'path': ROOT_CA, 'kind': 'file', 'mode': 0o644,
+                                'uid': 0, 'gid': 0, 'sha256': before_sha}
+                    baseline = {'version': 1, 'entries': [original]}
+                    with patch.object(files, 'entry', return_value=original):
+                        proof = files.verify(baseline)
+                    updated = {**original, 'mode': after_mode, 'sha256': after_sha}
+                    with patch.object(files, 'entry', return_value=updated):
+                        with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                            files.verify(baseline)
+                        proof['finalization'] = files.verify(baseline, kind)
+                    self.assertIs(files.validate_receipt(proof, kind), proof)
+                    final = proof['finalization']
+                    self.assertEqual(final['before'], final['after'])
+                    self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                    self.assertEqual(final['providerChanges'][0]['path'], ROOT_CA)
+                    self.assertEqual(final['providerChanges'][0]['before']['sha256'], before_sha)
+                    self.assertEqual(final['providerChanges'][0]['after']['sha256'], after_sha)
+                    invalid = deepcopy(proof)
+                    invalid['after'] = final['originalAfter']
+                    with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                        files.validate_receipt(invalid, kind)
+
+    def test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected(self):
+        before_sha, after_sha = ROOT_CA_ROTATIONS['desktop']
+        original = {'path': ROOT_CA, 'kind': 'file', 'mode': 0o644,
+                    'uid': 0, 'gid': 0, 'sha256': before_sha}
+        forbidden = [
+            {'uid': 1000}, {'gid': 1000}, {'mode': 0o666},
+            {'kind': 'link', 'sha256': None, 'target': '/opt/mikka/replaced.crt'},
+            {'kind': 'link', 'sha256': None, 'target': ROOT_CA},
+            {'kind': 'directory', 'sha256': None},
+        ]
+        for kind in ('claude', 'desktop', 'codex'):
+            baseline = {'version': 1, 'entries': [original]}
+            for update in forbidden:
+                with self.subTest(kind=kind, update=update), patch.object(files, 'entry', return_value={**original, **update}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline, kind)
+            with self.subTest(kind=kind, removed=True), patch.object(files, 'entry', side_effect=FileNotFoundError(ROOT_CA)):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_removed'):
+                    files.verify(baseline, kind)
+            for path in ('/usr/local/share/ca-certificates/unobserved.crt',
+                         '/usr/local/share/ca-certificates/e2b-ca.crt.backup',
+                         '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude', '/usr/local/bin/codex'):
+                before = {**original, 'path': path}
+                with self.subTest(kind=kind, path=path), patch.object(files, 'entry', return_value={**before, 'sha256': after_sha}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [before]}, kind)
+        with patch.object(files, 'entry', return_value={**original, 'sha256': after_sha}):
+            files.verify({'version': 1, 'entries': [original]}, 'codex')
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'codex')
+
+    def test_exact_root_ca_rotation_receipts_reject_invalid_hashes(self):
+        before_sha, after_sha = ROOT_CA_ROTATIONS['desktop']
+        for kind in ('claude', 'desktop', 'codex'):
+            rules, _ = files.finalization_policy(kind)
+            for side in ('before', 'after'):
+                for value in (None, '', 'f' * 63, 'g' * 64, 'A' * 64, 123):
+                    change = {'path': ROOT_CA, 'kind': 'file', 'before': {'sha256': before_sha}, 'after': {'sha256': after_sha}}
+                    change[side]['sha256'] = value
+                    with self.subTest(kind=kind, side=side, value=value):
+                        self.assertFalse(files.permitted_provider_change(change, rules))
+
     def test_missing_original_reports_the_exact_manifest_path_and_preserves_the_filesystem_cause(self):
         with tempfile.TemporaryDirectory() as name:
             cli = Path(name) / 'official-cli'
@@ -163,6 +243,60 @@ class OfficialFiles(unittest.TestCase):
         proof['after'] = {**proof['after'], 'sha256': 'c' * 64}
         with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
             files.validate_receipt(proof, 'claude')
+
+    def test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization(self):
+        # The d63 Claude fresh scan observed both the existing control-proven
+        # 0644 -> 0777 transition and a new provider CA. Codex already permits
+        # this exact path's per-boot bytes; its mode rule must not be widened.
+        path = '/usr/local/share/ca-certificates/e2b-ca.crt'
+        for kind, mode in [('claude', 0o644), ('desktop', 0o644), ('codex', 0o777)]:
+            with self.subTest(kind=kind):
+                original = {'path': path, 'kind': 'file', 'mode': mode, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
+                baseline = {'version': 1, 'entries': [original]}
+                with patch.object(files, 'entry', return_value=original):
+                    installation = files.verify(baseline)
+                rotated = {**original, 'mode': 0o777, 'sha256': 'b' * 64}
+                with patch.object(files, 'entry', return_value=rotated):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline)
+                    final = files.verify(baseline, kind)
+                self.assertEqual(final['before'], final['after'])
+                self.assertEqual(final['originalBefore'], installation['before'])
+                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                self.assertEqual(len(final['providerChanges']), 1)
+                self.assertEqual(final['providerChanges'][0]['path'], path)
+                self.assertEqual(final['providerChanges'][0]['after']['sha256'], 'b' * 64)
+                proof = {**installation, 'finalization': final}
+                self.assertIs(files.validate_receipt(proof, kind), proof)
+                proof['after'] = final['originalAfter']
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(proof, kind)
+
+    def test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards(self):
+        path = '/usr/local/share/ca-certificates/e2b-ca.crt'
+        original = {'path': path, 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
+        forbidden = [
+            ('uid', {**original, 'uid': 1000}),
+            ('gid', {**original, 'gid': 1000}),
+            ('mode', {**original, 'mode': 0o600}),
+            ('kind', {'path': path, 'kind': 'link', 'mode': 0o777, 'uid': 0, 'gid': 0, 'target': '/opt/mikka/replaced.crt'}),
+            ('invalid_hash', {**original, 'sha256': 'not-a-sha256'}),
+        ]
+        for kind in ('claude', 'desktop', 'codex'):
+            for field, updated in forbidden:
+                with self.subTest(kind=kind, field=field), patch.object(files, 'entry', return_value=updated):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [original]}, kind)
+            for other in ('/usr/local/share/ca-certificates/other-ca.crt', '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude'):
+                before = {**original, 'path': other}
+                with self.subTest(kind=kind, path=other), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [before]}, kind)
+        # Codex's measured policy still allows only byte rotation, not a new
+        # permission transition inferred from the other official templates.
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'codex')
 
     def test_an_unreadable_original_directory_cannot_be_silently_skipped(self):
         with tempfile.TemporaryDirectory() as name:

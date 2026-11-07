@@ -3,12 +3,14 @@ import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { alignServerTimings, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
-import { readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
+import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
+import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const workspace = id(1), botId = id(2), deviceId = id(3), agentId = id(4)
+const personalWorkspace = id(9), ownerId = 'PRIVATE_SMOKE_USER', adminId = 'PRIVATE_TEAM_ADMIN'
 const epoch = Date.parse('2026-11-06T12:00:00.000Z')
-const env = { ACME_DEMO_EMAIL: 'alex@acme.aspectlylabs.com', ACME_DEMO_PASSWORD: 'PRIVATE_PASSWORD' }
+const env = { SMOKE_OWNER_EMAIL: 'acceptance+mikka-smoke@example.invalid', SMOKE_OWNER_PASSWORD: 'PRIVATE_PASSWORD' }
 const models = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' }
 const options = (extra = []) => parseOptions(['--workspace', workspace, '--timeout-ms', '1000', ...extra], {})
 const stage = (name, at, ok = true) => ({ at: new Date(epoch + at).toISOString(), chunk: { type: 'data-run-stage', data: { stage: name, ms: 300, ok } } })
@@ -18,6 +20,7 @@ const startupTiming = (runId, harness) => ({ version: 1, runIdHash: createHash('
   phases: [{ name: 'daemon.adapter.cli_init', startMs: 50, endMs: 400, ms: 350, outcome: 'ok' }] })
 const startedStage = sample => { const item = stage('agent_start', 3500); item.chunk.data.startupTiming = startupTiming(sample.runId, sample.harness); return item }
 const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit',
+  scope: 'daemon_http_server_link_and_task_fetch', allFirstPartyHttpComplete: false,
   runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16), harness: sample.harness,
   startedAt: epoch + 1000, endedAt: epoch + 6000, ms: 5000, executionStartMs: 2500, executionEndMs: 4000,
   agentAccepted: { kind: sample.harness === 'codex' ? 'codex_turn_start_ack' : 'claude_user_ack', at: epoch + 3500, ms: 2500 },
@@ -25,15 +28,26 @@ const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', windo
     startMs: 3000, endMs: 3010, ms: 10, outcome: 'ok' }],
   counts: [{ endpoint: 'run_telemetry', phase: 'executing', shared: false, started: 1, completed: 1, errors: 0, ms: 10 }],
   providerOutputChunks: 2, toolCallsStarted: 1, toolCallsCompleted: 1, toolCallsFailed: 0,
+  mcpHttpTiming: { version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children', generationCoverage: 'unverified',
+    allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
+    runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16), harness: sample.harness,
+    startedAt: epoch + 2000, endedAt: epoch + 5500, expectedChildren: 1, observedChildren: 1, closedChildren: 0,
+    observedComplete: true, childLifecycleComplete: false, rejectedEvents: 0, truncated: false,
+    children: [{ child: 1, startedAt: epoch + 2100, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
+    requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: epoch + 2200,
+      endedAt: epoch + 2250, durationMs: 50, status: 200, outcome: 'ok' }] },
   officialCliTiming: { version: 1, source: 'official_cli_otlp', runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16),
     harness: sample.harness, startedAt: epoch + 2000, endedAt: epoch + 5500, collection: 'best_effort', flush: 'not_confirmed',
     cliExitObserved: true, batches: 1, recordsReceived: 1, duplicates: 0, rejectedBatches: 0, invalidEvents: 0, ignoredRecords: 0, truncated: false,
     events: [{ name: `${sample.harness}.api_request`, kind: 'provider', receivedAt: epoch + 4900, eventAt: epoch + 4000,
       durationMs: 1000, model: models[sample.harness], outcome: 'ok', status: 200, attempt: 1, sequence: 2 }] } })
 
-function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false } = {}) {
+function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
+  wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
+  workspaceRole = 'member', timingSecret = false } = {}) {
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
+  let chosenModel
   const json = value => Response.json(value)
   const rpc = result => json({ version: 1, ok: true, result })
   const readDetail = sample => {
@@ -71,28 +85,58 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       calls.push({ path, init })
       if (path === '/api/version') return json({ build: 'BUILD1' })
       if (path === '/api/auth/sign-in/email') {
-        assert.deepEqual(JSON.parse(init.body), { email: env.ACME_DEMO_EMAIL, password: env.ACME_DEMO_PASSWORD, rememberMe: false })
+        assert.deepEqual(JSON.parse(init.body), { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD, rememberMe: false })
         return Response.json({}, { headers: { 'set-cookie': 'session=PRIVATE_COOKIE; Path=/; Secure; HttpOnly' } })
       }
       assert.match(init.headers.cookie ?? '', /session=PRIVATE_COOKIE/)
-      if (path === '/api/auth/get-session') return json({ user: { id: 'PRIVATE_USER', email: env.ACME_DEMO_EMAIL } })
+      if (path === '/api/auth/get-session') return json({ user: { id: ownerId, email: env.SMOKE_OWNER_EMAIL } })
       if (path === '/api/auth/sign-out') return Response.json({}, { headers: { 'set-cookie': 'session=; Max-Age=0' } })
+      if (path === '/api/workspace') {
+        const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? personalWorkspace)
+        return json({ currentUserId: ownerId, workspace: { id: selected, kind: selected === workspace ? 'team' : 'personal' },
+          role: selected === workspace ? workspaceRole : 'admin', choices: [{ id: personalWorkspace, kind: 'personal' }, { id: workspace, kind: 'team' }],
+          members: selected === workspace ? [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] : [] })
+      }
       if (path === `/api/bots/${botId}`) return json({ id: botId, name: badBot ? 'Other real work' : '测试1505 fixture' })
       if (path === '/api/rpc') {
         assert.equal(init.headers.origin, 'https://app.aspectlylabs.com')
         assert.equal(init.headers['x-mikka-rpc'], '1')
         const { action, args } = JSON.parse(init.body)
-        if (action === 'workspace.switchWorkspace') return Response.json({ version: 1, ok: true, result: { ok: true, data: { workspaceId: args[0] } } },
-          { headers: { 'set-cookie': `mikka-workspace=${args[0]}; Path=/` } })
+        if (action === 'workspace.switchWorkspace') {
+          if (failRestore && args[0] === personalWorkspace) return Response.json({ error: 'PRIVATE_RESTORE_FAILURE' }, { status: 409 })
+          return Response.json({ version: 1, ok: true, result: { ok: true, data: { workspaceId: args[0] } } },
+            { headers: { 'set-cookie': `mikka-workspace=${args[0]}; Path=/` } })
+        }
         if (action === 'bots.createBot') return rpc({ id: botId, name: args[0].name })
-        if (action === 'workspace-secrets.listSecrets') return rpc({ secrets: [], role: 'owner' })
+        if (action === 'workspace-secrets.listSecrets') return rpc({ secrets: timingSecret ? [{ id: id(701), name: 'CLOUD_STARTUP_TIMING' }] : [], role: workspaceRole })
         if (action === 'workspace-secrets.createSecret') {
+          assert.ok(secretActionAllowed(workspaceRole, 'secret.create', [{ scopeType: 'repository' }]))
           assert.equal(args[0].name, 'CLOUD_STARTUP_TIMING'); assert.equal(args[0].value, '1')
           assert.deepEqual(args[0].scope, { type: 'repository', repository: 'alexj11324/Mikka-handoff' })
           return rpc({ id: id(700), name: args[0].name })
         }
-        if (action === 'workspace-secrets.deleteSecret') { assert.equal(args[0].id, id(700)); return rpc({ id: id(700) }) }
-        if (action === 'model-order.getModelOrder') return rpc({ candidates: Object.entries(models).map(([harness, model], index) => ({ harness, model, source: { kind: 'subscription', connectionId: id(50 + index) } })) })
+        if (action === 'workspace-secrets.deleteSecret') {
+          assert.ok(secretActionAllowed(workspaceRole, 'secret.delete'))
+          assert.equal(args[0].id, id(700)); return rpc({ id: id(700) })
+        }
+        if (action === 'model-order.getModelOrder') {
+          const candidates = Object.entries(models).map(([harness, model], index) => ({ harness, model, provider: harness === 'codex' ? 'codex' : 'claude',
+            credentialOwnerId: wrongSource ? ownerId : adminId, source: { kind: 'subscription', connectionId: id(50 + index) } }))
+          if (ambiguousSource) candidates.push({ ...candidates[0], source: { kind: 'subscription', connectionId: id(59) } })
+          return rpc({ candidates })
+        }
+        if (action === 'execution-settings.getBotModelMenu' || action === 'execution-settings.chooseBotModel') {
+          assert.equal(args[0], botId)
+          if (action === 'execution-settings.chooseBotModel') {
+            if (withdrawShare) return rpc({ ok: false, error: 'executionAccountUnavailable' })
+            chosenModel = Object.entries(models).map(([harness, modelId], index) => ({ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' })).find(item => item.id === args[1])
+            assert.ok(chosenModel)
+          }
+          return rpc({ groups: Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: 'Shared member',
+            options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })),
+            current: chosenModel ? { ...chosenModel, ...(remapCurrentId ? { id: id(850) } : {}), ...(fallbackMenu ? { fallback: 'quota' } : {}),
+              kind: 'subscription', chosen: true, available: !checkingMenu, availability: checkingMenu ? 'checking' : 'available' } : null })
+        }
         if (action === 'issues.saveIssue') {
           current = { issueId: id(100 + samples.length), runId: id(200 + samples.length), taskId: id(300 + samples.length),
             title: args[0].title, reads: 0, finished: false, workflowRunId: `wrun_TEST${samples.length}` }
@@ -106,6 +150,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
+          assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
           return rpc({ queued: true })
@@ -127,7 +172,8 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         assert.fail(`unexpected RPC ${action}`)
       }
       if (path === '/api/factory/agent-profiles') {
-        const body = JSON.parse(init.body), profile = { ...body.profile, id: id(500 + ++profileCount), version: 1 }
+        const body = JSON.parse(init.body), profile = { ...body.profile, id: id(500 + ++profileCount), version: 1, digest: 'e'.repeat(64) }
+        assert.equal(body.workspaceId, workspace)
         assert.equal(profile.model.source.kind, 'subscription'); assert.equal(profile.model.model, models[profile.harness])
         profiles.set(profile.id, profile); return json({ profile })
       }
@@ -143,10 +189,11 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       }
       if (/^\/api\/runs\/.*\/evidence$/.test(path)) return json({ run: { id: current.runId, issueId: current.issueId,
         harness: current.harness, model: models[current.harness], credentialType: badEvidence ? 'api_key' : 'subscription',
-        subscriptionRoute: current.harness === 'codex' ? 'codex_cli' : 'claude_code_cli', agentProfile: { profileId: current.profileId },
-        executionIdentity: { version: 1, requester: 'PRIVATE_USER', executionPrincipal: 'PRIVATE_USER',
-          billingAccount: { model: { kind: 'subscription' }, runtime: { kind: candidate ? 'local_device' : 'e2b' } },
-          resourceBindings: [{ kind: 'device', id: deviceId, access: 'owner' }, { kind: 'subscription', access: 'owner' }] } } })
+        subscriptionRoute: current.harness === 'codex' ? 'codex_cli' : 'claude_code_cli', agentProfile: { profileId: current.profileId, version: 1, digest: wrongProfile ? 'f'.repeat(64) : profiles.get(current.profileId).digest, source: 'explicit' },
+        executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId, botOwner: ownerId, outputOwner: ownerId,
+          workspaceId: wrongScope ? personalWorkspace : workspace, personalResourcePolicy: 'requester_only',
+          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? ownerId : adminId, resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
+          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId: adminId, access: 'workspace_share', revision: '2' }] } } })
       if (path === '/api/live/ticket') return json({ url: 'wss://live.example/v1/live/opaque/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 })
       if (path === '/api/factory/tasks') return json({ contractVersion: 1, issueId: current.issueId, tasks: [{ id: current.taskId, issueId: current.issueId }] })
       if (path === `/api/factory/tasks/${current.taskId}`) {
@@ -224,6 +271,11 @@ test('three real-shaped runs use normal cookies, pinned subscriptions, push read
   assert.ok(io.sockets.every(socket => socket.closed))
   assert.ok(io.calls.every(call => call.init.redirect === 'error'))
   assert.equal(io.calls.filter(call => call.path === '/api/auth/sign-out').length, 1)
+  assert.equal(report.team.teamWorkspaceConfirmed, true)
+  assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(report.botRetention, 'retained_no_delete_api')
+  assert.equal(io.calls.filter(call => call.init.body?.includes('execution-settings.chooseBotModel')).length, 3)
+  assert.ok(io.calls.filter(call => call.init.body?.includes('model-order.')).every(call => JSON.parse(call.init.body).action === 'model-order.getModelOrder'))
   assert.ok(io.calls.some(call => call.init.headers.cookie?.includes(`mikka-workspace=${workspace}`)))
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|alex@|cookie|ticket/i)
   const logs = report.samples.map(sample => ({ msg: 'dispatch_timing', workflowRunId: sample.workflowRunId, stepId: 'step',
@@ -231,6 +283,48 @@ test('three real-shaped runs use normal cookies, pinned subscriptions, push read
   const aligned = alignServerTimings(report, logs)
   assert.equal(aligned.status, 'baseline_recorded')
   assert.ok(aligned.samples.every(sample => sample.timing.dispatchToAgentStartMs === 3500 && sample.timing.dispatchToFirstProviderChunkMs === 3700))
+})
+
+test('SMOKE chooses the verified team without fixed IDs and accepts checking quota with a new catalogue clone ID', async () => {
+  const io = fixture({ checkingMenu: true, remapCurrentId: true })
+  const report = await runCloudStartup(parseOptions(['--timeout-ms', '1000'], {}), { env, ...io })
+  assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+  assert.equal(report.cleanup.workspaceRestored, true)
+  assert.ok(report.samples.every(sample => sample.execution.identity.subscriptionAccess[0] === 'workspace_share'))
+  await assert.rejects(runCloudStartup(options(), { env: { ACME_DEMO_EMAIL: env.SMOKE_OWNER_EMAIL, ACME_DEMO_PASSWORD: env.SMOKE_OWNER_PASSWORD }, ...io }), /startup_smoke_account_required/)
+})
+
+test('foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt', async () => {
+  for (const failure of [{ wrongPayer: true }, { wrongScope: true }, { wrongProfile: true }]) {
+    const io = fixture(failure), report = await runCloudStartup(options(), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.ok(report.samples.every(sample => sample.error === 'startup_shared_subscription_identity_mismatch'))
+    assert.ok(io.samples.every(sample => sample.cancelled && sample.deleted && sample.machineEnded))
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|example.invalid|alex@/)
+  }
+})
+
+test('wrong or ambiguous sources and sharing revoked during choice fail before dispatch without changing preferences', async () => {
+  for (const failure of [{ wrongSource: true }, { ambiguousSource: true }, { withdrawShare: true }, { fallbackMenu: true }]) {
+    const io = fixture(failure), report = await runCloudStartup(options(), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.ok(report.samples.some(sample => sample.status === 'failed'))
+    if (!failure.ambiguousSource) assert.equal(io.samples.length, 0)
+    else assert.deepEqual(io.samples.map(sample => sample.harness), ['codex'], 'the independent provider still runs')
+    assert.ok(io.calls.filter(call => call.init.body?.includes('model-order.')).every(call => JSON.parse(call.init.body).action === 'model-order.getModelOrder'))
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('workspace restore failure is visible but never suppresses profile cleanup or sign-out', async () => {
+  const io = fixture({ failRestore: true }), report = await runCloudStartup(options(), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.deepEqual(report.cleanup.errors.map(row => row.step), ['workspace_restore'])
+  assert.equal(io.calls.filter(call => call.init.method === 'DELETE' && call.path.startsWith('/api/factory/agent-profiles/')).length, 2)
+  assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
 })
 
 test('startup intervals retain only closed fields and reject foreign run data or unknown phases', () => {
@@ -253,7 +347,7 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
-test('the full runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness', () => {
+test('the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness', () => {
   const sample = { runId: id(999), harness: 'codex', sampleId: 'proof', requireRuntimeReceipt: true, requireOfficialTiming: true }
   const value = runtimeTiming(sample)
   sample.runIdHash = value.runIdHash
@@ -264,7 +358,7 @@ test('the full runtime receipt gates direct execution, preserves only closed evi
   assert.equal(sample.runtimeEvidence.status, 'passed')
   assert.equal(sample.runtimeEvidence.extraRemoteCalls, 0)
   assert.equal(sample.runtimeEvidence.officialDelivery, 'best_effort_not_a_complete_call_count')
-  assert.doesNotMatch(JSON.stringify(sample), /PRIVATE|path|error"/)
+  assert.doesNotMatch(JSON.stringify(sample), /PRIVATE|"(?:path|error)":/)
   const invalid = structuredClone(value); invalid.counts[0].started = 0
   assert.equal(readRuntimeTiming(invalid, sample), null)
   const missing = structuredClone(sample.runtimeTiming); delete missing.officialCliTiming
@@ -274,9 +368,77 @@ test('the full runtime receipt gates direct execution, preserves only closed evi
   assert.equal(runtimeEvidence(hiddenProxy).status, 'failed')
 })
 
+test('an HTTP-only legacy receipt cannot prove child-send coverage', () => {
+  const value = runtimeTiming({ runId: id(998), harness: 'codex' })
+  delete value.mcpHttpTiming
+  delete value.scope
+  delete value.allFirstPartyHttpComplete
+  const parsed = readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness })
+  const required = runtimeEvidence(parsed)
+  assert.equal(required.status, 'unavailable')
+  assert.equal(required.allFirstPartyHttpComplete, false)
+  assert.equal(required.reason, 'mcp_http_observation_missing')
+})
+
+test('child business observations cannot become global coverage or fail solely for a missing lifecycle close', () => {
+  const value = runtimeTiming({ runId: id(997), harness: 'claude_code' }), scope = { runIdHash: value.runIdHash, harness: value.harness }
+  value.mcpHttpTiming.privateToken = 'PRIVATE'
+  value.mcpHttpTiming.requests[0].url = 'PRIVATE'
+  const parsed = readRuntimeTiming(value, scope), proof = runtimeEvidence(parsed)
+  assert.equal(proof.status, 'passed')
+  assert.equal(proof.basis, 'host_authorization_census_and_closed_mcp_business_paths')
+  assert.equal(proof.hostAuthorizationComplete, true)
+  assert.equal(proof.allFirstPartyHttpComplete, false)
+  assert.equal(proof.childBusiness.generationCoverage, 'unverified')
+  assert.equal(proof.childBusiness.childLifecycleComplete, false)
+  assert.equal(proof.childBusiness.observedPhysicalSends, 1)
+  assert.doesNotMatch(JSON.stringify(parsed), /PRIVATE|privateToken|url/)
+  const pending = structuredClone(parsed)
+  pending.mcpHttpTiming.observedComplete = false
+  Object.assign(pending.mcpHttpTiming.children[0], { sent: 2, lastSequence: 4 })
+  pending.mcpHttpTiming.requests.push({ child: 1, sequence: 2, operation: 'decision_record', startedAt: epoch + 5000,
+    endedAt: null, durationMs: null, status: null, outcome: 'pending' })
+  const observed = runtimeEvidence(readRuntimeTiming(pending, scope))
+  assert.equal(observed.status, 'passed', 'an observed pending business request is not an extra authorization request')
+  assert.equal(observed.extraRemoteCalls, 0)
+  assert.equal(observed.childBusiness.pendingObservedSends, 1)
+  assert.equal(observed.childBusiness.observedComplete, false)
+})
+
+test('child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope', () => {
+  const value = runtimeTiming({ runId: id(996), harness: 'codex' }), scope = { runIdHash: value.runIdHash, harness: value.harness }
+  for (const mutate of [
+    child => { child.runIdHash = '0'.repeat(16) }, child => { child.harness = 'claude_code' },
+    child => { child.generationCoverage = 'complete' }, child => { child.allFirstPartyHttpComplete = true },
+    child => { delete child.remoteMcpServerCount }, child => { child.childPathAuditVersion = 2 },
+    child => { child.childLifecycleComplete = true }, child => { child.requests[0].operation = 'permission_check' },
+    child => { child.requests[0].sequence = 2 }, child => { child.children[0].lastSequence = 4 },
+    child => { child.requests[0].endedAt = null }, child => { child.requests.push({ ...child.requests[0] }) },
+    child => { child.requests[0].status = 503 }, child => { child.requests[0].status = null },
+  ]) {
+    const invalid = structuredClone(value); mutate(invalid.mcpHttpTiming)
+    assert.equal(readMcpHttpTiming(invalid.mcpHttpTiming, scope), null)
+    const proof = runtimeEvidence(readRuntimeTiming(invalid, scope))
+    assert.equal(proof.status, 'unavailable')
+    assert.equal(proof.reason, 'mcp_http_observation_invalid')
+  }
+  for (const mutate of [
+    child => { child.remoteMcpServerCount = 1 },
+    child => { child.observedComplete = false; child.rejectedEvents = 1 },
+    child => { child.observedComplete = false; child.truncated = true },
+    child => { child.observedComplete = false; child.children[0].lost = 1 },
+    child => { child.requests[0].operation = 'decision_record' },
+  ]) {
+    const incomplete = structuredClone(value); mutate(incomplete.mcpHttpTiming)
+    const parsed = readRuntimeTiming(incomplete, scope)
+    assert.ok(parsed.mcpHttpTiming)
+    assert.equal(runtimeEvidence(parsed).status, 'unavailable')
+  }
+})
+
 test('direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup', async () => {
   for (const extraAuth of [false, true]) {
-    const io = fixture({ runtime: true, extraAuth })
+    const io = fixture({ runtime: true, extraAuth, workspaceRole: 'admin' })
     const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
     assert.equal(report.status, extraAuth ? 'failed' : 'awaiting_server_timings', JSON.stringify(report))
     assert.ok(report.samples.every(sample => sample.runtimeEvidence?.status === (extraAuth ? 'failed' : 'passed')))
@@ -286,6 +448,67 @@ test('direct diagnostics use and delete only this test repository variable, and 
     assert.equal(io.calls.filter(call => call.init.body?.includes('workspace-secrets.deleteSecret')).length, 1)
     assert.doesNotMatch(JSON.stringify(report), /PRIVATE/)
   }
+})
+
+test('member candidate diagnostics use the trusted host without reading or writing workspace secrets', async () => {
+  for (const harness of ['claude_code', 'codex']) for (const timingSecret of [false, true]) {
+    const io = fixture({ candidate: true, runtime: true, timingSecret })
+    const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', harness,
+      '--device-id', deviceId, '--agent-id', agentId, '--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+    assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_host', scope: 'candidate_device', variableCreated: false, cleaned: true })
+    assert.ok(report.samples.every(sample => sample.requireOfficialTiming && sample.requireRuntimeReceipt
+      && sample.runtimeEvidence?.status === 'passed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('trusted candidate timing still refuses missing official CLI or MCP observations', async () => {
+  for (const field of ['officialCliTiming', 'mcpHttpTiming']) {
+    const io = fixture({ candidate: true, runtime: true })
+    io.onDetail = (_sample, detail) => {
+      for (const item of detail.chunks) if (item.chunk?.messageMetadata?.mikkaRuntimeTiming) delete item.chunk.messageMetadata.mikkaRuntimeTiming[field]
+    }
+    const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
+      '--device-id', deviceId, '--agent-id', agentId, '--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.samples[0].error, 'startup_runtime_evidence_failed')
+    assert.equal(report.samples[0].cleanup.status, 'passed')
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  }
+})
+
+test('trusted candidate timing cannot claim a host without a pinned device and agent', async () => {
+  const io = fixture({ candidate: true, runtime: true })
+  const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
+    '--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_candidate_target_invalid')
+  assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+})
+
+test('member cloud diagnostics fail before creating any variable they cannot delete', async () => {
+  const io = fixture({ runtime: true })
+  const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_timing_variable_cleanup_forbidden')
+  assert.equal(io.calls.filter(call => call.init.body?.includes('workspace-secrets.listSecrets')).length, 1)
+  assert.equal(io.calls.some(call => /workspace-secrets\.(create|replace|delete)Secret/.test(call.init.body ?? '')), false)
+  assert.equal(io.calls.some(call => call.init.body?.includes('bots.createBot') || call.path === '/api/factory/agent-profiles'), false)
+  assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+})
+
+test('admin diagnostics preserve an existing timing variable without replacing or deleting it', async () => {
+  const io = fixture({ runtime: true, workspaceRole: 'admin', timingSecret: true })
+  const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_timing_variable_exists')
+  assert.equal(io.calls.some(call => /workspace-secrets\.(create|replace|delete)Secret/.test(call.init.body ?? '')), false)
+  assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
 })
 
 test('candidate gate checks frozen device and marker without representing itself as cloud latency acceptance', async () => {
@@ -431,7 +654,7 @@ test('Claude initialization is retained as history but never proves current task
   value.agentAccepted.kind = 'claude_system_init'
   const parsed = readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})
   assert.equal(parsed.agentAccepted.kind,'claude_system_init')
-  assert.deepEqual(runtimeEvidence(parsed),{status:'unavailable',reason:'official_agent_acceptance_missing'})
+  assert.deepEqual(runtimeEvidence(parsed),{status:'unavailable',reason:'official_agent_acceptance_missing',allFirstPartyHttpComplete:false})
   value.agentAccepted.kind = 'claude_user_ack'
   assert.equal(runtimeEvidence(readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})).status,'passed')
 })

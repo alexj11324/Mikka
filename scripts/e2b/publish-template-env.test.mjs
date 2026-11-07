@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { assertConservation, currentWorkerSha, pairEnv, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { assertConservation, assertReleaseEvidence, currentWorkerSha, pairEnv, publicationInputFromFile, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { reportDigest, templateModelsDigest } from './runtime-report.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
@@ -11,10 +14,29 @@ const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [rep
 const TEMPLATES = { desktop: 'tpl-desktop', claude: 'tpl-claude', codex: 'tpl-codex' }
 const PROOF = { entries: 100, sha256: 'd'.repeat(64) }
 const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))).digest('hex')
+const SHARED = { verified: true, access: 'workspace_share', requesterHash: '1'.repeat(16), payerHash: '2'.repeat(16), workspaceHash: '3'.repeat(64),
+  connectionHash: '4'.repeat(16), bindingHash: '5'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: '6'.repeat(64) }
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
 } })
-const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
+const ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
+// Desktop is official-only artifact 13538924302; Claude is the d63 fresh-scan
+// failure (42326876749 / 128264238545), not by itself a production gate pass.
+const ROOT_CA_ROTATIONS = {
+  desktop: ['7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9', '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'],
+  claude: ['fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862', '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'],
+}
+const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
+  generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
+  runIdHash: createHash('sha256').update(runId).digest('hex').slice(0, 16), harness, startedAt: 1010, endedAt: 1900,
+  expectedChildren: 1, observedChildren: 1, closedChildren: 0, observedComplete: true, childLifecycleComplete: false,
+  rejectedEvents: 0, truncated: false,
+  children: [{ child: 1, startedAt: 1020, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
+  requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: 1040, endedAt: 1050, durationMs: 10, status: 200, outcome: 'ok' }] })
+const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'shared_smoke', workspaceRestored: true,
+  requesterHash: SHARED.requesterHash, payerHash: SHARED.payerHash,
+  team: { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamWorkspaceHash: SHARED.workspaceHash } },
+  templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
   templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
   conservation: conservation(kind), models: MODELS[kind],
 }])), subscriptionAcceptance: Object.fromEntries([['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([kind, harness, model]) => [kind, {
@@ -24,12 +46,40 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromE
   officialBinarySha256: 'e'.repeat(64), officialCliVersion: 'fixture-version',
   agentAcceptance: { runIdHash: createHash('sha256').update(`run-${kind}`).digest('hex').slice(0, 16), harness,
     kind: harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack', at: 1100, ms: 100 },
-  runtimeAuthorization: { source: 'http_server_link', complete: true, truncated: false, extraRemoteCalls: 0 },
+  runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
+    hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
+    mcpHttpTiming: mcpTiming(`run-${kind}`, harness), observedProviderEvents: 1, officialDelivery: 'best_effort_not_a_complete_call_count' },
+  sharedScope: { ...SHARED },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
 const OLD_STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: OTHER, sourceCommit: OTHER, models: MODELS }).map(row => [row.key, row.value]))
 OLD_STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
+
+test('publication reads complete file evidence and retains independently bound models, templates and all gates', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'publication-report-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'release.json'), evidence = structuredClone(EVIDENCE)
+  for (const [kind, row] of Object.entries(evidence.templates)) row.name = `mikka-${COMMIT.slice(0, 12)}-123-2-${kind}`
+  evidence.templates.claude.conservation.providerManifest = Array.from({ length: 5000 }, (_, index) => ({ path: `official/file-${index}`, sha256: 'd'.repeat(64) }))
+  const bytes = Buffer.from(JSON.stringify(evidence) + '\n')
+  assert.ok(bytes.length > 310446, 'the combined shared/native proof retains the complete report beyond the failing env payload')
+  writeFileSync(path, bytes)
+  const expected = { sha256: reportDigest(bytes), modelsSha256: templateModelsDigest(evidence), templates: TEMPLATES,
+    sourceSha: SHA, sourceCommit: COMMIT, runId: '123', runAttempt: '2' }
+  const input = publicationInputFromFile(path, expected)
+  assert.deepEqual(input.releaseEvidence, evidence)
+  assert.deepEqual(input.models, MODELS)
+  assert.doesNotThrow(() => assertReleaseEvidence(input))
+  assert.throws(() => publicationInputFromFile(path, { ...expected, modelsSha256: 'a'.repeat(64) }), /models_digest_mismatch/)
+  assert.throws(() => publicationInputFromFile(path, { ...expected, runAttempt: '3' }), /attempt_mismatch/)
+  assert.throws(() => publicationInputFromFile(path, { ...expected, sha256: 'c'.repeat(64) }), /digest_mismatch/)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, templates: { ...TEMPLATES, codex: 'other' } })), /template_invalid/)
+  delete evidence.subscriptionAcceptance.claude
+  const invalid = Buffer.from(JSON.stringify(evidence))
+  writeFileSync(path, invalid)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_shared_scope_invalid claude/)
+})
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {
   const proof = conservation('claude')
@@ -46,6 +96,61 @@ test('conservation requires both strict installation and exact provider-only fin
     const invalid = structuredClone(proof); mutate(invalid)
     assert.throws(() => assertConservation(invalid, 'claude'), /runtime_release_conservation_invalid/)
   }
+})
+
+for (const [kind, [beforeSha, afterSha]] of Object.entries(ROOT_CA_ROTATIONS)) {
+  test(`${kind} exact root CA rotation permits only finalization with an unchanged installation proof`, () => {
+    for (const modeChanged of [false, true]) {
+      const proof = conservation(kind)
+      proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }
+      proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file',
+        before: { sha256: beforeSha, ...(modeChanged ? { mode: 420 } : {}) },
+        after: { sha256: afterSha, ...(modeChanged ? { mode: 511 } : {}) } }]
+      assert.doesNotThrow(() => assertConservation(proof, kind))
+      const invalid = structuredClone(proof)
+      invalid.after = proof.finalization.originalAfter
+      assert.throws(() => assertConservation(invalid, kind), /runtime_release_conservation_invalid/)
+    }
+  })
+}
+
+test('exact root CA publication rules preserve metadata and reject other certificate or CLI paths', () => {
+  const [beforeSha, afterSha] = ROOT_CA_ROTATIONS.desktop
+  const forbidden = [
+    { before: { uid: 0 }, after: { uid: 1000 } },
+    { before: { gid: 0 }, after: { gid: 1000 } },
+    { before: { mode: 420 }, after: { mode: 438 } },
+    { before: { kind: 'file', sha256: beforeSha, target: null }, after: { kind: 'link', sha256: null, target: '/opt/mikka/replaced.crt' } },
+    { before: { kind: 'file', sha256: beforeSha, target: null }, after: { kind: 'link', sha256: null, target: ROOT_CA } },
+    { before: { kind: 'file', sha256: beforeSha }, after: { kind: 'directory', sha256: null } },
+  ]
+  for (const kind of ['claude', 'desktop', 'codex']) {
+    for (const fields of forbidden) {
+      const proof = conservation(kind)
+      proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', ...fields }]
+      assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+    }
+    for (const path of ['/usr/local/share/ca-certificates/unobserved.crt', '/usr/local/share/ca-certificates/e2b-ca.crt.backup',
+      '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude', '/usr/local/bin/codex']) {
+      const proof = conservation(kind)
+      proof.finalization.providerChanges = [{ path, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
+      assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+    }
+    for (const side of ['before', 'after']) {
+      for (const value of [null, '', 'f'.repeat(63), 'g'.repeat(64), 'A'.repeat(64), 123]) {
+        const proof = conservation(kind)
+        const change = { path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }
+        change[side].sha256 = value
+        proof.finalization.providerChanges = [change]
+        assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+      }
+    }
+  }
+  const codex = conservation('codex')
+  codex.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
+  assert.doesNotThrow(() => assertConservation(codex, 'codex'))
+  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }
+  assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)
 })
 
 test('certificate conversion proof fixes the original bytes and exact link target', () => {
@@ -295,6 +400,11 @@ test('GitHub-only build timeline waits for source upload before the single runti
 
 test('publication requires both real subscriptions on these exact candidates before any network request', async () => {
   for (const mutate of [
+    evidence => { delete evidence.acceptanceScope },
+    evidence => { evidence.acceptanceScope.account = 'owner_login' },
+    evidence => { evidence.acceptanceScope.workspaceRestored = false },
+    evidence => { evidence.subscriptionAcceptance.claude.sharedScope.payerHash = SHARED.requesterHash },
+    evidence => { evidence.subscriptionAcceptance.codex.sharedScope.access = 'owner' },
     value => { delete value.subscriptionAcceptance.codex },
     value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
     value => { value.subscriptionAcceptance.codex.model = 'other-model' },
@@ -303,6 +413,15 @@ test('publication requires both real subscriptions on these exact candidates bef
     value => { value.subscriptionAcceptance.claude.agentAcceptance.kind = 'claude_system_init' },
     value => { value.subscriptionAcceptance.codex.agentAcceptance.runIdHash = 'f'.repeat(16) },
     value => { value.subscriptionAcceptance.codex.runtimeAuthorization.extraRemoteCalls = 1 },
+    value => { delete value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.runIdHash = 'f'.repeat(16) },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.remoteMcpServerCount = 1 },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.childLifecycleComplete = true },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].sequence = 2 },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].status = 503 },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.allFirstPartyHttpComplete = true },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.basis = 'all_mikka_http_sends_during_execution_counted' },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.observedProviderEvents = 0 },
     value => { delete value.subscriptionAcceptance.codex.replyVerifiedAfterTool },
     value => { value.subscriptionAcceptance.codex.replyVerifiedAfterTool = false },
     value => { delete value.subscriptionAcceptance.claude.toolEvidence },

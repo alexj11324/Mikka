@@ -80,6 +80,8 @@ export interface SessionOptions {
   apps?: RunApps
   /** Trusted claimed run MCP; independent of optional app connections. */
   mcp?: import('../agents/run-apps').RunMcp
+  /** Acceptance-only host receiver, passed only to the Mikka MCP child. */
+  mcpHttpObservationUrl?: string
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */

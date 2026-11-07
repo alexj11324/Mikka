@@ -27,6 +27,14 @@ import {
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useServerLabel } from '@/components/desktop/desktop-server'
+
+/** The desktop adds each account's server when its accounts are on more than one (#1557). */
+type AccountServer = { url: string; cloud: boolean; name: string | null }
+function accountServer(account: object): AccountServer | null {
+  const server = (account as { server?: unknown }).server
+  return server && typeof server === 'object' && typeof (server as AccountServer).url === 'string' ? server as AccountServer : null
+}
 
 function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolean }) {
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-sidebar-primary-soft font-semibold text-sidebar-primary-soft-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
@@ -58,6 +66,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   onBeforeChange?: (action: () => Promise<void>) => void
 }) {
   const i18nText = useTranslations();
+  const serverLabel = useServerLabel()
   const locale = useLocale()
   const { setOpenMobile } = useSidebar()
   const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
@@ -138,7 +147,15 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       {/* About five workspaces show; more scroll inside the menu. */}
       <div className="max-h-44 overflow-y-auto">
         {data?.accounts.map(account => <DropdownMenuGroup key={account.id}>
-          <DropdownMenuLabel className="truncate font-normal" title={account.email}>{account.email}</DropdownMenuLabel>
+          {(() => {
+            const server = accountServer(account)
+            if (!server) return <DropdownMenuLabel className="truncate font-normal" title={account.email}>{account.email}</DropdownMenuLabel>
+            const name = serverLabel({ ...server, version: null, accounts: 0, signIn: null })
+            return <DropdownMenuLabel className="flex min-w-0 items-center gap-1.5 font-normal" title={`${account.email} · ${name}`}>
+              <span className="min-w-0 truncate">{account.email}</span>
+              <span className="shrink-0 truncate text-muted-foreground">{name}</span>
+            </DropdownMenuLabel>
+          })()}
           {account.choices.map(workspace => {
             const current = account.id === data.accounts[0].id && workspace.id === data.workspace.id
             return <DropdownMenuItem key={workspace.id} disabled={busy} aria-current={current ? 'true' : undefined} onClick={() => selectWorkspace(account.id, workspace.id)}>
