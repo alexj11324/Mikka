@@ -20,7 +20,11 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
   supported paths and retains TLS, loopback, channel, userinfo/query/fragment,
   expiry and main-process ticket boundaries. Regression: old code rejects the
   community ticket; patched code passes both transport and rejection cases.
-  This is not packaged-application/OAuth acceptance.
+  The image CI now also runs a packaged Electron against that actual community
+  image: explicit server selection, generated-account email login, authenticated
+  RPC, built-in live socket, chat submission and a synthetic-model reply. Its
+  receipt and screenshot are retained separately. This new case has not yet
+  passed CI; it does not claim real Google OAuth or subscription acceptance.
 - #1593: the report parser now retains nine closed validation booleans before
   refusing a native delivery. The historical artifact lacks the report text and
   the original combined assertion cannot identify which invariant failed.
@@ -69,3 +73,22 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
 
 No issue is closed solely because its code is on main, a guard job is green,
 a synthetic model responds, or the client stopped waiting.
+
+## Local production-build API receipt
+
+At 2026-11-07 23:36 UTC the compiled Node-server build
+`9787d259793ca9156de77dd48059a2d14fd1a7b4` ran at
+`http://localhost:3139/mikka`, community edition, with a disposable PG17
+`mikka_e2e` database. Eleven checks passed through real HTTP and browser RPC:
+normal email sessions, authenticated catalogue, disabled-model dispatch
+filtering, foreign source write denial and non-disclosure, entirely disabled
+key choice denial, new catalogue entry off/fresh, seen-without-enabling,
+foreign-origin 403, anonymous 401 and session sign-out. API catalogue rows were
+explicitly synthetic; no model/provider request was made. The temporary key
+was deleted and both sessions signed out. This accepts the application flow,
+not a real subscription or hosted-billing provider.
+
+CI's first Core unit failure was an outdated readiness-test query fixture,
+which assumed every SELECT read only the saved bot binding. It now models the
+new owner-scoped hosted-setting SELECT and the preferred-order fallback. Its
+four tests and the complete 31-test self-hosted-BYOK suite passed locally.
