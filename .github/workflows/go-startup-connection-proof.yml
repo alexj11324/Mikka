@@ -20,7 +20,7 @@ concurrency:
 jobs:
   proof:
     # LOCAL PREPARATION. Only Root may remove literal false after reviewing all four exact files.
-    if: ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/diagnostic/issue-1506-go-startup-proof-20261107-01' && github.run_attempt == 1 }}
+    if: ${{ false && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/diagnostic/issue-1506-go-startup-proof-20261107-01' && github.run_attempt == 1 }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
