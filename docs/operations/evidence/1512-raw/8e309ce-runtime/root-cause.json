@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "read_only_runtime_gate_root_cause_assessment",
+  "recordedAtUtc": "2026-11-07T06:22:16.029Z",
+  "sourceCommit": "8e309ce0b965feb5dc98f46281013e82462b1914",
+  "workflow": {
+    "runId": 42342903841,
+    "runAttempt": 1,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42342903841",
+    "conclusion": "failure",
+    "failedJobId": 128318683119,
+    "failedStepNumber": 12,
+    "publish": "skipped",
+    "cleanup": "success"
+  },
+  "productionAcceptance": false,
+  "originalReceipts": [
+    {
+      "file": "subscription-diagnostics.json",
+      "bytes": 476,
+      "sha256": "bbd6144beddeb69e3ec98e2cdf1401dd5885ce491f77890433761acfff012993",
+      "provenance": {
+        "kind": "unmodified_file_from_workflow_artifact",
+        "artifactId": 13562589842,
+        "artifactZipBytes": 421,
+        "artifactZipSha256": "eb26eca63bc939a3bae03ffbe393a586bfa78bb7ccd93bb433d542924d3d433e"
+      }
+    },
+    {
+      "file": "release-cleanup.from-job-log.json",
+      "bytes": 489,
+      "sha256": "a09963daf5fd6b8d3e25ab033a7c15d383168fc9eaab57aa5562dec4c78b0875",
+      "provenance": {
+        "kind": "closed_cleanup_json_extracted_from_completed_job_log",
+        "jobId": 128319376995,
+        "containsRawJobLog": false
+      }
+    }
+  ],
+  "ownerProjection": {
+    "sourceUrl": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6703091890",
+    "sourcePublishedAtUtc": "2026-11-07T05:59:03Z",
+    "provenance": "Published by the runtime owner after a read-only investigation of these exact runs; this follow-up did not independently reread their database rows.",
+    "codex": {
+      "runId": "e6d9d64e-f854-4ad0-b1e1-12429838673f",
+      "runIdHash": "a44083c5708c6350",
+      "status": "succeeded",
+      "completion": "submitted",
+      "agentStartOk": true,
+      "officialTurnAckPresent": true,
+      "toolCallsCompleted": 3,
+      "providerOutputChunks": 8,
+      "extraHostAuthorizationOrProxyRequests": 0,
+      "mcpBusinessObservation": "valid",
+      "officialTiming": {
+        "eventName": "codex.api_request",
+        "eventAt": 0,
+        "readerStatus": "invalid",
+        "runtimeEvidenceReason": "official_provider_timings_missing"
+      }
+    },
+    "claude": {
+      "runId": "1180d10c-d7d3-4de7-9483-22d2494001eb",
+      "runIdHash": "63eee42fbe7371c2",
+      "status": "succeeded"
+    }
+  },
+  "independentChecks": {
+    "exactRunHashes": {
+      "algorithm": "sha256_utf8_uuid_first_16_hex",
+      "codexMatchesOriginalReceipt": true,
+      "claudeMatchesOriginalReceipt": true,
+      "runIdsObtainedFromOwnerProjection": true,
+      "runIdsNotInferredFromHashes": true
+    },
+    "sourceFiles": [
+      {
+        "path": "packages/daemon/src/official-cli-timing.ts",
+        "bytes": 12056,
+        "sha256": "2e95ca2a2e500e39eeb846f0a54d4d54e75561a8ff96eeb432a70b571ebb12ef",
+        "gitBlob": "fcbbbf59c39befc2c32249d756a70d8d0df0e2a6"
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+        "bytes": 20055,
+        "sha256": "d5b2b8088630f0dd6dda204a708a046effda4de1ea1dfa00ad2fac9bdd71998e",
+        "gitBlob": "ddf2a1cfa264903a7e55b7139def0f933200dd6f"
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.mjs",
+        "bytes": 60838,
+        "sha256": "d0960819aca6f7c8593bbdebe3c5a291c19fdb92d3fa732bcc294d4128991ded",
+        "gitBlob": "fb27e4b097f0732d95e6bc986b0c30e8ea7f89c1"
+      }
+    ],
+    "causalPath": [
+      {
+        "path": "packages/daemon/src/official-cli-timing.ts",
+        "lines": "98-104",
+        "finding": "The fixed producer accepts a zero nanosecond string as a timestamp, emits eventAt=0 and may use the zero string in a deduplication identity."
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+        "lines": "102-122",
+        "finding": "The unchanged official timing reader accepts eventAt only when null or positive; eventAt=0 rejects the whole official timing receipt."
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+        "lines": "163-172,197-210",
+        "finding": "Invalid official timing is omitted and marked invalid; required official timing then yields official_provider_timings_missing."
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.mjs",
+        "lines": "632-636",
+        "finding": "The runtime evidence assertion yields startup_runtime_evidence_failed before the separate official ACK assertion."
+      }
+    ],
+    "protocolSource": {
+      "url": "https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto",
+      "finding": "OTLP defines time_unix_nano=0 as an unknown or missing timestamp.",
+      "referencePinned": false
+    },
+    "additionalDatabaseQueriesForThisFollowup": 0,
+    "additionalPostHogQueriesForThisFollowup": 0,
+    "providerCalls": 0,
+    "createdResources": 0,
+    "cleanupMutations": 0
+  },
+  "conclusion": {
+    "gateFailure": "startup_runtime_evidence_failed",
+    "underlyingEvidenceFailure": "official_provider_timings_missing",
+    "defectClass": "producer_unknown_timestamp_normalization",
+    "scope": "Owner-projected production facts correlated to the original receipt by exact run hashes, with an independent review and byte hashes of the fixed source.",
+    "originalFailurePreserved": true,
+    "doesNotReclassifyOriginalReleaseAsPassed": true,
+    "doesNotAttributeThisFailureToTheEarlierCompressionIssue": true,
+    "duplicateCountProvenance": "Zero timestamps can collide in the old deduplication identity; the sources here do not identify the cause of every duplicate in the original run."
+  },
+  "existingFixAtRead": {
+    "url": "https://github.com/alexj11324/Mikka/pull/1622",
+    "headSha": "7f07862079ed0d0bcc070beb6c5a46c83eda621f",
+    "stateAtRead": "open",
+    "mergedAtRead": false,
+    "scope": "Producer timestamp normalization and focused regression tests; consumer and release gates unchanged.",
+    "newSourceProductionAcceptanceStillRequired": true
+  }
+}

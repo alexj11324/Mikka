@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "byte_preserving_evidence_archive",
+  "recordedAtUtc": "2026-11-07T06:22:17.203627+00:00",
+  "branch": "evidence/1512-observability",
+  "parentCommit": "0908992f7833f7ba2471b15c3a0a5b060f9e43e8",
+  "baseTree": "92a677a48e972f8d8047f9b3f3f31f3ae6ebfb2d",
+  "payloadFiles": 13,
+  "indexExcludesItself": true,
+  "scopeNotes": [
+    "CI evidence is bound to exact head a6a584ae9070ae40454bc5d94bcf5068bdb66209; it is not production acceptance.",
+    "The original 8e runtime failure and cleanup receipts remain unchanged. Root-cause owner projections are separate from independent source review. No duplicate database or PostHog query was made for that follow-up.",
+    "Both alert draft and final records are preserved. Literal fixture rows were not ingested; registered_hyphen_action is a shape example, not a registry inventory or a real call.",
+    "Final alert SQL is exact saved readback at 2026-11-07T06:11:16.416471Z. Production compatibility returned 181 evaluated routes and zero breaches; request attribution was not yet deployed and remains unattributed.",
+    "Only an extra scratch-file terminal LF was removed from new-query.sql and final-query.sql to restore the exact corresponding saved SQL strings; validation JSON and original runtime receipts were not rewritten.",
+    "The request-attribution benchmark is offline CPU-only, 500 paired samples with 120 warmups, no network/database/model calls; its source hashes bind the measured local change and do not claim production overhead."
+  ],
+  "files": [
+    {
+      "source": "evidence/8e309ce-e2b-42342903841/release-cleanup.from-job-log.json",
+      "path": "docs/operations/evidence/1512-raw/8e309ce-runtime/release-cleanup.from-job-log.json",
+      "bytes": 489,
+      "sha256": "a09963daf5fd6b8d3e25ab033a7c15d383168fc9eaab57aa5562dec4c78b0875",
+      "gitBlob": "fb89d78ac119c07df5957e9c6117bfcac6a7ed0f"
+    },
+    {
+      "source": "evidence/8e309ce-e2b-42342903841/root-cause.json",
+      "path": "docs/operations/evidence/1512-raw/8e309ce-runtime/root-cause.json",
+      "bytes": 6053,
+      "sha256": "f325d7866b6a13f05c35dd72d43f86d383bff581bb325311a69938888fa2a293",
+      "gitBlob": "eae06bac8a2e016b50a63fbc9a8339c9cab2c40e"
+    },
+    {
+      "source": "evidence/8e309ce-e2b-42342903841/subscription-diagnostics.json",
+      "path": "docs/operations/evidence/1512-raw/8e309ce-runtime/subscription-diagnostics.json",
+      "bytes": 476,
+      "sha256": "bbd6144beddeb69e3ec98e2cdf1401dd5885ce491f77890433761acfff012993",
+      "gitBlob": "ec257ed203e7f6750ca0b944e820a4d80fb79610"
+    },
+    {
+      "source": "evidence/alert-source/final-query.sql",
+      "path": "docs/operations/evidence/1512-raw/alert-source/final-query.sql",
+      "bytes": 11298,
+      "sha256": "0380c78c1ba9ef7ed04ec70d4f5155da166c75ca71313ab44fc83e626488bbd4",
+      "gitBlob": "f3f8e98d1f54c0c4ad8236669b486249e981f989"
+    },
+    {
+      "source": "evidence/alert-source/fixture-after.sql",
+      "path": "docs/operations/evidence/1512-raw/alert-source/fixture-after.sql",
+      "bytes": 25578,
+      "sha256": "1d3fc53a2e6016ded98992887d6299895e7b84e913e134bb0b85ad5b838017fe",
+      "gitBlob": "b73fcb235c6fd50ab02e229deecedb42902eefd3"
+    },
+    {
+      "source": "evidence/alert-source/fixture-before.sql",
+      "path": "docs/operations/evidence/1512-raw/alert-source/fixture-before.sql",
+      "bytes": 21600,
+      "sha256": "1063b2407d9ef94d9cade8469feaa144c3ecd062fb2f0a8c978ff9b5fc21b22d",
+      "gitBlob": "778ca1b053100b6d06574eb2be92893d1d61cfff"
+    },
+    {
+      "source": "evidence/alert-source/new-query.sql",
+      "path": "docs/operations/evidence/1512-raw/alert-source/new-query.sql",
+      "bytes": 11254,
+      "sha256": "e1ef29bac56b7f314ae238a58ce895c02a4ea48220e7fa0f5980d73a4671dfbf",
+      "gitBlob": "585b2a9f0ce3476148a479563664f3b354d9722a"
+    },
+    {
+      "source": "evidence/alert-source/old-insight.json",
+      "path": "docs/operations/evidence/1512-raw/alert-source/old-insight.json",
+      "bytes": 7550,
+      "sha256": "62aee22abd5f503c1b6b7dde50f55474cdc84cb664a6cd2e2d72a75c29c52efe",
+      "gitBlob": "9d5afdece4e62d8ff39e9472f25c8e2bb069539c"
+    },
+    {
+      "source": "evidence/alert-source/validation-final.json",
+      "path": "docs/operations/evidence/1512-raw/alert-source/validation-final.json",
+      "bytes": 16556,
+      "sha256": "e038c16a08230252c614c3e75d03ee7063e94daaccf2cddce02452b76775608d",
+      "gitBlob": "097e11f65595cbcf0094a96caa04410720d634fd"
+    },
+    {
+      "source": "evidence/alert-source/validation.json",
+      "path": "docs/operations/evidence/1512-raw/alert-source/validation.json",
+      "bytes": 15869,
+      "sha256": "187c148597b56694c4ed856cdb97f6f61fde4daeb84b8aecc9b71c32709e7d32",
+      "gitBlob": "dbfaf00e11874b7b98739d5a54399a3990c46b21"
+    },
+    {
+      "source": "evidence/ci-a6-final.json",
+      "path": "docs/operations/evidence/1512-raw/ci/ci-a6-final.json",
+      "bytes": 23467,
+      "sha256": "c2da5df74e243d37008e442eea6055a73e88cc346cc4db5cbe95ea600d2ef497",
+      "gitBlob": "48514f68d78dab70623adcf9d073c93075ab82e1"
+    },
+    {
+      "source": "request-attribution-bench.json",
+      "path": "docs/operations/evidence/1512-raw/request-attribution/benchmark.json",
+      "bytes": 898,
+      "sha256": "dc626fcf9669839955131ac51f4ec953a81820a2008c632acd49c493ac6d4343",
+      "gitBlob": "bd7abbea9c04e3ff1a5c9b1327f5403ae21b2d63"
+    },
+    {
+      "source": "request-attribution-bench.mjs",
+      "path": "docs/operations/evidence/1512-raw/request-attribution/benchmark.mjs",
+      "bytes": 5857,
+      "sha256": "2b4faa15a7bcdc49f2fe043d79a2cb690477b08a27f8d74ce581bb1f5e00092c",
+      "gitBlob": "fdeed8b91e6a48cf036dfe6088612becc0eb7099"
+    }
+  ]
+}

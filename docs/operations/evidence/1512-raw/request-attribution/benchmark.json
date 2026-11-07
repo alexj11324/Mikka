@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "scope": "offline CPU only; request logs and six spans with immediate safe export into counters",
+  "baselineCommit": "a6a584ae9070ae40454bc5d94bcf5068bdb66209",
+  "sourceHashes": {
+    "lib/request-log.ts": "e6dd9a2ed59c981e62a7d8f3bd5871cc56d17b63fa9836856cd57bdffa105b0c",
+    "lib/tracing/spans.ts": "7e11a7c2ce659d4722206e89d5339ed2588e35ccebb15b68ce0e2870ea2bd04e",
+    "lib/desktop-rpc/handler.ts": "aa60f3b33bfd12eb67f52b6ea241eea10087b732795277f8ce8085c57bb8abba"
+  },
+  "nodeVersion": "v24.22.1",
+  "samples": 500,
+  "warmup": 120,
+  "unit": "microseconds",
+  "baseline": {
+    "p50": 117.979,
+    "p95": 330.299,
+    "p99": 571.182
+  },
+  "current": {
+    "p50": 171.91,
+    "p95": 415.637,
+    "p99": 794.099
+  },
+  "pairedDifference": {
+    "p50": 40.26,
+    "p95": 175.014,
+    "p99": 556.04
+  },
+  "exportedSpansPerVariant": 3720,
+  "externalRequests": 0
+}
