@@ -8,6 +8,8 @@
   "preview_urls": false,
   // One account-level trigger; the Worker fans out the existing UTC cadences.
   "triggers": { "crons": ["* * * * *"] },
-  "vars": { "MIKKA_URL": "https://app.aspectlylabs.com/mikka" },
+  // Set MIKKA_URL at deployment with --var MIKKA_URL:https://your-server/mikka.
+  // The official release script supplies its production URL explicitly.
+  "vars": {},
   "observability": { "enabled": true }
 }

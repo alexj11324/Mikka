@@ -3,6 +3,15 @@ import { withBasePath } from '@/lib/base-path'
 /** The nonce the desktop stores before sending the person to the browser. */
 export const DESKTOP_AUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/
 
+/** Native clients can omit browser headers. If supplied, both headers must
+ * describe this deployment; a configured hostname never broadens this check. */
+export function desktopSameOriginRequest(request: Request): boolean {
+  const origin = request.headers.get('origin')
+  if (origin !== null && origin !== new URL(request.url).origin) return false
+  const site = request.headers.get('sec-fetch-site')
+  return site === null || site === 'same-origin' || site === 'none'
+}
+
 export function desktopAuthState(value: unknown): string | null {
   return typeof value === 'string' && DESKTOP_AUTH_STATE_PATTERN.test(value) ? value : null
 }

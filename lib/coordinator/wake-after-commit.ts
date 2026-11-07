@@ -1,3 +1,4 @@
+import { defaultModelConfigured } from '@/lib/default-model-config'
 import { afterDatabaseCommit } from '../db/commit-effects'
 import { runTestFixture } from '../run-test-fixture'
 
@@ -5,7 +6,7 @@ import { runTestFixture } from '../run-test-fixture'
 export const coordinatorWakeTransport: { wake?: (userId: string) => Promise<unknown> } = {}
 
 /** Same condition as coordinatorEnabled (lib/coordinator/wake.ts), without loading the runtime. */
-const enabled = () => Boolean(coordinatorWakeTransport.wake || process.env.VERCEL === '1' || process.env.AI_GATEWAY_API_KEY || runTestFixture('mock') !== undefined)
+const enabled = () => Boolean(coordinatorWakeTransport.wake || defaultModelConfigured() || runTestFixture('mock') !== undefined)
 
 const wake = async (userId: string) => {
   if (coordinatorWakeTransport.wake) return coordinatorWakeTransport.wake(userId)

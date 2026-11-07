@@ -32,3 +32,12 @@ test('standalone startup uses the operator database and durable local Workflow o
   assert.throws(() => selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', VERCEL: '1' }, '/app'), /SELF_HOSTED_PLATFORM_ENV_REFUSED/)
   assert.throws(() => selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', WORKFLOW_TARGET_WORLD: 'vercel' }, '/app'), /SELF_HOSTED_LOCAL_WORKFLOW_REQUIRED/)
 })
+
+test('bad self-hosted origins fail before migration or sign-in', () => {
+  const env = { DATABASE_URL: 'postgres://fixture', BETTER_AUTH_URL: 'https://self.example.test' }
+  assert.equal(selfHostedEnvironment({ ...env, BETTER_AUTH_URL: 'https://self.example.test/' }, '/app').BETTER_AUTH_URL, 'https://self.example.test')
+  for (const BETTER_AUTH_URL of ['not-a-url', 'http://self.example.test', 'https://self.example.test/mikka',
+    'https://user:password@self.example.test', 'https://self.example.test?next=x', 'https://*.example.test']) {
+    assert.throws(() => selfHostedEnvironment({ ...env, BETTER_AUTH_URL }, '/app'), /SELF_HOSTED_ORIGIN_INVALID/)
+  }
+})

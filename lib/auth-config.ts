@@ -1,8 +1,15 @@
 import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
 import { isLoopbackHost } from '@/lib/loopback'
 import { isCloudEdition } from '@/lib/edition'
+import { CodedError } from '@mikka/protocol/coded-error'
 
 type AuthEnvironment = Record<string, string | undefined>
+export const MOBILE_APP_ORIGIN = 'mikka://'
+
+export function authSignInMethods(env: AuthEnvironment) {
+  return { google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
+    github: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), email: true }
+}
 
 export function resolveAppOrigin(env: AuthEnvironment) {
   const deployment = env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined
@@ -36,11 +43,26 @@ export function authTrustedOrigins(env: AuthEnvironment) {
     env.VERCEL_BRANCH_URL ? `https://${env.VERCEL_BRANCH_URL}` : undefined,
     env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined,
     env.V0_RUNTIME_URL, env.V0_DEV_APP_URL, env.V0_BUILD_URL, env.V0_SANDBOX_URL, env.CF_PAGES_URL,
-    ...(env.AUTH_TRUSTED_ORIGINS ?? '').split(',').map(value => value.trim()),
-  ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, loopbackAllowed(env))))]
+  ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, loopbackAllowed(env))).concat(
+    (env.AUTH_TRUSTED_ORIGINS ?? '').split(',').map(value => value.trim()).filter(Boolean)
+      .map(value => value === MOBILE_APP_ORIGIN ? value : httpsOrigin(value, loopbackAllowed(env))),
+  ))]
+}
+
+/** One source for Better Auth and discovery. Official cloud keeps its existing
+ * mobile integration; community administrators explicitly enable the scheme. */
+export function authEffectiveTrustedOrigins(env: AuthEnvironment) {
+  return [...new Set([
+    ...authTrustedOrigins(env),
+    ...(isCloudEdition(env) ? [MOBILE_APP_ORIGIN] : []),
+    ...(env.NODE_ENV === 'development' ? ['http://localhost:3000', 'exp://'] : []),
+  ])]
 }
 
 export function authOAuthProxyOptions(env: AuthEnvironment) {
+  if (!isCloudEdition(env) && (env.BETTER_AUTH_OAUTH_PROXY_URL || env.BETTER_AUTH_OAUTH_PROXY_SECRET)) {
+    throw new CodedError('SELF_HOSTED_OAUTH_PROXY_UNSUPPORTED')
+  }
   if (!env.BETTER_AUTH_OAUTH_PROXY_URL || !env.BETTER_AUTH_OAUTH_PROXY_SECRET) return undefined
   const productionURL = httpsOrigin(env.BETTER_AUTH_OAUTH_PROXY_URL)
   if (productionURL.includes('*')) throw new Error('The OAuth proxy hub must use an exact HTTPS origin')

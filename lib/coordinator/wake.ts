@@ -1,3 +1,4 @@
+import { defaultModelConfigured } from '@/lib/default-model-config'
 import 'server-only'
 import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
@@ -25,7 +26,7 @@ const recovery = createWakeRecovery(pool)
  * events still collect in the inbox and wait.
  */
 export function coordinatorEnabled(): boolean {
-  return process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY) || runTestFixture('mock') !== undefined
+  return defaultModelConfigured() || runTestFixture('mock') !== undefined
 }
 
 /** No answer leaves the event pending; it does not become background, result or a request for human approval. */

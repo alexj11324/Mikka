@@ -1,4 +1,6 @@
 import 'server-only'
+import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
+import { selfHostedDefaultModel } from './self-hosted-model'
 import { randomUUID } from 'node:crypto'
 import { gateway, type LanguageModel } from 'ai'
 import { modelAdmission } from '@/lib/model-admission/runtime'
@@ -42,6 +44,8 @@ const routeDenied = (error: unknown) => error instanceof ModelAdmissionError && 
  */
 export async function admitHostedModel(scope: { workspaceId: string; ownerId?: string }, modelId: string,
   options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<GatewayAdmission | null> {
+  const selfHosted = isZeroCatModel(modelId) ? selfHostedDefaultModelConfig() : null
+  if (selfHosted) { await modelAdmission.selfHosted(scope, selfHosted.modelId, selfHosted.baseURL, options); return null }
   if (isZeroCatModel(modelId) && zeroCatConfig()) {
     try { await modelAdmission.zeroCat(scope, modelId, ZEROCAT_MODEL_ENDPOINT, options); return null }
     catch (error) { if (!routeDenied(error)) throw error }
@@ -61,6 +65,11 @@ export async function hostedModel(
   provider?: Model,
   ownerId?: string,
 ): Promise<Model> {
+  if (isZeroCatModel(modelId) && selfHostedDefaultModelConfig()) {
+    if (provider) throw new ModelAdmissionError('modelRouteDenied')
+    const billing = hostedBillingScope.getStore()
+    return selfHostedDefaultModel({ workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) })
+  }
   await withSharedCredits(workspaceId, canUseMikkaPaid)
   const zeroCat = isZeroCatModel(modelId)
   // The default model's fallback is its own Gateway route; a caller may hand in
