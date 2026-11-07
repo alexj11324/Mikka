@@ -66,7 +66,9 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				timeout = 270 * time.Second
 			}
 			callCtx, cancel := context.WithTimeout(ctx, timeout)
-			callCtx, timing = withRequestTiming(callCtx)
+			if request.Method == "prepare" || request.Method == "executeStream" {
+				callCtx, timing = withRequestTiming(callCtx)
+			}
 			if w.ExecutionOnly && request.Method != "executeStream" && request.Method != "execute" && request.Method != "quota" && request.Method != "nativeContext" && request.Method != "nativeStream" {
 				cancel()
 				_ = encodeTimingMessage(encoder, map[string]any{"id": request.ID, "error": string(ErrUnsupported)}, timing)

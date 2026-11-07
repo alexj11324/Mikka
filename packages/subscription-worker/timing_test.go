@@ -85,20 +85,20 @@ func TestWorkerTimingTerminalKeepsOneOriginalFrameAndBudget(t *testing.T) {
 
 func TestWorkerTimingServePreservesUnsupportedAndInvalidRequests(t *testing.T) {
 	w := &Worker{ExecutionOnly: true}
-	input := "{\"id\":\"first\",\"method\":\"status\"}\n{\"id\":\"second\",\"method\":\"unknown\"}\n{\"id\":\"invalid\",\"method\":\"status\",\"private\":\"fixture-private\"}\n"
+	input := "{\"id\":\"first\",\"method\":\"status\"}\n{\"id\":\"second\",\"method\":\"unknown\"}\n{\"id\":\"invalid\",\"method\":\"status\",\"private\":\"fixture-private\"}\n{\"id\":\"prepared\",\"method\":\"prepare\"}\n"
 	var output bytes.Buffer
 	if err := w.Serve(context.Background(), strings.NewReader(input), &output); err != nil {
 		t.Fatal(err)
 	}
 	decoder := json.NewDecoder(&output)
-	for n := 0; n < 3; n++ {
+	for n, id := range []string{"first", "second", "", "prepared"} {
 		var message map[string]any
-		if decoder.Decode(&message) != nil || message["error"] != string(ErrUnsupported) {
+		if decoder.Decode(&message) != nil || message["id"] != id || message["error"] != string(ErrUnsupported) {
 			t.Fatal("the original unsupported/invalid refusal changed")
 		}
 		timing, present := message["timing"].(map[string]any)
-		if present != (n < 2) || (present && (timing["readCalls"] != float64(0) || timing["readyAuthMs"] != nil)) {
-			t.Fatal("invalid input invented a stage or a request inherited statistics")
+		if present != (n == 3) || (present && (timing["readCalls"] != float64(0) || timing["readyAuthMs"] != nil)) {
+			t.Fatal("only the model RPC refusal may carry numeric timing")
 		}
 	}
 	if decoder.Decode(new(any)) != io.EOF {
