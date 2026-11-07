@@ -881,6 +881,8 @@
     "sandboxUsernsSpec": "Ubuntu 对这项设置的说明",
     "sandboxDetail": "错误：{detail}",
     "sandboxFix": "修复方法",
+    "noAgentYet": "还没装 Agent",
+    "howToInstall": "怎么装",
     "installAgent": "安装方法",
     "copyInstall": "复制 {command}",
     "commands": {

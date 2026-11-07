@@ -1,7 +1,7 @@
 'use client'
 
 import { SettingsLoading } from '@/components/settings/primitives'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -33,14 +33,15 @@ const AGENT_INSTALL = [
 ] as const
 
 /** 安装方法: where a device reports no coding agent, each agent's install command. */
-export function InstallAgents() {
+/** The install commands in a popover; `label` replaces the trigger's words (a UI layer's own line). */
+export function InstallAgents({ label }: { label?: ReactNode } = {}) {
   const t = useTranslations('Devices')
   const [copied, setCopied] = useState<string | null>(null)
   function copy(command: string) {
     void navigator.clipboard.writeText(command).then(() => setCopied(command), () => {})
   }
   return <Popover>
-    <PopoverTrigger className="shrink-0 cursor-pointer text-foreground underline underline-offset-2">{t('installAgent')}</PopoverTrigger>
+    <PopoverTrigger className="shrink-0 cursor-pointer text-foreground underline underline-offset-2">{label ?? t('installAgent')}</PopoverTrigger>
     <PopoverContent align="start" className="w-96 gap-2">
       {AGENT_INSTALL.map(({ harness, command }) => <div key={harness} className="flex flex-col gap-1">
         <span className="text-xs"><HarnessLabel harness={harness} /></span>
