@@ -22,6 +22,21 @@ export function checkSessionTarget(session, env) {
     && !/[\r\n\0]/.test(session.cookie), 'SESSION_TARGET')
 }
 
+// This driver first proves that its disposable owner has no credentials or
+// devices. Normal enrollment then creates one account-scoped SSH credential;
+// boundDeviceId is for cloud workers, while local registration records the
+// relationship in device_token_devices. Never select from an ambiguous list.
+export function enrollmentToken(tokens) {
+  check(Array.isArray(tokens) && tokens.length === 1 && UUID.test(tokens[0]?.id ?? '')
+    && tokens[0].name === 'SSH' && tokens[0].boundDeviceId === null, 'TOKEN_IDENTITY')
+  return tokens[0]
+}
+
+export function checkOwnedEnrollment(account, ownerId, deviceId) {
+  check(UUID.test(deviceId ?? '') && account?.ownerId === ownerId && Array.isArray(account.deviceIds)
+    && account.deviceIds.length === 1 && account.deviceIds[0] === deviceId, 'OWNER_DEVICE')
+}
+
 export function createOwnerRequest(session, fetchImpl = fetch) {
   return async (path, method = 'GET', body) => {
     check(path.startsWith('/api/') && !path.includes('://') && !path.includes('#'), 'OWNER_REQUEST')
@@ -101,9 +116,10 @@ export async function runDaemonAcceptance(env = process.env) {
     const stored = JSON.parse(await readFile(join(dataDir, 'device.json'), 'utf8'))
     check(stored.deviceId === deviceId && /^orv_[A-Za-z0-9_-]{43}$/.test(stored.credential ?? ''), 'DEVICE_IDENTITY')
     credential = stored.credential
-    const tokens = (await owner('/api/device-tokens')).tokens
-    check(tokens?.length === 1 && UUID.test(tokens[0].id) && tokens[0].boundDeviceId === deviceId && tokens[0].revokedAt === null, 'TOKEN_IDENTITY')
-    tokenId = tokens[0].id
+    checkOwnedEnrollment(await owner('/api/devices/enrollment'), session.ownerId, deviceId)
+    const token = enrollmentToken((await owner('/api/device-tokens')).tokens)
+    check(token.revokedAt === null, 'TOKEN_IDENTITY')
+    tokenId = token.id
     check((await event('heartbeat')).deviceId === deviceId && (await event('gateway-pong')).deviceId === deviceId, 'TRANSPORT_IDENTITY')
     const devices = (await rpc('agents.pollDevices')).devices
     check(devices?.length === 1 && devices[0].id === deviceId && devices[0].online === true, 'DEVICE_ONLINE')
@@ -120,7 +136,7 @@ export async function runDaemonAcceptance(env = process.env) {
         if (!tokenId && child) {
           const tokens = (await owner('/api/device-tokens')).tokens
           check(Array.isArray(tokens) && tokens.length <= 1, 'CLEANUP_TOKEN_SCOPE')
-          if (tokens.length) { check(UUID.test(tokens[0].id) && (!deviceId || tokens[0].boundDeviceId === deviceId), 'CLEANUP_TOKEN_SCOPE'); tokenId = tokens[0].id }
+          if (tokens.length) tokenId = enrollmentToken(tokens).id
         }
         if (tokenId) {
           const revoked = await owner(`/api/device-tokens/${tokenId}/revoke`, 'POST')
