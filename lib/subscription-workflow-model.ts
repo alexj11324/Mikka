@@ -35,9 +35,10 @@ export class SubscriptionWorkflowModel implements V4Model {
     // the prepared stable prefix contiguous without extra OAuth request fields.
     const { withCacheBreakpoints, withCodexStablePrefix } = await import('./prompt-cache')
     const key = this.selection.type === 'api_key' ? 'anthropic' : this.selection.route === 'claude_cpa' ? 'openaiCompatible' : null
-    const prompt = key ? withCacheBreakpoints(options.prompt, key) : this.selection.type === 'subscription' && this.selection.route === 'codex_cpa' ? withCodexStablePrefix(options.prompt, this.modelId) : options.prompt
+    const codex = this.selection.type === 'subscription' && this.selection.route === 'codex_cpa'
+    const prompt = key ? withCacheBreakpoints(options.prompt, key) : codex ? withCodexStablePrefix(options.prompt, this.modelId) : options.prompt
     const request = prompt === options.prompt ? options : { ...options, prompt }
     const prefix = await promptPrefix(options.prompt, options.tools)
-    return timedModelStream(await model.doStream(request), { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, prefix, ...await stepIdentity() })
+    return timedModelStream(await model.doStream(request), { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, prefix, ...(codex ? { codexLayoutApplied: prompt !== options.prompt } : {}), ...await stepIdentity() })
   }
 }

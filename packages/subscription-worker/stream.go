@@ -30,6 +30,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	}
 	execCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	execCtx = withCodexSession(execCtx, w.Scope, w.Use, r.Epoch)
 	result, err := w.Executor.ExecuteStream(execCtx, a, exec.Request{Model: model, Payload: payload, Format: translator.FormatOpenAI}, exec.Options{Stream: true, SourceFormat: translator.FormatOpenAI, ResponseFormat: translator.FormatOpenAI})
 	if err != nil {
 		return executionFailure(err)

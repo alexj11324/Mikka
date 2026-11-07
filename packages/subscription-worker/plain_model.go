@@ -191,6 +191,13 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		}
 		req.Header.Set("ChatGPT-Account-Id", account)
 		req.Header.Set("Originator", "Mikka")
+		// Official Codex uses session-id for ChatGPT cache affinity
+		// (openai/codex d4a341bd, codex-rs/core/src/client.rs:734).
+		// Only our already-authorized Stream context supplies it; never payloads
+		// or credential metadata. No provider identity or body option changes.
+		if session, ok := ctx.Value(codexSessionKey{}).(string); ok && session != "" {
+			req.Header.Set("Session-Id", session)
+		}
 	}
 	client := http.Client{Timeout: 270 * time.Second}
 	if e.Client != nil {

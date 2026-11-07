@@ -29,16 +29,21 @@ export interface ModelCallTiming {
   cacheReadTokens: number | null
   /** Input tokens written to the cache (reported by Anthropic routes only). */
   cacheWriteTokens: number | null
+  /** Compatible-provider fields before the SDK normalizes an absent read count to zero. */
+  rawCache: { read: RawCacheCount; write: RawCacheCount; creation: RawCacheCount }
   outputTokens: number | null
   toolCalls: number
   finishReason: string | null
   /** The stream failed or was cancelled before it finished. */
   interrupted: boolean
-  /** Short hashes of what a provider caches first (tools, then each system message): the one that changes between turns explains a cache miss. Never the content. */
+  /** Pre-layout tools/system hashes: a difference is a prefix-change candidate, not proof of a miss. Never the content. */
   prefix?: PromptPrefix
+  /** Actual Codex layout result; absent for other routes, false for an unchanged prompt. */
+  codexLayoutApplied?: boolean
 }
 
 export type PromptPrefix = { tools: string; system: string[] }
+type RawCacheCount = { state: 'number'; tokens: number } | { state: 'missing' | 'null' | 'invalid'; tokens: null }
 
 export interface ModelCallStart {
   route: ModelRoute
@@ -52,6 +57,7 @@ export interface ModelCallStart {
   stepId?: string | null
   attempt?: number | null
   prefix?: PromptPrefix
+  codexLayoutApplied?: boolean
 }
 
 type Part = { type: string; usage?: unknown; finishReason?: unknown }
@@ -70,6 +76,22 @@ function cache(usage: unknown, field: 'cacheRead' | 'cacheWrite'): number | null
   if (!input || typeof input !== 'object' || !(field in input)) return null
   const value = (input as Record<string, unknown>)[field]
   return typeof value === 'number' ? value : null
+}
+
+function own(value: unknown, key: string): unknown {
+  return value && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, key) ? (value as Record<string, unknown>)[key] : undefined
+}
+
+function rawCache(usage: unknown): ModelCallTiming['rawCache'] {
+  const details = own(own(usage, 'raw'), 'prompt_tokens_details')
+  const count = (key: 'cached_tokens' | 'cache_write_tokens' | 'cached_creation_tokens'): RawCacheCount => {
+    if (!details || typeof details !== 'object' || Array.isArray(details) || !Object.hasOwn(details, key)) return { state: 'missing', tokens: null }
+    const value = own(details, key)
+    if (value === null) return { state: 'null', tokens: null }
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return { state: 'number', tokens: value }
+    return { state: 'invalid', tokens: null }
+  }
+  return { read: count('cached_tokens'), write: count('cache_write_tokens'), creation: count('cached_creation_tokens') }
 }
 
 function reason(value: unknown): string | null {
@@ -102,9 +124,11 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         inputTokens: usage && typeof usage === 'object' && 'inputTokens' in usage ? total(usage.inputTokens) : null,
         cacheReadTokens: cache(usage, 'cacheRead'),
         cacheWriteTokens: cache(usage, 'cacheWrite'),
+        rawCache: rawCache(usage),
         outputTokens: usage && typeof usage === 'object' && 'outputTokens' in usage ? total(usage.outputTokens) : null,
         toolCalls, finishReason, interrupted,
         ...(start.prefix ? { prefix: start.prefix } : {}),
+        ...(start.codexLayoutApplied === undefined ? {} : { codexLayoutApplied: start.codexLayoutApplied }),
       })
     } catch { /* timing never fails the call */ }
   }

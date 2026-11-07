@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { timedModelStream, type ModelCallTiming } from './model-call-timing'
 import { timedTools, type ToolTiming } from './subscription-workflow-turn'
 
@@ -24,6 +25,7 @@ test('a model call logs when its first token, first text and end came, its token
   assert.deepEqual(lines, [{
     msg: 'model_call_timing', route: 'subscription', model: 'claude-haiku-5-5', workflowRunId: 'wrun_x', stepId: 'step_1', attempt: 1, tools: 76,
     setupMs: 300, firstTokenMs: 3_000, firstTextMs: 8_000, durationMs: 8_500, inputTokens: 18_000, cacheReadTokens: 17_500, cacheWriteTokens: 300, outputTokens: 120, toolCalls: 1, finishReason: 'tool-calls', interrupted: false,
+    rawCache: { read: { state: 'missing', tokens: null }, write: { state: 'missing', tokens: null }, creation: { state: 'missing', tokens: null } },
   }])
   assert.doesNotMatch(JSON.stringify(lines), /secret plan|已经派出去了|create_issue/, 'no prompt, reply or tool content')
 })
@@ -66,4 +68,56 @@ test('the cacheable prefix is logged as short hashes of the tools and each syste
   const lines: ModelCallTiming[] = []
   await drain(timedModelStream({ stream: streamOf([{ type: 'finish', usage: {} }]) }, { route: 'subscription', model: 'm', tools: 1, startedAt: 0, requestedAt: 0, prefix: one }, clock(1), line => lines.push(line)).stream)
   assert.deepEqual(lines[0].prefix, one)
+})
+
+test('the actual compatible SDK timing distinguishes missing, null, zero and positive raw cache counts', async t => {
+  for (const sample of [
+    { name: 'missing', details: undefined, normalized: 0, read: { state: 'missing', tokens: null } },
+    { name: 'null', details: { cached_tokens: null }, normalized: 0, read: { state: 'null', tokens: null } },
+    { name: 'zero', details: { cached_tokens: 0 }, normalized: 0, read: { state: 'number', tokens: 0 } },
+    { name: 'positive', details: { cached_tokens: 3072 }, normalized: 3072, read: { state: 'number', tokens: 3072 } },
+  ]) {
+    await t.test(sample.name, async () => {
+      let requests = 0
+      const model = createOpenAICompatible({ name: 'fixture', baseURL: 'https://fixture.invalid/v1', fetch: async () => {
+        requests++
+        const chunk = { id: 'fixture', object: 'chat.completion.chunk', created: 1, model: 'gpt-6-luna', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: {
+          prompt_tokens: 4096, completion_tokens: 1, total_tokens: 4097,
+          ...(sample.details === undefined ? {} : { prompt_tokens_details: { ...sample.details, cache_write_tokens: 0, cached_creation_tokens: 17, private_field: 'synthetic-private-usage' } }),
+          private_field: 'synthetic-private-usage',
+        } }
+        return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } })
+      } })('gpt-6-luna')
+      const result = await model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'synthetic-private-prompt' }] }] })
+      const logs: ModelCallTiming[] = []
+      const timed = timedModelStream(result, { route: 'subscription', model: 'gpt-6-luna', tools: 0, startedAt: 0, requestedAt: 1 }, () => 5, line => logs.push(line))
+      for await (const part of timed.stream) assert.notEqual(part.type, 'error')
+      assert.equal(requests, 1, 'only the injected in-memory transport is called')
+      assert.equal(logs.length, 1)
+      assert.equal(logs[0].cacheReadTokens, sample.normalized, 'the existing SDK count keeps its original meaning')
+      assert.equal(logs[0].cacheWriteTokens, null, 'a new diagnostic does not invent the SDK normalized write count')
+      assert.deepEqual(logs[0].rawCache, {
+        read: sample.read,
+        write: sample.details === undefined ? { state: 'missing', tokens: null } : { state: 'number', tokens: 0 },
+        creation: sample.details === undefined ? { state: 'missing', tokens: null } : { state: 'number', tokens: 17 },
+      }, 'raw_cache_field_presence_not_reported')
+      assert.doesNotMatch(JSON.stringify(logs), /synthetic-private|private_field|prompt_tokens_details/)
+    })
+  }
+})
+
+test('raw cache diagnostics reject malformed counts and read only own whitelisted fields', async () => {
+  for (const invalid of [undefined, 'synthetic-private', {}, [], -1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    const logs: ModelCallTiming[] = []
+    const parts = [{ type: 'finish', usage: { inputTokens: { cacheRead: 88 }, raw: {
+      prompt_tokens_details: { cached_tokens: invalid, cache_write_tokens: null, cached_creation_tokens: 0, unknown: 'synthetic-private' },
+    } } }]
+    await drain(timedModelStream({ stream: streamOf(parts) }, { route: 'subscription', model: 'fixture', tools: 0, startedAt: 0, requestedAt: 1 }, () => 5, line => logs.push(line)).stream)
+    assert.equal(logs[0].cacheReadTokens, 88)
+    assert.deepEqual(logs[0].rawCache, { read: { state: 'invalid', tokens: null }, write: { state: 'null', tokens: null }, creation: { state: 'number', tokens: 0 } })
+    assert.doesNotMatch(JSON.stringify(logs), /synthetic-private|unknown/)
+  }
+  const logs: ModelCallTiming[] = []
+  await drain(timedModelStream({ stream: streamOf([{ type: 'finish', usage: { raw: { prompt_tokens_details: Object.create({ cached_tokens: 99 }) } } }]) }, { route: 'subscription', model: 'fixture', tools: 0, startedAt: 0, requestedAt: 1 }, () => 5, line => logs.push(line)).stream)
+  assert.deepEqual(logs[0].rawCache.read, { state: 'missing', tokens: null }, 'inherited properties are not provider fields')
 })
