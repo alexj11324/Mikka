@@ -3485,7 +3485,7 @@
         "load_skill": "加载技能"
       },
       "summary": {
-        "dispatch": "{count, plural, other {派发了 # 个线程}}",
+        "dispatch": "{count, plural, other {派发了 # 个任务}}",
         "dispatchFactory": "{count, plural, other {派发了 # 个 Factory 任务}}",
         "wake": "{count, plural, =1 {唤醒了电脑} other {唤醒了 # 次电脑}}",
         "messageThread": "{count, plural, =1 {给线程发了消息} other {给线程发了 # 条消息}}",
