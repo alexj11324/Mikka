@@ -190,7 +190,7 @@ export interface Task { id: string; identifier: string | null; title: string; st
   blockedBy?: string | null }
 
 /** One icon per state (decisions/2026-11-07-2230-one-icon-per-task-state.md); open and closed tasks show their board status. */
-export type TaskState = 'waiting' | 'failed' | 'running' | 'queued'
+export type TaskState = 'waiting' | 'failed' | 'blocked' | 'running' | 'queued'
 /** The API's `state`: the four attempt states, or the board status of an open or closed task. */
 export type ServerTaskState = TaskState | 'todo' | 'done' | 'canceled' | 'duplicate'
 export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'blocked_by' | 'flagged'
@@ -204,7 +204,7 @@ export interface TaskSchedule { label: string; nextAt: string | null }
 export type TaskActivity =
   | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean
     /** Its own result (2026-11-07-2230); absent from an older server. */
-    state?: 'running' | 'waiting' | 'failed' | 'done' }
+    state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done' }
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 

@@ -5,7 +5,7 @@ import { groupOf, rowState, TASK_GROUPS } from '@/features/tasks/model/task-grou
 export const MENU_TASKS = 5
 
 /** The SF Symbol for a task's own state (2026-11-07-2230): the hand only for 等你处理; else the board's status icon. */
-const STATE_SYMBOL: Record<TaskState, string> = { waiting: 'hand.raised', failed: 'exclamationmark.triangle', running: 'circle.dotted', queued: 'clock' }
+const STATE_SYMBOL: Record<TaskState, string> = { waiting: 'hand.raised', failed: 'exclamationmark.triangle', blocked: 'exclamationmark.octagon', running: 'circle.dotted', queued: 'clock' }
 const BOARD_SYMBOL: Record<string, string> = { backlog: 'circle.dashed', todo: 'circle', doing: 'circle.dotted', review: 'gauge.with.dots.needle.33percent', done: 'checkmark.circle', canceled: 'xmark.circle', duplicate: 'circle.slash' }
 
 export function taskSymbol(task: Pick<Task, 'group' | 'status' | 'blocked' | 'state' | 'reason'>) {

@@ -32,7 +32,7 @@ import { runName, type BotPage, type Chat, type CitationSource, type PendingActi
 import { ChatHeader } from '@/features/chat/components/chat-header'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { useTasks } from '@/features/tasks/components/task-list'
-import { TaskStateIcon } from '@/features/tasks/components/task-icons'
+import { AttemptIcon } from '@/features/tasks/components/task-icons'
 import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
@@ -301,7 +301,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
             <TimedRow key={id} time={time} offset={offset}>
               {run.issue && result
                 ? <ThreadCard title={[run.issue.identifier, run.issue.title].filter(Boolean).join(' ')} status={runIcon(run)} onPress={() => open(run)}
-                  icon={<TaskStateIcon state={result === 'done' || result === 'todo' ? null : result} status={result === 'done' ? 'done' : 'todo'} />}
+                  icon={<AttemptIcon result={result} />}
                   info={[ATTEMPT_WORD[result], run.agentName, shortWhen(item.createdAt)].filter(Boolean).join(' · ')} />
                 : <ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => open(run)} />}
             </TimedRow>

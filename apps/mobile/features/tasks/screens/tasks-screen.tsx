@@ -8,7 +8,7 @@ import { TaskList } from '../components/task-list'
 import { TASK_GROUPS, type TaskFilter } from '../model/task-groups'
 
 /**
- * The 任务 tab (decisions/2026-11-07-2045-tasks-only-threads-inside.md, Figma 1085:2 M1): the large title 任务 with +
+ * The 任务 tab (decisions/2026-11-07-2045-tasks-only-threads-inside.md, Figma 1085:2 M1): the title 任务 in the top row with +
  * and the filter on the right, then the tasks by group. + opens the Coordinator's composer, which dispatches a task.
  */
 export function TasksScreen() {
@@ -17,7 +17,7 @@ export function TasksScreen() {
     <View style={styles.screen}>
       <NavBar
         title="任务"
-        large
+        topTitle
         right={[
           { icon: 'line.3.horizontal.decrease', label: '筛选', web: <ListFilter size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => {},
             items: [{ id: 'all' as const, title: '全部' }, ...TASK_GROUPS].map(group => ({ label: group.title, on: filter === group.id, onPress: () => setFilter(group.id) })) },

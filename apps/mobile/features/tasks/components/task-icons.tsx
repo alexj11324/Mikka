@@ -1,14 +1,16 @@
 import { View } from 'react-native'
-import { Circle, CircleAlert, CircleCheck, CircleDashed, CircleDot, CircleGauge, CircleSlash2, CircleX, Clock, Hand, SignalHigh, SignalLow, SignalMedium, TriangleAlert } from 'lucide-react-native'
+import { Circle, CircleAlert, CircleCheck, CircleDashed, CircleDot, CircleGauge, CirclePause, CircleSlash2, CircleX, Clock, Hand, OctagonAlert, SignalHigh, SignalLow, SignalMedium, TriangleAlert } from 'lucide-react-native'
 import type { TaskGroup, TaskState } from '@/lib/types'
+import { ATTEMPT_WORD, type AttemptResult } from '../model/task-groups'
 import { colors } from '@/lib/theme'
 
 /**
  * One icon per state (decisions/2026-11-07-2230-one-icon-per-task-state.md). The hand is only 等你处理; 失败 is a
- * triangle (✕ is the board's 已取消); 运行中 the board's In Progress ring; 排队中 a clock. Grey, never a coloured dot.
+ * triangle (✕ is the board's 已取消); 受阻 an octagon (login, key, permission, quota, a device offline); 运行中 the
+ * board's In Progress ring; 排队中 a clock. Grey, never a coloured dot.
  */
-const STATE_ICON: Record<TaskState, typeof Hand> = { waiting: Hand, failed: TriangleAlert, running: CircleDot, queued: Clock }
-export const STATE_LABEL: Record<TaskState, string> = { waiting: '等你处理', failed: '失败', running: '运行中', queued: '排队中' }
+const STATE_ICON: Record<TaskState, typeof Hand> = { waiting: Hand, failed: TriangleAlert, blocked: OctagonAlert, running: CircleDot, queued: Clock }
+export const STATE_LABEL: Record<TaskState, string> = { waiting: '等你处理', failed: '失败', blocked: '受阻', running: '运行中', queued: '排队中' }
 
 /** The board's status icons (components/workspace/issue-properties.ts), so a task looks the same on the board and in a list. */
 const BOARD_ICON: Record<string, typeof Hand> = { backlog: CircleDashed, todo: Circle, doing: CircleDot, review: CircleGauge, done: CircleCheck, canceled: CircleX, duplicate: CircleSlash2 }
@@ -18,6 +20,14 @@ export const BOARD_LABEL: Record<string, string> = { backlog: '暂不处理', to
 export function TaskStateIcon({ state, status, size = 18 }: { state: TaskState | null; status: string; size?: number }) {
   const Icon = state ? STATE_ICON[state] : BOARD_ICON[status] ?? Circle
   return <Icon size={size} color={colors.secondary} strokeWidth={1.9} accessibilityLabel={state ? STATE_LABEL[state] : BOARD_LABEL[status] ?? status} />
+}
+
+/** An attempt's own result (never the hand): ring, pause, check, triangle, octagon. */
+const ATTEMPT_ICON: Record<AttemptResult, typeof Hand> = { running: CircleDot, paused: CirclePause, done: CircleCheck, failed: TriangleAlert, blocked: OctagonAlert }
+
+export function AttemptIcon({ result, size = 18 }: { result: AttemptResult; size?: number }) {
+  const Icon = ATTEMPT_ICON[result]
+  return <Icon size={size} color={colors.secondary} strokeWidth={1.9} accessibilityLabel={ATTEMPT_WORD[result]} />
 }
 
 /** A group header's icon: 等待你 the hand, 进行中 the ring, 待办 ◌, 已完成 ✓. Rows never borrow it. */

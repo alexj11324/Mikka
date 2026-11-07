@@ -16,7 +16,7 @@ import type { TaskActivity, TaskDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
 import { colors, LIST_INSET } from '@/lib/theme'
-import { BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
+import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
 
 const day = (iso: string) => {
@@ -24,15 +24,14 @@ const day = (iso: string) => {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
 }
 
-/** Where an attempt opens: its thread, titled 「第 N 次尝试 · Agent」 over the task's name. */
-export const attemptHref = (attempt: Extract<TaskActivity, { kind: 'attempt' }>, task: { title: string; identifier: string | null }): Href =>
-  ({ pathname: '/thread/[id]', params: { id: attempt.runId, n: String(attempt.n), agent: HARNESS[attempt.harness] ?? attempt.harness, task: [task.identifier, task.title].filter(Boolean).join(' ') } })
+/** Where an attempt opens: the task's one conversation, which holds every attempt in order (2026-11-07). */
+export const conversationHref = (taskId: string): Href => ({ pathname: '/task/[id]/conversation', params: { id: taskId } })
 
 /**
  * A task's detail (decisions/2026-11-07-2045-tasks-only-threads-inside.md, Figma 1085:2 M2): its number and title,
- * its properties in one grey box, its description, then 活动 (each attempt, a replaced thread, its creation), newest
- * first. An attempt opens that thread pushed over the task; a push about a waiting thread lands here with `attempt`
- * and opens it once. 「+ 评论」 floats at the foot.
+ * its properties in one grey box, its description, then 活动 oldest first (its creation, each attempt with its own
+ * result, a replaced thread). An attempt opens the task's one conversation; a push about a waiting thread lands here
+ * with `attempt` and opens it once. 「+ 评论」 floats at the foot.
  */
 export function TaskScreen() {
   const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
@@ -43,7 +42,9 @@ export function TaskScreen() {
   const task = data?.task
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
-  // The newest attempt is the task's current one: it says the task's reason (待审阅 · Claude Code · date).
+  // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
+  const activity = data ? [...data.activity].reverse() : []
+  // The newest attempt is the task's current one: a pause there says the task's reason (待审阅 · Claude Code · date).
   const currentAttempt = data?.activity.find(item => item.kind === 'attempt')?.runId
 
   // A push opens the task, then the attempt it was about, once.
@@ -51,8 +52,8 @@ export function TaskScreen() {
   useEffect(() => {
     if (opened.current || !attempt || !data) return
     opened.current = true
-    const found = data.activity.find((item): item is Extract<TaskActivity, { kind: 'attempt' }> => item.kind === 'attempt' && item.runId === attempt)
-    router.push(found ? attemptHref(found, data.task) : `/thread/${attempt}`)
+    const found = data.activity.some(item => item.kind === 'attempt' && item.runId === attempt)
+    router.push(found ? conversationHref(data.task.id) : `/thread/${attempt}`)
   }, [attempt, data, router])
 
   return (
@@ -75,10 +76,10 @@ export function TaskScreen() {
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
-            {data.activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}
-            {data.activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} last={index === data.activity.length - 1}
+            {activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}
+            {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} last={index === activity.length - 1}
               reason={item.kind === 'attempt' && item.runId === currentAttempt ? shown?.reason ?? null : null}
-              onOpen={item.kind === 'attempt' ? () => router.push(attemptHref(item, task)) : undefined} />)}
+              onOpen={item.kind === 'attempt' ? () => router.push(conversationHref(task.id)) : undefined} />)}
           </>
         ) : null}
       </ScrollView>
@@ -113,13 +114,14 @@ function ActivityRow({ item, last, reason, onOpen }: { item: TaskActivity; last:
         <View style={styles.node} />
         {last ? null : <View style={styles.line} />}
       </View>
-      {result ? <TaskStateIcon state={result === 'done' || result === 'todo' ? null : result} status={result === 'done' ? 'done' : 'todo'} size={20} /> : <View style={styles.noBot} />}
+      {/* An attempt shows its own result, never the task's hand; a replaced thread and the creation have no icon. */}
+      {result ? <AttemptIcon result={result} size={20} /> : <View style={styles.noBot} />}
       <View style={styles.activityText}>
         <Text style={styles.activityTitle} numberOfLines={1}>
           {item.kind === 'attempt' ? `第 ${item.n} 次尝试` : item.kind === 'replaced' ? '换了新线程' : item.by ? `${item.by} 创建了任务` : '创建了任务'}
         </Text>
         <Text style={styles.activityMeta} numberOfLines={1}>
-          {result && item.kind === 'attempt' ? [result === 'failed' ? ATTEMPT_WORD.failed : reason ?? ATTEMPT_WORD[result], HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
+          {result && item.kind === 'attempt' ? [result === 'paused' ? reason ?? ATTEMPT_WORD.paused : ATTEMPT_WORD[result], HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}

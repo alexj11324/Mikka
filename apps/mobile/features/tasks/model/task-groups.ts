@@ -1,4 +1,4 @@
-import type { Task, TaskActivity, TaskGroup, TaskReason, TaskState, ThreadGroup } from '@/lib/types'
+import type { Task, TaskGroup, TaskReason, TaskState, ThreadGroup } from '@/lib/types'
 
 /**
  * A task list's groups, in order (decisions/2026-11-07-2045 and 2026-11-07-2230): 等待你 is what waits on the person
@@ -52,7 +52,7 @@ export function reasonWord(reason: TaskReason, blockedBy?: string | null): strin
   }
 }
 
-const ATTEMPT_STATES = new Set<string>(['waiting', 'failed', 'running', 'queued'])
+const ATTEMPT_STATES = new Set<string>(['waiting', 'failed', 'blocked', 'running', 'queued'])
 
 /**
  * A row's state (decisions/2026-11-07-2230): the API's `state` and `reason` when it sends them; todo, done, canceled
@@ -71,31 +71,35 @@ export function rowState(task: Pick<Task, 'group' | 'status' | 'blocked' | 'stat
   const group = groupOf(task)
   if (group === 'pending' && !elsewhere) {
     if (block?.reason === 'failed') return { state: 'failed', reason: '失败' }
-    const reason = block?.reason === 'question' ? reasonWord('needs_input') : block?.reason === 'quota' ? reasonWord('quota') : block?.reason === 'run' ? reasonWord('blocked') : task.status === 'review' ? reasonWord('pr_review') : null
-    return { state: 'waiting', reason }
+    // 受阻 is its own state (quota, login, key, a device offline): the octagon, not the hand.
+    if (block?.reason === 'quota') return { state: 'blocked', reason: reasonWord('quota') }
+    if (block?.reason === 'run') return { state: 'blocked', reason: reasonWord('blocked') }
+    return { state: 'waiting', reason: block?.reason === 'question' ? reasonWord('needs_input') : task.status === 'review' ? reasonWord('pr_review') : null }
   }
   if (group === 'running') return { state: 'running', reason: elsewhere }
   return { state: null, reason: elsewhere }
 }
 
-/** An attempt in 活动 or a chat card: its own result as a state; a settled one shows done (✓) or open (○). */
-export function attemptState(attempt: { group?: ThreadGroup; failed?: boolean; status?: string; state?: 'running' | 'waiting' | 'failed' | 'done' }): TaskState | 'done' | 'todo' {
-  if (attempt.state) return attempt.state
+/**
+ * An attempt's own result, in 活动 and on a chat card (2026-11-07). The hand is the task's, never an attempt's: a
+ * paused attempt waiting for the person is a pause, a finished one a check, a failed one a triangle, a blocked one an
+ * octagon. The API's own attempt state wins; an older server's is read from the thread group.
+ */
+export type AttemptResult = 'running' | 'paused' | 'done' | 'failed' | 'blocked'
+
+export function attemptState(attempt: { group?: ThreadGroup; failed?: boolean; status?: string; state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done' }): AttemptResult {
+  if (attempt.state) return attempt.state === 'waiting' ? 'paused' : attempt.state
   if (attempt.failed || attempt.status === 'failed') return 'failed'
   switch (attempt.group) {
-    case 'waiting': case 'blocked': return 'waiting'
     case 'running': return 'running'
-    case 'resolved': return 'done'
-    case 'idle': return 'todo'
-    default: return 'waiting'
+    case 'blocked': return 'blocked'
+    case 'resolved': case 'idle': return 'done'
+    default: return 'paused'
   }
 }
 
-/**
- * The word for an attempt's state, as 活动 and a chat card say it. 等你处理 is the state's name, never shown: a
- * waiting attempt says its reason (待审阅, 等你回复) when it is known, else nothing.
- */
-export const ATTEMPT_WORD: Record<TaskState | 'done' | 'todo', string> = { waiting: '', failed: '失败', running: '运行中', queued: '排队中', done: '完成', todo: '空闲' }
+/** An attempt's result in words. */
+export const ATTEMPT_WORD: Record<AttemptResult, string> = { running: '运行中', paused: '等你回复', done: '完成', failed: '失败', blocked: '受阻' }
 
 export type TaskFilter = 'all' | TaskGroup
 
@@ -116,7 +120,3 @@ export function taskListRows<T extends Pick<Task, 'group' | 'status' | 'blocked'
   })
 }
 
-/** 「第 N 次尝试 · Agent」, an attempt's header title. */
-export const attemptTitle = (n: number, harness: string) => `第 ${n} 次尝试 · ${harness}`
-
-export type Attempt = Extract<TaskActivity, { kind: 'attempt' }>

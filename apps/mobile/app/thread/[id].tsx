@@ -23,17 +23,12 @@ import type { ThreadDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
-import { attemptTitle } from '@/features/tasks/model/task-groups'
 
 const STATUS_WORD = { running: '运行中', waiting: '等待你', paused: '已暂停', failed: '失败', done: '完成', stopped: '已停止' } as const
 
-/**
- * A thread's own page, pushed from its task's 活动; back returns to the task (decisions/2026-11-07-2045). Opened from
- * an attempt, the bar says 「第 N 次尝试 · Agent」 with the task's name under it; from anywhere else, the thread's name
- * and state.
- */
+/** A thread without a task, pushed from its card; a task's threads open as the task's one conversation (app/task/[id]/conversation.tsx). */
 export default function ThreadScreen() {
-  const { id, n, agent, task } = useLocalSearchParams<{ id: string; n?: string; agent?: string; task?: string }>()
+  const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   // Read again when one of its runs writes text or changes state (the web's thread and run keys); an
@@ -68,12 +63,7 @@ export default function ThreadScreen() {
     <View style={styles.screen}>
       <NavBar
         back={() => (router.canGoBack() ? router.back() : router.replace('/tasks'))}
-        titleView={n && agent ? (
-          <View style={styles.attempt}>
-            <Text style={styles.title} numberOfLines={1}>{attemptTitle(Number(n), agent)}</Text>
-            {task ? <Text style={styles.subtitle} numberOfLines={1}>{task}</Text> : null}
-          </View>
-        ) : thread ? (
+        titleView={thread ? (
           <View style={styles.titleRow}>
             <StatusIcon status={thread.status} size={18} />
             <View style={{ flexShrink: 1 }}>
@@ -123,7 +113,6 @@ export default function ThreadScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 260 },
-  attempt: { alignItems: 'center', maxWidth: 260 },
   title: { fontSize: 16, fontWeight: '600' },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   subtitle: { fontSize: 11, color: colors.secondary, flexShrink: 1 },

@@ -34,6 +34,7 @@ const task = (id, identifier, title, extra) => ({ id, identifier, title, status:
 const tasks = [
   task(TASK, '#1471', '修复 iOS 登录回调', { group: 'pending', state: 'waiting', reason: 'pr_review', status: 'review', priority: 'high', bot: frontend, createdAt: ago(0, 3) }),
   task('44444444-4444-4444-8444-444444444477', '#1477', '登录页要不要换新导航', { group: 'pending', state: 'failed', reason: null, status: 'doing', bot: design, createdAt: ago(0, 5) }),
+  task('44444444-4444-4444-8444-444444444480', '#1480', '同步十月发票', { group: 'pending', state: 'blocked', reason: 'quota', status: 'doing', bot: design, createdAt: ago(0, 6) }),
   task('44444444-4444-4444-8444-444444444462', '#1462', '整理竞品报告', { group: 'running', state: 'running', reason: null, status: 'doing', bot: research, createdAt: ago(5) }),
   task('44444444-4444-4444-8444-444444444401', '#1401', '行业研究周报', { group: 'running', state: 'queued', reason: null, status: 'doing', priority: 'low', bot: research, createdAt: ago(9), schedule: { label: '每天 09:00', nextAt: new Date(Date.now() + 86_400_000).toISOString() } }),
   task('44444444-4444-4444-8444-444444444446', '#1446', '设置页改用原生表单', { group: 'todo', state: 'todo', reason: 'blocked_by', blockedBy: '#1462', priority: 'none', createdAt: ago(2) }),
@@ -49,20 +50,26 @@ const detail = {
   },
   activity: [
     { kind: 'attempt', runId: RUN2, n: 2, group: 'waiting', state: 'waiting', harness: 'claude_code', createdAt: ago(0, 3), failed: false },
-    { kind: 'attempt', runId: RUN1, n: 1, group: 'blocked', state: 'failed', harness: 'claude_code', createdAt: ago(1), failed: true },
+    { kind: 'attempt', runId: RUN1, n: 1, group: 'blocked', state: 'failed', harness: 'codex', createdAt: ago(1), failed: true },
     { kind: 'created', by: 'Coordinator', createdAt: ago(1, 1) },
   ],
 }
 
-const thread = {
+// The task's two attempts: the first failed on Codex (its raw error stays inside it), the second runs on Claude Code.
+const threadOf = (id, harness, status, items, error) => ({
   live: { runs: [] },
-  thread: { id: RUN2, name: '修复 iOS 登录回调', status: 'waiting', by: '前端', harness: 'claude_code', device: { id: 'd', name: 'MacBook', kind: 'laptop' }, createdAt: ago(0, 3), finishedAt: null, group: 'waiting', attempts: 2 },
-  active: false, working: false, paused: null, summary: null, error: null,
-  items: [
-    { kind: 'person', id: 'p1', text: 'iOS 上 Google 登录回来以后停在空白页，修一下', mine: true, at: Date.now() - 10_000_000 },
-    { kind: 'steps', id: 's1', count: 9, at: Date.now() - 9_000_000 },
-    { kind: 'agent', id: 'a1', text: '回调地址少了 `mikka://` 的信任来源，加上以后在模拟器里登录能回到聊天列表。PR #1471 已开，等你审阅。', at: Date.now() - 8_000_000 },
-  ],
+  thread: { id, name: '修复 iOS 登录回调', status, by: '前端', harness, device: { id: 'd', name: 'MacBook', kind: 'laptop' }, createdAt: ago(1), finishedAt: null, group: 'waiting', attempts: 2 },
+  active: false, working: false, paused: null, summary: null, error, items,
+})
+const threads = {
+  [RUN1]: threadOf(RUN1, 'codex', 'failed', [
+    { kind: 'person', id: 'p1', text: 'iOS 上 Google 登录回来以后停在空白页，修一下', mine: true, at: Date.now() - 90_000_000 },
+    { kind: 'steps', id: 's1', count: 4, at: Date.now() - 89_000_000 },
+  ], 'agent_exited: codex exited with code 1 (E_SANDBOX_NETWORK)'),
+  [RUN2]: threadOf(RUN2, 'claude_code', 'waiting', [
+    { kind: 'steps', id: 's2', count: 9, at: Date.now() - 9_000_000 },
+    { kind: 'agent', id: 'a2', text: '回调地址少了 `mikka://` 的信任来源，加上以后在模拟器里登录能回到聊天列表。PR #1471 已开，等你审阅。', at: Date.now() - 8_000_000 },
+  ], null),
 }
 
 const homeBots = [
@@ -97,7 +104,7 @@ function apiResponse(url) {
   if (path === '/api/mobile/home') return json(home)
   if (path === '/api/mobile/tasks') return json({ tasks })
   if (path.startsWith('/api/mobile/tasks/')) return json(detail)
-  if (path.startsWith('/api/mobile/threads/')) return json(thread)
+  if (path.startsWith('/api/mobile/threads/')) return json(threads[path.split('/').pop()] ?? threads[RUN2])
   if (path === '/api/mobile/chat-order') return json({ chats: [] })
   if (path === '/api/pending-actions') return json([])
   if (path.startsWith('/api/live/')) return json({ error: 'offline' }, 404)
@@ -163,9 +170,9 @@ async function run() {
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-3-task.png`) })
       await page.getByText('第 2 次尝试').first().click()
-      await page.getByText('第 2 次尝试 · Claude Code').waitFor({ timeout: 20_000 })
+      await page.getByText('第 1 次尝试失败 · 换 Claude Code 再试').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
-      await page.screenshot({ path: join(outDir, `${theme}-4-attempt.png`) })
+      await page.screenshot({ path: join(outDir, `${theme}-4-conversation.png`) })
       await context.close()
     }
   } finally {

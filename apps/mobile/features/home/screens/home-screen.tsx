@@ -19,9 +19,9 @@ import { homeList, type HomeItem, type SectionId } from '../model/home-list'
 import { useHomeChats, type HomeChat } from '../model/use-home-chats'
 
 /**
- * The Bot tab (Comma designs 01–05; decisions/2026-11-07-2045-tasks-only-threads-inside.md): the person's chats under
- * the large title Bot, with + (新建 Bot, 新建群聊) on the right. No workspace menu: workspaces switch only in 设置 ›
- * 工作区. Search is its own tab. Pinned chats sit on top as tiles,
+ * The Bot tab (Comma designs 01–05; decisions/2026-11-07-2045-tasks-only-threads-inside.md): the person's chats, with
+ * the title Bot in the top row and + (新建 Bot, 新建群聊) on its right. No workspace menu: workspaces switch only in
+ * 设置 › 工作区. Search is its own tab. Pinned chats sit on top as tiles,
  * then the chats in folding sections (home-list.ts). Each row taps, long-presses, swipes and drags (home-chat-row.tsx).
  */
 export function HomeScreen() {
@@ -50,7 +50,7 @@ export function HomeScreen() {
     <View style={styles.screen}>
       <NavBar
         title="Bot"
-        large
+        topTitle
         right={{ icon: 'plus', label: '新建', web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
           items: [
             { label: '新建 Bot', icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },

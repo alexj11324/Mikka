@@ -31,7 +31,7 @@ export function SearchScreen() {
   ].filter(section => section.data.length) : []
   return (
     <View style={styles.screen}>
-      <NavBar title="搜索" large search={{ placeholder: 'Bot、群聊、任务', onChange: setQuery }} />
+      <NavBar title="搜索" topTitle search={{ placeholder: 'Bot、群聊、任务', onChange: setQuery }} />
       <SectionList
         sections={sections}
         keyExtractor={item => item.kind === 'chat' ? rowKey(item.row) : item.task.id}
