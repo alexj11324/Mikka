@@ -101,3 +101,52 @@ tracked separately in [#330](https://github.com/alexj11324/Mikka/issues/330).
 - No local development server, build or typecheck was run. The current application changes passed remote CI before PR #46 was merged; the branch-alias follow-up requires its own remote CI and production validation.
 
 Official references: [Vercel integration](https://vercel.com/marketplace/infisical), [Worker native sync](https://infisical.com/docs/integrations/secret-syncs/cloudflare-workers), [secret references](https://infisical.com/docs/documentation/platform/secret-reference), [Better Auth OAuth proxy](https://www.better-auth.com/docs/plugins/oauth-proxy).
+
+
+## Verified credential discovery and the 2026-11-07 403
+
+The release investigation originally tested only `mikka-github-cloud` through
+GitHub OIDC and incorrectly described its organization App Connection 403 as a
+missing organization credential. The environment already had a usable Universal
+Auth administrator identity. Both identities and the existing Vercel connection
+belong to organization `5caa4fcb-2003-4fc1-8e1f-3a4de2cc05e6`. This was an
+identity/action selection error, not two competing organizations. Do not delete
+an organization to resolve it.
+
+| Existing identity | Authentication and purpose |
+| --- | --- |
+| `token` (`264e0674-6468-4731-a57d-7bb1957f735b`) | Environment-configured Universal Auth; organization administration. Use existing `INFISICAL_*` bindings, never copy their values into the repository or terminal. |
+| `mikka-github-cloud` (`2cf9fa19-b9db-4c08-8ca0-b31859f2cbac`) | GitHub Actions OIDC, audience `mikka-infisical`; production secret delivery inside the runner. Its project membership does not itself grant organization App Connection permissions. |
+
+For a new agent, check the presence of the configured variable names and the
+existing authentication helper/startup notes supplied by its environment before
+assuming only OIDC exists. In this cloud workspace those notes are
+`/workspace/.tools/infisical-direct-startup.md`; the reusable
+`UniversalAuthAPI` class is in `/workspace/.tools/infisical-direct-probe.py`.
+Import the class for metadata/control-plane requests; do not run its unrelated
+credential probe. These paths are environment instructions, not a requirement
+for other hosts to copy credentials or depend on this workspace.
+
+Before reporting a blocker, record only the API action/status, identity name/ID,
+authentication method, and organization/project IDs. Test existing authorized
+identities against the **same** action. A 403 on the organization connection
+read route, a 404 from the wrong project route, and an empty connection list
+are separate observations. In particular, check
+`GET /api/v1/app-connections/vercel/available?projectId=<project>`: the built-in
+organization Member role can Connect while being unable to Read an individual
+connection. Do not require Read when the intended operation needs Connect.
+
+The existing connection is `mikka-team-vercel-native-sync`
+(`d5107d5c-fc41-4f42-a5b1-b77858811bdf`); the Mikka project is
+`89850d6a-f020-4936-863e-df77380dfe40`. Production preparation temporarily used
+the existing administrator to grant the existing OIDC identity the organization
+Connect capability. Restore its previous organization role after preparation;
+a native Secret Sync continues independently of the caller's token. Reuse the
+administrator for future control-plane maintenance rather than inventing a
+second identity or retaining unnecessary organization rights.
+
+This metadata/control-plane discovery does **not** authorize pulling production
+application secrets locally. Production setup, deployment, migrations and
+acceptance run through the existing GitHub Actions workflows with OIDC and
+Infisical. Log names and closed status summaries only; no secret values, raw
+provider responses, private source, or credentials in public artifacts.
