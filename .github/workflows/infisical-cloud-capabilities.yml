@@ -100,6 +100,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
+      pull-requests: write
       actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -203,6 +204,12 @@ jobs:
             ${{ startsWith(github.event.head_commit.message, 'ops: inspect private cloud production metering') && '1' || '0' }}
           MIKKA_CLOUD_ACCEPTANCE_PUBLIC: >-
             ${{ startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public') && '1' || '0' }}
+      - name: Independently read the existing TestFlight build and dispatch metadata-only native readback
+        if: >-
+          always() && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
+        run: node scripts/ops/self-hosting-release.mjs --clients-readback
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   community-subscriptions:
     if: >-

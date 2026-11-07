@@ -47,7 +47,16 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
       ...(bearer ? { authorization: 'Bearer ' + bearer } : {}), ...(csrf ? { 'x-csrf-token': csrf } : {}),
       ...(github ? { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' } : {}),
     }, ...(body ? { body: form ? new URLSearchParams(body).toString() : JSON.stringify(body) } : {}) }) } catch { throw Error('HTTP_TRANSPORT') }
-    report.http.push({ operation, status: response.status }); return response
+    report.http.push({ operation, status: response.status })
+    if (operation === 'github_webhook_progress_comment' && !response.ok) {
+      let body; try { body = await response.clone().json() } catch { body = {} }
+      const message = String(body.message ?? '')
+      const accepted = response.headers.get('x-accepted-github-permissions') ?? ''
+      report.githubCommentDenial = { status: response.status,
+        reason: /resource not accessible by integration/i.test(message) ? 'resource_not_accessible_by_integration' : /rate limit|abuse|spam/i.test(message) ? 'rate_limited' : /permission|forbidden/i.test(message) ? 'permission_denied' : 'other',
+        acceptedPermissions: /^[a-zA-Z0-9_:,;= -]{0,500}$/.test(accepted) ? accepted : 'OTHER' }
+    }
+    return response
   }
   const json = async (operation, path, options, status = 200) => {
     const response = await request(operation, cloudOrigin, PREFIX + path, options)

@@ -61,3 +61,5 @@ test('a failed provider source or fixture preserves the independent bound model 
 // Public release checkpoint: dispatch uses the commit subject prefix, independent of its explanatory body.
 
 // YAML mode expressions use block scalars because the commit prefix contains a colon.
+
+// PR comments use explicit Pull requests write; Apple/EAS readbacks run independently of protocol completion.
