@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "status": "approved_for_task_evidence_publication",
+  "reviewedAt": "2026-11-07T17:15:09.236766+00:00",
+  "originalSupportFiles": 104,
+  "originalSupportBytes": 1395302,
+  "independentSupportReviewSha256": "1b821c2f5e3ccc026c2c79e00e7afa09be310522bd4b4e4caae218df7ff2ae05",
+  "originalSupportBroadPatternFindings": 47,
+  "originalSupportClassifications": {
+    "exactPackageVersionReferences": 35,
+    "fixedDisposableWorkflowServiceUrlMatches": 2,
+    "fiveExistingOfflineTestUrlLinesMatches": 10
+  },
+  "originalSupportUnresolvedFindings": 0,
+  "addedFiles": 33,
+  "addedFilesBroadPatternFindings": 0,
+  "originalNativeJsonFiles": 6,
+  "nativeOriginalBytesUnmodified": true,
+  "signedUrlsPersisted": false,
+  "zipRetained": false,
+  "rawCiLogsIncluded": false,
+  "sourceBundleOrBase64Included": false,
+  "oldScannerHistoryPreserved": true,
+  "scope": "Only this fixed frozen collection and the individual source-only literal exceptions attested in its independent review. No general allowance for credentials or runtime identity data."
+}

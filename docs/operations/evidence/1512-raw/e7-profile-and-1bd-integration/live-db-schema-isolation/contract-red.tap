@@ -1,0 +1,96 @@
+TAP version 13
+# Subtest: live database authentication schema inspection finishes before temporary-schema fixtures start
+not ok 1 - live database authentication schema inspection finishes before temporary-schema fixtures start
+  ---
+  duration_ms: 10.89627
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/run-db-tests.test.mjs:433:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    BetterAuth introspects all schemas, including schemas concurrently dropped by other fixtures
+    + actual - expected
+    
+      [
+    +   'lib/builtin-gateway/postgres.db.test.ts',
+    +   'lib/computer/event-broker.db.test.ts',
+    +   'lib/computer/event-log.db.test.ts',
+        'lib/computer/event-session.db.test.ts',
+    +   'lib/computer/event-writers.db.test.ts',
+    +   'lib/db/listen.db.test.ts',
+    +   'lib/db/request-scope-live.db.test.ts',
+    +   'lib/live/approved-writes.db.test.ts',
+    +   'lib/live/artifacts.db.test.ts',
+    +   'lib/live/billing.db.test.ts',
+    +   'lib/live/chat-preferences.db.test.ts',
+    +   'lib/live/chats.db.test.ts',
+    +   'lib/live/computer-state.db.test.ts',
+    +   'lib/live/devices.db.test.ts',
+    +   'lib/live/factory.db.test.ts',
+    +   'lib/live/groups.db.test.ts',
+    +   'lib/live/issue-detail.db.test.ts',
+    +   'lib/live/issue-threads.db.test.ts',
+    +   'lib/live/lists.db.test.ts',
+    +   'lib/live/notification-context.db.test.ts',
+    +   'lib/live/panels.db.test.ts',
+    +   'lib/live/pending-actions.db.test.ts',
+    +   'lib/live/project-map.db.test.ts',
+    +   'lib/live/pull-requests.db.test.ts',
+    +   'lib/live/store.db.test.ts',
+        'lib/live/ticket-session.db.test.ts',
+    +   'lib/mcp/reply-live.db.test.ts',
+    +   'lib/mcp/reply-notifications.db.test.ts',
+    +   'lib/short-title-schedule.db.test.ts'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'lib/computer/event-session.db.test.ts'
+    1: 'lib/live/ticket-session.db.test.ts'
+  actual:
+    0: 'lib/builtin-gateway/postgres.db.test.ts'
+    1: 'lib/computer/event-broker.db.test.ts'
+    2: 'lib/computer/event-log.db.test.ts'
+    3: 'lib/computer/event-session.db.test.ts'
+    4: 'lib/computer/event-writers.db.test.ts'
+    5: 'lib/db/listen.db.test.ts'
+    6: 'lib/db/request-scope-live.db.test.ts'
+    7: 'lib/live/approved-writes.db.test.ts'
+    8: 'lib/live/artifacts.db.test.ts'
+    9: 'lib/live/billing.db.test.ts'
+    10: 'lib/live/chat-preferences.db.test.ts'
+    11: 'lib/live/chats.db.test.ts'
+    12: 'lib/live/computer-state.db.test.ts'
+    13: 'lib/live/devices.db.test.ts'
+    14: 'lib/live/factory.db.test.ts'
+    15: 'lib/live/groups.db.test.ts'
+    16: 'lib/live/issue-detail.db.test.ts'
+    17: 'lib/live/issue-threads.db.test.ts'
+    18: 'lib/live/lists.db.test.ts'
+    19: 'lib/live/notification-context.db.test.ts'
+    20: 'lib/live/panels.db.test.ts'
+    21: 'lib/live/pending-actions.db.test.ts'
+    22: 'lib/live/project-map.db.test.ts'
+    23: 'lib/live/pull-requests.db.test.ts'
+    24: 'lib/live/store.db.test.ts'
+    25: 'lib/live/ticket-session.db.test.ts'
+    26: 'lib/mcp/reply-live.db.test.ts'
+    27: 'lib/mcp/reply-notifications.db.test.ts'
+    28: 'lib/short-title-schedule.db.test.ts'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/scripts/run-db-tests.test.mjs:440:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 154.905083

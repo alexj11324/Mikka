@@ -1,0 +1,210 @@
+
+> next-app@0.0.1 lint /workspace/scratch/812e3b7d6d45/Mikka
+> pnpm lint:code && pnpm lint:ui
+
+
+> next-app@0.0.1 lint:code /workspace/scratch/812e3b7d6d45/Mikka
+> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:938:41: warning eslint(no-unused-vars): Variable 'm' is assigned a value but never used. Unused variables should start with a '_'. help: Did you mean to use this variable?
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1082:37: warning eslint(no-unused-vars): Parameter 'n' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:64:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:874:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:875:10: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:906:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:914:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:922:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:932:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:966:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:985:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1003:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1008:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1027:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1034:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1043:30: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1043:112: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1050:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1055:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1061:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1067:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1093:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1096:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1115:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1125:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1131:62: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1144:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1157:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1161:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1167:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-6i2HPe/build/dev/index.mjs:1248:210: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/httpxy-inspection.mjs:190:20: warning eslint(no-unused-vars): Parameter 'i3' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.
+.cache/httpxy-inspection.mjs:14:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:19:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:21:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:22:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:24:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:32:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:46:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:126:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:128:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:133:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:138:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:154:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:157:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:166:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:168:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:176:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:190:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:191:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:195:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:198:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:202:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:210:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:211:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:213:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:224:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:226:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:228:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:232:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:239:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:242:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:244:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:246:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:251:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:259:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:261:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:271:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:282:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:292:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:294:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:296:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:305:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:309:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:311:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:312:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:314:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:320:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:323:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:326:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:329:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:339:3: warning eslint(constructor-super): Expected to call `super()`. help: Add a `super()` call to the constructor
+.cache/httpxy-inspection.mjs:340:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:354:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:355:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:361:40: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:368:40: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:382:43: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:385:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:387:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:390:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:396:11: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:399:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:414:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:417:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:436:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:462:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:468:9: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:471:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:474:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:483:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:488:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:490:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:491:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:493:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:498:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/httpxy-inspection.mjs:501:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:938:41: warning eslint(no-unused-vars): Variable 'm' is assigned a value but never used. Unused variables should start with a '_'. help: Did you mean to use this variable?
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1082:37: warning eslint(no-unused-vars): Parameter 'n' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:64:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:874:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:875:10: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:906:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:914:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:922:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:932:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:966:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:985:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1003:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1008:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1027:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1034:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1043:30: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1043:112: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1050:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1055:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1061:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1067:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1093:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1096:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1115:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1125:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1131:62: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1144:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1157:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1161:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1167:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-E65WFY/build/dev/index.mjs:1248:210: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:938:41: warning eslint(no-unused-vars): Variable 'm' is assigned a value but never used. Unused variables should start with a '_'. help: Did you mean to use this variable?
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1082:37: warning eslint(no-unused-vars): Parameter 'n' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:64:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:874:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:875:10: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:906:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:914:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:922:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:932:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:966:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:985:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1003:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1008:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1027:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1034:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1043:30: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1043:112: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1050:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1055:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1061:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1067:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1093:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1096:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1115:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1125:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1131:62: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1144:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1157:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1161:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1167:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-e2gNHt/build/dev/index.mjs:1248:210: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:938:41: warning eslint(no-unused-vars): Variable 'm' is assigned a value but never used. Unused variables should start with a '_'. help: Did you mean to use this variable?
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1082:37: warning eslint(no-unused-vars): Parameter 'n' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:64:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:874:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:875:10: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:906:7: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:914:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:922:4: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:932:3: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:966:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:985:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1003:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1008:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1027:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1034:5: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1043:30: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1043:112: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1050:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1055:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1061:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1067:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1093:3: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1096:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1115:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1125:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1131:62: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1144:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1157:4: warning eslint(no-sparse-arrays): Unexpected comma in middle of array help: remove the comma or insert `undefined`
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1161:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1167:2: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it
+.cache/mcp-nitro-probe-eigzO2/build/dev/index.mjs:1248:210: warning eslint(no-useless-escape): Unnecessary escape character '/' help: Replace `\/` with `/`.
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

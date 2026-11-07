@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_live_database_schema_isolation_source_validation",
+  "status": "source_contract_passed_real_postgres_green_pending",
+  "createdAt": "2026-11-07T16:40:16.754436+00:00",
+  "repository": "alexj11324/Mikka",
+  "candidateBeforeFix": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "actualFailedCheckout": "49d93ce3feb348fdfb05bd30e9d0ae114066da25",
+  "treeBeforeFix": "67262992599d8de8a0aa04d35bbee3b98add277d",
+  "originalCi": {
+    "path": "evidence/ci-1bd4-owned-final.json",
+    "bytes": 139677,
+    "sha256": "97e8043a7050ffdd2ff9f2fbfb3bdcfd9a072ce4a07fa18117370502d73001cb",
+    "gitBlobSha": "79b398d9f4be2473cfdf7bf8b8a00b203b8d9073",
+    "runId": 42391049903,
+    "attempt": 1,
+    "jobId": 128458549150,
+    "step": 15,
+    "suite": "test:live-db",
+    "postgresVersion": "17.11",
+    "suiteTests": 163,
+    "suitePass": 162,
+    "suiteFail": 1,
+    "suiteSkipped": 0,
+    "errorCode": "3F000",
+    "schemaPrefix": "computer_broker_",
+    "postgresRoutine": "get_namespace_oid"
+  },
+  "rootCause": {
+    "failedTest": "lib/computer/event-session.db.test.ts",
+    "concurrentDdlFixture": "lib/computer/event-broker.db.test.ts",
+    "dependencyPath": [
+      "better-auth 1.7.12 initial schema validation",
+      "@better-auth/kysely-adapter 1.7.12 findSchemaProblems",
+      "kysely 0.29.7 PostgresIntrospector.getTables"
+    ],
+    "mechanism": "Authentication initialization introspects all visible non-system schemas. The concurrently running broker fixture drops its temporary schema; a name-based PostgreSQL schema lookup during introspection then raises 3F000. This was observed in the actual failed CI stack and missing-schema prefix.",
+    "additionalSamePath": "lib/live/ticket-session.db.test.ts also initializes real BetterAuth, so isolating only the originally failed file would leave the same race reachable."
+  },
+  "change": {
+    "files": [
+      {
+        "path": "package.json",
+        "snapshot": "live-db-schema-isolation/source/package.json",
+        "bytes": 75318,
+        "sha256": "37912acaacf1b64dea4b5308d0cddd158b4f6ddc62c264ac93f74545d414cb60",
+        "gitBlobSha": "9424ab745298fe9596dc78fc784d47fe9a6019ba",
+        "baseCandidate": {
+          "bytes": 75222,
+          "sha256": "dfdafcec8c862f61c2fde97cadc6c3a29f631f3b4de3dad290c8a6d6866560c6",
+          "gitBlobSha": "ce29b39f0489de2c61f9a39bdb667a93789a72b7"
+        }
+      },
+      {
+        "path": "scripts/run-db-tests.test.mjs",
+        "snapshot": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "bytes": 38722,
+        "sha256": "c64720c93f4b66a4a2e03b8dfec6158304dbf4750ba16436b041c79492105b03",
+        "gitBlobSha": "4662ac6f57d2045523285f9ab44eba99afb18287",
+        "baseCandidate": {
+          "bytes": 37095,
+          "sha256": "47394b8591daf4a1ca0bcc0d6be20e77bdbaacec79e1604945c05c0556b02682",
+          "gitBlobSha": "f5b4b6b267fb63700ac225c125ff0da8459fbefd"
+        }
+      }
+    ],
+    "patch": {
+      "path": "live-db-schema-isolation/patch.diff",
+      "bytes": 7201,
+      "sha256": "e4e7ac8f9865da5e7444c116d6416e1c28e1cffbae4af2b25289a7e79ace6376",
+      "gitBlobSha": "69132ec363169cb6bb0729b92e9493f3ae19751c"
+    },
+    "sequentialNodeGroups": [
+      [
+        "lib/computer/event-session.db.test.ts",
+        "lib/live/ticket-session.db.test.ts"
+      ],
+      [
+        "lib/live/factory.db.test.ts",
+        "lib/live/store.db.test.ts",
+        "lib/live/panels.db.test.ts",
+        "lib/db/request-scope-live.db.test.ts",
+        "lib/short-title-schedule.db.test.ts",
+        "lib/live/notification-context.db.test.ts",
+        "lib/live/computer-state.db.test.ts",
+        "lib/live/approved-writes.db.test.ts",
+        "lib/live/pending-actions.db.test.ts",
+        "lib/live/lists.db.test.ts",
+        "lib/mcp/reply-live.db.test.ts",
+        "lib/mcp/reply-notifications.db.test.ts",
+        "lib/db/listen.db.test.ts",
+        "lib/live/chats.db.test.ts",
+        "lib/live/chat-preferences.db.test.ts",
+        "lib/live/groups.db.test.ts",
+        "lib/live/issue-threads.db.test.ts",
+        "lib/live/issue-detail.db.test.ts",
+        "lib/live/devices.db.test.ts",
+        "lib/live/artifacts.db.test.ts",
+        "lib/live/billing.db.test.ts",
+        "lib/live/pull-requests.db.test.ts",
+        "lib/computer/event-log.db.test.ts",
+        "lib/computer/event-writers.db.test.ts",
+        "lib/computer/event-broker.db.test.ts",
+        "lib/live/project-map.db.test.ts",
+        "lib/builtin-gateway/postgres.db.test.ts"
+      ]
+    ],
+    "allOriginalFilesExactlyOnce": true,
+    "originalNodeFlagsPreserved": true,
+    "authenticationGroupContainsNoCreateDropAlterDdl": true,
+    "remainingFixtureGroupParallelismPreserved": true,
+    "noChangeTo": [
+      "SDK schema validation",
+      "product routes or authorization",
+      "real session and SQL assertions",
+      "test timeouts",
+      "required DB skip/failure policy",
+      "temporary schema cleanup",
+      "test database target guards"
+    ],
+    "exitPropagation": "The actual package command shell separators are tested with synthetic command exit statuses. Authentication failure fails the gate and prevents starting the later group; fixture failure also fails the gate."
+  },
+  "validation": [
+    {
+      "phase": "source_contract_red",
+      "exitCode": 1,
+      "command": "node --test --test-reporter=tap --test-name-pattern='live database authentication schema inspection' scripts/run-db-tests.test.mjs",
+      "summary": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "meaning": "The old single concurrent group included both BetterAuth files together with temporary-schema fixtures.",
+      "output": {
+        "path": "live-db-schema-isolation/contract-red.tap",
+        "bytes": 3717,
+        "sha256": "4d7e6365b3077543ac2c04d4d0c9f9dd0e75b406e59ca84b8f2dd62a4adc36a7",
+        "gitBlobSha": "29d5d294d03b5dd52d766ca95fd6e4eaee34eb42"
+      }
+    },
+    {
+      "phase": "source_contract_first_green",
+      "exitCode": 0,
+      "command": "node --test --test-reporter=tap scripts/run-db-tests.test.mjs",
+      "summary": {
+        "tests": 24,
+        "suites": 0,
+        "pass": 24,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "output": {
+        "path": "live-db-schema-isolation/contract-green.tap",
+        "bytes": 6466,
+        "sha256": "c91c277d62088f82bea00ff496c0a5193b6b8cb176437258ea8b17625f64bd7e",
+        "gitBlobSha": "a6f6ca6440cdb49bca094ed31cc73dbd7b56a03e"
+      }
+    },
+    {
+      "phase": "initial_lint",
+      "exitCode": 1,
+      "closedDiagnostic": "unicorn/prefer-string-starts-ends-with",
+      "resolution": "Replaced the equivalent suffix regex with String.endsWith; no behavior or test plan changed.",
+      "output": {
+        "path": "live-db-schema-isolation/lint.log",
+        "bytes": 227,
+        "sha256": "b67b62714f0c3e71d2377e05a45acd10f67a63c5e22e13bac55f558b290087fa",
+        "gitBlobSha": "c12e0d84ac1242dc7465fd964946c4b66e959db1"
+      }
+    },
+    {
+      "phase": "source_contract_final_green",
+      "exitCode": 0,
+      "command": "TMPDIR=/dev/shm/issue1512-ops-812e3b7d6d45/tmp node --test --test-reporter=tap scripts/run-db-tests.test.mjs",
+      "summary": {
+        "tests": 24,
+        "suites": 0,
+        "pass": 24,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "output": {
+        "path": "live-db-schema-isolation/contract-green-final.tap",
+        "bytes": 6457,
+        "sha256": "19039d9c32b1cc8702a8bb842bcb5627770e7be33ab855a109e0dc05695b1dc4",
+        "gitBlobSha": "368c147026b168ebf21b7e70074789bff9f707dc"
+      }
+    },
+    {
+      "phase": "final_lint",
+      "exitCode": 0,
+      "command": "./node_modules/.bin/oxlint --no-ignore --deny-warnings scripts/run-db-tests.test.mjs",
+      "output": {
+        "path": "live-db-schema-isolation/lint-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "phase": "final_diff_check",
+      "exitCode": 0,
+      "command": "git diff --check -- package.json scripts/run-db-tests.test.mjs",
+      "output": {
+        "path": "live-db-schema-isolation/diff-check-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    }
+  ],
+  "realPostgresValidation": {
+    "red": "Actual required CI shard failure preserved above.",
+    "green": "Pending the next fixed candidate required PostgreSQL CI; not executed or claimed locally.",
+    "localEnvironment": "No PostgreSQL or Docker executable and no configured E2E_DATABASE_URL; no service was installed or target invented."
+  },
+  "privacy": {
+    "rawCiLogsPersisted": false,
+    "savedCiProjectionClosed": true,
+    "newRealDatabaseOrProviderCalls": false,
+    "credentialsOrRuntimeEmailValuesIncluded": false
+  },
+  "mutation": {
+    "productRuntime": false,
+    "testWiringOnly": true,
+    "staged": false,
+    "committed": false,
+    "refs": false,
+    "publishState": false
+  }
+}

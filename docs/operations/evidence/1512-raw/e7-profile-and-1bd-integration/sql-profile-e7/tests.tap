@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: the exact successful Linux API is tied to e7 and its identical synthetic tree
+ok 1 - the exact successful Linux API is tied to e7 and its identical synthetic tree
+  ---
+  duration_ms: 0.952768
+  type: 'test'
+  ...
+# Subtest: CLI rejects incomplete, duplicated or unknown paths before any work
+ok 2 - CLI rejects incomplete, duplicated or unknown paths before any work
+  ---
+  duration_ms: 0.448387
+  type: 'test'
+  ...
+# Subtest: owner-wide reads require the actual personal home, never the selected team
+ok 3 - owner-wide reads require the actual personal home, never the selected team
+  ---
+  duration_ms: 1.318561
+  type: 'test'
+  ...
+# Subtest: thread sync uses returned positions and refuses a changed or unproved cursor
+ok 4 - thread sync uses returned positions and refuses a changed or unproved cursor
+  ---
+  duration_ms: 0.928832
+  type: 'test'
+  ...
+# Subtest: chat uses the normal null selector and only its returned continuation
+ok 5 - chat uses the normal null selector and only its returned continuation
+  ---
+  duration_ms: 0.363148
+  type: 'test'
+  ...
+# Subtest: the one batch preserves each measured argument and order without a mutation
+ok 6 - the one batch preserves each measured argument and order without a mutation
+  ---
+  duration_ms: 0.224509
+  type: 'test'
+  ...
+# Subtest: safe read receipts contain no body, owner, workspace, fixture ID or cursor
+ok 7 - safe read receipts contain no body, owner, workspace, fixture ID or cursor
+  ---
+  duration_ms: 0.306533
+  type: 'test'
+  ...
+# Subtest: each shared RPC and eight REST endpoint types has a Web/Native pair, without a mutation or refresh
+ok 8 - each shared RPC and eight REST endpoint types has a Web/Native pair, without a mutation or refresh
+  ---
+  duration_ms: 0.630382
+  type: 'test'
+  ...
+# Subtest: Native requests bind exact current scope and cursor, and enrollment stays a GET
+ok 9 - Native requests bind exact current scope and cursor, and enrollment stays a GET
+  ---
+  duration_ms: 0.894471
+  type: 'test'
+  ...
+# Subtest: issue sync validates both owned home and selected team, then uses only returned positions
+ok 10 - issue sync validates both owned home and selected team, then uses only returned positions
+  ---
+  duration_ms: 0.334124
+  type: 'test'
+  ...
+# Subtest: computer events keep the exact decimal cursor, require a complete ordered page and export no payload
+ok 11 - computer events keep the exact decimal cursor, require a complete ordered page and export no payload
+  ---
+  duration_ms: 0.425663
+  type: 'test'
+  ...
+# Subtest: REST receipts bind original default workspace, owner and owned fixture without disclosing text
+ok 12 - REST receipts bind original default workspace, owner and owned fixture without disclosing text
+  ---
+  duration_ms: 0.978297
+  type: 'test'
+  ...
+# Subtest: common read receipts validate the actual fixture and refuse non-isolated provider menu options
+ok 13 - common read receipts validate the actual fixture and refuse non-isolated provider menu options
+  ---
+  duration_ms: 0.407385
+  type: 'test'
+  ...
+# Subtest: the fixed table is the independently reviewed e7 catalogue, with residual unknowns retained
+ok 14 - the fixed table is the independently reviewed e7 catalogue, with residual unknowns retained
+  ---
+  duration_ms: 6.177348
+  type: 'test'
+  ...
+# Subtest: full snapshot validation rejects missing/extra labels, nonintegers, negative values and conservation loss
+ok 15 - full snapshot validation rejects missing/extra labels, nonintegers, negative values and conservation loss
+  ---
+  duration_ms: 3.857906
+  type: 'test'
+  ...
+# Subtest: a sparse delta follows full-map monotonic and scalar validation and preserves otherScoped/noScope
+ok 16 - a sparse delta follows full-map monotonic and scalar validation and preserves otherScoped/noScope
+  ---
+  duration_ms: 4.500686
+  type: 'test'
+  ...
+# Subtest: the actual copied reader accepts the full 287-label response above 8 KiB and refuses truncation/overflow
+ok 17 - the actual copied reader accepts the full 287-label response above 8 KiB and refuses truncation/overflow
+  ---
+  duration_ms: 2.557683
+  type: 'test'
+  ...
+# Subtest: the unchanged preload counts real method invocations against the new table without retaining arguments
+ok 18 - the unchanged preload counts real method invocations against the new table without retaining arguments
+  ---
+  duration_ms: 4.784285
+  type: 'test'
+  ...
+# Subtest: a 60-request sparse report stays bounded without dropping unknown buckets or raw count conservation
+ok 19 - a 60-request sparse report stays bounded without dropping unknown buckets or raw count conservation
+  ---
+  duration_ms: 10.88399
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 117.190731

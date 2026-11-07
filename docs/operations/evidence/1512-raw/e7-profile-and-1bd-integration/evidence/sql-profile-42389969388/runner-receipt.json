@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "runId": "42389969388",
+  "runAttempt": "1",
+  "operationRevision": "07062f0ca9e0eabd534bc85840d177e963123c30",
+  "sourceRevision": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "temporaryDownloadsRemoved": true,
+  "scripts": {
+    "driver.mjs": "7ea28445e759f8fb1e37eadb0aca9fdba397d425f02dd72b8ca5e2470397d4e8",
+    "artifact.mjs": "c317f6e598758af7ba55df02de4160355503ffca32968d86fd9a5be5e3108f9d",
+    "reads.mjs": "fc67e02da9887d29a77beda0f76608073467883031c94074de859fd7cdba8062",
+    "projection.mjs": "d7f6cce673fc3ee6c0508ccd9fdc97fb7d785d2669f5d58332ae8a61276afa54",
+    "driver.test.mjs": "766b9f9f2cc87b49f594223e706bec43379ec01b03399c934ee372a967630f15",
+    "projection.test.mjs": "a2d20e1275df5426e172d8e4fb861e195a60a248f21ca06d7feaa286292c0088",
+    "closed-labels.json": "dd352c9f91b3a1588d989ce974fbf5959c2107b790c234382364e03653812017",
+    "metrics-provenance.json": "0402fc020124b9e653fd6cf4af0fc00979e60468e80de04189bce5621155fe96",
+    "metrics/db-metrics.cjs": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+    "metrics/db-query-operations.cjs": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+    "metrics/db-query-unattributed-sources.cjs": "90e770a1c7d0fc2d4b504fb0761db98bbd3ba4db70d7edf8d4ad9578efb8d176",
+    "metrics/lifecycle-query-counts.mjs": "3133e8a475c7efd1613a0d53f0a72a28318e2725e2fdd16520995ba4f65a7c38"
+  },
+  "externalModelCalls": 0,
+  "externalVirtualMachines": 0,
+  "postgres": {
+    "scope": "fresh job-local GitHub Actions service",
+    "teardown": "pending workflow-owned Stop containers step"
+  },
+  "recordedAt": "2026-11-07T16:12:10.886Z",
+  "productionAcceptance": false
+}

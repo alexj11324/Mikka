@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "classification": "isolated-workflow-service-literal-not-production-credential",
+  "workflow": "sql-profile-e7/workflow.yml",
+  "sourceCommit": "07062f0ca9e0eabd534bc85840d177e963123c30",
+  "serviceImage": "postgres:17",
+  "hostIsLoopback": true,
+  "usernameMatchesDisposableService": true,
+  "passwordMatchesDisposableService": true,
+  "passwordValueIncluded": false,
+  "sourceValuesAlreadyVersionedInOwnedDiagnosticWorkflow": true,
+  "scope": "Only this fixed disposable local PostgreSQL service literal is excepted. All production secret/URL findings remain blocking."
+}

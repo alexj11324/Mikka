@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T16:24:01.894865+00:00",
+  "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+  "parent": "7b41a196592af8a63ec157c4eadc9fb06b04005c",
+  "main": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+  "workflowCheckpoint": "fea5b397464062755fe97ec0022c72d27593cfb6",
+  "ownerCheckpointFiles": 6,
+  "checkpointRemoteOriginalTextVerified": true,
+  "sourceImportRun": 42390984261,
+  "sourceImportJob": 128458300276,
+  "sourceImportConclusion": "success",
+  "operation": "fd3c0da847e51fe8491ec608bcf209bf5ab491d2",
+  "operationTree": "daa4389176f539e9b73d131c09ea2bfc27a299c6",
+  "bundleBytes": 21533,
+  "bundleSha256": "31a9d8fccf4c489fd85e5abc4604be6dfc4b1b0ffe086156ce2a52a04b3b69b3",
+  "remoteCommitTreeAndParentVerified": true,
+  "featureFastForwardFrom": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "ci": "pending",
+  "productionAcceptance": false
+}

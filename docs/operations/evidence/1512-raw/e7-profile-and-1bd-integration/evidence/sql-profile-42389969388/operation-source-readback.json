@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T16:23:32.199359+00:00",
+  "revision": "07062f0ca9e0eabd534bc85840d177e963123c30",
+  "method": "Immutable GitHub contents metadata for twelve payloads plus exact UTF-8 workflow response; compare local original Git blob identities without artifact download",
+  "files": [
+    {
+      "path": ".github/issue1512-sql-profile-e7/artifact.mjs",
+      "gitBlob": "68897f7fce279fc874f041769087ec437b6367e2",
+      "bytes": 5940
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/closed-labels.json",
+      "gitBlob": "d2328d33fd684e2794b9b5207a81ebd6283d9648",
+      "bytes": 23716
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/driver.mjs",
+      "gitBlob": "1b7fc413705539c2f24c54c7aece5d5a02e64d82",
+      "bytes": 39946
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/driver.test.mjs",
+      "gitBlob": "986c1e4fca7af38c94e3760ad5b172c1757ee732",
+      "bytes": 13962
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics-provenance.json",
+      "gitBlob": "0841241fb63a0337f51b48bdb6ec75ed33f03121",
+      "bytes": 2513
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/projection.mjs",
+      "gitBlob": "092b5ee4202639a825e49a5d4b7effec7e95bd7d",
+      "bytes": 4132
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/projection.test.mjs",
+      "gitBlob": "db3215732eb3966dd25f9e0a2f94761d0856fed4",
+      "bytes": 10473
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/reads.mjs",
+      "gitBlob": "13850386a6fa2afd5774a47a8796862a9b6f8d50",
+      "bytes": 15002
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/db-metrics.cjs",
+      "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9",
+      "bytes": 8336
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/db-query-operations.cjs",
+      "gitBlob": "9011b6edb7296c8872d3e311074529a49987b575",
+      "bytes": 529
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/db-query-unattributed-sources.cjs",
+      "gitBlob": "608f80e9c75964b8cf3c59918c7036d98a675900",
+      "bytes": 9513
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/lifecycle-query-counts.mjs",
+      "gitBlob": "8bef5b7c7abda0a50732bec502e924a66167c9ce",
+      "bytes": 21882
+    },
+    {
+      "path": ".github/workflows/issue1512-sql-profile-e7.yml",
+      "gitBlob": "4a651547bcb4a67388b13a01f01bf11170e5a2fa",
+      "bytes": 6519
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "candidate": "bd5f23536fb64f5db81668e60f2353678832550f",
+  "tree": "655e96ed60c638cdabc44f761d7fef531c765e40",
+  "parent": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "changedFiles": [
+    "package.json",
+    "scripts/run-db-tests.test.mjs"
+  ],
+  "published": false,
+  "realPgValidation": "pending_next_required_CI",
+  "commitOutput": "[feat/1512-run-observability bd5f2353] test: isolate authentication introspection from schema teardown\n 2 files changed, 24 insertions(+), 1 deletion(-)"
+}

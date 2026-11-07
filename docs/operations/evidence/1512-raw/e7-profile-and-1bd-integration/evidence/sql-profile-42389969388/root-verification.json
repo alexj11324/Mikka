@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T16:16:42.717848+00:00",
+  "run": 42389969388,
+  "attempt": 1,
+  "operation": "07062f0ca9e0eabd534bc85840d177e963123c30",
+  "actualSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "candidate": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "requests": 60,
+  "allOriginalPerRequestAndRefinementConserved": true,
+  "allRequestOrderMatched": true,
+  "oneApiPid": 3644,
+  "gaps": {
+    "queryCalls": 0,
+    "pgProtocolReceiveBytes": 0,
+    "pgProtocolSendBytes": 0
+  },
+  "driverElapsedMs": 11369,
+  "cleanup": {
+    "http_context": {
+      "status": "passed",
+      "created": 2,
+      "disposed": 2
+    },
+    "owned_loopback": {
+      "status": "passed"
+    },
+    "owned_pkce": {
+      "status": "passed",
+      "removedRows": 1
+    },
+    "fixtures": {
+      "status": "passed"
+    },
+    "lease": {
+      "status": "passed",
+      "state": "released"
+    },
+    "api_process": {
+      "status": "passed",
+      "exited": true,
+      "forcedKill": false
+    },
+    "local_gateway": {
+      "status": "passed",
+      "disposed": true,
+      "exited": true,
+      "forcedKill": false
+    },
+    "private_account_files": {
+      "status": "passed"
+    },
+    "private_runtime_files": {
+      "status": "passed"
+    },
+    "owned_metrics_socket": {
+      "status": "passed"
+    }
+  },
+  "runnerTemporaryDownloadsRemoved": true,
+  "externalModelCalls": 0,
+  "externalVirtualMachines": 0,
+  "productionAcceptance": false,
+  "nativeBudget": "prior actual Native 186 > Web 162 remains failed; sequential decomposition does not allocate its concurrent difference",
+  "files": [
+    {
+      "path": "artifact-receipt.json",
+      "bytes": 1103,
+      "sha256": "d978f1c5a478c0d0ffff1154bf08bed0b82b9d4c5a0b014eb5a7b5972689e078"
+    },
+    {
+      "path": "desktop-query-decomposition.json",
+      "bytes": 135603,
+      "sha256": "4cef0114bf5b809b2410ab5dd9596849d3369748a89bb02f556eeacd13217364"
+    },
+    {
+      "path": "runner-receipt.json",
+      "bytes": 1687,
+      "sha256": "08a045284f36a2e6e392badd33884c3b139bf0fcff459c764fb627a8bd89b2ae"
+    },
+    {
+      "path": "download-receipt.json",
+      "bytes": 958,
+      "sha256": "f3f13c98fa96926da9ff3bda80548fe0cb4e10e5fedd931ef2783ab18550a4db"
+    }
+  ]
+}

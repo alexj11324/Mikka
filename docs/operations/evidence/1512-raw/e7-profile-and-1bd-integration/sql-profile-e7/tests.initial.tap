@@ -1,0 +1,35 @@
+✔ the exact successful Linux API is tied to e7 and its identical synthetic tree (1.221175ms)
+✔ CLI rejects incomplete, duplicated or unknown paths before any work (0.448888ms)
+✔ owner-wide reads require the actual personal home, never the selected team (1.600106ms)
+✔ thread sync uses returned positions and refuses a changed or unproved cursor (1.07339ms)
+✔ chat uses the normal null selector and only its returned continuation (0.447085ms)
+✔ the one batch preserves each measured argument and order without a mutation (0.287965ms)
+✔ safe read receipts contain no body, owner, workspace, fixture ID or cursor (0.404451ms)
+✔ each shared RPC and eight REST endpoint types has a Web/Native pair, without a mutation or refresh (1.110717ms)
+✔ Native requests bind exact current scope and cursor, and enrollment stays a GET (1.026931ms)
+✔ issue sync validates both owned home and selected team, then uses only returned positions (0.366654ms)
+✔ computer events keep the exact decimal cursor, require a complete ordered page and export no payload (0.429238ms)
+✔ REST receipts bind original default workspace, owner and owned fixture without disclosing text (1.670713ms)
+✔ common read receipts validate the actual fixture and refuse non-isolated provider menu options (0.512124ms)
+✔ the fixed table is the independently reviewed e7 catalogue, with residual unknowns retained (5.518013ms)
+✔ full snapshot validation rejects missing/extra labels, nonintegers, negative values and conservation loss (3.126311ms)
+✔ a sparse delta follows full-map monotonic and scalar validation and preserves otherScoped/noScope (4.147844ms)
+✔ the actual copied reader accepts the full 287-label response above 8 KiB and refuses truncation/overflow (2.578643ms)
+✔ the unchanged preload counts real method invocations against the new table without retaining arguments (4.869693ms)
+✔ a 60-request sparse report stays bounded without dropping unknown buckets or raw count conservation (9.691044ms)
+ℹ Error: A resource generated asynchronous activity after the test ended. This activity created the error "Error: LIFECYCLE_QUERY_COUNTER_BODY_TOO_LARGE" which triggered an uncaughtException event, caught by the test runner.
+✖ projection.test.mjs (146.164433ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 19
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 157.727895
+
+✖ failing tests:
+
+test at projection.test.mjs:1:1
+✖ projection.test.mjs (146.164433ms)
+  'test failed'

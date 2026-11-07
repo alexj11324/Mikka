@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: next cjs: bind the actual PG after tracing, with distinct copies and no double count
+ok 1 - next cjs: bind the actual PG after tracing, with distinct copies and no double count
+  ---
+  duration_ms: 284.207587
+  type: 'test'
+  ...
+# Subtest: nitro cjs: bind the actual PG after tracing, with distinct copies and no double count
+ok 2 - nitro cjs: bind the actual PG after tracing, with distinct copies and no double count
+  ---
+  duration_ms: 180.527778
+  type: 'test'
+  ...
+# Subtest: nitro esm: bind the actual PG after tracing, with distinct copies and no double count
+ok 3 - nitro esm: bind the actual PG after tracing, with distinct copies and no double count
+  ---
+  duration_ms: 160.48043
+  type: 'test'
+  ...
+# Subtest: Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output
+ok 4 - Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output
+  ---
+  duration_ms: 98.448741
+  type: 'test'
+  ...
+# Subtest: lifecycle query windows retain exact counter deltas and omit unrelated content
+ok 5 - lifecycle query windows retain exact counter deltas and omit unrelated content
+  ---
+  duration_ms: 0.797244
+  type: 'test'
+  ...
+# Subtest: operation SQL counts partition the original full window without removing unknown or background work
+ok 6 - operation SQL counts partition the original full window without removing unknown or background work
+  ---
+  duration_ms: 0.531843
+  type: 'test'
+  ...
+# Subtest: operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories
+ok 7 - operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories
+  ---
+  duration_ms: 0.441587
+  type: 'test'
+  ...
+# Subtest: unattributed source refinement conserves the original partition and full-window deltas
+ok 8 - unattributed source refinement conserves the original partition and full-window deltas
+  ---
+  duration_ms: 0.672145
+  type: 'test'
+  ...
+# Subtest: unattributed source refinement rejects incomplete evidence without upgrading legacy reports
+ok 9 - unattributed source refinement rejects incomplete evidence without upgrading legacy reports
+  ---
+  duration_ms: 1.010977
+  type: 'test'
+  ...
+# Subtest: unattributed source refinement fits the unchanged control-response limit at the largest safe count
+ok 10 - unattributed source refinement fits the unchanged control-response limit at the largest safe count
+  ---
+  duration_ms: 0.369318
+  type: 'test'
+  ...
+# Subtest: lifecycle query windows refuse a changed process, reset, missing driver and unknown readings
+ok 11 - lifecycle query windows refuse a changed process, reset, missing driver and unknown readings
+  ---
+  duration_ms: 0.346984
+  type: 'test'
+  ...
+# Subtest: lifecycle reads only the attested primary metric socket, with bounded closed errors
+ok 12 - lifecycle reads only the attested primary metric socket, with bounded closed errors
+  ---
+  duration_ms: 1.246883
+  type: 'test'
+  ...
+# Subtest: RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields
+ok 13 - RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields
+  ---
+  duration_ms: 6.436609
+  type: 'test'
+  ...
+# Subtest: RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts
+ok 14 - RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts
+  ---
+  duration_ms: 7.822322
+  type: 'test'
+  ...
+# Subtest: RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls
+ok 15 - RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls
+  ---
+  duration_ms: 2.068043
+  type: 'test'
+  ...
+# Subtest: RPC diagnostics accept only the descriptor-bound primary log and complete measured windows
+ok 16 - RPC diagnostics accept only the descriptor-bound primary log and complete measured windows
+  ---
+  duration_ms: 1.779808
+  type: 'test'
+  ...
+# Subtest: RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable
+ok 17 - RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable
+  ---
+  duration_ms: 1.757154
+  type: 'test'
+  ...
+# Subtest: RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases
+ok 18 - RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases
+  ---
+  duration_ms: 2.051648
+  type: 'test'
+  ...
+# Subtest: RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries
+ok 19 - RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries
+  ---
+  duration_ms: 1.811996
+  type: 'test'
+  ...
+# Subtest: RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence
+ok 20 - RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence
+  ---
+  duration_ms: 2.96734
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 859.942954

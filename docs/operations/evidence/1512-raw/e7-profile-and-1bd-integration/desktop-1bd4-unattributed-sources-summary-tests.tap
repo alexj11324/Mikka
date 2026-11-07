@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: valid 12 snapshots, 8 segments and 4 totals retain full counts and source differences
+ok 1 - valid 12 snapshots, 8 segments and 4 totals retain full counts and source differences
+  ---
+  duration_ms: 7.120713
+  type: 'test'
+  ...
+# Subtest: legacy absence remains unavailable with original totals and no synthetic zeros
+ok 2 - legacy absence remains unavailable with original totals and no synthetic zeros
+  ---
+  duration_ms: 1.048683
+  type: 'test'
+  ...
+# Subtest: one missing refinement is incomplete instead of a valid zero or legacy report
+ok 3 - one missing refinement is incomplete instead of a valid zero or legacy report
+  ---
+  duration_ms: 5.927251
+  type: 'test'
+  ...
+# Subtest: invalid, negative, fractional, extra and missing source fields never leak input values
+ok 4 - invalid, negative, fractional, extra and missing source fields never leak input values
+  ---
+  duration_ms: 11.52933
+  type: 'test'
+  ...
+# Subtest: relabelled segments cannot preserve a passing result merely by retaining the sum
+ok 5 - relabelled segments cannot preserve a passing result merely by retaining the sum
+  ---
+  duration_ms: 1.677974
+  type: 'test'
+  ...
+# Subtest: a cross-window subcounter reset is rejected even when each local delta and original partition match
+ok 6 - a cross-window subcounter reset is rejected even when each local delta and original partition match
+  ---
+  duration_ms: 1.555649
+  type: 'test'
+  ...
+# Subtest: time, PID, original partition, first-pair and shape discrepancies retain incomplete evidence
+ok 7 - time, PID, original partition, first-pair and shape discrepancies retain incomplete evidence
+  ---
+  duration_ms: 7.112361
+  type: 'test'
+  ...
+# Subtest: source identity must match lifecycle, both renderers and the counter
+ok 8 - source identity must match lifecycle, both renderers and the counter
+  ---
+  duration_ms: 1.750083
+  type: 'test'
+  ...
+# Subtest: the CLI leaves original bytes intact and creates only a private closed projection
+ok 9 - the CLI leaves original bytes intact and creates only a private closed projection
+  ---
+  duration_ms: 121.230096
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 296.613454

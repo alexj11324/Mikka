@@ -1,0 +1,1695 @@
+{
+  "schemaVersion": 1,
+  "kind": "independent_closed_archive_audit",
+  "status": "passed_with_explicit_source_only_literal_addendum",
+  "reviewedAt": "2026-11-07T16:55:20.465944+00:00",
+  "reviewer": "llm_impl",
+  "inputs": [
+    {
+      "path": "evidence/archive-e7-profile-and-1bd-integration/support-preflight.json",
+      "bytes": 83770,
+      "unicodeCodePoints": 83770,
+      "sha256": "4f8b279d1072f98b81d20e3df8f0bc918cb34123d0bc3ce7f2cc6d8064ed09e3",
+      "gitBlobSha1": "494edb0ea90825ae2ccd604412c6a6f4961e941b"
+    },
+    {
+      "path": "evidence/archive-e7-profile-and-1bd-integration/extended-preflight.json",
+      "bytes": 100287,
+      "unicodeCodePoints": 100287,
+      "sha256": "d824966e72e72dd2e4f953453a4dd383a7d75e6633b2d4501b855ff7369d5ee4",
+      "gitBlobSha1": "d5a2aa6e6594d2ef8c1e2e38650a705b4607f865"
+    },
+    {
+      "path": "evidence/archive-e7-profile-and-1bd-integration/fixture-literal-review.json",
+      "bytes": 600,
+      "unicodeCodePoints": 600,
+      "sha256": "dc524b6bc55c6a733cc27f1fd8aa617881921be2a8e3052bb116d03221f80a9b",
+      "gitBlobSha1": "f56243eeb7525e264456a5b310a2b7d884f64465"
+    },
+    {
+      "path": "evidence/sql-profile-e7-feed-archive-inventory.json",
+      "bytes": 31804,
+      "unicodeCodePoints": 31804,
+      "sha256": "7b91be4e7f0101452cff4d200b96fd033040b0613007c8424b7979b8b6212d4a",
+      "gitBlobSha1": "c5f5a0191ef4f7a4e3090734987cf4d4525bf7a1"
+    },
+    {
+      "path": "evidence/ci-1bd4-owned-final.json",
+      "bytes": 139677,
+      "unicodeCodePoints": 139677,
+      "sha256": "97e8043a7050ffdd2ff9f2fbfb3bdcfd9a072ce4a07fa18117370502d73001cb",
+      "gitBlobSha1": "79b398d9f4be2473cfdf7bf8b8a00b203b8d9073"
+    },
+    {
+      "path": "live-db-schema-isolation/source-receipt.json",
+      "bytes": 9351,
+      "unicodeCodePoints": 9351,
+      "sha256": "34b7c3a947001913f508dd5e0fc5d5363e0edf30d6d5a27f27bebd22823f027a",
+      "gitBlobSha1": "8cda3354696ccd057c4f8aef224b614a2d0a7ee1"
+    }
+  ],
+  "scope": {
+    "originalSupportPayloads": 85,
+    "originalSupportBytes": 1067782,
+    "extendedPayloads": 104,
+    "extendedBytes": 1395302,
+    "verifiedSourceClaims": 90,
+    "nativeOriginalsIncluded": false,
+    "actualNativeOutcome": "not_reviewed_or_inferred",
+    "remoteReadOrWrite": false,
+    "testsExecuted": false,
+    "servicesStarted": false,
+    "sourceRefOrStateModified": false
+  },
+  "integrity": {
+    "allOriginalBytesEqualPayloads": true,
+    "allByteCodePointSha256GitBlobChecksPassed": true,
+    "allArchivePathsUniqueAndBoundToPrefix": true,
+    "original85EntriesUnchanged": true,
+    "old55InventoryAndPayloadsUnchanged": true,
+    "frozenInputsReReadUnchangedBeforeReceipt": true,
+    "perPayload": [
+      {
+        "path": "computer-event-feed-diffcheck.log",
+        "source": "computer-event-feed-diffcheck.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-live-coupling-red.default-reporter.log",
+        "source": "computer-event-feed-live-coupling-red.default-reporter.log",
+        "bytes": 1311,
+        "unicodeCodePoints": 1283,
+        "sha256": "f24167dbd4006fae82e597eb35028ddf82bd1d2e5f4c19bf99d751c0e74c4d38",
+        "gitBlobSha1": "e599989dfce5d1e7ac797ebfa3168bb2aed98c7a",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-live-coupling-red.tap",
+        "source": "computer-event-feed-live-coupling-red.tap",
+        "bytes": 1584,
+        "unicodeCodePoints": 1584,
+        "sha256": "5ac3ae9bd08efc78f47ad7b5b5b3112d2c18d6d5ab283d84a3ff58dd0ba605a4",
+        "gitBlobSha1": "789930487ff6c0207059fb641bcd75185fe9d1f9",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-live-coupling.test.ts",
+        "source": "computer-event-feed-live-coupling.test.ts",
+        "bytes": 6178,
+        "unicodeCodePoints": 6178,
+        "sha256": "445c169cff7c6e432640cf76fd00f9ced8944fac91ab29ce3406de2aa315f4fe",
+        "gitBlobSha1": "53e018802450749491bb88e412de96b3d1613acf",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-pending-diffcheck.log",
+        "source": "computer-event-feed-pending-diffcheck.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-pending-green.tap",
+        "source": "computer-event-feed-pending-green.tap",
+        "bytes": 17297,
+        "unicodeCodePoints": 17297,
+        "sha256": "4beb58b774c9fc28e62cb875f8f98d461e715475f5192d44e65d22484d80e6f5",
+        "gitBlobSha1": "50ceec68d3004ff66f8b240be938d2132d7daeb2",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-pending-red.tap",
+        "source": "computer-event-feed-pending-red.tap",
+        "bytes": 4540,
+        "unicodeCodePoints": 4540,
+        "sha256": "6f9b10d8e05df333fb514494b25c26cdbc6abee3ef45539ab582ccb886b36426",
+        "gitBlobSha1": "300e36d4743569c6da44735462338f4016c9a734",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-source-green.tap",
+        "source": "computer-event-feed-source-green.tap",
+        "bytes": 16506,
+        "unicodeCodePoints": 16506,
+        "sha256": "fcbced70c75d605d2d3fa94505336aa4a3c3f5ca93615210ed21c55ac47db2e8",
+        "gitBlobSha1": "e73d3b21861c894999ef05aacf27d5129837d83a",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "computer-event-feed-source-red.tap",
+        "source": "computer-event-feed-source-red.tap",
+        "bytes": 4900,
+        "unicodeCodePoints": 4900,
+        "sha256": "32bb96d7f61ad5394ea47449eb5cea0c97cdb4770d637c6265b3e5bab373af9b",
+        "gitBlobSha1": "82f6b49022162824424c670975be67f17478bd15",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/computer-event-feed-live-coupling-red.json",
+        "source": "evidence/computer-event-feed-live-coupling-red.json",
+        "bytes": 4541,
+        "unicodeCodePoints": 4541,
+        "sha256": "f4e224d31790093a869f36971b8db3d900975b2116d9212ee40562748709b1c2",
+        "gitBlobSha1": "d3a3db275240ec6ab4c4475c2ce98ac4007c4982",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/computer-event-feed-pending-regression.json",
+        "source": "evidence/computer-event-feed-pending-regression.json",
+        "bytes": 4800,
+        "unicodeCodePoints": 4800,
+        "sha256": "e402d55640e379249d17cc0d9b5f72e86e9c78f9b56cfc9b582b1edffb1ceff2",
+        "gitBlobSha1": "f5c2ff66300a4e1298c67c3f0616114498f4ce84",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/computer-event-feed-source-regression.json",
+        "source": "evidence/computer-event-feed-source-regression.json",
+        "bytes": 5480,
+        "unicodeCodePoints": 5480,
+        "sha256": "f66d5e7c4ee2195579b8d845f4d03555757da74cf6d4db72cfe6cb5ae3c91eea",
+        "gitBlobSha1": "452c11e5a92bd01f18140a1492db7a4c707cda83",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/main-d75-auth-desktop-authority-review.json",
+        "source": "evidence/main-d75-auth-desktop-authority-review.json",
+        "bytes": 46811,
+        "unicodeCodePoints": 46811,
+        "sha256": "e1f26a3d1353c01b28991e5230170fd1bfb4d805396d82fc339ccfaa2acf48cb",
+        "gitBlobSha1": "f187f6dfa4f21ca213f7a1d83a9027664b272747",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/request-route-source-catalog-e7.json",
+        "source": "evidence/request-route-source-catalog-e7.json",
+        "bytes": 79620,
+        "unicodeCodePoints": 79620,
+        "sha256": "2c2571b81600657c179e2d02960e0336fdbbf7d433750a00d7a5987e30d93b86",
+        "gitBlobSha1": "d4c9302632db27e94af588b1cf1655194cf9d7cf",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/artifact-receipt.json",
+        "source": "evidence/sql-profile-42389969388/artifact-receipt.json",
+        "bytes": 1103,
+        "unicodeCodePoints": 1103,
+        "sha256": "d978f1c5a478c0d0ffff1154bf08bed0b82b9d4c5a0b014eb5a7b5972689e078",
+        "gitBlobSha1": "bfe937725f7779d3e9d467d46395bd578d0be2fe",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/desktop-query-decomposition.json",
+        "source": "evidence/sql-profile-42389969388/desktop-query-decomposition.json",
+        "bytes": 135603,
+        "unicodeCodePoints": 135603,
+        "sha256": "4cef0114bf5b809b2410ab5dd9596849d3369748a89bb02f556eeacd13217364",
+        "gitBlobSha1": "c77bda88593aea5f4f267a34d749146c5b74faa7",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/download-receipt.json",
+        "source": "evidence/sql-profile-42389969388/download-receipt.json",
+        "bytes": 958,
+        "unicodeCodePoints": 958,
+        "sha256": "f3f13c98fa96926da9ff3bda80548fe0cb4e10e5fedd931ef2783ab18550a4db",
+        "gitBlobSha1": "f1e859c8a23752d1a0a14f62c8256697efbbb766",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/github-final-metadata.json",
+        "source": "evidence/sql-profile-42389969388/github-final-metadata.json",
+        "bytes": 7741,
+        "unicodeCodePoints": 7741,
+        "sha256": "434659aa140f3cb7de4e94db27ebc9a59dd485487a8eb899f854d8e72e47374a",
+        "gitBlobSha1": "894caeab1120a3b39c09098229b02af70882ca63",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/independent-final-verification.json",
+        "source": "evidence/sql-profile-42389969388/independent-final-verification.json",
+        "bytes": 13072,
+        "unicodeCodePoints": 13072,
+        "sha256": "d743944511d467183571482f4f80e4585c151993adbb51b4ec15c573dcb5c9d0",
+        "gitBlobSha1": "355804881870428db1d8ea6561a3f46465009921",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/operation-source-readback.json",
+        "source": "evidence/sql-profile-42389969388/operation-source-readback.json",
+        "bytes": 2472,
+        "unicodeCodePoints": 2472,
+        "sha256": "b7548657d9bf3af6e16b7a009703fca7f21a4227a8ced536db25eb65360ce806",
+        "gitBlobSha1": "418aa7e3c2605ba304a27b4775281daecd3e543c",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/root-verification.json",
+        "source": "evidence/sql-profile-42389969388/root-verification.json",
+        "bytes": 2313,
+        "unicodeCodePoints": 2313,
+        "sha256": "b8066a422bab6fac24b96d76a13651d9c2b41365aa82c68924f934b5e8fb04a8",
+        "gitBlobSha1": "e0f8d1ad5ccaf855b5fec3cf4651490ed5abf602",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/runner-receipt.json",
+        "source": "evidence/sql-profile-42389969388/runner-receipt.json",
+        "bytes": 1687,
+        "unicodeCodePoints": 1687,
+        "sha256": "08a045284f36a2e6e392badd33884c3b139bf0fcff459c764fb627a8bd89b2ae",
+        "gitBlobSha1": "9b6a46593ead3a2a80f07558a01060023770f9fc",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-42389969388/single-request-costs.md",
+        "source": "evidence/sql-profile-42389969388/single-request-costs.md",
+        "bytes": 1761,
+        "unicodeCodePoints": 1761,
+        "sha256": "713457ab29bc44a7d058e13aed628b853de74d59de1fab3fa1a0aaace4c7b334",
+        "gitBlobSha1": "ee6e6ac07be082d70af917dbd4f00b850696fedf",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "feed-fix-originals/hooks/use-subagent-updates.ts",
+        "source": "feed-fix-originals/hooks/use-subagent-updates.ts",
+        "bytes": 2390,
+        "unicodeCodePoints": 2390,
+        "sha256": "b22ae54e6be4e18c64df5fd6aa1844a10151ff0274caf38b855cc86c831a9279",
+        "gitBlobSha1": "27c2d3b69a1a25bc0415f7b66b9aaf08fdd73a09",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "feed-fix-originals/lib/computer/event-stream.test.ts",
+        "source": "feed-fix-originals/lib/computer/event-stream.test.ts",
+        "bytes": 6909,
+        "unicodeCodePoints": 6909,
+        "sha256": "289807e72ef2122a5d34715dfaf7723e39927ca996783b79a399d5fdd6454345",
+        "gitBlobSha1": "071bdaef82c43625fa1fec05757f3075185a7716",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "feed-fix-originals/lib/computer/event-stream.ts",
+        "source": "feed-fix-originals/lib/computer/event-stream.ts",
+        "bytes": 4139,
+        "unicodeCodePoints": 4139,
+        "sha256": "cb7f8686938918c2cb713bdbc9b5081df064e64ee2f0676ff0a184480f9b5f3a",
+        "gitBlobSha1": "20f57c424ea7f4ef9793997c0a1e3af44a794c3c",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "feed-fix-v1/hooks/use-subagent-updates.ts",
+        "source": "feed-fix-v1/hooks/use-subagent-updates.ts",
+        "bytes": 2441,
+        "unicodeCodePoints": 2441,
+        "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c",
+        "gitBlobSha1": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "feed-fix-v1/lib/computer/event-stream.test.ts",
+        "source": "feed-fix-v1/lib/computer/event-stream.test.ts",
+        "bytes": 14816,
+        "unicodeCodePoints": 14816,
+        "sha256": "0cfa9cf84ac111b3d2f88df874368cff7e58ba4881427a47bbac70f541c86b80",
+        "gitBlobSha1": "d53f08a5e5cbaad33f14fd05eba08a074e9c26f2",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "feed-fix-v1/lib/computer/event-stream.ts",
+        "source": "feed-fix-v1/lib/computer/event-stream.ts",
+        "bytes": 4679,
+        "unicodeCodePoints": 4679,
+        "sha256": "0b5dbf48224838002e939baccec4e31e9dfdd1f51e654618d6057cefa714095a",
+        "gitBlobSha1": "242d4c0b1712e12b14b8a0c1cd21bca7c033dfdd",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/README.md",
+        "source": "sql-profile-e7/README.md",
+        "bytes": 10174,
+        "unicodeCodePoints": 6722,
+        "sha256": "f211dbc6f024eafac1e44f6dc2e0960ef8a67b40669d4b7975ab7185090e797b",
+        "gitBlobSha1": "b0a1254358c23e32238f21ad926dbb33d84c224c",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/artifact.mjs",
+        "source": "sql-profile-e7/artifact.mjs",
+        "bytes": 5940,
+        "unicodeCodePoints": 5940,
+        "sha256": "c317f6e598758af7ba55df02de4160355503ffca32968d86fd9a5be5e3108f9d",
+        "gitBlobSha1": "68897f7fce279fc874f041769087ec437b6367e2",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/catalog-source-check.json",
+        "source": "sql-profile-e7/catalog-source-check.json",
+        "bytes": 646,
+        "unicodeCodePoints": 646,
+        "sha256": "1c155fd8af19a30bb37ba66c55173fa33f3bb1d32bdad48257c3ad5595e7ef11",
+        "gitBlobSha1": "bbe17c7cf491fb3e62051040313bfa71987fe36a",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/closed-labels.json",
+        "source": "sql-profile-e7/closed-labels.json",
+        "bytes": 23716,
+        "unicodeCodePoints": 23716,
+        "sha256": "dd352c9f91b3a1588d989ce974fbf5959c2107b790c234382364e03653812017",
+        "gitBlobSha1": "d2328d33fd684e2794b9b5207a81ebd6283d9648",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/driver.mjs",
+        "source": "sql-profile-e7/driver.mjs",
+        "bytes": 39946,
+        "unicodeCodePoints": 39946,
+        "sha256": "7ea28445e759f8fb1e37eadb0aca9fdba397d425f02dd72b8ca5e2470397d4e8",
+        "gitBlobSha1": "1b7fc413705539c2f24c54c7aece5d5a02e64d82",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/driver.test.mjs",
+        "source": "sql-profile-e7/driver.test.mjs",
+        "bytes": 13962,
+        "unicodeCodePoints": 13962,
+        "sha256": "766b9f9f2cc87b49f594223e706bec43379ec01b03399c934ee372a967630f15",
+        "gitBlobSha1": "986c1e4fca7af38c94e3760ad5b172c1757ee732",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/lint.initial.log",
+        "source": "sql-profile-e7/lint.initial.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/lint.log",
+        "source": "sql-profile-e7/lint.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/manifest.json",
+        "source": "sql-profile-e7/manifest.json",
+        "bytes": 8070,
+        "unicodeCodePoints": 8070,
+        "sha256": "9482619dcf3d134f973a0bcccd84c90aef10bcebe20981225a97a9ad56348008",
+        "gitBlobSha1": "49910b3cb853c26a70f1b0b7de35e1f8db19e0f4",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/metrics-provenance.json",
+        "source": "sql-profile-e7/metrics-provenance.json",
+        "bytes": 2513,
+        "unicodeCodePoints": 2513,
+        "sha256": "0402fc020124b9e653fd6cf4af0fc00979e60468e80de04189bce5621155fe96",
+        "gitBlobSha1": "0841241fb63a0337f51b48bdb6ec75ed33f03121",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/metrics/db-metrics.cjs",
+        "source": "sql-profile-e7/metrics/db-metrics.cjs",
+        "bytes": 8336,
+        "unicodeCodePoints": 8336,
+        "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+        "gitBlobSha1": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/metrics/db-query-operations.cjs",
+        "source": "sql-profile-e7/metrics/db-query-operations.cjs",
+        "bytes": 529,
+        "unicodeCodePoints": 529,
+        "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+        "gitBlobSha1": "9011b6edb7296c8872d3e311074529a49987b575",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/metrics/db-query-unattributed-sources.cjs",
+        "source": "sql-profile-e7/metrics/db-query-unattributed-sources.cjs",
+        "bytes": 9513,
+        "unicodeCodePoints": 9513,
+        "sha256": "90e770a1c7d0fc2d4b504fb0761db98bbd3ba4db70d7edf8d4ad9578efb8d176",
+        "gitBlobSha1": "608f80e9c75964b8cf3c59918c7036d98a675900",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/metrics/lifecycle-query-counts.mjs",
+        "source": "sql-profile-e7/metrics/lifecycle-query-counts.mjs",
+        "bytes": 21882,
+        "unicodeCodePoints": 21882,
+        "sha256": "3133e8a475c7efd1613a0d53f0a72a28318e2725e2fdd16520995ba4f65a7c38",
+        "gitBlobSha1": "8bef5b7c7abda0a50732bec502e924a66167c9ce",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/projection.mjs",
+        "source": "sql-profile-e7/projection.mjs",
+        "bytes": 4132,
+        "unicodeCodePoints": 4132,
+        "sha256": "d7f6cce673fc3ee6c0508ccd9fdc97fb7d785d2669f5d58332ae8a61276afa54",
+        "gitBlobSha1": "092b5ee4202639a825e49a5d4b7effec7e95bd7d",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/projection.test.mjs",
+        "source": "sql-profile-e7/projection.test.mjs",
+        "bytes": 10473,
+        "unicodeCodePoints": 10473,
+        "sha256": "a2d20e1275df5426e172d8e4fb861e195a60a248f21ca06d7feaa286292c0088",
+        "gitBlobSha1": "db3215732eb3966dd25f9e0a2f94761d0856fed4",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/reads.mjs",
+        "source": "sql-profile-e7/reads.mjs",
+        "bytes": 15002,
+        "unicodeCodePoints": 15002,
+        "sha256": "fc67e02da9887d29a77beda0f76608073467883031c94074de859fd7cdba8062",
+        "gitBlobSha1": "13850386a6fa2afd5774a47a8796862a9b6f8d50",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/remote-readback.json",
+        "source": "sql-profile-e7/remote-readback.json",
+        "bytes": 2020,
+        "unicodeCodePoints": 2020,
+        "sha256": "cd44a8b7b32ba656dd0b93cfd3b271199a9b1a9b004654557926bfab4fb975f9",
+        "gitBlobSha1": "5d190d866ee1756d2bcc7134b118892a78cf5b0a",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/source-contracts.json",
+        "source": "sql-profile-e7/source-contracts.json",
+        "bytes": 9384,
+        "unicodeCodePoints": 9384,
+        "sha256": "f3683233f489f293eead6df855a6b7c25bbaa235260947e064e97e7bf5272503",
+        "gitBlobSha1": "b3fc1ef36529676cfe32e554b2316077a9d49a0b",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/syntax.json",
+        "source": "sql-profile-e7/syntax.json",
+        "bytes": 640,
+        "unicodeCodePoints": 640,
+        "sha256": "1a3e5bdea9299987978257cc189c760e9287f5e002a52be39486759f08179e61",
+        "gitBlobSha1": "af026031f3c6a921aec4b255abade01e8ce2447b",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/tests.initial.tap",
+        "source": "sql-profile-e7/tests.initial.tap",
+        "bytes": 2496,
+        "unicodeCodePoints": 2434,
+        "sha256": "1becc246ac7dd84cf232903320fffc610a8afcfca46900b68437f2c15477ba10",
+        "gitBlobSha1": "e43917e00795b0ef384496fe74715ef8f140bf38",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/tests.pre-freeze.tap",
+        "source": "sql-profile-e7/tests.pre-freeze.tap",
+        "bytes": 4808,
+        "unicodeCodePoints": 4808,
+        "sha256": "5db8dce575fc607fc6df81fb21ed51bc5fd487799e80ecc9402b9a1c09e7caf1",
+        "gitBlobSha1": "5a11c42dd2d9d700d0c1793fc613560cce53f29b",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/tests.tap",
+        "source": "sql-profile-e7/tests.tap",
+        "bytes": 4809,
+        "unicodeCodePoints": 4809,
+        "sha256": "6d7112593096651b73c6154c4bf4d013699c42f212b6ba65cc44d9278f00be49",
+        "gitBlobSha1": "0fe30fd863ed1b65ebfb589b30f865fda6317399",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/validation.json",
+        "source": "sql-profile-e7/validation.json",
+        "bytes": 5144,
+        "unicodeCodePoints": 5144,
+        "sha256": "10a6bf10e9dce7e03ae90ebde3b14b2b77ccaf50b256a0b30e7a3058b0ed6e31",
+        "gitBlobSha1": "473aa8eb728e4fb15b68a32f4549ecd923321a00",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/workflow-check.json",
+        "source": "sql-profile-e7/workflow-check.json",
+        "bytes": 401,
+        "unicodeCodePoints": 401,
+        "sha256": "d1560f2ee005389ae2d0a7989b5a91f89312fac71598379161e85aff1c662410",
+        "gitBlobSha1": "3c255e8d092280fe10e03f98d657ea5863441ed2",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "sql-profile-e7/workflow.yml",
+        "source": "sql-profile-e7/workflow.yml",
+        "bytes": 6519,
+        "unicodeCodePoints": 6519,
+        "sha256": "d37fd119a98d12ac4b83344730eb8402653f7757f7f2adc2bc3020f6dd6b0dfa",
+        "gitBlobSha1": "4a651547bcb4a67388b13a01f01bf11170e5a2fa",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/sql-profile-e7-feed-archive-inventory.json",
+        "source": "evidence/sql-profile-e7-feed-archive-inventory.json",
+        "bytes": 31804,
+        "unicodeCodePoints": 31804,
+        "sha256": "7b91be4e7f0101452cff4d200b96fd033040b0613007c8424b7979b8b6212d4a",
+        "gitBlobSha1": "c5f5a0191ef4f7a4e3090734987cf4d4525bf7a1",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "source-1bd4f8a6/lib/computer/event-stream.ts",
+        "source": "git:1bd4f8a60010664cde2ec113e41e42f35067c1e4:lib/computer/event-stream.ts",
+        "bytes": 5382,
+        "unicodeCodePoints": 5382,
+        "sha256": "53001273e4b904562605a3701a4d8ef99415ecfb5c7161f6b216019b0985ba8b",
+        "gitBlobSha1": "62045dce9dfb0af2ac4a400f0c9a7d38873fe608",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "source-1bd4f8a6/hooks/use-subagent-updates.ts",
+        "source": "git:1bd4f8a60010664cde2ec113e41e42f35067c1e4:hooks/use-subagent-updates.ts",
+        "bytes": 2441,
+        "unicodeCodePoints": 2441,
+        "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c",
+        "gitBlobSha1": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "source-1bd4f8a6/lib/computer/event-stream.test.ts",
+        "source": "git:1bd4f8a60010664cde2ec113e41e42f35067c1e4:lib/computer/event-stream.test.ts",
+        "bytes": 18036,
+        "unicodeCodePoints": 18036,
+        "sha256": "91002b6845b39dc1d387afb2dd36553a8935773a4c6153166caf63f06f7ba7a3",
+        "gitBlobSha1": "762510b7b72602856feae599ec07967e5bd15ca2",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-main-merge-targeted.tap",
+        "source": "evidence/d75-main-merge-targeted.tap",
+        "bytes": 20669,
+        "unicodeCodePoints": 20667,
+        "sha256": "ac41b309eaba0aebbf2bf02e84898447f615eb17e1ccf96aa26d5c6103371a54",
+        "gitBlobSha1": "321da7b57e59e9b7a90d90669ca0defb11ed6abc",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-native-default-rest-counter.tap",
+        "source": "evidence/d75-native-default-rest-counter.tap",
+        "bytes": 5368,
+        "unicodeCodePoints": 5368,
+        "sha256": "a43f6036984dc591bea3a13f2ae8650853d79d658e41771842c2fc11512ab1c3",
+        "gitBlobSha1": "1f40a38b1a7a706035f82bf6c53ba1e131f01783",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-candidate-typecheck.log",
+        "source": "evidence/d75-candidate-typecheck.log",
+        "bytes": 550,
+        "unicodeCodePoints": 550,
+        "sha256": "5ed9f699746b6eff46d34dfc5a837c08bb5e2ea6a63477dc5ebe216f393ddcb5",
+        "gitBlobSha1": "865f222810b17aa13d83e08cf670354b14b25334",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-candidate-typecheck-final.log",
+        "source": "evidence/d75-candidate-typecheck-final.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-candidate-lint.log",
+        "source": "evidence/d75-candidate-lint.log",
+        "bytes": 34371,
+        "unicodeCodePoints": 34363,
+        "sha256": "9334fbf8464c9cf85ea9c6c02846aed365ba2ef06fd979c173e7ec762f0222cc",
+        "gitBlobSha1": "407ad1dcb908b45bc520d87f026c1860f1c6271c",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "source": "evidence/d75-candidate-clean-lint.log",
+        "bytes": 6480,
+        "unicodeCodePoints": 6178,
+        "sha256": "db945cb06dca0a441f9f5cf1dce64865dd2043252d3cfbd021c4747bb765208f",
+        "gitBlobSha1": "6cad4e77c62f7aa73b3298a9a4942184217a51a5",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-candidate-runtime-lint.log",
+        "source": "evidence/d75-candidate-runtime-lint.log",
+        "bytes": 335,
+        "unicodeCodePoints": 335,
+        "sha256": "36f8b723d2d4e64cf66b7ae1d50e30442ba1507aec7ada3a59105b1f25af63dc",
+        "gitBlobSha1": "648940063686450c246d46581294e6f1debcaa1f",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-pnpm-offline.log",
+        "source": "evidence/d75-pnpm-offline.log",
+        "bytes": 368,
+        "unicodeCodePoints": 364,
+        "sha256": "05a0710f96e29097c18b9411c2e761107217550bbb8e09304c9c63e22f8c1afd",
+        "gitBlobSha1": "8d73c44211a8370ee90a1e7aa805450742d7e905",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "source": "evidence/d75-pnpm-install.log",
+        "bytes": 1615,
+        "unicodeCodePoints": 1281,
+        "sha256": "2bd7f41e412470e23b65cbea8ddc822df038a4a2e1e89c02aae0a3512eeee9c3",
+        "gitBlobSha1": "c52f5c04ff98f806161002bd72e68ebc1ee781ea",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/candidate-1bd4-local-validation.json",
+        "source": "evidence/candidate-1bd4-local-validation.json",
+        "bytes": 3214,
+        "unicodeCodePoints": 3214,
+        "sha256": "9176a3335260f0f69f0650f8de80a8f8ef272410d92b2e0486adac75bdfd19e8",
+        "gitBlobSha1": "842fd6389e370f28d60a9f5b9825a55f14451b2b",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/source-integration-1bd4f8a6.json",
+        "source": "evidence/source-integration-1bd4f8a6.json",
+        "bytes": 948,
+        "unicodeCodePoints": 948,
+        "sha256": "4cacfcc2e7725770a6aef5a82382031537793baa6a82f2bb607bfc9d5dbdaa67",
+        "gitBlobSha1": "310348b0aba0c8c15ff8c35bd046804f9ff84d97",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/candidate-1bd4-github-and-main-version.json",
+        "source": "evidence/candidate-1bd4-github-and-main-version.json",
+        "bytes": 1336,
+        "unicodeCodePoints": 1336,
+        "sha256": "4406e69007bc3ed1997d633980e29f0f82fc7987b8d6486dc2ee4a2c5c98ef81",
+        "gitBlobSha1": "26afae6cfe2482be18078686b89a52d4e3c026a7",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/owned-overlay-backup-cleanup.json",
+        "source": "evidence/owned-overlay-backup-cleanup.json",
+        "bytes": 248406,
+        "unicodeCodePoints": 248406,
+        "sha256": "670e50473795d0931cd45453fe62ed8b673297478c1ea535bfdea3a5aef92b54",
+        "gitBlobSha1": "920d26f6b254f8b79e86b1f5d65ca64f40b3e4d4",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/receipt.json",
+        "source": "self-hosted-observability/receipt.json",
+        "bytes": 7649,
+        "unicodeCodePoints": 7649,
+        "sha256": "b3fcc973eaefa58b8ba44fe25a1701729d1f8fc191b9a6ea7747a1be1a415282",
+        "gitBlobSha1": "72f12f6f143f8a46dfc46db628b815bd794ee7b9",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/source/lib/abuse/model.ts",
+        "source": "self-hosted-observability/source/lib/abuse/model.ts",
+        "bytes": 18761,
+        "unicodeCodePoints": 18761,
+        "sha256": "0ac28708f7336e15262eb4fd8586575d0b4d705c7c3ec8dd91145c4e854cceee",
+        "gitBlobSha1": "4e9406a4e7b71b569004cf0ff33a9996a878eb72",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/source/lib/tracing/ai.ts",
+        "source": "self-hosted-observability/source/lib/tracing/ai.ts",
+        "bytes": 13617,
+        "unicodeCodePoints": 13617,
+        "sha256": "202630a776f9b9d543bd6581cc4b3be70b304fcdc22431fa9a990f985f4658b4",
+        "gitBlobSha1": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/source/lib/abuse/model.test.ts",
+        "source": "self-hosted-observability/source/lib/abuse/model.test.ts",
+        "bytes": 18665,
+        "unicodeCodePoints": 18665,
+        "sha256": "8157b7e70170737288453d9c26310e7663707e742bd615c4b0bdc98404d4e86e",
+        "gitBlobSha1": "6024f9edf4551a7ae305462c8504d3c46194bf4e",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/red.tap",
+        "source": "self-hosted-observability/red.tap",
+        "bytes": 3257,
+        "unicodeCodePoints": 3257,
+        "sha256": "67e596a9ccdb7c6a258542278518a9f1c9dd1598a524e9689ce2b9ff917532e4",
+        "gitBlobSha1": "91ac1a3bdb3f1aaa0c4e4285a1d3a9dc709ae766",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/green.tap",
+        "source": "self-hosted-observability/green.tap",
+        "bytes": 6982,
+        "unicodeCodePoints": 6982,
+        "sha256": "db0faec49327410140ef93a0bd4bd5aef20000e96d917a1196f94cca6b6d78e9",
+        "gitBlobSha1": "3ee372082c25ae20f57003ab77856e17c6039772",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/refusal-type-fix.tap",
+        "source": "self-hosted-observability/refusal-type-fix.tap",
+        "bytes": 1016,
+        "unicodeCodePoints": 1016,
+        "sha256": "21d52cd42411c2f7b392c3ba38d62226fd98c8efe1d9df16379bee4eb0492ecd",
+        "gitBlobSha1": "62bf6ecc7bf981fc012524185c443e28d39ab043",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/lint-final.log",
+        "source": "self-hosted-observability/lint-final.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/diff-check-final.log",
+        "source": "self-hosted-observability/diff-check-final.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/patch.diff",
+        "source": "self-hosted-observability/patch.diff",
+        "bytes": 9805,
+        "unicodeCodePoints": 9805,
+        "sha256": "19ea8dce473894a135e8251be2645fd16013aaa45bf153490dab64ff53861fb5",
+        "gitBlobSha1": "8f0bd671ad214ccc8e947666f108b16089e88be8",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/diff-check.log",
+        "source": "self-hosted-observability/diff-check.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/lint-no-ignore.log",
+        "source": "self-hosted-observability/lint-no-ignore.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "self-hosted-observability/lint.log",
+        "source": "self-hosted-observability/lint.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "source": "evidence/ci-1bd4-owned-final.json",
+        "bytes": 139677,
+        "unicodeCodePoints": 139677,
+        "sha256": "97e8043a7050ffdd2ff9f2fbfb3bdcfd9a072ce4a07fa18117370502d73001cb",
+        "gitBlobSha1": "79b398d9f4be2473cfdf7bf8b8a00b203b8d9073",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/run-trace-acceptance-1bd4-compatibility-review.json",
+        "source": "evidence/run-trace-acceptance-1bd4-compatibility-review.json",
+        "bytes": 31458,
+        "unicodeCodePoints": 31458,
+        "sha256": "e85050e2edb5a986765afaa6315b69516e50db3790a4a0d48a9d9a131b155edb",
+        "gitBlobSha1": "c0f0c55dc786c2fd83aacde8448da1694a240df4",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/source-receipt.json",
+        "source": "live-db-schema-isolation/source-receipt.json",
+        "bytes": 9351,
+        "unicodeCodePoints": 9351,
+        "sha256": "34b7c3a947001913f508dd5e0fc5d5363e0edf30d6d5a27f27bebd22823f027a",
+        "gitBlobSha1": "8cda3354696ccd057c4f8aef224b614a2d0a7ee1",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/source/package.json",
+        "source": "live-db-schema-isolation/source/package.json",
+        "bytes": 75318,
+        "unicodeCodePoints": 75318,
+        "sha256": "37912acaacf1b64dea4b5308d0cddd158b4f6ddc62c264ac93f74545d414cb60",
+        "gitBlobSha1": "9424ab745298fe9596dc78fc784d47fe9a6019ba",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "source": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "bytes": 38722,
+        "unicodeCodePoints": 38716,
+        "sha256": "c64720c93f4b66a4a2e03b8dfec6158304dbf4750ba16436b041c79492105b03",
+        "gitBlobSha1": "4662ac6f57d2045523285f9ab44eba99afb18287",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/patch.diff",
+        "source": "live-db-schema-isolation/patch.diff",
+        "bytes": 7201,
+        "unicodeCodePoints": 7201,
+        "sha256": "e4e7ac8f9865da5e7444c116d6416e1c28e1cffbae4af2b25289a7e79ace6376",
+        "gitBlobSha1": "69132ec363169cb6bb0729b92e9493f3ae19751c",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/contract-red.tap",
+        "source": "live-db-schema-isolation/contract-red.tap",
+        "bytes": 3717,
+        "unicodeCodePoints": 3717,
+        "sha256": "4d7e6365b3077543ac2c04d4d0c9f9dd0e75b406e59ca84b8f2dd62a4adc36a7",
+        "gitBlobSha1": "29d5d294d03b5dd52d766ca95fd6e4eaee34eb42",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/contract-green.tap",
+        "source": "live-db-schema-isolation/contract-green.tap",
+        "bytes": 6466,
+        "unicodeCodePoints": 6466,
+        "sha256": "c91c277d62088f82bea00ff496c0a5193b6b8cb176437258ea8b17625f64bd7e",
+        "gitBlobSha1": "a6f6ca6440cdb49bca094ed31cc73dbd7b56a03e",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/lint.log",
+        "source": "live-db-schema-isolation/lint.log",
+        "bytes": 227,
+        "unicodeCodePoints": 227,
+        "sha256": "b67b62714f0c3e71d2377e05a45acd10f67a63c5e22e13bac55f558b290087fa",
+        "gitBlobSha1": "c12e0d84ac1242dc7465fd964946c4b66e959db1",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/contract-green-final.tap",
+        "source": "live-db-schema-isolation/contract-green-final.tap",
+        "bytes": 6457,
+        "unicodeCodePoints": 6457,
+        "sha256": "19039d9c32b1cc8702a8bb842bcb5627770e7be33ab855a109e0dc05695b1dc4",
+        "gitBlobSha1": "368c147026b168ebf21b7e70074789bff9f707dc",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/lint-final.log",
+        "source": "live-db-schema-isolation/lint-final.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/diff-check-final.log",
+        "source": "live-db-schema-isolation/diff-check-final.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/diff-check.log",
+        "source": "live-db-schema-isolation/diff-check.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/commit-receipt.json",
+        "source": "live-db-schema-isolation/commit-receipt.json",
+        "bytes": 500,
+        "unicodeCodePoints": 500,
+        "sha256": "8083da0badbd9855d500b084b34fed6d366905e1a74adec8accaff8ce2936141",
+        "gitBlobSha1": "a31f8cacf02ac51448a171fc4fc8d81c0e7ec6ef",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/root-precommit-verification.json",
+        "source": "live-db-schema-isolation/root-precommit-verification.json",
+        "bytes": 1362,
+        "unicodeCodePoints": 1362,
+        "sha256": "9e504e481017e6b1edb49fd3a5ebea5ce36d066a698ab866c30206c8bad8e6cc",
+        "gitBlobSha1": "1df58eaec7461daa45a23161037f55abc83904b1",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/root-final-runner.tap",
+        "source": "live-db-schema-isolation/root-final-runner.tap",
+        "bytes": 6464,
+        "unicodeCodePoints": 6464,
+        "sha256": "804071184606c6f4336f5dae845f52d26163424334a3e9905772f0b5b37d1aae",
+        "gitBlobSha1": "935dd9ce14a4b64cc8aaabefc92a94cecb3122b3",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/root-final-lint.log",
+        "source": "live-db-schema-isolation/root-final-lint.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "live-db-schema-isolation/root-final-diff.log",
+        "source": "live-db-schema-isolation/root-final-diff.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "originalEqualsPayload": true
+      },
+      {
+        "path": "evidence/archive-e7-profile-and-1bd-integration/fixture-literal-review.json",
+        "source": "evidence/archive-e7-profile-and-1bd-integration/fixture-literal-review.json",
+        "bytes": 600,
+        "unicodeCodePoints": 600,
+        "sha256": "dc524b6bc55c6a733cc27f1fd8aa617881921be2a8e3052bb116d03221f80a9b",
+        "gitBlobSha1": "f56243eeb7525e264456a5b310a2b7d884f64465",
+        "originalEqualsPayload": true
+      }
+    ]
+  },
+  "fixedSourceBindings": {
+    "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+    "method": "local immutable Git blob/commit objects; no current worktree source substituted",
+    "files": [
+      {
+        "path": "lib/computer/event-stream.ts",
+        "archivePath": "source-1bd4f8a6/lib/computer/event-stream.ts",
+        "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "bytes": 5382,
+        "unicodeCodePoints": 5382,
+        "sha256": "53001273e4b904562605a3701a4d8ef99415ecfb5c7161f6b216019b0985ba8b",
+        "gitBlobSha1": "62045dce9dfb0af2ac4a400f0c9a7d38873fe608",
+        "equalsImmutableGitBlob": true
+      },
+      {
+        "path": "hooks/use-subagent-updates.ts",
+        "archivePath": "source-1bd4f8a6/hooks/use-subagent-updates.ts",
+        "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "bytes": 2441,
+        "unicodeCodePoints": 2441,
+        "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c",
+        "gitBlobSha1": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+        "equalsImmutableGitBlob": true
+      },
+      {
+        "path": "lib/computer/event-stream.test.ts",
+        "archivePath": "source-1bd4f8a6/lib/computer/event-stream.test.ts",
+        "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "bytes": 18036,
+        "unicodeCodePoints": 18036,
+        "sha256": "91002b6845b39dc1d387afb2dd36553a8935773a4c6153166caf63f06f7ba7a3",
+        "gitBlobSha1": "762510b7b72602856feae599ec07967e5bd15ca2",
+        "equalsImmutableGitBlob": true
+      },
+      {
+        "path": "lib/abuse/model.ts",
+        "archivePath": "self-hosted-observability/source/lib/abuse/model.ts",
+        "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "bytes": 18761,
+        "unicodeCodePoints": 18761,
+        "sha256": "0ac28708f7336e15262eb4fd8586575d0b4d705c7c3ec8dd91145c4e854cceee",
+        "gitBlobSha1": "4e9406a4e7b71b569004cf0ff33a9996a878eb72",
+        "equalsImmutableGitBlob": true
+      },
+      {
+        "path": "lib/tracing/ai.ts",
+        "archivePath": "self-hosted-observability/source/lib/tracing/ai.ts",
+        "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "bytes": 13617,
+        "unicodeCodePoints": 13617,
+        "sha256": "202630a776f9b9d543bd6581cc4b3be70b304fcdc22431fa9a990f985f4658b4",
+        "gitBlobSha1": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+        "equalsImmutableGitBlob": true
+      },
+      {
+        "path": "lib/abuse/model.test.ts",
+        "archivePath": "self-hosted-observability/source/lib/abuse/model.test.ts",
+        "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "bytes": 18665,
+        "unicodeCodePoints": 18665,
+        "sha256": "8157b7e70170737288453d9c26310e7663707e742bd615c4b0bdc98404d4e86e",
+        "gitBlobSha1": "6024f9edf4551a7ae305462c8504d3c46194bf4e",
+        "equalsImmutableGitBlob": true
+      }
+    ]
+  },
+  "privacy": {
+    "scanner": "same seven broad regex categories as support preflight; package hits additionally resolved against exact 1bd package.json and pnpm-lock.yaml",
+    "filesScanned": 104,
+    "matches": 47,
+    "classificationCounts": {
+      "exact_1bd_package_version_reference": 35,
+      "fixed_workflow_disposable_loopback_service": 2,
+      "unchanged_1bd_source_only_loopback_test_literal": 10
+    },
+    "unclassifiedMatches": 0,
+    "runtimeJsonCredentialUrlMatches": 0,
+    "credentialTokenPrivateKeyBearerJwtSignedUrlMatches": 0,
+    "matchedOriginalValuesIncluded": false,
+    "classificationScope": "Only these exact file/line/hash matches. No global host, package-name, or credential exception. Runtime JSON is never excepted for credential URLs.",
+    "findings": [
+      {
+        "path": "sql-profile-e7/driver.mjs",
+        "kind": "email",
+        "line": 359,
+        "bytes": 12,
+        "sha256": "3d349afaadf5bd51133b86637415a1694c9069110fb559804645c6b92516c4c2",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "sql-profile-e7/workflow.yml",
+        "kind": "email",
+        "line": 72,
+        "bytes": 24,
+        "sha256": "e2a5c7fb4067c7568d659bf02c4ca63a80e7b4b8dbb3e0f478e5811e845bf2da",
+        "classification": "fixed_workflow_disposable_loopback_service"
+      },
+      {
+        "path": "sql-profile-e7/workflow.yml",
+        "kind": "credential_url",
+        "line": 72,
+        "bytes": 32,
+        "sha256": "1627a13bbad59f3289581952542d47681068b03332d512bee253f2d9950493b2",
+        "classification": "fixed_workflow_disposable_loopback_service"
+      },
+      {
+        "path": "evidence/d75-candidate-lint.log",
+        "kind": "email",
+        "line": 2,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-lint.log",
+        "kind": "email",
+        "line": 6,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "kind": "email",
+        "line": 2,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "kind": "email",
+        "line": 6,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "kind": "email",
+        "line": 10,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "kind": "email",
+        "line": 15,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "kind": "email",
+        "line": 86,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-clean-lint.log",
+        "kind": "email",
+        "line": 91,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-candidate-runtime-lint.log",
+        "kind": "email",
+        "line": 2,
+        "bytes": 14,
+        "sha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "kind": "email",
+        "line": 15,
+        "bytes": 25,
+        "sha256": "ee06cacd3fceb41d042ee7a2519395dccc18095b9cd5edf1b8dc400048bd011a",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "kind": "email",
+        "line": 15,
+        "bytes": 18,
+        "sha256": "dae7c7f2fd80ae83bf50d0ef0bfebccdfaadad1c27157e6e02cf2f70db274f13",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "kind": "email",
+        "line": 16,
+        "bytes": 14,
+        "sha256": "e898226fce03ac88afd84c1389e4522828c2e53a1eaa204f12c9001c4a62c8a1",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "kind": "email",
+        "line": 16,
+        "bytes": 25,
+        "sha256": "6085fc489be191168424324e106faaa1dec8337c251a5744e7de8be566c4a820",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "kind": "email",
+        "line": 16,
+        "bytes": 18,
+        "sha256": "89b1c989b73f08f7e31cf13190704a715893c3e41586a132e47ad8110e6bf8ab",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/d75-pnpm-install.log",
+        "kind": "email",
+        "line": 17,
+        "bytes": 20,
+        "sha256": "0476d3c975cbdae4901fe5130050e826f04bf661702e401437f33ec9287250f4",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4330,
+        "bytes": 28,
+        "sha256": "9882565b7cccaab7b7ec7883269514a4de94841847e49b6c390b83a7422ab381",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4336,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4342,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4348,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4354,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4360,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4366,
+        "bytes": 30,
+        "sha256": "1b9759c485e00bbbdc99d89fd430cf2d44b71bbe4db8d5c6c653e88253a03fc2",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4366,
+        "bytes": 20,
+        "sha256": "e0eab36382acd12ba026ccbf9802862b948b81219a4cd61b6315673d5e99db29",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4366,
+        "bytes": 21,
+        "sha256": "17c164342761c6b6d73c5ec17066008fb299c88c69ed2ac34be2690a2439b98d",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4372,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4378,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4384,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4390,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4396,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4402,
+        "bytes": 30,
+        "sha256": "1b9759c485e00bbbdc99d89fd430cf2d44b71bbe4db8d5c6c653e88253a03fc2",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4402,
+        "bytes": 20,
+        "sha256": "e0eab36382acd12ba026ccbf9802862b948b81219a4cd61b6315673d5e99db29",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4402,
+        "bytes": 21,
+        "sha256": "17c164342761c6b6d73c5ec17066008fb299c88c69ed2ac34be2690a2439b98d",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "evidence/ci-1bd4-owned-final.json",
+        "kind": "email",
+        "line": 4408,
+        "bytes": 32,
+        "sha256": "436dfb799653548990b1362af8a0666fc4eed97a26bdc94a7a5d115a1e91cddb",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "live-db-schema-isolation/source/package.json",
+        "kind": "email",
+        "line": 7,
+        "bytes": 12,
+        "sha256": "3d349afaadf5bd51133b86637415a1694c9069110fb559804645c6b92516c4c2",
+        "classification": "exact_1bd_package_version_reference"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "email",
+        "line": 11,
+        "bytes": 15,
+        "sha256": "ff01e83abb5a02584c4db53390492137d923bbca2e0a149a834b5f311823e8fc",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "email",
+        "line": 64,
+        "bytes": 15,
+        "sha256": "ff01e83abb5a02584c4db53390492137d923bbca2e0a149a834b5f311823e8fc",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "email",
+        "line": 71,
+        "bytes": 15,
+        "sha256": "ff01e83abb5a02584c4db53390492137d923bbca2e0a149a834b5f311823e8fc",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "email",
+        "line": 168,
+        "bytes": 15,
+        "sha256": "ff01e83abb5a02584c4db53390492137d923bbca2e0a149a834b5f311823e8fc",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "email",
+        "line": 352,
+        "bytes": 15,
+        "sha256": "ff01e83abb5a02584c4db53390492137d923bbca2e0a149a834b5f311823e8fc",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "credential_url",
+        "line": 11,
+        "bytes": 23,
+        "sha256": "b4cf1dd06315d50b1d4e192133d97b70b8a32315be1c1d57c608ed37714aca6e",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "credential_url",
+        "line": 64,
+        "bytes": 23,
+        "sha256": "b4cf1dd06315d50b1d4e192133d97b70b8a32315be1c1d57c608ed37714aca6e",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "credential_url",
+        "line": 71,
+        "bytes": 23,
+        "sha256": "b4cf1dd06315d50b1d4e192133d97b70b8a32315be1c1d57c608ed37714aca6e",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "credential_url",
+        "line": 168,
+        "bytes": 23,
+        "sha256": "b4cf1dd06315d50b1d4e192133d97b70b8a32315be1c1d57c608ed37714aca6e",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "kind": "credential_url",
+        "line": 352,
+        "bytes": 23,
+        "sha256": "b4cf1dd06315d50b1d4e192133d97b70b8a32315be1c1d57c608ed37714aca6e",
+        "classification": "unchanged_1bd_source_only_loopback_test_literal"
+      }
+    ],
+    "packageCoordinateSourceHashes": {
+      "package.json": {
+        "bytes": 75222,
+        "unicodeCodePoints": 75222,
+        "sha256": "dfdafcec8c862f61c2fde97cadc6c3a29f631f3b4de3dad290c8a6d6866560c6",
+        "gitBlobSha1": "ce29b39f0489de2c61f9a39bdb667a93789a72b7"
+      },
+      "pnpm-lock.yaml": {
+        "bytes": 957312,
+        "unicodeCodePoints": 957312,
+        "sha256": "c25dcec973162a2e91bb8efead27f92cb9021b53a3afb4ef0215538ba1690f6a",
+        "gitBlobSha1": "0a6b6e088bc92c8774b381750153fc3a1d510f17"
+      }
+    },
+    "workflowLiteral": {
+      "path": "sql-profile-e7/workflow.yml",
+      "bytes": 6519,
+      "unicodeCodePoints": 6519,
+      "sha256": "d37fd119a98d12ac4b83344730eb8402653f7757f7f2adc2bc3020f6dd6b0dfa",
+      "gitBlobSha1": "4a651547bcb4a67388b13a01f01bf11170e5a2fa",
+      "checks": [
+        {
+          "oneDeclaredPg17": true,
+          "loopback": true,
+          "usernameMatchesService": true,
+          "passwordMatchesService": true,
+          "databaseMatchesService": true,
+          "postgresScheme": true,
+          "portMatchesService": true,
+          "noQueryOrFragment": true
+        }
+      ],
+      "sourceCommitFromFrozenPublicationReceipt": "07062f0ca9e0eabd534bc85840d177e963123c30",
+      "savedRemoteReadbackExact": true,
+      "freshRemoteReadPerformed": false,
+      "originalFixtureLiteralReviewUnchanged": true
+    },
+    "additionalTestSourceLiteralProof": [
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "line": 11,
+        "baseCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "basePath": "scripts/run-db-tests.test.mjs",
+        "baseLine": 11,
+        "lineSha256": "6a9e42a426a115ea25bed2acd51b23ab4e3764b06c4eba1bded35498afe6de08",
+        "literalSha256": "d02dc620664c18f972109779c827a031d8ba5e41646cb998d899f9e4684d35bf",
+        "lineUnchangedFromFixedSource": true,
+        "loopback": true,
+        "noQueryOrFragment": true,
+        "role": "existing mocked-runner or target-validation fixture; no runtime credential exception"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "line": 64,
+        "baseCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "basePath": "scripts/run-db-tests.test.mjs",
+        "baseLine": 64,
+        "lineSha256": "f349712117edd5efeaa42b37517e6b4f72f6449583c0e69f0bb42cb82de7335e",
+        "literalSha256": "c1cb5f791779758efab39920436eac8dc8f43955d304f1ed7fe34c774f5e6b14",
+        "lineUnchangedFromFixedSource": true,
+        "loopback": true,
+        "noQueryOrFragment": true,
+        "role": "existing mocked-runner or target-validation fixture; no runtime credential exception"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "line": 71,
+        "baseCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "basePath": "scripts/run-db-tests.test.mjs",
+        "baseLine": 71,
+        "lineSha256": "ef4577433ed9a6bcedb859b5fd62857a75e5d2c2f5b82eb131b20893d25926e9",
+        "literalSha256": "08210508d6a391841a531fc5c4f27749239288db2ce6ca9ec171cb76f3eb8be8",
+        "lineUnchangedFromFixedSource": true,
+        "loopback": true,
+        "noQueryOrFragment": true,
+        "role": "existing mocked-runner or target-validation fixture; no runtime credential exception"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "line": 168,
+        "baseCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "basePath": "scripts/run-db-tests.test.mjs",
+        "baseLine": 168,
+        "lineSha256": "1985cc6702896412814f6e61aa3a98e16a36c627e3c8b5ddd045ef331912e915",
+        "literalSha256": "33048850179bdb1ae972ba2bc1c4569faba371e133e94769b26e0ffcd9fce1ea",
+        "lineUnchangedFromFixedSource": true,
+        "loopback": true,
+        "noQueryOrFragment": true,
+        "role": "existing mocked-runner or target-validation fixture; no runtime credential exception"
+      },
+      {
+        "path": "live-db-schema-isolation/source/scripts/run-db-tests.test.mjs",
+        "line": 352,
+        "baseCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+        "basePath": "scripts/run-db-tests.test.mjs",
+        "baseLine": 352,
+        "lineSha256": "d0eaa1a69771e6086f8374d20733d4bb9381d766f7d04f915fc7c68e135e33bb",
+        "literalSha256": "1973f71cda64f72ccd4a807085e3c3798aea8cd8e2aaa40c396f2499269d1414",
+        "lineUnchangedFromFixedSource": true,
+        "loopback": true,
+        "noQueryOrFragment": true,
+        "role": "existing mocked-runner or target-validation fixture; no runtime credential exception"
+      }
+    ]
+  },
+  "scannerReconciliation": {
+    "old55OriginalSha256": "7b91be4e7f0101452cff4d200b96fd033040b0613007c8424b7979b8b6212d4a",
+    "old55PrivacyObjectUnmodified": true,
+    "old55BroadRegexMatchesUnderCurrentScanner": 3,
+    "old55ZeroFindingsNotReinterpretedAsCurrentRawRegexZero": true,
+    "original85RecordedFindings": 18,
+    "original85ExactlyReproduced": true,
+    "extendedManifestInheritedOriginal18Findings": true,
+    "extendedNewFindings": 29,
+    "explanation": "The historical 55-file review used a different scanner/exception reporting scope. Current broad email matching includes package versions and the fixed disposable workflow URL. The additional 19 payloads add dependency-path versions, a package-manager version, and five unchanged source-only test URL literals (two regex categories each). This review supplements historical claims without rewriting their original bytes."
+  },
+  "ciOriginal": {
+    "receipt": {
+      "path": "evidence/ci-1bd4-owned-final.json",
+      "bytes": 139677,
+      "unicodeCodePoints": 139677,
+      "sha256": "97e8043a7050ffdd2ff9f2fbfb3bdcfd9a072ce4a07fa18117370502d73001cb",
+      "gitBlobSha1": "79b398d9f4be2473cfdf7bf8b8a00b203b8d9073"
+    },
+    "runId": 42391049903,
+    "attempt": 1,
+    "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "actualCheckout": "49d93ce3feb348fdfb05bd30e9d0ae114066da25",
+    "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+    "parents": [
+      "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+    ],
+    "sourceBasis": "Frozen original collection independently read the synthetic Git object through GitHub REST and nine actual checkout logs. This audit rechecks the original receipt hash and numeric consistency. The synthetic Git object is not locally available and no new remote read is performed.",
+    "immutableSyntheticCommitRecheckedLocally": false,
+    "candidateTreeRecheckedLocally": true,
+    "jobs": {
+      "jobs": 12,
+      "success": 9,
+      "skipped": 1,
+      "failure": 2,
+      "cancelled": 0
+    },
+    "postgres": {
+      "postgresVersion": [
+        "17.11"
+      ],
+      "shards": 4,
+      "inventorySuiteCount": 68,
+      "selectedSuiteCount": 68,
+      "uniqueSelectedSuiteCount": 68,
+      "runnerOkSuiteCount": 67,
+      "nodeSummaryBlocks": 86,
+      "tests": 3290,
+      "pass": 3289,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "cleanupsSucceeded": 4,
+      "countBasis": "Only node:test summary blocks inside each required DB runner selected pnpm suite group, between its selection and timings markers. Exact runner OK status is preserved per suite. Progress previews, bootstrap/setup and separate early identity/privacy tests are excluded.",
+      "interpretation": "These are actual non-skipped test executions in required database-gate scripts, including any pure subtests. They are not SQL counts, production subscriptions or real provider calls."
+    },
+    "conclusion": "failure",
+    "directErrorCode": "3F000",
+    "rawLogsPersisted": false,
+    "nativeOrProductionAcceptanceClaimed": false
+  },
+  "isolationFix": {
+    "receipt": {
+      "path": "live-db-schema-isolation/source-receipt.json",
+      "bytes": 9351,
+      "unicodeCodePoints": 9351,
+      "sha256": "34b7c3a947001913f508dd5e0fc5d5363e0edf30d6d5a27f27bebd22823f027a",
+      "gitBlobSha1": "8cda3354696ccd057c4f8aef224b614a2d0a7ee1"
+    },
+    "commit": "bd5f23536fb64f5db81668e60f2353678832550f",
+    "parent": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "changedFilesExactly": [
+      "package.json",
+      "scripts/run-db-tests.test.mjs"
+    ],
+    "sourceSnapshotsEqualCommit": true,
+    "patchEqualsCommitDiff": true,
+    "original29FilesExactlyOnce": true,
+    "orderedGroupSizes": [
+      2,
+      27
+    ],
+    "redSourceContract": {
+      "tests": 1,
+      "fail": 1,
+      "exitCode": 1
+    },
+    "finalSourceContract": {
+      "tests": 24,
+      "suites": 0,
+      "pass": 24,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "initialLintFailurePreserved": true,
+    "finalLintAndDiffDeclaredExitCode": 0,
+    "realPostgresRed": "preserved actual 1bd CI failure",
+    "realPostgresGreen": "pending next required CI; not executed or inferred by this audit"
+  },
+  "nonBlockingNotes": [
+    {
+      "code": "inherited_pending_ci_label",
+      "detail": "The frozen extended pending list inherits the earlier CI-pending item, while the appended CI receipt is final failure. The old label is not evidence of a pass or missing CI data."
+    },
+    {
+      "code": "additional_source_only_literal_exception",
+      "detail": "The original fixture-literal-review covers only the workflow service URL. Five unchanged source-test URL literals are separately bound here to exact 1bd and bd5 source bytes; the earlier review is unchanged."
+    }
+  ],
+  "blockingFindings": [],
+  "boundaries": [
+    "This audit verifies archive integrity and narrowly scoped privacy classifications; it is not a test rerun or production acceptance.",
+    "The e7 HTTP profile remains a sequential decomposition, not an allocation of concurrent macOS login counts.",
+    "Historical failed/red/lint/type outputs remain selected as original bytes.",
+    "No Native originals were added, inspected, or inferred.",
+    "Only this new RAM receipt is written; frozen payloads, historical manifests, repository source, refs, and publish state remain untouched."
+  ]
+}

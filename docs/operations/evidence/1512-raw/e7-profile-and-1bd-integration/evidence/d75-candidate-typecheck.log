@@ -1,0 +1,5 @@
+lib/abuse/model.test.ts(202,26): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'PromiseLike<LanguageModelV4GenerateResult>' is not assignable to parameter of type 'Promise<unknown> | (() => Promise<unknown>)'.
+      Type 'PromiseLike<LanguageModelV4GenerateResult>' is missing the following properties from type 'Promise<unknown>': catch, [Symbol.toStringTag], finally
+lib/mail-delivery.ts(24,48): error TS2307: Cannot find module 'nodemailer' or its corresponding type declarations.

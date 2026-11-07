@@ -1,0 +1,50 @@
+{
+  "sourceBeforeCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "sourceHashes": {
+    "package.json": "37912acaacf1b64dea4b5308d0cddd158b4f6ddc62c264ac93f74545d414cb60",
+    "scripts/run-db-tests.test.mjs": "c64720c93f4b66a4a2e03b8dfec6158304dbf4750ba16436b041c79492105b03"
+  },
+  "checks": [
+    {
+      "name": "root-final-runner.tap",
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/run-db-tests.test.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 1216,
+      "bytes": 6464,
+      "sha256": "804071184606c6f4336f5dae845f52d26163424334a3e9905772f0b5b37d1aae"
+    },
+    {
+      "name": "root-final-lint.log",
+      "argv": [
+        "./node_modules/.bin/oxlint",
+        "--no-ignore",
+        "--deny-warnings",
+        "scripts/run-db-tests.test.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 132,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "root-final-diff.log",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 12,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "realPostgres": "pending_next_required_CI",
+  "rootDiffReviewed": true,
+  "noProductAuthChanges": true
+}

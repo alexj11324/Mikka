@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "kind": "source-regression-addendum",
+  "issue": 1512,
+  "createdAt": "2026-11-07T16:11:54.254279+00:00",
+  "previousReceipt": {
+    "path": "evidence/computer-event-feed-source-regression.json",
+    "bytes": 5480,
+    "sha256": "f66d5e7c4ee2195579b8d845f4d03555757da74cf6d4db72cfe6cb5ae3c91eea",
+    "gitBlobSha1": "452c11e5a92bd01f18140a1492db7a4c707cda83"
+  },
+  "historicalOriginalsUnchanged": true,
+  "sourceFiles": [
+    {
+      "path": "lib/computer/event-stream.ts",
+      "bytes": 5382,
+      "sha256": "53001273e4b904562605a3701a4d8ef99415ecfb5c7161f6b216019b0985ba8b",
+      "gitBlobSha1": "62045dce9dfb0af2ac4a400f0c9a7d38873fe608"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "bytes": 2441,
+      "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c",
+      "gitBlobSha1": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26"
+    },
+    {
+      "path": "lib/computer/event-stream.test.ts",
+      "bytes": 18036,
+      "sha256": "91002b6845b39dc1d387afb2dd36553a8935773a4c6153166caf63f06f7ba7a3",
+      "gitBlobSha1": "762510b7b72602856feae599ec07967e5bd15ca2"
+    }
+  ],
+  "reproduction": {
+    "description": "Actual LiveChannel 100ms queued catch-up is delivered while a post-boundary initial page is still in flight. v1 successful completion then repeated the read.",
+    "red": {
+      "tests": 15,
+      "passed": 14,
+      "failed": 1,
+      "skipped": 0,
+      "exitCode": 1,
+      "assertion": {
+        "expectedPhysicalReads": 1,
+        "actualPhysicalReads": 2
+      },
+      "productSource": "feed-fix-v1/lib/computer/event-stream.ts",
+      "testSourceSha256": "91002b6845b39dc1d387afb2dd36553a8935773a4c6153166caf63f06f7ba7a3",
+      "log": "computer-event-feed-pending-red.tap"
+    }
+  },
+  "fix": {
+    "pending": "Largest after among pending obligations; any missing after forces a subsequent read.",
+    "completion": "Only a current-generation complete, accepted page wave with began strictly greater than the largest pending after clears the pending obligation.",
+    "noEarlyProof": true,
+    "usesWallClock": false,
+    "additionalTimers": 0,
+    "coverageOrder": "existing global readBoundary counter",
+    "preserves": [
+      "newer after",
+      "any no-after forced read",
+      "before-open catch-up",
+      "partial pagination failure",
+      "invalid page",
+      "retry",
+      "abort/generation fence",
+      "identity and cursor behavior"
+    ]
+  },
+  "verification": {
+    "command": [
+      "node",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "--test-reporter=tap",
+      "--test-concurrency=1",
+      "lib/computer/event-stream.test.ts",
+      "lib/live/channel.test.ts"
+    ],
+    "tests": 70,
+    "passed": 70,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "log": "computer-event-feed-pending-green.tap",
+    "diffCheckExitCode": 0,
+    "lintAndTypes": "root integration responsibility, not claimed here"
+  },
+  "artifacts": [
+    {
+      "path": "computer-event-feed-pending-red.tap",
+      "bytes": 4540,
+      "sha256": "6f9b10d8e05df333fb514494b25c26cdbc6abee3ef45539ab582ccb886b36426",
+      "gitBlobSha1": "300e36d4743569c6da44735462338f4016c9a734"
+    },
+    {
+      "path": "computer-event-feed-pending-green.tap",
+      "bytes": 17297,
+      "sha256": "4beb58b774c9fc28e62cb875f8f98d461e715475f5192d44e65d22484d80e6f5",
+      "gitBlobSha1": "50ceec68d3004ff66f8b240be938d2132d7daeb2"
+    },
+    {
+      "path": "computer-event-feed-pending-diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ],
+  "v1SourceSnapshots": [
+    {
+      "path": "feed-fix-v1/lib/computer/event-stream.ts",
+      "bytes": 4679,
+      "sha256": "0b5dbf48224838002e939baccec4e31e9dfdd1f51e654618d6057cefa714095a",
+      "gitBlobSha1": "242d4c0b1712e12b14b8a0c1cd21bca7c033dfdd"
+    },
+    {
+      "path": "feed-fix-v1/hooks/use-subagent-updates.ts",
+      "bytes": 2441,
+      "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c",
+      "gitBlobSha1": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26"
+    },
+    {
+      "path": "feed-fix-v1/lib/computer/event-stream.test.ts",
+      "bytes": 14816,
+      "sha256": "0cfa9cf84ac111b3d2f88df874368cff7e58ba4881427a47bbac70f541c86b80",
+      "gitBlobSha1": "d53f08a5e5cbaad33f14fd05eba08a074e9c26f2"
+    }
+  ],
+  "scope": {
+    "remoteMutations": 0,
+    "servicesStarted": 0,
+    "databaseRequests": 0,
+    "providerCalls": 0,
+    "nativeAcceptance": null,
+    "performanceAttribution": "Confirms only this coupled duplicate-read path. No assignment of e7 otherScoped SQL counts and no claim final Native budget passes."
+  }
+}

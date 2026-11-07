@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "source": "49d93ce3feb348fdfb05bd30e9d0ae114066da25",
+  "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+  "base": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+  "runId": 42391049816,
+  "attempt": 1,
+  "indexSha256": "2d5b50fc0ca79b4c83ac14f07ae86584264bb4db0e30367690e5f472f2c40ebe",
+  "originalPayloadsVerified": 21,
+  "bytesVerified": 585069,
+  "windows": [
+    {
+      "window": "nativeLogin",
+      "queries": 209,
+      "snapshots": 4,
+      "operationAndSourceMapsConserve": true
+    },
+    {
+      "window": "webLogin",
+      "queries": 210,
+      "snapshots": 4,
+      "operationAndSourceMapsConserve": true
+    },
+    {
+      "window": "startup-bundled",
+      "queries": 169,
+      "snapshots": 2,
+      "operationAndSourceMapsConserve": true
+    },
+    {
+      "window": "startup-hosted",
+      "queries": 201,
+      "snapshots": 2,
+      "operationAndSourceMapsConserve": true
+    }
+  ],
+  "samePid": 29218,
+  "totalSnapshots": 12,
+  "allUnknownCountersZero": true,
+  "allCumulativeCountsMonotonic": true,
+  "allOperationAndSourcePartitionsConserve": true,
+  "allPhysicalAndLogicalRequestsCompletedWithinOriginalWindows": true,
+  "loginBudgetPassed": true,
+  "startupFirstPairBudgetPassed": true,
+  "pkceAndBackgroundSubtracted": false,
+  "causalFeedBenefitClaimed": false,
+  "notProofForMainA65OrProduction": true,
+  "aggregateCleanupStatus": "unknown; preserve individual passed cleanup and lease evidence from originals",
+  "mainCiConclusion": "failure"
+}

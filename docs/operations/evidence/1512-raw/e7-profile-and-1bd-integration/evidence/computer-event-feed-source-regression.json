@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "kind": "source-regression",
+  "issue": 1512,
+  "createdAt": "2026-11-07T16:09:27.266248+00:00",
+  "observedHeadAtFreeze": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "sourceFiles": [
+    {
+      "path": "lib/computer/event-stream.ts",
+      "bytes": 4679,
+      "sha256": "0b5dbf48224838002e939baccec4e31e9dfdd1f51e654618d6057cefa714095a",
+      "gitBlobSha1": "242d4c0b1712e12b14b8a0c1cd21bca7c033dfdd"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "bytes": 2441,
+      "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c",
+      "gitBlobSha1": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26"
+    },
+    {
+      "path": "lib/computer/event-stream.test.ts",
+      "bytes": 14816,
+      "sha256": "0cfa9cf84ac111b3d2f88df874368cff7e58ba4881427a47bbac70f541c86b80",
+      "gitBlobSha1": "d53f08a5e5cbaad33f14fd05eba08a074e9c26f2"
+    }
+  ],
+  "historicalRed": {
+    "receipt": "evidence/computer-event-feed-live-coupling-red.json",
+    "test": "computer-event-feed-live-coupling.test.ts",
+    "log": "computer-event-feed-live-coupling-red.tap",
+    "originalBytesUnchanged": true,
+    "tests": 3,
+    "passed": 2,
+    "failed": 1,
+    "exitCode": 1,
+    "bridge": "Historical original discards after; preserved, not rewritten to claim green."
+  },
+  "sourceRegression": {
+    "command": [
+      "node",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "--test-reporter=tap",
+      "--test-concurrency=1",
+      "lib/computer/event-stream.test.ts"
+    ],
+    "before": {
+      "tests": 12,
+      "passed": 9,
+      "failed": 3,
+      "skipped": 0,
+      "exitCode": 1,
+      "testSourceSha256": "0cfa9cf84ac111b3d2f88df874368cff7e58ba4881427a47bbac70f541c86b80",
+      "productSource": "feed-fix-originals/",
+      "log": "computer-event-feed-source-red.tap"
+    },
+    "after": {
+      "command": [
+        "node",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "lib/computer/event-stream.test.ts",
+        "lib/live/channel.test.ts"
+      ],
+      "tests": 67,
+      "passed": 67,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "log": "computer-event-feed-source-green.tap"
+    }
+  },
+  "scope": {
+    "clockUsedForCoverage": false,
+    "orderSource": "existing readBoundary global ordering counter",
+    "coverage": "same generation; complete pagination accepted; began strictly greater than actual Live after",
+    "inFlightReused": false,
+    "forcedReadsUnchanged": [
+      "initial",
+      "foreground",
+      "remount",
+      "retry",
+      "notifications without after"
+    ],
+    "preserved": [
+      "newer pending obligation",
+      "before-open catch-up",
+      "newer actual push",
+      "failure and retry",
+      "abort and page-refresh stop",
+      "cursor validation and bounded pagination",
+      "owner/workspace feed identity"
+    ]
+  },
+  "controls": [
+    "real LiveChannel delayed catch-up after committed initial read",
+    "real LiveChannel initial read before socket open",
+    "real socket push newer than completed wave",
+    "partial pagination failure is not completion proof",
+    "old covered obligation does not clear newer pending wave",
+    "old covered obligation does not cancel failed-read retry",
+    "remount clears previous generation proof",
+    "existing hidden abort/retry/cursor/page-refresh controls unchanged"
+  ],
+  "verification": {
+    "diffCheckExitCode": 0,
+    "lint": "deferred to root integration as assigned",
+    "types": "deferred to root integration as assigned",
+    "remoteActions": 0,
+    "servicesStarted": 0,
+    "databaseRequests": 0,
+    "providerCalls": 0,
+    "nativeAcceptance": null,
+    "performanceAttribution": "Local coupled regression only; does not attribute actual e7 44/23 otherScoped SQL or establish final Native budget."
+  },
+  "artifacts": [
+    {
+      "path": "computer-event-feed-source-red.tap",
+      "bytes": 4900,
+      "sha256": "32bb96d7f61ad5394ea47449eb5cea0c97cdb4770d637c6265b3e5bab373af9b",
+      "gitBlobSha1": "82f6b49022162824424c670975be67f17478bd15"
+    },
+    {
+      "path": "computer-event-feed-source-green.tap",
+      "bytes": 16506,
+      "sha256": "fcbced70c75d605d2d3fa94505336aa4a3c3f5ca93615210ed21c55ac47db2e8",
+      "gitBlobSha1": "e73d3b21861c894999ef05aacf27d5129837d83a"
+    },
+    {
+      "path": "computer-event-feed-diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ],
+  "originalSources": [
+    {
+      "path": "feed-fix-originals/lib/computer/event-stream.ts",
+      "bytes": 4139,
+      "sha256": "cb7f8686938918c2cb713bdbc9b5081df064e64ee2f0676ff0a184480f9b5f3a",
+      "gitBlobSha1": "20f57c424ea7f4ef9793997c0a1e3af44a794c3c"
+    },
+    {
+      "path": "feed-fix-originals/hooks/use-subagent-updates.ts",
+      "bytes": 2390,
+      "sha256": "b22ae54e6be4e18c64df5fd6aa1844a10151ff0274caf38b855cc86c831a9279",
+      "gitBlobSha1": "27c2d3b69a1a25bc0415f7b66b9aaf08fdd73a09"
+    },
+    {
+      "path": "feed-fix-originals/lib/computer/event-stream.test.ts",
+      "bytes": 6909,
+      "sha256": "289807e72ef2122a5d34715dfaf7723e39927ca996783b79a399d5fdd6454345",
+      "gitBlobSha1": "071bdaef82c43625fa1fec05757f3075185a7716"
+    }
+  ]
+}

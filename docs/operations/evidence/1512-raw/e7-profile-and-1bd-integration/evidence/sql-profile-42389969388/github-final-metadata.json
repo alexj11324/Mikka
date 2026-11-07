@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T16:21:04.720Z",
+  "method": "Exact attempt jobs collection and exact run/artifact metadata; no logs or ZIP bytes downloaded by reviewer",
+  "run": {
+    "id": 42389969388,
+    "run_attempt": 1,
+    "head_sha": "07062f0ca9e0eabd534bc85840d177e963123c30",
+    "event": "push",
+    "path": ".github/workflows/issue1512-sql-profile-e7.yml",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-07T16:10:46Z",
+    "updated_at": "2026-11-07T16:12:35Z"
+  },
+  "jobCollection": {
+    "endpoint": "actions/runs/42389969388/attempts/1/jobs?per_page=100",
+    "total_count": 1,
+    "returned": 1,
+    "complete": true
+  },
+  "job": {
+    "id": 128455295453,
+    "run_id": 42389969388,
+    "run_attempt": 1,
+    "head_sha": "07062f0ca9e0eabd534bc85840d177e963123c30",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-07T16:10:48Z",
+    "completed_at": "2026-11-07T16:12:34Z",
+    "steps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:10:49Z",
+        "completed_at": "2026-11-07T16:10:50Z"
+      },
+      {
+        "number": 2,
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:10:50Z",
+        "completed_at": "2026-11-07T16:11:02Z"
+      },
+      {
+        "number": 3,
+        "name": "Read the exact reviewed diagnostic",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:02Z",
+        "completed_at": "2026-11-07T16:11:05Z"
+      },
+      {
+        "number": 4,
+        "name": "Read the source used by the successful Linux API artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:05Z",
+        "completed_at": "2026-11-07T16:11:08Z"
+      },
+      {
+        "number": 5,
+        "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:08Z",
+        "completed_at": "2026-11-07T16:11:09Z"
+      },
+      {
+        "number": 6,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:09Z",
+        "completed_at": "2026-11-07T16:11:14Z"
+      },
+      {
+        "number": 7,
+        "name": "Check the closed request and cleanup contracts without services",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:14Z",
+        "completed_at": "2026-11-07T16:11:14Z"
+      },
+      {
+        "number": 8,
+        "name": "Verify and reuse the immutable successful compiled API",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:14Z",
+        "completed_at": "2026-11-07T16:11:16Z"
+      },
+      {
+        "number": 9,
+        "name": "Install pinned dependencies without any browser runtime",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:16Z",
+        "completed_at": "2026-11-07T16:11:59Z"
+      },
+      {
+        "number": 10,
+        "name": "Decompose normal authentication and read requests on disposable PostgreSQL",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:11:59Z",
+        "completed_at": "2026-11-07T16:12:10Z"
+      },
+      {
+        "number": 11,
+        "name": "Remove the exact diagnostic download and retain safe runner provenance",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:10Z",
+        "completed_at": "2026-11-07T16:12:10Z"
+      },
+      {
+        "number": 12,
+        "name": "Check only the explicitly safe reports before upload",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:10Z",
+        "completed_at": "2026-11-07T16:12:10Z"
+      },
+      {
+        "number": 13,
+        "name": "Preserve only safe diagnostic JSON",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:10Z",
+        "completed_at": "2026-11-07T16:12:11Z"
+      },
+      {
+        "number": 22,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:11Z",
+        "completed_at": "2026-11-07T16:12:31Z"
+      },
+      {
+        "number": 23,
+        "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:31Z",
+        "completed_at": "2026-11-07T16:12:31Z"
+      },
+      {
+        "number": 24,
+        "name": "Post Read the source used by the successful Linux API artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:31Z",
+        "completed_at": "2026-11-07T16:12:31Z"
+      },
+      {
+        "number": 25,
+        "name": "Post Read the exact reviewed diagnostic",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:31Z",
+        "completed_at": "2026-11-07T16:12:31Z"
+      },
+      {
+        "number": 26,
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:31Z",
+        "completed_at": "2026-11-07T16:12:32Z"
+      },
+      {
+        "number": 27,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-07T16:12:32Z",
+        "completed_at": "2026-11-07T16:12:32Z"
+      }
+    ]
+  },
+  "reportArtifact": {
+    "id": 13581421063,
+    "name": "issue1512-sql-decomposition-e7-42389969388-1",
+    "size_in_bytes": 13549,
+    "digest": "sha256:786b9664070d9e771534e96a57ae7889597235095d4ff3cd21eb60b7bb9a4145",
+    "expired": false,
+    "created_at": "2026-11-07T16:12:11Z",
+    "workflow_run": {
+      "id": 42389969388,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "ops/1512-git-transport",
+      "head_sha": "07062f0ca9e0eabd534bc85840d177e963123c30"
+    }
+  },
+  "sourceArtifact": {
+    "id": 13578149529,
+    "name": "desktop-api-build-383da169d23b9cb6bfae1951ef862f43919a89c8",
+    "size_in_bytes": 47867791,
+    "digest": "sha256:82926e56d5cc6f04bf19cc0354af2fb7682a61bededec372e00dc5b8d6b0d168",
+    "expired": false,
+    "created_at": "2026-11-07T15:08:04Z",
+    "workflow_run": {
+      "id": 42384327014,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "e7a1a267335604004586f88e6b530c51b0da286d"
+    }
+  },
+  "commits": [
+    {
+      "sha": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+      "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+      "parents": [
+        "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+        "e7a1a267335604004586f88e6b530c51b0da286d"
+      ]
+    },
+    {
+      "sha": "07062f0ca9e0eabd534bc85840d177e963123c30",
+      "tree": "53ea040abf96e89cc762db75ed2a932c8ea4af42",
+      "parents": [
+        "820b3cc4b1572b56d8524178214571067f16abbb"
+      ]
+    }
+  ],
+  "excluded": [
+    "actor account metadata",
+    "runner identifiers",
+    "signed download URLs",
+    "raw logs",
+    "artifact bytes"
+  ],
+  "productionAcceptance": false
+}

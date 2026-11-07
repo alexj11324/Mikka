@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "status": "frozen_prepared_not_executed",
+  "sourceHead": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "compiledSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "runtimePayloadCount": 12,
+  "runtimePayloads": [
+    {
+      "path": "driver.mjs",
+      "bytes": 39946,
+      "unicodeCodePoints": 39946,
+      "utf16CodeUnits": 39946,
+      "sha256": "7ea28445e759f8fb1e37eadb0aca9fdba397d425f02dd72b8ca5e2470397d4e8",
+      "gitBlob": "1b7fc413705539c2f24c54c7aece5d5a02e64d82",
+      "destination": ".github/issue1512-sql-profile-e7/driver.mjs"
+    },
+    {
+      "path": "artifact.mjs",
+      "bytes": 5940,
+      "unicodeCodePoints": 5940,
+      "utf16CodeUnits": 5940,
+      "sha256": "c317f6e598758af7ba55df02de4160355503ffca32968d86fd9a5be5e3108f9d",
+      "gitBlob": "68897f7fce279fc874f041769087ec437b6367e2",
+      "destination": ".github/issue1512-sql-profile-e7/artifact.mjs"
+    },
+    {
+      "path": "reads.mjs",
+      "bytes": 15002,
+      "unicodeCodePoints": 15002,
+      "utf16CodeUnits": 15002,
+      "sha256": "fc67e02da9887d29a77beda0f76608073467883031c94074de859fd7cdba8062",
+      "gitBlob": "13850386a6fa2afd5774a47a8796862a9b6f8d50",
+      "destination": ".github/issue1512-sql-profile-e7/reads.mjs"
+    },
+    {
+      "path": "projection.mjs",
+      "bytes": 4132,
+      "unicodeCodePoints": 4132,
+      "utf16CodeUnits": 4132,
+      "sha256": "d7f6cce673fc3ee6c0508ccd9fdc97fb7d785d2669f5d58332ae8a61276afa54",
+      "gitBlob": "092b5ee4202639a825e49a5d4b7effec7e95bd7d",
+      "destination": ".github/issue1512-sql-profile-e7/projection.mjs"
+    },
+    {
+      "path": "driver.test.mjs",
+      "bytes": 13962,
+      "unicodeCodePoints": 13962,
+      "utf16CodeUnits": 13962,
+      "sha256": "766b9f9f2cc87b49f594223e706bec43379ec01b03399c934ee372a967630f15",
+      "gitBlob": "986c1e4fca7af38c94e3760ad5b172c1757ee732",
+      "destination": ".github/issue1512-sql-profile-e7/driver.test.mjs"
+    },
+    {
+      "path": "projection.test.mjs",
+      "bytes": 10473,
+      "unicodeCodePoints": 10473,
+      "utf16CodeUnits": 10473,
+      "sha256": "a2d20e1275df5426e172d8e4fb861e195a60a248f21ca06d7feaa286292c0088",
+      "gitBlob": "db3215732eb3966dd25f9e0a2f94761d0856fed4",
+      "destination": ".github/issue1512-sql-profile-e7/projection.test.mjs"
+    },
+    {
+      "path": "closed-labels.json",
+      "bytes": 23716,
+      "unicodeCodePoints": 23716,
+      "utf16CodeUnits": 23716,
+      "sha256": "dd352c9f91b3a1588d989ce974fbf5959c2107b790c234382364e03653812017",
+      "gitBlob": "d2328d33fd684e2794b9b5207a81ebd6283d9648",
+      "destination": ".github/issue1512-sql-profile-e7/closed-labels.json"
+    },
+    {
+      "path": "metrics-provenance.json",
+      "bytes": 2513,
+      "unicodeCodePoints": 2513,
+      "utf16CodeUnits": 2513,
+      "sha256": "0402fc020124b9e653fd6cf4af0fc00979e60468e80de04189bce5621155fe96",
+      "gitBlob": "0841241fb63a0337f51b48bdb6ec75ed33f03121",
+      "destination": ".github/issue1512-sql-profile-e7/metrics-provenance.json"
+    },
+    {
+      "path": "metrics/db-metrics.cjs",
+      "bytes": 8336,
+      "unicodeCodePoints": 8336,
+      "utf16CodeUnits": 8336,
+      "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9",
+      "destination": ".github/issue1512-sql-profile-e7/metrics/db-metrics.cjs"
+    },
+    {
+      "path": "metrics/db-query-operations.cjs",
+      "bytes": 529,
+      "unicodeCodePoints": 529,
+      "utf16CodeUnits": 529,
+      "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+      "gitBlob": "9011b6edb7296c8872d3e311074529a49987b575",
+      "destination": ".github/issue1512-sql-profile-e7/metrics/db-query-operations.cjs"
+    },
+    {
+      "path": "metrics/db-query-unattributed-sources.cjs",
+      "bytes": 9513,
+      "unicodeCodePoints": 9513,
+      "utf16CodeUnits": 9513,
+      "sha256": "90e770a1c7d0fc2d4b504fb0761db98bbd3ba4db70d7edf8d4ad9578efb8d176",
+      "gitBlob": "608f80e9c75964b8cf3c59918c7036d98a675900",
+      "destination": ".github/issue1512-sql-profile-e7/metrics/db-query-unattributed-sources.cjs"
+    },
+    {
+      "path": "metrics/lifecycle-query-counts.mjs",
+      "bytes": 21882,
+      "unicodeCodePoints": 21882,
+      "utf16CodeUnits": 21882,
+      "sha256": "3133e8a475c7efd1613a0d53f0a72a28318e2725e2fdd16520995ba4f65a7c38",
+      "gitBlob": "8bef5b7c7abda0a50732bec502e924a66167c9ce",
+      "destination": ".github/issue1512-sql-profile-e7/metrics/lifecycle-query-counts.mjs"
+    }
+  ],
+  "workflow": {
+    "path": "workflow.yml",
+    "bytes": 6519,
+    "unicodeCodePoints": 6519,
+    "utf16CodeUnits": 6519,
+    "sha256": "d37fd119a98d12ac4b83344730eb8402653f7757f7f2adc2bc3020f6dd6b0dfa",
+    "gitBlob": "4a651547bcb4a67388b13a01f01bf11170e5a2fa",
+    "destination": ".github/workflows/issue1512-sql-profile-e7.yml"
+  },
+  "supportingEvidence": [
+    {
+      "path": "README.md",
+      "bytes": 10174,
+      "unicodeCodePoints": 6722,
+      "utf16CodeUnits": 6722,
+      "sha256": "f211dbc6f024eafac1e44f6dc2e0960ef8a67b40669d4b7975ab7185090e797b",
+      "gitBlob": "b0a1254358c23e32238f21ad926dbb33d84c224c"
+    },
+    {
+      "path": "source-contracts.json",
+      "bytes": 9384,
+      "unicodeCodePoints": 9384,
+      "utf16CodeUnits": 9384,
+      "sha256": "f3683233f489f293eead6df855a6b7c25bbaa235260947e064e97e7bf5272503",
+      "gitBlob": "b3fc1ef36529676cfe32e554b2316077a9d49a0b"
+    },
+    {
+      "path": "catalog-source-check.json",
+      "bytes": 646,
+      "unicodeCodePoints": 646,
+      "utf16CodeUnits": 646,
+      "sha256": "1c155fd8af19a30bb37ba66c55173fa33f3bb1d32bdad48257c3ad5595e7ef11",
+      "gitBlob": "bbe17c7cf491fb3e62051040313bfa71987fe36a"
+    },
+    {
+      "path": "tests.initial.tap",
+      "bytes": 2496,
+      "unicodeCodePoints": 2434,
+      "utf16CodeUnits": 2434,
+      "sha256": "1becc246ac7dd84cf232903320fffc610a8afcfca46900b68437f2c15477ba10",
+      "gitBlob": "e43917e00795b0ef384496fe74715ef8f140bf38"
+    },
+    {
+      "path": "tests.pre-freeze.tap",
+      "bytes": 4808,
+      "unicodeCodePoints": 4808,
+      "utf16CodeUnits": 4808,
+      "sha256": "5db8dce575fc607fc6df81fb21ed51bc5fd487799e80ecc9402b9a1c09e7caf1",
+      "gitBlob": "5a11c42dd2d9d700d0c1793fc613560cce53f29b"
+    },
+    {
+      "path": "tests.tap",
+      "bytes": 4809,
+      "unicodeCodePoints": 4809,
+      "utf16CodeUnits": 4809,
+      "sha256": "6d7112593096651b73c6154c4bf4d013699c42f212b6ba65cc44d9278f00be49",
+      "gitBlob": "0fe30fd863ed1b65ebfb589b30f865fda6317399"
+    },
+    {
+      "path": "syntax.json",
+      "bytes": 640,
+      "unicodeCodePoints": 640,
+      "utf16CodeUnits": 640,
+      "sha256": "1a3e5bdea9299987978257cc189c760e9287f5e002a52be39486759f08179e61",
+      "gitBlob": "af026031f3c6a921aec4b255abade01e8ce2447b"
+    },
+    {
+      "path": "lint.initial.log",
+      "bytes": 0,
+      "unicodeCodePoints": 0,
+      "utf16CodeUnits": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "lint.log",
+      "bytes": 0,
+      "unicodeCodePoints": 0,
+      "utf16CodeUnits": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "workflow-check.json",
+      "bytes": 401,
+      "unicodeCodePoints": 401,
+      "utf16CodeUnits": 401,
+      "sha256": "d1560f2ee005389ae2d0a7989b5a91f89312fac71598379161e85aff1c662410",
+      "gitBlob": "3c255e8d092280fe10e03f98d657ea5863441ed2"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 5144,
+      "unicodeCodePoints": 5144,
+      "utf16CodeUnits": 5144,
+      "sha256": "10a6bf10e9dce7e03ae90ebde3b14b2b77ccaf50b256a0b30e7a3058b0ed6e31",
+      "gitBlob": "473aa8eb728e4fb15b68a32f4549ecd923321a00"
+    }
+  ],
+  "runtimeBytes": 155944,
+  "publicationAuthorizedByRootOnly": true,
+  "notMacOSAcceptance": true
+}

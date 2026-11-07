@@ -1,0 +1,4 @@
+
+> next-app@0.0.1 lint:runtime /dev/shm/issue1512-ops-812e3b7d6d45/lint-candidate-1bd4f8a6
+> oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs
+

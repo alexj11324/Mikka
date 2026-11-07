@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T16:22:36.475082+00:00",
+  "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+  "reviewedMain": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+  "mainMerge": "3a362fe7562203faa403ef88d0385973325f5c78",
+  "workflowCheckpoint": "fea5b397464062755fe97ec0022c72d27593cfb6",
+  "checkpointMerge": "6d7ca30dc75cd806dc9e9e03479cd8293b8cb1df",
+  "mergeConflictsResolved": [
+    "apps/api/generated/routes.json",
+    "apps/api/generated/routes.ts",
+    "apps/api/nitro.config.ts",
+    "lib/coordinator/decide.ts",
+    "package.json"
+  ],
+  "generatedRoutes": 223,
+  "checks": {
+    "mainCompatibilityTests": 84,
+    "nativeCounterTests": 20,
+    "feedChannelFinalTests": 70,
+    "selfHostedModelAndAiTestsBeforeFinalTestOnlyTypeCorrection": 26,
+    "selfHostedFinalTypeCorrectionFocusedTest": 1,
+    "fullTypecheckExit": 0,
+    "fullLintExit": 0,
+    "runtimeLintExit": 0,
+    "lintMigrationsTests": 55,
+    "cleanLintCheckoutBoundToCandidate": true,
+    "lintWorktreeRemoved": true,
+    "retainedMigrationFixturesPreserved": true
+  },
+  "initialFailures": {
+    "typecheck": "new test PromiseLike assert corrected and main pinned nodemailer installed; original output preserved",
+    "lint": "working-directory generated untracked Nitro probe output was linted; unchanged pnpm lint on clean exact-candidate worktree passed; original workspace artifacts preserved",
+    "offlineInstall": "pinned nodemailer package not cached; normal frozen install then succeeded"
+  },
+  "productionAcceptance": false,
+  "nativeBudget": "new candidate not run; old e7 failure remains",
+  "files": [
+    {
+      "path": "evidence/d75-main-merge-targeted.tap",
+      "bytes": 20669,
+      "sha256": "ac41b309eaba0aebbf2bf02e84898447f615eb17e1ccf96aa26d5c6103371a54"
+    },
+    {
+      "path": "evidence/d75-native-default-rest-counter.tap",
+      "bytes": 5368,
+      "sha256": "a43f6036984dc591bea3a13f2ae8650853d79d658e41771842c2fc11512ab1c3"
+    },
+    {
+      "path": "evidence/d75-candidate-typecheck.log",
+      "bytes": 550,
+      "sha256": "5ed9f699746b6eff46d34dfc5a837c08bb5e2ea6a63477dc5ebe216f393ddcb5"
+    },
+    {
+      "path": "evidence/d75-candidate-typecheck-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/d75-candidate-lint.log",
+      "bytes": 34371,
+      "sha256": "9334fbf8464c9cf85ea9c6c02846aed365ba2ef06fd979c173e7ec762f0222cc"
+    },
+    {
+      "path": "evidence/d75-candidate-clean-lint.log",
+      "bytes": 6480,
+      "sha256": "db945cb06dca0a441f9f5cf1dce64865dd2043252d3cfbd021c4747bb765208f"
+    },
+    {
+      "path": "evidence/d75-candidate-runtime-lint.log",
+      "bytes": 335,
+      "sha256": "36f8b723d2d4e64cf66b7ae1d50e30442ba1507aec7ada3a59105b1f25af63dc"
+    },
+    {
+      "path": "evidence/d75-pnpm-offline.log",
+      "bytes": 368,
+      "sha256": "05a0710f96e29097c18b9411c2e761107217550bbb8e09304c9c63e22f8c1afd"
+    },
+    {
+      "path": "evidence/d75-pnpm-install.log",
+      "bytes": 1615,
+      "sha256": "2bd7f41e412470e23b65cbea8ddc822df038a4a2e1e89c02aae0a3512eeee9c3"
+    }
+  ]
+}

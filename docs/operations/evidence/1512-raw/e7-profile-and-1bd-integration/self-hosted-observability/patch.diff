@@ -1,0 +1,179 @@
+diff --git a/lib/abuse/model.test.ts b/lib/abuse/model.test.ts
+index 9195c29b..6024f9ed 100644
+--- a/lib/abuse/model.test.ts
++++ b/lib/abuse/model.test.ts
+@@ -1,5 +1,7 @@
+ import assert from 'node:assert/strict'
+ import { before, beforeEach, mock, test } from 'node:test'
++import { hostedBillingScope } from './context'
++import { COORDINATOR_MODEL } from '../coordinator/model'
+ let verified = true,
+   allow = true
+ const reservations: string[] = [],
+@@ -11,6 +13,11 @@ let generated = 0,
+ let managed = false, denyAt: 'prepare' | 'send' | null = null
+ let beforeSettlement: ((cost: number | null) => Promise<void>) | undefined, generationFailure: Error | undefined
+ const modelOptions: unknown[] = []
++type Generation = { distinctId: string; event: string; properties?: Record<string, unknown> }
++const captured: Generation[] = [], selfHostedAdmissions: unknown[][] = []
++let selfHostedConfig: ReturnType<typeof import('../default-model-config')['selfHostedDefaultModelConfig']> = null
++let selfHostedTransport: { baseURL: string; apiKey?: string } | undefined
++let gatewayCalls = 0
+ let gatewayConfig: { baseURL?: string; fetch?: typeof fetch; apiKey?: string } | undefined
+ const usage = { inputTokens: { total: 12 }, outputTokens: { total: 3 } }
+ const model = {
+@@ -48,7 +55,7 @@ const model = {
+     }
+   },
+ }
+-const gateway = Object.assign(() => model, {
++const gateway = Object.assign(() => { gatewayCalls++; return model }, {
+   getAvailableModels: async () => ({
+     models: [
+       {
+@@ -58,8 +65,38 @@ const gateway = Object.assign(() => model, {
+     ],
+   }),
+ })
++mock.module(new URL('../default-model-config.ts', import.meta.url).href, {
++  namedExports: { selfHostedDefaultModelConfig: () => selfHostedConfig },
++})
++mock.module(new URL('../posthog-server.ts', import.meta.url).href, {
++  namedExports: { serverPostHog: () => ({ capture: (event: Generation) => captured.push(event) }) },
++})
++const localUsage = { inputTokens: { total: 12, noCache: 4, cacheRead: 6, cacheWrite: 2 }, outputTokens: { total: 3 } }
++mock.module('@ai-sdk/openai-compatible', { namedExports: { createOpenAICompatible: (config: typeof selfHostedTransport) => {
++  selfHostedTransport = config
++  return { chatModel: (modelId: string) => ({ ...model, modelId,
++    async doGenerate(options: unknown) {
++      return { ...await model.doGenerate(options), usage: localUsage,
++        content: [{ type: 'text', text: 'PRIVATE_SELF_HOSTED_RESPONSE' }],
++        request: { body: 'PRIVATE_SELF_HOSTED_REQUEST' } }
++    },
++    async doStream(options: unknown) {
++      streamed++; modelOptions.push(options)
++      return { stream: new ReadableStream({ start(controller) {
++        controller.enqueue({ type: 'text-delta', id: 't', delta: 'PRIVATE_SELF_HOSTED_RESPONSE' })
++        controller.enqueue({ type: 'finish', usage: localUsage, finishReason: { unified: 'stop', raw: 'stop' } })
++        controller.close()
++      } }) }
++    },
++  }) }
++} } })
+ mock.module('ai', { namedExports: { gateway, createGateway: (options: typeof gatewayConfig) => { gatewayConfig = options; return gateway } } })
+ mock.module(new URL('../model-admission/runtime.ts', import.meta.url).href, { namedExports: { modelAdmission: {
++  async selfHosted(...args: unknown[]) {
++    selfHostedAdmissions.push(args)
++    if (denyAt) throw Error('modelRouteDenied')
++    return null
++  },
+   async gateway(_scope: unknown, model: string, endpoint: string, options: { auditAllowed?: boolean }) {
+     if (denyAt === (options.auditAllowed === false ? 'prepare' : 'send')) throw Error('modelRouteDenied')
+     return managed ? { model, endpoint, servingProviders: ['deepseek'], dataRegion: 'unknown' } : null
+@@ -100,12 +137,79 @@ beforeEach(() => {
+   settlements.length = 0
+   generations.length = 0
+   modelOptions.length = 0
++  captured.length = 0
++  selfHostedAdmissions.length = 0
++  selfHostedConfig = null
++  selfHostedTransport = undefined
++  gatewayCalls = 0
+   managed = false
+   denyAt = null
+   gatewayConfig = undefined
+   beforeSettlement = undefined
+   generationFailure = undefined
+ })
++
++for (const streaming of [false, true]) test(`self-hosted default ${streaming ? 'stream' : 'generation'} keeps direct admission and records only its actual model receipt`, async () => {
++  selfHostedConfig = { baseURL: 'https://self-hosted-canary.invalid/v1', apiKey: 'synthetic-self-hosted-key-canary', modelId: 'configured/local-model' }
++  verified = false; allow = false
++  const ownerId = streaming ? 'billing-owner' : 'explicit-owner'
++  await hostedBillingScope.run({ workspaceId: 'workspace', ownerId: 'billing-owner' }, async () => {
++    const wrapped = await hostedModel('workspace', COORDINATOR_MODEL, undefined, streaming ? undefined : ownerId,
++      { operation: 'coordinator', tier: 'standard', effort: 'high' })
++    assert.equal(wrapped.modelId, 'configured/local-model')
++    const args = { prompt: [{ role: 'user' as const, content: [{ type: 'text' as const, text: 'PRIVATE_SELF_HOSTED_PROMPT' }] }],
++      providerOptions: { gateway: { apiKey: 'PRIVATE_SELF_HOSTED_GATEWAY_KEY' } } }
++    if (streaming) {
++      const result = await wrapped.doStream(args)
++      const parts = []; for await (const part of result.stream) parts.push(part)
++      assert.equal(parts[0].type, 'text-delta')
++      assert.equal(parts.at(-1)?.type, 'finish')
++    } else assert.equal((await wrapped.doGenerate(args)).content[0].type, 'text')
++  })
++  assert.equal(gatewayCalls, 0)
++  assert.equal(generated + streamed, 1)
++  assert.equal(reservations.length + settlements.length + generations.length, 0)
++  assert.deepEqual(selfHostedAdmissions[0].slice(0, 3), [
++    { workspaceId: 'workspace', ownerId }, 'configured/local-model', selfHostedConfig.baseURL,
++  ])
++  assert.equal(selfHostedTransport?.baseURL, selfHostedConfig.baseURL)
++  assert.equal(selfHostedTransport?.apiKey, selfHostedConfig.apiKey)
++  assert.deepEqual((modelOptions[0] as { providerOptions: unknown }).providerOptions, {})
++  assert.equal(captured.length, 1, 'the self-hosted early return must pass through the generation observer exactly once')
++  const event = captured[0], properties = event.properties!
++  assert.equal(event.distinctId, ownerId)
++  assert.equal(event.event, '$ai_generation')
++  assert.equal(properties.$ai_model, 'configured/local-model', 'do not report the hosted UI alias')
++  assert.equal(properties['mikka.ai.route'], 'self_hosted')
++  assert.equal(properties['mikka.ai.operation'], 'coordinator')
++  assert.equal(properties['mikka.ai.effort'], 'high')
++  assert.equal(properties.$ai_input_tokens, 12)
++  assert.equal(properties.$ai_output_tokens, 3)
++  assert.equal(properties.$ai_cache_read_input_tokens, 6)
++  assert.equal(properties.$ai_cache_creation_input_tokens, 2)
++  assert.equal(properties.$ai_stream, streaming)
++  assert.equal(properties.$ai_is_error, false)
++  assert.equal(properties.$ai_total_cost_usd, undefined, 'no charge or zero-cost receipt is invented')
++  assert.equal(typeof properties.$ai_time_to_first_token, streaming ? 'number' : 'undefined')
++  assert.doesNotMatch(JSON.stringify(captured), /PRIVATE_SELF_HOSTED|self-hosted-canary\.invalid|synthetic-self-hosted-key-canary/)
++})
++
++test('a refused self-hosted generation stays refused without provider or paid fallback and without borrowed owner scope', async () => {
++  selfHostedConfig = { baseURL: 'https://self-hosted-canary.invalid/v1', apiKey: 'synthetic-self-hosted-key-canary', modelId: 'configured/local-model' }
++  denyAt = 'send'
++  await hostedBillingScope.run({ workspaceId: 'another-workspace', ownerId: 'unrelated-owner' }, async () => {
++    const wrapped = await hostedModel('workspace', COORDINATOR_MODEL, undefined, undefined, { operation: 'bot' })
++    await assert.rejects(async () => wrapped.doGenerate({ prompt: [] }), /modelRouteDenied/)
++  })
++  assert.deepEqual(selfHostedAdmissions[0][0], { workspaceId: 'workspace', ownerId: undefined })
++  assert.equal(generated + streamed + gatewayCalls, 0)
++  assert.equal(reservations.length + settlements.length, 0)
++  assert.equal(captured.length, 1)
++  assert.equal(captured[0].distinctId, 'mikka:server')
++  assert.equal(captured[0].properties?.$ai_is_error, true)
++  assert.equal(captured[0].properties?.['mikka.ai.route'], 'self_hosted')
++  assert.equal(captured[0].properties?.$ai_input_tokens, undefined)
++})
+ test('verification and zero balance prevent provider I/O, including another tool step', async () => {
+   verified = false
+   await assert.rejects(
+diff --git a/lib/abuse/model.ts b/lib/abuse/model.ts
+index 6054069f..4e9406a4 100644
+--- a/lib/abuse/model.ts
++++ b/lib/abuse/model.ts
+@@ -70,7 +70,8 @@ export async function hostedModel(
+   if (isZeroCatModel(modelId) && selfHostedDefaultModelConfig()) {
+     if (provider) throw new ModelAdmissionError('modelRouteDenied')
+     const billing = hostedBillingScope.getStore()
+-    return selfHostedDefaultModel({ workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) })
++    const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
++    return observedModel(selfHostedDefaultModel(scope), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
+   }
+   await withSharedCredits(workspaceId, canUseMikkaPaid)
+   const zeroCat = isZeroCatModel(modelId)
+diff --git a/lib/tracing/ai.ts b/lib/tracing/ai.ts
+index 6e84dc28..a017de18 100644
+--- a/lib/tracing/ai.ts
++++ b/lib/tracing/ai.ts
+@@ -24,7 +24,7 @@ export interface AiMetadata {
+ }
+ 
+ export interface AiRoute {
+-  route?: 'gateway' | 'zerocat' | 'subscription' | 'api_key' | 'decision'
++  route?: 'gateway' | 'zerocat' | 'subscription' | 'api_key' | 'self_hosted' | 'decision'
+   fallbackReason?: string
+   zeroCatMs?: number
+   totalCostUsd?: number | null

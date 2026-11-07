@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "receipt_observed_at": "2026-11-07T16:32:55Z",
+  "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+  "github_commit_api": {
+    "sha": "49d93ce3feb348fdfb05bd30e9d0ae114066da25",
+    "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+    "parents": [
+      "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+    ]
+  },
+  "main_production": {
+    "sha": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+    "vercel_id": "dpl_mf9JEB9pAKbTsUXGMx6CqzM1re8D",
+    "state": "READY",
+    "target": "production",
+    "ready_at_ms": 1794068446944,
+    "version_url": "https://app.aspectlylabs.com/mikka/api/version",
+    "version_http_status": 200,
+    "version_build": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+    "version_response_keys": [
+      "build",
+      "overlaySha",
+      "minMobileBuild",
+      "mobileUpdateUrl",
+      "minDesktopVersion"
+    ],
+    "not_candidate_deployment": true,
+    "e2b_full_release_not_yet_attested": true
+  },
+  "sources": [
+    "GitHub GET git/commits/49d93ce3feb348fdfb05bd30e9d0ae114066da25",
+    "Vercel get_deployment exact immutable id",
+    "Public unauthenticated urllib GET; exec session21185 completed and observed; values not inferred from deployment metadata"
+  ]
+}

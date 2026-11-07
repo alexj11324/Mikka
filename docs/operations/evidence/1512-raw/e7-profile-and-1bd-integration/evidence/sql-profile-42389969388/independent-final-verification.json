@@ -1,0 +1,445 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T16:24:50.030707+00:00",
+  "kind": "independent_completed_profile_reconciliation",
+  "reviewer": "daemon_impl",
+  "run": 42389969388,
+  "attempt": 1,
+  "job": 128455295453,
+  "reportArtifact": 13581421063,
+  "operationRevision": "07062f0ca9e0eabd534bc85840d177e963123c30",
+  "actualProductSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "candidate": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "parents": [
+    "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+    "e7a1a267335604004586f88e6b530c51b0da286d"
+  ],
+  "status": "verified",
+  "productionAcceptance": false,
+  "originalFiles": [
+    {
+      "path": "evidence/sql-profile-42389969388/artifact-receipt.json",
+      "bytes": 1103,
+      "sha256": "d978f1c5a478c0d0ffff1154bf08bed0b82b9d4c5a0b014eb5a7b5972689e078",
+      "gitBlob": "bfe937725f7779d3e9d467d46395bd578d0be2fe"
+    },
+    {
+      "path": "evidence/sql-profile-42389969388/desktop-query-decomposition.json",
+      "bytes": 135603,
+      "sha256": "4cef0114bf5b809b2410ab5dd9596849d3369748a89bb02f556eeacd13217364",
+      "gitBlob": "c77bda88593aea5f4f267a34d749146c5b74faa7"
+    },
+    {
+      "path": "evidence/sql-profile-42389969388/runner-receipt.json",
+      "bytes": 1687,
+      "sha256": "08a045284f36a2e6e392badd33884c3b139bf0fcff459c764fb627a8bd89b2ae",
+      "gitBlob": "9b6a46593ead3a2a80f07558a01060023770f9fc"
+    }
+  ],
+  "downloadReceipt": {
+    "path": "evidence/sql-profile-42389969388/download-receipt.json",
+    "bytes": 958,
+    "sha256": "f3f13c98fa96926da9ff3bda80548fe0cb4e10e5fedd931ef2783ab18550a4db",
+    "gitBlob": "f1e859c8a23752d1a0a14f62c8256697efbbb766"
+  },
+  "rootReceipt": {
+    "path": "evidence/sql-profile-42389969388/root-verification.json",
+    "bytes": 2313,
+    "sha256": "b8066a422bab6fac24b96d76a13651d9c2b41365aa82c68924f934b5e8fb04a8",
+    "gitBlob": "e0f8d1ad5ccaf855b5fec3cf4651490ed5abf602"
+  },
+  "githubReadback": {
+    "path": "evidence/sql-profile-42389969388/github-final-metadata.json",
+    "bytes": 7741,
+    "sha256": "434659aa140f3cb7de4e94db27ebc9a59dd485487a8eb899f854d8e72e47374a",
+    "gitBlob": "894caeab1120a3b39c09098229b02af70882ca63"
+  },
+  "operationSourceReadback": {
+    "path": "evidence/sql-profile-42389969388/operation-source-readback.json",
+    "bytes": 2472,
+    "sha256": "b7548657d9bf3af6e16b7a009703fca7f21a4227a8ced536db25eb65360ce806",
+    "gitBlob": "418aa7e3c2605ba304a27b4775281daecd3e543c"
+  },
+  "identityVerification": {
+    "runAndAttemptExact": true,
+    "sourceCommitTreeParentsIndependentlyReadFromGitHub": true,
+    "sourceArtifactMetadataMatchesOriginalReceipt": true,
+    "reportArtifactDigestMatchesDownloadReceipt": true,
+    "originalJsonBytesMatchDownloadedFileHashes": true,
+    "zipBytesReDownloadedOrRehashedByReviewer": false,
+    "zipWasAlreadyVerifiedAndRemovedByDownloader": true,
+    "runtimePayloadsAndWorkflowGitBlobsMatchExactOperation": 13,
+    "localProductSourceHashesVerified": 43,
+    "catalogueReferenceVerified": {
+      "path": "evidence/request-route-source-catalog-e7.json",
+      "bytes": 79620,
+      "sha256": "2c2571b81600657c179e2d02960e0336fdbbf7d433750a00d7a5987e30d93b86",
+      "gitBlob": "d4c9302632db27e94af588b1cf1655194cf9d7cf"
+    }
+  },
+  "countVerification": {
+    "requests": 60,
+    "passed": 60,
+    "exactPlanOrder": true,
+    "singleApiPid": 3644,
+    "snapshots": 120,
+    "pairScalarDeltasVerified": 60,
+    "betweenRequestGapScalarDeltasVerified": 59,
+    "tailGapProjectionVerified": true,
+    "snapshotMapBodiesRetainedInReport": false,
+    "deltaMapPartitionsVerified": 120,
+    "approvedOperationLabels": 17,
+    "approvedUnattributedLabels": 287,
+    "operationCountSum": 296,
+    "queryOperations": {
+      "/api/auth/[...all]": 38,
+      "/api/rpc": 33,
+      "/api/workspace": 10,
+      "/actions/coordinator/summaries": 10,
+      "/actions/coordinator/poll": 42,
+      "/actions/issues/poll": 32,
+      "/actions/projects/list": 4,
+      "/actions/threads/poll": 22,
+      "/api/workspace/switcher": 6,
+      "unattributed": 42,
+      "/api/live/ticket": 6,
+      "/api/desktop/begin": 1,
+      "/api/desktop/return": 2,
+      "/api/desktop/exchange": 8,
+      "/api/desktop/rpc": 31,
+      "/actions/task-runs/read": 9
+    },
+    "unattributedSources": {
+      "/api/agent/sessions": 4,
+      "/api/computer/events": 16,
+      "/api/settings/preferences": 4,
+      "/api/devices/enrollment": 6,
+      "/api/conversations": 10,
+      "/api/pending-actions": 2
+    },
+    "gaps": {
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0
+    },
+    "unknownStreamReadings": 0,
+    "driverElapsedMs": 11369,
+    "ghaJobElapsedMs": 106000
+  },
+  "costs": {
+    "paired": [
+      {
+        "operation": "sign_in",
+        "webQueryCalls": 17,
+        "nativeQueryCalls": 17,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "get_session",
+        "webQueryCalls": 2,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "bootstrap",
+        "webQueryCalls": 2,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "session",
+        "webQueryCalls": 0,
+        "nativeQueryCalls": 0,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "workspace",
+        "webQueryCalls": 5,
+        "nativeQueryCalls": 5,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "bots",
+        "webQueryCalls": 4,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": -2
+      },
+      {
+        "operation": "summaries",
+        "webQueryCalls": 5,
+        "nativeQueryCalls": 5,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "chat_first",
+        "webQueryCalls": 11,
+        "nativeQueryCalls": 11,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "chat_cursor",
+        "webQueryCalls": 7,
+        "nativeQueryCalls": 7,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "issues_first",
+        "webQueryCalls": 9,
+        "nativeQueryCalls": 9,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "issues_cursor",
+        "webQueryCalls": 7,
+        "nativeQueryCalls": 7,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "projects",
+        "webQueryCalls": 2,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "thread_first",
+        "webQueryCalls": 6,
+        "nativeQueryCalls": 6,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "thread_cursor",
+        "webQueryCalls": 4,
+        "nativeQueryCalls": 4,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "teams",
+        "webQueryCalls": 2,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "project_teams",
+        "webQueryCalls": 1,
+        "nativeQueryCalls": 1,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "model_menu",
+        "webQueryCalls": 24,
+        "nativeQueryCalls": 24,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "switcher",
+        "webQueryCalls": 4,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": -2
+      },
+      {
+        "operation": "agent_sessions",
+        "webQueryCalls": 2,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "computer_first",
+        "webQueryCalls": 4,
+        "nativeQueryCalls": 4,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "computer_cursor",
+        "webQueryCalls": 4,
+        "nativeQueryCalls": 4,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "preferences",
+        "webQueryCalls": 2,
+        "nativeQueryCalls": 2,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "enrollment",
+        "webQueryCalls": 3,
+        "nativeQueryCalls": 3,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "conversations",
+        "webQueryCalls": 5,
+        "nativeQueryCalls": 5,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "pending_actions",
+        "webQueryCalls": 1,
+        "nativeQueryCalls": 1,
+        "nativeMinusWeb": 0
+      },
+      {
+        "operation": "live_ticket",
+        "webQueryCalls": 3,
+        "nativeQueryCalls": 3,
+        "nativeMinusWeb": 0
+      }
+    ],
+    "unpaired": [
+      {
+        "operation": "pkce_begin",
+        "queryCalls": 1
+      },
+      {
+        "operation": "system_browser_config",
+        "queryCalls": 0
+      },
+      {
+        "operation": "system_browser_session",
+        "queryCalls": 0
+      },
+      {
+        "operation": "pkce_return",
+        "queryCalls": 2
+      },
+      {
+        "operation": "pkce_exchange",
+        "queryCalls": 8
+      },
+      {
+        "operation": "native_task_runs_first",
+        "queryCalls": 3
+      },
+      {
+        "operation": "native_task_runs_second",
+        "queryCalls": 3
+      },
+      {
+        "operation": "native_read_batch",
+        "queryCalls": 11
+      }
+    ],
+    "sameArgumentsSeparateReads": 14,
+    "sameArgumentsActualBatch": 11,
+    "batchDifference": -3,
+    "isConcurrentNativeWindowAllocation": false,
+    "isNewMainBaseline": false
+  },
+  "cleanupReconciliation": {
+    "reportedOwnedCleanup": {
+      "http_context": {
+        "status": "passed",
+        "created": 2,
+        "disposed": 2
+      },
+      "owned_loopback": {
+        "status": "passed"
+      },
+      "owned_pkce": {
+        "status": "passed",
+        "removedRows": 1
+      },
+      "fixtures": {
+        "status": "passed"
+      },
+      "lease": {
+        "status": "passed",
+        "state": "released"
+      },
+      "api_process": {
+        "status": "passed",
+        "exited": true,
+        "forcedKill": false
+      },
+      "local_gateway": {
+        "status": "passed",
+        "disposed": true,
+        "exited": true,
+        "forcedKill": false
+      },
+      "private_account_files": {
+        "status": "passed"
+      },
+      "private_runtime_files": {
+        "status": "passed"
+      },
+      "owned_metrics_socket": {
+        "status": "passed"
+      }
+    },
+    "runnerTemporaryDownloadsRemoved": true,
+    "runnerOriginalPostgresStateUnchanged": "pending workflow-owned Stop containers step",
+    "laterGithubStopContainers": {
+      "number": 26,
+      "name": "Stop containers",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-07T16:12:31Z",
+      "completed_at": "2026-11-07T16:12:32Z"
+    },
+    "jobFinalConclusion": "success",
+    "separateContainerLivenessProbePerformed": false
+  },
+  "privacy": {
+    "originalJsonScans": [
+      {
+        "path": "artifact-receipt.json",
+        "patternMatchCounts": {
+          "email": 0,
+          "credential_prefix": 0,
+          "signed_url": 0,
+          "private_canary": 0,
+          "uuid": 0
+        }
+      },
+      {
+        "path": "desktop-query-decomposition.json",
+        "patternMatchCounts": {
+          "email": 0,
+          "credential_prefix": 0,
+          "signed_url": 0,
+          "private_canary": 0,
+          "uuid": 0
+        }
+      },
+      {
+        "path": "runner-receipt.json",
+        "patternMatchCounts": {
+          "email": 0,
+          "credential_prefix": 0,
+          "signed_url": 0,
+          "private_canary": 0,
+          "uuid": 0
+        }
+      }
+    ],
+    "allRequestIdsFromFixedPlan": true,
+    "operationAndSourceKeysFromFixedAllowlist": true,
+    "rawSqlExported": false,
+    "rawScopeExported": false,
+    "rawLogsDownloadedOrPersistedByReviewer": false,
+    "signedUrlsPersisted": false,
+    "personalAccountOrBusinessIdentifiersPresent": false
+  },
+  "boundaries": [
+    "Sequential one-shot request costs on exact e7 compiled API; no browser, WebSocket client, daemon or provider was started by the diagnostic.",
+    "All primary API queryCalls and protocol bytes in each request window were retained; zero gaps were checked, not subtracted.",
+    "Web comparison-only session/preferences/enrollment requests do not add work to the Web login budget.",
+    "Preexisting Native 186 versus Web 162 remains failed. This diagnostic cannot allocate its concurrent difference or establish d75/new-candidate performance.",
+    "Full raw snapshot maps were validated by the source-bound driver before compact projection; independent review can recheck scalar snapshots and every retained delta partition, not reconstruct omitted zero-valued snapshot maps.",
+    "API/worker cleanup is reported by the source-bound driver. Exact later GitHub Stop containers success independently closes the earlier runner pending stage. No extra live process/DB probe was made."
+  ],
+  "reviewActions": {
+    "profileReexecuted": false,
+    "servicesStarted": 0,
+    "databaseQueries": 0,
+    "providerCalls": 0,
+    "virtualMachinesCreated": 0,
+    "testsRerun": false,
+    "zipDownloads": 0,
+    "productFilesChanged": false,
+    "remoteRefsChanged": false,
+    "publishStateChanged": false
+  }
+}

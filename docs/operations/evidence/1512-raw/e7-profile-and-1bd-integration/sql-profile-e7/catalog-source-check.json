@@ -1,0 +1,22 @@
+{
+  "source": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "checkedFiles": [
+    "apps/api/scripts/generate-routes.mjs",
+    "apps/api/src/index.ts",
+    "apps/api/src/application.ts",
+    "apps/api/src/routes.ts",
+    "apps/api/runtime/request-trace.ts",
+    "lib/request-log.ts",
+    "lib/db/egress-sample.ts",
+    "lib/tracing/jobs.ts",
+    "lib/tracing/labels.ts",
+    "lib/background.ts",
+    "apps/desktop/test/db-metrics.cjs",
+    "apps/desktop/test/db-query-operations.cjs",
+    "apps/desktop/test/db-query-unattributed-sources.cjs",
+    "app/api/settings/[read]/route.ts"
+  ],
+  "count": 14,
+  "allExact": true,
+  "remoteRead": false
+}

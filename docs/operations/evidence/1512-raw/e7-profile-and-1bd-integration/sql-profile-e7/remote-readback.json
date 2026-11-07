@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "commit": "07062f0ca9e0eabd534bc85840d177e963123c30",
+  "tree": "53ea040abf96e89cc762db75ed2a932c8ea4af42",
+  "parent": "820b3cc4b1572b56d8524178214571067f16abbb",
+  "workflowRun": 42389969388,
+  "originalBytesLocallyHashAndGitBlobVerified": true,
+  "allRemoteOriginalTextExact": true,
+  "files": [
+    {
+      "path": ".github/issue1512-sql-profile-e7/driver.mjs",
+      "exact": true,
+      "characters": 39946
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/artifact.mjs",
+      "exact": true,
+      "characters": 5940
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/reads.mjs",
+      "exact": true,
+      "characters": 15002
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/projection.mjs",
+      "exact": true,
+      "characters": 4132
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/driver.test.mjs",
+      "exact": true,
+      "characters": 13962
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/projection.test.mjs",
+      "exact": true,
+      "characters": 10473
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/closed-labels.json",
+      "exact": true,
+      "characters": 23716
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics-provenance.json",
+      "exact": true,
+      "characters": 2513
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/db-metrics.cjs",
+      "exact": true,
+      "characters": 8336
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/db-query-operations.cjs",
+      "exact": true,
+      "characters": 529
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/db-query-unattributed-sources.cjs",
+      "exact": true,
+      "characters": 9513
+    },
+    {
+      "path": ".github/issue1512-sql-profile-e7/metrics/lifecycle-query-counts.mjs",
+      "exact": true,
+      "characters": 21882
+    },
+    {
+      "path": ".github/workflows/issue1512-sql-profile-e7.yml",
+      "exact": true,
+      "characters": 6519
+    }
+  ]
+}

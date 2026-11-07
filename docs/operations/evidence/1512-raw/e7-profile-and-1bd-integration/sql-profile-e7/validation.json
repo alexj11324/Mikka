@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "status": "prepared_not_executed",
+  "recordedAt": "2026-11-07T16:08:25.065734+00:00",
+  "scope": "ops-only immutable e7 sequential HTTP/PG diagnostic preparation",
+  "sourceHead": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "compiledSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "requestPlan": {
+    "total": 60,
+    "commonRpcOperations": 10,
+    "pairedGetEndpointTypes": 8,
+    "webPhaseRequests": 26,
+    "nativeAndPkcePhaseRequests": 34,
+    "actualBrowserFrequencyReplayed": false
+  },
+  "checks": {
+    "offlineTests": {
+      "command": "node --test --test-reporter=tap driver.test.mjs projection.test.mjs",
+      "passed": 19,
+      "failed": 0,
+      "exitCode": 0,
+      "output": {
+        "path": "tests.tap",
+        "bytes": 4809,
+        "unicodeCodePoints": 4809,
+        "utf16CodeUnits": 4809,
+        "sha256": "6d7112593096651b73c6154c4bf4d013699c42f212b6ba65cc44d9278f00be49",
+        "gitBlob": "0fe30fd863ed1b65ebfb589b30f865fda6317399"
+      }
+    },
+    "initialTestAttempt": {
+      "passedAssertions": 19,
+      "fileLevelAsyncFailure": 1,
+      "exitCode": 1,
+      "reason": "test seam emitted destroy error repeatedly; real Node destroy is idempotent; seam corrected, no production workaround",
+      "output": {
+        "path": "tests.initial.tap",
+        "bytes": 2496,
+        "unicodeCodePoints": 2434,
+        "utf16CodeUnits": 2434,
+        "sha256": "1becc246ac7dd84cf232903320fffc610a8afcfca46900b68437f2c15477ba10",
+        "gitBlob": "e43917e00795b0ef384496fe74715ef8f140bf38"
+      }
+    },
+    "priorGreen": {
+      "passed": 19,
+      "failed": 0,
+      "exitCode": 0,
+      "output": {
+        "path": "tests.pre-freeze.tap",
+        "bytes": 4808,
+        "unicodeCodePoints": 4808,
+        "utf16CodeUnits": 4808,
+        "sha256": "5db8dce575fc607fc6df81fb21ed51bc5fd487799e80ecc9402b9a1c09e7caf1",
+        "gitBlob": "5a11c42dd2d9d700d0c1793fc613560cce53f29b"
+      }
+    },
+    "syntax": {
+      "files": 10,
+      "exitCode": 0,
+      "output": {
+        "path": "syntax.json",
+        "bytes": 640,
+        "unicodeCodePoints": 640,
+        "utf16CodeUnits": 640,
+        "sha256": "1a3e5bdea9299987978257cc189c760e9287f5e002a52be39486759f08179e61",
+        "gitBlob": "af026031f3c6a921aec4b255abade01e8ce2447b"
+      }
+    },
+    "lint": {
+      "files": 10,
+      "config": "Mikka/.oxlintrc.json",
+      "directBinary": true,
+      "noIgnore": true,
+      "denyWarnings": true,
+      "exitCode": 0,
+      "output": {
+        "path": "lint.log",
+        "bytes": 0,
+        "unicodeCodePoints": 0,
+        "utf16CodeUnits": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    "workflow": {
+      "yaml": 1,
+      "bashBlocks": 6,
+      "exitCode": 0,
+      "output": {
+        "path": "workflow-check.json",
+        "bytes": 401,
+        "unicodeCodePoints": 401,
+        "utf16CodeUnits": 401,
+        "sha256": "d1560f2ee005389ae2d0a7989b5a91f89312fac71598379161e85aff1c662410",
+        "gitBlob": "3c255e8d092280fe10e03f98d657ea5863441ed2"
+      }
+    },
+    "catalogue": {
+      "sourceFiles": 14,
+      "allExact": true,
+      "output": {
+        "path": "catalog-source-check.json",
+        "bytes": 646,
+        "unicodeCodePoints": 646,
+        "utf16CodeUnits": 646,
+        "sha256": "1c155fd8af19a30bb37ba66c55173fa33f3bb1d32bdad48257c3ad5595e7ef11",
+        "gitBlob": "bbe17c7cf491fb3e62051040313bfa71987fe36a"
+      }
+    }
+  },
+  "instrumentation": {
+    "path": "metrics-provenance.json",
+    "bytes": 2513,
+    "unicodeCodePoints": 2513,
+    "utf16CodeUnits": 2513,
+    "sha256": "0402fc020124b9e653fd6cf4af0fc00979e60468e80de04189bce5621155fe96",
+    "gitBlob": "0841241fb63a0337f51b48bdb6ec75ed33f03121"
+  },
+  "sourceContracts": {
+    "path": "source-contracts.json",
+    "bytes": 9384,
+    "unicodeCodePoints": 9384,
+    "utf16CodeUnits": 9384,
+    "sha256": "f3683233f489f293eead6df855a6b7c25bbaa235260947e064e97e7bf5272503",
+    "gitBlob": "b3fc1ef36529676cfe32e554b2316077a9d49a0b"
+  },
+  "privacy": {
+    "filesScanned": 23,
+    "emailMatches": 0,
+    "secretValueMatches": 0,
+    "signedUrlMatches": 0,
+    "sourceAndCanariesReviewed": true,
+    "staticLocalOnlyPostgresPassword": "e2e-local-only",
+    "rawRuntimeLogsReadOrRetained": false,
+    "sqlParametersOrResponseBodiesExported": false,
+    "closedSourceTableOnly": true
+  },
+  "boundaries": {
+    "databaseStarted": false,
+    "servicesStarted": false,
+    "networkCalls": 0,
+    "browserOrElectronStarted": false,
+    "modelOrVmCalls": 0,
+    "productFilesModified": false,
+    "sourceRefsModified": false,
+    "remotePublished": false,
+    "productionAcceptance": false,
+    "nativeBudgetPassed": false,
+    "previousNativeLogin": {
+      "nativeQueries": 186,
+      "webQueries": 162,
+      "status": "failed_unchanged"
+    },
+    "sequentialCostsDoNotAllocateConcurrentDifference": true,
+    "newMainImported": false,
+    "unknownSourcesPreserved": true,
+    "outputTruncationAllowed": false
+  }
+}

@@ -1,0 +1,714 @@
+{
+  "schemaVersion": 1,
+  "kind": "read_only_source_compatibility_review",
+  "issue": 1512,
+  "recordedAt": "2026-11-07T16:43:31.435942Z",
+  "source": {
+    "commit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "tree": "67262992599d8de8a0aa04d35bbee3b98add277d",
+    "parents": [
+      "7b41a196592af8a63ec157c4eadc9fb06b04005c"
+    ],
+    "mainIntegrationReviewed": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+    "comparisonBase": "e7a1a267335604004586f88e6b530c51b0da286d",
+    "readMethod": "git show exact immutable commit; no checkout, fetch or merge"
+  },
+  "requirements": {
+    "issueUrl": "https://github.com/alexj11324/Mikka/issues/1512",
+    "stateObserved": "open",
+    "updatedAtObserved": "2026-11-07T07:21:56Z",
+    "retrievedIssueBodyCharacters": 3728,
+    "accountEnvironment": "Infisical prod:/ ACME_DEMO_EMAIL and ACME_DEMO_PASSWORD; values not accessed",
+    "claude": "real browser submission plus actual official claude-haiku-5-5 subscription runtime",
+    "codex": "independent official gpt-6-luna subscription runtime",
+    "controlledFailure": "Existing test-environment proof is permitted; this review adds no production-failure requirement"
+  },
+  "result": {
+    "status": "no_proven_source_compatibility_blocker",
+    "provenSourceBlockers": [],
+    "productionReadiness": "unobserved",
+    "productionAcceptance": "not_established",
+    "testsExecuted": 0,
+    "liveAccountReads": 0,
+    "providerCalls": 0,
+    "virtualMachinesCreated": 0,
+    "browserSessionsOpened": 0,
+    "scope": "Dedicated workflow and driver contracts against candidate 1bd4 and integrated d75 authority/session/Coordinator/Factory paths; not a general security audit"
+  },
+  "confirmedContracts": [
+    {
+      "id": "main_and_served_sha",
+      "sources": [
+        ".github/workflows/run-trace-acceptance.yml",
+        "scripts/acceptance/run-observability.mjs:348",
+        "app/api/version/route.ts",
+        "lib/app-build.ts"
+      ],
+      "finding": "Acceptance job only runs on official repository main; expected-deployment-sha must equal workflow GITHUB_SHA before credentials. Driver separately requires actual /mikka/api/version build equality before login, before submission, during event-driven observation and at completion. Final merged main/deployment SHA, not feature or PR synthetic SHA, must be supplied."
+    },
+    {
+      "id": "normal_identity_and_authority",
+      "sources": [
+        "apps/api/runtime/request-authority.ts",
+        "lib/api-auth.ts",
+        "lib/desktop-rpc/handler.ts:30",
+        "lib/factory/browser-human.ts",
+        "scripts/acceptance/run-observability.mjs:307"
+      ],
+      "finding": "Fixed HTTPS public origin, same-origin Origin header, ordinary private cookie jar, no bearer token or authority spoof. New configured-host authority preserves the request; human-only approval still obtains a real browser session with disableCookieCache=true."
+    },
+    {
+      "id": "unique_workspace_and_coordinator",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:68",
+        "lib/workspace-access.ts:91",
+        "app/actions/workspace.ts:86",
+        "app/api/coordinator/messages/route.ts"
+      ],
+      "finding": "Exactly one personal workspace choice, active sole-member admin equal to authenticated owner. Normal switchWorkspace action has matching result shape and actual cookie readback. Coordinator is resolved only after the same session has selected that workspace."
+    },
+    {
+      "id": "model_and_profile",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:154",
+        "lib/bot-model-menu-view.ts",
+        "lib/factory/agent-profile-http.ts",
+        "lib/factory/agent-profile-store.ts",
+        "lib/desktop-rpc/schemas.ts:155"
+      ],
+      "finding": "Both fixed model paths, own connected unpaused subscription, current explicit restorable model, cloud-ready placement, fallback off, and one enabled temporary fixed profile are checked. Create requestId yields id/version1; update/archive require exact version. Driver submission positional arguments still match current registry schema and normal action."
+    },
+    {
+      "id": "profile_restore_cas",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:382",
+        "lib/factory/agent-profile-store.ts"
+      ],
+      "finding": "Prepare changes use normal APIs. Profile disable/restore uses acknowledged version/digest and original definition, and rechecks owner activity. Lost/changed mutation results fail closed. Existing boolean fallback and chat-model restoration compare values but have no server revision/atomic CAS; the existing documented limitation remains, not a new d75 regression."
+    },
+    {
+      "id": "browser_ui_text_and_role",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:130",
+        "scripts/acceptance/run-observability-workflow.mjs",
+        "components/coordinator/new-task-dialog.tsx:139",
+        "app/actions/coordinator.ts:221"
+      ],
+      "finding": "New task with explicit Cloud, no project context, matching temporary profile and this workspace Coordinator produces the driver expected en/zh-CN wrapper. Browser-ready bridge posts only the code-generated fixture; browser mode never API-submits. Browser and driver sessions are independent, so the real browser must select the reported workspace/profile itself."
+    },
+    {
+      "id": "native_provenance_and_factory",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:177",
+        "lib/captures/store.ts:291",
+        "lib/execution-identity.ts",
+        "lib/factory/contract.ts",
+        "lib/factory/store.ts:477"
+      ],
+      "finding": "Run evidence exposes exact harness/model/subscription route/profile revision and frozen requester/principal/output/bot/workspace/resource payer fields expected by the driver. Host freezes Factory flowVersion2. Normal no-spec route enters execute, then independent review; legacy requires verify. Spec, repair or duplicate native attempts are intentionally outside the bounded fixture and fail the budget rather than being counted as a pass."
+    },
+    {
+      "id": "owner_acceptance",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:686",
+        "app/api/factory/tasks/[taskId]/approval/route.ts",
+        "lib/factory/approval-http.ts",
+        "lib/factory/merge.ts:293"
+      ],
+      "finding": "Only exact no-repository deliverable bytes pass. Owner acceptance matches actual accept request/result: fresh own session, exact task binding, single eventId, accepted receipt and revision+1. Deliverable path does not obtain a GitHub token or publish a repository. Independent passed attempt/epoch and final receipt are re-read."
+    },
+    {
+      "id": "resource_cleanup",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:545",
+        "app/api/threads/[runId]/machine/route.ts",
+        "lib/cloud-computer/thread-machines.ts:1060",
+        "app/api/mobile/threads/[id]/machine/route.ts"
+      ],
+      "finding": "Driver stops only proven own runs/tasks, waits via live keys, then ends each owned machine. API end fences the run/device tokens, kills the saved provider sandbox and returns ended only after acknowledged retirement; provisioning-pending or failed kill remains failure. Missing-row 404 is accepted only with fresh terminal own-run and explicit null machine proof. Temporary profile/model/settings and own session are restored/closed, or report is blocked."
+    },
+    {
+      "id": "live_transport_and_no_sdk_install",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:221",
+        "lib/live/events.ts",
+        "lib/desktop-rpc/wire.ts",
+        ".github/workflows/run-trace-acceptance.yml"
+      ],
+      "finding": "Node24 entrypoint imports only built-ins, pure local type-strippable TS and JSON. It waits on authenticated live invalidations; no periodic business polling or API resend. Required bot_chat/run/factory_task/factory_issue capabilities and fixed secure socket URL must be present."
+    },
+    {
+      "id": "exports_are_separate_evidence",
+      "sources": [
+        ".github/workflows/run-trace-acceptance.yml:131",
+        "scripts/ops/posthog-export-evidence.mjs",
+        "scripts/ops/posthog-replay-evidence.mjs"
+      ],
+      "finding": "Export job is source-SHA guarded and uses existing runner-held PostHog key, numeric saved target and one native PNG export. Replay reads one bounded real segment into safe metadata; trace correlation and playback remain explicitly unverified. Export scripts do not query served Mikka build or automatically prove screenshot/run attribution."
+    }
+  ],
+  "operationalLimits": [
+    {
+      "id": "preflight_catalogue_side_effect",
+      "severity": "documented_execution_boundary",
+      "sources": [
+        "app/actions/model-order.ts:31",
+        "lib/execution-settings.ts:160",
+        "lib/subscription-service.ts:294",
+        "packages/daemon/src/subscription-worker-client.ts"
+      ],
+      "fact": "GET model-order may refresh a missing current-revision catalogue through the owned Go subscription worker, then insert bindings/update modelCatalog. This is account catalogue discovery, explicitly no inference; the inspected path does not create an E2B task VM. Thus preflight is not guaranteed database-write-free outside session creation. No live missing catalogue or failure was observed."
+    },
+    {
+      "id": "preflight_requires_existing_usable_choice",
+      "severity": "required_input_state",
+      "fact": "Preflight rejects inherited/unavailable current model, paid fallback, multiple matching own sources, non-cloud order, unavailable exact model, active profiles unless execute prepare is requested, or visible owner/workspace work. It does not silently set a new source/location or repair stale quota."
+    },
+    {
+      "id": "production_runtime_release",
+      "severity": "independent_gate",
+      "fact": "Public /api/version proves the web build only. The matching accepted official runtime artifacts/template release and real per-run model/collection receipts must be checked independently. This source review did not read deployment or runtime state."
+    },
+    {
+      "id": "live_and_signal_failure",
+      "severity": "stop_condition",
+      "fact": "Missing live capability, disconnect, timeout, foreign activity, profile/model drift, changed SHA, wrong native identity/model, excess attempts, missing/stale review or cleanup uncertainty yields blocked. Signals request normal finally cleanup; no source-only claim of success after hard runner termination."
+    },
+    {
+      "id": "single_revision_fixture",
+      "severity": "no_repeat",
+      "fact": "Deterministic profile ID is unique per deployed revision/model. Existing fixture record causes previous_fixture, including an archived successful record. Do not delete or rename it to repeat a paid case."
+    },
+    {
+      "id": "evidence_completion",
+      "severity": "independent_gate",
+      "fact": "runtime_verified deliberately leaves browserReplayVerified and posthogIngestionVerified false. Export correlation must use observed session/run/trace IDs and matching time window; API-generated W3C parent and CLI exit do not prove backend ingestion, generation completeness, native flush, playback or overall acceptance."
+    }
+  ],
+  "executionChecklist": [
+    {
+      "phase": "release",
+      "inputs": {
+        "source": "final merged main SHA",
+        "expectedDeploymentSha": "same full 40-character main SHA"
+      },
+      "closedChecks": [
+        "main workflow checkout SHA equals expected",
+        "/mikka/api/version build equals expected",
+        "normal release gates and runtime-refresh completed",
+        "accepted official runtime identity matches intended source"
+      ],
+      "performNow": false
+    },
+    {
+      "phase": "preflight",
+      "inputs": {
+        "mode": "preflight",
+        "model-case": "all",
+        "prepare": false,
+        "browser-submit": false
+      },
+      "requiredOutput": [
+        "status=ready",
+        "both cases ready",
+        "sessionClosed=true",
+        "no cleanup/preparation failure"
+      ],
+      "performNow": false
+    },
+    {
+      "phase": "claude_real_browser",
+      "inputs": {
+        "mode": "execute",
+        "model-case": "claude",
+        "prepare": "true only when preflight showed explicitly restorable settings need preparation",
+        "browser-submit": true
+      },
+      "closedChecks": [
+        "wait exact generated browser-ready revision/workspace/bot/profile and deadline",
+        "refresh already-authenticated browser after deployment",
+        "select matching personal workspace and Coordinator",
+        "New task: explicit Cloud and temporary profile; no project",
+        "paste exact generated fixture and submit once",
+        "case runtime_verified plus cleanup complete and sessionClosed true"
+      ],
+      "performNow": false
+    },
+    {
+      "phase": "codex_independent",
+      "inputs": {
+        "mode": "execute",
+        "model-case": "codex",
+        "prepare": "same explicit conditional rule",
+        "browser-submit": false
+      },
+      "closedChecks": [
+        "previous case cleanup and settings restoration complete",
+        "independent gpt-6-luna/codex_cli exact native receipts",
+        "Factory execute/review and human acceptance verified",
+        "case runtime_verified plus cleanup complete and sessionClosed true"
+      ],
+      "performNow": false
+    },
+    {
+      "phase": "posthog_and_export",
+      "inputs": {
+        "mode": "export",
+        "expected-deployment-sha": "current export workflow main SHA; retain separate acceptance source binding",
+        "export-target": "dashboard or insight",
+        "export-id": "verified positive numeric saved target",
+        "session-id": "actual observed browser session UUID only when available",
+        "trace-id": "actual correlated trace hex paired with session-id"
+      },
+      "closedChecks": [
+        "observed APM/Logs/AI run IDs and full pagination/integrity checks",
+        "no prompt/output/credential content in saved projection",
+        "real browser same-session/time overlap and Replay/playback evidence",
+        "verified saved view points to that run before native PNG export",
+        "record acceptance source separately from export workflow source"
+      ],
+      "performNow": false
+    }
+  ],
+  "recommendedExistingVerification": {
+    "notRunInThisReview": true,
+    "beforeCredentialWorkflowTests": [
+      "scripts/acceptance/run-observability.test.mjs",
+      "scripts/acceptance/run-observability-workflow.test.mjs"
+    ],
+    "exportOfflineTests": [
+      "scripts/ops/posthog-export-evidence.test.mjs",
+      "scripts/ops/posthog-replay-evidence.test.mjs"
+    ],
+    "onlyIfRelevantContractsChange": [
+      "apps/api/runtime/request-authority.test.ts",
+      "lib/desktop-rpc/handler.test.ts",
+      "lib/factory/agent-profile.test.ts",
+      "lib/factory/merge.db.test.ts",
+      "lib/factory/profile-dispatch.db.test.ts"
+    ],
+    "exactSourcePathsExist": true
+  },
+  "unchangedExactByteChecks": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "24fc57680a4e92b4f97ab56393b8b1687dc5f691eca361ef7738defb45bf152e",
+      "candidateSha256": "24fc57680a4e92b4f97ab56393b8b1687dc5f691eca361ef7738defb45bf152e"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398",
+      "candidateSha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "65d57cc3496a5e50795cd6fa3ff75f0d53676322539d0e198ceb60b68d029ebd",
+      "candidateSha256": "65d57cc3496a5e50795cd6fa3ff75f0d53676322539d0e198ceb60b68d029ebd"
+    },
+    {
+      "path": "scripts/acceptance/response-cookie-jar.mjs",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178",
+      "candidateSha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/approval/route.ts",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "0a0303aff8c9e7113b4db17b12ab45bdd8710d008d138281febf5742fc6c5c9c",
+      "candidateSha256": "0a0303aff8c9e7113b4db17b12ab45bdd8710d008d138281febf5742fc6c5c9c"
+    },
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09",
+      "candidateSha256": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09"
+    },
+    {
+      "path": "app/api/workspace/route.ts",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "524b229c3d61c626d88a4f39149e300b55f219df94b3d99f559fe3ae9514751f",
+      "candidateSha256": "524b229c3d61c626d88a4f39149e300b55f219df94b3d99f559fe3ae9514751f"
+    },
+    {
+      "path": "app/api/runs/[runId]/evidence/route.ts",
+      "base": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "sameBytes": true,
+      "baseSha256": "f51c8e65daa53269bdf4e857759b0d5300006b5a783f3a9536a904cedf263d44",
+      "candidateSha256": "f51c8e65daa53269bdf4e857759b0d5300006b5a783f3a9536a904cedf263d44"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 20245,
+      "sha256": "5c6ed942c827a66f50a2aa847536efecbb67ba80f8e2e9d476847854ea531b3c",
+      "gitBlob": "245281562212902f5042649bd41d2a3573121824"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 8934,
+      "sha256": "1a7bc3cc9f0f4e4020a144eb414a22a5384b88cb85bba79af8830fcbc5055bd6",
+      "gitBlob": "5d6803e937f97ed38ab653fdc65c3c08e72f3649"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 8496,
+      "sha256": "24fc57680a4e92b4f97ab56393b8b1687dc5f691eca361ef7738defb45bf152e",
+      "gitBlob": "67424002a30a507fac9b3861e3cbe721c37a72d2"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 56471,
+      "sha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398",
+      "gitBlob": "1eedff30eee7021fa6503c760253fe499664c7d0"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "bytes": 13958,
+      "sha256": "0bbbe2df456a6e5cac4e762aefebc4499b686d030d108b3b9671af78099da22b",
+      "gitBlob": "a771a5256cc45f8b866e148265b241136bb20d6b"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 44891,
+      "sha256": "109c22a0ac01c984af315c35e6b39ea680996c5bd2af72e374462575f6960bb0",
+      "gitBlob": "1a8697345e5aa2c06442538f7eba264e6572eb59"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "bytes": 9280,
+      "sha256": "65d57cc3496a5e50795cd6fa3ff75f0d53676322539d0e198ceb60b68d029ebd",
+      "gitBlob": "ed7bdd1c9166e118868dd53c693938ee20379a8e"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+      "bytes": 9277,
+      "sha256": "7b3557a4533c1ad9621cf2728f36eb7a79fdada3ca12a0bb8d179048b6f71156",
+      "gitBlob": "637da6d91c652cb99035a3ce69a666f7e93e803e"
+    },
+    {
+      "path": "scripts/acceptance/response-cookie-jar.mjs",
+      "bytes": 2277,
+      "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178",
+      "gitBlob": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "bytes": 59347,
+      "sha256": "65d716fbb26599f007f272b0d9a3063d0665ff52ddd0b2c31df5789be5b5f112",
+      "gitBlob": "b159d8b3a9f07bb3148ffd7467b396da91bde216"
+    },
+    {
+      "path": "app/api/version/route.ts",
+      "bytes": 949,
+      "sha256": "c8c7456968162edcb99e61b6054ca2407ef8b73e248ddc29f719a5209c640727",
+      "gitBlob": "75e6b47b7a38cf5bfd050ded0f11b2fbabf4751d"
+    },
+    {
+      "path": "lib/app-build.ts",
+      "bytes": 5540,
+      "sha256": "3a1d9fa499b9ede523fa8ec48d505a14d324f9232ad28c384e1c97fb3531c54c",
+      "gitBlob": "29d9c1a489eec6269e4c16115fffb00278261538"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "bytes": 20761,
+      "sha256": "ebd3f5254eb26312668131d1043e635db070a10fe05368b148f753a416180d0a",
+      "gitBlob": "0d865dc31de7a29191f5be621cbf3859c1314dca"
+    },
+    {
+      "path": "lib/desktop-rpc/handler.ts",
+      "bytes": 5708,
+      "sha256": "4926573396e6461d409253fb24dbea171d83a8da646015b482b9d7856f8d8ad3",
+      "gitBlob": "177cf18288f5e7f5f7d8b5fdd53df054b58cefbd"
+    },
+    {
+      "path": "app/api/workspace/route.ts",
+      "bytes": 1479,
+      "sha256": "524b229c3d61c626d88a4f39149e300b55f219df94b3d99f559fe3ae9514751f",
+      "gitBlob": "10c6f56fc11e998e4adcf4602066dcba10e331b2"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "bytes": 7748,
+      "sha256": "cd857a447d52c494a98bece2d645e288a4b786c73b7020c69f442b4bd6fa5811",
+      "gitBlob": "72f45fa04b71befa509d319eeb1031d99ec5314c"
+    },
+    {
+      "path": "app/actions/workspace.ts",
+      "bytes": 15333,
+      "sha256": "1f3f46a333364369b2894e5edc645059effdd76ba72d6cb8419b82102527932d",
+      "gitBlob": "5ec0c7c728ae516c3d5e954dec02fc967024aee8"
+    },
+    {
+      "path": "lib/api-auth.ts",
+      "bytes": 2491,
+      "sha256": "6ffd944bab6c8d0aed2bff26f07b0c75369fbbdf55b5ce88fe805bcb30f8f9ef",
+      "gitBlob": "b2e86c5aece99ae4be5291caebc8043400318616"
+    },
+    {
+      "path": "apps/api/runtime/request-authority.ts",
+      "bytes": 5817,
+      "sha256": "cba3dc886c5ba9f2e9d5ac97bd995c4c40e8159d15a2b68fec68cd150b4dc66a",
+      "gitBlob": "cdaadf196ea8eee5e4f68b613e1450eb6f9017ca"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "gitBlob": "3cde11bdaab0164d179d51f37efdf1d77ec7e938"
+    },
+    {
+      "path": "app/api/coordinator/messages/route.ts",
+      "bytes": 4542,
+      "sha256": "407191fe9c217b60d166bea69f30018c7dd9b9e7fec3d93d81d813460918a7fe",
+      "gitBlob": "b6e7b570c4026906f67a8f878703ad87a9624d06"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "bytes": 21237,
+      "sha256": "fa1ae6aaf4f8271bb620e97d90ed425a9727026d8861675d67dab2930fccb238",
+      "gitBlob": "561752eef3ab1d5a439d39d61be8da7a41ed0a45"
+    },
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "bytes": 17352,
+      "sha256": "bed604f301a2b545666858d055c60e86bc728ccfb05991e75b3713f62fb72e27",
+      "gitBlob": "802719ebe0740321df932cc6851fa08b85f4ccfe"
+    },
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 3642,
+      "sha256": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09",
+      "gitBlob": "3b6d4ae8bb734fd8ee95d04872aa44f9075f3732"
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "bytes": 11011,
+      "sha256": "b2355880023512d33563f5b96901aef793f00454a72cf56a642405a947751bbd",
+      "gitBlob": "87d0f525089cef9be5b253a3b39dfed3a42a45c2"
+    },
+    {
+      "path": "lib/bot-model-menu-view.ts",
+      "bytes": 4217,
+      "sha256": "798e661aad2b0129debb42da7dde8f72b2994ab7c697e260e6d79fab4f2de39e",
+      "gitBlob": "5a48fd49f414b517f40cb1a908420c331bab04ee"
+    },
+    {
+      "path": "app/api/settings/[read]/route.ts",
+      "bytes": 5533,
+      "sha256": "17806db00cdde5941c101a2d7b50fbf056fd14703166786fd04245818dc33d8e",
+      "gitBlob": "2735cd2f2ed63b4c755554cdfb5c002dc6be38e4"
+    },
+    {
+      "path": "app/actions/model-order.ts",
+      "bytes": 3523,
+      "sha256": "33f7f6b528185876a17e5e79e32c3bf9e5e69a26dd98816ead468a3a0a8cef1f",
+      "gitBlob": "d9f805c761cf2ebd7094537a445bf62bbe9279f2"
+    },
+    {
+      "path": "lib/workspace-admin/settings-action.ts",
+      "bytes": 1712,
+      "sha256": "db5a479e6fbabdb85310f7d3e83481fa57aface31afc54855e99ed2bf118a582",
+      "gitBlob": "45af21f438b0c8b54da83d8c9f5d6f8da2fff20d"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 20499,
+      "sha256": "ac564db188c004fb76408cc4e52028353ff93672d0bca030219553e3acdecd63",
+      "gitBlob": "48068b9cfc04c0ad4e1cdb9fe8059bf4d48774e7"
+    },
+    {
+      "path": "lib/subscription-runtime.ts",
+      "bytes": 8067,
+      "sha256": "1cd6c35b046987aff02512e4ba969a04ab26ce82ef816aa033885c03b7348419",
+      "gitBlob": "7e7287142b6bd9a41e7bbcd60eab43fac9f0cfea"
+    },
+    {
+      "path": "lib/subscription-service.ts",
+      "bytes": 30151,
+      "sha256": "c032c9579daa2effade470b395285f8e6ab43410be5dffaef3c7b68a1ce04cb3",
+      "gitBlob": "c241587777d02a993304f5835d0b94f6d3b7b7cd"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "bytes": 11440,
+      "sha256": "c6a11ee110ac4b1fa1e345e7ec2a0231a76c9d90d811d5e82333f2d880aa2512",
+      "gitBlob": "6ab81966917f7ab46d725d00f18ce5cff4e75ba4"
+    },
+    {
+      "path": "app/api/factory/agent-profiles/route.ts",
+      "bytes": 253,
+      "sha256": "30043b81aea21e265ce8e9df6ba36bb520cdf7f806b6a9636b39b15538f369fb",
+      "gitBlob": "38b779de150dd4dc004ac2dc5be45b59c6d705b0"
+    },
+    {
+      "path": "app/api/factory/agent-profiles/[profileId]/route.ts",
+      "bytes": 568,
+      "sha256": "29539c7066307e778b4e7aafcdcae7b3b063aae9d3feb5478c4fbebe5bd5d138",
+      "gitBlob": "be0ef7585acdca34e423c31c4ef5ec4abd7c9475"
+    },
+    {
+      "path": "lib/factory/agent-profile-server.ts",
+      "bytes": 900,
+      "sha256": "bdbaffdf5e3e5c0e153cff40f56194a7757a72c1e9c1fcc6d16b98fca7bed33f",
+      "gitBlob": "97fc9f26144fd3de7d2394711dd54fedc6e45fe8"
+    },
+    {
+      "path": "lib/factory/agent-profile-http.ts",
+      "bytes": 4226,
+      "sha256": "c6ecba718a6ee40ef2f3241f5fea3e7b42ef6696d0145f0032b00f044d0935bb",
+      "gitBlob": "e53da5fe0c59b8e2477721ff8a4fffaff107d770"
+    },
+    {
+      "path": "lib/factory/agent-profile-definition.ts",
+      "bytes": 5968,
+      "sha256": "e01939ca24838ddc455b694e4bb42e972e45be9252348d72c8c5fe8322cffc16",
+      "gitBlob": "bc454c89f2c81bc07fc82fc65ac5924f9bb80e4f"
+    },
+    {
+      "path": "lib/factory/agent-profile-store.ts",
+      "bytes": 9350,
+      "sha256": "5c2fbe883ec69f58714879c4735ee6c4ed1616d60b6410ef528af7776e695310",
+      "gitBlob": "b1fd8a0c284c774883261af9a11ba9f3b1192322"
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "bytes": 26157,
+      "sha256": "350f6c6fd787a5b15da6f8aec60666736e0ccb5a45576fd3642711d0dfe03575",
+      "gitBlob": "31af8fb4375d4f2de093ba263ff33590ddc0a6c4"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/route.ts",
+      "bytes": 1706,
+      "sha256": "952d3cbc60bc565b1b89908bf60e6e625d9581b17d56d68a16a788fc17599dc4",
+      "gitBlob": "9979c0945dc9bb700ca083f52310d43e12741290"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/approval/route.ts",
+      "bytes": 2011,
+      "sha256": "0a0303aff8c9e7113b4db17b12ab45bdd8710d008d138281febf5742fc6c5c9c",
+      "gitBlob": "6c284931a32b5f87e45fa4e79159666d94fcaea4"
+    },
+    {
+      "path": "lib/factory/approval-http.ts",
+      "bytes": 4127,
+      "sha256": "ee2edbff121e0d973b0b0f5262992ad6c566c77e31f81428086bee1539b4251c",
+      "gitBlob": "28a49b43b624c3e376f6e73c249cd1a75346d930"
+    },
+    {
+      "path": "lib/factory/browser-human.ts",
+      "bytes": 635,
+      "sha256": "b6a7fccd8db99a97290b711d42aefe203881abd18a026422860808dc1d7c93da",
+      "gitBlob": "f08ab058d934594808f93d7c2605ca3eca420e94"
+    },
+    {
+      "path": "lib/factory/merge.ts",
+      "bytes": 25059,
+      "sha256": "2c56ae59a015a7a8f661a94bf87709c47a0c7a1f24eeabea6ef81beed7db109e",
+      "gitBlob": "2668c61a5f3727deba620e77f184fd6826bd77ba"
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "bytes": 82613,
+      "sha256": "eebf736fa966b7de322dc4b3dd9bb2f15f372279fa644a72e34ec245f6331260",
+      "gitBlob": "ed53fba310b0c4f2c69a3654deb14893479c50e3"
+    },
+    {
+      "path": "lib/factory/contract.ts",
+      "bytes": 5566,
+      "sha256": "f95319a337dbecf9822e7c60add4703a9bea28b02b8c60f78c2a433c5f4d5858",
+      "gitBlob": "2f0931e2c4136a7c9a02af8e5d73619116afcbfc"
+    },
+    {
+      "path": "app/api/runs/[runId]/evidence/route.ts",
+      "bytes": 1453,
+      "sha256": "f51c8e65daa53269bdf4e857759b0d5300006b5a783f3a9536a904cedf263d44",
+      "gitBlob": "4483187b65f6a411ab8f85ff2515cb63fcbecb8d"
+    },
+    {
+      "path": "lib/captures/store.ts",
+      "bytes": 24583,
+      "sha256": "74081b0566b7786d2cd651f2fc1bdc3ee79f54159d1421b78b7782a6c68df8a0",
+      "gitBlob": "3246946bb62748642d2edefb2bc14c498d716221"
+    },
+    {
+      "path": "lib/execution-identity.ts",
+      "bytes": 11483,
+      "sha256": "5256ea4d36c41ef247cc25b8e0b48aa2dbc61eb5a38b2774a5b770128892842c",
+      "gitBlob": "2dfd90d0367d05ddefe78d912f574d26abf338ef"
+    },
+    {
+      "path": "app/api/threads/[runId]/machine/route.ts",
+      "bytes": 1576,
+      "sha256": "22f11d9eb506b07d33f1947016ba0df8011f1fb94ce8d8975eee6f9ffedbf1c5",
+      "gitBlob": "39681bce488d7ad650d739f5fead0308cb1ec138"
+    },
+    {
+      "path": "app/api/mobile/threads/[id]/machine/route.ts",
+      "bytes": 1475,
+      "sha256": "76dca1228bbcf0af62700249b8bb07ba7072e76f3f8b2faa8fdeaf2c9cd7ab38",
+      "gitBlob": "267e56ef44f4ffaa47229b4bcd4df111173f3b4d"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "bytes": 98272,
+      "sha256": "d8f423b675a9c95a36f9b7d906d0945e9b6688bfab1af686faa8c3a7d6ff37e0",
+      "gitBlob": "f3bd51f601bb6cc77cc955aa8c74b232d5bb774b"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+      "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a"
+    },
+    {
+      "path": "scripts/ops/posthog-export-evidence.mjs",
+      "bytes": 11762,
+      "sha256": "94282fae71b089bfe7154b907c1ebd45fc5c352e16c3369e184b64a1374b8045",
+      "gitBlob": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e"
+    },
+    {
+      "path": "scripts/ops/posthog-replay-evidence.mjs",
+      "bytes": 13579,
+      "sha256": "4df87f17ee6175a0b3498652f9af4ac61afec35dea022c116d81050396a0bddf",
+      "gitBlob": "fe28b5927b8df35d42bce2984a95dcfdd50e6965"
+    }
+  ],
+  "privacy": {
+    "secretValuesRead": false,
+    "accountDataRead": false,
+    "rawRuntimeLogsRead": false,
+    "newRuntimePayloadsSaved": false,
+    "content": "static repository paths, exact source hashes, closed checks and source-review conclusions only"
+  },
+  "actions": {
+    "sourceEdits": 0,
+    "tests": 0,
+    "gitMutations": 0,
+    "remoteMutations": 0,
+    "stateWrites": 0,
+    "productionLogin": 0,
+    "modelCalls": 0,
+    "resourceCreation": 0,
+    "ownedResourcesRemaining": 0,
+    "newArtifact": "this independent source review only",
+    "prior55FileArchiveInventoryModified": false
+  }
+}

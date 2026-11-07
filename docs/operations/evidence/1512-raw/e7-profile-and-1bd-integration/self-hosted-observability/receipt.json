@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "kind": "self_hosted_generation_observability_source_regression",
+  "status": "source_verified_not_production_validated",
+  "createdAt": "2026-11-07T16:19:28.390166+00:00",
+  "repository": "alexj11324/Mikka",
+  "headAtReceipt": "6d7ca30dc75cd806dc9e9e03479cd8293b8cb1df",
+  "integratedMain": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+  "files": [
+    {
+      "path": "lib/abuse/model.ts",
+      "snapshot": "self-hosted-observability/source/lib/abuse/model.ts",
+      "bytes": 18761,
+      "sha256": "0ac28708f7336e15262eb4fd8586575d0b4d705c7c3ec8dd91145c4e854cceee",
+      "gitBlobSha": "4e9406a4e7b71b569004cf0ff33a9996a878eb72",
+      "lines": 333,
+      "mergedIndexBeforePatch": {
+        "bytes": 18660,
+        "sha256": "448b46f80514f380affa3e376a4f011b3914edd2d4245af5fccfd7b8d86bfa8b",
+        "gitBlobSha": "6054069f8ab2c3907683d83d04ac8c412d67312d"
+      }
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "snapshot": "self-hosted-observability/source/lib/tracing/ai.ts",
+      "bytes": 13617,
+      "sha256": "202630a776f9b9d543bd6581cc4b3be70b304fcdc22431fa9a990f985f4658b4",
+      "gitBlobSha": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "lines": 258,
+      "mergedIndexBeforePatch": {
+        "bytes": 13601,
+        "sha256": "f1edfcbef075f6974c5c2ccf32c7ef1a50ce731a6209032f4c84d798949a40d7",
+        "gitBlobSha": "6e84dc28b8e0639e35029854f84873c84049d718"
+      }
+    },
+    {
+      "path": "lib/abuse/model.test.ts",
+      "snapshot": "self-hosted-observability/source/lib/abuse/model.test.ts",
+      "bytes": 18665,
+      "sha256": "8157b7e70170737288453d9c26310e7663707e742bd615c4b0bdc98404d4e86e",
+      "gitBlobSha": "6024f9edf4551a7ae305462c8504d3c46194bf4e",
+      "lines": 382,
+      "mergedIndexBeforePatch": {
+        "bytes": 12334,
+        "sha256": "f7ef806034ccbd8f7fdd37dc64872684644072bc310420f1013e3b6e553fccc1",
+        "gitBlobSha": "9195c29b0a51aa638f028c1cb698e48924e37cd5"
+      }
+    }
+  ],
+  "patch": {
+    "path": "self-hosted-observability/patch.diff",
+    "bytes": 9805,
+    "sha256": "19ea8dce473894a135e8251be2645fd16013aaa45bf153490dab64ff53861fb5",
+    "gitBlobSha": "8f0bd671ad214ccc8e947666f108b16089e88be8"
+  },
+  "problem": "The new self-hosted default-model early return bypassed observedModel: admitted successful, streaming and rejected invocations emitted no AI generation receipt.",
+  "change": [
+    "Wrap only the existing selfHostedDefaultModel(scope) in observedModel.",
+    "Add closed self_hosted route; actual modelId comes from the configured provider model, not the hosted UI alias.",
+    "Preserve explicit owner or same-workspace billing owner and operation/tier/effort metadata."
+  ],
+  "preserved": [
+    "Original per-call admission, direct configured provider, prompt size guard, output bounds and timeout.",
+    "No Gateway fallback, billing reservation or settlement, or new authentication/database call.",
+    "Original provider result, stream and rejection behavior.",
+    "Missing cost and nonstreaming TTFT remain absent; no zero values are invented."
+  ],
+  "privacy": [
+    "The provider factory and PostHog capture are in-memory mocks; no real provider or telemetry transport is used.",
+    "Static prompt, response, request, caller Gateway-key, baseURL and API-key canaries are absent from captured generation events.",
+    "The transport still receives its original configured values; telemetry does not receive those values."
+  ],
+  "validation": [
+    {
+      "phase": "red_before_production_fix",
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test --test-reporter=tap --test-name-pattern='self-hosted' lib/abuse/model.test.ts",
+      "exitCode": 1,
+      "summary": {
+        "tests": 3,
+        "suites": 0,
+        "pass": 0,
+        "fail": 3,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedFailure": "All three cases observed 0 generation events instead of exactly 1; direct/admission/business assertions before that point passed.",
+      "output": {
+        "path": "self-hosted-observability/red.tap",
+        "bytes": 3257,
+        "sha256": "67e596a9ccdb7c6a258542278518a9f1c9dd1598a524e9689ce2b9ff917532e4",
+        "gitBlobSha": "91ac1a3bdb3f1aaa0c4e4285a1d3a9dc709ae766"
+      }
+    },
+    {
+      "phase": "green_before_test_type_only_fix",
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test --test-reporter=tap lib/abuse/model.test.ts lib/tracing/ai.test.ts",
+      "exitCode": 0,
+      "summary": {
+        "tests": 26,
+        "suites": 0,
+        "pass": 26,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "modelTestSha256": "90dde2079862941c9251d776407aca27d43f43b8fc5ba344396a0574222de0f3",
+      "output": {
+        "path": "self-hosted-observability/green.tap",
+        "bytes": 6982,
+        "sha256": "db0faec49327410140ef93a0bd4bd5aef20000e96d917a1196f94cca6b6d78e9",
+        "gitBlobSha": "3ee372082c25ae20f57003ab77856e17c6039772"
+      }
+    },
+    {
+      "phase": "final_test_type_fix",
+      "change": "An async assertion callback assimilates the Model PromiseLike, preserving its rejection and satisfying node:assert typing.",
+      "reportedBy": "root canonical typecheck",
+      "rootLog": "evidence/d75-candidate-typecheck.log",
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test --test-reporter=tap --test-name-pattern='a refused self-hosted' lib/abuse/model.test.ts",
+      "exitCode": 0,
+      "summary": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "output": {
+        "path": "self-hosted-observability/refusal-type-fix.tap",
+        "bytes": 1016,
+        "sha256": "21d52cd42411c2f7b392c3ba38d62226fd98c8efe1d9df16379bee4eb0492ecd",
+        "gitBlobSha": "62bf6ecc7bf981fc012524185c443e28d39ab043"
+      }
+    },
+    {
+      "phase": "final_lint",
+      "command": "./node_modules/.bin/oxlint --no-ignore --deny-warnings lib/abuse/model.ts lib/tracing/ai.ts lib/abuse/model.test.ts",
+      "exitCode": 0,
+      "toolVersion": "1.89.0",
+      "output": {
+        "path": "self-hosted-observability/lint-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "phase": "final_diff_check",
+      "command": "git diff --check -- lib/abuse/model.ts lib/tracing/ai.ts lib/abuse/model.test.ts",
+      "exitCode": 0,
+      "output": {
+        "path": "self-hosted-observability/diff-check-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    }
+  ],
+  "limits": [
+    "No real model, database, VM or remote query was executed.",
+    "The full canonical typecheck is owned by root and is not claimed as passed here.",
+    "The complete 26-test run predates only the async assertion type fix; the final changed case was rerun once and passed.",
+    "This source regression does not establish production PostHog delivery or the separate Native/Web query budget."
+  ],
+  "mutations": {
+    "sourceFiles": [
+      "lib/abuse/model.ts",
+      "lib/tracing/ai.ts",
+      "lib/abuse/model.test.ts"
+    ],
+    "stagedByThisTask": false,
+    "committedByThisTask": false,
+    "remoteWrites": false
+  }
+}

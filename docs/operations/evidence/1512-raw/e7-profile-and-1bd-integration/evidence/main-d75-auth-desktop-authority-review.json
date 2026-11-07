@@ -1,0 +1,976 @@
+{
+  "schema": "mikka.issue1512.readonly-compatibility-review.v1",
+  "recordedAt": "2026-11-07T16:17:23.011164+00:00",
+  "reviewer": "daemon_impl",
+  "repository": "alexj11324/Mikka",
+  "revisions": {
+    "base": {
+      "sha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+      "tree": "15017013716b71640bac10686115776b511c639d",
+      "parents": [
+        "0dee82a7737d29297186b77360370832cfcc3f5d",
+        "887c2d034952a0155c86b3b814771a6e6adac65f"
+      ]
+    },
+    "main": {
+      "sha": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "tree": "05d37a9751a53b4e30112b99141d3b4e4f7107ff",
+      "parents": [
+        "b32ad8e3c99b47898e3c1c3f7dca00b9b37a1b10",
+        "78e7255231db37fa55f9b22f790ecd35349e82d6"
+      ]
+    },
+    "feature": {
+      "sha": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+      "parents": [
+        "905b37f4df9ccd4c4497194c501d3f33ab13c72d"
+      ]
+    }
+  },
+  "pullRequest": {
+    "number": 1609,
+    "mergeCommit": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+    "url": "https://github.com/alexj11324/Mikka/pull/1609",
+    "state": "merged",
+    "runtimeClaimsInDescriptionIndependentlyRevalidated": false
+  },
+  "method": {
+    "fixedGitObjectsOnly": true,
+    "instructionsReadFromExactGitHubMain": true,
+    "localInstructionDigestsRechecked": true,
+    "testsRun": false,
+    "productSourceExecuted": false,
+    "databaseQueries": 0,
+    "providerCalls": 0,
+    "servicesStarted": 0,
+    "virtualMachinesCreated": 0,
+    "gitMutations": false,
+    "remoteMutations": false,
+    "sourceFilesChanged": false,
+    "publishStateChanged": false,
+    "workingTreeMergeReviewed": false
+  },
+  "scope": {
+    "comparison": "6fed to d75 with feature e7 preservation references",
+    "wholeDeltaChangedFiles": 228,
+    "whole228FileAudit": false,
+    "included": [
+      "auth/Desktop authority and session contracts",
+      "direct query-cost compatibility",
+      "trace/AI merge preservation"
+    ],
+    "excluded": [
+      "full BYOK/billing audit",
+      "self-hosted deployment acceptance",
+      "bulk backfill/migration semantics",
+      "new runtime/SQL measurement"
+    ],
+    "protectedAreaChangedPaths": [
+      "lib/desktop-rpc/bootstrap.ts",
+      "lib/desktop-rpc/handler.test.ts",
+      "lib/desktop-rpc/handler.ts",
+      "lib/desktop-rpc/wire.ts",
+      "packages/daemon/src/server-link-http.ts",
+      "workflows/coordinator/finish-turn.ts",
+      "workflows/coordinator/handoff.test.ts",
+      "workflows/coordinator/workflow.ts"
+    ]
+  },
+  "findings": [
+    {
+      "id": "authority-preserves-request",
+      "paths": [
+        "apps/api/runtime/request-authority.ts",
+        "apps/api/request-authority-module.mjs",
+        "apps/api/nitro.config.ts"
+      ],
+      "observation": "New production node-server authority selects only exact configured origins, allows HTTP only on loopback and rejects duplicate/conflicting authority headers. It adjusts the original request URL and forwards the same Request, retaining headers, body, abort and runtime context. The guard adds no database access.",
+      "requiredMerge": "Keep main nodeRequestAuthority and builtinServices together with feature workflowDevelopmentAliases, workflowNodeExternals and existing Vercel authority. Preserve feature generated trace/route wrappers.",
+      "limitation": "Rejected requests may end before route instrumentation; actual merged HTTP ingress was not executed."
+    },
+    {
+      "id": "origin-guard-and-atomic-exchange",
+      "paths": [
+        "lib/desktop-auth.ts",
+        "app/api/desktop/begin/route.ts",
+        "app/api/desktop/exchange/route.ts",
+        "lib/desktop-rpc/handler.ts"
+      ],
+      "observation": "Main desktopSameOriginRequest accepts missing native browser headers, but rejects mismatched Origin and Sec-Fetch-Site except absent, same-origin or none. It runs before body/auth work and is header-only.",
+      "requiredMerge": "Add main guards without reverting feature single-statement locked exchange consumption, first-attempt token clearing, expiry/revocation checks or BetterAuth OTT verification. Keep noteLogRpcAction after registered-action validation, per-item authorization and batch behavior.",
+      "limitation": "No new PostgreSQL concurrency or token-burn execution in this review."
+    },
+    {
+      "id": "session-proof-unchanged",
+      "paths": [
+        "lib/desktop-rpc/authentication.ts",
+        "lib/desktop-rpc/session.ts",
+        "lib/desktop-rpc/session-cache.ts",
+        "lib/fresh-session.ts"
+      ],
+      "observation": "All four files are byte-identical in base, main and feature. Token-bound signed cache, native bearer isolation from browser cookies, request-local reuse and fresh expiry/revocation reads remain unchanged.",
+      "requiredMerge": "Retain feature identity-only Web PKCE and full-workspace phase/session fences. Main does not replace that renderer machinery.",
+      "limitation": "Required fresh-session and rate-limit operations are neither removed nor assumed free."
+    },
+    {
+      "id": "edition-and-defaults-change-baseline",
+      "paths": [
+        "lib/edition.ts",
+        ".github/workflows/desktop.yml",
+        ".github/workflows/ui-policy.yml",
+        ".github/workflows/web-deploy.yml",
+        "lib/posthog-server.ts",
+        "lib/feature-flags.ts",
+        "lib/builtin-gateway/config.ts"
+      ],
+      "observation": "Default edition becomes community; main hosted workflows explicitly select cloud. Builtin gateway/scheduler stay disabled for cloud/VERCEL, while explicit external worker settings retain precedence. Separately, absence of a PostHog client now uses productionFlagDefault rather than all flags false; this server default is not community-only.",
+      "requiredMerge": "Keep explicit cloud selection and configured feature/model/gateway metadata. Merge main defaults into feature bounded PostHog queue, safe errors, timestamps and flush hooks.",
+      "limitation": "Cloud edition by itself does not prove old e7 feature states or SQL costs unchanged."
+    },
+    {
+      "id": "discovery-cost-boundary",
+      "paths": [
+        "lib/desktop-discovery.ts",
+        "app/api/desktop/discovery/route.ts",
+        "apps/desktop/src/main/server-discovery.ts",
+        "apps/desktop/src/main/bundled-servers.ts",
+        "lib/auth-config.ts"
+      ],
+      "observation": "Ordinary discovery projects public configuration. GITHUB_SIGN_IN_USE_APP enables auth initialization/credential resolution, so that opt-in path is not established as zero database work. Existing Desktop discovery client is byte-identical and runs from explicit probe rather than state/select.",
+      "requiredMerge": "Preserve exact-origin, no-credential, no-redirect discovery validation and main configuration negotiation.",
+      "limitation": "A new endpoint is not proof of an extra automatic login/startup request; no discovery call was executed."
+    },
+    {
+      "id": "coordinator-query-cost-changes",
+      "paths": [
+        "lib/coordinator/store.ts",
+        "lib/coordinator/wake.ts",
+        "lib/coordinator/model-ready.ts",
+        "lib/default-model-config.ts",
+        "app/actions/coordinator.ts"
+      ],
+      "observation": "chatViewState and chatVersionState each replace three separate default-path reads with one bounded coherent SQL statement. coordinatorEnabled can now perform selected-model readiness authorization through database readers when no server default or mock fixture is available. A configured default avoids that readiness branch.",
+      "requiredMerge": "Keep coherent snapshot and readiness authorization semantics while retaining feature tracing.",
+      "limitation": "Static statement comparison, not measured whole-window savings; changes can affect costs in either direction. Large unrelated backfill/migration semantics are outside this review."
+    },
+    {
+      "id": "task-runs-and-live-preservation",
+      "paths": [
+        "app/actions/task-runs.ts",
+        "lib/builtin-gateway/config.ts"
+      ],
+      "observation": "Main replaces the explicit worker presence guard with gatewayConfig, adding community/builtin mode without changing feature renderer batching or Live trigger code.",
+      "requiredMerge": "Preserve feature latest-200 issue selection, owner-filtered bot joins, three-level runBotId fallback, fingerprint/expiry aggregate, revision-before-data ordering and separate database pools.",
+      "limitation": "Main is not shown to resolve old e7 extra reads or otherScoped SQL."
+    },
+    {
+      "id": "trace-ai-and-new-step",
+      "paths": [
+        "lib/coordinator/decide.ts",
+        "lib/posthog-server.ts",
+        "lib/posthog-config.ts",
+        "lib/tracing/context.ts",
+        "lib/tracing/ai.ts",
+        "workflows/coordinator/finish-turn.ts",
+        "packages/daemon/src/server-link-http.ts"
+      ],
+      "observation": "Main adds a normal use-step bounded-turn handoff and configurable decision credentials/cloud billing checks. Protected API request cache and base protocol/tracing files are unchanged. Daemon HTTP diff changes only a comment URL. Existing SDK continuous propagation applies to the added step when retained.",
+      "requiredMerge": "Keep main credential/edition semantics plus feature per-generation spans, numeric receipts, failure accounting, safe stage logs and flush behavior. Do not restore old content-bearing/unbounded analytics.",
+      "limitation": "Custom PostHog host configuration does not broaden daemon endpoint validation: official US/EU plus development loopback remain allowed. Arbitrary self-hosted cross-service telemetry is not attested."
+    },
+    {
+      "id": "build-and-test-provenance",
+      "paths": [
+        "apps/api/nitro.config.ts",
+        "apps/api/scripts/build.mjs",
+        "package.json"
+      ],
+      "observation": "MIKKA_BUILD_REVISION now precedes deployment/git fallback. A configured string does not replace actual checkout/tree/manifest/artifact proof. Main test:desktop-auth adds discovery; feature adds batch/context/exchange cases.",
+      "requiredMerge": "Keep both sides of test scripts and exact-source/artifact evidence guards.",
+      "limitation": "No integrated main checkout, new CI result or runtime source identity is claimed."
+    }
+  ],
+  "unchangedSourceProof": [
+    {
+      "path": "lib/desktop-rpc/authentication.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "261b44d879290f415d8fd58f01e27713d43f6861",
+      "mainBlob": "261b44d879290f415d8fd58f01e27713d43f6861",
+      "featureBlob": "261b44d879290f415d8fd58f01e27713d43f6861",
+      "featureAlsoIdentical": true,
+      "mainSha256": "206f09f84f14d2d09bbe734f3dc9072d5b99b80f1976ca12f73cfa22af72a92c",
+      "featureSha256": "206f09f84f14d2d09bbe734f3dc9072d5b99b80f1976ca12f73cfa22af72a92c"
+    },
+    {
+      "path": "lib/desktop-rpc/session.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "c6b0bd381b0c62df8c7404cd62b31402c95354a9",
+      "mainBlob": "c6b0bd381b0c62df8c7404cd62b31402c95354a9",
+      "featureBlob": "c6b0bd381b0c62df8c7404cd62b31402c95354a9",
+      "featureAlsoIdentical": true,
+      "mainSha256": "9a9083622b42034d00f5e425319561397ea28e3c8b2220f1a0ed93b43b969103",
+      "featureSha256": "9a9083622b42034d00f5e425319561397ea28e3c8b2220f1a0ed93b43b969103"
+    },
+    {
+      "path": "lib/desktop-rpc/session-cache.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "e5ae261f13a9bd7ee68057922eaa322154e8d845",
+      "mainBlob": "e5ae261f13a9bd7ee68057922eaa322154e8d845",
+      "featureBlob": "e5ae261f13a9bd7ee68057922eaa322154e8d845",
+      "featureAlsoIdentical": true,
+      "mainSha256": "a57afb87c4c4ac3fa0c31be645e40686fdc36c456f1013c886616836657dd884",
+      "featureSha256": "a57afb87c4c4ac3fa0c31be645e40686fdc36c456f1013c886616836657dd884"
+    },
+    {
+      "path": "lib/fresh-session.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "ea79357b95916168b13d2707594244896a60a7c5",
+      "mainBlob": "ea79357b95916168b13d2707594244896a60a7c5",
+      "featureBlob": "ea79357b95916168b13d2707594244896a60a7c5",
+      "featureAlsoIdentical": true,
+      "mainSha256": "1100600b5c2cd015e3e5de2302860ff15e3b3915d086bee7a77bf05f302e6750",
+      "featureSha256": "1100600b5c2cd015e3e5de2302860ff15e3b3915d086bee7a77bf05f302e6750"
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "788d222d3faf4d11f2f32f6c3907de4f37b6419f",
+      "mainBlob": "788d222d3faf4d11f2f32f6c3907de4f37b6419f",
+      "featureBlob": "788d222d3faf4d11f2f32f6c3907de4f37b6419f",
+      "featureAlsoIdentical": true,
+      "mainSha256": "2b6ea0143688bc5f80fd4d2b4984d4843991972c10dea5e4586a0949a5d3b2f2",
+      "featureSha256": "2b6ea0143688bc5f80fd4d2b4984d4843991972c10dea5e4586a0949a5d3b2f2"
+    },
+    {
+      "path": "apps/desktop/src/main/server-discovery.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "1bf27cbaa79bf95e448a38381d86f547eb803c52",
+      "mainBlob": "1bf27cbaa79bf95e448a38381d86f547eb803c52",
+      "featureBlob": "1bf27cbaa79bf95e448a38381d86f547eb803c52",
+      "featureAlsoIdentical": true,
+      "mainSha256": "bbc9c7848c79f554709516afb878cf5c1ef01af2a9ab5845983bc2196543a009",
+      "featureSha256": "bbc9c7848c79f554709516afb878cf5c1ef01af2a9ab5845983bc2196543a009"
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-servers.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "a81a4c62880d5f65216cfb77f7e424f75bf73721",
+      "mainBlob": "a81a4c62880d5f65216cfb77f7e424f75bf73721",
+      "featureBlob": "a81a4c62880d5f65216cfb77f7e424f75bf73721",
+      "featureAlsoIdentical": true,
+      "mainSha256": "85d09b1feda0188fe40ada81c3dd7868db278e76e6e89b1f2cb3619d91c52b6e",
+      "featureSha256": "85d09b1feda0188fe40ada81c3dd7868db278e76e6e89b1f2cb3619d91c52b6e"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "383dc00ce9781885a770541636f1b97966c32fd1",
+      "mainBlob": "383dc00ce9781885a770541636f1b97966c32fd1",
+      "featureBlob": "230766f11a150ebb2f949b32df71b5a47a73c1f0",
+      "featureAlsoIdentical": false,
+      "mainSha256": "99be517821915848237463d7c7bbc9061097f9fddca723996356006c93e9389e",
+      "featureSha256": "43ebb82c6c84b1de5e1cdc4f7ee4d9c54133f66183c4cac5627a9cea53b93b65"
+    },
+    {
+      "path": "apps/api/src/application.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "68f34467fe2560f9943baa6831e45a80eb8670b3",
+      "mainBlob": "68f34467fe2560f9943baa6831e45a80eb8670b3",
+      "featureBlob": "68f34467fe2560f9943baa6831e45a80eb8670b3",
+      "featureAlsoIdentical": true,
+      "mainSha256": "8091bbfea82be3855f9684cefa486f44050b1551dfe0e036852e5eacf25643b9",
+      "featureSha256": "8091bbfea82be3855f9684cefa486f44050b1551dfe0e036852e5eacf25643b9"
+    },
+    {
+      "path": "apps/api/src/context.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "ee90c3133ebfe8e2ba957a56ed5fd05a30655fda",
+      "mainBlob": "ee90c3133ebfe8e2ba957a56ed5fd05a30655fda",
+      "featureBlob": "ee90c3133ebfe8e2ba957a56ed5fd05a30655fda",
+      "featureAlsoIdentical": true,
+      "mainSha256": "73b5ecaa23a4848e3224c4c6dab58b732f10162994f497ea2e6803fd0d9e06a5",
+      "featureSha256": "73b5ecaa23a4848e3224c4c6dab58b732f10162994f497ea2e6803fd0d9e06a5"
+    },
+    {
+      "path": "lib/request-log.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "f22039d149ec40f42d66e8bae7aac0a1659d4703",
+      "mainBlob": "f22039d149ec40f42d66e8bae7aac0a1659d4703",
+      "featureBlob": "3e6a99e4b6e63a5e491e44d4ad2379cf9d0e75a7",
+      "featureAlsoIdentical": false,
+      "mainSha256": "1cf7ff7738cacebb339671642aa1aba74d243e4355348bb57eb71f4570f7db75",
+      "featureSha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "1951ec6dff3ec874ccf8684daed13c2278a71439",
+      "mainBlob": "1951ec6dff3ec874ccf8684daed13c2278a71439",
+      "featureBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "featureAlsoIdentical": false,
+      "mainSha256": "8370d2606fe0e1bc939a2c73f5b45b310148e805e79726522a522d79517d35ac",
+      "featureSha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670"
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "baseMainIdentical": true,
+      "baseBlob": "39cf5f3347144cd4d9bb8d966d281c62e1845f20",
+      "mainBlob": "39cf5f3347144cd4d9bb8d966d281c62e1845f20",
+      "featureBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "featureAlsoIdentical": false,
+      "mainSha256": "c17f1c2dccfaa26a7b42c831e988b27213eb1710223c6a4ba4f102ad6eedf715",
+      "featureSha256": "eb882501a08c02178edb4d2bd1293316923f5bca18210bbac43081f41fdb3acc"
+    }
+  ],
+  "historicalEvidence": {
+    "immutableIndex": "https://github.com/alexj11324/Mikka/blob/307ce814d434a63f15cf76efc0c45ba12d761d18/docs/operations/evidence/1512-raw/e7-native-scope-diagnostic/index.json",
+    "actualDesktopSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+    "candidate": "e7a1a267335604004586f88e6b530c51b0da286d",
+    "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+    "loginQueryCalls": {
+      "native": 186,
+      "web": 162,
+      "nativeNotAboveWeb": false
+    },
+    "firstStartupPairQueryCalls": {
+      "bundled": 54,
+      "hosted": 176,
+      "nativePhysicalCrossingEnd": 2,
+      "nativeLogicalCrossingEnd": 6,
+      "lowerCompleteWorkProven": false
+    },
+    "interpretation": "Exact e7 evidence and a fixed-e7 sequential profiler remain valid only for that source/configuration. They are not a d75 baseline, do not identify otherScoped causes alone, and are not overwritten."
+  },
+  "recommendedVerification": {
+    "runByThisReviewer": false,
+    "groups": [
+      {
+        "id": "authority-and-origin",
+        "why": "Exact authority, conflicting proxy headers, request/body/context preservation and Desktop same-origin guard.",
+        "paths": [
+          "apps/api/runtime/request-authority.test.ts",
+          "apps/api/runtime/http-policy.test.mjs",
+          "lib/desktop-auth.test.ts",
+          "lib/desktop-rpc/handler.test.ts"
+        ],
+        "executedByThisReview": false,
+        "sourceAvailability": {
+          "apps/api/runtime/request-authority.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "apps/api/runtime/http-policy.test.mjs": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "lib/desktop-auth.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "lib/desktop-rpc/handler.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ]
+        }
+      },
+      {
+        "id": "desktop-auth-existing-gate",
+        "why": "Keep discovery plus feature batch/exchange tests in test:desktop-auth; real PostgreSQL cases remain normal CI obligations.",
+        "paths": [
+          "lib/auth-config.test.ts",
+          "lib/desktop-discovery.test.ts",
+          "lib/desktop-rpc/read-batch.test.ts",
+          "lib/desktop-rpc/read-batch-context.test.ts",
+          "tests/desktop-auth-exchange.test.ts",
+          "tests/desktop-auth-handoff.db.test.ts",
+          "tests/desktop-rpc-auth.db.test.ts",
+          "tests/desktop-session-cache.db.test.ts"
+        ],
+        "executedByThisReview": false,
+        "sourceAvailability": {
+          "lib/auth-config.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "lib/desktop-discovery.test.ts": [
+            "main"
+          ],
+          "lib/desktop-rpc/read-batch.test.ts": [
+            "feature"
+          ],
+          "lib/desktop-rpc/read-batch-context.test.ts": [
+            "feature"
+          ],
+          "tests/desktop-auth-exchange.test.ts": [
+            "feature"
+          ],
+          "tests/desktop-auth-handoff.db.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "tests/desktop-rpc-auth.db.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "tests/desktop-session-cache.db.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ]
+        }
+      },
+      {
+        "id": "feature-auth-phase-and-workflow",
+        "why": "Identity-only Web PKCE, same-owner session retirement, development native imports and continuous run context.",
+        "paths": [
+          "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+          "apps/api/scripts/workflow-development-aliases.test.mjs",
+          "lib/tracing/run-context.test.ts"
+        ],
+        "executedByThisReview": false,
+        "sourceAvailability": {
+          "apps/frontend/scripts/auth-only-bootstrap.test.mjs": [
+            "feature"
+          ],
+          "apps/api/scripts/workflow-development-aliases.test.mjs": [
+            "feature"
+          ],
+          "lib/tracing/run-context.test.ts": [
+            "feature"
+          ]
+        }
+      },
+      {
+        "id": "changed-coordinator-read-and-telemetry",
+        "why": "Readiness, coherent snapshots and new bounded-turn handoff; conflict-resolved decision and PostHog instrumentation.",
+        "paths": [
+          "lib/coordinator/model-ready.test.ts",
+          "lib/coordinator/chat-version.db.test.ts",
+          "workflows/coordinator/handoff.test.ts",
+          "lib/posthog-server.test.ts",
+          "lib/tracing/ai.test.ts",
+          "lib/model-call-timing.test.ts"
+        ],
+        "executedByThisReview": false,
+        "sourceAvailability": {
+          "lib/coordinator/model-ready.test.ts": [
+            "main"
+          ],
+          "lib/coordinator/chat-version.db.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "workflows/coordinator/handoff.test.ts": [
+            "main"
+          ],
+          "lib/posthog-server.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ],
+          "lib/tracing/ai.test.ts": [
+            "feature"
+          ],
+          "lib/model-call-timing.test.ts": [
+            "base",
+            "main",
+            "feature"
+          ]
+        }
+      }
+    ],
+    "conditionalOnly": [
+      {
+        "paths": [
+          "apps/api/runtime/builtin-gateway.test.ts"
+        ],
+        "condition": "Verify community node-server module/security-wrapper integration."
+      },
+      {
+        "paths": [
+          "tests/action-read-egress.db.test.ts"
+        ],
+        "condition": "If merge resolution touches task-runs SQL rather than only gateway guard."
+      }
+    ],
+    "realDatabaseBoundary": "Existing normal CI must run PostgreSQL exchange concurrency, revocation and coherent-snapshot tests; no local database was started."
+  },
+  "verdict": {
+    "mergeRisk": "medium",
+    "alignment": "good",
+    "impact": "large: authentication, authority and edition configuration",
+    "verification": "fixed-source contracts reviewed; integrated runtime and CI pending",
+    "rollback": "code/config reversible; deployment rollback not validated",
+    "errorDetection": "closed status/action diagnostics retained if preservation requirements are followed; real total-window measurement remains necessary",
+    "additionalScopedBlockersIdentified": [],
+    "overallIssueAcceptance": false,
+    "integratedMergeApprovedByThisReceipt": false
+  },
+  "sourceDigests": [
+    {
+      "path": "AGENTS.md",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 20245,
+      "sha256": "5c6ed942c827a66f50a2aa847536efecbb67ba80f8e2e9d476847854ea531b3c",
+      "gitBlob": "245281562212902f5042649bd41d2a3573121824",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/AGENTS.md"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 8934,
+      "sha256": "1a7bc3cc9f0f4e4020a144eb414a22a5384b88cb85bba79af8830fcbc5055bd6",
+      "gitBlob": "5d6803e937f97ed38ab653fdc65c3c08e72f3649",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/CONTRIBUTING.md"
+    },
+    {
+      "path": ".claude/skills/merge-risk/SKILL.md",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 2862,
+      "sha256": "1a11fcb7503eeb92a901755c0f729216cfdb8674a4ac2b0890e019d594e1ae17",
+      "gitBlob": "c8a545a237d7be29c0302d4aba3f1a8b7cfe9851",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/.claude/skills/merge-risk/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/systematic-debugging/SKILL.md",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 9530,
+      "sha256": "51c6435d98c83c42c96ba7c35725a0b2c376cd487fb1a4e6bd0ddbe7e33ef202",
+      "gitBlob": "62fc752aaef59a8bbed5d305f4cadc60f8ae07ed",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/.claude/skills/systematic-debugging/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/verification-before-completion/SKILL.md",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 3646,
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+      "gitBlob": "7d45333cc4a49c57a80df6c1fe2fa777a207afbc",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/.claude/skills/verification-before-completion/SKILL.md"
+    },
+    {
+      "path": "apps/api/runtime/request-authority.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 5817,
+      "sha256": "cba3dc886c5ba9f2e9d5ac97bd995c4c40e8159d15a2b68fec68cd150b4dc66a",
+      "gitBlob": "cdaadf196ea8eee5e4f68b613e1450eb6f9017ca",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/runtime/request-authority.ts"
+    },
+    {
+      "path": "apps/api/plugins/node-request-authority.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 385,
+      "sha256": "79ca674dc2f1469c86ec89b8b9ee2dd715fb01b80ad8f353ce09862c0c7d1811",
+      "gitBlob": "0db203f8e120f99af271e4c8637c500716e4759d",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/plugins/node-request-authority.ts"
+    },
+    {
+      "path": "apps/api/plugins/request-authority.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 648,
+      "sha256": "dd53a14b7641de21de7d325051183f7f455c779b973eeb41916a64d220e13347",
+      "gitBlob": "c71b6372c82ae6531aa8de3314f4fcd3735f8c67",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/plugins/request-authority.ts"
+    },
+    {
+      "path": "apps/api/request-authority-module.mjs",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 1024,
+      "sha256": "b7799aa22defbeb94341be8f9459e17819c4c3bc326b8e3ab7d2f688fe66838c",
+      "gitBlob": "6c7f8a530f6f25ad951939e030236a60f66fb83f",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/request-authority-module.mjs"
+    },
+    {
+      "path": "apps/api/nitro.config.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 2811,
+      "sha256": "d5e803cc9764f1ee02bddeb96257b887a3f674b6154a3e98783165f1f70b9121",
+      "gitBlob": "e0d383cea01a091ea08a2df4eaa01fb821aadcf4",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/nitro.config.ts"
+    },
+    {
+      "path": "apps/api/runtime/http-policy.mjs",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 7292,
+      "sha256": "c60980a03e57f4d4b30f9dd2b4162664025ef6ceab126ec4279a58bbbc935c37",
+      "gitBlob": "ec0915a312d21c9f868cddcd8df7a4b44413acc4",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/runtime/http-policy.mjs"
+    },
+    {
+      "path": "apps/api/scripts/build.mjs",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 2324,
+      "sha256": "9034aac0819d13611b65f98b7703770d0421ebe4553025306ae1d2604c5071e3",
+      "gitBlob": "f05a802d0591a51ce3eb02d40caac7acf10f4754",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/scripts/build.mjs"
+    },
+    {
+      "path": "lib/desktop-auth.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 4812,
+      "sha256": "67cfebf33be94b73224fe37c08d4a956f6bdad6d991e6ebe82e6c572e0ca703b",
+      "gitBlob": "c861a6d6ccd67e2c9f486f3a0774dce4e82065b0",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/desktop-auth.ts"
+    },
+    {
+      "path": "app/api/desktop/begin/route.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 1974,
+      "sha256": "c60a9bfef2b79d74a4bd1310f30510a89f6b4e73f152ddfbda0b4ad3899c35da",
+      "gitBlob": "e20730817db24ac84be972fe738ac1c7531885eb",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/app/api/desktop/begin/route.ts"
+    },
+    {
+      "path": "app/api/desktop/exchange/route.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 3454,
+      "sha256": "acb80f690c3053f98d1a82049deb0768d243d1657d3526261ec152ce12890caf",
+      "gitBlob": "b95620935b17abed3c73a7416d8507473cd20cb4",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/app/api/desktop/exchange/route.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/handler.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 5623,
+      "sha256": "3d92b54542610f71691d9ff87e744b5eaaf7ec68c0f82aac46704a2272daf839",
+      "gitBlob": "12862f1a41a4af2760003e3fb4e5ace1a0ab39c4",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/desktop-rpc/handler.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 2507,
+      "sha256": "a102dce6274cf3a5a808953b96bd841abb7d29a31d406a5b5f600c6f44bb7ddb",
+      "gitBlob": "ff5d7348bd502a73c48c5d2c282e5390a53b901d",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/desktop-rpc/bootstrap.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/desktop-rpc/wire.ts"
+    },
+    {
+      "path": "lib/edition.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 660,
+      "sha256": "779f421ebe198e6f99b851eca23e26bfa7a1af90fa1c4c2a277424df7084e12e",
+      "gitBlob": "bbee750760addebb58147a4913fa77d709e886c9",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/edition.ts"
+    },
+    {
+      "path": "lib/auth-config.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 3749,
+      "sha256": "2c36d9e4174105e2f4636571f43bb742de1f4672d1c91740766a1dc3ddfa3d70",
+      "gitBlob": "c8dfad109accb402df43fe8d84e775fa78b4b37c",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/auth-config.ts"
+    },
+    {
+      "path": "lib/auth.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 9215,
+      "sha256": "9046b8252bc8d9ca7f31a4a5326b53bbdf9b945783654312c27283cc7f258c85",
+      "gitBlob": "9d1c941206f4ebc4d187ab8f17cd762740c78d94",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/auth.ts"
+    },
+    {
+      "path": "lib/desktop-discovery.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 2073,
+      "sha256": "086b7d6636870e07a523bc4b0452ca1bb4232082a46295fe7f78def29738ee6c",
+      "gitBlob": "6e03b50e8023bedec7f2ce3ed0d0f245dc0cf281",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/desktop-discovery.ts"
+    },
+    {
+      "path": "app/api/desktop/discovery/route.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 886,
+      "sha256": "559f613ad1c8cb8d699c2cedb23380a4b4192ddefa59b116fa75e95d6309ded8",
+      "gitBlob": "f1b56e6e8209fd0b8466768659c839ddc5a82db6",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/app/api/desktop/discovery/route.ts"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 60827,
+      "sha256": "93e60a30dbfbc8049815adeb50b474cc4b682198b094a845c54e36ec20c9046c",
+      "gitBlob": "9c1df72bf6ea94fc7bc2a14f8097432abd3c3944",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/coordinator/store.ts"
+    },
+    {
+      "path": "lib/coordinator/model-ready.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 1934,
+      "sha256": "a3c11f5eea106bb2c5c4ec44f8e9ccfce5b2e4782171bd64aa794fb560b566e7",
+      "gitBlob": "cd6ecaaaf847ca8619e55d7d42133c9214b07392",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/coordinator/model-ready.ts"
+    },
+    {
+      "path": "lib/coordinator/wake.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 8321,
+      "sha256": "765e80cbbb2d9608eed93a7df49209781fb09c5cf3650ed5f61af9eecbb2f871",
+      "gitBlob": "bf5fbf4786fa7beef8deb43d9e66ed84e2062888",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/coordinator/wake.ts"
+    },
+    {
+      "path": "lib/default-model-config.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 1068,
+      "sha256": "50d1be7901a67b9af377556be78ba1c9d08c75fa5d2f16d148e5b4311532cdb1",
+      "gitBlob": "5ee3874a339af890c576f0b4a5c3051fb271be10",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/default-model-config.ts"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "gitBlob": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/app/actions/coordinator.ts"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 12900,
+      "sha256": "96628ac3061555276d0d77e294d1da1a509eb5a41561f51cb38b6539afb1dcea",
+      "gitBlob": "f437af769b9d5ab11b43d63513679bc90f04564a",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/app/actions/task-runs.ts"
+    },
+    {
+      "path": "lib/posthog-server.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 4522,
+      "sha256": "edd02fc5657996e0ef2664edd8cae40b8882aeff8ebf65f8f913fa3313cb442b",
+      "gitBlob": "73eb415cabc5d2851a1d64fd3be7312c984e0762",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/posthog-server.ts"
+    },
+    {
+      "path": "lib/posthog-config.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 358,
+      "sha256": "cd149157b6e4f2ed3c524e512274b9181858889a1dceca8eab5f38d429560545",
+      "gitBlob": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/posthog-config.ts"
+    },
+    {
+      "path": "lib/feature-flags.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 3609,
+      "sha256": "d09c4fce9ae584d59121f7140a19cb43de2f418d3ce937b25fd99949b840167f",
+      "gitBlob": "e091b03f5376e24e94210d5c2c1660f81450ea22",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/feature-flags.ts"
+    },
+    {
+      "path": "lib/deployment-switches.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 14890,
+      "sha256": "fb3b81f9cdff4b5d19b83878bdeb0accb8d35388b3bfd61f9b714b963065d40b",
+      "gitBlob": "10cdd3fe19da1b426416fe3809095072e6e2260b",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/deployment-switches.ts"
+    },
+    {
+      "path": "lib/builtin-gateway/config.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 1799,
+      "sha256": "b867c942d5a076351716c27657359db817a7d16b638b8c6fcb89915212d82a69",
+      "gitBlob": "6305b4023a5d7dcc22fee92555267b556579ee98",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/builtin-gateway/config.ts"
+    },
+    {
+      "path": "apps/api/builtin-services-module.mjs",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 924,
+      "sha256": "5740d264a1c50f19c5294bcbea578341e48bdfb32cc5431db537831aa6990e27",
+      "gitBlob": "68bd17f54ed56ad01106d47b1099ab6231feddf6",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/apps/api/builtin-services-module.mjs"
+    },
+    {
+      "path": "lib/coordinator/decide.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 7209,
+      "sha256": "77603a6b2a1fad03a1ddc13da4c342c4b2a0b1ea0f5218ef44c9e05049e657e7",
+      "gitBlob": "a250b6e3be0f010641f188a480fb348112f545a5",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/lib/coordinator/decide.ts"
+    },
+    {
+      "path": "workflows/coordinator/finish-turn.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 554,
+      "sha256": "c4c00968cf7dfac1614c00606d6ee2de705402aa47e37c8c18941d150c193b32",
+      "gitBlob": "192467b9790c9e3accc6cedc3b98342d2ffdd6aa",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/workflows/coordinator/finish-turn.ts"
+    },
+    {
+      "path": "workflows/coordinator/workflow.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 15464,
+      "sha256": "096320ad68c821c8abbf90d8b768c94024cecbfa31eca9ddeec63665b5e9f993",
+      "gitBlob": "239886a2be739474ff2de22b24063b8c2d25d247",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/workflows/coordinator/workflow.ts"
+    },
+    {
+      "path": "packages/daemon/src/server-link-http.ts",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 27193,
+      "sha256": "eca7aae81fa23255f748ad32ed970ccc2099b5ec4799ba79e60d9caf61dc0caf",
+      "gitBlob": "ed282904dd1c3ce9867c923f5170a8dfb5539a4e",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/packages/daemon/src/server-link-http.ts"
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 14734,
+      "sha256": "3b5809a3a2f083ec71570e5390ca2ba0f2b3b75ce6601cfad29110ee3bb30e22",
+      "gitBlob": "ab003d0b12686183ad5d1841cb01e8ff97f636d5",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/.github/workflows/desktop.yml"
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 24896,
+      "sha256": "2c3196af7242872ded0a4bea0b961ceb215cb979d4f993e9d54214ac6b8073f6",
+      "gitBlob": "9d3584238bbb5d585763aafe21e5e63bc7e0f192",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/.github/workflows/ui-policy.yml"
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "revision": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "bytes": 10941,
+      "sha256": "ec95a949c17d4f90137e6381c57bff8c4e1413cd5b17cc7c933bc28eb0817a80",
+      "gitBlob": "3779064210353f6e2f4d9b241d44155d4cbb7eea",
+      "url": "https://github.com/alexj11324/Mikka/blob/d75bee79966ff55c881e9f96b73ce51a98fb290c/.github/workflows/web-deploy.yml"
+    },
+    {
+      "path": "app/api/desktop/exchange/route.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 3790,
+      "sha256": "3b6dbcfea54cf6c97ee7350525a33c5fd45293ff70c80859b0a79cbcd375db06",
+      "gitBlob": "c38192f7e111ac11cb064ef71c8c9fce4e444c5c",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/app/api/desktop/exchange/route.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/handler.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 5554,
+      "sha256": "aa60f3b33bfd12eb67f52b6ea241eea10087b732795277f8ce8085c57bb8abba",
+      "gitBlob": "c6e8be5f34099133ab89f1af81eec0727979f47a",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/desktop-rpc/handler.ts"
+    },
+    {
+      "path": "apps/api/nitro.config.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 2758,
+      "sha256": "4edaddcdfa6c66fcf658060a3277d4278e8e642fab999f65c5dfbf8534948f44",
+      "gitBlob": "e14f47be902e7e29c2169c8e86bca25092e2c949",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/apps/api/nitro.config.ts"
+    },
+    {
+      "path": "apps/api/workflow-development-aliases.mjs",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 3774,
+      "sha256": "744e8b087cc08ab692c48948b09bbf7c9def0cdcf87d84e212f92ea150166c10",
+      "gitBlob": "eb42c3a59f020fd9c7423834f7ce9301fd0b5885",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/apps/api/workflow-development-aliases.mjs"
+    },
+    {
+      "path": "lib/posthog-server.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 3399,
+      "sha256": "50be94c70ee32aa370e64e88f5e594d47e214aaa238edb93e1160bd977ed4b84",
+      "gitBlob": "f6bcaabfdb7aca4e42cc1f4cf66bada51354b566",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/posthog-server.ts"
+    },
+    {
+      "path": "lib/coordinator/decide.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 8557,
+      "sha256": "ec705740098bd78370e983389c8e47b6dc2a7a17fb5304b11c465944cac6dc84",
+      "gitBlob": "32d9628a01c7607015e6e4b23a2a15676339d791",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/coordinator/decide.ts"
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 4360,
+      "sha256": "c0c6ced12ec5f1f2f406221b1dd94b9bf2af72c130bc706e615beab2f774b168",
+      "gitBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/tracing/context.ts"
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 13601,
+      "sha256": "f1edfcbef075f6974c5c2ccf32c7ef1a50ce731a6209032f4c84d798949a40d7",
+      "gitBlob": "6e84dc28b8e0639e35029854f84873c84049d718",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/tracing/ai.ts"
+    },
+    {
+      "path": "lib/tracing/logs.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 4312,
+      "sha256": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d",
+      "gitBlob": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/tracing/logs.ts"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 7106,
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "gitBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/tracing/node.ts"
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 3376,
+      "sha256": "b26acae1c89e8a74a6aae8769ffbab32af72c72250b239711b0786f160f65856",
+      "gitBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/lib/tracing/config.ts"
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 5523,
+      "sha256": "eb882501a08c02178edb4d2bd1293316923f5bca18210bbac43081f41fdb3acc",
+      "gitBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/packages/protocol/src/trace-context.ts"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 5484,
+      "sha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+      "gitBlob": "868622ca05b4bf700d8bc0265c3fe0757b2c1770",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/apps/desktop/src/renderer/read-batch.ts"
+    },
+    {
+      "path": "package.json",
+      "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "bytes": 74101,
+      "sha256": "eb793c95e4996334b5dae60fd0da6bcad1fc8c9066d457d10dc258d29d63bc87",
+      "gitBlob": "0cef0bf01d4773b521a62df0f096149bda48cebe",
+      "url": "https://github.com/alexj11324/Mikka/blob/e7a1a267335604004586f88e6b530c51b0da286d/package.json"
+    }
+  ],
+  "privacy": {
+    "containsRawLogs": false,
+    "containsRequestBodies": false,
+    "containsSqlText": false,
+    "containsCredentials": false,
+    "containsPersonalAccountIdentifiers": false,
+    "fixedSourceIdentifiersAndPublicUrlsOnly": true
+  }
+}

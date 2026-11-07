@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "run": 42389969388,
+  "attempt": 1,
+  "artifact": 13581421063,
+  "zipBytes": 13549,
+  "zipSha256": "786b9664070d9e771534e96a57ae7889597235095d4ff3cd21eb60b7bb9a4145",
+  "zipRetained": false,
+  "signedUrlPersisted": false,
+  "allOriginalJsonPreserved": true,
+  "files": [
+    {
+      "path": "artifact-receipt.json",
+      "bytes": 1103,
+      "sha256": "d978f1c5a478c0d0ffff1154bf08bed0b82b9d4c5a0b014eb5a7b5972689e078",
+      "gitBlob": "bfe937725f7779d3e9d467d46395bd578d0be2fe"
+    },
+    {
+      "path": "desktop-query-decomposition.json",
+      "bytes": 135603,
+      "sha256": "4cef0114bf5b809b2410ab5dd9596849d3369748a89bb02f556eeacd13217364",
+      "gitBlob": "c77bda88593aea5f4f267a34d749146c5b74faa7"
+    },
+    {
+      "path": "runner-receipt.json",
+      "bytes": 1687,
+      "sha256": "08a045284f36a2e6e392badd33884c3b139bf0fcff459c764fb627a8bd89b2ae",
+      "gitBlob": "9b6a46593ead3a2a80f07558a01060023770f9fc"
+    }
+  ]
+}

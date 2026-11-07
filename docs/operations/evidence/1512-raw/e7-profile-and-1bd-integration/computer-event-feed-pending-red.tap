@@ -1,0 +1,116 @@
+TAP version 13
+# Subtest: cursor pages preserve bigint precision and reject regressions, non-progressing continuations and oversized batches
+ok 1 - cursor pages preserve bigint precision and reject regressions, non-progressing continuations and oversized batches
+  ---
+  duration_ms: 1.470731
+  type: 'test'
+  ...
+# Subtest: one shared feed drains bounded pages, then reads only after invalidation and resumes its cursor on remount
+ok 2 - one shared feed drains bounded pages, then reads only after invalidation and resumes its cursor on remount
+  ---
+  duration_ms: 11.421018
+  type: 'test'
+  ...
+# Subtest: a burst during an in-flight read coalesces into one catch-up and never fetches concurrently
+ok 3 - a burst during an in-flight read coalesces into one catch-up and never fetches concurrently
+  ---
+  duration_ms: 1.300805
+  type: 'test'
+  ...
+# Subtest: hidden tabs fetch nothing, abort an active read and ignore its late result before foreground catch-up
+ok 4 - hidden tabs fetch nothing, abort an active read and ignore its late result before foreground catch-up
+  ---
+  duration_ms: 3.77472
+  type: 'test'
+  ...
+# Subtest: failed reads retry at 60 seconds, a notification fetches sooner, and hiding cancels retry
+ok 5 - failed reads retry at 60 seconds, a notification fetches sooner, and hiding cancels retry
+  ---
+  duration_ms: 1.17223
+  type: 'test'
+  ...
+# Subtest: a required page refresh aborts data reads and visibility or new subscribers cannot restart them
+ok 6 - a required page refresh aborts data reads and visibility or new subscribers cannot restart them
+  ---
+  duration_ms: 0.852888
+  type: 'test'
+  ...
+# Subtest: a late feed read committed after the actual channel boundary covers its queued catch-up
+ok 7 - a late feed read committed after the actual channel boundary covers its queued catch-up
+  ---
+  duration_ms: 4.239703
+  type: 'test'
+  ...
+# Subtest: the actual channel still catches up a feed read begun before socket open
+ok 8 - the actual channel still catches up a feed read begun before socket open
+  ---
+  duration_ms: 1.389959
+  type: 'test'
+  ...
+# Subtest: a newer actual live push is not covered by an earlier completed feed read
+ok 9 - a newer actual live push is not covered by an earlier completed feed read
+  ---
+  duration_ms: 1.606866
+  type: 'test'
+  ...
+# Subtest: a partially accepted pagination wave cannot cover a boundary until the final page succeeds
+ok 10 - a partially accepted pagination wave cannot cover a boundary until the final page succeeds
+  ---
+  duration_ms: 0.847049
+  type: 'test'
+  ...
+# Subtest: reusing an older boundary cannot erase a newer pending wave or cancel a failed-read retry
+ok 11 - reusing an older boundary cannot erase a newer pending wave or cancel a failed-read retry
+  ---
+  duration_ms: 1.072389
+  type: 'test'
+  ...
+# Subtest: a remounted generation cannot use a previous generation successful read as proof
+ok 12 - a remounted generation cannot use a previous generation successful read as proof
+  ---
+  duration_ms: 0.958217
+  type: 'test'
+  ...
+# Subtest: a slow late initial read covers the actual catch-up queued while its response was pending
+not ok 13 - a slow late initial read covers the actual catch-up queued while its response was pending
+  ---
+  duration_ms: 4.641168
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/lib/computer/event-stream.test.ts:1:13046'
+  failureType: 'testCodeFailure'
+  error: |-
+    full acceptance covers the older pending obligation without a second request
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/computer/event-stream.test.ts:327:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: pending boundaries retain the newest obligation and any forced read dominates older after values
+ok 14 - pending boundaries retain the newest obligation and any forced read dominates older after values
+  ---
+  duration_ms: 1.799307
+  type: 'test'
+  ...
+# Subtest: pending catch-up remains unsatisfied when a partial page wave fails or returns an invalid final page
+ok 15 - pending catch-up remains unsatisfied when a partial page wave fails or returns an invalid final page
+  ---
+  duration_ms: 1.885968
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 14
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 376.135026

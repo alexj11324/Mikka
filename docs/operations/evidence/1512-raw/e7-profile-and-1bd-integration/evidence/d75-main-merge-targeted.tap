@@ -1,0 +1,521 @@
+TAP version 13
+# Subtest: literal trailing slashes match installed Next redirects before machine dispatch for GET and POST
+ok 1 - literal trailing slashes match installed Next redirects before machine dispatch for GET and POST
+  ---
+  duration_ms: 13.679607
+  type: 'test'
+  ...
+# Subtest: page locale uses the same last valid cookie as the installed SDK
+ok 2 - page locale uses the same last valid cookie as the installed SDK
+  ---
+  duration_ms: 5.879448
+  type: 'test'
+  ...
+# Subtest: page-only locale and legacy redirects retain query while machine paths never get SPA HTML
+ok 3 - page-only locale and legacy redirects retain query while machine paths never get SPA HTML
+  ---
+  duration_ms: 1.285772
+  type: 'test'
+  ...
+# Subtest: security projection preserves body stream, raw cookies, status and route-specific headers
+ok 4 - security projection preserves body stream, raw cookies, status and route-specific headers
+  ---
+  duration_ms: 1.366333
+  type: 'test'
+  ...
+# Subtest: token pages keep private headers in both locales; document requests alone update locale cookie
+ok 5 - token pages keep private headers in both locales; document requests alone update locale cookie
+  ---
+  duration_ms: 1.169435
+  type: 'test'
+  ...
+# Subtest: the official Vercel adapter preserves configured HTTPS authority for the existing strict RPC guard
+ok 6 - the official Vercel adapter preserves configured HTTPS authority for the existing strict RPC guard
+  ---
+  duration_ms: 97.326495
+  type: 'test'
+  ...
+# Subtest: the unadapted official Node adapter reproduces the HTTPS reverse-proxy RPC rejection
+ok 7 - the unadapted official Node adapter reproduces the HTTPS reverse-proxy RPC rejection
+  ---
+  duration_ms: 16.033451
+  type: 'test'
+  ...
+# Subtest: raw Host and proxy conflicts cannot add an authority; Origin remains independently enforced
+ok 8 - raw Host and proxy conflicts cannot add an authority; Origin remains independently enforced
+  ---
+  duration_ms: 27.289468
+  type: 'test'
+  ...
+# Subtest: deployment-local Workflow ingress retains its own HTTPS URL, raw body and real waitUntil lifetime
+ok 9 - deployment-local Workflow ingress retains its own HTTPS URL, raw body and real waitUntil lifetime
+  ---
+  duration_ms: 13.321736
+  type: 'test'
+  ...
+# Subtest: legacy domain remains a fixed redirect without reaching application data
+ok 10 - legacy domain remains a fixed redirect without reaching application data
+  ---
+  duration_ms: 10.197327
+  type: 'test'
+  ...
+# Subtest: self-hosted Node accepts only its configured HTTPS authority behind a proxy
+ok 11 - self-hosted Node accepts only its configured HTTPS authority behind a proxy
+  ---
+  duration_ms: 13.937505
+  type: 'test'
+  ...
+# Subtest: authority registration is Vercel-production-only and configuration cannot contain arbitrary URL parts
+ok 12 - authority registration is Vercel-production-only and configuration cannot contain arbitrary URL parts
+  ---
+  duration_ms: 1.118249
+  type: 'test'
+  ...
+# Subtest: actual packaged bootstrap patches pg before application import and preserves Vercel function contract
+ok 13 - actual packaged bootstrap patches pg before application import and preserves Vercel function contract
+  ---
+  duration_ms: 320.611971
+  type: 'test'
+  ...
+# Subtest: unexpected generated Vercel handler fails instead of silently changing runtime semantics
+ok 14 - unexpected generated Vercel handler fails instead of silently changing runtime semantics
+  ---
+  duration_ms: 2.796553
+  type: 'test'
+  ...
+# Subtest: native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds
+ok 15 - native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds
+  ---
+  duration_ms: 551.317886
+  type: 'test'
+  ...
+# ✓ Compiled workflows in 371ms (5 steps, 1 workflow)
+# Subtest: the actual Workflow LocalBuilder output loads natively and answers GET/HEAD health after the API alias pass
+ok 16 - the actual Workflow LocalBuilder output loads natively and answers GET/HEAD health after the API alias pass
+  ---
+  duration_ms: 1571.195223
+  type: 'test'
+  ...
+# Subtest: production builds register no extra pass; dev registers after both SDK build phases
+ok 17 - production builds register no extra pass; dev registers after both SDK build phases
+  ---
+  duration_ms: 0.671534
+  type: 'test'
+  ...
+# Subtest: community trusts the exact mobile scheme only when configured; cloud retains its current mobile default
+ok 18 - community trusts the exact mobile scheme only when configured; cloud retains its current mobile default
+  ---
+  duration_ms: 5.116396
+  type: 'test'
+  ...
+# Subtest: community cannot borrow the hosted OAuth proxy or enable one with a partial setting
+ok 19 - community cannot borrow the hosted OAuth proxy or enable one with a partial setting
+  ---
+  duration_ms: 0.896664
+  type: 'test'
+  ...
+# Subtest: real Better Auth uses each community server OAuth callback without the hosted proxy
+ok 20 - real Better Auth uses each community server OAuth callback without the hosted proxy
+  ---
+  duration_ms: 83.14665
+  type: 'test'
+  ...
+# Subtest: community email sessions authenticate locally and foreign browser origins remain refused
+ok 21 - community email sessions authenticate locally and foreign browser origins remain refused
+  ---
+  duration_ms: 105.939369
+  type: 'test'
+  ...
+# Subtest: community production permits its exact loopback origin without allowing cleartext network origins
+ok 22 - community production permits its exact loopback origin without allowing cleartext network origins
+  ---
+  duration_ms: 0.460326
+  type: 'test'
+  ...
+# Subtest: Preview chooses its deployment origin and keeps explicit configuration authoritative
+ok 23 - Preview chooses its deployment origin and keeps explicit configuration authoritative
+  ---
+  duration_ms: 0.196276
+  type: 'test'
+  ...
+# Subtest: trusts exact configured cloud origins in production and validates origin syntax
+ok 24 - trusts exact configured cloud origins in production and validates origin syntax
+  ---
+  duration_ms: 0.405012
+  type: 'test'
+  ...
+# Subtest: proxy requires both explicit settings and an HTTPS hub origin
+ok 25 - proxy requires both explicit settings and an HTTPS hub origin
+  ---
+  duration_ms: 0.437921
+  type: 'test'
+  ...
+# Subtest: development and hosted CI allow only HTTP loopback origins; the proxy hub always requires HTTPS
+ok 26 - development and hosted CI allow only HTTP loopback origins; the proxy hub always requires HTTPS
+  ---
+  duration_ms: 0.912839
+  type: 'test'
+  ...
+# Subtest: local test mode allows HTTP loopback origins only with a loopback *_e2e database
+ok 27 - local test mode allows HTTP loopback origins only with a loopback *_e2e database
+  ---
+  duration_ms: 0.809262
+  type: 'test'
+  ...
+# Subtest: real Better Auth Preview initiation sends Google to the stable hub callback
+ok 28 - real Better Auth Preview initiation sends Google to the stable hub callback
+  ---
+  duration_ms: 15.896775
+  type: 'test'
+  ...
+# Subtest: local development can initiate Google login directly or through the fixed hub
+ok 29 - local development can initiate Google login directly or through the fixed hub
+  ---
+  duration_ms: 6.408067
+  type: 'test'
+  ...
+# Subtest: real Better Auth rejects foreign origins and lookalike callback hosts
+ok 30 - real Better Auth rejects foreign origins and lookalike callback hosts
+  ---
+  duration_ms: 3.472223
+  type: 'test'
+  ...
+# Subtest: Vercel branch aliases can sign out an authenticated session without trusting other deployments
+ok 31 - Vercel branch aliases can sign out an authenticated session without trusting other deployments
+  ---
+  duration_ms: 100.656176
+  type: 'test'
+  ...
+# Subtest: v0 hosts and local development complete signed proxy login through a hub that trusts only itself
+ok 32 - v0 hosts and local development complete signed proxy login through a hub that trusts only itself
+  ---
+  duration_ms: 65.109639
+  type: 'test'
+  ...
+# Subtest: local test-account mode allows HTTP loopback only with its switch and a loopback *_e2e database
+ok 33 - local test-account mode allows HTTP loopback only with its switch and a loopback *_e2e database
+  ---
+  duration_ms: 0.906869
+  type: 'test'
+  ...
+# (node:191) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:191) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: without a server default, a committed inbox write still reaches the per-bot readiness check
+ok 34 - without a server default, a committed inbox write still reaches the per-bot readiness check
+  ---
+  duration_ms: 16.448258
+  type: 'test'
+  ...
+# Subtest: already-committed writes notify; delivered or background events do not queue a wake
+ok 35 - already-committed writes notify; delivered or background events do not queue a wake
+  ---
+  duration_ms: 2.013871
+  type: 'test'
+  ...
+# (node:210) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:210) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: deferred Coordinator consumers release the writer connection while retaining its database
+ok 36 - deferred Coordinator consumers release the writer connection while retaining its database
+  ---
+  duration_ms: 14.683021
+  type: 'test'
+  ...
+# Subtest: community default model needs an administrator-owned complete route
+ok 37 - community default model needs an administrator-owned complete route
+  ---
+  duration_ms: 1.472754
+  type: 'test'
+  ...
+# Subtest: native handoff origin checks work on any exact server origin and reject cross-site browser traffic
+ok 38 - native handoff origin checks work on any exact server origin and reject cross-site browser traffic
+  ---
+  duration_ms: 3.719511
+  type: 'test'
+  ...
+# Subtest: the OAuth callback is a base-path-free API path
+ok 39 - the OAuth callback is a base-path-free API path
+  ---
+  duration_ms: 0.288786
+  type: 'test'
+  ...
+# Subtest: the loopback callback is carried through the return path
+ok 40 - the loopback callback is carried through the return path
+  ---
+  duration_ms: 0.22551
+  type: 'test'
+  ...
+# Subtest: only an unadorned loopback callback is accepted
+ok 41 - only an unadorned loopback callback is accepted
+  ---
+  duration_ms: 0.260754
+  type: 'test'
+  ...
+# Subtest: the desktop state must be URL-safe and bounded
+ok 42 - the desktop state must be URL-safe and bounded
+  ---
+  duration_ms: 0.170408
+  type: 'test'
+  ...
+# Subtest: the OAuth callback URL is absolute and keeps the base path
+ok 43 - the OAuth callback URL is absolute and keeps the base path
+  ---
+  duration_ms: 0.633446
+  type: 'test'
+  ...
+# Subtest: challenge, verifier and code shapes are bounded
+ok 44 - challenge, verifier and code shapes are bounded
+  ---
+  duration_ms: 0.501738
+  type: 'test'
+  ...
+# Subtest: the browser starts the provider the app asked for, and never hands over a web session unseen
+ok 45 - the browser starts the provider the app asked for, and never hands over a web session unseen
+  ---
+  duration_ms: 0.774549
+  type: 'test'
+  ...
+# Subtest: discovery matches the desktop contract without a login or provider credentials
+ok 46 - discovery matches the desktop contract without a login or provider credentials
+  ---
+  duration_ms: 4.662039
+  type: 'test'
+  ...
+# Subtest: only configured sign-in methods and effective mobile trust are advertised
+ok 47 - only configured sign-in methods and effective mobile trust are advertised
+  ---
+  duration_ms: 0.531653
+  type: 'test'
+  ...
+# Subtest: manifest-managed GitHub sign-in can supply its initialized provider status
+ok 48 - manifest-managed GitHub sign-in can supply its initialized provider status
+  ---
+  duration_ms: 0.571993
+  type: 'test'
+  ...
+# Subtest: version negotiation preserves the fixed update error and still returns server capabilities
+ok 49 - version negotiation preserves the fixed update error and still returns server capabilities
+  ---
+  duration_ms: 1.842042
+  type: 'test'
+  ...
+# Subtest: RPC never authenticates a cookie-only, revoked, invalid or delegated token
+ok 50 - RPC never authenticates a cookie-only, revoked, invalid or delegated token
+  ---
+  duration_ms: 6.016625
+  type: 'test'
+  ...
+# Subtest: authenticated bearer wins over foreign cookies and the original action sees its real session
+ok 51 - authenticated bearer wins over foreign cookies and the original action sees its real session
+  ---
+  duration_ms: 4.56925
+  type: 'test'
+  ...
+# Subtest: parallel users retain separate request scopes and original tenant checks
+ok 52 - parallel users retain separate request scopes and original tenant checks
+  ---
+  duration_ms: 1.67514
+  type: 'test'
+  ...
+# Subtest: current and previous versions work and unsupported versions return the fixed update code
+ok 53 - current and previous versions work and unsupported versions return the fixed update code
+  ---
+  duration_ms: 1.947591
+  type: 'test'
+  ...
+# Subtest: closed whitelist rejects arbitrary exports and prototype names before dispatch
+ok 54 - closed whitelist rejects arbitrary exports and prototype names before dispatch
+  ---
+  duration_ms: 1.050597
+  type: 'test'
+  ...
+# Subtest: request attribution records only registry-owned RPC actions without arguments or credentials
+ok 55 - request attribution records only registry-owned RPC actions without arguments or credentials
+  ---
+  duration_ms: 3.038578
+  type: 'test'
+  ...
+# Subtest: all parameters are validated, including extras and malformed nested wire tags
+ok 56 - all parameters are validated, including extras and malformed nested wire tags
+  ---
+  duration_ms: 1.464642
+  type: 'test'
+  ...
+# Subtest: safe session summary omits token, timestamps, network and provider credentials
+ok 57 - safe session summary omits token, timestamps, network and provider credentials
+  ---
+  duration_ms: 0.209566
+  type: 'test'
+  ...
+# Subtest: native header adapter preserves browser authority but strips all bearer cookies
+ok 58 - native header adapter preserves browser authority but strips all bearer cookies
+  ---
+  duration_ms: 0.329307
+  type: 'test'
+  ...
+# Subtest: native bearer requests cannot import another origin or cross-site fetch metadata
+ok 59 - native bearer requests cannot import another origin or cross-site fetch metadata
+  ---
+  duration_ms: 0.733277
+  type: 'test'
+  ...
+# Subtest: registry schemas reject forged authority, malformed nested input and extra arguments
+ok 60 - registry schemas reject forged authority, malformed nested input and extra arguments
+  ---
+  duration_ms: 4.613997
+  type: 'test'
+  ...
+# Subtest: explicit schemas and function map have exactly matching action names
+ok 61 - explicit schemas and function map have exactly matching action names
+  ---
+  duration_ms: 0.862783
+  type: 'test'
+  ...
+# Subtest: billing re-export consumers accept only the existing workspace selector and purchase amounts
+ok 62 - billing re-export consumers accept only the existing workspace selector and purchase amounts
+  ---
+  duration_ms: 0.446364
+  type: 'test'
+  ...
+# Subtest: Coordinator history keeps the current bounded page size and previous two-argument calls
+ok 63 - Coordinator history keeps the current bounded page size and previous two-argument calls
+  ---
+  duration_ms: 0.211108
+  type: 'test'
+  ...
+# Subtest: cached list cursors retain each reader limit, old calls and unique bounded row proofs
+ok 64 - cached list cursors retain each reader limit, old calls and unique bounded row proofs
+  ---
+  duration_ms: 3.591393
+  type: 'test'
+  ...
+# Subtest: cached chat metadata repair is literal, bounded and cannot authorize another reader
+ok 65 - cached chat metadata repair is literal, bounded and cannot authorize another reader
+  ---
+  duration_ms: 0.664794
+  type: 'test'
+  ...
+# Subtest: cached detail and bootstrap accept identity-free selectors while preserving legacy bootstrap
+ok 66 - cached detail and bootstrap accept identity-free selectors while preserving legacy bootstrap
+  ---
+  duration_ms: 0.264639
+  type: 'test'
+  ...
+# Subtest: concurrent owner-wide readers reuse their actual personal home only within the batch
+ok 67 - concurrent owner-wide readers reuse their actual personal home only within the batch
+  ---
+  duration_ms: 1.796583
+  type: 'test'
+  ...
+# Subtest: different Live kinds share one revision query before either consumer reads its data
+ok 68 - different Live kinds share one revision query before either consumer reads its data
+  ---
+  duration_ms: 7.118468
+  type: 'test'
+  ...
+# Subtest: owner observations are separate for parallel batches, owners and database authorities
+ok 69 - owner observations are separate for parallel batches, owners and database authorities
+  ---
+  duration_ms: 0.547617
+  type: 'test'
+  ...
+# Subtest: later reads in one batch keep the earlier revision, while the next batch reads the new revision
+ok 70 - later reads in one batch keep the earlier revision, while the next batch reads the new revision
+  ---
+  duration_ms: 0.458893
+  type: 'test'
+  ...
+# Subtest: a missing or failed revision never becomes fabricated proof and does not poison the next request
+ok 71 - a missing or failed revision never becomes fabricated proof and does not poison the next request
+  ---
+  duration_ms: 0.64231
+  type: 'test'
+  ...
+# Subtest: ordinary revision readers and different database scopes remain independent
+ok 72 - ordinary revision readers and different database scopes remain independent
+  ---
+  duration_ms: 0.484591
+  type: 'test'
+  ...
+# Subtest: bound after-work cannot reuse an already completed batch authority observation
+ok 73 - bound after-work cannot reuse an already completed batch authority observation
+  ---
+  duration_ms: 0.289848
+  type: 'test'
+  ...
+# Subtest: notification target resolution never inherits an earlier list-read home, even inside the batch
+ok 74 - notification target resolution never inherits an earlier list-read home, even inside the batch
+  ---
+  duration_ms: 0.219481
+  type: 'test'
+  ...
+# Subtest: the ordinary version-1 RPC preserves batch order, original results and wire values
+ok 75 - the ordinary version-1 RPC preserves batch order, original results and wire values
+  ---
+  duration_ms: 10.812656
+  type: 'test'
+  ...
+# Subtest: every item is validated before any original action runs, including nested and mutating calls
+ok 76 - every item is validated before any original action runs, including nested and mutating calls
+  ---
+  duration_ms: 7.943375
+  type: 'test'
+  ...
+# Subtest: each business failure keeps the single-action HTTP mapping without exposing its error message
+ok 77 - each business failure keeps the single-action HTTP mapping without exposing its error message
+  ---
+  duration_ms: 1.214474
+  type: 'test'
+  ...
+# Subtest: thrown and returned authRequired both preserve Main HTTP 401 after all item work settles
+ok 78 - thrown and returned authRequired both preserve Main HTTP 401 after all item work settles
+  ---
+  duration_ms: 1.41707
+  type: 'test'
+  ...
+# Subtest: parallel batch requests retain their real session and each original ownership check
+ok 79 - parallel batch requests retain their real session and each original ownership check
+  ---
+  duration_ms: 1.943214
+  type: 'test'
+  ...
+# Subtest: batch readers share the API request memo while later requests authorize a fresh workspace view
+ok 80 - batch readers share the API request memo while later requests authorize a fresh workspace view
+  ---
+  duration_ms: 1.443249
+  type: 'test'
+  ...
+# Subtest: a person flag is on only when PostHog answers exactly true
+ok 81 - a person flag is on only when PostHog answers exactly true
+  ---
+  duration_ms: 1.205741
+  type: 'test'
+  ...
+# Subtest: an unavailable PostHog reads off: no client, an error or a timeout
+ok 82 - an unavailable PostHog reads off: no client, an error or a timeout
+  ---
+  duration_ms: 11.208525
+  type: 'test'
+  ...
+# Subtest: without a project, deployed subscription routes work and billing or experiments stay off
+ok 83 - without a project, deployed subscription routes work and billing or experiments stay off
+  ---
+  duration_ms: 0.389599
+  type: 'test'
+  ...
+# Subtest: a flag value is reused for a few minutes per person and key
+ok 84 - a flag value is reused for a few minutes per person and key
+  ---
+  duration_ms: 0.451001
+  type: 'test'
+  ...
+1..84
+# tests 84
+# suites 0
+# pass 84
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7869.453092

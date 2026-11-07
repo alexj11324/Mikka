@@ -1,0 +1,162 @@
+TAP version 13
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] start
+# Subtest: runner bounds concurrency and still reports every suite when one fails
+ok 1 - runner bounds concurrency and still reports every suite when one fails
+  ---
+  duration_ms: 34.736299
+  type: 'test'
+  ...
+# Subtest: a suite whose clone failed or is missing never runs, and the gate fails
+ok 2 - a suite whose clone failed or is missing never runs, and the gate fails
+  ---
+  duration_ms: 2.759518
+  type: 'test'
+  ...
+# Subtest: clone names stay loopback *_e2e databases within the identifier limit
+ok 3 - clone names stay loopback *_e2e databases within the identifier limit
+  ---
+  duration_ms: 0.57603
+  type: 'test'
+  ...
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node stderr] err
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node stdout] out
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] exit code=3 signal=none
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] close code=3 signal=none
+# [db-runner /nonexistent/command lifecycle] start
+# Subtest: the default runner buffers a suite's output and reports its exit status
+ok 4 - the default runner buffers a suite's output and reports its exit status
+  ---
+  duration_ms: 95.699671
+  type: 'test'
+  ...
+# [db-runner /nonexistent/command lifecycle] close code=-2 signal=none
+# ::error::Missing/invalid E2E_DATABASE_URL
+# Subtest: the CLI streams bounded attributed progress before a suite exits and retains its complete failure
+ok 5 - the CLI streams bounded attributed progress before a suite exits and retains its complete failure
+  ---
+  duration_ms: 218.222408
+  type: 'test'
+  ...
+# Subtest: the CLI drains large failed-suite diagnostics before exiting with the failure status
+ok 6 - the CLI drains large failed-suite diagnostics before exiting with the failure status
+  ---
+  duration_ms: 259.980513
+  type: 'test'
+  ...
+# Subtest: runner validates all expected and discovered suites before sharding and before subprocesses
+ok 7 - runner validates all expected and discovered suites before sharding and before subprocesses
+  ---
+  duration_ms: 1.78742
+  type: 'test'
+  ...
+# Subtest: runner rejects invalid shards before execution and preserves per-shard summary failures
+ok 8 - runner rejects invalid shards before execution and preserves per-shard summary failures
+  ---
+  duration_ms: 3.9785
+  type: 'test'
+  ...
+# Subtest: parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions
+ok 9 - parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions
+  ---
+  duration_ms: 0.41681
+  type: 'test'
+  ...
+# Subtest: only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess
+ok 10 - only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess
+  ---
+  duration_ms: 0.497061
+  type: 'test'
+  ...
+# Subtest: feature inventory fails on deleted suite, removed script or zero enrollment
+ok 11 - feature inventory fails on deleted suite, removed script or zero enrollment
+  ---
+  duration_ms: 0.648399
+  type: 'test'
+  ...
+# Subtest: discovers every present pg/DB suite and rejects unregistered or ambiguous files
+ok 12 - discovers every present pg/DB suite and rejects unregistered or ambiguous files
+  ---
+  duration_ms: 0.47694
+  type: 'test'
+  ...
+# Subtest: type-only pg imports do not enroll source-only tests as database suites
+ok 13 - type-only pg imports do not enroll source-only tests as database suites
+  ---
+  duration_ms: 0.36362
+  type: 'test'
+  ...
+# Subtest: self-managed suites are excluded only with a reason and a live dedicated runner
+ok 14 - self-managed suites are excluded only with a reason and a live dedicated runner
+  ---
+  duration_ms: 0.38393
+  type: 'test'
+  ...
+# Subtest: dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests
+ok 15 - dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests
+  ---
+  duration_ms: 0.727489
+  type: 'test'
+  ...
+# Subtest: real-driver offline exclusions require the actual source guard and the explicit pure script
+ok 16 - real-driver offline exclusions require the actual source guard and the explicit pure script
+  ---
+  duration_ms: 0.483831
+  type: 'test'
+  ...
+# Subtest: offline guard must be on the same step that runs the guarded file (GM3)
+ok 17 - offline guard must be on the same step that runs the guarded file (GM3)
+  ---
+  duration_ms: 0.99325
+  type: 'test'
+  ...
+# Subtest: live database authentication schema inspection finishes before temporary-schema fixtures start
+ok 18 - live database authentication schema inspection finishes before temporary-schema fixtures start
+  ---
+  duration_ms: 13.047187
+  type: 'test'
+  ...
+# Subtest: test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall
+ok 19 - test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall
+  ---
+  duration_ms: 8.126926
+  type: 'test'
+  ...
+# Subtest: offline guard import is resolved relative to the suite file
+ok 20 - offline guard import is resolved relative to the suite file
+  ---
+  duration_ms: 0.304499
+  type: 'test'
+  ...
+# Subtest: this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates
+ok 21 - this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates
+  ---
+  duration_ms: 556.271561
+  type: 'test'
+  ...
+# Subtest: self-improvement DB suite stays mandatory when its feature exists
+ok 22 - self-improvement DB suite stays mandatory when its feature exists
+  ---
+  duration_ms: 0.306874
+  type: 'test'
+  ...
+# Subtest: isolated fixture databases reject application targets before I/O
+ok 23 - isolated fixture databases reject application targets before I/O
+  ---
+  duration_ms: 18.738614
+  type: 'test'
+  ...
+# Subtest: isolated fixture databases create distinct empty databases and close admin pools on success or failure
+ok 24 - isolated fixture databases create distinct empty databases and close admin pools on success or failure
+  ---
+  duration_ms: 1.115675
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1417.990876

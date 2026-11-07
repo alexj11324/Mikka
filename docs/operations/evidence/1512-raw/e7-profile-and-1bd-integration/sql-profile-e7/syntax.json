@@ -1,0 +1,42 @@
+[
+  {
+    "path": "artifact.mjs",
+    "exitCode": 0
+  },
+  {
+    "path": "driver.mjs",
+    "exitCode": 0
+  },
+  {
+    "path": "driver.test.mjs",
+    "exitCode": 0
+  },
+  {
+    "path": "metrics/db-metrics.cjs",
+    "exitCode": 0
+  },
+  {
+    "path": "metrics/db-query-operations.cjs",
+    "exitCode": 0
+  },
+  {
+    "path": "metrics/db-query-unattributed-sources.cjs",
+    "exitCode": 0
+  },
+  {
+    "path": "metrics/lifecycle-query-counts.mjs",
+    "exitCode": 0
+  },
+  {
+    "path": "projection.mjs",
+    "exitCode": 0
+  },
+  {
+    "path": "projection.test.mjs",
+    "exitCode": 0
+  },
+  {
+    "path": "reads.mjs",
+    "exitCode": 0
+  }
+]

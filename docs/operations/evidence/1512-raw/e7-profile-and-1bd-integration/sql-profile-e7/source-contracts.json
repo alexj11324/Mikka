@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "sourceHead": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "sourceTree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "compiledRevision": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "status": "prepared_not_executed",
+  "files": [
+    {
+      "path": "app/api/desktop/begin/route.ts",
+      "bytes": 2009,
+      "sha256": "2283d4669e828112d3a79998e48fb313fa125be104300d514f65e5c4dc0eebaa",
+      "gitBlob": "f7a792a287cfecbff6a47e25e27d36a0d6b41705"
+    },
+    {
+      "path": "app/api/desktop/return/route.ts",
+      "bytes": 3441,
+      "sha256": "0dc038c8958b0a797862999d4fd20ea4ad8c34280e0070c8e293f16b3cd701da",
+      "gitBlob": "4b4c6b3a7f0455d09475ffc71047c40f3a23bf3f"
+    },
+    {
+      "path": "app/api/desktop/exchange/route.ts",
+      "bytes": 3790,
+      "sha256": "3b6dbcfea54cf6c97ee7350525a33c5fd45293ff70c80859b0a79cbcd375db06",
+      "gitBlob": "c38192f7e111ac11cb064ef71c8c9fce4e444c5c"
+    },
+    {
+      "path": "app/api/computer/events/route.ts",
+      "bytes": 1722,
+      "sha256": "c307052c163c79d60f662bfdcd3ba56681c36289ffbe16c3a4fc42429d70f7d9",
+      "gitBlob": "141f888308ba4a36a4ebed3c099407ab3a4eaf30"
+    },
+    {
+      "path": "app/api/agent/sessions/route.ts",
+      "bytes": 1248,
+      "sha256": "55b1ae203c510c1800a711587b1341aaa706c0958b1e8eef2345a6498ffe3af6",
+      "gitBlob": "593cb8713e3fff10004ac44f3f144393c4d2d1c1"
+    },
+    {
+      "path": "lib/agent-store.ts",
+      "bytes": 2530,
+      "sha256": "f76567073a53586e8b6f749cd222b8420e7d79803d5128656d9a4581cc9617c9",
+      "gitBlob": "d9144a32d45bb9bf9fdb33efdb49217f7408e3a8"
+    },
+    {
+      "path": "app/api/workspace/route.ts",
+      "bytes": 1479,
+      "sha256": "524b229c3d61c626d88a4f39149e300b55f219df94b3d99f559fe3ae9514751f",
+      "gitBlob": "10c6f56fc11e998e4adcf4602066dcba10e331b2"
+    },
+    {
+      "path": "app/api/workspace/switcher/route.ts",
+      "bytes": 1234,
+      "sha256": "107c80be7d00666dae2c73ae2031540af53d993f8f2e033b9c34879808bc389b",
+      "gitBlob": "91b864094d0f6527ddedef2c3a8da6ac6cb3e4ba"
+    },
+    {
+      "path": "lib/workspace-switcher.ts",
+      "bytes": 1585,
+      "sha256": "1f65374c875b22f4dcce1af7f5014c8938dbf09f2da3d40a98839093b10e870b",
+      "gitBlob": "19020448541943213051a1176d6b5b86b12f3ec6"
+    },
+    {
+      "path": "app/api/settings/[read]/route.ts",
+      "bytes": 5533,
+      "sha256": "17806db00cdde5941c101a2d7b50fbf056fd14703166786fd04245818dc33d8e",
+      "gitBlob": "2735cd2f2ed63b4c755554cdfb5c002dc6be38e4"
+    },
+    {
+      "path": "app/actions/preferences.ts",
+      "bytes": 4396,
+      "sha256": "36d031cf21c1a93bd98b14de5f6447194b8c344cc706cbe322ddf1a4bd4d41b6",
+      "gitBlob": "fde394718fe88ddaed31f2a5256630ea3e8cb647"
+    },
+    {
+      "path": "lib/preferences.ts",
+      "bytes": 4288,
+      "sha256": "9bef69646f2ed2f9669a63b08eb7b6f80899aad007bcab674b6d9b90555d8c80",
+      "gitBlob": "5076bfec71434bba9c8d345ab32335eafe00285b"
+    },
+    {
+      "path": "app/api/devices/enrollment/route.ts",
+      "bytes": 1688,
+      "sha256": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa",
+      "gitBlob": "6485b75409ad1927b721645119db28647de2ee35"
+    },
+    {
+      "path": "app/api/conversations/route.ts",
+      "bytes": 291,
+      "sha256": "3d18fce6ff0759821f8482a5a9cf4cdcecaf312e7439c45ba47a10b0bac99118",
+      "gitBlob": "1b8c25ead7ae3ede7795c43537f8890af1430bdf"
+    },
+    {
+      "path": "lib/group-conversations-store.ts",
+      "bytes": 22566,
+      "sha256": "07ca994337589a23f73336c2b0a074573fba30853f1cb7a82dfed0a93eab0c1e",
+      "gitBlob": "243079b530d6e189cbd7103e81ed7c2b19636aa6"
+    },
+    {
+      "path": "app/api/pending-actions/route.ts",
+      "bytes": 990,
+      "sha256": "eaa1ecacbfda5731507987c914c29672a539f728ad055b23bc24a54594c15ba8",
+      "gitBlob": "cf225d2ab0f918928bf87baae7b37763acdd9f85"
+    },
+    {
+      "path": "app/actions/execution-settings.ts",
+      "bytes": 3402,
+      "sha256": "f82fc11fda38f8817c260c77a42d06a768b2bbfcfb590463c32111ceffcd0329",
+      "gitBlob": "3b27222dee1b8b84e4b74581e0827de07fc4de8d"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 20499,
+      "sha256": "ac564db188c004fb76408cc4e52028353ff93672d0bca030219553e3acdecd63",
+      "gitBlob": "48068b9cfc04c0ad4e1cdb9fe8059bf4d48774e7"
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "bytes": 11523,
+      "sha256": "7b0c3964d6437fb5dd5df990603231305725f1033a901ebd6e83c9926036de2b",
+      "gitBlob": "6f6823287caa24511c1fb06b8bde701956626d35"
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "bytes": 20761,
+      "sha256": "ebd3f5254eb26312668131d1043e635db070a10fe05368b148f753a416180d0a",
+      "gitBlob": "0d865dc31de7a29191f5be621cbf3859c1314dca"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "bytes": 1004,
+      "sha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d",
+      "gitBlob": "64fabbf385b646ff9fe6f7f07d2a6eecf0211625"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "bytes": 15162,
+      "sha256": "99941a8ab30a471030b0000089ab7fd920ef6dda7786501ea6aab88a1732ba6d",
+      "gitBlob": "6f773394dee20cd247daffc152b781423b37a900"
+    },
+    {
+      "path": "apps/desktop/test/production-application.mjs",
+      "bytes": 3770,
+      "sha256": "14dfe18057cc88b1c95276c97f7942bcae1f9f36c6e5812da2eb204df11fae5a",
+      "gitBlob": "1a7d3e374af646c3ccbbd568deb975acad04a3f2"
+    },
+    {
+      "path": "apps/desktop/test/live-worker.mjs",
+      "bytes": 7385,
+      "sha256": "b46a346690c3e50cff1f8f65b6a631b2da1f32cf46d5e12b673277e9a58baff3",
+      "gitBlob": "e25a81358b49d8771d22c31949a42b763894fd1e"
+    },
+    {
+      "path": "scripts/test-accounts/session.mjs",
+      "bytes": 23152,
+      "sha256": "aeee1b4115955a5814a3bf8d95e70c469274b1926685410cd1ea64d054c4facf",
+      "gitBlob": "4d178439f9ebdf0528f265c0682c04f27fd5e91d"
+    },
+    {
+      "path": "scripts/test-accounts/http-body.mjs",
+      "bytes": 1162,
+      "sha256": "eaf852558e81fe4f3669ac7bac18d7630f3acb1044e30cc2f18e118dbaba53e3",
+      "gitBlob": "c071e6efa5ce3385ec218fc71a86b90fcc3701ec"
+    },
+    {
+      "path": "lib/computer/event-page.ts",
+      "bytes": 1122,
+      "sha256": "19df15ded443a6cb110a9b6be5a25aa56acc0f099c1c878c744590c9bc7b6ea9",
+      "gitBlob": "6351ef38b2408ade50187342b7a721bf6b348517"
+    },
+    {
+      "path": "lib/computer/event-stream.ts",
+      "bytes": 4139,
+      "sha256": "cb7f8686938918c2cb713bdbc9b5081df064e64ee2f0676ff0a184480f9b5f3a",
+      "gitBlob": "20f57c424ea7f4ef9793997c0a1e3af44a794c3c"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "bytes": 2390,
+      "sha256": "b22ae54e6be4e18c64df5fd6aa1844a10151ff0274caf38b855cc86c831a9279",
+      "gitBlob": "27c2d3b69a1a25bc0415f7b66b9aaf08fdd73a09"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5330,
+      "sha256": "91255a411957347ebe720f578e882e894e8cf66d63095cd5deaff1dda9cabdbc",
+      "gitBlob": "e64bf441a6b5d558650b7256e710540d98a151b9"
+    }
+  ],
+  "boundaries": {
+    "onlyGitShowExactE7": true,
+    "laterMainImported": false,
+    "noProductEdit": true,
+    "noServiceStarted": true,
+    "noDatabaseOrProviderCall": true,
+    "productionAcceptance": false
+  },
+  "inheritedLifecycle": {
+    "parentDiagnostic": "sql-profile-1f548/driver.mjs",
+    "parentSha256": "58a4840e3464db4f3c0fdb739a695794d84e5f551dd2fb8b2eab8f38d095ceaa",
+    "blocks": [
+      {
+        "name": "owned_setup_process",
+        "byteIdentical": true,
+        "bytes": 1124,
+        "sha256": "2c031644e8793d53b1c26e792612450c12b427c2201989eaaaa752e44c134768"
+      },
+      {
+        "name": "response_body_drain",
+        "byteIdentical": true,
+        "bytes": 283,
+        "sha256": "138578a82401b8d6c55d77e51c2966a84604b518e6a0e06d9cde8bbc18b9e9cf"
+      },
+      {
+        "name": "ordinary_email_auth",
+        "byteIdentical": true,
+        "bytes": 1426,
+        "sha256": "ab1d019bf11450de67d48c6f6df24321d4df935554b0731f9bf2158e4e60ce66"
+      },
+      {
+        "name": "http_context_create",
+        "byteIdentical": true,
+        "bytes": 508,
+        "sha256": "7c0144b0ea5a0d83d30ef3747a002820144ad919612c3c16a49d7a9cd54e334b"
+      },
+      {
+        "name": "http_context_dispose",
+        "byteIdentical": true,
+        "bytes": 121,
+        "sha256": "cd6f2ccae582362aa20c195f0cb5e2184d876c07fec2890c6ab36dfe62a0128b"
+      },
+      {
+        "name": "browser_http_transport",
+        "byteIdentical": true,
+        "bytes": 738,
+        "sha256": "7f632e591a7eba0685c700344d5db9cf50473a0f7ac1ea26e627b83dd795af6e"
+      },
+      {
+        "name": "native_signed_cache",
+        "byteIdentical": true,
+        "bytes": 694,
+        "sha256": "1b541e893f4e6c34b6a0a641863c9514bdf703e71a81025bed5e96652ee8e909"
+      },
+      {
+        "name": "real_pkce_sequence",
+        "byteIdentical": true,
+        "bytes": 4024,
+        "sha256": "92e934de103845a589da4a27f3b0adb0efae6c8816e5a6ac6c905add6ec17a99"
+      },
+      {
+        "name": "owned_cleanup",
+        "byteIdentical": true,
+        "bytes": 2988,
+        "sha256": "3ccb136e8fcbf18b42b60bf7bcd31e89907d03711f252c0f244b206c6d3b7277"
+      }
+    ],
+    "driverBudgetMs": 480000,
+    "httpTimeoutMs": 15000,
+    "bodyMaxBytes": 8388608,
+    "startupBudgetMs": 60000,
+    "ownedShutdownGraceMs": 35000,
+    "ownedShutdownKillMs": 5000
+  }
+}

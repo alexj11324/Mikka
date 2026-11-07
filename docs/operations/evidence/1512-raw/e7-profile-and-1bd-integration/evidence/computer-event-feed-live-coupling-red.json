@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "kind": "actual_modules_offline_coupled_red",
+  "observedAt": "2026-11-07T15:56:14.149702+00:00",
+  "sourceHead": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "sourceTree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "sources": [
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 23821,
+      "sha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b"
+    },
+    {
+      "path": "lib/computer/event-stream.ts",
+      "bytes": 4139,
+      "sha256": "cb7f8686938918c2cb713bdbc9b5081df064e64ee2f0676ff0a184480f9b5f3a"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "bytes": 2390,
+      "sha256": "b22ae54e6be4e18c64df5fd6aa1844a10151ff0274caf38b855cc86c831a9279"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 4604,
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463"
+    },
+    {
+      "path": "app/api/computer/events/route.ts",
+      "bytes": 1722,
+      "sha256": "c307052c163c79d60f662bfdcd3ba56681c36289ffbe16c3a4fc42429d70f7d9"
+    },
+    {
+      "path": "lib/computer/event-stream.test.ts",
+      "bytes": 6909,
+      "sha256": "289807e72ef2122a5d34715dfaf7723e39927ca996783b79a399d5fdd6454345"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "computer-event-feed-live-coupling.test.ts",
+      "bytes": 6178,
+      "sha256": "445c169cff7c6e432640cf76fd00f9ced8944fac91ab29ce3406de2aa315f4fe"
+    },
+    {
+      "path": "computer-event-feed-live-coupling-red.tap",
+      "bytes": 1584,
+      "sha256": "5ac3ae9bd08efc78f47ad7b5b5b3112d2c18d6d5ab283d84a3ff58dd0ba605a4"
+    },
+    {
+      "path": "computer-event-feed-live-coupling-red.default-reporter.log",
+      "bytes": 1311,
+      "sha256": "f24167dbd4006fae82e597eb35028ddf82bd1d2e5f4c19bf99d751c0e74c4d38"
+    }
+  ],
+  "runtime": {
+    "node": "v24.22.1",
+    "networkCalls": 0,
+    "databaseCalls": 0,
+    "providerCalls": 0,
+    "nativeAppRuns": 0,
+    "productEdits": 0,
+    "fakeTimerCleanupAsserted": true,
+    "tmpdir": "/dev/shm/issue1512-ops-812e3b7d6d45/tmp/event-feed-coupling",
+    "tsxCacheDisabled": true,
+    "nodeCompileCacheDisabled": true
+  },
+  "command": [
+    "node",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "--test-concurrency=1",
+    "/dev/shm/issue1512-ops-812e3b7d6d45/computer-event-feed-live-coupling.test.ts"
+  ],
+  "result": {
+    "exitCode": 1,
+    "tests": 3,
+    "pass": 2,
+    "fail": 1,
+    "skip": 0,
+    "assertionCode": "ERR_ASSERTION",
+    "expectedPhysicalReads": 1,
+    "actualPhysicalReads": 2,
+    "initialReadBegan": 3,
+    "actualChannelCatchupAfter": 2,
+    "firstSnapshotCommittedBeforeFlush": true,
+    "initialReadBeforeSocketOpenStillCatchesUp": true,
+    "newerRealLiveEventStillReads": true
+  },
+  "occurrence": {
+    "condition": "first ComputerEventFeed subscriber joins an already-connected LiveChannel for the same authorized workspace",
+    "ordering": [
+      "LiveChannel.subscribe queues a catch-up carrying its actual after boundary",
+      "ComputerEventFeed.subscribe immediately starts and commits a valid page after that boundary",
+      "real LiveChannel 100ms flush calls current useSubagentUpdates bridge",
+      "bridge discards after; feed unconditionally starts a second physical page"
+    ],
+    "scopeLifecycle": "channels are stable by owner; feeds are shared by channels plus workspace; not caused by ordinary proof persistence"
+  },
+  "impact": {
+    "proven": "one extra physical page in this exact late-subscription ordering; each real event page performs existing fresh session authorization, active membership check and event read",
+    "native44Web23Attribution": null,
+    "runtimeOccurrenceCount": null,
+    "realNativeBudgetFixed": false
+  },
+  "minimalImplementationBoundarySuggested": {
+    "productFiles": [
+      "lib/computer/event-stream.ts",
+      "hooks/use-subagent-updates.ts"
+    ],
+    "forwardActualAfterBoundary": true,
+    "onlyReuseSuccessfulCurrentGenerationPageWaveBeginningAfterObligation": true,
+    "preservePreConnectionCatchup": true,
+    "preserveNewerPushCatchup": true,
+    "preserveForegroundAndRemountForcedRead": true,
+    "preserveAuthMembershipAndCursorValidation": true,
+    "noTimerOrWindowChanges": true,
+    "noGlobalIdentityCache": true
+  },
+  "testBoundary": "real LiveChannel and ComputerEventFeed with injected clock, socket and finite page provider; coupling bridge exactly matches current production loss of after; this is not live production evidence"
+}
