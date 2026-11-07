@@ -5,12 +5,14 @@ on:
     outputs:
       source-sha:
         value: ${{ jobs.build.outputs.source-sha }}
-      template-ids:
-        value: ${{ jobs.build.outputs.template-ids }}
+      template-models-sha256:
+        value: ${{ jobs.build.outputs.template-models-sha256 }}
       candidate-artifact-id:
         value: ${{ jobs.build.outputs.candidate-artifact-id }}
-      candidate-report-sha256:
-        value: ${{ jobs.build.outputs.candidate-report-sha256 }}
+      candidate-sha256:
+        value: ${{ jobs.build.outputs.candidate-sha256 }}
+      candidate-identities:
+        value: ${{ jobs.build.outputs.candidate-identities }}
 permissions:
   contents: read
 jobs:
@@ -23,9 +25,10 @@ jobs:
       id-token: write
     outputs:
       source-sha: ${{ steps.build.outputs.source-sha }}
-      template-ids: ${{ steps.build.outputs.template-ids }}
+      template-models-sha256: ${{ steps.build.outputs.template-models-sha256 }}
       candidate-artifact-id: ${{ steps.candidates.outputs.artifact-id }}
-      candidate-report-sha256: ${{ steps.build.outputs.report-sha256 }}
+      candidate-sha256: ${{ steps.build.outputs.candidate-sha256 }}
+      candidate-identities: ${{ steps.build.outputs.candidate-identities }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -58,24 +61,41 @@ jobs:
         run: |
           name="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"
-          node scripts/e2b/release-handoff.mjs pack-candidates "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/candidate-handoff"
-      - name: Close leftover probes and failed private builds
-        if: always() && steps.e2b-key.outcome == 'success'
-        run: |
-          args=()
-          if [ "$BUILD_OUTCOME" = success ]; then args+=(--sandboxes-only --report "$RUNNER_TEMP/candidates.json"); fi
-          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"
-        env:
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-      - name: Preserve the complete candidate report for this attempt
-        if: always() && steps.build.outcome == 'success'
+          node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
+          import { readFileSync, appendFileSync } from 'node:fs'
+          import { assertReportIdentity, cleanupIdentity, reportDigest, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
+          reportStep(() => {
+            const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
+            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,
+              runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
+            assertReportIdentity(report, expected)
+            for (const kind of ['desktop', 'claude', 'codex']) {
+              const row = report.templates[kind], proof = row.conservation
+              if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)
+                || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('runtime_report_preservation_invalid')
+              console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)
+            }
+            appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models-sha256=${templateModelsDigest(report)}\ncandidate-sha256=${reportDigest(bytes)}\ncandidate-identities=${cleanupIdentity(report, expected)}\n`)
+          })
+          JS
+      - name: Preserve the complete private candidate report
         id: candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2b-candidates-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/candidate-handoff/
+          path: ${{ runner.temp }}/candidates.json
           if-no-files-found: error
           retention-days: 7
+      - name: Close leftover probes and failed private builds
+        if: always() && steps.e2b-key.outcome == 'success'
+        run: |
+          args=()
+          if [ "$BUILD_OUTCOME" = success ]; then args+=(--report "$RUNNER_TEMP/candidates.json"); fi
+          if [ "$BUILD_OUTCOME" = success ] && [ "$ARTIFACT_OUTCOME" = success ]; then args+=(--sandboxes-only); fi
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.candidates.outcome }}
       - name: Preserve candidate build cleanup receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
