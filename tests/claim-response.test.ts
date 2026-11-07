@@ -4,6 +4,7 @@ import { gzipSync } from 'node:zlib'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, RUN_CREDENTIALS_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
+import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER } from '@mikka/protocol/subscription'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { POLICY_SNAPSHOT_HEADER } from '@mikka/protocol/policy-snapshot'
@@ -35,6 +36,8 @@ function fixture() {
     memberAllowed:true,questionRetryBlocked:false,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
     issueAccessError: undefined as Error | undefined,
     credentialCapability: false,
+    catalogueCapability: false,
+    nativeLeaseCapabilities: [] as boolean[],
     credentialOwners: [] as string[],
     credentialFailure: undefined as Error | undefined,
     beforeCredential: undefined as (() => Promise<void>) | undefined,
@@ -43,7 +46,7 @@ function fixture() {
   return probe
 }
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings']) {
-  try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+  try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
@@ -372,6 +375,31 @@ test('a capable bound cloud daemon receives its real subscription lease in the i
     assert.deepEqual(body.subscriptionLease, nativeLease)
     assert.equal(body.github.token, 'fixture-claim-github-token')
     assert.deepEqual((probe as typeof probe & { nativeRunCalls: string[][] }).nativeRunCalls, [['member', 'device', 'run']])
+    assert.equal((probe as typeof probe & { nativeLeaseCalls: unknown[] }).nativeLeaseCalls.length, 1)
+    assert.deepEqual(probe.nativeLeaseCapabilities, [false], 'older strict daemons do not receive extra lease fields')
+  } finally {
+    keys.forEach((key, index) => { if (saved[index] === undefined) delete process.env[key]; else process.env[key] = saved[index] })
+  }
+})
+
+test('a capable cloud claim preserves prepared full-model catalogue evidence without another request', async () => {
+  const keys = ['MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'MIKKA_BYO_E2B_KEY'] as const
+  const saved = keys.map(key => process.env[key])
+  Object.assign(process.env, { MIKKA_CLOUD_COMPUTER_TASKS: '1', MIKKA_BYOS_ENABLED: '1', MIKKA_BYO_E2B_KEY: '1' })
+  try {
+    const probe = fixture()
+    probe.credentialCapability = true
+    probe.catalogueCapability = true
+    probe.agent.harness = 'claude_code'
+    const nativeLease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', revision: 1, accountId: 'fixture-account',
+      accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z', modelCatalogueVerified: true }
+    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' },
+      cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'claude_code_cli', modelId: 'claude-haiku-5-5' } } })
+    Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true, subscriptionModelCatalogue: true }] })
+    const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings'])
+    assert.equal(response.status, 200)
+    assert.deepEqual((await response.json()).subscriptionLease, nativeLease)
+    assert.deepEqual(probe.nativeLeaseCapabilities, [true])
     assert.equal((probe as typeof probe & { nativeLeaseCalls: unknown[] }).nativeLeaseCalls.length, 1)
   } finally {
     keys.forEach((key, index) => { if (saved[index] === undefined) delete process.env[key]; else process.env[key] = saved[index] })

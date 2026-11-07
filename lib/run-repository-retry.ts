@@ -64,7 +64,9 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         return { retried: false, blocked: 'The selected recovery device is no longer authorized and available. Select an available device to retry this task.' }
       // Idle gateway daemons have no HTTP heartbeat. Presence has one bounded
       // lookup per device; ownership/scheduling authority remains the locked SQL.
-      const presence = await deviceOnlineStates(devices, now.getTime())
+      // Policy/row locks may have waited while a real heartbeat arrived. The
+      // lease snapshot still fences the attempt; it is not the presence clock.
+      const presence = await deviceOnlineStates(devices)
       const source = devices.find(device => device.id === run.deviceId)
       if (queued && source?.enabled && !source.removedAt && presence.get(source.id)) return { retried: false }
       if (!presence.get(target.deviceId))

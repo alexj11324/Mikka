@@ -21,6 +21,8 @@ describe("device online state", () => {
     expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS - 1, now)).toBe(false)
     expect(isDeviceOnline(null, now)).toBe(false)
     expect(isDeviceOnline("not a date", now)).toBe(false)
+    expect(isDeviceOnline(now + 1, now)).toBe(false)
+    expect(isDeviceOnline("2036-11-06T12:00:00Z", now)).toBe(false)
   })
 
   it("summarizes 设备 n/m 在线", () => {
@@ -102,6 +104,9 @@ describe("device link schemas", () => {
     const subscriptionLease = { route: "claude_code_cli", modelId: "claude-haiku-5-5", revision: 1, accountId: "fixture", expiresAt: "2026-11-06T21:00:00.000Z", accessToken: "fixture-access" }
     const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "claude_code", prompt: "p", subscriptionBinding }
     expect(runAssignmentSchema.parse({ ...base, subscriptionLease }).subscriptionLease).toEqual(subscriptionLease)
+    const verifiedLease = { ...subscriptionLease, modelCatalogueVerified: true }
+    expect(runAssignmentSchema.parse({ ...base, subscriptionLease: verifiedLease }).subscriptionLease).toEqual(verifiedLease)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease: { ...subscriptionLease, modelCatalogueVerified: false } }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, subscriptionBinding: undefined }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, harness: "codex" }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease: { ...subscriptionLease, route: "codex_cli" } }).success).toBe(false)

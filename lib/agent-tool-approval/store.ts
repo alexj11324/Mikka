@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
-import { lockCliRunPolicy, cliPolicyGuard, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
+import { lockCliRunPolicy, cliPolicyGuard, policyMemberships, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { runChanged } from '@/lib/live/panels'
 import { runListChanged } from '@/lib/live/lists'
@@ -11,7 +11,7 @@ export class ApprovalUnavailable extends Error { constructor(readonly revokeReas
 export class AgentToolApprovalStore {
   constructor(private readonly pool: Pick<Pool, 'connect' | 'query'>, private readonly membership: CliMembershipGuard = realCliMembershipGuard) {}
   /** Locks the run before every state mutation so stop, lease and ownership are checked. */
-  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false, liveness?: { deviceId: string; revision: string }): Promise<T> {
+  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false, liveness?: { deviceId: string; revision: string }, guard = cliPolicyGuard(runId,userId,this.membership)): Promise<T> {
     const result = await writeTransaction<{ unavailable: ApprovalUnavailable } | { value: T }>(this.pool, async client => {
       const run = await client.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND status=ANY($3::text[]) AND "stopRequestedAt" IS NULL AND "leaseExpiresAt">now() FOR UPDATE`, [runId, userId, ['preparing','running','waiting_input', ...(allowPaused ? ['paused'] : [])]])
       if (!run.rowCount) {
@@ -22,7 +22,7 @@ export class AgentToolApprovalStore {
         return { unavailable: new ApprovalUnavailable(reason) }
       }
       return { value: await work(client) }
-    }, { guard: cliPolicyGuard(runId,userId,this.membership) })
+    }, { guard })
     if ('unavailable' in result) throw result.unavailable
     return result.value
   }
@@ -53,13 +53,16 @@ export class AgentToolApprovalStore {
   }
   /** Authenticated distribution only; snapshots never replace live tool authorization. */
   async policyDistribution(actor: DeviceActor, runId: string, revision?: string) {
+    // Like readCliRunPolicy, retain these APP locks through the membership
+    // lease and COMMIT without resolving the same policy a second time.
+    let current: Awaited<ReturnType<typeof lockCliRunPolicy>> | undefined
     return this.transaction(runId, actor.userId, async client => {
       const owned = await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2',[runId,actor.deviceId])
       if (!owned.rowCount) throw new ApprovalUnavailable()
-      const current = await lockCliRunPolicy(client,runId,actor.userId)
+      current = await lockCliRunPolicy(client,runId,actor.userId)
       if (revision && current.revision !== revision) throw new ApprovalUnavailable()
       return current
-    }, true)
+    }, true, undefined, (_client,signal) => policyMemberships(current!,actor.userId,signal,this.membership))
   }
   async check(actor: DeviceActor, runId: string, revision: string) {
     const state = await this.checkState(actor, runId, revision)

@@ -19,11 +19,13 @@ function recoveredUnregistered(options: { denied?: boolean; owned?: boolean } = 
   const events: SshInstallState[] = []
   const verified: { deviceId: string; ownerId?: string }[] = []
   let serviceInstalls = 0, minted = 0, signedIn = false
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
   const installer = new SshInstaller('https://example.com/mikka', async () => {
     minted++
     if (options.denied) throw new Error('Sign in to register a device')
     return 'private-registration-token'
-  }, state => { events.push(state) }, async (_command, args, input) => {
+  }, state => { events.push(state); if (state.status === 'online' || state.status === 'failed') finish() }, async (_command, args, input) => {
     const script = args[1]
     calls.push({ script, input })
     if (script.startsWith('mikka daemon service install')) {
@@ -37,20 +39,20 @@ function recoveredUnregistered(options: { denied?: boolean; owned?: boolean } = 
   }, '/home/nobody', undefined, undefined, 'dev',
   { command: '/bin/zsh', args: script => ['-lc', script] },
   async (deviceId, ownerId) => { verified.push({ deviceId, ownerId }); return options.owned !== false })
-  return { installer, calls, events, verified, serviceInstalls: () => serviceInstalls, minted: () => minted }
+  return { installer, calls, events, verified, done, serviceInstalls: () => serviceInstalls, minted: () => minted }
 }
 
-test('repair registers an already running unregistered daemon without reinstalling it', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] })
+test('repair registers an already running unregistered daemon without reinstalling it', { timeout: 5_000 }, async () => {
   const flow = recoveredUnregistered()
   await flow.installer.repairLocal('current-owner')
-  await settle(t, flow.installer)
+  await flow.done
   assert.equal(flow.installer.state()?.status, 'online')
   assert.equal(flow.installer.state()?.deviceId, 'current-device')
   assert.equal(flow.serviceInstalls(), 1)
   assert.equal(flow.minted(), 1)
   assert.deepEqual(flow.verified, [{ deviceId: 'current-device', ownerId: 'current-owner' }])
-  assert.deepEqual(flow.calls.map(call => call.script), [
+  assert.match(flow.calls[0].script, /MIKKA_NODE_BIN=/)
+  assert.deepEqual(flow.calls.slice(1).map(call => call.script), [
     "mikka daemon service install --server 'https://example.com/mikka' --device-type laptop --dev",
     'mikka daemon status --dev',
     "mikka daemon login --server 'https://example.com/mikka' --registration-token-stdin --dev",
@@ -62,28 +64,28 @@ test('repair registers an already running unregistered daemon without reinstalli
   assert.deepEqual([...new Set(flow.events.map(state => state.step))], ['service', 'connect'])
 })
 
-test('recovered daemon registration denial fails without another install or credential attempt', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] })
+test('recovered daemon registration denial fails without another install or credential attempt', { timeout: 5_000 }, async () => {
   const flow = recoveredUnregistered({ denied: true })
   await flow.installer.repairLocal('current-owner')
-  await settle(t, flow.installer)
+  await flow.done
   assert.equal(flow.installer.state()?.status, 'failed')
   assert.equal(flow.installer.state()?.step, 'connect')
-  assert.equal(flow.installer.state()?.reason, 'Sign in to register a device')
+  assert.equal(flow.installer.state()?.error?.cause, 'connection_failed')
+  assert.match(flow.installer.state()?.reason ?? '', /Sign in to register a device/)
   assert.equal(flow.serviceInstalls(), 1)
   assert.equal(flow.minted(), 1)
   assert.equal(flow.calls.some(call => call.script.startsWith('npm ') || call.script.startsWith('mikka daemon login')), false)
   assert.deepEqual(flow.verified, [])
 })
 
-test('recovered daemon registration still rejects a device owned by another account', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] })
+test('recovered daemon registration still rejects a device owned by another account', { timeout: 5_000 }, async () => {
   const flow = recoveredUnregistered({ owned: false })
   await flow.installer.repairLocal('current-owner')
-  await settle(t, flow.installer)
+  await flow.done
   assert.equal(flow.installer.state()?.status, 'failed')
   assert.equal(flow.installer.state()?.step, 'connect')
-  assert.equal(flow.installer.state()?.reason, 'Device does not belong to the signed-in account')
+  assert.equal(flow.installer.state()?.error?.cause, 'connection_failed')
+  assert.match(flow.installer.state()?.reason ?? '', /Device does not belong to the signed-in account/)
   assert.equal(flow.serviceInstalls(), 1)
   assert.equal(flow.minted(), 1)
   assert.deepEqual(flow.verified, [{ deviceId: 'current-device', ownerId: 'current-owner' }])
