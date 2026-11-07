@@ -1,0 +1,76 @@
+name: Issue 1503 release window maintenance
+on:
+  push:
+    branches: [ops/issue-1503-release-window]
+    paths: [.github/workflows/issue1503-release-window.yml]
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: issue1503-release-window-once
+  cancel-in-progress: false
+jobs:
+  cancel-unpublished-redundant-build:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel one unpublished manual build after verifying stable production
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node <<'NODE'
+          const repository = 'alexj11324/Mikka';
+          const source = '8180f687d19e117437403b865692388a9c05b554';
+          const target = 42313939332;
+          const completed = 42311480344;
+          const base = 'https://api.github.com/repos/' + repository;
+          async function api(path, method='GET') {
+            const response = await fetch(base + path, { method, headers: {
+              Authorization: 'Bearer ' + process.env.GH_TOKEN,
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28' } });
+            if (!response.ok) throw new Error('github_http_' + response.status);
+            return response.status === 204 ? null : await response.json();
+          }
+          function requireTrue(value, code) { if (!value) throw new Error(code); }
+          async function preflight() {
+            const [main, prior, run, jobs, response] = await Promise.all([
+              api('/git/ref/heads/main'), api('/actions/runs/' + completed),
+              api('/actions/runs/' + target), api('/actions/runs/' + target + '/jobs?per_page=100'),
+              fetch('https://app.aspectlylabs.com/mikka/api/version', {headers:{'Cache-Control':'no-cache'}})
+            ]);
+            requireTrue(main.object.sha === source, 'main_changed');
+            requireTrue(prior.head_sha === source && prior.status === 'completed' && prior.conclusion === 'success', 'prior_release_unconfirmed');
+            requireTrue(response.ok && (await response.json()).build === source, 'production_version_mismatch');
+            requireTrue(run.head_sha === source && run.head_branch === 'main' && run.event === 'workflow_dispatch'
+              && run.path === '.github/workflows/web-deploy.yml' && run.status === 'in_progress', 'target_scope_mismatch');
+            requireTrue(jobs.total_count === 1 && jobs.jobs.length === 1, 'unexpected_jobs');
+            const job=jobs.jobs[0], steps=job.steps;
+            const build=steps.find(x=>x.name === 'Build (runs migrations last, as the Vercel build did)');
+            const upload=steps.find(x=>x.name === 'Upload the prebuilt output to production');
+            const verify=steps.find(x=>x.name === 'Verify the public production version before releasing the deployment queue');
+            const runtime=steps.find(x=>x.name === 'Publish the verified additive runtime pair inside the deployment queue');
+            const age=Date.now()-Date.parse(build?.started_at);
+            requireTrue(job.status === 'in_progress' && build?.status === 'in_progress' && age >= 0 && age < 180000, 'outside_early_build_window');
+            requireTrue(upload?.status === 'pending' && upload.started_at === null
+              && verify?.status === 'pending' && runtime?.conclusion === 'skipped', 'production_work_has_started');
+            return {source,target,prior:completed,jobId:job.id,buildAgeMs:age,uploadStatus:upload.status,runtimeConclusion:runtime.conclusion};
+          }
+          (async()=>{
+            const receipt=await preflight();
+            console.log(JSON.stringify({phase:'verified_unpublished_build',...receipt}));
+            await api('/actions/runs/' + target + '/cancel','POST');
+            console.log(JSON.stringify({phase:'cancel_requested',target}));
+            for(let attempt=0;attempt<25;attempt++){
+              const run=await api('/actions/runs/' + target);
+              if(run.status==='completed'){
+                requireTrue(run.conclusion==='cancelled','unexpected_terminal_result');
+                console.log(JSON.stringify({phase:'cancel_confirmed',target,status:run.status,conclusion:run.conclusion}));
+                return;
+              }
+              await new Promise(resolve=>setTimeout(resolve,2000));
+            }
+            throw new Error('cancel_terminal_not_yet_confirmed');
+          })().catch(error=>{console.error(JSON.stringify({status:'failed',code:error.message}));process.exitCode=1});
+          NODE
