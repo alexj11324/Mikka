@@ -61,6 +61,8 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: (() => { const value = runtimeTiming(sample)
             if (extraAuth) { value.requests[0].endpoint = 'permission_check'; value.counts[0].endpoint = 'permission_check' }; return value })() } } }] : [])] : [stage('repository', 1000)],
       live: { runs: [{ id: sample.runId, workspaceId: workspace }] } }
+    detail.thread.latestRunId = sample.runId
+    detail.thread.attempts = [{ runId: sample.runId, status: detail.thread.status }]
     io.onDetail?.(sample, detail)
     return detail
   }
@@ -614,56 +616,82 @@ test('candidate cleanup deadline retains its fixture when the daemon never confi
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_/)
 })
 
-test('cleanup discovers a queued continuation behind a terminal root and waits before deleting its issue', async () => {
-  const runId = id(70), continuationId = id(71), issueId = id(72)
-  const record = { runId, issueId, title: '测试 1505 continuation cleanup' }
-  let continuationStatus = 'queued', stopRequested = false, deleted = false, socket, watchOpened
-  const watching = new Promise(resolve => { watchOpened = resolve })
+function continuationCleanupFixture() {
+  const root = id(810), child = id(811), issueId = id(812), calls = [], sockets = []
+  const record = { runId: root, issueId, title: '测试 1505 queued continuation', status: 'failed', error: 'startup_ended_before_execution_proof' }
+  let childStatus = 'queued', stopped
+  const stopRequested = new Promise(resolve => { stopped = resolve })
   const client = {
     async json(path) {
       if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [] }
       assert.equal(path, `/api/live/ticket?workspace=${workspace}`)
-      return { url: 'wss://live.example.invalid/test', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 60000 }
+      return { url: 'wss://live.example/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 }
     },
     async rpc(action, args) {
+      calls.push({ action, args })
       if (action === 'agents.getIssueThread') {
-        assert.equal(args[0], issueId)
-        assert.ok([runId, continuationId].includes(args[1]))
-        return { thread: { id: args[1], status: args[1] === runId ? 'failed' : continuationStatus,
-          attempts: [{ runId, status: 'failed' }, { runId: continuationId, status: continuationStatus }] },
-        chunks: [], live: { runs: [{ id: continuationId, workspaceId: workspace }] } }
+        assert.deepEqual(args, [issueId, root])
+        return { thread: { id: root, status: 'failed', latestRunId: child,
+          attempts: [{ runId: root, status: 'failed' }, { runId: child, status: childStatus }],
+          continuation: { id: child, status: childStatus } },
+        live: { runs: [{ id: root, workspaceId: workspace }, { id: child, workspaceId: workspace }] } }
       }
-      if (action === 'agents.stopRun') { assert.deepEqual(args, [continuationId]); stopRequested = true; return { stoppedRunIds: [continuationId] } }
-      if (action === 'issues.getIssue') { assert.deepEqual(args, [issueId]); return { issue: { id: issueId, title: record.title, revision: 3 } } }
+      if (action === 'agents.stopRun') {
+        assert.deepEqual(args, [root]); stopped()
+        return { stoppedRunIds: [child] }
+      }
+      if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
       assert.equal(action, 'issue-operations.setIssueDeleted')
-      assert.deepEqual(args, [{ id: issueId, revision: 3 }])
-      deleted = true
+      assert.deepEqual(args, [{ id: issueId, revision: 2 }])
+      return { deleted: true }
     },
   }
-  class LiveSocket {
-    readyState = 1
-    constructor() {
-      socket = this
-      queueMicrotask(() => { this.onopen?.(); this.onmessage?.({ data: JSON.stringify({ type: 'live_ready', kinds: ['thread', 'run'] }) }); watchOpened() })
-    }
-    send(value) { assert.equal(value, 'ping') }
-    close() { this.closed = true }
+  const io = { client, record, calls, sockets, stopRequested, now: () => epoch,
+    push(kind, runId) { for (const socket of sockets) if (!socket.closed) socket.onmessage?.({ data: JSON.stringify({ kind, id: runId }) }) },
+    finishChild() { childStatus = 'cancelled'; io.push('run', child) },
+    WebSocketImpl: class {
+      constructor() {
+        this.readyState = 1; sockets.push(this)
+        queueMicrotask(() => { this.onopen?.(); this.onmessage?.({ data: JSON.stringify({ type: 'live_ready', kinds: ['run', 'thread'] }) }) })
+      }
+      send(message) { assert.equal(message, 'ping') }
+      close() { this.closed = true; this.readyState = 3 }
+    },
   }
-  const pending = cleanupCase(client, record, 'device', { timeoutMs: 1000, WebSocketImpl: LiveSocket, now: () => epoch })
-  try {
-    await Promise.race([watching, pending])
-    await new Promise(setImmediate)
-    assert.equal(stopRequested, true, 'a terminal root does not mean its same-issue continuation ended')
-    assert.equal(deleted, false, 'an accepted stop must not delete the issue while the continuation remains queued')
-  } finally {
-    continuationStatus = 'stopped'
-    socket?.onmessage?.({ data: JSON.stringify({ kind: 'run', id: continuationId }) })
-    await pending
-  }
-  assert.equal(deleted, true)
-  assert.equal(record.cleanup.status, 'passed')
-  assert.equal(record.cleanup[`runStopped_${continuationId}`], true)
-  assert.equal(socket.closed, true)
+  return { ...io, root, child }
+}
+
+test('candidate cleanup stops a queued continuation after its original run failed and waits for the child push', async () => {
+  const io = continuationCleanupFixture()
+  let settled = false
+  const pending = cleanupCase(io.client, io.record, 'device', { ...io, timeoutMs: 1000 }).then(() => { settled = true })
+  await Promise.race([io.stopRequested, pending])
+  await new Promise(setImmediate)
+  assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1, 'the terminal parent still addresses its live child through the normal stop API')
+  assert.equal(settled, false, 'a queued child is not terminal merely because its parent failed')
+  assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
+  const reads = io.calls.filter(call => call.action === 'agents.getIssueThread').length
+  io.push('run', id(999))
+  await new Promise(setImmediate)
+  assert.equal(io.calls.filter(call => call.action === 'agents.getIssueThread').length, reads, 'unrelated run pushes do not read this fixture')
+  io.finishChild()
+  await pending
+  assert.equal(io.calls.filter(call => call.action === 'agents.getIssueThread').length, reads + 1, 'the child push supplies the terminal acknowledgement')
+  assert.equal(io.record.cleanup.status, 'passed')
+  assert.equal(io.record.cleanup.taskDeleted, true)
+  assert.equal(io.record.error, 'startup_ended_before_execution_proof', 'cleanup never changes failed execution evidence')
+  assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('candidate cleanup retains both original and queued continuation IDs when no child terminal arrives', async () => {
+  const io = continuationCleanupFixture()
+  await cleanupCase(io.client, io.record, 'device', { ...io, timeoutMs: 20 })
+  assert.equal(io.record.cleanup.status, 'failed')
+  assert.equal(io.record.cleanup.errors[0].code, 'startup_cleanup_terminal_timeout')
+  assert.deepEqual(io.record.cleanup.retainedFixture, { issueId: io.record.issueId, runIds: [io.root, io.child] })
+  assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
+  assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1)
+  assert.ok(io.sockets.every(socket => socket.closed))
 })
 
 test('cleanup retains its fixture when Factory cancellation loses its revision fence', async () => {
@@ -681,7 +709,7 @@ test('cleanup retains its fixture when Factory cancellation loses its revision f
       throw new Error('startup_http_409')
     },
     async rpc(action, args) {
-      if (action === 'agents.getIssueThread') { assert.deepEqual(args, [issueId, runId]); return { thread: { id: runId, status: 'failed' } } }
+      if (action === 'agents.getIssueThread') { assert.deepEqual(args, [issueId, runId]); return { thread: { id: runId, status: 'failed', latestRunId: runId, attempts: [{ runId, status: 'failed' }] } } }
       if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
       assert.equal(action, 'issue-operations.setIssueDeleted')
       deleted = true

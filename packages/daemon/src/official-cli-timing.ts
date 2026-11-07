@@ -167,6 +167,7 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   server.on("error", () => { collector.reject(); mcpCollector.reject() })
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const endpoint = `${origin}${path}`
+  // Codex requires compression unset; preserve the validated Claude configuration.
   const env: Record<string, string> = {
     OTEL_METRICS_EXPORTER: "none", OTEL_TRACES_EXPORTER: "none", OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: endpoint,
