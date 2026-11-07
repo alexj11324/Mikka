@@ -32,13 +32,13 @@ const STARTUP_PHASES = new Set([
   "daemon.adapter.auth.context", "daemon.adapter.auth.access", "daemon.adapter.auth.token",
   "daemon.adapter.auth.native_auth", "daemon.adapter.auth.refresh",
   "daemon.adapter.auth.broker", "daemon.adapter.workspace.shadow_clone", "daemon.adapter.workspace.read_tree",
-  "daemon.adapter.cli_init", "daemon.adapter.account_check", "daemon.adapter.account_check.account_info",
+  "daemon.adapter.cli_init", "daemon.adapter.cli_init.prewarm", "daemon.adapter.account_check", "daemon.adapter.account_check.account_info",
   "daemon.adapter.account_check.login",
 ] as const)
 type StartupPhaseName = typeof STARTUP_PHASES extends Set<infer Name> ? Name : never
 export type DaemonStartupPhase = {
   name: StartupPhaseName
-  /** Monotonic offsets from adapter.start; parent and child intervals overlap. */
+  /** Monotonic offsets from this receipt's start; parent and child intervals overlap. */
   startMs: number
   endMs: number
   ms: number
@@ -53,9 +53,12 @@ export type DaemonStartupTiming = {
   ms: number
   outcome: "ok" | "error"
   phases: DaemonStartupPhase[]
-  /** Also true if a child was still pending when adapter.start ended. */
+  /** Also true if a child was still pending when this measured boundary settled. */
   truncated: boolean
 }
+/** A task's early start, including its wait for checkout, with its own clock
+ * origin. It is not a child interval of the later agent_start stage. */
+export type DaemonPreparationTiming = DaemonStartupTiming & { source: 'prepared_agent_start' }
 type StartupScope = {
   runIdHash: string; harness: Harness; startedAt: number; started: number
   phases: DaemonStartupPhase[]; phaseCount: number; truncated: boolean; closed: boolean
@@ -179,21 +182,10 @@ export class DaemonTracer {
    */
   span<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, options: SpanOptions = {}): Promise<T> {
     const hash = attributes["mikka.run.id_hash"], harness = attributes["mikka.harness"]
-    if (name === "daemon.adapter.start" && typeof hash === "string" && /^[a-f0-9]{16}$/.test(hash)
+    if (name === "daemon.adapter.start" && options.onStartupTiming && typeof hash === "string" && /^[a-f0-9]{16}$/.test(hash)
       && HARNESSES.includes(harness as Harness)) {
-      const scope: StartupScope = { runIdHash: hash, harness: harness as Harness, startedAt: Date.now(), started: performance.now(),
-        phases: [], phaseCount: 0, truncated: false, closed: false }
-      return this.startupScope.run(scope, () => this.measuredSpan(name, attributes, work, options, failed => {
-        scope.closed = true
-        const timing: DaemonStartupTiming = { version: 1, runIdHash: scope.runIdHash, harness: scope.harness,
-          startedAt: scope.startedAt, endedAt: Date.now(), ms: milliseconds(performance.now() - scope.started),
-          outcome: failed ? "error" : "ok", phases: scope.phases.sort((a, b) => a.startMs - b.startMs),
-          truncated: scope.truncated || scope.phases.length < scope.phaseCount }
-        // Long-lived CLI callbacks inherit this scope. Close it and release the
-        // records before returning; later provider activity is not startup.
-        scope.phases = []
-        try { options.onStartupTiming?.(timing) } catch { /* measurement never changes work */ }
-      }))
+      return this.collectStartup({ runIdHash: hash, harness: harness as Harness },
+        end => this.measuredSpan(name, attributes, work, options, end), options.onStartupTiming)
     }
     const scope = this.startupScope.getStore()
     if (scope && !scope.closed && !options.root && (hash === undefined || hash === scope.runIdHash)
@@ -212,6 +204,35 @@ export class DaemonTracer {
     }
     if (options.root || name === "daemon.adapter.start") return this.startupScope.exit(() => this.traceSpan(name, attributes, work, options))
     return this.traceSpan(name, attributes, work, options)
+  }
+
+  /** Explicitly owns the earlier Promise's measurement context. This adds no
+   * OTel root, request or timer; callers opt in before native preparation. */
+  preparation<T>(identity: { runIdHash: string; harness: Harness }, work: () => Promise<T>,
+    report: (timing: DaemonPreparationTiming) => void): Promise<T> {
+    if (!/^[a-f0-9]{16}$/.test(identity.runIdHash) || !HARNESSES.includes(identity.harness)) return work()
+    return this.collectStartup(identity, end => {
+      let pending: Promise<T>
+      try { pending = work() } catch (error) { end(true); throw error }
+      return pending.then(value => { end(false); return value }, (error: unknown) => { end(true); throw error })
+    }, timing => report({ ...timing, source: 'prepared_agent_start' }))
+  }
+
+  private collectStartup<T>(identity: { runIdHash: string; harness: Harness },
+    work: (end: (failed: boolean) => void) => Promise<T>, report: (timing: DaemonStartupTiming) => void): Promise<T> {
+    const scope: StartupScope = { ...identity, startedAt: Date.now(), started: performance.now(),
+      phases: [], phaseCount: 0, truncated: false, closed: false }
+    return this.startupScope.run(scope, () => work(failed => {
+      scope.closed = true
+      const timing: DaemonStartupTiming = { version: 1, runIdHash: scope.runIdHash, harness: scope.harness,
+        startedAt: scope.startedAt, endedAt: Date.now(), ms: milliseconds(performance.now() - scope.started),
+        outcome: failed ? 'error' : 'ok', phases: scope.phases.sort((a, b) => a.startMs - b.startMs),
+        truncated: scope.truncated || scope.phases.length < scope.phaseCount }
+      // Detached CLI callbacks retain the context, but never append after the
+      // measured start has settled. The run-owned result holds only numbers.
+      scope.phases = []
+      try { report(timing) } catch { /* measurement never changes work */ }
+    }))
   }
 
   private measuredSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, options: SpanOptions, end: (failed: boolean) => void): Promise<T> {

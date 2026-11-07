@@ -118,6 +118,39 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   return [...new Map(ordered.map(item => [entryKey(item), item])).values()]
 }
 
+/** A custom fixed Profile already names one source/model/harness. Recheck that
+ * entry without enumerating unrelated accounts or choosing an alternative.
+ * Default/inherited selection still uses orderCandidates and its full ordering.
+ * This is a fresh candidate read, not a credential grant or cached admission. */
+export async function selectedOrderCandidates(query: Query, scope: OrderScope, entry: OrderEntry): ReturnType<typeof orderCandidates> {
+  if (!z.uuid().safeParse(sourceId(entry)).success) return []
+  if (entry.source.kind === 'api_key') {
+    const { usableApiKeys } = await import('./model-api-keys')
+    return (await usableApiKeys(query, scope.ownerId, scope.workspaceId, entry.source.keyId))
+      .filter(key => key.models.includes(entry.model) && apiKeyHarnesses(key).includes(entry.harness))
+      .map(key => ({ harness: entry.harness, model: entry.model, name: entry.model,
+        source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider, credentialOwnerId: key.ownerId }))
+  }
+  const { runMayUseCredentialSql } = await import('./personal-policy')
+  // Derive the payor only from the exact source and its current workspace share.
+  // The source owner's active membership is still checked before its catalogue.
+  const { rows: [source] } = await query.query<{ ownerId: string }>(`SELECT c."ownerId" FROM byos_connections c
+    WHERE c.id=$1 AND ${runMayUseCredentialSql('c."ownerId"', '$2', '$3')}`,
+  [entry.source.connectionId, scope.ownerId, scope.workspaceId])
+  if (!source) return []
+  if (source.ownerId !== scope.ownerId) {
+    const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
+    try { await authorizeSubscriptionWorkspace(source.ownerId, scope.workspaceId) } catch { return [] }
+  }
+  const { executionModelOptions } = await import('./execution-model-options')
+  return (await executionModelOptions(query, { ...scope, ownerId: source.ownerId }, true,
+    { connectionId: entry.source.connectionId, model: entry.model }))
+    .map(row => ({ harness: (row.provider === 'codex' ? 'codex' : 'claude_code') as OrderHarness,
+      model: String(row.modelId), name: String(row.modelId), source: { kind: 'subscription' as const, connectionId: String(row.connectionId) },
+      provider: String(row.provider), credentialOwnerId: String(row.ownerId) }))
+    .filter(candidate => entryKey(candidate) === entryKey(entry))
+}
+
 async function settingsRow(query: Query, scope: OrderScope) {
   const { rows: [row] } = await query.query<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean }>(
     'SELECT location,customized,"preferredHarness","autoModelRouting" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])

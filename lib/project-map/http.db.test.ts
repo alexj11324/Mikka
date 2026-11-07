@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { mock, test } from 'node:test'
+import { RUN_DECISION_CATALOGUE } from './mcp-tool'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { createApiHandler } from '../../apps/api/src/application'
 import * as apiServer from '../../apps/api/compat/server'
@@ -108,7 +109,7 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   await t.test('exported worker MCP lists and actually calls record_decision; revoked token fails', async () => {
     const listed = await rpc(runToken.token, 'tools/list', {})
     assert.equal(listed.response.status, 200)
-    assert.ok(listed.payload.result.tools.some((tool: { name: string }) => tool.name === 'record_decision'))
+    assert.deepEqual(listed.payload.result.tools.find((tool: { name: string }) => tool.name === 'record_decision'), RUN_DECISION_CATALOGUE.tool)
     const args = { ...input, projectId, issueId, idempotencyKey: 'mcp-real-write' }
     const called = await rpc(runToken.token, 'tools/call', { name: 'record_decision', arguments: args })
     assert.equal(called.response.status, 200)

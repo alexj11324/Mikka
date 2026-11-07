@@ -256,13 +256,13 @@ export interface UsableApiKey extends ApiKeyView {
  * there), then other members' keys shared with 分享给团队成员, oldest share
  * first. The model picker's 「API Key」 group reads this.
  */
-export async function usableApiKeys(query: Query, userId: string, workspaceId: string): Promise<UsableApiKey[]> {
+export async function usableApiKeys(query: Query, userId: string, workspaceId: string, selectedKeyId?: string): Promise<UsableApiKey[]> {
   // One after the other: a dispatch reads this on its transaction's client.
   // The person's own keys always (decision 2026-11-01-2240); others' only while the admin allows member credentials.
   const allowed = await memberSubscriptionsAllowed(query, workspaceId)
-  const mine = (await query.query<Row>(`SELECT ${COLUMNS} FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`, [userId])).rows
+  const mine = (await query.query<Row>(`SELECT ${COLUMNS} FROM model_api_keys WHERE "ownerId"=$1${selectedKeyId ? ' AND id=$2' : ''} ORDER BY "createdAt",id`, [userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows
   const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
-    WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`, [workspaceId, userId])).rows : []
+    WHERE s."workspaceId"=$1 AND k."ownerId"<>$2${selectedKeyId ? ' AND k.id=$3' : ''} ORDER BY s."createdAt",k.id`, [workspaceId, userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows : []
   return [...mine.map(row => ({ ...view(row), ownerId: row.ownerId, mine: true })), ...others.map(row => ({ ...view(row), ownerId: row.ownerId, mine: false }))]
 }
 

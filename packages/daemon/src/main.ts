@@ -47,7 +47,7 @@ import { CursorAdapter } from "./adapters/cursor"
 import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
-import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials } from './agents/github-runtime'
+import { agentPublishedReceipt, githubReceiptEnvironment } from './agents/github-runtime'
 import { prepareLocalGitHub } from './agents/local-github'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
@@ -95,7 +95,8 @@ import { DeviceGatewayClosedError, openDeviceGateway, runDeviceGateway } from ".
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
-import { EmptyRepositoryError, RepositoryCache } from "./repositories"
+import { RepositoryCache } from "./repositories"
+import { prepareRunRepository } from './run-repository'
 import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
 import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
@@ -155,7 +156,7 @@ export interface DaemonOptions {
   initialRunId?: string
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
-  /** Trusted acceptance launcher only; collect hosted CLI diagnostics without task-secret injection. */
+  /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
   collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
   e2bContainerRuntime?: boolean
@@ -216,9 +217,15 @@ const HARNESS_RESCAN_MS = 5 * 60_000
 /** How often the CLIs are asked again for their models; 重新检测 asks at once. */
 const MODEL_PROBE_MS = 6 * 60 * 60_000
 
-/** Whose model credential a cloud run uses: the subscription binding's owner, or for an API-key run the run owner the server assigned the computer to. */
-function credentialOwner(assignment: RunAssignment): string | undefined {
-  return assignment.subscriptionBinding?.ownerId ?? (assignment.modelCredential ? assignment.computer?.ownerId : undefined)
+/** The authenticated claim grants a computer to this run on this device.
+ * A shared subscription can have a different payer. Existing signed policy
+ * envelopes also bind the execution owner; their signature and freshness are
+ * verified by verifyRunPolicy before worktree setup or agent work. Older
+ * servers keep their authenticated claim contract without an envelope. */
+function cloudComputerGrantMatches(assignment: RunAssignment | undefined, runId: string, deviceId: string | undefined): boolean {
+  if (!assignment?.computer || !deviceId || assignment.runId !== runId || assignment.deviceId !== deviceId) return false
+  const snapshot = assignment.policySnapshot?.payload
+  return !snapshot || (snapshot.runId === runId && snapshot.deviceId === deviceId && snapshot.ownerId === assignment.computer.ownerId)
 }
 
 export class Daemon {
@@ -393,7 +400,7 @@ export class Daemon {
       const liveComputer = (runId: string, display: string | undefined) => {
         const entry = this.journal.get(runId)
         const computer = entry?.assignment.computer
-        if (this.stopped || !this.registered || !computer || computer.display !== display || !entry || computer.ownerId !== credentialOwner(entry.assignment) || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
+        if (this.stopped || !this.registered || !computer || computer.display !== display || !cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
         return computer
       }
       const executeOrdinary = async (current: typeof driver, call: import('./computer/driver.mjs').ComputerCall, display: string | undefined, runId: string, assertLive: () => void) => {
@@ -404,13 +411,13 @@ export class Daemon {
         needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const entry = this.journal.get(runId)
-          return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
+          return Boolean(!this.stopped && this.registered && cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) && this.supervisor?.computerRunAllowed(runId))
         },
         execute: createHostedComputerExecutor({ liveComputer, executeOrdinary, authority: this.options.credentialExecutorAuthority }),
         // The server picks the desktop from the run's binding; the call names none.
         capture: async (runId, call, signal) => {
           const entry = this.journal.get(runId)
-          if (!entry?.assignment.computer || !this.supervisor.computerRunAllowed(runId) || !this.options.link.screenCapture) throw new Error('Cloud computer run unavailable')
+          if (this.stopped || !this.registered || !cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) || !this.supervisor.computerRunAllowed(runId) || !this.options.link.screenCapture) throw new Error('Cloud computer run unavailable')
           try {
             return await this.options.link.screenCapture(runId, call, signal)
           } catch (error) {
@@ -485,6 +492,7 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
+      collectCliTiming: this.options.collectCliTiming,
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
       downloadChatFile: this.options.link.downloadChatFile?.bind(this.options.link),
@@ -494,6 +502,7 @@ export class Daemon {
       adapters,
       startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
       startCredential: hosted?.start,
+      prepareSubscription: hosted?.prepare,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
@@ -535,23 +544,8 @@ export class Daemon {
           }
         : undefined,
       repository: assignment => this.repository(assignment),
-      prepareRepository: async (assignment, signal, githubEnvironment) => {
-        const remoteUrl = assignment.remoteUrl
-        if (!remoteUrl) return
-        await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir, async (env, github) => {
-          try {
-            await this.repositories.prepare(remoteUrl, signal, env)
-          } catch (error) {
-            if (!(error instanceof EmptyRepositoryError)) throw error
-            // An empty remote: a run that may push gives it a first commit
-            // with no files on its base branch, then works like on any other.
-            if (!pushDecision(runPolicy(assignment.policy)).push) return this.repositories.localEmptyBase(remoteUrl)
-            const branch = assignment.baseBranch && assignment.baseBranch !== 'HEAD' ? assignment.baseBranch : (await github.defaultBranch()) ?? 'main'
-            await this.repositories.seedEmpty(remoteUrl, branch, signal, env)
-            await this.repositories.prepare(remoteUrl, signal, env)
-          }
-        }, githubEnvironment)
-      },
+      prepareRepository: (assignment, signal, githubEnvironment, policyReady) => prepareRunRepository(this.repositories,
+        runPaths(this.paths.adapterState, assignment.runId).privateDir, assignment, signal, githubEnvironment, policyReady),
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
         : Promise.resolve(assignment.baseBranch ?? 'HEAD'),
@@ -1607,7 +1601,7 @@ export class Daemon {
         throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
       }
     }
-    if (assignment.computer && (!this.cloudComputerBroker || assignment.computer.ownerId !== credentialOwner(assignment))) throw new Error('Cloud computer runtime unavailable')
+    if (assignment.computer && (!this.cloudComputerBroker || !cloudComputerGrantMatches(assignment, runId, deviceId))) throw new Error('Cloud computer runtime unavailable')
     // A response may arrive after shutdown began, including while repository
     // validation awaited I/O. Its server lease can expire; never launch it.
     if (this.stopped) throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")

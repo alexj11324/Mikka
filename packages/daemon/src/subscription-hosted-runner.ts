@@ -1,9 +1,10 @@
 // Each hosted task owns its E2B machine. The owner-bound claim supplies
 // credentials once; official CLIs connect directly to their providers and use
 // the machine's normal HOME, environment and working directory Git metadata.
+import { randomUUID } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk'
 import { harnessReportsModel, type HarnessInfo, type RunAssignment } from '@mikka/protocol'
@@ -11,6 +12,7 @@ import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import type { UserErrorDetail } from '@mikka/protocol/user-error-codes'
 import { ClaudeAdapter, ClaudeInitializationError } from './adapters/claude'
 import { CodexAdapter } from './adapters/codex'
+import { prepareAgentStart, type ClaudePreparation } from './adapters/claude-prewarm'
 import type { AgentSession, StartOptions } from './adapters/types'
 import { runPaths } from './agents/run-context'
 import type { spawnCli } from './agents/child'
@@ -25,7 +27,7 @@ import type { ComputerBroker } from './computer/broker.mjs'
 import { decide } from './permissions'
 import { removeRunCredentials } from './run-scratch'
 import { daemonTracer, runIdHash } from './tracing'
-import { runRuntimeTimings } from './run-runtime-timing'
+import { runDiagnosticsEnabled, runRuntimeTimings } from './run-runtime-timing'
 import { startCliTimingCollector } from './official-cli-timing'
 import { hostedBinaries } from './hosted-binaries'
 import { stopGroup } from './process-group'
@@ -104,10 +106,7 @@ export async function createHostedBotRunner(host: {
   if (host.dockerSocket !== undefined && host.dockerSocket !== 'unix:///run/mikka-container/docker.sock') throw unavailable('host_unsupported')
   const binaries = hostedBinaries(host.binaries)
   if (!binaries.codex && !binaries.claude_code) throw unavailable('cli_missing')
-  return {
-    harnesses: Object.keys(binaries).filter(kind => binaries[kind as keyof typeof binaries]) as ('codex' | 'claude_code')[],
-    binaries: { ...binaries }, command: runHostedCommand,
-    async start(assignment: RunAssignment, options: StartOptions): Promise<AgentSession> {
+  const start = async (assignment: RunAssignment, options: StartOptions, preparation?: ClaudePreparation): Promise<AgentSession> => {
       const gate = requireRunToolApproval(options.runId, options.toolApproval)
       const selected = assignment.subscriptionBinding
       const apiKey = assignment.modelCredential
@@ -158,6 +157,7 @@ export async function createHostedBotRunner(host: {
           finally {
             await cliTiming?.close({ cliExitObserved: cliStarted > 0 && cliStarted === cliExited })
             offRevoke()
+            preparation?.signal.removeEventListener('abort', abortPreparation)
             // The VM belongs to this task. Keep its last native login for
             // final verification/publication; the VM reclaims it afterwards.
             github?.close({ retainCredential: true })
@@ -168,8 +168,11 @@ export async function createHostedBotRunner(host: {
         lifetime.abort()
         return closing
       }
-      offRevoke = gate.onRevoke(() => { void close().catch(() => undefined) })
+      const abortPreparation = () => { void close().catch(() => undefined) }
+      preparation?.signal.addEventListener('abort', abortPreparation, { once: true })
+      offRevoke = gate.onRevoke(abortPreparation)
       try {
+        preparation?.signal.throwIfAborted()
         if (!await gate.checkLive()) { gate.revoke(); throw unavailable('run_closed') }
         // The claim already prepared owner-bound secrets; local metadata/model
         // work may run alongside the old-server one-time lease fallback.
@@ -190,7 +193,7 @@ export async function createHostedBotRunner(host: {
         }
         const paths = runPaths(host.stateDir, assignment.runId)
         mkdirSync(paths.runDir, { recursive: true, mode: 0o700 })
-        const cwd = realpathSync(options.cwd)
+        const cwd = preparation ? resolve(options.cwd) : realpathSync(options.cwd)
         const env = Object.fromEntries(Object.entries({ ...process.env, ...options.env, ...assignment.taskEnv })
           .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
         const selectedGithub = options.github ?? (assignment.github ? { ...assignment.github, issueId: assignment.issueId, runToken: assignment.mcp?.token } : undefined)
@@ -218,22 +221,23 @@ export async function createHostedBotRunner(host: {
         if (continuation && existsSync(ledger)) throw unavailable('ledger_mismatch')
         const previousLedger = continuation ? join(host.stateDir, 'native-ledgers', continuation.runId + '.json') : ledger
         const previous = scope ? readJson(previousLedger) as { scope: typeof scope; sessionId: string } | undefined : undefined
+        if (preparation && previous) throw unavailable('ledger_mismatch')
         const expectedScope = scope && continuation ? { ...scope, runId: continuation.runId } : scope
         if (scope && ((existsSync(previousLedger) && (!previous || JSON.stringify(previous.scope) !== JSON.stringify(expectedScope) || typeof previous.sessionId !== 'string')) ||
           (assignment.requireSessionResume && (!previous || previous.sessionId !== assignment.resumeSessionId)))) throw unavailable('ledger_mismatch')
         if (scope) mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 })
         const record = async (sessionId: string) => { assertOpen(); if (scope) writeJsonAtomic(ledger, { scope, sessionId }) }
         const computer = assignment.computer
-        if (computer && (!host.computerBroker || (selected && computer.ownerId !== selected.ownerId))) throw unavailable('computer_unavailable')
+        if (computer && !host.computerBroker) throw unavailable('computer_unavailable')
         computerGrant = computer ? host.computerBroker!.spec(assignment.runId, decide('computer_use', { policy: assignment.policy }), { display: computer.display }) : undefined
         if (computer && !computerGrant) throw unavailable('computer_unavailable')
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, '--captures'], env: {},
         } : undefined
-        if (host.collectCliTiming === true || assignment.taskEnv?.CLOUD_STARTUP_TIMING === '1') {
+        if (runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming)) {
           try {
             cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
-              remoteMcpServerCount: options.apps?.apps.length ?? 0 })
+              remoteMcpServerCount: options.apps?.apps.length ?? 0, decisionCatalogue: options.mcp?.decisionCatalogue })
           } catch { /* Missing observation is unavailable evidence, not a business or authorization failure. */ }
           assertOpen()
         }
@@ -247,7 +251,7 @@ export async function createHostedBotRunner(host: {
             delete childEnv.ANTHROPIC_API_KEY
           }
           const child = spawn(binaries[kind]!, [...config.args, ...(cliTiming?.args ?? [])], {
-            cwd, env: childEnv, detached: true,
+            cwd: preparation ? config.cwd : cwd, env: childEnv, detached: true,
             stdio: oauthToken === undefined ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe', 'pipe'],
           })
           children.add(child)
@@ -294,7 +298,22 @@ export async function createHostedBotRunner(host: {
         const runtimeOptions = { ...options, env, cwd, machineEnvironment: true as const,
           mcpHttpObservationUrl: cliTiming?.mcpHttpObservationUrl,
           credential: apiKey, ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}) }
-        const session = previous && !continuation
+        let session: AgentSession
+        if (preparation) {
+          if (!(adapter instanceof ClaudeAdapter) || !scope || !subscription || continuation || assignment.requireSessionResume)
+            throw unavailable('assignment_invalid')
+          const finalOptions = preparation.finalOptions.then(final => {
+            if (JSON.stringify(final.env) !== JSON.stringify(options.env) || final.toolApproval !== gate)
+              throw unavailable('assignment_invalid')
+            return { ...final, env, cwd: realpathSync(final.cwd), machineEnvironment: true as const,
+              mcpHttpObservationUrl: cliTiming?.mcpHttpObservationUrl, credential: apiKey }
+          })
+          void finalOptions.catch(() => undefined)
+          session = await adapter.startPrepared(runtimeOptions, { ...scope,
+            sessionId: randomUUID(), cwd, deviceId: assignment.deviceId, model: subscription.first.modelId,
+            policyHash: options.policyHash ?? null,
+          }, { ...preparation, finalOptions }, async () => { await Promise.all([...children].map(child => stopGroup(child))) })
+        } else session = previous && !continuation
           ? await adapter.resume(previous.sessionId, runtimeOptions) : await adapter.start(runtimeOptions)
         if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
           await session.cancel(); throw unavailable('session_mismatch')
@@ -321,6 +340,17 @@ export async function createHostedBotRunner(host: {
         if (refusal instanceof CodedError) logCodedError(refusal, { runId: assignment.runId, harness: kind }, options.log)
         throw refusal
       }
+  }
+  return {
+    harnesses: Object.keys(binaries).filter(kind => binaries[kind as keyof typeof binaries]) as ('codex' | 'claude_code')[],
+    binaries: { ...binaries }, command: runHostedCommand, start,
+    prepare(assignment: RunAssignment, options: StartOptions, signal: AbortSignal) {
+      if (assignment.harness !== 'claude_code' || !assignment.subscriptionBinding || !assignment.subscriptionLease ||
+        assignment.modelCredential || assignment.requireSessionResume || assignment.continuesRunId || assignment.resumeFrom ||
+        assignment.resumeSessionId || options.continueSession || (assignment.github && !assignment.github.token))
+        throw unavailable('assignment_invalid')
+      return prepareAgentStart(signal, control => start(assignment, options, control),
+        runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming) ? { runId: assignment.runId, harness: 'claude_code' } : undefined)
     },
   }
 }

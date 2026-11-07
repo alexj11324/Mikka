@@ -1,5 +1,5 @@
 import { type ReactNode, useRef, useState } from 'react'
-import { Platform, StyleSheet, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
 import { GlassButton } from '@/components/GlassButton'
 import { api, ApiError } from '@/lib/api'
@@ -23,6 +23,8 @@ export function FailedReply({ failure, botId, onQueued, modelChoice }: { failure
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
   const [outcome, setOutcome] = useState<ReplyRetryOutcome | null>(null)
+  // The stored code, folded like the web's 详情 (decision 2026-11-05-0330): never in place of the line.
+  const [details, setDetails] = useState(false)
   const retry = async () => {
     if (inFlight.current) return
     inFlight.current = true
@@ -45,6 +47,8 @@ export function FailedReply({ failure, botId, onQueued, modelChoice }: { failure
     <View style={styles.failed}>
       <Text style={styles.error}>{line.text}</Text>
       {outcome ? <Text accessibilityLiveRegion="polite" style={styles.retryResult}>{replyRetryLine(outcome)}</Text> : null}
+      {failure.raw ? <Pressable accessibilityRole="button" accessibilityState={{ expanded: details }} onPress={() => setDetails(open => !open)}><Text style={styles.detailsToggle}>详情</Text></Pressable> : null}
+      {failure.raw && details ? <Text selectable style={styles.details}>{failure.raw}</Text> : null}
       <View style={styles.failedActions}>
         {line.retry ? <GlassButton label="重试" busy={busy} onPress={() => void retry()} /> : null}
         {line.recovery === 'model' ? Platform.OS === 'ios' && modelChoice ? modelChoice : <GlassButton label="聊天模型" disabled={!modelPath} onPress={() => { if (modelPath) void openOnWeb(modelPath) }} /> : null}
@@ -58,5 +62,7 @@ const styles = StyleSheet.create({
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   failedActions: { flexDirection: 'row', gap: 8 },
   retryResult: { color: colors.secondary, fontSize: 13, textAlign: 'center' },
+  detailsToggle: { color: colors.secondary, fontSize: 12, textDecorationLine: 'underline' },
+  details: { color: colors.secondary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12, marginHorizontal: 24, textAlign: 'center' },
   error: { alignSelf: 'center', color: colors.danger, fontSize: 13, textAlign: 'center', marginHorizontal: 24 },
 })

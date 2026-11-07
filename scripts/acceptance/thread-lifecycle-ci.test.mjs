@@ -202,9 +202,59 @@ function providerReport() {
     acceptance: '11111111-1111-1111-1111-111111111111', runId: '22222222-2222-2222-2222-222222222222',
     sandboxId: 'owned-instance', template: 'codex', subscriptionAcceptance: false, modelCalls: 0,
     resumeScope: 'provider-resume-to-controller-monitor', counters: { info: 10, keepAlive: 2, pause: 3, kill: 1 },
-    cases: ['active-monitor', 'provider-refusal', 'lost-pause-response', 'resume-monitor', 'stale-epoch', 'stop-idempotence', 'end-idempotence'],
+    requestDeadlineScope: 'sdk-request-deadline-to-controller-recovery',
+    requestDeadline: { operation: 'setTimeout', requestTimeoutMs: 1, retries: 0, errorName: 'TimeoutError', earlyReplayIo: 0, recovered: true },
+    retirement: { scope: 'confirmed-checkpoint-to-automatic-retirement', clock: 'controlled-paused-deadline', checkpointSha256: 'c'.repeat(64),
+      restoredBeforeKill: true, restoredAfterKill: true, uploadClockAuthoritative: true, openRetentionRetained: true,
+      closedGraceRetained: true, missingCheckpointRetained: true, deviceTokenRevoked: true, automaticKillConfirmed: true, historyPreserved: true,
+      requestedAt: '2026-11-07T11:00:00.000Z', observedAt: '2026-11-07T11:00:01.000Z' },
+    cases: ['active-monitor', 'provider-request-deadline', 'provider-refusal', 'lost-pause-response', 'resume-monitor', 'stale-epoch', 'stop-idempotence', 'end-idempotence'],
     cleanup: { provider: 'confirmed_missing', database: 'dropped' }, unexpected: 'private-provider-body' }
 }
+
+test('real request deadline evidence requires the actual timeout, bounded no-retry call and recovered controller', async () => {
+  const raw = providerReport()
+  raw.requestDeadline.unexpected = 'private-provider-body'
+  const passed = await providerReceipt({ sourceCommit: SHA, run: async () => raw })
+  assert.equal(passed.status, 'passed')
+  assert.equal(passed.scope.requestDeadlineScope, 'sdk-request-deadline-to-controller-recovery')
+  assert.deepEqual(passed.requestDeadline, providerReport().requestDeadline)
+  assert.ok(!JSON.stringify(passed).includes('private-provider-body'))
+  for (const mutate of [value => { delete value.requestDeadline },
+    value => { delete value.requestDeadlineScope },
+    value => { value.requestDeadline.errorName = 'AbortError' },
+    value => { value.requestDeadline.requestTimeoutMs = 15_000 },
+    value => { value.requestDeadline.retries = 1 },
+    value => { value.requestDeadline.earlyReplayIo = 1 },
+    value => { value.requestDeadline.recovered = false },
+    value => { value.cases = value.cases.filter(name => name !== 'provider-request-deadline') }]) {
+    const bad = providerReport(); mutate(bad)
+    const rejected = await providerReceipt({ sourceCommit: SHA, run: async () => bad })
+    assert.equal(rejected.status, 'failed')
+    assert.equal(rejected.cleanup.status, 'unconfirmed')
+  }
+})
+
+test('automatic retirement evidence requires confirmed recoverable bytes, retention refusals and preserved history', async () => {
+  const raw = providerReport()
+  raw.retirement.unexpected = 'private-checkpoint-bytes'
+  const passed = await providerReceipt({ sourceCommit: SHA, run: async () => raw })
+  assert.equal(passed.status, 'passed')
+  assert.deepEqual(passed.retirement, providerReport().retirement)
+  assert.ok(!JSON.stringify(passed).includes('private-checkpoint-bytes'))
+  for (const field of ['restoredBeforeKill', 'restoredAfterKill', 'uploadClockAuthoritative', 'openRetentionRetained',
+    'closedGraceRetained', 'missingCheckpointRetained', 'deviceTokenRevoked', 'automaticKillConfirmed', 'historyPreserved']) {
+    const bad = providerReport(); bad.retirement[field] = false
+    assert.equal((await providerReceipt({ sourceCommit: SHA, run: async () => bad })).status, 'failed')
+  }
+  for (const mutate of [value => { delete value.retirement }, value => { value.retirement.scope = 'explicit_end' },
+    value => { value.retirement.clock = 'natural_expiry' }, value => { value.retirement.checkpointSha256 = '' },
+    value => { value.counters.kill = 0 }, value => { value.counters.kill = 2 },
+    value => { value.retirement.requestedAt = 'not-a-date' }, value => { value.retirement.observedAt = '2020-01-01T00:00:00.000Z' }]) {
+    const bad = providerReport(); mutate(bad)
+    assert.equal((await providerReceipt({ sourceCommit: SHA, run: async () => bad })).status, 'failed')
+  }
+})
 
 test('only actual completed driver cleanup allows the independent subscription cases after a provider failure', async () => {
   const passed = await providerReceipt({ sourceCommit: SHA, run: async () => providerReport() })
@@ -245,9 +295,10 @@ test('continue-on-error never turns partial, failed or unconfirmed-cleanup evide
   assert.equal(result.status, 'passed')
   assert.equal(result.questionResume, 'passed')
   assert.equal(result.providerIntegration, 'passed')
+  assert.equal(result.automaticRetirement, 'passed')
   assert.equal(result.issueAcceptance, 'incomplete')
   assert.deepEqual(result.pending, ['external_wait_and_adjacent_stage_continuity', 'terminal_revoke_and_close_grace_retention',
-    'provider_timeout_fault_injection', 'latency_and_cost_measurement'])
+    'latency_and_cost_measurement'])
   assert.equal(result.subscriptions, undefined, 'the report never declares complete subscription/issue acceptance')
   for (const status of ['partial', 'blocked', 'failed'])
     assert.equal(completeEvidence(SHA, provider, { ...owner, status }, outcomes).status, 'failed')
@@ -256,6 +307,19 @@ test('continue-on-error never turns partial, failed or unconfirmed-cleanup evide
   const failedProvider = completeEvidence(SHA, provider, owner, { ...outcomes, provider: 'failure' })
   assert.equal(failedProvider.status, 'failed')
   assert.equal(failedProvider.providerIntegration, 'incomplete')
+  assert.ok(failedProvider.pending.includes('provider_timeout_fault_injection'))
+  for (const mutate of [value => { delete value.requestDeadline },
+    value => { delete value.retirement },
+    value => { value.retirement.restoredAfterKill = false },
+    value => { value.counters.kill = 0 }, value => { value.counters.kill = 2 },
+    value => { value.requestDeadline.errorName = 'AbortError' },
+    value => { value.cases = value.cases.filter(name => name !== 'provider-request-deadline') },
+    value => { value.scope = { ...value.scope, requestDeadlineScope: 'unproved' } }]) {
+    const bad = structuredClone(provider); mutate(bad)
+    const incomplete = completeEvidence(SHA, bad, owner, outcomes)
+    assert.equal(incomplete.providerIntegration, 'incomplete')
+    assert.ok(incomplete.pending.includes('provider_timeout_fault_injection'))
+  }
   assert.equal(completeEvidence(SHA, { ...provider, sourceCommit: OTHER }, owner, outcomes).providerIntegration, 'incomplete')
   assert.equal(completeEvidence(SHA, provider, null, { ...outcomes, owner: 'skipped' }).status, 'failed')
   for (const override of [{ issueAcceptance: 'passed' }, { scope: 'full_issue_acceptance' }, { cases: owner.cases.slice(0, 1) },

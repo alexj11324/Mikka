@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { cleanupLifecycleCase, createProviderObserver, isExactNativeCommand, lifecycleHash, MODELS, nativeEvidence, nativeSnapshotCommand,
   readOptions, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
 import { watchRun } from './cloud-startup.mjs'
@@ -46,6 +47,20 @@ test('entry requires main workflow, exact source, runner temp, and the existing 
   assert.deepEqual(MODELS, { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' })
 })
 
+test('Owner RPC action literals belong to the real registry and argument-schema closed sets', () => {
+  const actionNames = path => new Set([...readFileSync(new URL(path, import.meta.url), 'utf8')
+    .matchAll(/^  '([^']+)':/gm)].map(match => match[1]))
+  const registry = actionNames('../../lib/desktop-rpc/registry.ts')
+  const schemas = actionNames('../../lib/desktop-rpc/schemas.ts')
+  const source = readFileSync(new URL('./thread-lifecycle.mjs', import.meta.url), 'utf8')
+  const used = new Set([...source.matchAll(/\.rpc\(\s*['"]([^'"]+)['"]/g)].map(match => match[1]))
+  assert.ok(used.size > 0 && registry.size > 0 && schemas.size > 0)
+  for (const action of used) {
+    assert.ok(registry.has(action), `${action} is absent from the real RPC registry`)
+    assert.ok(schemas.has(action), `${action} is absent from the real RPC argument schemas`)
+  }
+})
+
 test('unknown errors and secret response bodies never become public error strings', () => {
   assert.equal(safeError(new Error('PRIVATE_PASSWORD cookie=PRIVATE_COOKIE')), 'lifecycle_failed')
   assert.equal(safeError(new Error('lifecycle_source_pin_required')), 'lifecycle_source_pin_required')
@@ -57,7 +72,7 @@ test('provider 404 before positive ownership is blocked, not pause or cleanup pr
   const observe = createProviderObserver({ apiKey: 'PRIVATE_KEY', now, getInfo: async () => { calls++; throw { status: 404, body: 'PRIVATE_RESPONSE' } } })
   const proof = await observe({ sandboxId: 'owned-case-vm', workspaceId, originRunId: id(11) })
   assert.equal(calls, 1)
-  assert.deepEqual(proof, { observedAt: new Date(epoch).toISOString(), vmHash: lifecycleHash('vm', 'owned-case-vm'),
+  assert.deepEqual(proof, { requestedAt: new Date(epoch).toISOString(), observedAt: new Date(epoch).toISOString(), vmHash: lifecycleHash('vm', 'owned-case-vm'),
     status: 'blocked', reason: 'account_mapping_unproven_404', ownershipVerified: false })
   assert.doesNotMatch(JSON.stringify(proof), /PRIVATE/)
 })
@@ -76,6 +91,27 @@ test('provider requires exact application/workspace/creation-run metadata and ac
   assert.equal((await observe({ ...target, originRunId: id(12) })).reason, 'account_mapping_unproven_404')
   next = { sandboxId: 'owned-case-vm', state: 'paused', metadata: { application: 'mikka-thread', workspaceId, runId: id(12), operationId: id(20) } }
   assert.equal((await observe(target)).reason, 'provider_metadata_mismatch')
+})
+
+test('provider observation times distinguish request start from successful, missing and failed responses', async () => {
+  let clock = epoch, outcome = 'paused'
+  const observe = createProviderObserver({ now: () => clock, apiKey: 'PRIVATE_KEY', getInfo: async () => {
+    clock += 250
+    if (outcome === 'missing') throw { status: 404 }
+    if (outcome === 'failed') throw new Error('PRIVATE_PROVIDER_RESPONSE')
+    return { sandboxId: 'owned-case-vm', state: outcome,
+      metadata: { application: 'mikka-thread', workspaceId, runId: id(11), operationId: id(20) } }
+  } })
+  for (const state of ['paused', 'missing', 'failed']) {
+    outcome = state
+    const requestedAt = new Date(clock).toISOString(), observedAt = new Date(clock + 250).toISOString()
+    const result = await observe({ sandboxId: 'owned-case-vm', workspaceId, originRunId: id(11) })
+    assert.equal(result.observedAt, observedAt)
+    assert.equal(result.requestedAt, requestedAt)
+    assert.equal(result.status, state === 'failed' ? 'blocked' : 'observed')
+    assert.equal(result.ownershipVerified, true)
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE/)
+  }
 })
 
 test('no observation key does not contact E2B or substitute the CI key into product settings', async () => {
@@ -181,7 +217,7 @@ function mainClient({ configured = true, errorOnArchive = false, loseFirstProfil
       calls.push({ action, args })
       if (action === 'model-order.getModelOrder') return { candidates: Object.entries(MODELS).map(([harness, model], index) => ({
         harness, model, credentialOwnerId: ADMIN, source: { kind: 'subscription', connectionId: id(50 + index) } })) }
-      if (action === 'workspace-secrets.getE2BKey') return { configured, byoEnabled: true, lastErrorCode: null }
+      if (action === 'workspace-secrets.getE2BKeyCapability') return { canEdit: true, configured, byoEnabled: true, lastErrorCode: null, lastErrorAt: null }
       if (action === 'execution-settings.getBotModelMenu') return { groups: Object.entries(MODELS).map(([harness, modelId], index) => ({
         kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: 'Shared member', options: [{ id: id(70 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })) }
       if (action === 'execution-settings.chooseBotModel') {
@@ -211,6 +247,27 @@ test('missing Owner cloud key records both fixed subscription preconditions with
   assert.equal(report.cleanup.status, 'passed')
   assert.ok(f.calls.some(call => call.path === '/api/auth/sign-out'))
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|acceptance\+|apiKey|cookie|password/i)
+})
+
+test('preflight HTTP failures retain their closed phase on the report and both unallocated legs', async () => {
+  for (const [action, phase, code] of [
+    ['model-order.getModelOrder', 'subscription_catalogue', 'startup_http_502'],
+    ['workspace-secrets.getE2BKeyCapability', 'owner_cloud_capability', 'startup_http_404'],
+  ]) {
+    const f = mainClient(), original = f.client.rpc
+    f.client.rpc = (name, args) => {
+      if (name === action) throw new Error(code, { cause: new Error('PRIVATE_RESPONSE_BODY https://private.invalid') })
+      return original(name, args)
+    }
+    const report = await runThreadLifecycle(readOptions(env), { env, createClient: () => f.client, now, readSource: async () => SOURCE_FILE,
+      WebSocketImpl: class {}, runCase: async () => assert.fail('must not allocate') })
+    assert.deepEqual(report.failure, { phase, code })
+    assert.equal(report.error, code)
+    assert.ok(report.cases.every(item => item.status === 'blocked' && item.failure.phase === phase && item.failure.code === code))
+    assert.ok(!f.calls.some(call => call.action === 'bots.createBot'))
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_RESPONSE_BODY|private\.invalid|cause/)
+  }
 })
 
 test('a failed first leg still runs the second fixed model; the account and profiles are cleaned', async () => {
@@ -422,7 +479,8 @@ test('live deadline final read is serialized behind the in-flight async observer
   assert.equal(reads, 2); assert.equal(maximum, 1)
 })
 
-function lifecycleClient({ providerBlocked = false, changedSession = false, driftAtAnswer = false, missRunningSample = false } = {}) {
+function lifecycleClient({ providerBlocked = false, changedSession = false, driftAtAnswer = false, missRunningSample = false,
+  finishedAt = { origin: new Date(epoch + 20).toISOString(), continuation: new Date(epoch + 40).toISOString() } } = {}) {
   const fixed = fixture(), actions = [], observations = []
   let phase = 'origin', machineState = 'running', answered = false, cancelled = false, pinCalls = 0
   const question = final => ({ id: final ? id(22) : id(21), issueId: fixed.issueId, taskId: fixed.taskId, kind: 'decision',
@@ -435,7 +493,9 @@ function lifecycleClient({ providerBlocked = false, changedSession = false, drif
     const final = runId === fixed.continuationRunId, record = { ...fixed, runId }
     const chunks = final ? [...proofChunks(record, 'after_answer', true), ...proofChunks(record, 'delivery', true)] : proofChunks(record, 'before_question')
     chunks.push(...nativePair(`${runId}:ask`, 'mcp__mikka__ask_human', { kind: 'decision', question: question(final).question }, final ? [{ type: 'text', text: 'Recorded' }] : 'Recorded', 10))
-    return { thread: { id: runId, status: terminal ? 'stopped' : 'running' }, chunks,
+    return { thread: { id: runId, status: terminal ? 'stopped' : 'running', finishedAt: new Date(epoch + 999).toISOString(),
+      attempts: [{ runId: fixed.runId, status: final || terminal ? 'stopped' : 'running', finishedAt: final || terminal ? finishedAt.origin : null },
+        ...(final ? [{ runId: fixed.continuationRunId, status: terminal ? 'stopped' : 'running', finishedAt: terminal ? finishedAt.continuation : null }] : [])] }, chunks,
       live: { runs: [{ id: runId, workspaceId }] } }
   }
   const frozenEvidence = runId => ({ run: { id: runId, issueId: fixed.issueId, harness: 'claude_code', model: MODELS.claude_code,
@@ -532,6 +592,22 @@ test('normal double decision passes its declared scope while overall issue accep
   assert.equal(report.delivery.finalSubmission, 'blocked_unpinned_next_stage_profile')
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|markerValue|reportText/)
   assert.ok(!f.actions.some(item => item.action?.includes('setIssueDeleted')))
+})
+
+test('terminal timestamps come from the exact read attempt and missing timestamps do not add a pass gate', async () => {
+  const report = await runFixture(lifecycleClient())
+  assert.equal(report.status, 'passed')
+  assert.equal(report.terminal.origin.runId, id(11))
+  assert.equal(report.terminal.origin.finishedAt, new Date(epoch + 20).toISOString())
+  assert.equal(report.terminal.continuation.runId, id(12))
+  assert.equal(report.terminal.continuation.finishedAt, new Date(epoch + 40).toISOString())
+  assert.equal(report.terminal.continuation.source, 'normal_owner_thread_attempt')
+  assert.equal(report.terminal.continuation.status, 'stopped')
+  const absent = await runFixture(lifecycleClient({ finishedAt: { origin: null, continuation: 'PRIVATE_NOT_A_TIMESTAMP' } }))
+  assert.equal(absent.status, 'passed')
+  assert.equal(absent.terminal.origin.finishedAt, null)
+  assert.equal(absent.terminal.continuation.finishedAt, null)
+  assert.doesNotMatch(JSON.stringify(absent), /PRIVATE_NOT_A_TIMESTAMP/)
 })
 
 test('unmatched observer account preserves genuine native/Owner evidence but never invents provider pause or deletion', async () => {

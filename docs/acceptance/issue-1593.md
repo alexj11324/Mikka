@@ -76,21 +76,26 @@ Node 24, pnpm 10.34.3 and PostgreSQL 17.
 | Static policy / migrations | Full code lint and migration/factory checks pass; migration regression suite 55/55. UI policy and copy checks pass. |
 | Daemon socket integration | Six relevant files, 109/109 passing in cloud Linux. The 46 subscription-resume fixtures require the existing non-root host guard; they use local fake CLI fixtures, not real subscriptions. |
 | API / CLI | 78/78 API contract tests pass after regenerating the standard route manifest; actual local `/mikka/api/version` and `/mikka/sign-in` return HTTP 200, migrations and daemon CLI `--help` exit 0. |
-| Exact-head CI | [PR #1610](https://github.com/alexj11324/Mikka/pull/1610): the final head `fc17849c742563e3a9bc5ae54719563face90def` passed its checks, including the corrected DB/daemon/Node 22 regressions and GitGuardian. It merged as `4f0f68e971b2676a156a3cedd7bc97413afb2310`. The acceptance wiring follow-up needs its own current-head CI and real main-run evidence. |
+| Exact-head CI | [PR #1610](https://github.com/alexj11324/Mikka/pull/1610) passed its exact-head checks and merged as `4f0f68e971b2676a156a3cedd7bc97413afb2310`. [PR #1628](https://github.com/alexj11324/Mikka/pull/1628) passed all eight exact-head workflows and merged as `f811448d805e7baa7b032fd6ae62d991f59966c8`; its [main CI](https://github.com/alexj11324/Mikka/actions/runs/42356253038) passed all 12 jobs. A later correction requires its own exact-head checks. |
 | Cloud runtime unit fixtures | The initial CI exposed eight outdated SQL mocks; the updated task-lock and lifecycle receipts pass all 51 cloud-limits tests locally. |
 | Claude missing-session fallback | Both Node 22 and the main daemon CI found premature gate revocation during ordinary fallback. A direct-adapter test reproduced it; the fixed resume and provider-failure files pass 21/21, including strict question-session refusal and actual child-exit confirmation. |
 | Desktop continuation repository | The second CI passed DB shards 1/2/4 and daemon/Node 22, while three desktop-entry continuation cases exposed a dropped prior repository URL. The continuation now forwards the same admitted repository as the Coordinator/API paths; regression assertions require the original VM, device and repository. |
-| Real E2B fault injection | Prepared `scripts/e2b/thread-lifecycle-acceptance.ts`; not yet run with the provider credential. |
-| Claude subscription | The `4f0f68e9` candidate gate passed actual official Claude Code 2.1.305 / `claude-haiku-5-5`, including tool execution and the reply after it. The separate Task VM question/resume case has not run. |
-| Codex subscription | The same release registered official Codex 0.166.0, but obtained no accepted execution receipt. The Task VM question/resume case has not run. Required model remains `gpt-6-luna`. |
-| Production | [Web deployment run 42350707891](https://github.com/alexj11324/Mikka/actions/runs/42350707891) succeeded; deployment `dpl_DBRS1JzUmTdu7yuzq7pRBXZocCF6` is READY and the public version returned `4f0f68e971b2676a156a3cedd7bc97413afb2310`. [Main CI 42350707914](https://github.com/alexj11324/Mikka/actions/runs/42350707914) passed. Complete lifecycle acceptance remains pending. |
+| Real E2B fault injection | On `f811448d`, [run 42360728689](https://github.com/alexj11324/Mikka/actions/runs/42360728689) passed all seven original provider/controller cases against isolated PostgreSQL and a real VM; cleanup confirmed the VM missing and database dropped. Refusal/lost-response faults were injected; a real SDK request deadline was not exercised. |
+| Claude subscription | The `f811448d` candidate gate passed official Claude Code 2.1.305 / `claude-haiku-5-5`, including the native acknowledgement, a successful tool and reply after it. The separate Owner Task case stopped at preallocation HTTP 404. |
+| Codex subscription | The same `f811448d` gate passed official Codex 0.166.0 / `gpt-6-luna` with the required execution proofs. The separate Owner Task case stopped at the same preallocation HTTP 404. |
+| Production | [Web run 42356253062](https://github.com/alexj11324/Mikka/actions/runs/42356253062) and [runtime release 42356253078](https://github.com/alexj11324/Mikka/actions/runs/42356253078) succeeded. Runtime-refresh deployment `dpl_EKh8ATho1pPt7BaCeZzCnwhUqie8` is READY; at 09:41:01 UTC on 2026-11-07 the public version returned exact `f811448d805e7baa7b032fd6ae62d991f59966c8`. Complete lifecycle acceptance remains pending. |
 
 The real-provider driver refuses deployed/remote database targets and a dirty
 or mismatched source tree. Its nonallocating `--check` validates the target;
 full execution uses one uniquely tagged disposable VM, verifies pause,
 resume, static timeout renewal, stale epoch and kill behavior, and confirms
 cleanup. Provider-refusal and lost-response cases inject transport faults
-around real RPCs. This driver does not wait for natural timeout expiry, run a
+around real RPCs. The follow-up request-deadline case uses the actual SDK's
+one-millisecond request deadline with no automatic retries, requires the
+original native `TimeoutError`, and verifies durable backoff, no provider I/O
+on an early replay, and normal same-VM renewal recovery. A request that beats
+its deadline is inconclusive and cannot produce a passing receipt. This driver
+does not wait for natural timeout expiry, run a
 daemon, or execute a native subscription session; its report marks those
 boundaries and makes no model calls.
 
@@ -123,6 +128,237 @@ not evidence of quota exhaustion or a Codex CLI failure. The old artifact does
 not directly bind that workflow to its failed candidate sample, so that final
 correlation remains unproved. A separate 300-second stream timeout in the
 window is not assigned to this call merely from timestamp proximity.
+
+### Runtime publication and the first Owner attempt
+
+On 2026-11-07, `f811448d805e7baa7b032fd6ae62d991f59966c8` completed
+[release 42356253078, attempt 1](https://github.com/alexj11324/Mikka/actions/runs/42356253078).
+Both accepted subscription receipts bind worker
+`18d86efa6f4ed740bbc86f02db2f77eecc16cff6`, the exact source and candidate:
+
+| Path | Template | Actual run |
+| --- | --- | --- |
+| Claude Code / `claude-haiku-5-5` | `g4eg9fzgm51gtgnuzvax` | `bec62916-7bb6-4a07-80d0-49f3c3347482` |
+| Codex / `gpt-6-luna` | `bihq9h4vj8gehz7pfu9k` | `a9853441-177f-4d3f-b4da-a078a159f875` |
+
+Release evidence artifact `13569215487` was independently downloaded and
+verified against SHA-256
+`bd3e6d73ba17de06da4ea9f50fe27a0d2d4f23fb8a76dead7e5514ee577ae7a4`.
+Final cleanup artifact `13570185225` has SHA-256
+`e1c3d98fb9bc1ff525cd65aa7cbe7a9e3b72e49fe5bf118c9db42ead988410d4`:
+no remaining test sandboxes or cleanup errors; the three published templates
+are retained for production and rollback. The current Codex receipt does not
+identify which parameter caused the older 4f HTTP 400.
+
+[Task evidence run 42360728689, attempt 1](https://github.com/alexj11324/Mikka/actions/runs/42360728689)
+then authenticated the same release and Web source. At 09:42:02–09:42:12 UTC,
+its provider layer passed `active-monitor`, `provider-refusal`,
+`lost-pause-response`, `resume-monitor`, `stale-epoch`, `stop-idempotence` and
+`end-idempotence`. The isolated fixture run was
+`6eadc09c-37e4-46b0-9c39-51dcc197a6d5`, with official `codex` VM
+`ipktoromeirrmaexw85e0`. Its receipt confirms `provider: confirmed_missing`
+and `database: dropped`; it makes no daemon or subscription claim.
+
+The normal Owner driver ran from 09:42:17.417 to 09:42:27.585 UTC and stopped
+before allocating either Task. Both cases reported `startup_http_404`, with
+successful account/workspace cleanup. The strict aggregate correctly failed.
+Artifact `13569761286` was verified against SHA-256
+`2189e85f9fb89409ebf0699500f4b8f6678cee8a77017e3f46e95d1c9a23cec4`.
+
+The cause is a caller contract error: `workspace-secrets.getE2BKey` is an
+exported server action but is absent from the browser RPC registry/schema.
+The registered read-only capability action is
+`workspace-secrets.getE2BKeyCapability`. Unknown RPC actions return 404 before
+the key-status function runs, so this result says nothing about whether the
+Owner has configured a personal E2B key. The correction calls the existing
+capability action and verifies every literal Owner RPC against the real
+registry and schemas; the new contract regression failed on the old caller.
+Closed failure phases preserve where a preallocation or setup failure occurred
+without exporting HTTP bodies or credential data.
+
+### Second Owner attempt: real provider pass and shared-subscription refusal
+
+[PR #1631](https://github.com/alexj11324/Mikka/pull/1631) passed all six
+exact-head workflows and merged as
+`e4494a3c8620d0ac8fe4cd885144a3f47be0252c`. Its
+[main CI 42363131769](https://github.com/alexj11324/Mikka/actions/runs/42363131769)
+passed all 12 jobs. [Web run 42363131663](https://github.com/alexj11324/Mikka/actions/runs/42363131663)
+succeeded; deployment `dpl_2HY7JTyRWZrJ4TKudYa85xb1D6Bq` was READY and the
+public version returned exact `e4494a3c` at 10:37:44 UTC on 2026-11-07.
+The successful E2B release check `42363131705 / 1` found the worker unchanged
+at `18d86efa6f4ed740bbc86f02db2f77eecc16cff6`; it reused the published runtime.
+It did not build candidates or run new candidate subscription cases.
+
+[Task evidence run 42363177678 / 1](https://github.com/alexj11324/Mikka/actions/runs/42363177678)
+then bound the exact main, upstream attempt and public Web build. Artifact
+`13570494196` contains all four reports; two independent downloads verified
+the 4,563-byte ZIP against SHA-256
+`e576acab17ba836b814bf56b4066b630d56fc6a413fd30497b4d2007b1de376b`.
+
+At 10:37:46–10:37:58 UTC, the real-provider layer passed all eight ordered
+cases, including `provider-request-deadline`. Its fixture run was
+`043f4bd9-22e7-4bb7-830c-168b6abbf121`, VM `isdtm9nsqr5dtpiesklj7`, on the
+official `codex` template. The deadline receipt records one `setTimeout`
+request with `requestTimeoutMs: 1`, `retries: 0`, the native `TimeoutError`,
+`earlyReplayIo: 0` and `recovered: true`. Cleanup confirmed the VM missing
+and the isolated database dropped. This proves SDK deadline-to-controller
+recovery, not natural timeout expiry or native subscription execution.
+
+The Owner driver ran from 10:38:02.127 to 10:42:35.923 UTC. Its normal
+capability read confirmed `configured: true` and `byoEnabled: true`; both
+cases proved the intended fixed model and shared subscription binding.
+Each created a real Task VM, but neither reached a native question:
+
+| Path | Origin run | VM | Origin `finishedAt` UTC |
+| --- | --- | --- | --- |
+| Claude Code / `claude-haiku-5-5` | `6d125edd-5129-47e2-8034-2b316d99df68` | `ia39xpkfn9u93ach3zfxz` | 10:40:20.363 |
+| Codex / `gpt-6-luna` | `80ea7d0a-1b94-4bb5-8082-846c704abe40` | `ip13i0ea3cg416s11egxp` | 10:42:27.560 |
+
+Both reports stopped at `waiting_for_native_question` with
+`lifecycle_unexpected_factory_attempt`. Read-only production queries, scoped
+to those exact runs and their reported retries, found `stopReason: device_lost`,
+no native session or worktree, and zero `run_chunks`. The two follow-ups have
+`retryOf` pointing to their origins and `attempt: 2`; cleanup stopped them
+before they started. Thus the driver error identifies the unexpected retry,
+not the reason the original claim failed.
+
+The initial leases expired without renewal. Server claim timing reached
+`response_fence` in 5.147 and 5.316 seconds, so a 90-second credential-preparation
+wait is not the explanation. The exact production bindings show the desktop
+owner equals the run requester, while the shared subscription owner differs.
+Both runs use the desktop template, have no repository remote, and have no
+read-only mode or policy ceiling; the workspace computer permission is `allow`.
+The response therefore carries a computer grant for the requester. The daemon's
+old `credentialOwner()` instead returns the subscription payer and rejects this
+grant before `supervisor.start()`. No journal/active entry is created, so the
+daemon reports no run to renew; the existing recovery timer eventually records
+`device_lost` and creates a retry. A regression through the real
+`claimAndStart()` reproduces this pre-start rejection. The worker's later log
+stream was not retained, so no exact worker exception line is claimed as a
+production observation.
+
+Independent review found the same payer/computer-owner comparison again in
+`createHostedBotRunner()`, after credential preparation and before the local
+computer grant and CLI spawn. Fixing only the daemon precheck would therefore
+leave both shared-subscription desktop paths blocked. The native session
+ledger and resume checks correctly bind to the subscription payer; those
+checks must stay intact.
+
+The same-source lifecycle evidence still establishes automatic failed-run
+parking and final cleanup. Matching run/VM hashes and epoch 2 bind the events:
+
+| Observation, UTC | Claude | Codex |
+| --- | --- | --- |
+| Run token revoked | 10:40:20.817 | 10:42:28.140 |
+| `pause_requested` | 10:40:21.711 | 10:42:29.100 |
+| Device token revoked | 10:40:21.718 | 10:42:29.107 |
+| First provider `pause_ack` after commit | 10:40:22.020 | 10:42:29.453 |
+| Reconcile `run_ended / pause_ack` | 10:40:22.051 | 10:42:29.486 |
+| Explicit cleanup `kill_ack` | 10:40:24.910 | 10:42:32.500 |
+| Independent provider missing confirmation | 10:40:26.711 | 10:42:34.276 |
+
+Each origin had exactly one issued device token and one issued run token;
+the scoped read-only queries found both revoked, with no unrevoked/unexpired
+run tokens. The unstarted retries had no issued run tokens. These are database
+revocation observations, not attempts to authenticate with the old secrets.
+The `finishedAt` to first `pause_ack` confirmation bounds are **1.657 seconds**
+and **1.893 seconds**. They include scheduling, provider response, database and
+logging time; they do not identify E2B's exact internal transition instant.
+The later explicit cleanup kills are not automatic idle-retirement timings.
+The 121/113 compute-second values are cumulative database estimates, not idle
+compute, provider bills or a measured before/after saving.
+
+All three test VMs were independently confirmed missing. Owner cleanup also
+restored the workspace and archived the created Profiles; task history remains.
+The strict aggregate correctly failed with `providerIntegration: passed`,
+`questionResume: incomplete` and `issueAcceptance: incomplete`. It cleared
+only `provider_timeout_fault_injection`. Neither a native model execution nor
+an original-session question continuation is claimed for these two failed runs.
+
+The correction binds the server-issued computer grant to the requested run
+and current device. An existing signed policy envelope additionally binds its
+run, device and execution owner; the existing independent signature, issuer
+and freshness verifier still runs before repository or adapter effects.
+Older authenticated claims without an envelope keep their existing contract.
+The broker reuses the same binding check for permission, desktop actions and
+capture, with the existing active lease, shutdown, registration and display
+fences. Hosted startup requires that broker and its policy-scoped grant,
+without mistaking the subscription payer for the Task's computer owner. It
+does not change credential routing, native-ledger scope, resume identity,
+protocol fields or the no-per-tool-remote-check contract. This runtime change
+requires new candidate conservation and both official subscription gates;
+the earlier unchanged-worker proof cannot stand in for those gates.
+
+### Checkpoint confirmation and automatic retirement
+
+The item 7 audit found a separate concrete contract mismatch. The daemon
+created `checkpoint.takenAt` from its device clock, while the authenticated
+upload route persisted `clock_timestamp()` and returned only HTTP 204. The
+terminal report retained the device timestamp. Both the lifecycle decision
+and the final locked retirement guard correctly require the report to match
+the uploaded row, so ordinary successful uploads could not establish that
+proof. Existing daemon fixtures kept the supplied time; existing database
+retirement fixtures supplied equal times manually. Neither exercised the
+actual upload-to-retirement boundary.
+
+The upload now returns a strict optional `{ runId, takenAt }` receipt from
+the same admitted database write. New workers bind final checkpoint evidence
+to that server timestamp; a confirmed native exit precedes the final upload,
+so its safe-point observation uses the same acknowledged time. Old workers
+ignore the new successful JSON body. A new worker receiving an old HTTP 204
+retains the workspace but cannot certify an archive for automatic retirement.
+The server upload clock, final-write ordering, exact checkpoint match, task
+closure, epoch and ownership guards stay authoritative. No tolerance window,
+data migration or client-supplied retirement timestamp is introduced.
+
+The legacy empty-acknowledgement case failed against the old supervisor and
+passed after the change. The two complete terminal-checkpoint/HTTP test files
+pass 52/52 locally; protocol tests pass 24/24. The new PostgreSQL cases consume
+the real POST receipt, persist completion, park and run the actual controller
+and end guard. They require a current receipt to permit retirement, reject a
+replaced receipt or no receipt, and preserve the uploaded bytes and history.
+These database cases require the follow-up head's CI; they were not executed
+against a local database in this interactive environment.
+
+CI `42370351852/1` on `d3b8234` then exercised that boundary in PostgreSQL.
+The current-receipt case reached one acknowledged kill, `ended` and a null
+sandbox, but its immediate replay exposed a completed reconciliation claim
+still retained by the retirement write. The fix releases only that completed
+claim in the existing owner/workspace/epoch/sandbox-fenced success update,
+after provider acknowledgement; failed deletion and pending creation keep
+their recovery deadlines. The two negative cases also needed distinct agent
+fixture names to satisfy the existing owner/name unique key. Their full
+GREEN result remains required on the corrected head; the earlier failure is
+not reported as a passing suite.
+
+The guarded provider driver also strengthens `end-idempotence`. Its same
+single disposable VM contains a known Git base and a real changed file. The
+file must survive actual pause/resume, and its actual Git diff goes through
+the authenticated checkpoint handler in the isolated database. The runner
+reconstructs the base and recovers the saved bytes independently before and
+after the VM is killed. Only fixture `pausedAt` deadlines advance: an open
+task after seven days, a closed task inside its one-hour grace, and a closed
+task without final archive proof must all retain the VM. A valid receipt then
+allows the real controller to call fenced automatic end; repeated end must
+not kill twice, and task/run/checkpoint history must remain unchanged.
+The result carries a closed `retirement` receipt, and aggregation rejects
+missing restore, retention-refusal, token-revocation, kill or history evidence.
+The one-hour and seven-day clocks start at `lifecycle.pausedAt`, not at the
+time the Task is closed. This is a controlled clock/provider test with no
+native session; it does not claim a natural seven-day wait or replace Owner
+subscription acceptance. Its real-provider result is still pending execution
+on the follow-up merge source.
+
+Item 6 gains a separate controlled PostgreSQL case for external PR waiting:
+the actual lifecycle/park path pauses a terminal producer while Factory waits
+for approval; the normal publication and merged-event writers complete the
+Task and deliver committed live invalidations without starting compute.
+Duplicate events cannot create another run or provider action. Provider and
+live transports are explicit fixtures. Existing signed-webhook admission and
+the full adjacent-stage Factory dispatch/handoff tests provide the other
+controlled boundaries. The new joint case passed in `d3b8234` CI's
+`test:factory-approval-db` suite (52/52, no skips). The final corrected head
+must still pass its complete CI before merge.
 
 ### Main-only acceptance delivery
 
@@ -177,10 +413,13 @@ A green evidence run covers this limited question → pause → original VM/SID
 resume → native report/marker flow. Every summary still records
 `issueAcceptance: incomplete`. The remaining issue criteria require separate
 evidence for external waiting and adjacent-stage continuity (item 6), terminal
-revocation, closed-task grace and safe retention (item 7), real-provider timeout
-fault injection (item 8), and measured pause/retirement latency and idle compute
-cost (section C). The reports' `pending` fields identify those original gaps;
-this narrower flow does not establish them.
+revocation, closed-task grace and safe retention (item 7), and measured
+pause/retirement latency and idle compute cost (section C). The aggregate only
+clears the real-provider timeout fault pending item when the same-source
+provider step, all eight ordered cases, actual SDK deadline/recovery receipt
+and cleanup succeed. The older seven-case report cannot clear that item.
+The separate Owner report makes no provider-fault claim. The reports' `pending`
+fields identify the original gaps this narrower flow does not establish.
 
 The native report and its trusted uploaded checkpoint can establish the
 delivery boundary in item 5. This driver stops at its second real Owner decision
@@ -201,6 +440,23 @@ continuity, token revocation and final cleanup for each official subscription.
 Measure terminal-to-provider-pause latency and idle compute seconds on the
 same source. No production cost savings or latency numbers are claimed by
 the deterministic tests.
+
+The Owner driver now preserves `terminal.origin` and `terminal.continuation`
+from the exact `runId` in the already-read normal Owner thread's attempts.
+Each record includes the actual `finishedAt` when present; a missing or invalid
+timestamp remains null and does not add a new question/resume gate. A chain's
+latest completion time is never substituted for another attempt's completion.
+Provider observations retain `requestedAt` separately and take `observedAt`
+after the response or error arrives. That response time is a confirmation
+bound, not the provider's exact physical transition instant.
+
+Combine a valid attempt completion time with the matching server
+`thread_machine_lifecycle` `pause_ack` / `kill_ack`, run/VM hash and epoch when
+measuring confirmation latency. The report's Factory task hash differs from
+the server event's issue hash. A cumulative `computeSeconds` estimate includes
+productive work; it is not automatically idle compute or an actual bill.
+The first `f811448d` Owner attempt allocated no Task, so it provides no native
+terminal-to-pause timing or production cost comparison.
 
 ## Review and rollback
 

@@ -18,6 +18,7 @@ import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/compon
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
+import * as settingsFrameSlot from '@ui-slot/settings-frame'
 import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
@@ -96,6 +97,9 @@ const TaskDetail = dynamic(() => import('./task-detail').then(module => module.T
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
 // Settings chunks load inside the persistent frame, leaving its navigation and providers mounted.
+// OWN_SETTINGS_FRAME is optional (lib/ui-overlay.mjs UI_SLOT_EXPORTS): a layer without it keeps the workspace frame.
+const ownSettingsFrame = (settingsFrameSlot as { OWN_SETTINGS_FRAME?: boolean }).OWN_SETTINGS_FRAME === true
+const { SettingsFrame } = settingsFrameSlot
 const SettingsRouteContent = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsRouteContent), { loading: WorkspaceContentLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
@@ -546,12 +550,18 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     closeSettings(); showBrowser(true)
     if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) router.push('/')
   }
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame settings={settingsShown}
+  const settingsContent = pathname.startsWith('/settings')
+    ? <SettingsRouteContent user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+    : <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+  // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
+  // the default keeps the workspace frame mounted around settings (#1603).
+  // Both visual frames share the workspace's pending notes and computer registry.
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
+    ? <SettingsFrame user={user} onRail={leaveSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
+    : <AppFrame settings={settingsShown}
     bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} />}>
-    {settingsShown ? pathname.startsWith('/settings')
-      ? <SettingsRouteContent user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
-      : <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+    {settingsShown ? settingsContent
       : <>
     {/* The board keeps only the rail on its left (MIK-45); a phone, with no rail, keeps the list's sheet. */}
     <BotList phoneOnly={fullPage} bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} issues={tasks} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />
@@ -590,5 +600,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
 }

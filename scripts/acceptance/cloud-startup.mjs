@@ -25,6 +25,7 @@ const STARTUP_PHASES = new Set(['daemon.adapter.model_report', 'daemon.adapter.a
   'daemon.adapter.auth.context', 'daemon.adapter.auth.access', 'daemon.adapter.auth.token', 'daemon.adapter.auth.native_auth',
   'daemon.adapter.auth.refresh', 'daemon.adapter.auth.broker', 'daemon.adapter.workspace.shadow_clone', 'daemon.adapter.workspace.read_tree',
   'daemon.adapter.cli_init', 'daemon.adapter.account_check', 'daemon.adapter.account_check.account_info', 'daemon.adapter.account_check.login'])
+const PREPARATION_PHASES = new Set([...STARTUP_PHASES, 'daemon.adapter.cli_init.prewarm'])
 const sha = value => createHash('sha256').update(value).digest('hex')
 const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cause } : undefined) }
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
@@ -35,9 +36,9 @@ export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'si
 // messages. The candidate validator independently projects this same contract.
 export const STARTUP_FAILURE_CODES = Object.freeze([
   'aborted', 'action_refused', 'api_refused', 'bot_create_failed', 'bot_invalid', 'build_changed', 'build_mismatch', 'build_missing',
-  'candidate_target_invalid', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
+  'candidate_target_invalid', 'cleanup_machine_unconfirmed', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
   'coordinator_stream_invalid', 'coordinator_stream_too_large', 'coordinator_stream_unavailable', 'daemon_startup_timing_incomplete',
-  'dispatch_not_new', 'dispatch_not_observed', 'dispatch_refused', 'dispatch_run_missing', 'dispatch_timings_required',
+  'diagnostic_bot_required', 'dispatch_not_new', 'dispatch_not_observed', 'dispatch_refused', 'dispatch_run_missing', 'dispatch_timings_required',
   'ended_before_execution_proof', 'execution_device_mismatch', 'execution_timeout', 'factory_list_invalid', 'failed',
   'fixture_required', 'fixture_scope_invalid', 'foreign_origin', 'harness_invalid', 'http_error', 'issue_create_failed',
   'live_capability_missing', 'live_disconnected', 'live_origin_invalid', 'live_scope_missing', 'live_ticket_expired', 'live_ticket_invalid',
@@ -357,7 +358,7 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
 }
 
-function readStartupTiming(value, record) {
+function readStartupTiming(value, record, names = STARTUP_PHASES) {
   const duration = number => Number.isFinite(number) && number >= 0 && number <= 3_600_000
   const outcome = text => text === 'ok' || text === 'error'
   if (value?.version !== 1 || !/^[a-f0-9]{16}$/.test(value.runIdHash ?? '') || value.runIdHash !== record.runIdHash
@@ -366,13 +367,35 @@ function readStartupTiming(value, record) {
     || !duration(value.ms) || typeof value.truncated !== 'boolean' || !Array.isArray(value.phases) || value.phases.length > 64) return null
   const phases = []
   for (const phase of value.phases) {
-    if (!STARTUP_PHASES.has(phase?.name) || !outcome(phase.outcome) || !duration(phase.ms) || !duration(phase.startMs)
+    if (!names.has(phase?.name) || !outcome(phase.outcome) || !duration(phase.ms) || !duration(phase.startMs)
       || !duration(phase.endMs) || phase.endMs < phase.startMs || phase.endMs > value.ms + 0.01
       || Math.abs(phase.ms - (phase.endMs - phase.startMs)) > 0.01) return null
     phases.push({ name: phase.name, startMs: phase.startMs, endMs: phase.endMs, ms: phase.ms, outcome: phase.outcome })
   }
   return { version: 1, runIdHash: value.runIdHash, harness: value.harness, startedAt: value.startedAt, endedAt: value.endedAt,
     ms: value.ms, outcome: value.outcome, phases, truncated: value.truncated }
+}
+
+function readPreparationTiming(value, record, stage) {
+  if (value?.source !== 'prepared_agent_start' || value.harness !== 'claude_code' || !stage) return null
+  const timing = readStartupTiming(value, record, PREPARATION_PHASES)
+  // The task-owned Promise starts before the stage joins it and settles before
+  // that join returns. Never rebase its earlier intervals onto the stage root.
+  if (!timing || timing.startedAt > stage.startedAt || timing.endedAt > stage.endedAt) return null
+  return { ...timing, source: 'prepared_agent_start' }
+}
+
+/** Both start paths require actual successful CLI initialization. A provided
+ * but invalid/incomplete preparation receipt cannot fall back to old evidence. */
+export function hasStartupInitialization(record) {
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  if (record.startupTimingStatus !== 'complete' || !stage || stage.truncated || stage.outcome !== 'ok') return false
+  const has = (timing, name) => timing.phases.some(phase => phase.name === name && phase.outcome === 'ok')
+  if (record.preparationTimingStatus === undefined || record.preparationTimingStatus === 'unavailable')
+    return record.daemonPreparationTiming === undefined && has(stage, 'daemon.adapter.cli_init')
+  const prepared = record.preparationTimingStatus === 'complete' && readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  return Boolean(prepared && !prepared.truncated && prepared.outcome === 'ok'
+    && has(prepared, 'daemon.adapter.cli_init.prewarm') && has(prepared, 'daemon.adapter.cli_init'))
 }
 
 /** Only post-start provider output counts. Stage/usage/state/status and a bare
@@ -404,6 +427,12 @@ export function observeChunks(record, detail, observedAt) {
           if (timing) record.daemonStartupTiming ??= timing
           record.startupTimingStatus = record.daemonStartupTiming ? (record.daemonStartupTiming.truncated ? 'truncated' : 'complete')
             : data.startupTiming === undefined ? 'unavailable' : 'invalid'
+          if (data.preparationTiming !== undefined) {
+            const preparation = readPreparationTiming(data.preparationTiming, record, timing)
+            if (preparation) record.daemonPreparationTiming ??= preparation
+            record.preparationTimingStatus = record.preparationTimingStatus === 'invalid' || !preparation ? 'invalid'
+              : preparation.truncated ? 'truncated' : 'complete'
+          } else record.preparationTimingStatus ??= 'unavailable'
         }
         if (data.stage === 'agent_start' && data.ok) {
           started = true
@@ -604,7 +633,7 @@ export async function subscriptionProof(client, record, scope, profile) {
 export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now } = {}) {
   const cleanup = record.cleanup ??= { status: 'running', errors: [] }
   const runIds = new Set(record.runId ? [record.runId] : [])
-  let runsEnded = true
+  let runsEnded = true, machinesEnded = true
   const step = async (name, operation) => {
     try { await operation(); cleanup[name] = true; return true }
     catch (error) { cleanup.errors.push({ step: name, code: safeError(error) }); return false }
@@ -623,13 +652,14 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
   })
   // A normal stop on the original run also stops its later attempts. Keep any
   // discovered child IDs for failure recovery without issuing duplicate stops.
-  const initialRunIds = [...runIds]
+  const initialRunIds = [...runIds], chainRoots = [], handledRunIds = new Set()
   for (const runId of initialRunIds) {
+    if (handledRunIds.has(runId)) continue
+    chainRoots.push(runId)
     const stopped = await step(`runStopped_${runId}`, async () => {
       const ended = detail => {
-        if (target !== 'device') return TERMINAL.has(detail.thread?.status)
         const attempts = cleanupAttempts(detail, runId)
-        for (const attempt of attempts) runIds.add(attempt.runId)
+        for (const attempt of attempts) { runIds.add(attempt.runId); handledRunIds.add(attempt.runId) }
         return attempts.every(attempt => TERMINAL.has(attempt.status))
       }
       const detail = await client.rpc('agents.getIssueThread', [record.issueId, runId])
@@ -642,23 +672,55 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
         if (!ended(latest)) throw error
         return
       }
-      // A local device cannot be removed while any run is live. An accepted
-      // stop only records stopRequestedAt; wait for the daemon's real terminal
-      // update using the same owner live channel as execution observation.
-      if (target === 'device') await watchRun(client, { issueId: record.issueId, runId },
+      // An accepted stop only records stopRequestedAt. Both placements must
+      // observe the complete server-resolved chain's real terminal update.
+      await watchRun(client, { issueId: record.issueId, runId },
         Math.min(timeoutMs, 60000), WebSocketImpl, now, runIds)
     })
-    if (target === 'device' && !stopped) runsEnded = false
-    if (target === 'cloud') await step(`machineEnded_${runId}`, () => client.json(`/api/threads/${runId}/machine`, post({ action: 'end' }), 120000))
+    if (!stopped) runsEnded = false
+  }
+  if (target === 'cloud') {
+    cleanup.machines = []
+    // An adopted old row is already ended and no longer owns the sandbox.
+    // End every discovered attempt through the normal owner API; its response
+    // is acknowledged only after provider retirement (or a no-resource row).
+    for (const runId of runIds) {
+      const receipt = { runId, requestedAt: iso(now()), outcome: 'unconfirmed' }
+      cleanup.machines.push(receipt)
+      const ended = await step(`machineEnded_${runId}`, async () => {
+        try {
+          const result = await client.json(`/api/threads/${runId}/machine`, post({ action: 'end' }), 120000)
+          assert(result?.runId === runId && result.state === 'ended', 'cleanup_machine_unconfirmed')
+          receipt.outcome = 'ended'; receipt.state = result.state
+        } catch (error) { receipt.outcome = 'failed'; receipt.code = safeError(error); throw error }
+        finally { receipt.finishedAt = iso(now()) }
+      })
+      if (!ended) machinesEnded = false
+    }
+    // This is one bounded readback per resolved chain, not a poll. It sees the
+    // latest owner, including an adopted VM, and maps ended-with-resources to
+    // error. A null/ended view alone never substitutes for the end receipts.
+    for (const runId of chainRoots) {
+      const verified = await step(`machineVerified_${runId}`, async () => {
+        const machine = await client.rpc('agents.getThreadMachine', [record.issueId, runId])
+        const view = { runId, observedAt: iso(now()), kind: ['cloud', 'laptop', 'server'].includes(machine?.kind) ? machine.kind : null,
+          state: ['online', 'offline', 'starting', 'running', 'paused', 'ended', 'error'].includes(machine?.state) ? machine.state : null,
+          sandboxIdHash: typeof machine?.cloud?.sandboxId === 'string' ? sha(machine.cloud.sandboxId).slice(0, 16) : null }
+        cleanup.machineViews ??= []
+        cleanup.machineViews.push(view)
+        assert(machine?.kind === 'cloud' && machine.state === 'ended' && machine.cloud === null, 'cleanup_machine_unconfirmed')
+      })
+      if (!verified) machinesEnded = false
+    }
   }
   // Failed Factory cancellation can leave a producer able to create another
   // attempt. Keep the issue accessible for recovery even if known runs ended.
-  if (record.issueId && runsEnded && factoryCancelled) await step('taskDeleted', async () => {
+  if (record.issueId && runsEnded && factoryCancelled && machinesEnded) await step('taskDeleted', async () => {
     const { issue } = await client.rpc('issues.getIssue', [record.issueId])
     assert(issue?.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
     await client.rpc('issue-operations.setIssueDeleted', [{ id: issue.id, revision: issue.revision }])
   })
-  if (!runsEnded || !factoryCancelled) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
+  if (!runsEnded || !factoryCancelled || !machinesEnded || cleanup.errors.length) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
 }
 
@@ -722,8 +784,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'execution_receipt'
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
     if (record.requireAgentAcceptance) assert(record.runtimeTiming?.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'), 'official_agent_acceptance_missing')
-    if (!deviceId) assert(record.startupTimingStatus === 'complete' && record.daemonStartupTiming?.outcome === 'ok'
-      && record.daemonStartupTiming.phases.some(phase => phase.name === 'daemon.adapter.cli_init'), 'daemon_startup_timing_incomplete')
+    if (!deviceId && (runtimeEvidenceMode === 'required' || officialTiming === 'enabled')) assert(hasStartupInitialization(record), 'daemon_startup_timing_incomplete')
     record.observed = { messageToAgentStartMs: dateValue(record.agentStart.observedAt) - dateValue(record.messageSubmittedAt),
       toolObservedToAgentStartMs: dateValue(record.agentStart.observedAt) - dateValue(record.dispatchObservedAt),
       toolObservedToFirstProviderMs: dateValue(record.firstProviderChunk.observedAt) - dateValue(record.dispatchObservedAt),
@@ -799,10 +860,13 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         // and this path owns no workspace variable requiring admin deletion.
         report.officialTiming = { enabled: true, source: 'trusted_host', scope: 'candidate_device', variableCreated: false, cleaned: true }
       } else if (options.mode === 'acceptance') {
-        // Released cloud workers collect through the same trusted host. The
-        // actual CLI/MCP receipt is still required below; old workers with no
-        // collector fail that gate instead of changing workspace permissions.
-        report.officialTiming = { enabled: true, source: 'trusted_host', scope: 'cloud_task', variableCreated: false, cleaned: true }
+        // An operator pins this dedicated Bot/repository in a short-lived
+        // deployment window. The existing authorized claim opts in matching
+        // read-only subscription tasks; this member writes no workspace env.
+        // The window covers that Bot/repository, not one uniquely granted run.
+        assert(UUID.test(options.botId ?? ''), 'diagnostic_bot_required')
+        report.officialTiming = { enabled: true, source: 'trusted_claim', scope: 'dedicated_bot_repository_window',
+          botId: options.botId, variableCreated: false, cleaned: true }
       } else {
         const listed = await client.rpc('workspace-secrets.listSecrets', [scope.workspaceId])
         assert(listed?.role === 'admin', 'timing_variable_cleanup_forbidden')

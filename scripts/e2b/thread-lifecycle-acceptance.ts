@@ -1,5 +1,6 @@
-/** Real E2B provider integration + disposable PostgreSQL, with injected transport
- * faults. No model, subscription, API-server or daemon acceptance is implied.
+/** Real E2B provider integration + disposable PostgreSQL, with a real SDK request
+ * deadline and injected transport faults. No model, subscription, API-server or
+ * daemon acceptance is implied.
  *
  * NODE_ENV=test node --import ./scripts/server-test.mjs --import tsx \
  *   scripts/e2b/thread-lifecycle-acceptance.ts [--check]
@@ -8,12 +9,16 @@
  */
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { gzipSync } from 'node:zlib'
 import { Pool } from 'pg'
 import { NotFoundError, Sandbox, SandboxNotFoundError } from 'e2b'
+import { CLIENT_VERSION_HEADER } from '@mikka/protocol'
+import { runCheckpointReceiptSchema, type RunCheckpoint } from '@mikka/protocol/device'
+import { DAEMON_VERSION } from '../../packages/daemon/src/paths'
 import { APPLICATION_DATABASE_URLS, assertE2eTarget, disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { assertDevLocal } from '../dev-local/guard.mjs'
 import { cloudAcceptanceRelease } from './cloud-acceptance-release.mjs'
@@ -22,6 +27,7 @@ import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { taskTemplate } from '../../lib/secrets/e2b-runtime'
 import type { ThreadProviderInfo } from '../../lib/cloud-computer/thread-lifecycle-provider'
 import type { ThreadMachineFence } from '../../lib/cloud-computer/thread-machines'
+import { ARCHIVE_BASELINE, ARCHIVE_GIT_ENV, ARCHIVE_GIT_OPTIONS, recoverAcceptanceArchive } from './thread-lifecycle-archive'
 
 type Env = Record<string, string | undefined>
 const PURPOSE = 'thread-lifecycle-provider-acceptance'
@@ -60,6 +66,25 @@ export function validateThreadLifecycleTarget(env: Env, checkOnly = false) {
 function missing(error: unknown) {
   return error instanceof NotFoundError || error instanceof SandboxNotFoundError
     || Boolean(error && typeof error === 'object' && 'status' in error && error.status === 404)
+}
+
+type ProviderRenew = (id: string, owner: string, timeoutMs: number) => Promise<void>
+
+/** Observe the SDK's actual abort reason while handing that same error to the
+ * controller. A request that beats its deadline cannot prove timeout recovery. */
+export async function observeProviderRequestDeadline(request: ProviderRenew,
+  reconcile: (renew: ProviderRenew) => Promise<false | number>) {
+  let attempts = 0, rejected = false, failure: unknown
+  const retryAt = await reconcile(async (...args) => {
+    attempts++
+    try { await request(...args) }
+    catch (error) { rejected = true; failure = error; throw error }
+  })
+  assert.equal(attempts, 1, 'acceptance_request_deadline_attempt_count')
+  if (!rejected) throw new Error('acceptance_request_deadline_inconclusive')
+  if (!(failure instanceof DOMException) || failure.name !== 'TimeoutError')
+    throw new Error('acceptance_request_deadline_unexpected_error', { cause: failure })
+  return { retryAt, errorName: 'TimeoutError' as const }
 }
 
 export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
@@ -108,7 +133,7 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     for (const name of APPLICATION_DATABASE_URLS) process.env[name] = target.toString()
     assert.equal((await pool.query('SELECT current_database() AS name')).rows[0].name, database)
     appPool = (await import('../../lib/db')).pool
-    const { reconcileThreadMachine } = await import('../../lib/cloud-computer/thread-lifecycle')
+    const { reconcileThreadMachine, CLOSED_TASK_RETENTION_MS, THREAD_MACHINE_RETENTION_MS } = await import('../../lib/cloud-computer/thread-lifecycle')
     const { parkThreadMachine, threadMachineAction, threadMachineProvider } = await import('../../lib/cloud-computer/thread-machines')
     const owned = (id: string) => { assert.ok(ownedIds.has(id), 'Provider operations are restricted to this acceptance VM'); cancelled.signal.throwIfAborted() }
     const info = async (id: string): Promise<ThreadProviderInfo> => {
@@ -121,7 +146,10 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     const provider = { info, keepAlive: async (id: string, _owner: string, timeoutMs: number) => {
       owned(id); counters.keepAlive++; await Sandbox.setTimeout(id, timeoutMs, connection)
     } }
-    const kill = async (id: string) => { owned(id); counters.kill++; await Sandbox.kill(id, connection) }
+    const kill = async (id: string) => {
+      owned(id); counters.kill++
+      assert.equal(await Sandbox.kill(id, connection), true, 'automatic retirement must delete the owned sandbox')
+    }
     const originalKill = threadMachineProvider.kill, originalPrepareKill = threadMachineProvider.prepareKill
     threadMachineProvider.kill = kill
     threadMachineProvider.prepareKill = async () => kill
@@ -138,6 +166,23 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     const sandboxId = sandbox.sandboxId; ownedIds.add(sandboxId)
     const markerPath = `/tmp/mikka-lifecycle-${acceptance}`, marker = `disposable-${acceptance}`
     await sandbox.files.write(markerPath, marker)
+    const archiveRepo = `/tmp/mikka-lifecycle-${acceptance}-repo`, archiveWorktree = `/tmp/mikka-lifecycle-${acceptance}-worktree`
+    const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'"
+    const git = (directory: string, args: string[]) => ['git', ...ARCHIVE_GIT_OPTIONS, '-C', directory, ...args].map(quote).join(' ')
+    const command = async (script: string) => {
+      owned(sandboxId)
+      const output = await sandbox.commands.run(script, { user: 'user', envs: ARCHIVE_GIT_ENV, timeoutMs: 20_000 })
+      assert.equal(output.exitCode, 0, 'archive_fixture_command_failed')
+      return output.stdout
+    }
+    await command(`mkdir -p ${quote(archiveRepo)}`)
+    await sandbox.files.write(`${archiveRepo}/baseline.txt`, ARCHIVE_BASELINE)
+    await command(['set -eu', git(archiveRepo, ['init', '--quiet', '--initial-branch=main', '--object-format=sha1']),
+      git(archiveRepo, ['add', 'baseline.txt']), git(archiveRepo, ['commit', '--quiet', '-m', 'Disposable lifecycle baseline']),
+      git(archiveRepo, ['worktree', 'add', '--quiet', '--detach', archiveWorktree, 'HEAD'])].join('\n'))
+    const archiveBase = (await command(git(archiveRepo, ['rev-parse', 'HEAD']))).trim()
+    assert.match(archiveBase, /^[a-f0-9]{40}$/)
+    await sandbox.files.write(`${archiveWorktree}/deliverable.txt`, marker)
     const actor = { userId: `lifecycle-${acceptance}`, workspaceId: randomUUID() }
     const runId = randomUUID(), issueId = randomUUID(), botId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID(), tokenId = randomUUID()
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Lifecycle acceptance',$2,true,now(),now())`, [actor.userId, `${acceptance}@example.invalid`])
@@ -170,6 +215,34 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     assert.equal(typeof await reconcile(), 'number')
     assert.equal((await row()).lifecycle.phase, 'active')
     assert.ok((await row()).lifecycleAt && (await info(sandboxId)).endAt! > Date.now())
+    passed.push(stage)
+
+    stage = 'provider-request-deadline'
+    const active = await row(), beforeDeadline = { ...counters }
+    assert.ok(beforeDeadline.info > 0 && beforeDeadline.keepAlive > 0)
+    await makeDue()
+    const deadline = await observeProviderRequestDeadline(async (id, _owner, timeoutMs) => {
+      owned(id); counters.keepAlive++
+      await Sandbox.setTimeout(id, timeoutMs, { ...connection, requestTimeoutMs: 1, retries: 0 })
+    }, keepAlive => reconcileThreadMachine(pool!, actor, runId, { ...dependencies, provider: { ...provider, keepAlive } }))
+    const retry = await row(), retryAt = new Date(retry.lifecycleAt).getTime()
+    assert.equal(retry.sandboxId, sandboxId); assert.equal(retry.epoch, active.epoch); assert.equal(retry.state, 'running')
+    assert.equal(retry.lifecycle.phase, 'needs_reconciliation'); assert.equal(retry.lifecycle.reason, 'operation_failed')
+    assert.equal(retry.lifecycle.failures, 1); assert.equal(deadline.retryAt, retryAt); assert.ok(retryAt > Date.now())
+    assert.deepEqual(counters, { ...beforeDeadline, info: beforeDeadline.info + 1, keepAlive: beforeDeadline.keepAlive + 1 })
+    const beforeDeadlineReplay = { ...counters }
+    assert.equal(await reconcile(), retryAt); assert.deepEqual(counters, beforeDeadlineReplay)
+    assert.equal((await info(sandboxId)).state, 'running')
+    const beforeDeadlineRecovery = { ...counters }
+    await makeDue(); await reconcile()
+    const recovered = await row()
+    assert.equal(recovered.sandboxId, sandboxId); assert.equal(recovered.epoch, active.epoch); assert.equal(recovered.state, 'running')
+    assert.equal(recovered.lifecycle.phase, 'active'); assert.equal(recovered.lifecycle.reason, 'active_run')
+    assert.equal(recovered.lifecycle.owner, 'run-recovery'); assert.equal(recovered.lifecycle.failures, 0)
+    assert.ok(new Date(recovered.lifecycleAt).getTime() > Date.now())
+    assert.deepEqual(counters, { ...beforeDeadlineRecovery, info: beforeDeadlineRecovery.info + 1, keepAlive: beforeDeadlineRecovery.keepAlive + 1 })
+    const requestDeadline = { operation: 'setTimeout', requestTimeoutMs: 1, retries: 0,
+      errorName: deadline.errorName, earlyReplayIo: 0, recovered: true }
     passed.push(stage)
 
     // Synthetic terminal receipt: no native model/session was ever started.
@@ -205,6 +278,37 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     assert.equal((await row()).lifecycle.owner, 'run-recovery'); assert.ok((await row()).lifecycleAt)
     assert.equal(counters.keepAlive, renewals + 1); passed.push(stage)
 
+    // The file really survived the provider pause/resume. Archive its actual
+    // Git bytes through the authenticated production handler in the isolated
+    // database; never manufacture a matching checkpoint timestamp.
+    assert.equal(await sandbox.files.read(`${archiveWorktree}/deliverable.txt`), marker)
+    const diff = await command(['set -eu', git(archiveWorktree, ['add', '--intent-to-add', 'deliverable.txt']),
+      git(archiveWorktree, ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'])].join('\n'))
+    assert.ok(diff.includes('deliverable.txt'))
+    const checkpoint: RunCheckpoint = { baseCommit: archiveBase, patch: gzipSync(diff).toString('base64'), files: 1,
+      takenAt: '2099-01-01T00:00:00.000Z' }
+    const { issueDeviceToken, hashDeviceToken } = await import('../../lib/device-link')
+    const uploadToken = await issueDeviceToken(actor.userId, 'Disposable checkpoint upload')
+    const uploadTokenRow = (await pool.query(`UPDATE device_tokens SET "boundDeviceId"=$2,"boundWorkspaceId"=$3,"expiresAt"=now()+interval '1 hour'
+      WHERE "tokenHash"=$1 AND "userId"=$4 RETURNING id`, [hashDeviceToken(uploadToken), deviceId, actor.workspaceId, actor.userId])).rows[0]
+    assert.ok(uploadTokenRow)
+    const { POST } = await import('../../app/v1/runs/[runId]/checkpoint/route')
+    const upload = await POST(new Request(`http://127.0.0.1/mikka/v1/runs/${runId}/checkpoint`, {
+      method: 'POST', headers: { authorization: `Bearer ${uploadToken}`, 'content-type': 'application/json', [CLIENT_VERSION_HEADER]: DAEMON_VERSION },
+      body: JSON.stringify(checkpoint),
+    }), { params: Promise.resolve({ runId }) })
+    assert.equal(upload.status, 200, 'archive_upload_not_acknowledged')
+    const receipt = runCheckpointReceiptSchema.parse(await upload.json())
+    assert.equal(receipt.runId, runId); assert.notEqual(receipt.takenAt, checkpoint.takenAt)
+    const storedArchive = async (): Promise<RunCheckpoint> => {
+      const stored = (await pool!.query('SELECT "baseCommit",patch,files,"takenAt","unavailableReason" FROM run_checkpoints WHERE "runId"=$1 AND "userId"=$2', [runId, actor.userId])).rows[0]
+      assert.ok(stored && !stored.unavailableReason, 'archive_missing_or_unavailable')
+      return { baseCommit: stored.baseCommit, patch: Buffer.from(stored.patch).toString('base64'), files: stored.files, takenAt: stored.takenAt.toISOString() }
+    }
+    const archived = await storedArchive()
+    assert.equal(archived.takenAt, receipt.takenAt)
+    await recoverAcceptanceArchive(archived, marker)
+
     stage = 'stale-epoch'
     const stale = await fence(), before = { ...counters }
     await makeDue()
@@ -227,16 +331,49 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     passed.push(stage)
 
     stage = 'end-idempotence'
-    // Explicit end of this disposable task may discard its fixture marker.
-    await threadMachineAction(pool, actor, runId, 'end', await fence())
+    // No native CLI was started: this is a controlled terminal receipt, bound
+    // to a real persisted upload and independently restored worktree bytes.
+    const terminalReport = { safePoint: { session: 'exited', checkpoint: 'ready', checkpointTakenAt: receipt.takenAt, observedAt: receipt.takenAt } }
+    await pool.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=now(),"leaseExpiresAt"=NULL,report=$2 WHERE id=$1`, [runId, JSON.stringify(terminalReport)])
+    assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [uploadTokenRow.id])).rows[0].revokedAt)
+    const pausedAt = (age: number) => pool!.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('pausedAt',$2::double precision),"lifecycleAt"=now() WHERE "runId"=$1`, [runId, Date.now() - age])
+    await pausedAt(THREAD_MACHINE_RETENTION_MS + 1000); await reconcile()
+    assert.equal((await row()).lifecycle.reason, 'native_archive_unverified')
+    assert.equal((await row()).sandboxId, sandboxId); assert.equal(counters.kill, 0)
+    await pool.query('UPDATE issues SET status=\'done\' WHERE id=$1', [issueId])
+    await pausedAt(CLOSED_TASK_RETENTION_MS / 2); await reconcile()
+    assert.equal((await row()).state, 'paused'); assert.equal(counters.kill, 0)
+    assert.ok(new Date((await row()).lifecycleAt).getTime() > Date.now())
+    await pool.query(`UPDATE agent_runs SET report=jsonb_set(report,'{safePoint,checkpoint}','"unavailable"') WHERE id=$1`, [runId])
+    await pausedAt(CLOSED_TASK_RETENTION_MS + 1000); await reconcile()
+    assert.equal((await row()).lifecycle.reason, 'checkpoint_unverified')
+    assert.equal((await row()).sandboxId, sandboxId); assert.equal(counters.kill, 0)
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [runId, JSON.stringify(terminalReport)])
+    const history = async () => ({
+      task: (await pool!.query('SELECT to_jsonb(i) AS value FROM issues i WHERE id=$1', [issueId])).rows[0].value,
+      run: (await pool!.query('SELECT to_jsonb(r) AS value FROM agent_runs r WHERE id=$1', [runId])).rows[0].value,
+      checkpoint: await storedArchive(),
+    })
+    const retainedHistory = await history(), retirementRequestedAt = new Date().toISOString()
+    await makeDue(); await reconcile()
     const kills = counters.kill
     await threadMachineAction(pool, actor, runId, 'end')
     assert.equal(counters.kill, kills); assert.equal(kills, 1)
     assert.equal((await row()).state, 'ended'); assert.equal((await row()).sandboxId, null)
     assert.equal((await info(sandboxId)).state, 'missing'); assert.equal(await reconcile(), false)
+    const retirementObservedAt = new Date().toISOString()
+    assert.deepEqual(await history(), retainedHistory)
+    await recoverAcceptanceArchive(await storedArchive(), marker)
+    const retirement = { scope: 'confirmed-checkpoint-to-automatic-retirement', clock: 'controlled-paused-deadline',
+      checkpointSha256: createHash('sha256').update(Buffer.from(archived.patch, 'base64')).digest('hex'),
+      restoredBeforeKill: true, restoredAfterKill: true, uploadClockAuthoritative: true,
+      openRetentionRetained: true, closedGraceRetained: true, missingCheckpointRetained: true,
+      deviceTokenRevoked: true, automaticKillConfirmed: true, historyPreserved: true,
+      requestedAt: retirementRequestedAt, observedAt: retirementObservedAt }
     passed.push(stage)
     result = { kind: PURPOSE, status: 'passed', acceptance, ...release, template, sandboxId, runId, cases: passed,
-      subscriptionAcceptance: false, modelCalls: 0, resumeScope: 'provider-resume-to-controller-monitor', counters }
+      subscriptionAcceptance: false, modelCalls: 0, resumeScope: 'provider-resume-to-controller-monitor',
+      requestDeadlineScope: 'sdk-request-deadline-to-controller-recovery', requestDeadline, retirement, counters }
   } catch (error) { failed = true; failure = error }
   finally {
     restoreProvider?.()

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { discoverAcceptanceSandboxes, validateThreadLifecycleTarget } from './thread-lifecycle-acceptance'
+import { discoverAcceptanceSandboxes, observeProviderRequestDeadline, validateThreadLifecycleTarget } from './thread-lifecycle-acceptance'
 
 const isolated = () => ({ NODE_ENV: 'test', MIKKA_LOCAL_TEST_ACCOUNTS: '1',
   E2E_DATABASE_URL: 'postgresql://test:synthetic@127.0.0.1:5432/mikka_e2e', E2B_API_KEY: 'synthetic-only' })
@@ -63,4 +63,49 @@ test('foreign invocation or source metadata never authorizes cleanup of its VM',
       list: () => pages([[{ sandboxId: 'foreign-vm', metadata: { ...metadata, ...mismatch } }]]) }), /Cleanup metadata mismatch/)
     assert.equal(ownedIds.size, 0)
   }
+})
+
+test('the request deadline observer gives the controller the original native TimeoutError and returns only closed evidence', async () => {
+  const failure = new DOMException('private-provider-message', 'TimeoutError')
+  const due = Date.now() + 5000
+  let attempts = 0
+  const evidence = await observeProviderRequestDeadline(async (...args) => {
+    assert.deepEqual(args, ['owned-vm', 'owned-user', 900_000]); attempts++; throw failure
+  }, async renew => {
+    await assert.rejects(renew('owned-vm', 'owned-user', 900_000), error => error === failure)
+    return due
+  })
+  assert.equal(attempts, 1)
+  assert.deepEqual(evidence, { retryAt: due, errorName: 'TimeoutError' })
+  assert.ok(!JSON.stringify(evidence).includes('private-provider-message'))
+})
+
+test('a request that beats its deadline is inconclusive even when the controller reports a future deadline', async () => {
+  let attempts = 0
+  await assert.rejects(observeProviderRequestDeadline(async () => { attempts++ }, async renew => {
+    await renew('owned-vm', 'owned-user', 900_000)
+    return Date.now() + 300_000
+  }), /acceptance_request_deadline_inconclusive/)
+  assert.equal(attempts, 1)
+})
+
+test('cancellation, provider refusal and a non-native TimeoutError cannot satisfy the actual deadline case', async () => {
+  for (const failure of [new DOMException('private-cancellation', 'AbortError'),
+    Object.assign(new Error('private-provider-body'), { status: 503 }),
+    Object.assign(new Error('private-rpc-timeout'), { name: 'TimeoutError' })]) {
+    await assert.rejects(observeProviderRequestDeadline(async () => { throw failure }, async renew => {
+      await assert.rejects(renew('owned-vm', 'owned-user', 900_000), error => error === failure)
+      return Date.now() + 5000
+    }), error => error instanceof Error && error.message === 'acceptance_request_deadline_unexpected_error' && error.cause === failure)
+  }
+})
+
+test('a missing request or failed controller persistence cannot produce deadline evidence', async () => {
+  await assert.rejects(observeProviderRequestDeadline(async () => { assert.fail('request must not run') },
+    async () => Date.now() + 5000), /acceptance_request_deadline_attempt_count/)
+  const timeout = new DOMException('private-timeout', 'TimeoutError'), databaseFailure = new Error('private-database-error')
+  await assert.rejects(observeProviderRequestDeadline(async () => { throw timeout }, async renew => {
+    await assert.rejects(renew('owned-vm', 'owned-user', 900_000), error => error === timeout)
+    throw databaseFailure
+  }), error => error === databaseFailure)
 })

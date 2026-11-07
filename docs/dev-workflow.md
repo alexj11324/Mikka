@@ -150,12 +150,18 @@ old module owners (backend was Codex's).
    until it is READY and the production domain serves that commit. After a
    batch lands, leave `main` unchanged until both conditions hold. Pending
    migrations run through the existing flow (`pnpm build` runs
-   `scripts/migrate.mjs`). Then the owner accepts the change in production
-   against the issue's acceptance criteria, with a real account and task
-   (leased test accounts, [`test-accounts.md`](test-accounts.md); no junk
-   data). A simulated test is not production acceptance. The owner writes
-   the evidence on the issue (time, run id, log summary; no secrets or
-   personal data) and closes the issue.
+   `scripts/migrate.mjs`). A change a local production build can show (UI,
+   interaction, navigation, page refresh, layout, copy) is accepted by CI
+   and the PR's screenshots; the owner notes on the issue that production
+   serves the merge commit and closes it. Only what cannot be tested
+   locally (real subscriptions, OAuth, model providers, the GitHub App,
+   payments, push and other external services) is accepted in production,
+   with the shared test account and a real task (no junk data; see
+   [`acceptance.md`](acceptance.md)). A simulated test is not production
+   acceptance. The owner writes the evidence on the issue (time, run id,
+   log summary; no secrets or personal data) and closes the issue. Every
+   production Web deploy also runs the automatic post-deploy smoke test
+   (Alex, 2026-11-07).
 6. **If production breaks,** fix forward with a new PR, or revert through a
    revert PR. Never delete deployments, revoke shared tokens, change
    production Neon settings or create paid resources without Alex.
