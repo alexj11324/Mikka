@@ -5,6 +5,7 @@ import { canonicalJSON, digest, makeSnapshot, parseDefinition, type AgentDefinit
 import { platformEffectiveTools } from './builtin'
 import { compareReports, type EvalReport } from './evals'
 import { assertSafeImprovement, caseFromFailure, proposeImprovement, type FailureCode, type FailureEvidence } from './improvement'
+import type { ToolOutcome } from './instrument'
 
 export interface AgentScope { ownerId: string; botId: string | null; workspaceId: string | null }
 export interface DefinitionVersion { id: string; version: number; definition: AgentDefinition; digest: string; source: 'builtin' | 'user' | 'improvement'; base_version: string | null; created_at?: Date | string }
@@ -168,14 +169,19 @@ export class AgentKitStore {
     }
     await client.query('insert into agent_kit_events(execution_id,owner_id,bot_key,event_key,kind,payload) values($1,$2,$3,$4,$5,$6)',[executionId,...params(scope),eventKey,kind,JSON.stringify(payload)])
   }
-  async recordTool(scope: AgentScope, executionId: string, callId: string, toolName: string, phase: 'start' | 'finish', outcome?: 'ok' | 'error' | 'approval_pending') {
+  async recordTool(scope: AgentScope, executionId: string, callId: string, toolName: string, phase: 'start' | 'finish', outcome?: ToolOutcome) {
     z.string().min(1).max(180).parse(callId)
     return this.transaction(async client => {
       const execution = await this.executionState(client,scope,executionId,toolName,true)
       if (!execution.tool_allowed) throw new AgentKitError('agentToolNotAllowed',403)
       const eventKey = `${callId}:${phase}`
       if (execution.status !== 'running') {
-        const old = await client.query('select 1 from agent_kit_events where execution_id=$1 and event_key=$2',[executionId,eventKey])
+        // 停止 closes the execution without waiting for a running tool. Its
+        // exact started call may finish auditing later; no new call can start.
+        // Fold that proof into the existing replay lookup, with no extra read.
+        const old = await client.query(`select 1 from agent_kit_events where execution_id=$1 and
+          (event_key=$2 or ($3::boolean and event_key=$4 and kind='tool_started' and payload->>'toolName'=$5)) limit 1`,
+        [executionId,eventKey,phase==='finish' && execution.status==='completed',`${callId}:start`,toolName])
         if (!old.rowCount) throw new AgentKitError('agentExecutionClosed')
       }
       await this.event(client,scope,executionId,eventKey,phase === 'start' ? 'tool_started' : 'tool_finished',{ toolName, ...(phase === 'finish' ? { outcome: outcome ?? 'error' } : {}) })
