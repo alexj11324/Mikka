@@ -1,5 +1,5 @@
 /** Explicitly authorized #1503 fixture cleanup. Run only after the delivery receipt is saved. */
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pool, withDatabaseClient } from '../../../lib/db'
 import { workspacePool } from '../../../lib/workspace-db'
@@ -10,6 +10,7 @@ import { ownerSettingsChanged } from '../../../lib/live/lists'
 import { computerGone, computerState, killComputer } from '../../../lib/computer/e2b-provider'
 import { cleanupIssue1503SmokeGitHub, SmokeGitHubSetupError } from '../issue1503-smoke-github.mjs'
 import { smokeSession, SMOKE_ID, OWNER_ID, fail } from './http'
+import { modelOrderCleanupPlan, sameModelOrder } from './model-order-cleanup'
 
 const WORKSPACE_ID = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
 const E2B_UPDATED_AT = '2026-11-06T18:21:51.895Z'
@@ -142,12 +143,6 @@ async function scopedJson(path: string, init?: RequestInit) {
   return response.json()
 }
 
-const briefOrder = (value: any) => ({ location: value.location, preferredHarness: value.preferredHarness,
-  autoModelRouting: value.autoModelRouting, customized: value.customized,
-  entries: value.entries.map((entry: any) => ({ harness: entry.harness, model: entry.model, source: entry.source })) })
-const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical)
-  : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value
-const effectiveOrder = (value: any) => JSON.stringify(canonical({ ...briefOrder(value), customized: undefined }))
 const unwrap = (value: any) => value?.ok === true ? value.data : value
 
 /** Operator-only repair of this fixture's first driver's materialized default. The normal API has no reset action. */
@@ -156,23 +151,14 @@ async function restoreModelOrderDefault() {
     ?? 'scripts/ops/issue1503/initial-model-order.json', 'utf8'))
   const latest = JSON.parse(await readFile(process.env.MIKKA_1503_SUCCESSFUL_DELIVERY_FILE
     ?? 'scripts/ops/issue1503/last-successful-delivery.json', 'utf8'))
-  const original = initial.originalOrder
-  const validReceipt = (value: any) => value?.issue === 1503 && value.workspaceId === WORKSPACE_ID
-    && value.phase === 'delivery' && value.repository === 'alexj11324/Mikka-handoff'
-    && Number.isFinite(Date.parse(value.startedAt)) && Number.isFinite(Date.parse(value.completedAt))
-    && Date.parse(value.completedAt) >= Date.parse(value.startedAt)
-  if (!validReceipt(initial) || initial.marker !== '42278720813-1' || original?.customized !== false
-    || createHash('sha256').update(JSON.stringify(canonical(original))).digest('hex') !== '528cdc4ffd615042e48ab112b9132779f328637e0469364e71f9cbc22a590792'
-    || !validReceipt(latest) || latest.status !== 'passed' || Date.parse(latest.startedAt) < Date.parse(initial.completedAt)
-    || Date.parse(latest.completedAt) > Date.now() + 30_000
-    || !latest.cleanup?.some((entry: any) => entry.kind === 'effective_model_order_restored')
-    || effectiveOrder(latest.restoredOrder) !== effectiveOrder(original)) fail('cleanup_model_order_receipt_mismatch')
+  const { original, materialized, currentDefault } = modelOrderCleanupPlan(initial, latest)
   const currentView = unwrap(await session!.rpc('model-order.getModelOrder', [WORKSPACE_ID]))
   if (currentView.customized === false) {
-    report.modelOrder = { status: 'already_default', customized: false }
+    if (!sameModelOrder(currentView, currentDefault)) fail('cleanup_model_order_default_changed')
+    report.modelOrder = { status: 'already_default', customized: false, defaultEntries: currentDefault.entries.length }
     return
   }
-  if (currentView.customized !== true || effectiveOrder(currentView) !== effectiveOrder(original))
+  if (currentView.customized !== true || !sameModelOrder(currentView, materialized))
     fail('cleanup_model_order_concurrent_change')
   const scope = { ownerId: SMOKE_ID, workspaceId: WORKSPACE_ID }
   const client = await pool.connect()
@@ -190,7 +176,7 @@ async function restoreModelOrderDefault() {
     const withinDriver = (value: string) => Date.parse(value) >= Date.parse(latest.startedAt) && Date.parse(value) <= Date.parse(latest.completedAt)
     const locked = await readOrder(client, scope)
     if (!settings?.customized || !withinDriver(settings.updated_at) || entries.some(entry => !withinDriver(entry.created_at))
-      || effectiveOrder(locked) !== effectiveOrder(original) || entries.length !== original.entries.length)
+      || !sameModelOrder(locked, materialized) || entries.length !== materialized.entries.length)
       fail('cleanup_model_order_writer_guard_changed')
     const changed = await client.query(`UPDATE model_order_settings SET customized=false,"updatedAt"=clock_timestamp()
       WHERE "ownerId"=$1 AND "workspaceId"=$2 AND customized=true AND "updatedAt"=$3::timestamptz
@@ -199,7 +185,7 @@ async function restoreModelOrderDefault() {
     if (changed.rowCount !== 1) fail('cleanup_model_order_compare_failed')
     // The tentative flag is invisible to other transactions. Reuse the real default resolver, and roll back if the catalogue changed.
     const resolvedDefault = await readOrder(client, scope)
-    if (resolvedDefault.customized || effectiveOrder(resolvedDefault) !== effectiveOrder(original))
+    if (!sameModelOrder(resolvedDefault, currentDefault))
       fail('cleanup_model_order_default_changed')
     const removed = await client.query(`DELETE FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2
       AND id=ANY($3::uuid[]) RETURNING id`, [SMOKE_ID, WORKSPACE_ID, entries.map(entry => entry.id)])
@@ -211,8 +197,9 @@ async function restoreModelOrderDefault() {
   } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error }
   finally { client.release() }
   const restored = unwrap(await session!.rpc('model-order.getModelOrder', [WORKSPACE_ID]))
-  if (restored.customized !== false || effectiveOrder(restored) !== effectiveOrder(original)) fail('cleanup_model_order_readback_changed')
-  report.modelOrder = { status: 'default_restored', customized: false, removedEntries, guardedByDriverWindow: true }
+  if (!sameModelOrder(restored, currentDefault)) fail('cleanup_model_order_readback_changed')
+  report.modelOrder = { status: 'default_restored', customized: false, removedEntries,
+    initialEntries: original.entries.length, defaultEntries: currentDefault.entries.length, guardedByDriverWindow: true }
 }
 
 try {
