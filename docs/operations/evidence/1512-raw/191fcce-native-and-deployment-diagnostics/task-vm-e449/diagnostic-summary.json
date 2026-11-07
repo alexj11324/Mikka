@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "kind": "task-vm-readonly-failure-diagnosis",
+  "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "runId": 42363177678,
+  "attempt": 1,
+  "jobId": 128375673499,
+  "failedStep": 13,
+  "observedAt": "2026-11-07T10:47:21.701958+00:00",
+  "artifact": {
+    "id": 13570494196,
+    "name": "thread-lifecycle-question-resume-42363177678-1",
+    "bytes": 4563,
+    "sha256": "e576acab17ba836b814bf56b4066b630d56fc6a413fd30497b4d2007b1de376b",
+    "digestVerified": true
+  },
+  "provider": {
+    "status": "passed",
+    "modelCalls": 0,
+    "deadline": {
+      "operation": "setTimeout",
+      "requestTimeoutMs": 1,
+      "retries": 0,
+      "errorName": "TimeoutError",
+      "earlyReplayIo": 0,
+      "recovered": true
+    },
+    "cleanup": {
+      "status": "passed",
+      "provider": "confirmed_missing",
+      "database": "dropped"
+    }
+  },
+  "owner": {
+    "status": "failed",
+    "cases": [
+      {
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "status": "failed",
+        "phase": "waiting_for_native_question",
+        "error": "lifecycle_unexpected_factory_attempt",
+        "runId": "6d125edd-5129-47e2-8034-2b316d99df68",
+        "taskId": "eac0c1e6-e4bd-4b78-b28d-95168012927f",
+        "issueId": "d9e95736-23ce-4283-a4e1-1848886a324e",
+        "sandboxId": "ia39xpkfn9u93ach3zfxz",
+        "dispatchAttempted": true,
+        "subscriptionRoute": "claude_code_cli",
+        "credentialType": "subscription",
+        "sharedScopeVerified": true,
+        "subscriptionAccess": [
+          "workspace_share"
+        ],
+        "origin": {
+          "runId": "6d125edd-5129-47e2-8034-2b316d99df68",
+          "status": "failed",
+          "finishedAt": "2026-11-07T10:40:20.363Z",
+          "observedAt": "2026-11-07T10:40:21.719Z",
+          "source": "normal_owner_thread_attempt"
+        },
+        "continuationRunRecorded": false,
+        "nativeQuestionRecorded": false,
+        "originFailureCause": "unknown",
+        "ownedVmRunningObserved": true,
+        "cleanup": {
+          "status": "passed",
+          "errorCount": 0,
+          "runIds": [
+            "6d125edd-5129-47e2-8034-2b316d99df68",
+            "043fe81b-026c-4757-b3e5-5aa2aa029016"
+          ],
+          "machineReceipts": [
+            {
+              "runId": "6d125edd-5129-47e2-8034-2b316d99df68",
+              "state": "ended",
+              "observedAt": "2026-11-07T10:40:24.918Z"
+            },
+            {
+              "runId": "043fe81b-026c-4757-b3e5-5aa2aa029016",
+              "state": "ended",
+              "observedAt": "2026-11-07T10:40:26.198Z"
+            }
+          ],
+          "originalProviderVmMissingConfirmed": true,
+          "history": "retained",
+          "botRetention": "retained_no_delete_api"
+        }
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "status": "failed",
+        "phase": "waiting_for_native_question",
+        "error": "lifecycle_unexpected_factory_attempt",
+        "runId": "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+        "taskId": "a33c3b5b-cf93-4481-b97b-e469ddd2f8cb",
+        "issueId": "71b549eb-987c-40f8-bbf3-6d791837231f",
+        "sandboxId": "ip13i0ea3cg416s11egxp",
+        "dispatchAttempted": true,
+        "subscriptionRoute": "codex_cli",
+        "credentialType": "subscription",
+        "sharedScopeVerified": true,
+        "subscriptionAccess": [
+          "workspace_share"
+        ],
+        "origin": {
+          "runId": "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+          "status": "failed",
+          "finishedAt": "2026-11-07T10:42:27.560Z",
+          "observedAt": "2026-11-07T10:42:29.274Z",
+          "source": "normal_owner_thread_attempt"
+        },
+        "continuationRunRecorded": false,
+        "nativeQuestionRecorded": false,
+        "originFailureCause": "unknown",
+        "ownedVmRunningObserved": true,
+        "cleanup": {
+          "status": "passed",
+          "errorCount": 0,
+          "runIds": [
+            "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+            "74d1217b-f15a-4c09-be5c-0bb558ae25ea"
+          ],
+          "machineReceipts": [
+            {
+              "runId": "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+              "state": "ended",
+              "observedAt": "2026-11-07T10:42:32.510Z"
+            },
+            {
+              "runId": "74d1217b-f15a-4c09-be5c-0bb558ae25ea",
+              "state": "ended",
+              "observedAt": "2026-11-07T10:42:33.723Z"
+            }
+          ],
+          "originalProviderVmMissingConfirmed": true,
+          "history": "retained",
+          "botRetention": "retained_no_delete_api"
+        }
+      }
+    ],
+    "cleanupStatus": "passed",
+    "cleanupErrorCount": 0,
+    "workspaceRestored": true
+  },
+  "guardCause": {
+    "source": "scripts/acceptance/thread-lifecycle.mjs@e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+    "line": 277,
+    "code": "lifecycle_unexpected_factory_attempt",
+    "condition": "A Factory attempt runId is neither the original runId nor the already authorized continuationRunId.",
+    "additionalAttemptsAutomaticRetryProved": false,
+    "rootFailureCauseAvailable": false
+  },
+  "issue1512": {
+    "sameStrictAttemptGuardUsed": false,
+    "sharedTeamSampleIsAcmeAcceptance": false,
+    "productionAcceptanceStillRequired": true,
+    "provenAcmeSpecificBlocker": false
+  },
+  "privacy": {
+    "scanPassed": true,
+    "knownJsonOnly": true,
+    "rawLogRead": false,
+    "signedUrlSaved": false,
+    "providerOrAccountAccessPerformed": false
+  }
+}

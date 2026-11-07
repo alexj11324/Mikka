@@ -1,0 +1,49 @@
+{
+  "kind": "thread-lifecycle-provider-acceptance",
+  "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "scope": {
+    "realProviderRpc": true,
+    "injectedTransportFaults": true,
+    "naturalTimeoutExpiry": false,
+    "daemonAcceptance": false,
+    "subscriptionAcceptance": false,
+    "modelCalls": 0,
+    "resumeScope": "provider-resume-to-controller-monitor",
+    "requestDeadlineScope": "sdk-request-deadline-to-controller-recovery"
+  },
+  "status": "passed",
+  "acceptance": "d5cc8c24-c81a-44d1-9229-c25707e13831",
+  "workerHash": "18d86efa6f4ed740bbc86f02db2f77eecc16cff6",
+  "template": "codex",
+  "sandboxId": "isdtm9nsqr5dtpiesklj7",
+  "runId": "043f4bd9-22e7-4bb7-830c-168b6abbf121",
+  "cases": [
+    "active-monitor",
+    "provider-request-deadline",
+    "provider-refusal",
+    "lost-pause-response",
+    "resume-monitor",
+    "stale-epoch",
+    "stop-idempotence",
+    "end-idempotence"
+  ],
+  "requestDeadline": {
+    "operation": "setTimeout",
+    "requestTimeoutMs": 1,
+    "retries": 0,
+    "errorName": "TimeoutError",
+    "earlyReplayIo": 0,
+    "recovered": true
+  },
+  "counters": {
+    "info": 16,
+    "keepAlive": 4,
+    "pause": 2,
+    "kill": 1
+  },
+  "cleanup": {
+    "status": "passed",
+    "provider": "confirmed_missing",
+    "database": "dropped"
+  }
+}

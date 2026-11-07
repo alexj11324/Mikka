@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "issue": 1593,
+  "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "origin": "https://app.aspectlylabs.com",
+  "fixtureId": "f716d6d1-3fd2-4578-a94e-81cd162171e2",
+  "startedAt": "2026-11-07T10:38:02.127Z",
+  "status": "failed",
+  "issueAcceptance": "incomplete",
+  "cases": [
+    {
+      "caseId": "355bdc7f-127d-4e88-b897-08a5cf26fce3",
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+      "botId": "775fa1eb-4ed5-48e2-97aa-49a3f11f9e18",
+      "profileId": "d31978fc-cc58-4fd0-a3db-52f0c99c2dca",
+      "startedAt": "2026-11-07T10:38:13.566Z",
+      "status": "failed",
+      "issueAcceptance": "incomplete",
+      "phase": "waiting_for_native_question",
+      "markerSha256": "df3a9da264c4dc940dd3a54c0eb29fb50b5cf7bf1f773795edad3c5df007045b",
+      "markerBytes": 157,
+      "provider": {
+        "origin_running": {
+          "requestedAt": "2026-11-07T10:38:43.305Z",
+          "vmHash": "e2fcf6603717",
+          "observedAt": "2026-11-07T10:38:43.559Z",
+          "status": "observed",
+          "state": "running",
+          "ownershipVerified": true,
+          "operationHash": "1068db161928"
+        }
+      },
+      "correlation": {
+        "runHash": "322e268ce0ca",
+        "taskHash": "95cd8dbcd5bc",
+        "vmHash": "e2fcf6603717"
+      },
+      "terminal": {
+        "origin": {
+          "runId": "6d125edd-5129-47e2-8034-2b316d99df68",
+          "status": "failed",
+          "finishedAt": "2026-11-07T10:40:20.363Z",
+          "observedAt": "2026-11-07T10:40:21.719Z",
+          "source": "normal_owner_thread_attempt"
+        },
+        "continuation": null
+      },
+      "placement": {
+        "kind": "cloud"
+      },
+      "limits": [
+        "automatic_next_stage_profile_not_pinned",
+        "markdown_download_not_tested"
+      ],
+      "issueId": "d9e95736-23ce-4283-a4e1-1848886a324e",
+      "dispatchAttempted": true,
+      "runId": "6d125edd-5129-47e2-8034-2b316d99df68",
+      "execution": {
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "credentialType": "subscription",
+        "deviceId": "77e86e73-fbd7-4436-a0eb-1d3244676ff8",
+        "subscriptionRoute": "claude_code_cli",
+        "identity": {
+          "version": 1,
+          "requesterHash": "b823ba1c5729768b",
+          "executionPrincipalHash": "b823ba1c5729768b",
+          "model": "subscription",
+          "runtime": "e2b",
+          "subscriptionAccess": [
+            "workspace_share"
+          ]
+        },
+        "sharedScope": {
+          "verified": true,
+          "requesterHash": "b823ba1c5729768b",
+          "payerHash": "b86765f1f6d3a988",
+          "workspaceHash": "fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade",
+          "connectionHash": "ccca34377eae9409",
+          "bindingHash": "20cd2f86db880623",
+          "connectionRevision": "2",
+          "profileVersion": 1,
+          "profileDigest": "df1eeae495e38c1d9bbb71ff3e2f21fc5dcb02aa3fffb24c6c9a99667b37bedc",
+          "access": "workspace_share"
+        }
+      },
+      "taskId": "eac0c1e6-e4bd-4b78-b28d-95168012927f",
+      "sandboxId": "ia39xpkfn9u93ach3zfxz",
+      "machine": {
+        "state": "running",
+        "observedAt": "2026-11-07T10:38:57.153Z",
+        "evidence": "owner_database_projection"
+      },
+      "error": "lifecycle_unexpected_factory_attempt",
+      "cleanup": {
+        "status": "passed",
+        "errors": [],
+        "history": "retained",
+        "machineReceipts": [
+          {
+            "runId": "6d125edd-5129-47e2-8034-2b316d99df68",
+            "state": "ended",
+            "observedAt": "2026-11-07T10:40:24.918Z"
+          },
+          {
+            "runId": "043fe81b-026c-4757-b3e5-5aa2aa029016",
+            "state": "ended",
+            "observedAt": "2026-11-07T10:40:26.198Z"
+          }
+        ],
+        "databaseEndedAt": "2026-11-07T10:40:26.581Z",
+        "provider": {
+          "requestedAt": "2026-11-07T10:40:26.581Z",
+          "vmHash": "e2fcf6603717",
+          "observedAt": "2026-11-07T10:40:26.711Z",
+          "status": "observed",
+          "state": "missing",
+          "ownershipVerified": true
+        },
+        "runIds": [
+          "6d125edd-5129-47e2-8034-2b316d99df68",
+          "043fe81b-026c-4757-b3e5-5aa2aa029016"
+        ]
+      },
+      "finishedAt": "2026-11-07T10:40:27.171Z",
+      "bot": {
+        "id": "775fa1eb-4ed5-48e2-97aa-49a3f11f9e18",
+        "retention": "retained_no_delete_api"
+      }
+    },
+    {
+      "caseId": "0d35883a-e78c-46e5-a594-92b26d6b2222",
+      "harness": "codex",
+      "model": "gpt-6-luna",
+      "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+      "botId": "09060bff-e96a-45d4-8cb8-e5767eb96227",
+      "profileId": "28946330-4538-4747-9949-1bc2187978de",
+      "startedAt": "2026-11-07T10:40:29.137Z",
+      "status": "failed",
+      "issueAcceptance": "incomplete",
+      "phase": "waiting_for_native_question",
+      "markerSha256": "97f1091a0859aa929ff9a6839e470562850c88fc0b3d7b66bee083e263a30eac",
+      "markerBytes": 157,
+      "provider": {
+        "origin_running": {
+          "requestedAt": "2026-11-07T10:40:56.787Z",
+          "vmHash": "7bd43793e9fd",
+          "observedAt": "2026-11-07T10:40:56.872Z",
+          "status": "observed",
+          "state": "running",
+          "ownershipVerified": true,
+          "operationHash": "256ca21e94a8"
+        }
+      },
+      "correlation": {
+        "runHash": "a45c3a13fe34",
+        "taskHash": "9dc3af663a2b",
+        "vmHash": "7bd43793e9fd"
+      },
+      "terminal": {
+        "origin": {
+          "runId": "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+          "status": "failed",
+          "finishedAt": "2026-11-07T10:42:27.560Z",
+          "observedAt": "2026-11-07T10:42:29.274Z",
+          "source": "normal_owner_thread_attempt"
+        },
+        "continuation": null
+      },
+      "placement": {
+        "kind": "cloud"
+      },
+      "limits": [
+        "automatic_next_stage_profile_not_pinned",
+        "markdown_download_not_tested"
+      ],
+      "issueId": "71b549eb-987c-40f8-bbf3-6d791837231f",
+      "dispatchAttempted": true,
+      "runId": "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+      "execution": {
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "credentialType": "subscription",
+        "deviceId": "1a914619-000b-4b20-8e28-ce34403b67c7",
+        "subscriptionRoute": "codex_cli",
+        "identity": {
+          "version": 1,
+          "requesterHash": "b823ba1c5729768b",
+          "executionPrincipalHash": "b823ba1c5729768b",
+          "model": "subscription",
+          "runtime": "e2b",
+          "subscriptionAccess": [
+            "workspace_share"
+          ]
+        },
+        "sharedScope": {
+          "verified": true,
+          "requesterHash": "b823ba1c5729768b",
+          "payerHash": "b86765f1f6d3a988",
+          "workspaceHash": "fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade",
+          "connectionHash": "f05380d0f88c99a6",
+          "bindingHash": "c0ca7e45464888b2",
+          "connectionRevision": "2",
+          "profileVersion": 1,
+          "profileDigest": "82a30100092fa8449198d6f0f731bf985e6241392d2fa1b77fde9fd7c5faffaa",
+          "access": "workspace_share"
+        }
+      },
+      "taskId": "a33c3b5b-cf93-4481-b97b-e469ddd2f8cb",
+      "sandboxId": "ip13i0ea3cg416s11egxp",
+      "machine": {
+        "state": "running",
+        "observedAt": "2026-11-07T10:41:00.988Z",
+        "evidence": "owner_database_projection"
+      },
+      "error": "lifecycle_unexpected_factory_attempt",
+      "cleanup": {
+        "status": "passed",
+        "errors": [],
+        "history": "retained",
+        "machineReceipts": [
+          {
+            "runId": "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+            "state": "ended",
+            "observedAt": "2026-11-07T10:42:32.510Z"
+          },
+          {
+            "runId": "74d1217b-f15a-4c09-be5c-0bb558ae25ea",
+            "state": "ended",
+            "observedAt": "2026-11-07T10:42:33.723Z"
+          }
+        ],
+        "databaseEndedAt": "2026-11-07T10:42:33.910Z",
+        "provider": {
+          "requestedAt": "2026-11-07T10:42:33.910Z",
+          "vmHash": "7bd43793e9fd",
+          "observedAt": "2026-11-07T10:42:34.276Z",
+          "status": "observed",
+          "state": "missing",
+          "ownershipVerified": true
+        },
+        "runIds": [
+          "80ea7d0a-1b94-4bb5-8082-846c704abe40",
+          "74d1217b-f15a-4c09-be5c-0bb558ae25ea"
+        ]
+      },
+      "finishedAt": "2026-11-07T10:42:34.515Z",
+      "bot": {
+        "id": "09060bff-e96a-45d4-8cb8-e5767eb96227",
+        "retention": "retained_no_delete_api"
+      }
+    }
+  ],
+  "cleanup": {
+    "status": "passed",
+    "errors": [],
+    "workspaceRestored": true
+  },
+  "scope": "real_owner_factory_question_pause_resume_with_native_report",
+  "pending": [
+    "external_wait_and_adjacent_stage_continuity",
+    "terminal_revoke_and_close_grace_retention",
+    "provider_timeout_fault_injection",
+    "latency_and_cost_measurement"
+  ],
+  "excluded": [
+    "provider_fault_injection_separate_driver",
+    "natural_timeout_expiry",
+    "markdown_download",
+    "automatic_final_stage_model_selection",
+    "final_factory_submission",
+    "independent_coding_stage_completion"
+  ],
+  "source": {
+    "path": "lib/cloud-computer/thread-lifecycle.ts",
+    "sha256": "9aecc7f7e0f83379df2deca66794e62a2d1d278f9704d3ce148d06cd690fc2e5"
+  },
+  "build": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "ownerHash": "c4d6b5727534",
+  "team": {
+    "teamWorkspaceConfirmed": true,
+    "teamWorkspaceHash": "fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade",
+    "teamSelectionBasis": "unique-active-admin-identity-match",
+    "teamOwnerAttribution": "AGENTS.md-and-owner-comment-1504-6691409495",
+    "teamAdminMembershipVerified": true
+  },
+  "ownerCloud": {
+    "configured": true,
+    "byoEnabled": true,
+    "lastErrorCode": null,
+    "observedAt": "2026-11-07T10:38:11.615Z",
+    "source": "normal_owner_status_no_key_value"
+  },
+  "finishedAt": "2026-11-07T10:42:35.923Z"
+}

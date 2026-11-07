@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "status": "passed",
+  "scope": "Known JSON members only; ZIP verified in memory then discarded; no URL, PNG or runtime log retained.",
+  "files": [
+    {
+      "member": "lifecycle.json",
+      "bytes": 172928,
+      "sha256": "95fed0edb9815cd97534c39b51be4791f2d335bc25973f1552fd63d559742eb0",
+      "patternMatches": {
+        "email": 0,
+        "credential": 0,
+        "private_key": 0,
+        "bearer": 0,
+        "signed_query": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "parity/parity.json",
+      "bytes": 106605,
+      "sha256": "331e047c5d0655c26440af5c970d6edd3573374e7cfede84f7eaebb3f9c853b0",
+      "patternMatches": {
+        "email": 0,
+        "credential": 0,
+        "private_key": 0,
+        "bearer": 0,
+        "signed_query": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "smoke.json",
+      "bytes": 3125,
+      "sha256": "565d3103dc979c8d4ec7f541cb2fd68e2e7caec8eaf1aa853c093cfe36a5371f",
+      "patternMatches": {
+        "email": 0,
+        "credential": 0,
+        "private_key": 0,
+        "bearer": 0,
+        "signed_query": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "24b95573cc56a479e0f5fc621bc8fc469634a879a3f22fa593728d84aa6d6b06",
+      "patternMatches": {
+        "email": 0,
+        "credential": 0,
+        "private_key": 0,
+        "bearer": 0,
+        "signed_query": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "0751df3d6992d7ccaef422bde41ec98a56ca44535d2d172e376c2676e93d1f11",
+      "patternMatches": {
+        "email": 0,
+        "credential": 0,
+        "private_key": 0,
+        "bearer": 0,
+        "signed_query": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    }
+  ]
+}

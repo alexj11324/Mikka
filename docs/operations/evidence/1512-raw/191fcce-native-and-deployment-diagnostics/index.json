@@ -1,0 +1,615 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-native-and-deployment-diagnostics",
+  "createdAt": "2026-11-07T10:53:14.586Z",
+  "issue": 1512,
+  "pullRequest": 1518,
+  "repository": "alexj11324/Mikka",
+  "preservation": {
+    "parentEvidenceCommit": "0799447dd2f05bc48c585d29b1c2a4089d44a175",
+    "parentEvidenceTree": "53aec187a70628658371036bf8a401cbcd3ad724",
+    "additionalParents": [],
+    "opsAncestorAlreadyPreserved": "0f2ddd52158d70d9af29ef60b8242bb92254bc20",
+    "originalFiles": 23,
+    "originalBytes": 455735,
+    "representation": "Exact original UTF-8 bytes; SHA256 and Git blob SHA1 recorded per file; remote bytes are read back before branch fast-forward.",
+    "noProductOrFeatureRefChanges": true
+  },
+  "acceptance": {
+    "overall": "incomplete",
+    "productionAcceptance": false,
+    "ci": "14/14 normal workflows passed for candidate 191fcce",
+    "desktopFunctional": "passed",
+    "desktopLoginQueryCriterion": "failed",
+    "nativeLoginSqlQueries": 208,
+    "webLoginSqlQueries": 161,
+    "loginDifference": 47,
+    "loginRelativePercent": 29.19254658385093,
+    "firstStartupPairCriterion": "passed within the documented bundled-versus-hosted Electron warm-server window",
+    "nativeStartupSqlQueries": 173,
+    "hostedElectronStartupSqlQueries": 200,
+    "productionModelTraceReplayAcceptance": "not established by this archive"
+  },
+  "provenance": {
+    "workflowRun": 42363981423,
+    "candidate": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+    "candidateTree": "8496f5f9ddab1c55cce1d6cc454b5b1d46cb346c",
+    "actualAppAndHarness": {
+      "sha": "a5be42ddee7690de2c2ce11574a47cac0f482a79",
+      "tree": "308ab535bd2002ad4d4658283e2300ac50618bbb",
+      "parents": [
+        "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+        "191fcce2391c1d24b502bc256a2c8a0e27359f1c"
+      ]
+    },
+    "sourceFiles": {
+      "lifecycle.json": {
+        "bytes": 172928,
+        "sha256": "95fed0edb9815cd97534c39b51be4791f2d335bc25973f1552fd63d559742eb0"
+      },
+      "parity/parity.json": {
+        "bytes": 106605,
+        "sha256": "331e047c5d0655c26440af5c970d6edd3573374e7cfede84f7eaebb3f9c853b0"
+      },
+      "smoke.json": {
+        "bytes": 3125,
+        "sha256": "565d3103dc979c8d4ec7f541cb2fd68e2e7caec8eaf1aa853c093cfe36a5371f"
+      },
+      "native-crypto.json": {
+        "bytes": 2868,
+        "sha256": "0751df3d6992d7ccaef422bde41ec98a56ca44535d2d172e376c2676e93d1f11"
+      },
+      "mac-acceptance-package.json": {
+        "bytes": 957,
+        "sha256": "24b95573cc56a479e0f5fc621bc8fc469634a879a3f22fa593728d84aa6d6b06"
+      }
+    }
+  },
+  "desktop": {
+    "reports": "desktop/",
+    "login": {
+      "native": 208,
+      "web": 161,
+      "difference": 47,
+      "relativePercent": 29.19254658385093,
+      "nativeNoMoreThanWeb": false
+    },
+    "firstStartupPair": {
+      "native": 173,
+      "web": 200,
+      "difference": -27,
+      "relativePercent": -13.5,
+      "nativeNoMoreThanWeb": true
+    },
+    "protocol": {
+      "login": "Same already leased account and primary API, ordinary email authentication; native adds normal PKCE handoff. All-process unsampled cumulative SQL counter deltas include concurrent traffic.",
+      "startup": "First already authenticated bundled Electron versus hosted Electron startup pair on the same warm primary API; not independent Chromium cold startup.",
+      "countWindowUnchanged": true,
+      "sqlDerivedFromRpcCounts": false
+    },
+    "loginSegments": {
+      "web": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 142
+        }
+      ],
+      "native": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 17
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 172
+        }
+      ]
+    },
+    "physicalRpcTotals": {
+      "nativeLogin": 16,
+      "webLogin": 13,
+      "startup-bundled": 12,
+      "startup-hosted": 22
+    },
+    "logicalRpcTotals": {
+      "nativeLogin": 22,
+      "webLogin": 13,
+      "startup-bundled": 20,
+      "startup-hosted": 22
+    },
+    "nativeLoginBatchEnvelopes": 3,
+    "nativeLoginBatchItems": 9,
+    "counterIntegrity": {
+      "comparable": true,
+      "stablePid": true,
+      "unknownReadingsAllZero": true,
+      "cumulativeQueryCallsNondecreasing": true
+    },
+    "functional": {
+      "lifecycle": "passed",
+      "parity": "passed",
+      "parityCases": "100/100",
+      "smoke": "passed",
+      "crypto": true,
+      "package": true
+    },
+    "cleanup": {
+      "reportsPassed": true,
+      "lease": "released",
+      "ownerBaselineAfter": true,
+      "peerBaselineAfter": true,
+      "source": "Unmodified lifecycle/smoke/parity originals and desktop/summary.json"
+    },
+    "installedParityDaemon": {
+      "revisions": [
+        "f811448d805e7baa7b032fd6ae62d991f59966c8"
+      ],
+      "independentOfAppAndHarness": true,
+      "production1512TracingAcceptance": false
+    },
+    "limits": [
+      "Full login query criterion remains failed despite normal 14/14 CI success.",
+      "Single paired startup query window is bundled vs hosted Electron on a warm server; not independent Chromium cold startup or five SQL pairs.",
+      "SQL calls are all-process unsampled deltas, not per-action allocations. All concurrent traffic is retained.",
+      "Batch physical and logical RPC projections are separate and complete.",
+      "Public app/harness source is a5be (e449+191); installed local daemon during parity was separately reported as f811. These are not production daemon tracing acceptance."
+    ]
+  },
+  "taskVm": {
+    "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+    "runId": 42363177678,
+    "attempt": 1,
+    "artifactId": 13570494196,
+    "reports": "task-vm-e449/",
+    "providerIntegration": "passed",
+    "providerModelCalls": 0,
+    "ownerCases": [
+      {
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "status": "failed"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "status": "failed"
+      }
+    ],
+    "failurePhase": "waiting_for_native_question",
+    "guardCode": "lifecycle_unexpected_factory_attempt",
+    "condition": "An extra Factory attempt had a runId outside the original run and any already authorized continuation. No continuation was created.",
+    "originFailureCause": "unknown",
+    "extraAttemptStageAndRetryCause": "unknown",
+    "sharedSubscriptionBindingVerified": true,
+    "sampleIs1512AcmeAcceptance": false,
+    "nativeQuestionOrContinuationProved": false,
+    "cleanup": "Reports passed, both cases' normal machine-ended receipts and original owned VM missing observations preserved; workspace restored; bots retained under existing no-delete-API policy.",
+    "rawProviderOrAccountQueriesPerformedByThisReview": false
+  },
+  "web": {
+    "sourceCommit": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "runId": 42364868968,
+    "failedStep": 22,
+    "code": "webDeploy:buildFailed",
+    "compilerCause": "unknown",
+    "compilerSourceFile": "unknown",
+    "artifactCount": 0,
+    "privacyBoundary": "Existing build-vercel wrapper stores overlay compiler output only in the ephemeral runner private 0600 log. Public log exposes only the closed build code; raw log was used in RAM and discarded.",
+    "deploymentPassed": false,
+    "relationTo191Native": "This later main source is not the synthetic source tested by the archived 191 native run."
+  },
+  "reconciler": {
+    "scope": "offline metadata reconciliation only",
+    "productionValidated": false,
+    "overallAcceptance": null,
+    "networkCalls": 0,
+    "providerCalls": 0,
+    "resourcesCreated": 0,
+    "tests": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "receipt": "reconciler/production-evidence-reconciler-offline.json",
+    "limits": [
+      "Two complete same-window snapshots, every discovered trace and every required page remain necessary inputs.",
+      "Passing the offline fixtures, zero rows, equal counts or matching sets does not establish production completeness.",
+      "Claude independent upstream generation count and official native flush are explicitly unproven."
+    ]
+  },
+  "privacy": {
+    "runtimeJsonFiles": "All scanned runtime and metadata JSON files had zero email, credential, JWT, bearer, private-key, signed-URL or nonempty credential-field matches.",
+    "sourceFixtureException": {
+      "path": "reconciler/reconcile-production-evidence.test.mjs",
+      "line": 166,
+      "pattern": "email",
+      "matches": 1,
+      "basis": "Explicit synthetic canary on a reserved example domain in the privacy rejection test; not an account identity or observed runtime value.",
+      "originalBytesPreserved": true
+    },
+    "zipPngDmgApiBuildAndRawRuntimeLogsIncluded": false,
+    "signedDownloadUrlsIncluded": false
+  },
+  "files": [
+    {
+      "path": "desktop/ci-final.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/ci-final.json",
+      "bytes": 36138,
+      "sha256": "db4486606ff8c5233f7eb1da0d71ee515493ae048636521052816a2aeb884f35",
+      "gitBlobSha1": "d1c750da7a403434d4be71b5a79e562739a03c5f",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/download-receipt.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/download-receipt.json",
+      "bytes": 1140,
+      "sha256": "bdd3d0267ffb20c00abc1e284af046ed823c09ef8c7bcc378656a6aa2d0f68d8",
+      "gitBlobSha1": "c9a43e5806fd9acd0716a965ab85e46e1818354d",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/lifecycle.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/lifecycle.json",
+      "bytes": 172928,
+      "sha256": "95fed0edb9815cd97534c39b51be4791f2d335bc25973f1552fd63d559742eb0",
+      "gitBlobSha1": "522045521848ab6cd000f5f0b043cfa9b4afb0fa",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/mac-acceptance-package.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "24b95573cc56a479e0f5fc621bc8fc469634a879a3f22fa593728d84aa6d6b06",
+      "gitBlobSha1": "5d9545c65c6f0aa4997ac08cf6eb15b3f96dd13d",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/native-crypto.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "0751df3d6992d7ccaef422bde41ec98a56ca44535d2d172e376c2676e93d1f11",
+      "gitBlobSha1": "1a12614a841ae8d667cd74584cb459349715294a",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/parity/parity.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/parity/parity.json",
+      "bytes": 106605,
+      "sha256": "331e047c5d0655c26440af5c970d6edd3573374e7cfede84f7eaebb3f9c853b0",
+      "gitBlobSha1": "c7cb2f25db50f2035e87bcadc17b377db73cc8ae",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/privacy-scan.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/privacy-scan.json",
+      "bytes": 1923,
+      "sha256": "cd9b91c9a06bc344e06db0084558a750d209086553adce35305243ceba09c1c8",
+      "gitBlobSha1": "0d45af53bfa8130f64504c2d4211866a2e1ee30b",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/smoke.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/smoke.json",
+      "bytes": 3125,
+      "sha256": "565d3103dc979c8d4ec7f541cb2fd68e2e7caec8eaf1aa853c093cfe36a5371f",
+      "gitBlobSha1": "77d1ec3a984a767729cd059d6cf123c2ae6f2ea4",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "desktop/summary.json",
+      "originalLocalPath": "ops1512/evidence/desktop-191fcce/summary.json",
+      "bytes": 51753,
+      "sha256": "aaca0acc0bfc05fb12f6a87ae87ebd308bd938cbc35a6f5a67ddda2fccd3e452",
+      "gitBlobSha1": "7aab2490964ffe1c5621af8700605c628f24a521",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "task-vm-e449/attestation.json",
+      "originalLocalPath": "ops1512/evidence/task-vm-e449-42363177678/attestation.json",
+      "bytes": 752,
+      "sha256": "946c4559096669f23d2863b941c45661eaadf6ad68baeb55ef309f8c9dd24a2a",
+      "gitBlobSha1": "d71de1967c020ad05cea58c7837ba8911cfa686c",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "task-vm-e449/diagnostic-summary.json",
+      "originalLocalPath": "ops1512/evidence/task-vm-e449-42363177678/diagnostic-summary.json",
+      "bytes": 5537,
+      "sha256": "560786c4d9dab88d9c88395cfa968711c7cfc8d7085dd34e87a9d74fc14ec590",
+      "gitBlobSha1": "0c6f25ff30ea427b8f66a7a566febb586cb62bcf",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "task-vm-e449/download-receipt.json",
+      "originalLocalPath": "ops1512/evidence/task-vm-e449-42363177678/download-receipt.json",
+      "bytes": 1921,
+      "sha256": "cc220f9ec52a7b6fa9754342ad22364812f10872da368c9db225a2ac785a98c9",
+      "gitBlobSha1": "79cc1f43e254414aa509aa26430a17e805335975",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "task-vm-e449/provider-report.json",
+      "originalLocalPath": "ops1512/evidence/task-vm-e449-42363177678/provider-report.json",
+      "bytes": 1297,
+      "sha256": "6e43105c7c3cb150cd82497ff8237c69da21a57682c239238f045f0ac7738fa5",
+      "gitBlobSha1": "c66cc37075054efda4a4ca3781dc4fee1b5e729c",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "task-vm-e449/report.json",
+      "originalLocalPath": "ops1512/evidence/task-vm-e449-42363177678/report.json",
+      "bytes": 10170,
+      "sha256": "d6c9ac6826b635cdd46a58eba71d716fd1722e2c1b5b8ae103cf3cab1dfb8b7c",
+      "gitBlobSha1": "8c16d65e5c0cd82eae76e96959a0d52f19447d43",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "task-vm-e449/summary.json",
+      "originalLocalPath": "ops1512/evidence/task-vm-e449-42363177678/summary.json",
+      "bytes": 837,
+      "sha256": "db4879c31e0d572727d9fd92687fdd1807ff2ff62a3bcb9a117a49d1d362280f",
+      "gitBlobSha1": "bde7304c0f5353e800400c08d514397a5ed7a1ef",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "web-f722/diagnostic-summary.json",
+      "originalLocalPath": "ops1512/evidence/web-f722-42364868968/diagnostic-summary.json",
+      "bytes": 812,
+      "sha256": "a622ff7aa2273f244cde1ef6c6ac97357110ecd66822099e11fe7b42e3a1ab88",
+      "gitBlobSha1": "dcf46820e53db2de27375d47c7d2b8521e5e011b",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "ops/download-desktop-json.py",
+      "originalLocalPath": "ops1512/download-desktop-json.py",
+      "bytes": 6398,
+      "sha256": "cd7087c861ecb8c552af5f88101398e59983e15e00e7b3b978435ff065bc9d86",
+      "gitBlobSha1": "ce342d1306a4bfd44bf15fed516acf5317ac355d",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "reconciler/reconcile-production-evidence.mjs",
+      "originalLocalPath": "ops1512/reconcile-production-evidence.mjs",
+      "bytes": 26641,
+      "sha256": "22ec0669a234d03bdbf991aa0bebd209031c6c42815d4d04ba22fbc2cb6fd0e2",
+      "gitBlobSha1": "550141c5e945505f31ad26487689f2af7b792577",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "reconciler/reconcile-production-evidence.test.mjs",
+      "originalLocalPath": "ops1512/reconcile-production-evidence.test.mjs",
+      "bytes": 13824,
+      "sha256": "d15239cb74232d669186613061bff86075e6cc053f7f850d4fa17a1665cc48bb",
+      "gitBlobSha1": "e8c3b495a71e59ebd1099ca89668cf154746277a",
+      "privacyPatternMatches": {
+        "email": 1,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "reconciler/reconcile-production-evidence.md",
+      "originalLocalPath": "ops1512/reconcile-production-evidence.md",
+      "bytes": 6663,
+      "sha256": "aebc35e46e4f7a38d7db943e746b5b0b7cc04e6787c5ad5a3535d7ce7377f4fb",
+      "gitBlobSha1": "9ba28ac106a9b1e543d34d388921debefb3e57fb",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "reconciler/reconcile-production-evidence-test.tap",
+      "originalLocalPath": "ops1512/reconcile-production-evidence-test.tap",
+      "bytes": 932,
+      "sha256": "b09bedba292843ce4cd66c938442badeb52c0490669f26c0f39224f124dd2618",
+      "gitBlobSha1": "f390781a07e2455c69c22181096d514ca3d5a377",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "reconciler/reconcile-production-evidence-lint.log",
+      "originalLocalPath": "ops1512/reconcile-production-evidence-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "reconciler/production-evidence-reconciler-offline.json",
+      "originalLocalPath": "ops1512/evidence/production-evidence-reconciler-offline.json",
+      "bytes": 2514,
+      "sha256": "77c65a02a0bb0a141a46b671c383ea21eb0fbc16e61ba89f9afa44524e94347e",
+      "gitBlobSha1": "b14a7540416949f9d6813844f8825c361cfcd467",
+      "privacyPatternMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "thread-lifecycle-question-resume-evidence",
+  "issue": 1593,
+  "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "scope": "provider_controller_faults_and_task_vm_question_resume",
+  "status": "failed",
+  "issueAcceptance": "incomplete",
+  "pending": [
+    "external_wait_and_adjacent_stage_continuity",
+    "terminal_revoke_and_close_grace_retention",
+    "latency_and_cost_measurement"
+  ],
+  "providerIntegration": "passed",
+  "questionResume": "incomplete",
+  "providerScope": {
+    "realProviderRpc": true,
+    "injectedTransportFaults": true,
+    "naturalTimeoutExpiry": false,
+    "daemonAcceptance": false,
+    "subscriptionAcceptance": false,
+    "modelCalls": 0,
+    "resumeScope": "provider-resume-to-controller-monitor",
+    "requestDeadlineScope": "sdk-request-deadline-to-controller-recovery"
+  }
+}

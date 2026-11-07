@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T10:48:05.362Z",
+  "scope": "offline_metadata_reconciliation_only",
+  "candidateContext": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "overallAcceptance": null,
+  "productionValidated": false,
+  "networkCalls": 0,
+  "providerCalls": 0,
+  "resourcesCreated": 0,
+  "files": [
+    {
+      "path": "reconcile-production-evidence.mjs",
+      "bytes": 26641,
+      "sha256": "22ec0669a234d03bdbf991aa0bebd209031c6c42815d4d04ba22fbc2cb6fd0e2",
+      "lines": 280
+    },
+    {
+      "path": "reconcile-production-evidence.test.mjs",
+      "bytes": 13824,
+      "sha256": "d15239cb74232d669186613061bff86075e6cc053f7f850d4fa17a1665cc48bb",
+      "lines": 197
+    },
+    {
+      "path": "reconcile-production-evidence.md",
+      "bytes": 6663,
+      "sha256": "aebc35e46e4f7a38d7db943e746b5b0b7cc04e6787c5ad5a3535d7ce7377f4fb"
+    },
+    {
+      "path": "reconcile-production-evidence-test.tap",
+      "bytes": 932,
+      "sha256": "b09bedba292843ce4cd66c938442badeb52c0490669f26c0f39224f124dd2618"
+    },
+    {
+      "path": "reconcile-production-evidence-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "sources": [
+    {
+      "path": "production-evidence-query-templates.json",
+      "bytes": 56861,
+      "sha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873"
+    },
+    {
+      "path": "evidence/posthog-pagination-schema-191fcce2.json",
+      "bytes": 42221,
+      "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74"
+    }
+  ],
+  "validation": {
+    "tests": {
+      "command": "node --test ops1512/reconcile-production-evidence.test.mjs",
+      "exitCode": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "syntax": {
+      "command": "node --check ops1512/reconcile-production-evidence.mjs",
+      "exitCode": 0
+    },
+    "lint": {
+      "command": "Mikka/node_modules/.bin/oxlint ops1512/reconcile-production-evidence.mjs ops1512/reconcile-production-evidence.test.mjs",
+      "exitCode": 0
+    }
+  },
+  "boundaries": [
+    "Normalized typed rows required; raw MCP formatted text is not parsed",
+    "Two complete same-window snapshots; every discovered trace and every 500-row page required",
+    "CLI exit, equal counts, zero rows and matching sets never establish upstream completeness or production acceptance",
+    "Claude independent upstream count and official native flush remain explicitly unproven"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "web-build-readonly-failure-diagnosis",
+  "sourceCommit": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+  "runId": 42364868968,
+  "jobId": 128380699741,
+  "step": 22,
+  "code": "webDeploy:buildFailed",
+  "compilerDetailAvailable": false,
+  "artifactCount": 0,
+  "rawLogRetained": false,
+  "observedLogCharacters": 299216,
+  "reason": "The existing build-vercel wrapper writes overlay compiler diagnostics only to the ephemeral runner private 0600 official-web-build.log; public logs contain only the closed buildFailed code.",
+  "sourceReference": "scripts/release/build-vercel.mjs",
+  "sourceLines": [
+    46,
+    52
+  ],
+  "specificSourceFileOrCompilerCause": "unknown",
+  "deploymentFailed": true,
+  "newProductionSourceAttested": false,
+  "sameProviderFailureProved": false
+}

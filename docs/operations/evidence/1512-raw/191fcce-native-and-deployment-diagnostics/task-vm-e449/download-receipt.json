@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "sourceCommit": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "runId": 42363177678,
+  "attempt": 1,
+  "artifact": {
+    "id": 13570494196,
+    "name": "thread-lifecycle-question-resume-42363177678-1",
+    "bytes": 4563,
+    "sha256": "e576acab17ba836b814bf56b4066b630d56fc6a413fd30497b4d2007b1de376b",
+    "digestVerified": true
+  },
+  "files": [
+    {
+      "path": "attestation.json",
+      "bytes": 752,
+      "sha256": "946c4559096669f23d2863b941c45661eaadf6ad68baeb55ef309f8c9dd24a2a",
+      "privacyMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "provider-report.json",
+      "bytes": 1297,
+      "sha256": "6e43105c7c3cb150cd82497ff8237c69da21a57682c239238f045f0ac7738fa5",
+      "privacyMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "report.json",
+      "bytes": 10170,
+      "sha256": "d6c9ac6826b635cdd46a58eba71d716fd1722e2c1b5b8ae103cf3cab1dfb8b7c",
+      "privacyMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    },
+    {
+      "path": "summary.json",
+      "bytes": 837,
+      "sha256": "db4879c31e0d572727d9fd92687fdd1807ff2ff62a3bcb9a117a49d1d362280f",
+      "privacyMatches": {
+        "email": 0,
+        "credential": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedUrl": 0
+      },
+      "sensitiveNonemptyFields": 0
+    }
+  ],
+  "privacy": "passed",
+  "scope": "Only four expected JSON files; ZIP verified in RAM and discarded; no signed URL or raw log persisted."
+}

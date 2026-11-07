@@ -1,0 +1,15 @@
+✔ all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success (19.952079ms)
+✔ 501 rows require continuous pages and original UUIDs, including the explicit final short page (52.221217ms)
+✔ equal row totals cannot hide different event, span, physical UUID, parent or model identities (2.431862ms)
+✔ native emissions and app-server receipts use distinct equations, without double counting matched fallbacks (2.399954ms)
+✔ missing fields/tables, wrong cluster/window, truncation and unstable aggregates remain incomplete (1.12602ms)
+✔ null is distinct from zero and arbitrary payload/labels never appear in output (1.275325ms)
+✔ Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence (0.869192ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 186.572835
