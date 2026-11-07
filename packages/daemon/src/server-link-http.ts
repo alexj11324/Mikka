@@ -42,6 +42,7 @@ import {
   heartbeatResultSchema,
   pendingRunsResponse,
   runAssignmentSchema,
+  runCheckpointReceiptSchema,
   runGitHubCredentialSchema,
   runCommandsResponse,
   daemonVersionsSchema,
@@ -106,6 +107,8 @@ export class SessionRejectedError extends DaemonError {
 interface CallOptions<T> {
   body?: unknown
   schema?: z.ZodType<T>
+  /** Endpoint-specific success decoding, including an older empty response. */
+  decodeResponse?: (response: Response) => Promise<unknown>
   /** Map 409 to `RunNotPinnedHereError` for this run. */
   claimOf?: string
   /** Default 15 s; long-polls wait longer. */
@@ -361,7 +364,7 @@ export class HttpServerLink implements ServerLink {
       )
     }
     if (!options.schema) return undefined as T
-    const parsed = options.schema.safeParse(await response.json())
+    const parsed = options.schema.safeParse(options.decodeResponse ? await options.decodeResponse(response) : await response.json())
     if (!parsed.success) {
       throw new DaemonError(
         DAEMON_RPC_ERRORS.serverUnreachable,
@@ -501,8 +504,10 @@ export class HttpServerLink implements ServerLink {
   }
 
   async checkpointRun(runId: string, checkpoint: RunCheckpoint) {
-    await this.call("POST", devicePaths.runCheckpoint(checkId(runId)), {
+    return this.call("POST", devicePaths.runCheckpoint(checkId(runId)), {
       body: checkpoint,
+      schema: runCheckpointReceiptSchema.refine(receipt => receipt.runId === runId, { message: 'Checkpoint receipt belongs to another run' }).optional(),
+      decodeResponse: async response => response.status === 204 ? undefined : response.json().catch(() => null),
     })
   }
 
