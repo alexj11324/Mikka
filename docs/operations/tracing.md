@@ -822,7 +822,10 @@ complete Factory inventory. It temporarily prepares the account through existing
 settings APIs and restores unchanged settings afterward. For actual Replay
 evidence, run a single model case with `browser-submit=true`, refresh the
 already-signed-in production browser after deployment, and follow the generated
-ready comment in #1512 to submit the exact fixture once through New task.
+ready comment in #1512 to submit the exact fixture once through New task. Confirm
+that the browser has selected the official Cloud backend before selecting the
+reported workspace: `/api/version` identifies the official browser shell even
+when business requests are routed to a selected self-hosted backend.
 The API-only case does not prove browser Replay. The driver also does not prove
 PostHog ingestion; correlate its recorded IDs with the actual APM, AI, Logs and
 Replay records afterward. See the full
