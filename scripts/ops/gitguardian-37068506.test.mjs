@@ -304,3 +304,32 @@ test('this diagnostic revision cannot invoke disposition through the CLI', () =>
   assert.equal(receipt.writeAttempts, 0)
   assert.deepEqual(receipt.requests, [])
 })
+
+test('only the exact previously observed extra occurrence can disclose a validated repository source', () => {
+  const extra = { ...occurrences()[0], id: 296439688, sha: '3367c154e0ebb5acde0cc22cca1a034c708a947f',
+    filepath: 'docs/example.yml', source: { id: 30134018, type: 'github', full_name: 'fixture-owner/fixture-repo',
+      external_id: '123456', url: 'https://github.com/fixture-owner/fixture-repo' },
+    matches: [{ post_line_start: 7, post_line_end: 7 }] }
+  assert.deepEqual(inspectOccurrences([extra], new Headers()).rows[0].extraSource, {
+    repositoryFullName: 'fixture-owner/fixture-repo', githubUrl: 'https://github.com/fixture-owner/fixture-repo',
+    repositoryId: 123456, filePath: 'docs/example.yml', line: 7,
+  })
+  const other = clone(extra); other.id++
+  assert.equal('extraSource' in inspectOccurrences([other], new Headers()).rows[0], false)
+  for (const mutate of [
+    row => { row.source.id++ }, row => { row.source.type = 'other' }, row => { row.sha = 'c'.repeat(40) }, row => { row.incident_id++ },
+    row => { row.matches[0].post_line_start = 8 }, row => { row.matches.push(clone(row.matches[0])) },
+  ]) {
+    const invalid = clone(extra); mutate(invalid)
+    assert.throws(() => inspectOccurrences([invalid], new Headers()), code('INSPECTION_EXTRA_SOURCE_SCOPE'))
+  }
+  for (const mutate of [
+    row => { row.source.full_name = 'owner/repo/extra' }, row => { row.source.full_name = '-owner/repo' },
+    row => { row.source.full_name = 'owner/..' }, row => { row.source.url = 'https://example.invalid/fixture-owner/fixture-repo' },
+    row => { row.source.url += '?untrusted=true' }, row => { row.source.external_id = 'not-a-number' },
+    row => { row.filepath = '../escape' },
+  ]) {
+    const invalid = clone(extra); mutate(invalid)
+    assert.throws(() => inspectOccurrences([invalid], new Headers()), code('INSPECTION_EXTRA_SOURCE_FORMAT'))
+  }
+})

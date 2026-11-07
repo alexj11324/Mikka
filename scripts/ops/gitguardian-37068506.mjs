@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: '3bd9d7fb40b484cb83c4f914e60f8ed2a2e4859f',
+  base: '6a7852a3dde2bd52530f3a6521e241bd998546b1',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -124,6 +124,23 @@ export function inspectOccurrences(rows, headers) {
   return { noNextPage: true, returnedCount: rows.length, rows: rows.map(row => {
     requireThat(Array.isArray(row?.matches) && row.matches.length <= 32, 'INSPECTION_MATCH_LIMIT')
     const repoNumericMatches = row.source?.external_id === TARGET.repositoryId || row.source?.external_id === String(TARGET.repositoryId)
+    let extraSource
+    if (row.id === 296439688) {
+      requireThat(row.incident_id === TARGET.incident && row.source?.id === 30134018 && row.source.type === 'github'
+        && row.sha === '3367c154e0ebb5acde0cc22cca1a034c708a947f'
+        && row.matches.length === 1 && row.matches[0]?.post_line_start === 7 && row.matches[0]?.post_line_end === 7,
+      'INSPECTION_EXTRA_SOURCE_SCOPE')
+      const fullName = row.source.full_name
+      const [owner, repository, extraPart] = typeof fullName === 'string' ? fullName.split('/') : []
+      const externalId = row.source.external_id
+      const repositoryId = typeof externalId === 'number' ? externalId
+        : typeof externalId === 'string' && /^[1-9][0-9]{0,15}$/.test(externalId) ? Number(externalId) : null
+      requireThat(typeof owner === 'string' && owner.length <= 39 && /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(owner) && !owner.includes('--')
+        && typeof repository === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(repository) && !['.', '..'].includes(repository) && extraPart === undefined
+        && typeof row.source.url === 'string' && row.source.url.toLowerCase() === `https://github.com/${fullName.toLowerCase()}`
+        && positive(repositoryId) && legalPath(row.filepath), 'INSPECTION_EXTRA_SOURCE_FORMAT')
+      extraSource = { repositoryFullName: fullName, githubUrl: row.source.url, repositoryId, filePath: row.filepath, line: 7 }
+    }
     return {
       id: integerOrNull(row.id), incidentMatches: row.incident_id === TARGET.incident,
       repoNumericMatches,
@@ -136,6 +153,7 @@ export function inspectOccurrences(rows, headers) {
         preLineStart: integerOrNull(match?.pre_line_start), preLineEnd: integerOrNull(match?.pre_line_end),
         postLineStart: integerOrNull(match?.post_line_start), postLineEnd: integerOrNull(match?.post_line_end),
       })),
+      ...(extraSource ? { extraSource } : {}),
     }
   }) }
 }
