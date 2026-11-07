@@ -19,6 +19,13 @@ try {
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
+// Keep cold loading of the application graph outside these cases' 30-second
+// database deadline. A timed-out parent runs cleanup while its nested cases
+// are still starting; their later FK/pool errors obscure the original timeout.
+const snapshotRuntime = databaseUrl ? await Promise.all([
+  import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
+]) : null
+
 /** Commit the real inbox claim after PostgreSQL has answered the first state
  * statement, before the reader can issue another. No sleeps or fake SQL rows. */
 async function claimBetweenChatReads<T>(reader: PoolClient, claim: () => Promise<void>, read: () => Promise<T>) {
@@ -42,9 +49,7 @@ async function claimBetweenChatReads<T>(reader: PoolClient, claim: () => Promise
 }
 
 dbTest('full and compact chat reads use one snapshot across a concurrent inbox claim', { timeout: 30_000 }, async t => {
-  const [{ createRequestDatabaseScope, db, pool, withDatabaseClient }, schema, store, { userMessageEvent }, { chatFailure }, { eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
-  ])
+  const [{ createRequestDatabaseScope, db, pool, withDatabaseClient }, schema, store, { userMessageEvent }, { chatFailure }, { eq, sql }] = snapshotRuntime!
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-snapshot-${randomUUID()}`
   t.after(async () => {
@@ -94,9 +99,7 @@ dbTest('full and compact chat reads use one snapshot across a concurrent inbox c
 })
 
 dbTest('a continuation keeps the tail snapshot state after an earlier version read', { timeout: 30_000 }, async t => {
-  const [{ createRequestDatabaseScope, db, pool, withDatabaseClient }, schema, store, { userMessageEvent }, { chatFailure }, { eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
-  ])
+  const [{ createRequestDatabaseScope, db, pool, withDatabaseClient }, schema, store, { userMessageEvent }, { chatFailure }, { eq, sql }] = snapshotRuntime!
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-tail-snapshot-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_tail_snapshot'
   t.after(async () => {

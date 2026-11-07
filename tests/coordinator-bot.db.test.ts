@@ -286,7 +286,9 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       assert.deepEqual((await pool.query('SELECT id,"botId","sourceEventId" FROM factory_tasks WHERE id=$1', [task.id])).rows, [{ id: task.id, botId: null, sourceEventId: eventId }])
       const reader = await pool.connect()
       try {
-        await reader.query('BEGIN READ ONLY')
+        // Match the real Factory GET transaction: authorization still takes
+        // the issue's shared scope lock even when task/source reads do not.
+        await reader.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
         assert.equal((await factoryStore.readTask(reader, p.id, shared.id)).botId, null)
       } finally { await reader.query('ROLLBACK'); reader.release() }
       await assert.rejects(executionIdentityForRun(pool, malformed, p.id), { name: 'ExecutionIdentityError' })

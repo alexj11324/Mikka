@@ -213,6 +213,7 @@ export async function runAcceptance(env = process.env) {
     report.checks.minio = { applicationUpload: true, privateObject: true, presignedDownload: true, bytesVerified: true }
 
     report.stage = 'community-chat-31'
+    report.chatProgress = { confirmedReplies: 0 }
     for (let turn = 1; turn <= 31; turn++) {
       const number = String(turn).padStart(2, '0'), reply = `SELF_HOSTED_REPLY_${number}`
       await request('/mikka/api/mobile/chat', { method: 'POST', expected: [202], body: { botId: bot.id, text: `selfhost_turn_${number}`, submissionId: randomUUID() } })
@@ -223,7 +224,10 @@ export async function runAcceptance(env = process.env) {
           report.chatObservation = { turn, ...chatObservation(chat, reply) }
         }
         check(chat.enabled === true && !chat.error && !chat.failure, 'CHAT_UNAVAILABLE')
-        if (!chat.working && chat.items?.some(item => item.from === 'coordinator' && item.text?.includes(reply))) break
+        if (!chat.working && chat.items?.some(item => item.from === 'coordinator' && item.text?.includes(reply))) {
+          report.chatProgress.confirmedReplies = turn
+          break
+        }
         check(Date.now() < deadline, 'CHAT_REPLY_TIMEOUT')
         await live.next(value => value.kind === 'bot_chat' && value.id === bot.id, deadline - Date.now())
       }
