@@ -9,9 +9,11 @@ import * as deviceProtocol from '@mikka/protocol/device'
 import * as harnessProtocol from '@mikka/protocol/harness'
 import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
+import * as subscriptionProtocol from '@mikka/protocol/subscription'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
+import * as startupTracing from '../computer/startup-tracing'
 import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
 import messages from '@/messages/zh-CN.json'
 const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
@@ -38,6 +40,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    '@/lib/computer/startup-tracing':startupTracing,
     '@/lib/live/lists':{runListChanged:async(executor:unknown,runId:string)=>{
       assert.equal(executor,db);assert.equal(runId,run.id);assert.equal(run.status,'failed');calls.push('listChanged')
     }},
@@ -50,6 +53,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/harness':harnessProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
     '@mikka/protocol/repository':repositoryProtocol,
+    '@mikka/protocol/subscription':subscriptionProtocol,
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
     '@/messages/zh-CN.json':{default:messages},
     // This legacy-capability fixture has no managed organization policy.
@@ -94,12 +98,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       assertNoProfile(run.agentDefinition)
       const tx={query:async(statement:string,args:unknown[])=>{
         assert.ok(statement.startsWith('UPDATE agent_runs SET "deviceTokenId"=$2'))
-        assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner'])
+        assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner',false])
         run.deviceTokenId=String(args[1]);return {rows:[],rowCount:1}
       }}
       if(!await guard(tx))return 'unavailable';calls.push('claim');run.status='preparing';await after(tx);return 'claimed'
     }},
     '@/lib/subscription-runtime':{},
+    '@/lib/subscription-native-device':{},
     // The real switch, read against this fixture's environment rather than the test process's.
     '@/lib/deployment-switches':{deploymentSwitch:(name:DeploymentSwitch)=>deploymentSwitch(name,fixtureEnv)},
     '@/lib/computer/native-run-binding':{},

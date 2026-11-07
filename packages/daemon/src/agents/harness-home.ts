@@ -55,6 +55,9 @@ export function wipeRunCredentials(runDir: string) {
  * cleanup a crashed or killed daemon could not do. Run at daemon start.
  */
 export function sweepRunCredentials(stateDir: string) {
+  // Local native gh logins survive only until this process's run finishes.
+  // A restarted daemon reacquires them before any repository or CLI work.
+  rmSync(join(stateDir, 'github'), { recursive: true, force: true })
   let runs: string[]
   try {
     runs = readdirSync(join(stateDir, "runs"))

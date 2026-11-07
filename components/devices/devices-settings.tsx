@@ -6,11 +6,10 @@ import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { modelOrderKey, readModelOrder } from '@/components/settings/model-order-settings'
 import { pollDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { listReadDeadline, listReadPresence, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
-import { HarnessLabel, harnessName } from '@/components/labels/entity-labels'
+import { HarnessLabel } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -108,18 +107,22 @@ function DeviceTypeIcon({ device }: { device: DeviceView }) {
 }
 
 /**
- * R5: which allowed models (模型与订阅 › 优先使用的模型, this workspace) the device
- * can run, or that it gets no runs while offline. Two names at most, else a count.
+ * Why the device gets no runs, in the 离线 · 不会被派任务 form; nothing when it can take runs.
+ * Which models a run may use comes from credentials alone (Alex, 2026-11-06, #1539), so the device
+ * says only whether it takes runs, never which models.
  */
-function RunsLine({ device, models }: { device: DeviceView; models: string[] | undefined }) {
+function NoRunsLine({ device, agents, blocked }: { device: DeviceView; agents: number; blocked: boolean }) {
   const t = useTranslations('Devices')
+  const reason = !device.online ? null
+    : !device.enabled ? t('noRuns', { reason: t('notScheduling') })
+    : agents === 0 ? t('noRuns', { reason: blocked ? t('sandboxUnavailable') : t('noAgent') })
+    : device.harnesses.some(item => item.installed && item.subscriptionBroker) ? null
+    : t('noSubscriptionRuns', { reason: t('needsUpdate') })
   if (!device.online) return <span className="text-xs text-warning-foreground">{t('offlineNoRuns')}</span>
-  if (!models) return null
-  const line = models.length === 0 ? t('runsNone') : models.length <= 2 ? t('runsModels', { models: models.join('、') }) : t('runsCount', { count: models.length })
-  return <span className="truncate text-xs text-muted-foreground">{line}</span>
+  return reason ? <span className="truncate text-xs text-warning-foreground">{reason}</span> : null
 }
 
-function DeviceRow({ device, models, onChanged, onReconnect }: { device: DeviceView; models: string[] | undefined; onChanged: () => void; onReconnect: (device: DeviceView) => void }) {
+function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onChanged: () => void; onReconnect: (device: DeviceView) => void }) {
   const t = useTranslations('Devices')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
@@ -154,14 +157,12 @@ function DeviceRow({ device, models, onChanged, onReconnect }: { device: DeviceV
     <span className={cn('flex min-w-0 flex-1 flex-col gap-0.5', !device.online && 'text-muted-foreground')}>
       <span className="truncate text-sm font-medium">{device.name}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-        <span className="truncate">{device.online && agents.length === 0
-          ? `${status} · ${blocked.agents.length > 0 ? t('sandboxBlocked', { agents: blocked.agents.map(harnessName).join(', ') }) : t('noAgent')}`
-          : status}</span>
+        <span className="truncate">{status}</span>
         {device.online && (agents.length > 0
           ? <AgentMarks agents={agents} />
           : blocked.agents.length > 0 ? <SandboxBlocked missing={blocked.missing} reason={blocked.reason} detail={blocked.detail} /> : <InstallAgents />)}
       </span>
-      <RunsLine device={device} models={models} />
+      <NoRunsLine device={device} agents={agents.length} blocked={blocked.agents.length > 0} />
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={() => onReconnect(device)}>{t('reconnect')}</Button>}
     {/* 参与调度: the device's one switch (decision 2026-11-02-1400); on a phone it keeps its label on its own line. */}
@@ -235,16 +236,16 @@ function RenameDialog({ device, open, onOpenChange, onSave }: { device: DeviceVi
   </Dialog>
 }
 
-function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: { title: string; devices: DeviceView[]; deviceModels: Record<string, string[]> | undefined; onChanged: () => void; onReconnect: (device: DeviceView) => void }) {
+function DeviceGroup({ title, devices, onChanged, onReconnect }: { title: string; devices: DeviceView[]; onChanged: () => void; onReconnect: (device: DeviceView) => void }) {
   return devices.length > 0 && <section aria-label={title} className="flex flex-col gap-2">
     <h2 className="px-1 text-sm font-medium text-muted-foreground">{title}</h2>
-    <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">{devices.map((device, index) => <Fragment key={device.id}>{index > 0 && <ItemSeparator className="my-0" />}<DeviceRow device={device} models={deviceModels?.[device.id]} onChanged={onChanged} onReconnect={onReconnect} /></Fragment>)}</ItemGroup>
+    <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">{devices.map((device, index) => <Fragment key={device.id}>{index > 0 && <ItemSeparator className="my-0" />}<DeviceRow device={device} onChanged={onChanged} onReconnect={onReconnect} /></Fragment>)}</ItemGroup>
   </section>
 }
 
 /**
  * 设置 › 设备 (Figma V09b 683:24269, S-L2 684:24422, S-L3 684:24731): only
- * machines the user connected, laptops under 本机 and SSH-installed servers
+ * machines the user connected, laptops under 电脑 and SSH-installed servers
  * under Remote control. The bots' cloud computer is ours and never listed.
  * In the desktop app this computer becomes a device by itself, shown here by
  * LocalSetupStatus; 添加设备 is the one-click SSH install for remote computers
@@ -252,7 +253,7 @@ function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: {
  * the browser cannot open SSH (#491). In the desktop app, 重新连接 on this
  * computer's own row restarts its daemon (usability C10).
  */
-export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
+export function DevicesSettings(_props: { workspaceId?: string }) {
   const t = useTranslations('Devices')
   const key = 'devices-settings'
   const { data, error, mutate } = useSWR(key, () => observeListRead(pollDevices))
@@ -262,9 +263,6 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const owner = data?.live.ownerId
   const home = owner ? ownerListWorkspace(data, owner) : null
   useLiveKey('device_list', home ?? UNRESOLVED_LIST_SCOPE, [key], home, { minIntervalMs: 2_000, deadline: owner ? listReadDeadline(data, owner) : undefined, presence: listReadPresence(data), shareAcrossTabs: true })
-  // The same read as 模型与订阅, so both pages agree on what each device can run.
-  const order = useSWR(workspaceId ? modelOrderKey(workspaceId) : null, () => readModelOrder(workspaceId!))
-  const deviceModels = order.data && !order.data.error ? order.data.deviceModels : undefined
   const [adding, setAdding] = useState(false)
   const [desktopSsh, setDesktopSsh] = useState(false)
   const [thisDevice, setThisDevice] = useState<string | null>(null)
@@ -300,8 +298,8 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
     {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
     {!data ? !error && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
       : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
-      <DeviceGroup title={t('thisMachine')} devices={devices.filter(device => device.deviceType !== 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
-      <DeviceGroup title={t('otherDevices')} devices={devices.filter(device => device.deviceType === 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
+      <DeviceGroup title={t('computers')} devices={devices.filter(device => device.deviceType !== 'server')} onChanged={changed} onReconnect={reconnect} />
+      <DeviceGroup title={t('otherDevices')} devices={devices.filter(device => device.deviceType === 'server')} onChanged={changed} onReconnect={reconnect} />
     </>}
     {desktopSsh
       ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices} onAdded={changed} />

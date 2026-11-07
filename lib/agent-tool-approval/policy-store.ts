@@ -212,7 +212,7 @@ export async function providerContinuationPolicy(tx: PoolClient, userId: string,
   return policy
 }
 
-async function policyMemberships(current: Awaited<ReturnType<typeof lockCliAgentPolicy>>, userId: string, signal: AbortSignal, membership: CliMembershipGuard): Promise<MailboxTransactionLease> {
+export async function policyMemberships(current: Awaited<ReturnType<typeof lockCliAgentPolicy>>, userId: string, signal: AbortSignal, membership: CliMembershipGuard): Promise<MailboxTransactionLease> {
   const leases: MailboxTransactionLease[] = []
   try {
     for (const id of current.workspaceIds) leases.push(await membership(id,userId,signal))

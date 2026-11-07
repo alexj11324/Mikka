@@ -1,10 +1,12 @@
 import { HostedWorkflowModel } from './abuse/workflow-model'
 import { WorkflowAgent, type WorkflowAgentStreamOptions } from '@ai-sdk/workflow'
-import type { ToolSet } from 'ai'
+import type { StopCondition, ToolSet } from 'ai'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
 import { getWorkflowMetadata } from 'workflow'
 import { generationFailureDetails } from './subscription-generation-diagnostics'
+import { CodedError } from '@mikka/protocol/coded-error'
+import { invalidToolCalls, invalidToolCounts, invalidToolStepCount, markInvalidToolMessages, MAX_INVALID_TOOL_STEPS } from './coordinator/invalid-tool-call'
 
 /** How long one tool call took, by name only (no input or output). */
 export type ToolTiming = { tool: string; ms: number; failed: boolean }
@@ -43,12 +45,36 @@ export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tool
     ? new HostedWorkflowModel(scope!.ownerId,scope!.botId,runtime.model)
     : new SubscriptionWorkflowModel(runtime.modelSelection)
   const toolTimings: ToolTiming[] = []
-  const result = await new WorkflowAgent({ model,tools:timedTools(tools,toolTimings,Date.now,options.abortSignal) }).stream({ ...options,maxRetries:0 })
+  // The SDK returns an invalid call to the same model as a tool error. Keep
+  // that correction path, but stop after the second invalid step even when
+  // it also contains text. Returning null from repairToolCall would not drop it.
+  const stopOnInvalidTools: StopCondition<ToolSet> = ({ steps }) => invalidToolStepCount(steps) >= MAX_INVALID_TOOL_STEPS
+  const stopWhen = [...(Array.isArray(options.stopWhen) ? options.stopWhen : options.stopWhen ? [options.stopWhen] : []), stopOnInvalidTools]
+  const result = await new WorkflowAgent({ model,tools:timedTools(tools,toolTimings,Date.now,options.abortSignal) }).stream({ ...options,stopWhen,maxRetries:0,
+    onStepEnd: async step => {
+      if (options.onStepEnd) await options.onStepEnd({ ...step, response: { ...step.response, messages: markInvalidToolMessages(step) } })
+    },
+  })
   if ('error' in result) {
     let workflowRunId: string | null = null
     try { workflowRunId = getWorkflowMetadata().workflowRunId } catch { /* outside a Workflow in unit tests */ }
     try { console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage: 'workflow_result', ...generationFailureDetails(result.error), workflowRunId })) } catch { /* diagnostics cannot mask the refusal */ }
-    throw new Error('subscription_generation_failed')
+    throw new Error('subscription_generation_failed', { cause: result.error })
   }
-  return { text:result.steps.at(-1)?.text ?? '',finishReason:result.finishReason,responseMessages:result.steps.flatMap(step => step.response.messages),toolTimings,modelCalls:result.steps.length }
+  const invalidSteps = invalidToolStepCount(result.steps)
+  // Some providers emit a blank tool name which their parser drops. A
+  // tool-calls finish without a call is a malformed response, never success.
+  const emptyToolCall = result.finishReason === 'tool-calls' && !result.steps.at(-1)?.toolCalls?.length
+  if (invalidSteps || emptyToolCall) {
+    let workflowRunId: string | null = null
+    try { workflowRunId = getWorkflowMetadata().workflowRunId } catch { /* outside a Workflow in unit tests */ }
+    const exhausted = invalidSteps >= MAX_INVALID_TOOL_STEPS || emptyToolCall
+    const counts = invalidToolCounts(result.steps, tools)
+    if (emptyToolCall) counts.empty++
+    const firstInvalidStep = result.steps.findIndex(step => invalidToolCalls(step).length > 0)
+    const recoverySteps = firstInvalidStep < 0 ? 0 : Math.min(1, result.steps.length - firstInvalidStep - 1)
+    try { console.warn(JSON.stringify({ level:'warn',msg:'model_invalid_tool_call',workflowRunId,model:runtime.model,invalidSteps,recoverySteps,exhausted,counts })) } catch { /* diagnostics never replace the outcome */ }
+    if (exhausted) throw new CodedError('model_tool_unavailable', { cause: result.steps.flatMap(invalidToolCalls).at(-1)?.error })
+  }
+  return { text:result.steps.at(-1)?.text ?? '',finishReason:result.finishReason,responseMessages:result.steps.flatMap(markInvalidToolMessages),toolTimings,modelCalls:result.steps.length }
 }

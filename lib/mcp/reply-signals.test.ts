@@ -4,17 +4,20 @@ import type { SharedSubscription } from '../db/listen'
 import { observeReplySignals } from './reply-signals'
 import { waitForReply } from './reply-wait'
 
+type Wake = Awaited<ReturnType<SharedSubscription['next']>>
 const flush = async () => { for (let n = 0; n < 16; n++) await Promise.resolve() }
 function subscription() {
   let heard = false, lost = false, wake: (() => void) | undefined, closed = 0, waiting = 0
   const value: SharedSubscription = {
     reset() { heard = false }, get lost() { return lost }, close() { closed++ },
     next(_milliseconds, signal) {
-      if (heard || signal?.aborted) return Promise.resolve()
+      if (signal?.aborted) return Promise.resolve('aborted')
+      if (heard) return Promise.resolve('notified')
       waiting++
-      return new Promise<void>(resolve => {
-        const done = () => { waiting--; signal?.removeEventListener('abort', done); wake = undefined; resolve() }
-        wake = done; signal?.addEventListener('abort', done, { once: true })
+      return new Promise<Wake>(resolve => {
+        const done = (reason: Wake) => { waiting--; signal?.removeEventListener('abort', abort); wake = undefined; resolve(reason) }
+        const abort = () => done('aborted')
+        wake = () => done('notified'); signal?.addEventListener('abort', abort, { once: true })
       })
     },
   }

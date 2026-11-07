@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { REPO_ORIGIN_HEADER, RUN_CREDENTIALS_HEADER } from '@mikka/protocol/device'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { remoteKey } from '@mikka/protocol/repository'
 
@@ -69,6 +69,7 @@ before(async () => {
   const device = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const policy = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
   const claim = await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
+  const commands = await import('../../app/v1/devices/[deviceId]/commands/route')
   const settings = await import('../../app/api/agent-cli-policy/route')
   server = createServer(async (req,res) => {
     try {
@@ -77,7 +78,9 @@ before(async () => {
       const request = new Request(`${origin}${req.url}`, { method: req.method, headers: req.headers as HeadersInit, ...(req.method==='GET' || req.method==='HEAD' ? {} : {body:Buffer.concat(chunks)}) })
       const runRoute = /^\/v1\/runs\/([^/]+)\/(tool-approval|policy-snapshot)$/.exec(pathname)
       const routeRunId = runRoute?.[1] ?? runId
-      const response = req.url === '/api/agent-cli-policy' ? await settings.POST(request) : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
+      const response = req.url === '/api/agent-cli-policy' ? await settings.POST(request)
+        : pathname === `/v1/devices/${deviceId}/commands` ? await commands.GET(request, { params: Promise.resolve({ deviceId }) })
+          : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
       res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()))
     } catch(error) {
       // HTTP failures may include a Drizzle query or response object. Keep the
@@ -129,10 +132,11 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'queued')
   assert.equal((await pool.query('SELECT count(*)::int n FROM run_tokens WHERE "runId"=$1',[runId])).rows[0].n,0)
   await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,harnesses(true)])
-  const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.456', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION } })
+  const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.456', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION,[RUN_CREDENTIALS_HEADER]:'1' } })
   const claimBody = await claim.json()
   assert.equal(claim.status,200,`the real authenticated claim must pass its scope and lease fences: ${claim.status === 200 ? 'accepted' : JSON.stringify(claimBody)}`)
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'preparing')
+  assert.equal((await pool.query('SELECT "machineAuthority" FROM agent_runs WHERE id=$1',[runId])).rows[0].machineAuthority,true)
   const assignment = claimBody as import('@mikka/protocol/device').RunAssignment
   assert.equal(assignment.prompt,'APPROVAL_TEST')
   assert.equal(assignment.expectedRepoRemote,remoteUrl)
@@ -152,10 +156,14 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   claimed = assignment
 })
 
-test('a changed run policy answers live:false, revokes the real daemon gate, and each check logs one line', async () => {
+test('policy changes persist a stop command; operations check locally and legacy HTTP checks retain safe diagnostics', async () => {
   assert.ok(claimed, 'the claim test above runs first')
   const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
-  const link = new HttpServerLink(origin)
+  const sends: string[] = []
+  const link = new HttpServerLink(origin, (async (input, init) => {
+    sends.push(new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).pathname)
+    return fetch(input, init)
+  }) as typeof fetch)
   Object.assign(link, { credential: 'synthetic' })
   const lines: Record<string, unknown>[] = []
   const restore = (['log','warn','error'] as const).map(level => {
@@ -166,22 +174,39 @@ test('a changed run policy answers live:false, revokes the real daemon gate, and
     }
     return () => { console[level] = original }
   })
-  const gate = await link.prepareRunToolApproval(claimed, new AbortController().signal, () => {})
+  const stop = new AbortController()
+  const gate = await link.prepareRunToolApproval(claimed, stop.signal, () => {})
+  const legacyCheck = () => fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST',
+    headers:{'x-mikka-client-version':'0.0.456',authorization:'Bearer synthetic','content-type':'application/json'},
+    body:JSON.stringify({operation:'check',deviceId,policyRevision:claimed!.policyRevision}) })
   try {
     assert.equal(await gate.checkLive(), true)
+    assert.deepEqual(sends, [], 'normal operation checks add no HTTP request')
+    assert.equal(lines.length, 0)
+    assert.deepEqual(await (await legacyCheck()).json(), { live: true, paused: false })
     assert.deepEqual(Object.keys(lines.at(-1)!).sort(), ['durationMs','level','live','msg','reason','runId','status','timestamp'])
     assert.deepEqual({ ...lines.at(-1), timestamp: 0, durationMs: 0 }, { level:'info', msg:'tool_approval_check', timestamp:0, runId, live:true, reason:'ok', status:200, durationMs:0 })
     const settings = async (payload: object) => fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie:'owner=1',origin,'content-type':'application/json'}, body:JSON.stringify(payload) })
     const current = await (await settings({operation:'read',runId})).json() as {revision:string}
     assert.equal(current.revision, claimed.policyRevision, 'nothing changed the run policy since its claim')
     assert.equal((await settings({operation:'set',runId,target:'worker',expectedRevision:current.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
-    // The gate's own 1 s monitor sees the new revision and revokes the run.
-    const deadline = Date.now() + 10_000
-    while (!gate.revoked && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50))
+    const persisted = (await pool.query('SELECT "stopRequestedAt","leaseExpiresAt"<=clock_timestamp() AS expired FROM agent_runs WHERE id=$1',[runId])).rows[0]
+    assert.ok(persisted.stopRequestedAt)
+    assert.equal(persisted.expired, true)
+    // The real authenticated commands route delivers the committed stop.
+    // The supervisor consumes this command by aborting the held local run;
+    // its process termination is covered in the full daemon liveness suite.
+    assert.deepEqual(await link.fetchCommands(deviceId, 0), [{ kind: 'stop', runId }])
+    assert.deepEqual(sends, [`/v1/devices/${deviceId}/commands`])
+    stop.abort()
     assert.equal(gate.revoked, true)
     assert.equal(await gate.checkLive(), false)
+    assert.deepEqual(sends, [`/v1/devices/${deviceId}/commands`], 'revoked operation checks remain local')
+    const stopped = await legacyCheck()
+    assert.equal(stopped.status, 409)
+    assert.deepEqual(await stopped.json(), { error: 'approvalUnavailable' })
     const stale = lines.find(line => line.live === false)
-    assert.deepEqual({ ...stale, timestamp: 0, durationMs: 0 }, { level:'info', msg:'tool_approval_check', timestamp:0, runId, live:false, reason:'policy_revision_mismatch', status:200, durationMs:0 })
+    assert.deepEqual({ ...stale, timestamp: 0, durationMs: 0 }, { level:'warn', msg:'tool_approval_check', timestamp:0, runId, live:false, reason:'run_unavailable', status:409, durationMs:0 })
     // Another device's check for this run: the run row is not its own.
     const foreign = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{'x-mikka-client-version':'0.0.456',authorization:'Bearer synthetic','content-type':'application/json'}, body:JSON.stringify({operation:'check',deviceId:randomUUID(),policyRevision:claimed.policyRevision}) })
     assert.equal(foreign.status, 409)
@@ -203,7 +228,7 @@ test('real authenticated HTTP retains a lease-loss cause but never invents it fo
     method:'POST', headers:{'x-mikka-client-version':'0.0.456',authorization:'Bearer synthetic','content-type':'application/json'},
     body:JSON.stringify({operation:'check',deviceId,policyRevision:revision,...extra}),
   })
-  await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [runId])
+  await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [runId])
   const expired = await check()
   assert.equal(expired.status,200)
   assert.deepEqual(await expired.json(),{live:false,revokeReason:'device_lost'})

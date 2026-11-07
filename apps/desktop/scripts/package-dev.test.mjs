@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { devPackageEnvironment } from './package-dev.mjs'
 
 test('Dev ad-hoc signing cannot inherit release credentials and does not mutate the parent environment', () => {
@@ -42,4 +45,35 @@ test('ad-hoc library validation exception is confined to Dev and inherited accep
   assert.doesNotMatch(production, /identity: '-'/)
   assert.doesNotMatch(productionEntitlements, /<key>com\.apple\.security\.cs\.disable-library-validation<\/key>/)
   assert.match(devEntitlements, /<key>com\.apple\.security\.cs\.disable-library-validation<\/key>\s*<true\/>/)
+})
+
+test('each flavor declares only its own sign-in link scheme after electron-builder merges extends', async () => {
+  const builderRequire = createRequire(createRequire(import.meta.url).resolve('electron-builder/package.json'))
+  const { getConfig } = builderRequire('app-builder-lib/out/util/config/config.js')
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const schemes = async file => {
+    const { protocols } = await getConfig(root, join(root, file), null)
+    return [protocols].flat().flatMap(protocol => protocol.schemes)
+  }
+  assert.deepEqual(await schemes('electron-builder.yml'), ['mikka-auth'])
+  assert.deepEqual(await schemes('electron-builder.dev.yml'), ['mikka-dev-auth'])
+  assert.deepEqual(await schemes('electron-builder.acceptance.yml'), ['mikka-dev-auth'])
+})
+
+test('every packaged flavor excludes workspace dependencies through the actual node-module matcher', async () => {
+  const builderRequire = createRequire(createRequire(import.meta.url).resolve('electron-builder/package.json'))
+  const { getConfig } = builderRequire('app-builder-lib/out/util/config/config.js')
+  const { getNodeModuleFileMatcher } = builderRequire('app-builder-lib/out/fileMatcher.js')
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const file = { isDirectory: () => false }
+  for (const name of ['electron-builder.yml', 'electron-builder.dev.yml', 'electron-builder.acceptance.yml']) {
+    const config = await getConfig(root, join(root, name), null)
+    const matcher = getNodeModuleFileMatcher(root, '/unused', value => value, config.mac, {
+      config, debugLogger: { isEnabled: false },
+    }).createFilter()
+    for (const path of ['node_modules/package/index.js', 'node_modules/@scope/package/index.js.map', 'node_modules/package/src/index.ts']) {
+      assert.equal(matcher(join(root, path), file), false, `${name}: ${path}`)
+    }
+    assert.equal(matcher(join(root, 'dist/main.cjs'), file), true)
+  }
 })

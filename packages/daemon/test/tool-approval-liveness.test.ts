@@ -1,7 +1,6 @@
-// A run's liveness gate, end to end in the daemon: the real HttpServerLink
-// gate against a scripted tool-approval route, driving a fake Claude Code run.
-// The server half (a changed policy revision answers live:false) runs against
-// real Postgres in lib/agent-tool-approval/http.db.test.mts.
+// A run's machine-local gate, end to end through the real HttpServerLink and
+// Claude SDK protocol. Policy/owner changes stop the run through existing
+// run-control commands or heartbeat leases, never an operation-time auth RPC.
 import { chmodSync, existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
@@ -39,7 +38,11 @@ async function boot(answer: (body: { policyRevision: string }) => Response | Pro
     return answer(body)
   }) as typeof fetch)
   const link = server.link()
-  link.prepareRunToolApproval = (assignment, signal, check) => http.prepareRunToolApproval({ ...assignment, policyRevision: REVISION }, signal, check)
+  let gate: ToolApprovalGate | undefined
+  link.prepareRunToolApproval = async (assignment, signal, check) => {
+    gate = await http.prepareRunToolApproval({ ...assignment, policyRevision: REVISION }, signal, check)
+    return gate
+  }
   const daemon = await new Daemon({
     dataDir: tempDir(), flavor: "dev", link, credential: "cred", heartbeatMs: 50,
     harnesses: [{ harness: "claude_code", installed: true, version: "fake" }],
@@ -50,7 +53,7 @@ async function boot(answer: (body: { policyRevision: string }) => Response | Pro
   const runId = server.queueRun(DEVICE, { issueId: "issue-1", repoId: "repo", baseBranch: "main", harness: "claude_code", prompt, policy: resolveAgentSettings({}).policy })
   await daemon.syncWithServer()
   await waitFor(() => daemon.supervisor.get(runId).state === "running")
-  return { daemon, runId, checks }
+  return { daemon, runId, checks, server, gate: gate! }
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
@@ -111,58 +114,48 @@ it("does not share an in-flight check across gates or run identities", async () 
   expect(await Promise.all(waiters)).toEqual([true, true, true])
 })
 
-it("ends a running run when the server says its policy revision is no longer live", async () => {
-  let live = true
-  const { daemon, runId, checks } = await boot(() => json({ live, paused: false }))
-  await waitFor(() => checks.length > 0)
+it("ends a running run through an existing stop command without querying remote tool authority", async () => {
+  const { daemon, runId, checks, server } = await boot(() => { throw Error('No operation-time auth RPC is allowed') })
   expect(daemon.supervisor.get(runId).state).toBe("running")
-  live = false
+  server.requestStop(runId)
   await daemon.supervisor.idle()
-  // The revoked gate stops the CLI (SIGTERM on a direct spawn). A hosted run
-  // (subscription-hosted-runner) cancels its session instead and ends cancelled.
-  expect(daemon.supervisor.get(runId)).toMatchObject({ state: "failed", stopReason: "error" })
-  expect(daemon.supervisor.get(runId).error).toMatch(/SIGTERM/)
-  expect(checks.every(revision => revision === REVISION)).toBe(true)
+  expect(daemon.supervisor.get(runId)).toMatchObject({ state: "cancelled", stopReason: "cancelled" })
+  expect(checks).toEqual([])
 }, 20_000)
 
-it("records host lease revocation before Claude exits 143, even before the heartbeat learns it", async () => {
+it("records heartbeat lease revocation before the native Claude process exits 143", async () => {
   const exited = join(tempDir(), 'sigterm-exit')
-  let revoked = false
-  const { daemon, runId } = await boot(() => json(revoked
-    ? { live: false, revokeReason: 'device_lost' }
-    : { live: true, paused: false }), `HANG SIGTERM_EXIT_143:${exited}`)
+  const { daemon, runId, server, checks } = await boot(() => json({ live: true }), `HANG SIGTERM_EXIT_143:${exited}`)
   await waitFor(() => existsSync(`${exited}.ready`))
-  revoked = true
+  server.runs.get(runId)!.state = 'failed'
+  await daemon.syncWithServer()
   await daemon.supervisor.idle()
   expect(readFileSync(exited, 'utf8')).toBe('143\n')
   expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'failed', stopReason: 'device_lost' })
+  expect(checks).toEqual([])
 }, 20_000)
 
 it("keeps an unclassified SIGTERM 143 as error instead of inventing lease revocation", async () => {
   const exited = join(tempDir(), 'sigterm-exit')
-  let live = true
-  const { daemon, runId } = await boot(() => json({ live, paused: false }), `HANG SIGTERM_EXIT_143:${exited}`)
+  const { daemon, runId, gate, checks } = await boot(() => json({ live: true }), `HANG SIGTERM_EXIT_143:${exited}`)
   await waitFor(() => existsSync(`${exited}.ready`))
-  live = false
+  gate.revoke()
   await daemon.supervisor.idle()
   expect(readFileSync(exited, 'utf8')).toBe('143\n')
   expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'failed', stopReason: 'error' })
+  expect(checks).toEqual([])
 }, 20_000)
 
-it("a pending host response cannot replace the person's earlier cancellation", async () => {
-  const pending = deferred<Response>()
-  let wait = false, requested = false
-  const { daemon, runId } = await boot(() => {
-    if (!wait) return json({ live: true, paused: false })
-    requested = true
-    return pending.promise
-  })
-  wait = true
-  await waitFor(() => requested)
+it("a late lease-revocation notification cannot replace the person's earlier cancellation", async () => {
+  const pending = deferred<void>()
+  const { daemon, runId, gate, checks } = await boot(() => json({ live: true }))
+  const notification = pending.promise.then(() => gate.revoke('device_lost'))
   const cancelled = daemon.supervisor.cancel(runId)
-  pending.resolve(json({ live: false, revokeReason: 'device_lost' }))
+  pending.resolve()
+  await notification
   await cancelled
   expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'cancelled', stopReason: 'cancelled' })
+  expect(checks).toEqual([])
 }, 20_000)
 
 it("a gate keeps its first host cause through synchronous abort callbacks", () => {
@@ -178,19 +171,15 @@ it("a gate keeps its first host cause through synchronous abort callbacks", () =
   expect(cancelled.revokeReason).toBeUndefined()
 })
 
-it("keeps a running run through a slow cold start of the liveness route", async () => {
-  let slow = false, failed = 0
-  const { daemon, runId, checks } = await boot(async () => {
-    if (!slow) return json({ live: true, paused: false })
+it("keeps execution independent of an unavailable legacy liveness route", async () => {
+  let failed = 0
+  const { daemon, runId, gate, checks } = await boot(async () => {
     failed++
     throw new DOMException("The operation timed out.", "TimeoutError")
   })
-  slow = true
-  await waitFor(() => failed >= 3)
-  expect(daemon.supervisor.get(runId).state).toBe("running")
-  slow = false
-  const answered = checks.length
-  await waitFor(() => checks.length > answered + 1)
+  for (let i = 0; i < 100; i++) expect(await gate.checkLive()).toBe(true)
+  expect(failed).toBe(0)
+  expect(checks).toEqual([])
   expect(daemon.supervisor.get(runId).state).toBe("running")
   await daemon.supervisor.cancel(runId)
   expect(daemon.supervisor.get(runId)).toMatchObject({ state: "cancelled", stopReason: "cancelled" })

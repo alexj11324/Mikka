@@ -41,7 +41,7 @@ export function ArchivedBotsSettings({ workspaceId }: { workspaceId: string }) {
   if (!bots.length) return null
   return <>
     <SettingsSection id="archived-bots-heading" title={t('heading')}>
-      {bots.map(bot => <SettingRow key={bot.id} title={bot.name} icon={<BotAvatar color={bot.color} shape={bot.shape} size="row" />}>
+      {bots.map(bot => <SettingRow key={bot.id} title={bot.name} icon={<BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" />}>
         <Button variant="outline" size="sm" disabled={pending !== null} onClick={() => void takeOver(bot.id)}>{t('takeOver')}</Button>
       </SettingRow>)}
     </SettingsSection>

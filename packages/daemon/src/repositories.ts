@@ -51,23 +51,41 @@ export class RepositoryCache {
     const git = (args: string[], cwd?: string) => execa('git', [
       ...FETCH_GIT, '-c', `protocol.file.allow=${this.allowFile ? 'always' : 'never'}`, ...args,
     ], { cwd, env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true })
+    let cloned = false
     if (!existsSync(path)) {
       const temporary = `${path}.clone-${randomUUID()}`
       try {
-        await git(['clone', '--no-checkout', '--no-hardlinks', '--no-recurse-submodules', '--', remote, temporary])
+        await git(['clone', '--depth=50', '--no-single-branch', '--no-checkout', '--no-hardlinks', '--no-recurse-submodules', '--', remote, temporary])
         renameSync(temporary, path)
+        cloned = true
       } finally { if (!this.retainResources) rmSync(temporary, { recursive: true, force: true }) }
     } else {
       this.assertClone(path)
       // The validated assignment is authoritative. A cache's stale remote
       // must never select another repository or an executable transport.
       await git(['remote', 'set-url', 'origin', remote], path)
-      await git(['fetch', ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
+      // Empty clones have no shallow boundary; Git 2.56 rejects --depth on
+      // their empty fetch. Preserve full legacy caches rather than truncating
+      // user history, and retain the depth only for the new shallow clones.
+      const depth = existsSync(join(path, '.git', 'shallow')) ? ['--depth=50'] : []
+      await git(['fetch', ...depth, ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
     }
     this.assertClone(path)
+    let freshHead = false
+    if (cloned) {
+      try {
+        // Clone already asked the remote for HEAD. Check both its symbolic
+        // target and commit locally before paying for another remote request.
+        const ref = (await git(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], path)).stdout.trim()
+        if (ref.startsWith('refs/remotes/origin/')) {
+          await git(['rev-parse', '--verify', `${ref}^{commit}`], path)
+          freshHead = true
+        }
+      } catch { /* Empty or broken HEAD keeps the existing remote diagnosis below. */ }
+    }
     // Refresh when the host changes its default branch after the first clone.
     try {
-      await git(['remote', 'set-head', 'origin', '-a'], path)
+      if (!freshHead) await git(['remote', 'set-head', 'origin', '-a'], path)
       // The remote has commits now: a local empty base from before is stale.
       await git(['update-ref', '-d', LOCAL_EMPTY_BASE], path)
     } catch (error) {

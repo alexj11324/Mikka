@@ -6,6 +6,7 @@ import { logReplyCompletion } from './reply-completion'
 import { observeReplySignals } from './reply-signals'
 import { REPLY_FALLBACK_MS, waitForReply, type ReplyObserver, type ReplyWaitCompletion, type ReplyChanged, type ReplyRead } from './reply-wait'
 
+type Wake = Awaited<ReturnType<SharedSubscription['next']>>
 const flush = async () => { for (let n = 0; n < 24; n++) await Promise.resolve() }
 const deferred = <T>() => Promise.withResolvers<T>()
 
@@ -35,16 +36,17 @@ test('completion counts actual quiet reads and setup time once, after unsubscrib
 
 test('completion distinguishes real signal-adapter notifications, loss and the existing fallback', async t => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 2_000_000 })
-  let lost = false, ready = false, closed = 0, waiting = deferred<void>()
+  let lost = false, ready = false, closed = 0, waiting = deferred<Wake>()
   const subscription: SharedSubscription = {
     reset() {}, get lost() { return lost }, close() { closed++ },
     next(_ms, signal) {
-      const current = waiting, abort = () => current.resolve()
+      if (signal?.aborted) return Promise.resolve('aborted')
+      const current = waiting, abort = () => current.resolve('aborted')
       signal?.addEventListener('abort', abort, { once: true })
       return current.promise.finally(() => signal?.removeEventListener('abort', abort))
     },
   }
-  const push = () => { const current = waiting; waiting = deferred<void>(); current.resolve() }
+  const push = () => { const current = waiting; waiting = deferred<Wake>(); current.resolve('notified') }
   const records: ReplyWaitCompletion[] = []
   const pending = waitForReply(async () => ready ? { done: true, value: 'current state' } : { done: false }, {
     deadline: Date.now() + 90_000,

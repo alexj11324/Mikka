@@ -17,7 +17,8 @@
     "v0_memories/**",
     ".claude/**",
     ".output/**",
-    ".vercel/**"
+    ".vercel/**",
+    ".hosted-ui/**"
   ],
   "rules": {
     "no-restricted-imports": [

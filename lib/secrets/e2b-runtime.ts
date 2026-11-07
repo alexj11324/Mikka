@@ -2,6 +2,7 @@ import 'server-only'
 // Every sandbox runs on its owner's own E2B key (orchestration § 2): never a teammate's, never the platform's.
 import { AuthenticationError, NotFoundError, RateLimitError, SandboxNotFoundError } from 'e2b'
 import { E2BKeyError, type E2BKeyErrorCode } from './flag'
+import { cloudTemplateModels, type CloudTemplateKind } from '../cloud-template-models'
 
 type Env = Record<string, string | undefined>
 
@@ -21,22 +22,29 @@ export async function sandboxKeyOwner(workspaceId: string, sandboxId: string): P
   return rows[0]?.ownerId ?? null
 }
 
-/** New Bot computers use E2B's unchanged official desktop; custom replacements are refused. */
+function selectedTemplate(kind: CloudTemplateKind, variable: string, env: Env): string {
+  const selected = env[variable] || kind
+  if (selected === kind) return selected
+  const release = cloudTemplateModels(env)?.templates[kind]
+  if (!release || release.templateId !== selected || release.baseTemplate !== kind || release.preinstalled !== true)
+    throw new E2BKeyError('e2b_template_unavailable', 'Verified additive runtime template required')
+  return selected
+}
+
+/** New Bot computers use the verified additive official-desktop release. */
 export function computerTemplate(env: Env = process.env): string {
-  if (env.E2B_BYO_COMPUTER_TEMPLATE && env.E2B_BYO_COMPUTER_TEMPLATE !== 'desktop') throw new E2BKeyError('e2b_template_unavailable', 'Official desktop template required')
-  return 'desktop'
+  return selectedTemplate('desktop', 'E2B_BYO_COMPUTER_TEMPLATE', env)
 }
 
 /** Which variable names a task machine's template, by the run's harness (decision 2026-11-01-2335). */
 const TASK_TEMPLATE_ENV = { claude_code: 'E2B_CLAUDE_TEMPLATE', codex: 'E2B_CODEX_TEMPLATE' } as const
 
-/** New repository tasks use the official CLI template for their harness; other harnesses are refused. */
+/** New repository tasks use their harness's verified additive image. */
 export function taskTemplate(harness: string, env: Env = process.env): string {
   const key = Object.hasOwn(TASK_TEMPLATE_ENV, harness) ? TASK_TEMPLATE_ENV[harness as keyof typeof TASK_TEMPLATE_ENV] : undefined
   if (!key) throw new E2BKeyError('e2b_template_unavailable', 'Official task template required')
   const official = harness === 'codex' ? 'codex' : 'claude'
-  if (env[key] && env[key] !== official) throw new E2BKeyError('e2b_template_unavailable', 'Official task template required')
-  return official
+  return selectedTemplate(official, key, env)
 }
 
 const status = (error: unknown): number | undefined => {

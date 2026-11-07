@@ -209,9 +209,10 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal(await stopped(deepRun), true, 'removing the key stops the run that was handed it')
     // Withdrawing the share stops the run that was handed the key, and no later run gets it.
     assert.equal(await stopped(carolRun), false)
+    await pool.query(`UPDATE agent_runs SET status='paused' WHERE id=$1`, [sharedRun])
     await store.setApiKeyShare(pool, 'bob', team, gateway.id, false)
     assert.equal(await stopped(carolRun), true)
-    assert.equal(await stopped(sharedRun), true, 'Alice\'s separate Gateway run had Bob\'s key too')
+    assert.equal(await stopped(sharedRun), true, 'the paused Gateway run cannot resume with Bob\'s withdrawn key')
     assert.equal(await stopped(run), false, 'her own Anthropic run keeps its original key')
     await assert.rejects(store.apiKeyForRun(pool, carolRun, gateway.id, 'codex', env), { code: 'apiKeyNotFound' })
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')

@@ -24,6 +24,7 @@ import { quotaSnapshotSchema } from "./quota"
 import { runStopReason, runBenchmarkContext } from "./run"
 import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
+import { nativeLeaseSchema } from './subscription'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -48,7 +49,7 @@ export function isDeviceOnline(
       : typeof lastSeenAt === "number"
         ? lastSeenAt
         : Date.parse(lastSeenAt)
-  return Number.isFinite(seen) && now - seen <= DEVICE_ONLINE_WINDOW_MS
+  return Number.isFinite(seen) && seen <= now && now - seen <= DEVICE_ONLINE_WINDOW_MS
 }
 
 /** "设备 n/m 在线": how many of the user's devices are online. */
@@ -297,8 +298,12 @@ export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
 
 /** Sent by a daemon that injects `modelCredential`; a run frozen on an API key is handed only to one. */
 export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
+/** The daemon accepts credentials prepared in the claim response (#1505). */
+export const RUN_CREDENTIALS_HEADER = "x-mikka-run-credentials"
 
 const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.test(value))
+/** Background refresh response; null means the provider set no expiry. */
+export const runGitHubCredentialSchema = z.object({ token: credentialKey, expiresAt: isoTime.nullable() }).strip()
 const credentialBaseUrl = z.url().max(500).refine(value => {
   const url = new URL(value)
   return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash
@@ -374,11 +379,13 @@ export const runAssignmentSchema = z.object({
   model: modelNameSchema.optional(),
   /** Frozen Profile effort, passed to the native harness unchanged. */
   effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
-  /** Owner-bound selection only; no subscription credential enters the assignment. */
+  /** Owner-bound subscription selection; the optional lease below is prepared once at claim. */
   subscriptionBinding: z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
     consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
   }).strict().optional(),
+  /** Access credential for the selected subscription. Kept in memory, never journaled. */
+  subscriptionLease: nativeLeaseSchema.optional(),
   /**
    * The run's own API key, opened for this claim only. Never with
    * `subscriptionBinding`. The daemon keeps it in memory and hands it only
@@ -438,15 +445,17 @@ export const runAssignmentSchema = z.object({
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
   }).optional(),
   /**
-   * The run owner's own GitHub credential (decision 2026-11-02-1600): the run
-   * token exchanges it at `endpoint` for git and gh, for any github.com
-   * repository the person authorized. `repository` is this run's; `branch`,
-   * when present, is the task branch the agent delivers to.
+   * The run owner's own GitHub credential for git and gh, prepared once at
+   * claim. `endpoint` refreshes it only near its natural expiry. Older
+   * servers omit the token; the daemon obtains it once during preparation.
+   * `repository` is this run's; `branch` is the task's delivery branch.
    */
   github: z.object({
     endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
     branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/).optional(),
-  }).strict().optional(),
+    token: runGitHubCredentialSchema.shape.token.optional(),
+    expiresAt: runGitHubCredentialSchema.shape.expiresAt.optional(),
+  }).strict().refine(value => Boolean(value.token) === (value.expiresAt !== undefined), { message: 'A prepared GitHub token includes its natural expiry', path: ['expiresAt'] }).optional(),
   /** Question continuation must not silently open a different session. */
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
@@ -505,6 +514,9 @@ export const runAssignmentSchema = z.object({
   /** Frozen by the server benchmark ledger; never extracted from model output. */
   benchmark: runBenchmarkContext.optional(),
 }).refine(value => !(value.modelCredential && value.subscriptionBinding), { message: "A run has one model credential", path: ["modelCredential"] })
+  .refine(value => !value.subscriptionLease || Boolean(value.subscriptionBinding && value.subscriptionBinding.route === value.subscriptionLease.route &&
+    (value.harness === 'codex' ? value.subscriptionLease.route === 'codex_cli' : value.harness === 'claude_code' && value.subscriptionLease.route === 'claude_code_cli')),
+  { message: 'A subscription lease belongs to the selected harness and binding', path: ['subscriptionLease'] })
 export type RunAssignment = z.infer<typeof runAssignmentSchema>
 
 /**

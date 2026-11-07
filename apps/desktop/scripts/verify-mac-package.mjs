@@ -14,6 +14,7 @@ const fuseRequire = createRequire(appBuilderRequire.resolve('@electron/fuses'))
 const { FuseState } = fuseRequire('./constants')
 
 const DEV_ID = 'com.aspectlylabs.mikka.dev'
+const DEV_SCHEME = 'mikka-dev-auth'
 const ENTITLEMENTS = [
   'com.apple.security.cs.allow-jit',
   'com.apple.security.cs.allow-unsigned-executable-memory',
@@ -24,7 +25,7 @@ const FAILURE_CODES = new Set([
   'MAC_PACKAGE_ARGUMENTS', 'MAC_PACKAGE_PLATFORM', 'MAC_PACKAGE_SIGNATURE',
   'MAC_PACKAGE_IDENTITY', 'MAC_PACKAGE_HARDENED_RUNTIME', 'MAC_PACKAGE_ENTITLEMENTS',
   'MAC_PACKAGE_ENTITLEMENTS_FORMAT', 'MAC_PACKAGE_MACHO_TYPE',
-  'MAC_PACKAGE_INFO', 'MAC_PACKAGE_ARCHITECTURE', 'MAC_PACKAGE_FUSES',
+  'MAC_PACKAGE_INFO', 'MAC_PACKAGE_URL_SCHEME', 'MAC_PACKAGE_ARCHITECTURE', 'MAC_PACKAGE_FUSES',
   'MAC_PACKAGE_NESTED_SIGNATURE', 'MAC_PACKAGE_COMMAND_FAILED',
 ])
 function need(value, code) { if (!value) throw new Error(code) }
@@ -172,6 +173,10 @@ export async function inspectMacPackage(appPath, variant, {
     const info = JSON.parse(output(run, '/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(appPath, 'Contents', 'Info.plist')], 'MAC_PACKAGE_INFO'))
     need(info.CFBundleIdentifier === DEV_ID && info.CFBundleExecutable === 'Mikka Dev', 'MAC_PACKAGE_INFO')
     report.bundleIdentifier = DEV_ID
+    // The sign-in return link (src/main/app-link.ts): Dev's own scheme only, never the release app's.
+    const schemes = (Array.isArray(info.CFBundleURLTypes) ? info.CFBundleURLTypes : []).flatMap(type => type?.CFBundleURLSchemes ?? [])
+    need(JSON.stringify(schemes) === JSON.stringify([DEV_SCHEME]), 'MAC_PACKAGE_URL_SCHEME')
+    report.urlScheme = DEV_SCHEME
     const arch = output(run, '/usr/bin/lipo', ['-archs', join(appPath, 'Contents', 'MacOS', 'Mikka Dev')], 'MAC_PACKAGE_ARCHITECTURE').trim()
     need(arch === 'arm64', 'MAC_PACKAGE_ARCHITECTURE')
     report.architecture = arch

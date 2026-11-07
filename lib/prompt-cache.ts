@@ -10,10 +10,10 @@ import type { LanguageModel, SystemModelMessage } from 'ai'
  * do not invalidate the earlier tools and rules. The last conversation message
  * also has a breakpoint for calls that share the same history.
  *
- * Claude needs explicit breakpoints (OpenAI and DeepSeek cache prefixes on
- * their own); a breakpoint is an `ephemeral` cache_control, at most four per
- * request, and the layered prompt uses three. Old persisted prompts with a
- * single stable boundary retain their two-breakpoint layout.
+ * Claude's layered prompt uses three `ephemeral` cache_control breakpoints.
+ * Supported Codex models retain implicit history caching and also mark the two
+ * stable system layers explicitly: the implicit initial developer boundary is
+ * after the changing tail. Old persisted prompts keep their existing layout.
  */
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
@@ -69,4 +69,26 @@ export function withCacheBreakpoints(prompt: Prompt, key: 'openaiCompatible' | '
     }
     return next
   })
+}
+
+/**
+ * Carry only preparation's stable-system hints through the compatible SDK.
+ * The worker verifies CPA's developer text/order before converting this private
+ * marker to Responses content-block breakpoints. Implicit caching stays on.
+ */
+export function withCodexSystemCacheBreakpoints(prompt: Prompt, modelId: string): Prompt {
+  // A capability gate, not a model selection catalogue. Keep the worker's gate
+  // in sync; unknown aliases and older generations retain their wire format.
+  if (!/^gpt-(?:5\.6(?:-(?:luna|sol|terra))?|6-(?:luna|sol|astra)|6\.1-(?:sol|terra))$/.test(modelId)) return prompt
+  let marked: Prompt | undefined
+  let count = 0
+  for (let index = 0; index < prompt.length && prompt[index].role === 'system'; index++) {
+    const message = prompt[index]
+    const hint = message.providerOptions?.anthropic?.cacheControl
+    if (count === 2 || !hint || typeof hint !== 'object' || Array.isArray(hint) || !('type' in hint) || hint.type !== 'ephemeral') continue
+    marked ??= [...prompt]
+    marked[index] = { ...message, providerOptions: { ...message.providerOptions, openaiCompatible: { ...message.providerOptions?.openaiCompatible, mikka_cache_breakpoint: 'stable_system_v1' } } }
+    count++
+  }
+  return marked ?? prompt
 }

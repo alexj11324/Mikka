@@ -164,7 +164,7 @@ export class SubscriptionService {
     // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
     return {ownerId:String(row.ownerId),workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }
-  async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {
+  async nativeContext(use: SubscriptionUse, signal?: AbortSignal, requireModelCatalogue = false) {
     return measureSubscriptionNative('context', use.runId, async timing => {
       const binding=await timing.measure('binding', () => this.repository.binding(use.ownerId,use.bindingId))
       const selected = await timing.measure('selection', () => this.nativeRunSelection(use, binding.modelId))
@@ -174,19 +174,52 @@ export class SubscriptionService {
       const authorized=await timing.measure('access', () => this.check(use,signal,selected.modelId ?? null))
       await timing.measure('admit_after', () => this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal, false))
       const row=await timing.measure('connection', () => this.repository.connection(use.ownerId,binding.connectionId))
+      // Requested only by a daemon that could not resolve a full ID through its
+      // shortcut menu. The evidence belongs to this exact authorized binding and
+      // credential epoch; a different account's catalogue grants nothing.
+      if (requireModelCatalogue && (binding.route !== 'claude_code_cli' || row.state !== 'connected'
+        || row.paused || Number(row.epoch) !== authorized.binding.connectionRevision
+        || !row.modelCatalog || Number(row.modelCatalog.revision) !== Number(row.epoch)
+        || !Array.isArray(row.modelCatalog.models) || !row.modelCatalog.models.includes(binding.modelId))) {
+        throw new SubscriptionRefusal('binding_mismatch')
+      }
       const client=this.worker(this.repository.scope(row)).forUse(use)
       await timing.measure('prepare', () => client.call('prepare',{revision:authorized.binding.connectionRevision},signal))
       const info=await timing.measure('context', () => client.call<{accountId:string;plan?:string;expiresAt:string}>('nativeContext',{revision:authorized.binding.connectionRevision},signal))
       return nativeBrokerContextSchema.parse({...info,route:binding.route,modelId:binding.modelId,revision:authorized.binding.connectionRevision})
     })
   }
-  /** A device run's access lease: the same checks as nativeContext, then the access token only. */
-  async nativeLease(use: SubscriptionUse, signal?: AbortSignal) {
-    const context=await this.nativeContext(use,signal)
-    const binding=await this.repository.binding(use.ownerId,use.bindingId)
-    const row=await this.repository.connection(use.ownerId,binding.connectionId)
-    const lease=await this.worker(this.repository.scope(row)).forUse(use).call<{accessToken?:unknown;expiresAt?:unknown}>('nativeAuth',{revision:context.revision},signal)
-    return nativeLeaseSchema.parse({...context,accessToken:lease.accessToken,...(typeof lease.expiresAt==='string'?{expiresAt:new Date(lease.expiresAt).toISOString()}:{})})
+  /** Prepare a device's direct-provider credential once. nativeAuth performs
+   * the custody refresh itself and returns the expiry with the access token;
+   * separate prepare/context child processes would repeat that same work. */
+  async nativeLease(use: SubscriptionUse, signal?: AbortSignal, includeModelCatalogue = false) {
+    return measureSubscriptionNative('lease', use.runId, async timing => {
+      const binding = await timing.measure('binding', () => this.repository.binding(use.ownerId, use.bindingId))
+      const selected = await timing.measure('selection', () => this.nativeRunSelection(use, binding.modelId))
+      const model = selected.modelId ?? binding.modelId
+      const scope = { ownerId: selected.executionOwnerId, workspaceId: binding.workspaceId, runId: use.runId }
+      await timing.measure('admit_before', () => this.admitModel(scope, model, binding.route, signal, false))
+      const authorized = await timing.measure('access', () => this.check(use, signal, model ?? null))
+      await timing.measure('admit_after', () => this.admitModel(scope, model, binding.route, signal, false))
+      const row = await timing.measure('connection', () => this.repository.connection(use.ownerId, binding.connectionId))
+      // This is evidence for the prepared model, not another authorization
+      // round trip. Reuse the exact connection/epoch already read for custody.
+      // Older strict lease clients retain their original response shape.
+      const catalogue = row.modelCatalog
+      const modelCatalogueVerified = includeModelCatalogue && binding.route === 'claude_code_cli'
+        && row.id === binding.connectionId && String(row.ownerId) === use.ownerId
+        && row.state === 'connected' && !row.paused
+        && Number(row.epoch) === authorized.binding.connectionRevision
+        && catalogue != null && Number(catalogue.revision) === Number(row.epoch)
+        && Array.isArray(catalogue.models) && catalogue.models.includes(model)
+      const lease = await timing.measure('native_auth', () => this.worker(this.repository.scope(row)).forUse(use)
+        .call<{ accessToken?: unknown; expiresAt?: unknown; accountId?: unknown; chatgptAccountId?: unknown; chatgptPlanType?: unknown }>('nativeAuth', { revision: authorized.binding.connectionRevision }, signal))
+      return nativeLeaseSchema.parse({ route: binding.route, modelId: model, revision: authorized.binding.connectionRevision,
+        ...(modelCatalogueVerified ? { modelCatalogueVerified: true } : {}),
+        accountId: binding.route === 'codex_cli' ? lease.chatgptAccountId : lease.accountId,
+        ...(typeof lease.chatgptPlanType === 'string' ? { plan: lease.chatgptPlanType } : {}),
+        accessToken: lease.accessToken, expiresAt: typeof lease.expiresAt === 'string' ? new Date(lease.expiresAt).toISOString() : lease.expiresAt })
+    })
   }
   async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
     return measureSubscriptionNative('request', use.runId, async timing => {

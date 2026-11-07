@@ -21,7 +21,7 @@ const RUN = "local-subscription"
 const TOKEN = "fixture-run-access-token"
 const lease = (patch: Partial<NativeLease> = {}): NativeLease => ({ route: "claude_code_cli", modelId: "claude-test", revision: 3, accountId: "acct-1",
   expiresAt: new Date(Date.now() + 3_600_000).toISOString(), accessToken: TOKEN, ...patch })
-const assignment = { runId: RUN, deviceId: "device-1", harness: "claude_code",
+const assignment = { runId: RUN, deviceId: "device-1", harness: "claude_code", model: "claude-test",
   subscriptionBinding: { bindingId: "b", ownerId: "o", workspaceId: "w", consumerId: "c", route: "claude_code_cli" } } as unknown as RunAssignment
 const gate = () => new ToolApprovalGate(RUN, { isLive: id => id === RUN })
 
@@ -49,7 +49,7 @@ function filesUnder(dir: string): string[] {
 }
 
 describe("local subscription runs", () => {
-  it("hand the run's access lease to the CLI on its pipe only", async () => {
+  it.each([false, true])("hands the run's access lease to the CLI on its pipe only (claim bundle: %s)", async bundled => {
     const record = join(tempDir(), "record.json")
     const stateDir = join(tempDir(), "adapters")
     const asked: string[] = []
@@ -59,7 +59,7 @@ describe("local subscription runs", () => {
       claude: { sandbox: new NoSandbox(), stateDir, binary: recordingCli(record) },
       codex: { sandbox: new NoSandbox(), stateDir },
     })
-    const session = await runner.start(assignment, { runId: RUN, cwd: await makeRepo(), prompt: "hello", model: "claude-test",
+    const session = await runner.start({ ...assignment, ...(bundled ? { subscriptionLease: lease() } : {}) }, { runId: RUN, cwd: await makeRepo(), prompt: "hello", model: "claude-test",
       env: buildChildEnv(), log: createLogger({ level: "silent" }), toolApproval: gate() })
     const events = []
     for await (const event of session.events()) events.push(event)
@@ -69,7 +69,7 @@ describe("local subscription runs", () => {
     expect(seen.env).toEqual(["CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"])
     // The git config entries are the run's own maintenance settings, nothing else.
     expect(seen.gitConfig).toEqual({ GIT_CONFIG_KEY_0: "maintenance.auto", GIT_CONFIG_VALUE_0: "false", GIT_CONFIG_KEY_1: "gc.auto", GIT_CONFIG_VALUE_1: "0" })
-    expect(asked).toEqual([`device-1/${RUN}`])
+    expect(asked).toEqual(bundled ? [] : [`device-1/${RUN}`])
     expect(JSON.stringify(events)).not.toContain(TOKEN)
     for (const file of filesUnder(stateDir)) expect(readFileSync(file, "utf8")).not.toContain(TOKEN)
   })

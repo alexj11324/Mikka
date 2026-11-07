@@ -3,7 +3,7 @@
 // decoding with the packages/protocol schemas.
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
+import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
@@ -14,7 +14,7 @@ import {
   ServerUnreachableError,
 } from "../src/errors"
 import { deviceLogin, LoginError } from "../src/login"
-import { HttpServerLink, LIVENESS_UNREACHABLE_GRACE_MS, SessionRejectedError } from "../src/server-link-http"
+import { HttpServerLink, SessionRejectedError } from "../src/server-link-http"
 import { Daemon } from "../src/main"
 import { readJson, writeJsonAtomic } from "../src/fs-util"
 import { createLogger } from "../src/log"
@@ -91,146 +91,39 @@ describe("HttpServerLink", () => {
   it('advertises strict local-worktree continuation and preserves the required assignment', async () => {
     const fetcher = (async (_url, init) => {
       expect(new Headers(init?.headers).get(RECOVERY_WORKTREE_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(RUN_CREDENTIALS_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
       return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
     }) as typeof fetch
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
     expect(result.requireWorktreeContinuation).toBe(true)
   })
-  it('holds the run during human control and continues the same gate on release', async () => {
-    vi.useFakeTimers()
-    let paused = true, live = true, executed = 0
-    const { fetch } = scripted(() => json({ live, paused }))
-    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval({ ...assignment('run-1'), harness:'codex', policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,computer_use:'allow'}}, policyRevision:'a'.repeat(64) }, new AbortController().signal, () => {})
+  it('preserves negotiated catalogue evidence in the natural-expiry lease response', async () => {
+    const lease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', accountId: 'fixture-account', revision: 1,
+      expiresAt: SOON(), accessToken: 'fixture-access', modelCatalogueVerified: true }
+    const fetcher = vi.fn(async (_url: URL | string, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
+      return json(lease)
+    }) as unknown as typeof fetch
+    expect(await new HttpServerLink('http://server.test', fetcher).nativeLease('dev-1', 'run-1')).toEqual(lease)
+    expect(fetcher).toHaveBeenCalledOnce()
+  })
+  it('uses only the claimed local lease for every provider/tool check', async () => {
+    const fetcher = vi.fn(async () => { throw new Error('operation-time HTTP is forbidden') })
+    const link = new HttpServerLink('http://server.test', fetcher)
+    let live = true
+    const check = vi.fn(() => { if (!live) throw new Error('local lease expired') })
+    const gate = await link.prepareRunToolApproval({ ...assignment('run-1'), harness: 'codex', policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) }, new AbortController().signal, check)
     try {
-      const pending = gate.checkLive().then(allowed => { if (allowed) executed++ })
-      await vi.advanceTimersByTimeAsync(3000)
-      expect(executed).toBe(0)
-      expect(gate.revoked).toBe(false)
-      paused = false
-      await vi.advanceTimersByTimeAsync(1000)
-      await pending
-      expect(executed).toBe(1)
-      expect(gate.runId).toBe('run-1')
-      paused = true
-      const ending = gate.checkLive().then(allowed => { if (allowed) executed++ })
-      await vi.advanceTimersByTimeAsync(1000)
+      for (let i = 0; i < 100; i++) expect(await gate.checkLive()).toBe(true)
       live = false
-      await vi.advanceTimersByTimeAsync(1000)
-      await ending
-      expect(executed).toBe(1)
-    } finally { gate.revoke(); vi.useRealTimers() }
+      expect(await gate.checkLive()).toBe(false)
+      expect(fetcher).not.toHaveBeenCalled()
+      expect(check).toHaveBeenCalledTimes(101)
+    } finally { gate.revoke() }
   })
 
-  it.each(['local_authority', 'server_check'] as const)('retains bounded %s diagnostics without exception or response bodies', async phase => {
-    const lines: string[] = []
-    const log = vi.spyOn(console, 'warn').mockImplementation(line => { lines.push(String(line)) })
-    const privateText = 'private-exception-and-response-marker'
-    const { fetch } = scripted(() => phase === 'server_check' ? json({ error: privateText }, 403) : json({ live: true }))
-    const run = { ...assignment('8e8a1c58-696a-46ef-b880-888a0bb12599'), harness: 'codex' as const, policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) }
-    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval(run, new AbortController().signal, () => {
-      if (phase === 'local_authority') throw new Error(privateText)
-    })
-    try {
-      expect(await gate.checkLive()).toBe(false)
-      expect(lines).toHaveLength(1)
-      expect(JSON.parse(lines[0]!)).toEqual({ event: 'run_liveness_refused', runId: run.runId, deviceId: run.deviceId,
-        phase, reason: 'check_failed', errorClass: phase === 'server_check' ? 'DaemonError' : 'unknown', status: phase === 'server_check' ? 403 : null })
-      expect(JSON.stringify(lines)).not.toContain(privateText)
-      await gate.checkLive()
-      expect(lines).toHaveLength(1)
-    } finally { gate.revoke(); log.mockRestore() }
-  })
-  it.each([403,409])('revokes an idle run when its liveness endpoint returns %s', async status => {
-    vi.useFakeTimers()
-    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
-    try {
-      const {fetch,calls}=scripted(()=>json({error:'unavailable'},status))
-      gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
-      await vi.advanceTimersByTimeAsync(1000)
-      expect(gate.revoked).toBe(true)
-      await vi.advanceTimersByTimeAsync(2000)
-      expect(calls).toHaveLength(1)
-    } finally { gate?.revoke(); vi.useRealTimers() }
-  })
-  // Production run 8d45ba93 (2026-11-02): a redeploy's cold start took about
-  // 5 s to answer, the 5 s check timed out and the healthy run was cancelled.
-  it.each([
-    ['a timeout', () => Promise.reject(new DOMException('The operation timed out.', 'TimeoutError'))],
-    ['a 503', () => Promise.resolve(json({ error: 'unavailable' }, 503))],
-  ] as const)('keeps a run whose liveness check meets %s, then answers live', async (_name, fail) => {
-    vi.useFakeTimers()
-    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
-    try {
-      let failing = true
-      const {fetch,calls}=scripted(() => failing ? fail() : json({live:true}))
-      gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
-      let allowed: boolean | undefined
-      const pending = gate.checkLive().then(value => { allowed = value })
-      await vi.advanceTimersByTimeAsync(5000)
-      expect(allowed).toBeUndefined()
-      expect(gate.revoked).toBe(false)
-      failing = false
-      await vi.advanceTimersByTimeAsync(1000)
-      await pending
-      expect(allowed).toBe(true)
-      expect(gate.revoked).toBe(false)
-      expect(calls.length).toBeGreaterThan(2)
-    } finally { gate?.revoke(); vi.useRealTimers() }
-  })
-  it('revokes an idle run whose liveness endpoint stays unreachable past the grace', async () => {
-    vi.useFakeTimers()
-    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
-    try {
-      const {fetch,calls}=scripted(()=>json({error:'unavailable'},500))
-      gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
-      await vi.advanceTimersByTimeAsync(LIVENESS_UNREACHABLE_GRACE_MS)
-      expect(gate.revoked).toBe(false)
-      await vi.advanceTimersByTimeAsync(2000)
-      expect(gate.revoked).toBe(true)
-      const made = calls.length
-      await vi.advanceTimersByTimeAsync(2000)
-      expect(calls).toHaveLength(made)
-    } finally { gate?.revoke(); vi.useRealTimers() }
-  })
-  it('bounds liveness requests and aborts an in-flight check when the run is revoked', async () => {
-    vi.useFakeTimers()
-    const timeout=new AbortController()
-    const deadline=vi.spyOn(AbortSignal,'timeout').mockReturnValue(timeout.signal)
-    let observed: AbortSignal | undefined
-    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
-    try {
-      const fetch=(async (_url: unknown,init?: RequestInit) => {
-        if (String(_url).includes("/policy-snapshot?")) return new Response(null,{status:404})
-        return new Promise<Response>((_resolve,reject)=>{
-        observed=init?.signal ?? undefined
-        observed?.addEventListener('abort',()=>reject(new Error('aborted')),{once:true})
-      })}) as typeof globalThis.fetch
-      gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
-      await vi.advanceTimersByTimeAsync(1000)
-      expect(deadline).toHaveBeenCalledWith(5000)
-      expect(observed?.aborted).toBe(false)
-      gate.revoke()
-      expect(observed?.aborted).toBe(true)
-      await vi.advanceTimersByTimeAsync(2000)
-      expect(deadline).toHaveBeenCalledTimes(2)
-    } finally { gate?.revoke(); deadline.mockRestore(); vi.useRealTimers() }
-  })
-  it('revokes an idle run when its server-side policy revision or lease ceases to be live', async () => {
-    vi.useFakeTimers()
-    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
-    try {
-      const {fetch,calls}=scripted(()=>json({live:false}))
-      const link=new HttpServerLink('http://server.test',fetch)
-      gate=await link.prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
-      expect(gate.revoked).toBe(false)
-      await vi.advanceTimersByTimeAsync(1000)
-      expect(gate.revoked).toBe(true)
-      expect(calls).toHaveLength(1)
-      await vi.advanceTimersByTimeAsync(1000)
-      expect(calls).toHaveLength(1)
-    } finally { gate?.revoke(); vi.useRealTimers() }
-  })
   it('revokes a prepared approval gate when its run aborts, including before preparation', async () => {
     const { fetch, calls } = scripted(() => json({ live: true }))
     const link = new HttpServerLink('http://server.test', fetch)
@@ -461,81 +354,25 @@ describe("HttpServerLink", () => {
   })
 })
 
-describe('run control without polling while the gateway pushes (#1212)', () => {
-  const run = () => ({ ...assignment('run-1'), harness: 'codex' as const, policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) })
-  const checks = (calls: { path: string }[]) => calls.filter(call => call.path.endsWith('/tool-approval')).length
+describe('machine run control without remote permission checks (#1505)', () => {
   afterEach(() => vi.useRealTimers())
-
-  it('connected: an idle run makes no liveness request; a push checks once and a stop revokes', async () => {
+  it.each(['legacy', 'push', 'fallback'] as const)('makes no auth request on idle, hint or mode switch: %s', async mode => {
     vi.useFakeTimers()
-    let live = true
-    const { fetch, calls } = scripted(() => json({ live }))
-    const link = new HttpServerLink('http://server.test', fetch)
-    link.setRunControlMode('push')
-    const gate = await link.prepareRunToolApproval(run(), new AbortController().signal, () => {})
+    const fetcher = vi.fn(async () => { throw new Error('no per-operation or idle HTTP') })
+    const link = new HttpServerLink('http://server.test', fetcher)
+    link.setRunControlMode(mode)
+    const controller = new AbortController()
+    const gate = await link.prepareRunToolApproval({ ...assignment('run-1'), harness: 'codex', policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) }, controller.signal, () => {})
     try {
-      await vi.advanceTimersByTimeAsync(10 * 60_000)
-      expect(checks(calls)).toBe(0)
+      await vi.advanceTimersByTimeAsync(600_000)
       link.invalidateRunControls()
-      await vi.advanceTimersByTimeAsync(0)
-      expect(checks(calls)).toBe(1)
-      expect(gate.revoked).toBe(false)
-      live = false
-      link.invalidateRunControls()
-      await vi.advanceTimersByTimeAsync(0)
-      expect(checks(calls)).toBe(2)
+      link.setRunControlMode(mode === 'push' ? 'fallback' : 'push')
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(await gate.checkLive()).toBe(true)
+      controller.abort()
       expect(gate.revoked).toBe(true)
-    } finally { gate.revoke() }
-  })
-
-  it('disconnected: falls back to one liveness request every 20 s, and back to none on reconnect', async () => {
-    vi.useFakeTimers()
-    const { fetch, calls } = scripted(() => json({ live: true }))
-    const link = new HttpServerLink('http://server.test', fetch)
-    link.setRunControlMode('push')
-    const gate = await link.prepareRunToolApproval(run(), new AbortController().signal, () => {})
-    try {
-      link.setRunControlMode('fallback')
-      await vi.advanceTimersByTimeAsync(0)
-      expect(checks(calls)).toBe(1)
-      await vi.advanceTimersByTimeAsync(60_000)
-      expect(checks(calls)).toBe(4)
-      link.setRunControlMode('push')
-      await vi.advanceTimersByTimeAsync(0)
-      expect(checks(calls)).toBe(5)
-      await vi.advanceTimersByTimeAsync(60_000)
-      expect(checks(calls)).toBe(5)
-    } finally { gate.revoke() }
-  })
-
-  it('a paused run waits for the push that resumes it instead of asking every second', async () => {
-    vi.useFakeTimers()
-    let paused = true
-    const { fetch, calls } = scripted(() => json({ live: true, paused }))
-    const link = new HttpServerLink('http://server.test', fetch)
-    link.setRunControlMode('push')
-    const gate = await link.prepareRunToolApproval(run(), new AbortController().signal, () => {})
-    try {
-      let allowed: boolean | undefined
-      const pending = gate.checkLive().then(value => { allowed = value })
-      await vi.advanceTimersByTimeAsync(60_000)
-      expect(checks(calls)).toBe(1)
-      expect(allowed).toBeUndefined()
-      paused = false
-      link.invalidateRunControls()
-      await vi.advanceTimersByTimeAsync(0)
-      await pending
-      expect(allowed).toBe(true)
-    } finally { gate.revoke() }
-  })
-
-  it('an older server (legacy mode) keeps the one-second check', async () => {
-    vi.useFakeTimers()
-    const { fetch, calls } = scripted(() => json({ live: true }))
-    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval(run(), new AbortController().signal, () => {})
-    try {
-      await vi.advanceTimersByTimeAsync(3000)
-      expect(checks(calls)).toBe(3)
+      expect(await gate.checkLive()).toBe(false)
+      expect(fetcher).not.toHaveBeenCalled()
     } finally { gate.revoke() }
   })
 })

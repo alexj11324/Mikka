@@ -1,17 +1,25 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { assertDeployedTarget, DeployedTargetError, publicTargetFailure } from './deployed-target.mjs'
+import { selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, TeamWorkspaceError,
+  publicTeamWorkspaceFailure } from './team-workspace.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const SIGN_OUT = ORIGIN + '/mikka/api/auth/sign-out'
 const SESSION = ORIGIN + '/mikka/api/auth/get-session'
 const REPORT = 'production-deployed-browser-report/report.json'
 const MODE = 'deployed-target'
+// Only named smoke operations may enter a report; never a locator or page value.
+const BROWSER_STAGES = new Set([
+  'sign-in', 'session-identity', 'team-selection', 'navigation', 'signed-in-route',
+  'coordinator-selection', 'composer', 'feature-coordinator', 'feature-credential-vault',
+  'feature-approved-writes', 'computer-panel', 'computer-tab', 'required-coordinator', 'required-features',
+])
 const CODES = new Set([
   'browser_mode_rejected', 'browser_origin_rejected', 'browser_contract_rejected',
   'browser_assertions_failed', 'browser_session_not_observed', 'browser_cleanup_failed',
   'browser_page_close_failed', 'browser_signout_failed', 'browser_session_still_present',
-  'browser_report_failed', 'browser_target_blocked', 'browser_target_inconclusive',
+  'browser_report_failed', 'browser_target_blocked', 'browser_target_inconclusive', 'browser_team_workspace_failed',
   'production_reports_invalid', 'production_report_missing', 'production_report_binding_mismatch',
   'production_report_not_passed', 'production_cleanup_unproven',
 ])
@@ -26,8 +34,19 @@ const check = (ok, code) => { if (!ok) throw new DeployedBrowserError(code) }
 const BINDING_FIELDS = ['targetMode', 'applicationSha', 'driverRevision', 'driverRunId',
   'driverRunAttempt', 'webDeployRunId', 'webAttempt', 'deploymentId']
 const projectBinding = proof => Object.fromEntries(BINDING_FIELDS.map(key => [key, proof[key]]))
+const TEAM_FIELDS = ['teamWorkspaceConfirmed', 'teamWorkspaceHash', 'teamAdminMembershipVerified',
+  'teamSelectionBasis', 'teamOwnerAttribution']
+const isConfirmedTeam = value => value?.teamWorkspaceConfirmed === true &&
+  value.teamAdminMembershipVerified === true &&
+  typeof value.teamWorkspaceHash === 'string' && /^[a-f0-9]{64}$/.test(value.teamWorkspaceHash) &&
+  value.teamSelectionBasis === 'unique-active-admin-identity-match' &&
+  value.teamOwnerAttribution === 'AGENTS.md-and-owner-comment-1504-6691409495'
+const projectTeam = proof => Object.fromEntries(TEAM_FIELDS.map(key => [key, proof[key]]))
 const publicFailure = error => error instanceof DeployedTargetError
   ? publicTargetFailure(error)
+  : error instanceof TeamWorkspaceError
+    ? { status: 'fail', code: 'browser_team_workspace_failed',
+        teamDetail: publicTeamWorkspaceFailure(error).detail }
   : { status: 'fail', code: error instanceof DeployedBrowserError ? error.code : 'browser_assertions_failed' }
 
 async function writeClosedReport(path, report) {
@@ -47,7 +66,45 @@ async function closePage(page) {
   } finally { clearTimeout(timer) }
 }
 
-/** Runs the unchanged browser assertions only in the explicit deployed-target mode.
+/** Use this test's normal Playwright cookie jar for team selection in both
+ * default and deployed smoke. The helper never manufactures a cookie, selects
+ * a first/name-matched team, or exposes the owner/workspace IDs in its result. */
+export async function selectBrowserTeamWorkspace({ page, baseURL, ownerId }) {
+  let closedFailure
+  try {
+    const base = new URL(baseURL)
+    check(['http:', 'https:'].includes(base.protocol) && !base.username && !base.password &&
+      page?.request && typeof page.request.get === 'function' &&
+      typeof page.request.post === 'function', 'browser_contract_rejected')
+    const origin = base.origin
+    const json = async (path, body) => {
+      const post = body !== undefined
+      check(post ? path === '/mikka/api/rpc' && isTeamWorkspaceSwitchRequest(body)
+        : isTeamWorkspaceReadPath(path) || path === '/mikka/api/auth/get-session',
+      'browser_contract_rejected')
+      const url = origin + path
+      const options = { headers: { origin, 'cache-control': 'no-store' },
+        maxRedirects: 0, failOnStatusCode: false, timeout: 30_000 }
+      let response
+      try {
+        response = post ? await page.request.post(url, { ...options,
+          headers: { ...options.headers, 'x-mikka-rpc': '1' }, data: body })
+          : await page.request.get(url, options)
+        const bytes = await response.body()
+        check(response.status() === 200 && response.url() === url, 'browser_team_workspace_failed')
+        return JSON.parse(bytes.toString('utf8'))
+      } finally { await dispose(response) }
+    }
+    return await selectTeamWorkspace({ ownerId, json })
+  } catch (error) {
+    // A default Playwright reporter must not print a transport cause/body.
+    // Preserve a closed failure, then throw outside catch without private data.
+    closedFailure = publicTeamWorkspaceFailure(error)
+  }
+  throw new TeamWorkspaceError(closedFailure.detail)
+}
+
+/** Runs the browser assertions only in the explicit deployed-target mode.
  * The page and its request context belong to this single Playwright test.
  * The caller's actual identity assertion marks the normal owner session; no
  * cookie, email, password, user ID or raw failure is retained in this report. */
@@ -62,7 +119,10 @@ export async function runDeployedBrowserSmoke({
     status: 'blocked', code: null, startedAt: new Date(now()).toISOString(),
     targetBeforeVerified: false, targetAfterVerified: false,
     browserExecuted: false, assertionsPassed: false, pageErrorCount: 0,
+    browserStage: null, failedStage: null,
     signInAttempted: false, normalSessionObserved: false,
+    teamWorkspaceConfirmed: false, teamWorkspaceHash: null, teamAdminMembershipVerified: false,
+    teamSelectionBasis: null, teamOwnerAttribution: null, teamWorkspaceFailure: null,
     pageClosed: false, signOutAttempted: false, signOutSucceeded: false,
     anonymousAfterLogout: false, sessionClosed: false,
     cleanupSucceeded: false, cleanupCode: null,
@@ -73,10 +133,20 @@ export async function runDeployedBrowserSmoke({
   let originalFailure, failure, listening = false, targetBefore
   const onPageError = () => { report.pageErrorCount++ }
   const scope = Object.freeze({
+    async step(stage, operation) {
+      check(BROWSER_STAGES.has(stage) && typeof operation === 'function', 'browser_contract_rejected')
+      report.browserStage = stage
+      try { return await operation() }
+      catch (error) { report.failedStage = stage; throw error }
+    },
     signInAttempted() { report.signInAttempted = true },
     identityConfirmed() {
       check(report.signInAttempted, 'browser_session_not_observed')
       report.normalSessionObserved = true
+    },
+    teamWorkspaceConfirmed(proof) {
+      check(report.normalSessionObserved && isConfirmedTeam(proof), 'browser_team_workspace_failed')
+      Object.assign(report, projectTeam(proof))
     },
   })
   try {
@@ -92,6 +162,7 @@ export async function runDeployedBrowserSmoke({
     report.browserExecuted = true
     await smoke(scope)
     check(report.normalSessionObserved, 'browser_session_not_observed')
+    check(report.teamWorkspaceConfirmed, 'browser_team_workspace_failed')
     report.assertionsPassed = true
   } catch (error) {
     originalFailure = error
@@ -152,8 +223,10 @@ export async function runDeployedBrowserSmoke({
       failure = { status: 'fail', code: 'browser_cleanup_failed' }
       originalFailure = undefined
     }
-    if (failure) { report.status = failure.status; report.code = failure.code }
-    else { report.status = 'pass'; report.code = null }
+    if (failure) {
+      report.status = failure.status; report.code = failure.code
+      if (failure.teamDetail) report.teamWorkspaceFailure = { code: 'team_workspace_failed', detail: failure.teamDetail }
+    } else { report.status = 'pass'; report.code = null }
     report.finishedAt = new Date(now()).toISOString()
     try { await saveReport(report) }
     catch {
@@ -198,6 +271,10 @@ export async function verifyDeployedProductionReports({
       report.targetMode === MODE, 'production_report_binding_mismatch')
   }
   const { browser, managed, mobileDaemon, mcp } = reports
+  for (const report of Object.values(reports)) {
+    check(isConfirmedTeam(report) && report.teamWorkspaceHash === browser.teamWorkspaceHash,
+      'production_report_not_passed')
+  }
   check(browser.status === 'pass' && browser.browserExecuted === true && browser.assertionsPassed === true &&
     browser.normalSessionObserved === true && browser.targetBeforeVerified === true &&
     browser.targetAfterVerified === true, 'production_report_not_passed')
@@ -205,7 +282,7 @@ export async function verifyDeployedProductionReports({
     browser.anonymousAfterLogout === true && browser.sessionClosed === true &&
     browser.cleanupSucceeded === true && browser.unknownSignInOutcome === false, 'production_cleanup_unproven')
   check(managed.status === 'pass' && managed.normalSessionObserved === true &&
-    managed.personalWorkspaceConfirmed === true && managed.submissionCount === 1 &&
+    managed.teamWorkspaceConfirmed === true && managed.submissionCount === 1 &&
     managed.cleanupSubmissionCount === 0 && managed.sdkMutations === 0 && managed.cronRequests === 0 &&
     managed.databaseWritesByDriver === 0 && managed.managed &&
     typeof managed.managed === 'object' && managed.managed.coordinatorCompleted === true &&
@@ -217,6 +294,7 @@ export async function verifyDeployedProductionReports({
     emptyArray(mobileDaemon.errors), 'production_report_not_passed')
   check(allTrue(mobileDaemon.cleanup, MOBILE_CLEANUP), 'production_cleanup_unproven')
   check(mcp.status === 'passed' && emptyArray(mcp.cleanup?.failureCodes) &&
+    mcp.teamBindingScope === 'owner-session' && mcp.catalogueWorkspaceDataVerified === false &&
     mcp.toolsInvoked === 0 && mcp.modelCalls === 0, 'production_report_not_passed')
   check(allTrue(mcp.cleanup, MCP_CLEANUP) && mcp.cleanup?.unresolvedResources === false, 'production_cleanup_unproven')
   // A fresh live alias/deployment/public-version proof is the final operation.
@@ -226,6 +304,8 @@ export async function verifyDeployedProductionReports({
   check(BINDING_FIELDS.every(key => finalTarget[key] === attestation[key]), 'production_report_binding_mismatch')
   return {
     version: 1, kind: 'production-deployed-target-completion', ...projectBinding(finalTarget),
+    ...projectTeam(browser),
+    teamBindingScope: 'authenticated-sessions', mcpCatalogueWorkspaceDataVerified: false,
     status: 'pass', code: null, completedAt: new Date(now()).toISOString(),
     browserPassed: true, managedWorkflowPassed: true, mobileDaemonPassed: true, mcpPassed: true,
     allRequiredCleanupProven: true, finalTargetVerified: true,

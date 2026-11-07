@@ -37,7 +37,8 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
       version: __MIKKA_APP_VERSION__,
       flavor: __MIKKA_FLAVOR__,
       runtime: 'electron',
-      serverUrl: __MIKKA_APP_URL__,
+      // The current account's server (#1557), read once: switching servers reloads the page.
+      serverUrl: bundled ? String(ipcRenderer.sendSync(BUNDLED_IPC.serverUrl) || __MIKKA_APP_URL__) : __MIKKA_APP_URL__,
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
       prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
@@ -93,6 +94,12 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
     signOut: () => ipcRenderer.invoke(BUNDLED_IPC.signOut),
     accounts: () => ipcRenderer.invoke(BUNDLED_IPC.accounts),
     linkAccount: provider => ipcRenderer.invoke(BUNDLED_IPC.linkAccount, provider),
+    server: {
+      state: () => ipcRenderer.invoke(BUNDLED_IPC.serverState),
+      probe: address => ipcRenderer.invoke(BUNDLED_IPC.serverProbe, address),
+      select: url => ipcRenderer.invoke(BUNDLED_IPC.serverSelect, url),
+      disconnect: url => ipcRenderer.invoke(BUNDLED_IPC.serverDisconnect, url),
+    },
     onSessionChanged: listener => {
       const handler = () => listener()
       ipcRenderer.on(BUNDLED_IPC.sessionChanged, handler)

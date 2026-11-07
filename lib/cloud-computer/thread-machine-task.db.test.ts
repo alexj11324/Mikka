@@ -15,6 +15,15 @@ import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
+type UploadedFile = { path: string; data: string };
+function uploadedFiles(path: string | UploadedFile[], body?: unknown): UploadedFile[] {
+  return typeof path === 'string' ? [{ path, data: typeof body === 'string' ? body : '' }] : path;
+}
+function uploadedBootstrap(path: string | UploadedFile[], body?: unknown): { deviceId: string; credential: string } | undefined {
+  const file = uploadedFiles(path, body).find(file => /^\/run\/mikka-viewer\/thread-[\w-]+\.json$/.test(file.path));
+  return file ? JSON.parse(file.data) : undefined;
+}
+
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
   const u = new URL(url);
@@ -206,7 +215,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       try {
         fixture.provider.connect=async id=>{
           fixture.calls.push(`connect:${id}`);
-          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string,body:string)=>{if(path.startsWith('/run/mikka-viewer/thread-'))bootstrap=JSON.parse(body);}},
+          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string|UploadedFile[],body:unknown)=>{bootstrap=uploadedBootstrap(path,body)??bootstrap;}},
             commands:{run:async(command:string)=>{
               if(command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')){
                 assert.ok(bootstrap);assert.equal(bootstrap.deviceId,f.prior.device);
@@ -369,9 +378,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         fixture.calls.push(`connect:${id}`);
         return {
           sandboxId: id,
-          files: { read: async () => sha, write: async (path: string, body: string) => {
-            assert.match(path, /^\/run\/mikka-viewer\/thread-/);
-            bootstrap = JSON.parse(body);
+          files: { read: async () => sha, write: async (path: string | UploadedFile[], body: unknown) => {
+            bootstrap = uploadedBootstrap(path,body);
+            assert.ok(bootstrap);
           } },
           commands: { run: async (command: string) => {
             let stdout = '';
@@ -844,8 +853,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(await questionHistory(f), before);
     }));
 
-    await t.test('a queued stage upgrades its adopted official VM before bootstrap and preserves its completed producer', () => withRefreshWorker(async () => {
-      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+    for (const derived of [false, true]) await t.test(`a queued stage upgrades its adopted ${derived ? 'retired additive' : 'official'} VM before bootstrap and preserves its completed producer`, () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId, { template: derived ? 'retired-derived-codex' : 'codex' }), next = await run(issueId);
+      if (derived) await pool.query('UPDATE thread_machines SET "templateKind"=$2 WHERE "runId"=$1', [prior.runId, 'codex']);
       await pool.query(`UPDATE agent_runs SET "sessionId"='retained-original-session',report='{"summary":"original immutable result"}' WHERE id=$1`, [prior.runId]);
       const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0];
       const fixture = refreshFake({ prior }, 'paused'), connect = fixture.provider.connect;
@@ -853,6 +863,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         const sandbox = await connect(...args), execute = sandbox.commands.run.bind(sandbox.commands);
         sandbox.commands.run = (async (...commandArgs: Parameters<typeof sandbox.commands.run>) => {
           if (String(commandArgs[0]).includes('MIKKA_OFFICIAL_WORKER_STAGE')) {
+            assert.match(String(commandArgs[0]), /bash -s -- [a-f0-9]{40} [a-f0-9]{40} codex stage /, 'worker maintenance uses the preserved official base, never the retired image ID');
             const tx = await pool.connect();
             try {
               await tx.query('BEGIN'); await tx.query(`SET LOCAL lock_timeout='250ms'`);
@@ -871,6 +882,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0], before);
       assert.equal((await machine(prior.runId)).sandboxId, null);
       assert.deepEqual(await machine(next), { state: 'running', sandboxId: prior.sandboxId, deviceId: prior.device, issueId });
+      assert.equal((await pool.query('SELECT "templateKind" FROM thread_machines WHERE "runId"=$1', [next])).rows[0].templateKind, 'codex');
       const current = (await pool.query('SELECT status,"deviceId","sessionId" FROM agent_runs WHERE id=$1', [next])).rows[0];
       assert.deepEqual(current, { status: 'queued', deviceId: prior.device, sessionId: null }, 'the independent checker has not borrowed the producer session');
     }));
@@ -1147,18 +1159,29 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
       try {
         const runId = await run(await task()), fixture = fake();
-        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0;
+        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0;
         fixture.provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
           files: {
             read: async () => 'a'.repeat(40),
-            write: async (path: string, body: string) => {
-              if (path.startsWith('/run/mikka-viewer/thread-')) bootstrap = JSON.parse(body);
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              uploads++;
+              const files = uploadedFiles(path,body), primary = files.find(file => file.path.endsWith('.json'));
+              bootstrap = uploadedBootstrap(path,body);
+              assert.ok(primary); assert.ok(bootstrap);
+              assert.deepEqual(body, { user: 'root', useOctetStream: false });
+              const locator = files.find(file => file.path === primary.path + '.run');
+              assert.ok(locator);
+              assert.deepEqual(JSON.parse(locator.data), { version: 1, runId, bootstrapSha256: createHash('sha256').update(primary.data).digest('hex') });
+              assert.ok(!locator.data.includes(bootstrap.credential));
+              assert.equal('initialRunId' in JSON.parse(primary.data), false, 'old strict bootstrap consumers retain the original schema');
             },
           },
           commands: { run: async (command: string) => {
             if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap);
+              assert.equal(uploads, 1, 'the optional locator shares the existing upload RPC');
+              assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
               await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
@@ -1202,9 +1225,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
           sandboxId: `sandbox-${op}`,
           files: {
             read: async () => 'a'.repeat(40),
-            write: async (path: string, body: string) => {
-              if (path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
-              files.set(path, body);
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              for (const file of uploadedFiles(path,body)) {
+                if (file.path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
+                files.set(file.path, file.data);
+              }
             },
           },
           commands: { run: async (command: string) => {
@@ -1242,7 +1267,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         } };
         provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
-          files: { read: async () => 'a'.repeat(40), write: async (path: string) => { if (path.startsWith('/run/mikka-viewer/thread-')) throw new Error('fixture reached worker handoff'); } },
+          files: { read: async () => 'a'.repeat(40), write: async (path: string | UploadedFile[]) => { if (uploadedFiles(path).some(file => file.path.startsWith('/run/mikka-viewer/thread-'))) throw new Error('fixture reached worker handoff'); } },
           commands,
         }) as never;
         await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /fixture reached worker handoff/);
@@ -1262,6 +1287,25 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       }
     });
 
+    await t.test('additive releases preserve the task VM and official harness provenance after catalogue rotation', async () => {
+      const issueId = await task(), before = await parked(issueId, { template: 'retired-derived-codex' });
+      await pool.query('UPDATE thread_machines SET "templateKind"=$2 WHERE "runId"=$1', [before.runId, 'codex']);
+      const next = await run(issueId), fixture = fake();
+      fixture.provider.connect = async id => { fixture.calls.push(`connect:${id}`); throw new Error('fixture retained derived runtime'); };
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), RetainedTaskMachineUnavailable);
+      assert.deepEqual(fixture.calls, [`connect:${before.sandboxId}`]);
+      const retained = (await pool.query('SELECT "snapshotId","templateKind","sandboxId" FROM thread_machines WHERE "runId"=$1', [next])).rows[0];
+      assert.deepEqual(retained, { snapshotId: 'retired-derived-codex', templateKind: 'codex', sandboxId: before.sandboxId });
+      assert.equal((await machine(before.runId)).sandboxId, null);
+    });
+    await t.test('a derived VM from another official harness cannot be adopted', async () => {
+      const issueId = await task(), before = await parked(issueId, { template: 'retired-derived-claude' });
+      await pool.query('UPDATE thread_machines SET "templateKind"=$2 WHERE "runId"=$1', [before.runId, 'claude']);
+      const next = await run(issueId), fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider));
+      assert.deepEqual(fixture.calls, ['create']);
+      assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+    });
     await t.test("the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device", async () => {
       const issueId = await task();
       const before = await parked(issueId);

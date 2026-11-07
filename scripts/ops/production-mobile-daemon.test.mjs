@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import { attestDeployedTarget } from '../acceptance/deployed-target.mjs'
 import { PROJECT, TEAM, PRODUCTION_ALIAS } from '../ops/deployment-regression.mjs'
 import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
@@ -7,6 +8,9 @@ import { runMobileDaemonProof, newEnrollmentCredential } from './production-mobi
 
 const id = n => '30000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const OWNER = id(1), WORKSPACE = id(2), OLD_DEVICE = id(3), NEW_DEVICE = id(4), OLD_TOKEN = id(5), NEW_TOKEN = id(6)
+const TEAM_WORKSPACE = id(8), SECOND_TEAM = id(9)
+// Public Owner identity from comment #1504/6691409495; fixture data, never a login.
+const POLICY_ADMIN_EMAIL = 'alex@acme.aspectlylabs.com', POLICY_ADMIN_ID = 'policy-admin'
 const CREDENTIAL = 'orv_' + 'c'.repeat(43), GRANT = 'orv_' + 'g'.repeat(43)
 const COOKIE = 'opaque-session-must-not-appear'
 const ENV = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/ops/issue1415-production-functional',
@@ -24,6 +28,19 @@ function fixture(options = {}) {
   const oldDevice = { id: OLD_DEVICE, name: 'Existing protected device', enabled: true, online: false,
     hostname: 'existing', platform: 'other', arch: 'other', harnesses: [], lastSeenAt: null, repos: [] }
   const requests = []
+  const choices = [{ id: WORKSPACE, name: 'Personal', kind: 'personal' },
+    ...(options.teamCount === 0 ? [] : [
+      { id: SECOND_TEAM, name: 'Other team', kind: 'team' },
+      { id: TEAM_WORKSPACE, name: 'Team', kind: 'team' },
+    ])]
+  const members = workspaceId => [
+    { userId: OWNER, email: ENV.SMOKE_OWNER_EMAIL, role: 'member', status: 'active' },
+    { userId: POLICY_ADMIN_ID,
+      email: options.adminMatches !== 0 && (workspaceId === TEAM_WORKSPACE || options.adminMatches === 2)
+        ? POLICY_ADMIN_EMAIL : 'unrelated-admin@example.invalid',
+      role: 'admin', status: 'active' },
+  ]
+  const selectedTeam = headers => headers.get('cookie')?.split('; ').includes('mikka-workspace=' + TEAM_WORKSPACE)
   const devices = () => {
     if (newDevice && clock - newDevice.seen >= 60_000) newDevice.online = false
     const own = newDevice && !removed ? [{ ...newDevice, seen: undefined }] : []
@@ -36,7 +53,7 @@ function fixture(options = {}) {
     const path = url.pathname
     let body
     if (init.body) body = JSON.parse(init.body)
-    requests.push({ path, method, action: body?.action })
+    requests.push({ path, search: url.search, method, action: body?.action })
     if (path.includes('/api/auth/')) {
       assert.equal(headers.get('origin'), url.origin)
       if (path.endsWith('/sign-in/email')) {
@@ -53,7 +70,8 @@ function fixture(options = {}) {
         return response({ success: true }, 200, { 'set-cookie': '__Secure-better-auth.session_token=; Path=/mikka; Max-Age=0; Secure; HttpOnly' })
       }
       if (path.endsWith('/get-session')) {
-        assert.equal(url.search, '?disableCookieCache=true')
+        assert.ok(['', '?disableCookieCache=true'].includes(url.search))
+        if (!url.search) assert.equal(selectedTeam(headers), true)
         return response(activeSession ? { user: { id: OWNER, email: ENV.SMOKE_OWNER_EMAIL } } : null)
       }
     }
@@ -62,9 +80,26 @@ function fixture(options = {}) {
       assert.equal(headers.has('authorization'), false)
       assert.equal(headers.get('origin'), url.origin)
       assert.equal(activeSession, true)
+      if (path.endsWith('/api/workspace')) {
+        assert.equal(method, 'GET')
+        if (url.search) {
+          const candidate = url.searchParams.get('workspace')
+          assert.ok([SECOND_TEAM, TEAM_WORKSPACE].includes(candidate))
+          assert.equal(url.search, '?workspace=' + candidate)
+          assert.equal(selectedTeam(headers), false)
+          return response({ currentUserId: OWNER, role: 'member', choices,
+            workspace: { id: candidate, kind: 'team' }, members: members(candidate) })
+        }
+        const selected = selectedTeam(headers)
+        return response({ currentUserId: OWNER, role: 'member', choices,
+          workspace: selected ? { id: TEAM_WORKSPACE, kind: 'team' } : { id: WORKSPACE, kind: 'personal' },
+          members: selected ? members(TEAM_WORKSPACE) : [] })
+      }
       if (path.endsWith('/api/mobile/home')) return response({
         user: { id: options.foreignMobile ? id(90) : OWNER, email: ENV.SMOKE_OWNER_EMAIL },
-        workspace: { id: WORKSPACE }, workspaces: [], bots: [], threads: { running: 0, waiting: 0 },
+        workspace: selectedTeam(headers) && !options.wrongMobileWorkspace
+          ? { id: TEAM_WORKSPACE, kind: 'team' } : { id: WORKSPACE, kind: 'personal' },
+        workspaces: choices, bots: [], threads: { running: 0, waiting: 0 },
         live: { ownerId: OWNER, workspaceId: null },
       })
       if (path.endsWith('/renderer-manifest.json')) return response({ version: 1, target: 'web',
@@ -82,6 +117,12 @@ function fixture(options = {}) {
         assert.equal(body.version, 1)
         const args = decode(body.args)
         let result
+        if (body.action === 'workspace.switchWorkspace') {
+          assert.equal(method, 'POST'); assert.deepEqual(Object.keys(body).sort(), ['action', 'args', 'version'])
+          assert.deepEqual(args, [TEAM_WORKSPACE])
+          return response({ version: 1, ok: true, result: encode({ ok: true, data: { workspaceId: TEAM_WORKSPACE } }) },
+            200, options.dropSwitchCookie ? undefined : { 'set-cookie': 'mikka-workspace=' + TEAM_WORKSPACE + '; Path=/; Secure; HttpOnly; SameSite=Lax' })
+        }
         if (body.action === 'agents.pollDevices') result = { devices: devices(), live: { ownerId: OWNER, workspaceId: WORKSPACE } }
         else if (body.action === 'agents.setDeviceEnabled') {
           assert.deepEqual(args, [{ deviceId: NEW_DEVICE, enabled: false }])
@@ -139,8 +180,9 @@ function fixture(options = {}) {
 
 function noSensitiveReport(report) {
   const value = JSON.stringify(report)
-  for (const secret of [CREDENTIAL, GRANT, COOKIE, OWNER, OLD_TOKEN, NEW_TOKEN, OLD_DEVICE, NEW_DEVICE,
-    ENV.SMOKE_OWNER_EMAIL, ENV.SMOKE_OWNER_PASSWORD, ENV.GH_TOKEN, 'transport-error-'])
+  for (const secret of [CREDENTIAL, GRANT, COOKIE, OWNER, WORKSPACE, TEAM_WORKSPACE, SECOND_TEAM, OLD_TOKEN, NEW_TOKEN, OLD_DEVICE, NEW_DEVICE,
+    ENV.SMOKE_OWNER_EMAIL, ENV.SMOKE_OWNER_PASSWORD, ENV.GH_TOKEN, POLICY_ADMIN_EMAIL, POLICY_ADMIN_ID,
+    'unrelated-admin@example.invalid', 'transport-error-'])
     assert.equal(value.includes(secret), false, 'closed report must omit identities, credentials and raw error')
 }
 
@@ -149,6 +191,16 @@ test('real source HTTP client proves mobile owner, enroll, disabled heartbeat, r
   const report = await f.run()
   assert.equal(report.status, 'pass', JSON.stringify(report))
   assert.equal(report.checks.mobileHomeOwner, true)
+  assert.equal(report.teamWorkspaceConfirmed, true)
+  assert.equal(report.teamWorkspaceHash, createHash('sha256').update('team-workspace\0' + TEAM_WORKSPACE).digest('hex'))
+  assert.equal(report.teamAdminMembershipVerified, true)
+  assert.equal(report.teamSelectionBasis, 'unique-active-admin-identity-match')
+  assert.equal(report.teamOwnerAttribution, 'AGENTS.md-and-owner-comment-1504-6691409495')
+  assert.deepEqual(f.requests.filter(row => row.path.endsWith('/api/workspace')).map(row => [row.method, row.search]),
+    [['GET', ''], ['GET', '?workspace=' + SECOND_TEAM], ['GET', '?workspace=' + TEAM_WORKSPACE], ['GET', '']])
+  const switchedAt = f.requests.findIndex(row => row.action === 'workspace.switchWorkspace')
+  assert.ok(switchedAt > 0 && switchedAt < f.requests.findIndex(row => row.path.endsWith('/api/mobile/home')))
+  assert.equal(f.requests.filter(row => row.action === 'workspace.switchWorkspace').length, 1)
   assert.equal(report.checks.heartbeat, true)
   assert.equal(report.client.version, '0.0.1')
   assert.equal(report.client.protocolVersion, 3)
@@ -370,6 +422,40 @@ test('failed mobile business or cleanup still observes the final target without 
     }
     assert.equal(f.requests.filter(row => row.path.endsWith('/register')).length, 1)
     assert.equal(f.requests.filter(row => row.path.endsWith('/sign-out')).length, 1)
+    noSensitiveReport(report)
+  }
+})
+
+test('mobile refuses missing or ambiguous admin-bound teams before resource creation and still signs out', async () => {
+  for (const [options, detail] of [[{ teamCount: 0 }, 'team_missing'],
+    [{ adminMatches: 0 }, 'team_admin_missing'], [{ adminMatches: 2 }, 'team_admin_ambiguous']]) {
+    const f = fixture(options), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.deepEqual(report.teamFailure, { code: 'team_workspace_failed', detail })
+    assert.equal(report.teamAdminMembershipVerified, false)
+    assert.equal(report.resources.enrollmentAttempts, 0)
+    assert.equal(f.requests.some(row => row.action === 'workspace.switchWorkspace'), false)
+    assert.equal(f.requests.some(row => row.path.endsWith('/api/mobile/home')), false)
+    assert.equal(report.cleanup.sessionClosed, true)
+    noSensitiveReport(report)
+  }
+})
+
+test('mobile requires the switched cookie readback and the actual home to identify the selected team', async () => {
+  for (const options of [{ dropSwitchCookie: true }, { wrongMobileWorkspace: true }]) {
+    const f = fixture(options), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.equal(report.resources.enrollmentAttempts, 0)
+    assert.equal(report.cleanup.sessionClosed, true)
+    assert.equal(f.requests.filter(row => row.action === 'workspace.switchWorkspace').length, 1)
+    if (options.dropSwitchCookie) {
+      assert.deepEqual(report.teamFailure, { code: 'team_workspace_failed', detail: 'workspace_changed' })
+      assert.equal(f.requests.some(row => row.path.endsWith('/api/mobile/home')), false)
+    } else {
+      assert.equal(report.teamWorkspaceConfirmed, true)
+      assert.equal(report.checks.mobileHomeOwner, false)
+      assert.ok(report.errors.some(row => row.code === 'mobile_home_failed'))
+    }
     noSensitiveReport(report)
   }
 })

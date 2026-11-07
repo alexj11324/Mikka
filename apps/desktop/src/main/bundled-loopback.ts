@@ -1,9 +1,10 @@
 import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
-import { loopbackLocale, type LoopbackAuthServer } from './loopback'
+import { loopbackLocale, sendReturnPage, type LoopbackAuthServer } from './loopback'
 
-/** A one-shot code receiver. State/verifier and the received code never visit a renderer. */
-export async function startBundledLoopback(state: string, received: (code: string) => void): Promise<LoopbackAuthServer> {
+/** A one-shot code receiver. State/verifier and the received code never visit a renderer.
+ * `link` is the app link the callback page opens to bring the app forward. */
+export async function startBundledLoopback(state: string, received: (code: string) => void, link?: string): Promise<LoopbackAuthServer> {
   if (!/^[A-Za-z0-9_-]{32,128}$/.test(state)) throw new Error('Invalid desktop nonce')
   let used = false
   let expectedHost = ''
@@ -19,9 +20,8 @@ export async function startBundledLoopback(state: string, received: (code: strin
     const code = url.searchParams.get('code') ?? ''
     if (url.pathname !== '/auth/callback' || url.searchParams.getAll('state').length !== 1 || url.searchParams.getAll('code').length !== 1 || !/^[A-Za-z0-9_-]{32,128}$/.test(code) || !/^[A-Za-z0-9_-]{32,128}$/.test(returned) || returned.length !== state.length || !timingSafeEqual(Buffer.from(returned), Buffer.from(state))) { reject(); return }
     used = true
-    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-    const message = loopbackLocale(request.headers['accept-language']) === 'en' ? 'Returning to Mikka…' : '正在返回 Mikka…'
-    response.end(`<!doctype html><meta charset="utf-8"><title>Mikka</title><p>${message}</p>`)
+    // Its headers take precedence: the page allows only its own nonce'd script and style.
+    sendReturnPage(response, loopbackLocale(request.headers['accept-language']), link)
     server.close()
     received(code)
   })

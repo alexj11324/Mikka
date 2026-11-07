@@ -1,112 +1,51 @@
-name: E2B worker template
-# Builds the three cloud templates from main (the bot's computer from E2B's desktop, task
-# machines from E2B's claude and codex; decision 2026-11-01-2335), makes them public, points
-# production at them and redeploys (decision 2026-11-01-1201-e2b-template-public-auto-release).
+name: E2B additive template candidates
+# Reusable builder only. It cannot make a candidate public or change production.
 on:
-  push:
-    branches: [main]
-    # Keep in step with WORKER_PATHS in scripts/e2b/build-template.py.
-    paths: &template_paths
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'packages/daemon/**'
-      - 'packages/protocol/**'
-      - 'packages/config/**'
-      - 'patches/**'
-      - 'scripts/e2b/**'
-      - '.github/workflows/e2b-template.yml'
-  pull_request:
-    paths: *template_paths
-  workflow_dispatch:
-    inputs:
-      force:
-        description: Rebuild even when the worker hash matches production
-        type: boolean
-        default: false
+  workflow_call:
+    outputs:
+      source-sha:
+        value: ${{ jobs.build.outputs.source-sha }}
+      template-models-sha256:
+        value: ${{ jobs.build.outputs.template-models-sha256 }}
+      candidate-artifact-id:
+        value: ${{ jobs.build.outputs.candidate-artifact-id }}
+      candidate-sha256:
+        value: ${{ jobs.build.outputs.candidate-sha256 }}
+      candidate-identities:
+        value: ${{ jobs.build.outputs.candidate-identities }}
 permissions:
   contents: read
-# One release at a time. A newer main push waits instead of cancelling a build half way.
-concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('e2b-template-{0}', github.ref) || 'e2b-template-release' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - run: python3 scripts/e2b/build-template.test.py
-      - run: node --test scripts/e2b/publish-template-env.test.mjs
-
-  # Holds only the Vercel team token, to read production's current worker hash. A commit that
-  # leaves the template's inputs alone gives the same hash, and nothing below runs.
-  check:
-    needs: test
-    if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      id-token: write
-    outputs:
-      changed: ${{ steps.compare.outputs.changed }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - name: Read the Vercel team token through Infisical workload identity
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Compare the worker hash with production
-        id: compare
-        run: |
-          wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
-          live="$(node scripts/e2b/publish-template-env.mjs --current)"
-          echo "worker hash $wanted; production $live"
-          if [ "$wanted" = "$live" ] && [ "${{ inputs.force }}" != "true" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
-
-  # Holds only E2B_API_KEY. Nothing below runs unless every template is built, public and ready.
   build:
-    needs: check
-    if: needs.check.outputs.changed == 'true'
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
       id-token: write
     outputs:
-      desktop-template-id: ${{ steps.build.outputs.desktop-template-id }}
-      claude-template-id: ${{ steps.build.outputs.claude-template-id }}
-      codex-template-id: ${{ steps.build.outputs.codex-template-id }}
       source-sha: ${{ steps.build.outputs.source-sha }}
-      template-models: ${{ steps.build.outputs.template-models }}
+      template-models-sha256: ${{ steps.build.outputs.template-models-sha256 }}
+      candidate-artifact-id: ${{ steps.candidates.outputs.artifact-id }}
+      candidate-sha256: ${{ steps.build.outputs.candidate-sha256 }}
+      candidate-identities: ${{ steps.build.outputs.candidate-identities }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Install the E2B SDK
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Refuse an obsolete source before building candidates
+        run: node scripts/release/web-deploy.mjs main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Install the pinned E2B SDK
         run: |
           python3 -m venv "$RUNNER_TEMP/e2b"
           "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
-      - name: Read the platform E2B key through Infisical workload identity
+      - name: Read the existing E2B build key
+        id: e2b-key
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -117,62 +56,49 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Build, make public and verify
+      - name: Build private versioned candidates and require official file conservation
         id: build
         run: |
-          name="mikka-cloud-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
-          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --public --json > "$RUNNER_TEMP/template.json"
-          node --input-type=module - "$RUNNER_TEMP/template.json" <<'JS'
+          name="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"
+          node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs'
-          const out = JSON.parse(readFileSync(process.argv[2], 'utf8'))
-          if (out.sourceCommit !== process.env.GITHUB_SHA) throw new Error('Templates were built from another commit')
-          if (!/^[0-9a-f]{40}$/.test(out.workerSha)) throw new Error('Invalid worker hash')
-          const lines = [`source-sha=${out.workerSha}`]
-          const models = {}
+          import { assertReportIdentity, cleanupIdentity, reportDigest, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
+          const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
+          const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,
+            runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
+          assertReportIdentity(report, expected)
           for (const kind of ['desktop', 'claude', 'codex']) {
-            const template = out.templates?.[kind]
-            if (template?.public !== true || template.buildStatus !== 'ready') throw new Error(`Template ${kind} is not public and ready`)
-            if (!/^[A-Za-z0-9_-]+$/.test(template.templateId)) throw new Error(`Invalid ${kind} template id`)
-            lines.push(`${kind}-template-id=${template.templateId}`)
-            if (!Array.isArray(template.models) || !template.models.length) throw new Error(`Missing ${kind} model probe`)
-            models[kind] = template.models
-            console.log(`${kind} template ${template.templateId} (${template.name}) from ${out.sourceCommit}, worker hash ${out.workerSha}: public, ready`)
+            const row = report.templates[kind], proof = row.conservation
+            if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)
+              || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('Candidate preservation gate failed')
+            console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)
           }
-          lines.push(`template-models=${JSON.stringify(models)}`)
-          appendFileSync(process.env.GITHUB_OUTPUT, lines.join('\n') + '\n')
+          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models-sha256=${templateModelsDigest(report)}\ncandidate-sha256=${reportDigest(bytes)}\ncandidate-identities=${cleanupIdentity(report, expected)}\n`)
           JS
-
-  # Holds only the Vercel team token. All variables change in one request, then production redeploys.
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Preserve the complete private candidate report
+        id: candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - name: Read the Vercel team token through Infisical workload identity
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Point production at the templates and redeploy
-        run: node scripts/e2b/publish-template-env.mjs
+          name: e2b-candidates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidates.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Close leftover probes and failed private builds
+        if: always() && steps.e2b-key.outcome == 'success'
+        run: |
+          args=()
+          if [ "$BUILD_OUTCOME" = success ]; then args+=(--report "$RUNNER_TEMP/candidates.json"); fi
+          if [ "$BUILD_OUTCOME" = success ] && [ "$ARTIFACT_OUTCOME" = success ]; then args+=(--sandboxes-only); fi
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"
         env:
-          DESKTOP_TEMPLATE_ID: ${{ needs.build.outputs.desktop-template-id }}
-          CLAUDE_TEMPLATE_ID: ${{ needs.build.outputs.claude-template-id }}
-          CODEX_TEMPLATE_ID: ${{ needs.build.outputs.codex-template-id }}
-          SOURCE_SHA: ${{ needs.build.outputs.source-sha }}
-          TEMPLATE_MODELS: ${{ needs.build.outputs.template-models }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.candidates.outcome }}
+      - name: Preserve candidate build cleanup receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-candidate-build-cleanup
+          path: ${{ runner.temp }}/build-cleanup.json
+          if-no-files-found: warn
+          retention-days: 7

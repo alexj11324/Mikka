@@ -89,6 +89,44 @@ for (const route of ['codex_cpa', 'claude_cpa', 'codex_cli', 'claude_code_cli'] 
 }
 
 for (const route of ['codex_cli', 'claude_code_cli'] as const) {
+  test(`${route}: initial lease preserves admission and uses one custody handoff with natural expiry`, async () => {
+    const { use, access } = subscriptionFixture(route)
+    access.connection!.quota.observedAt = new Date().toISOString()
+    const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId,
+      provider: route === 'codex_cli' ? 'codex' : 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota }
+    const repository = { binding: async () => ({ ...access.binding!, modelId: 'fixture-model' }), connection: async () => row, scope: () => ({}) } as unknown as SubscriptionService['repository']
+    const methods: string[] = [], admissions: boolean[] = []
+    let denyAt = 0
+    const refusal = new Error('fixture policy revoked')
+    const worker = { forUse() { return this }, async call(method: string) {
+      methods.push(method)
+      return { accessToken: 'fixture-access', expiresAt: '2030-01-01T00:00:00.000Z',
+        ...(route === 'codex_cli' ? { chatgptAccountId: 'fixture-account', chatgptPlanType: 'pro' } : { accountId: 'fixture-account' }) }
+    } }
+    const service = new SubscriptionService(repository, () => worker as never,
+      { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined,
+      async (_scope, _model, _route, _signal, auditAllowed) => {
+        admissions.push(auditAllowed !== false)
+        if (admissions.length === denyAt) throw refusal
+      })
+    const lease = await service.nativeLease(use)
+    assert.equal(lease.accessToken, 'fixture-access')
+    assert.equal(lease.accountId, 'fixture-account')
+    assert.equal(lease.expiresAt, '2030-01-01T00:00:00.000Z')
+    assert.equal(lease.route, route)
+    assert.deepEqual(methods, ['nativeAuth'], 'credential preparation must not spawn redundant prepare/context workers')
+    assert.deepEqual(admissions, [false, false])
+    Object.assign(row, { modelCatalog: { revision: 1, models: ['fixture-model'] } })
+    const negotiated = await service.nativeLease(use, undefined, true)
+    assert.equal(negotiated.modelCatalogueVerified, route === 'claude_code_cli' ? true : undefined,
+      'catalogue evidence never broadens Codex beyond its official CLI report')
+    for (denyAt of [1, 2]) {
+      methods.length = 0; admissions.length = 0
+      await assert.rejects(service.nativeLease(use), error => error === refusal)
+      assert.deepEqual(methods, [])
+    }
+  })
+
   test(`${route}: context checks both admissions without generation audit; actual requests retain audit`, async () => {
     const { use, access } = subscriptionFixture(route)
     access.connection!.quota.observedAt = new Date().toISOString()
@@ -126,3 +164,70 @@ for (const route of ['codex_cli', 'claude_code_cli'] as const) {
     }
   })
 }
+
+test('a full Claude model ID is admitted only by the authorized connection catalogue at its current epoch', async () => {
+  const { use, access } = subscriptionFixture('claude_code_cli')
+  access.connection!.quota.observedAt = new Date().toISOString()
+  const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId,
+    provider: 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota,
+    modelCatalog: { revision: 1, models: ['claude-sonnet-5'] } as { revision: number; models: string[] } | null }
+  const repository = { binding: async () => ({ ...access.binding!, modelId: 'claude-sonnet-5' }), connection: async () => row, scope: () => ({}) } as unknown as SubscriptionService['repository']
+  const calls: string[] = []
+  const worker = { forUse() { return this }, async call(method: string) {
+    calls.push(method)
+    return { accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60_000).toISOString() }
+  } }
+  const service = new SubscriptionService(repository, () => worker as never,
+    { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined, async () => undefined)
+  const context = await service.nativeContext(use, undefined, true)
+  assert.equal(context.modelId, 'claude-sonnet-5')
+  assert.deepEqual(Object.keys(context).sort(), ['accountId', 'expiresAt', 'modelId', 'revision', 'route'], 'existing daemons keep the same strict response shape')
+  for (const catalogue of [null, { revision: 0, models: ['claude-sonnet-5'] }, { revision: 1, models: ['another-model'] }]) {
+    row.modelCatalog = catalogue
+    calls.length = 0
+    await assert.rejects(service.nativeContext(use, undefined, true), { code: 'binding_mismatch' })
+    assert.deepEqual(calls, [], 'unknown or stale evidence cannot prepare a provider session')
+  }
+  await service.nativeContext(use)
+  assert.deepEqual(calls, ['prepare', 'nativeContext'], 'legacy model-probe contexts keep their original behavior')
+})
+
+test('prepared Claude leases carry only negotiated current-account evidence for the actual selected model', async () => {
+  const { use, access } = subscriptionFixture('claude_code_cli')
+  use.runId = 'fixture-run'
+  access.connection!.quota.observedAt = new Date().toISOString()
+  const model = 'claude-haiku-5-5', boundModel = 'claude-sonnet-5'
+  const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId,
+    provider: 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota,
+    modelCatalog: { revision: 1, models: [model] } as { revision: number; models: string[] } | null }
+  const repository = {
+    pool: { query: async () => ({ rows: [{ userId: use.ownerId, agentDefinition: { cliModelSelection: 'explicit', model } }] }) },
+    binding: async () => ({ ...access.binding!, modelId: boundModel }),
+    connection: async (ownerId: string, connectionId: string) => {
+      assert.equal(ownerId, use.ownerId)
+      assert.equal(connectionId, access.binding!.connectionId, 'only the selected account can provide evidence')
+      return row
+    },
+    scope: () => ({}),
+  } as unknown as SubscriptionService['repository']
+  const calls: string[] = []
+  const worker = { forUse() { return this }, async call(method: string) {
+    calls.push(method)
+    return { accessToken: 'fixture-access', accountId: 'fixture-account', expiresAt: '2030-01-01T00:00:00.000Z' }
+  } }
+  const service = new SubscriptionService(repository, () => worker as never,
+    { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined, async () => undefined)
+  const oldLease = await service.nativeLease(use)
+  assert.equal(oldLease.modelId, model)
+  assert.equal(Object.hasOwn(oldLease, 'modelCatalogueVerified'), false, 'old strict clients keep the exact original shape')
+  assert.deepEqual(Object.keys(oldLease).sort(), ['accessToken', 'accountId', 'expiresAt', 'modelId', 'revision', 'route'])
+  const verified = await service.nativeLease(use, undefined, true)
+  assert.equal(verified.modelCatalogueVerified, true)
+  assert.equal(verified.modelId, model, 'catalogue evidence follows the frozen run model, not the saved binding default')
+  for (const catalogue of [null, { revision: 0, models: [model] }, { revision: 1, models: [boundModel] }]) {
+    row.modelCatalog = catalogue
+    const unverified = await service.nativeLease(use, undefined, true)
+    assert.equal(unverified.modelCatalogueVerified, undefined)
+  }
+  assert.deepEqual(calls, Array(5).fill('nativeAuth'), 'no extra context, preparation, model probe or provider call')
+})

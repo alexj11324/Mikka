@@ -13,6 +13,7 @@ import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
 import { eventLine, type EventLine } from './event-line'
 import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
 import { quotePreview, toolQuote } from './tool-quote'
+import { invalidToolParts } from './invalid-tool-call'
 
 export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './tool-quote'
 
@@ -414,6 +415,7 @@ function takeArtifacts(text: string): { ids: string[]; text: string } {
  */
 export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
+  const invalidParts = invalidToolParts(rows.map(row => row.message))
   let briefingBoundary = false
   // Artifacts handed over since the last reply, waiting for one to sit under.
   const waiting = { ids: [] as string[], position: 0, createdAt: new Date(0) }
@@ -482,8 +484,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
-      const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
-      const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
+      const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part) ? [part.toolName] : [])
+      const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part)
         ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...toolCallMetadata(part.toolName, part.input, part as ProjectedToolMetadata), ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)),
           ...withQuote(part.input === undefined ? quotePreview((part as { quotePreview?: unknown }).quotePreview) : toolQuote(part.input)) }] : [])
       // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
@@ -519,6 +521,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue
       for (const part of message.content) {
+        if (invalidParts.has(part)) continue
         const runId = dispatchedRun(part)
         if (runId && !last.threads.includes(runId)) last.threads.push(runId)
         const step = part.type === 'tool-result' ? last.activity?.tools.find(tool => tool.call === part.toolCallId) : undefined

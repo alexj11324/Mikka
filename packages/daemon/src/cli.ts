@@ -16,6 +16,7 @@ import { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 import { connectDaemonInDataDir, isNoDaemon, type DaemonClient } from "./rpc/client"
 import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
+import type { HostedModelProbe } from "./cloud-model-probe"
 
 const USAGE = `Usage:
   mikka daemon [--dev] [--no-auto-update] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--hosted-subscriptions]
@@ -70,7 +71,7 @@ const defaultIO: CliIO = {
 export async function runCli(
   argv: string[],
   io: CliIO = defaultIO,
-  privateConfig?: { protectionBypass?: string }
+  privateConfig?: { protectionBypass?: string; preloadedModels?: HostedModelProbe; initialRunId?: string }
 ): Promise<number | null> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -230,6 +231,8 @@ export async function runCli(
       fixturesDir: values["fixtures-dir"],
       retainResources: values["retain-resources"],
       hostedSubscriptions: values["hosted-subscriptions"],
+      preloadedModels: privateConfig?.preloadedModels,
+      initialRunId: privateConfig?.initialRunId,
       e2bContainerRuntime: values["e2b-container-runtime"],
       cloudComputer: values["e2b-computer"],
       stallMs: values["stall-minutes"]

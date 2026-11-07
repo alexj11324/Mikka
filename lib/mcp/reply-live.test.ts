@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
 import type { SharedSubscription } from '../db/listen'
 
+type Wake = Awaited<ReturnType<SharedSubscription['next']>>
 const app = { options: { connectionString: 'postgresql://localhost/mcp_app_e2e' } }
 const workspace = { options: { connectionString: 'postgresql://localhost/mcp_workspace_e2e' } }
 mock.module('../db', { namedExports: { pool: app } })
@@ -19,8 +20,8 @@ mock.module('../db/listen', { namedExports: {
     }
     const subscription: SharedSubscription = {
       reset() {}, lost: false, close() { row.closes++ },
-      next(_milliseconds, abort) { return new Promise<void>(resolve => {
-        if (abort?.aborted) resolve(); else abort?.addEventListener('abort', () => resolve(), { once: true })
+      next(_milliseconds, abort) { return new Promise<Wake>(resolve => {
+        if (abort?.aborted) resolve('aborted'); else abort?.addEventListener('abort', () => resolve('aborted'), { once: true })
       }) },
     }
     return subscription

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { ExecutionSettings } from "./execution-settings";
 // Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
@@ -28,6 +29,8 @@ test(
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
+      CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE workspace_e2b_keys ("workspaceId" uuid PRIMARY KEY,"createdBy" text);
@@ -180,6 +183,7 @@ test(
         }),
       });
       stub("./db/index.ts", { pool });
+      stub("./workspace-db.ts", { workspaceDb: drizzle(pool) });
       // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
       stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) });
       const actions = await import("../app/actions/execution-settings");
@@ -210,6 +214,8 @@ test(
       // with no share row and no switch; 分享给团队成员 and the admin switch decide only other members' use.
       const teamB = { ownerId: alice.ownerId, workspaceId: randomUUID() };
       const teamBot = randomUUID(), bobBot = randomUUID();
+      await pool.query('INSERT INTO mikka_workspaces VALUES ($1)', [teamB.workspaceId]);
+      await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [teamB.workspaceId]);
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3),($4,$5,$3)',[teamBot,alice.ownerId,teamB.workspaceId,bobBot,'bob']);
       assert.equal((await pool.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,teamB.workspaceId])).rowCount,0,'nothing shared into team B');
       const inTeam = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies);

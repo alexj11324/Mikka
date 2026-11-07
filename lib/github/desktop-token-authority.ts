@@ -2,6 +2,7 @@ import 'server-only'
 import { pool } from '@/lib/db'
 import { authenticateDevice } from '@/lib/device-link'
 import type { RunGitHubScope } from './run-token-exchange'
+import { z } from 'zod'
 
 /**
  * A Bot's cloud desktop asks with its own worker device credential, scoped to
@@ -18,4 +19,20 @@ export async function authorizeDesktopGitHubToken(request: Request, deviceId: st
     WHERE m."deviceId"=$1 AND m."workspaceId"=$2 AND m."ownerId"=$3 AND m.state='running'
       AND d."ownerId"=$3 AND d.kind='cloud' AND d."removedAt" IS NULL LIMIT 1`, [deviceId, caller.scopeWorkspaceId, caller.userId])
   return rowCount ? { runId: deviceId, userId: caller.userId } : null
+}
+
+/** Natural-expiry refresh for the task machine. The device credential and
+ * live run determine the owner; no model-provided owner or repository does. */
+export async function authorizeDeviceRunGitHubToken(request: Request, deviceId: string, runId: string): Promise<RunGitHubScope | null> {
+  if (!z.uuid().safeParse(deviceId).success || !z.uuid().safeParse(runId).success) return null
+  const caller = await authenticateDevice(request)
+  if (!caller || (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId)) return null
+  const { rows: [run] } = await pool.query<{ remoteKey: string | null }>(`SELECT repo."repoPath" AS "remoteKey" FROM agent_runs r
+    JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.enabled AND d."removedAt" IS NULL
+    LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=d.id
+    WHERE r.id=$1 AND r."deviceId"=$2 AND r."userId"=$3
+      AND (d.kind='local' OR (d.kind='cloud' AND $4::uuid=d.id))
+      AND r.status IN ('preparing','running','paused','waiting_input') AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()`,
+  [runId, deviceId, caller.userId, caller.scopeDeviceId ?? null])
+  return run ? { runId, userId: caller.userId, ...(run.remoteKey?.startsWith('v2/github.com/') ? { remoteKey: run.remoteKey } : {}) } : null
 }

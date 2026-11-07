@@ -33,7 +33,7 @@ const runner = createLocalSubscriptionRunner({ stateDir,
     return { route: 'claude_code_cli', modelId: input.subscription.modelId, revision: 1, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 3_600_000).toISOString(), accessToken: 'fixture-run-access-token' }
   } },
 })
-const session = await runner.start({ runId: input.runId, deviceId: input.deviceId, harness: 'claude_code', subscriptionBinding: input.binding },
+const session = await runner.start({ runId: input.runId, deviceId: input.deviceId, harness: 'claude_code', model: input.model, subscriptionBinding: input.binding },
   { runId: input.runId, cwd: root, prompt: 'hello', model: input.model, env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: root } }), log: createLogger({ level: 'silent' }), toolApproval: new ToolApprovalGate(input.runId, { isLive: id => id === input.runId }) })
 const events = []
 for await (const event of session.events()) events.push(event)
