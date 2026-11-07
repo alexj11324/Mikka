@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: issue1503-credential-maintenance
+  group: production-smoke-owner-acceptance
   cancel-in-progress: false
 jobs:
   rotate_github_child:

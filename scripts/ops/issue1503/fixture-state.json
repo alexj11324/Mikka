@@ -24,12 +24,12 @@
     "appId": "4840908",
     "repositoryId": "1436202099",
     "installationId": "173164679",
-    "listedRepositoryCount": 51,
-    "otherRepositoryMetadataCount": 50,
+    "listedRepositoryCount": 53,
+    "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T02:21:59.000Z",
-    "connectionExpiresAt": "2026-11-07T02:21:48.448Z",
-    "connectionUpdatedAt": "2026-11-06T23:07:50.448Z",
-    "tokenSha256": "f6da68d330c201781ddfcef4c400bc545fe9f0dd97b402b667eac8b42fd0f8b4"
+    "providerExpiresAt": "2026-11-07T15:07:53.000Z",
+    "connectionExpiresAt": "2026-11-07T15:07:42.785Z",
+    "connectionUpdatedAt": "2026-11-07T11:32:58.786Z",
+    "tokenSha256": "89203678a1bd0309e0785e1f54c9975408838aed1374a1fc7d0ee378a115d94a"
   }
 }
