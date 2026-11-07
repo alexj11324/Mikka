@@ -28,9 +28,9 @@ mock.module(at('app/actions/agents.ts'), { namedExports: { findThreadIssue: asyn
 } } })
 mock.module(at('components/workspace/issue-thread-panel.tsx'), { namedExports: { IssueThreadPanel: () => <section data-conversation="">Existing conversation<textarea defaultValue="Unsent reply" /></section> } })
 mock.module(at('components/nav/context-panel.tsx'), { namedExports: { PANEL_WIDTH: { storageKey: 'fixture:thread-width', min: 320, max: 'half', initial: 360, edge: 'start' } } })
-const notices = new Map<string, { action?: { onClick: () => void } }>()
+const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
 mock.module('sonner', { namedExports: { toast: {
-  error: (_message: string, options: { id: string; action?: { onClick: () => void } }) => { notices.set(options.id, options) },
+  error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) },
 } } })
 let container: HTMLDivElement
@@ -100,7 +100,7 @@ test('a background thread lookup failure keeps the mounted conversation and retr
   const retry = notices.get(`thread-issue-read-${runId}`)?.action
   assert.ok(retry)
   failure = null
-  await act(async () => { retry.onClick(); await new Promise(resolve => setTimeout(resolve, 0)) })
+  await act(async () => { retry.onClick(new Event('click', { cancelable: true })); await new Promise(resolve => setTimeout(resolve, 0)) })
   assert.ok(container.querySelector('[data-conversation]') === conversation)
   assert.equal(notices.size, 0)
 })
