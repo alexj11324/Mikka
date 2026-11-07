@@ -10,7 +10,6 @@ import { PROPERTY_LABEL, ROW_VALUE } from './issue-property-row'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from './issue-metadata-controls'
-import { IssueScopeControl } from './issue-scope-control'
 import type { TaskScope } from '@/lib/task-identifier'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 import { cn } from '@/lib/utils'
@@ -18,7 +17,6 @@ import { formatDateOnly } from '@/lib/date-only'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { AgentSphere } from './issue-assignee-menu'
 import { useIssueThreads } from './issue-threads'
-import type { ExplicitTeamChoice } from '@/lib/issue-team-intent'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { TaskWorkspace } from '@ui-slot/task-workspace'
 
@@ -37,7 +35,6 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const [expanded, setExpanded] = useState(false)
-  const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
   const contentId = useId()
   const control = { task, disabled: metadataDisabled, onSaved: onMetadataSaved, onBusyChange: onMetadataBusy, request }
   // A task is readable only in its own workspace, so it is the one shown; a mismatch means another tab switched.
@@ -51,7 +48,6 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
         <TaskWorkspace variant="detail" workspace={workspace} row={(label, value) => <PropertyRow label={label}>{value}</PropertyRow>} />
         <PropertyRow label={t('statusLabel')}><IssuePropertyMenu variant="row" label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={onStatus} /></PropertyRow>
         <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
-        <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} teamChoice={teamChoice} /></PropertyRow>
         {/* R-60: the assignee is a person; a Bot the task is handed to sits on its own line under it. */}
         <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} task={{ ...task, metadata: { ...task.metadata, assignee: task.metadata.assignee?.kind === 'member' ? task.metadata.assignee : null } }} section="assignee" /><DelegateLine issueId={task.id} assignee={task.metadata.assignee} /></PropertyRow>
         <PropertyRow label={tMetadata('labels')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="labels" /></div></PropertyRow>
@@ -59,7 +55,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
         {task.metadata.estimate !== null && <PropertyRow label={tMetadata('estimate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button></PropertyRow>}
         {task.metadata.dueDate && <PropertyRow label={tMetadata('dueDate')}><Button variant="ghost" size="sm" className={cn(ROW_VALUE, overdue(task.metadata.dueDate, status, now) && 'text-destructive-foreground')} disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{formatDateOnly(format, task.metadata.dueDate, { month: 'short', day: 'numeric' })}</time></Button></PropertyRow>}
         {task.metadata.pullRequests.length > 0 && <PropertyRow label={tMetadata('pullRequests')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="pullRequests" /></div></PropertyRow>}
-        <IssueTeamControl issueId={task.id} disabled={metadataDisabled} onChosen={(issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null)} />
+        <IssueTeamControl issueId={task.id} disabled={metadataDisabled} />
       </FieldGroup>
     </section>
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
