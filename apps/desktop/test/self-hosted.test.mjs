@@ -3,7 +3,7 @@ import test from 'node:test'
 import { validateSelfHostedDesktopTarget } from './self-hosted.mjs'
 const uuid = '10000000-0000-4000-8000-000000000001', revision = 'a'.repeat(40)
 const fixture = { origin: 'http://localhost:3000', revision, ownerId: 'disposable', workspaceId: uuid, botId: uuid,
-  email: 'generated@example.test', password: 'b'.repeat(32) }
+  email: `selfhost-${uuid}@selfhost.example.test`, password: 'b'.repeat(32) }
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_SHA: revision,
   RUNNER_TEMP: '/tmp/runner', GITHUB_WORKSPACE: '/repo', MIKKA_DESKTOP_EXECUTABLE: '/repo/acceptance' }
 test('packaged desktop only accepts the exact disposable image and generated identity', () => {

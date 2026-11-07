@@ -19,7 +19,7 @@ export function validateSelfHostedDesktopTarget(value, env) {
   assert.equal(value.origin, 'http://localhost:3000')
   for (const key of ['workspaceId', 'botId']) assert.match(value[key] ?? '', UUID)
   assert.ok(typeof value.ownerId === 'string' && value.ownerId.length > 0 && value.ownerId.length <= 128)
-  assert.match(value.email ?? '', /^[^\s@]+@example\.test$/)
+  assert.match(value.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
   assert.ok(typeof value.password === 'string' && value.password.length >= 24 && value.password.length <= 200)
   assert.ok(env.RUNNER_TEMP && env.GITHUB_WORKSPACE && env.MIKKA_DESKTOP_EXECUTABLE)
 }
@@ -102,7 +102,7 @@ async function main() {
     for (;;) {
       const before = await page.evaluate(() => window.__selfHostedAcceptance.chatEvents)
       const chat = await rpc('coordinator.pollCoordinatorChat', [fixture.botId])
-      assert.ok(!chat.error)
+      assert.ok(chat.enabled === true && !chat.error)
       if (!chat.working && JSON.stringify(chat.items).includes('SELF_HOSTED_REPLY_32')) break
       assert.ok(Date.now() < deadline)
       await page.waitForFunction(count => window.__selfHostedAcceptance.chatEvents > count || window.__selfHostedAcceptance.failed,
