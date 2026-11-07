@@ -34,7 +34,7 @@ export const navigationAllowlist = {
   'components/settings/settings-shell.tsx': { 'navigation/router': { count: 2, reason: 'sign-out leaves for /sign-in; Settings links fall back to the router where pushSettingsHistory cannot' } },
   'components/settings/settings-view.tsx': { 'navigation/router': { count: 1, reason: 'an unknown settings section is replaced by 通用' } },
   'components/settings/settings-preview.tsx': { 'navigation/router': { count: 6, reason: 'the signed-out Settings preview sends every control to sign-in' } },
-  'components/settings/locale-setting.tsx': { 'navigation/router': { count: 1, reason: 'reloads the same page in the new language' } },
+  'hooks/settings/use-preferences-page.ts': { 'navigation/router': { count: 1, reason: 'reloads the same page in the new language' } },
   'components/nav-user.tsx': { 'navigation/router': { count: 1, reason: 'reloads the same page in the new language' } },
   'components/workspace/members-settings.tsx': { 'navigation/router': { count: 1, reason: 'Settings › 成员 for another workspace' } },
   'components/teams/team-directory.tsx': { 'navigation/router': { count: 1, reason: 'Settings › 团队 falls back to the router where pushSettingsHistory cannot' } },
