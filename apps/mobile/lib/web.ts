@@ -1,10 +1,15 @@
-import { Alert, Platform } from 'react-native'
+import { Alert, Linking, Platform } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { api, apiConnection } from '@/lib/api'
 import { API_URL } from '@/lib/config'
 import { apiCache } from './api-cache'
 
 export { webChatPath } from './web-chat'
+
+export async function openPrivacyPolicy(): Promise<void> {
+  try { await Linking.openURL('https://aspectlylabs.com/privacy') }
+  catch { Alert.alert('网页打开未确认') }
+}
 
 /**
  * Opens a page of the web app signed in as the person, for what the app cannot
