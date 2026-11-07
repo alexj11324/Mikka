@@ -1,37 +1,228 @@
-# Prepared only. Deployment commit is pinned; wait for the paired web +
-# official-runtime READY confirmation before pushing this workflow and driver.
-name: Issue 1505 production startup baseline
+# Prepared only. Queue only after root verifies this exact runtime's dual subscription
+# proof, public release tuple, and actual final paired DPL ID/source (BUILDING or READY).
+# All existing production READY checks still precede models. Do not push before root GO.
+name: Issue 1505 strict production startup acceptance
 on:
   push:
     branches: [ops/1505-preflight]
 permissions:
   contents: read
 concurrency:
-  group: issue-1505-production-acceptance
+  group: production-smoke-owner-acceptance
   cancel-in-progress: false
+  queue: max
 jobs:
-  baseline:
+  acceptance:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
+      actions: read
       id-token: write
     env:
-      MIKKA_ACCEPTANCE_WORKSPACE_ID: de300001-ece6-4021-8214-c986ea306bde
-      MIKKA_ACCEPTANCE_BOT_ID: bc925088-d87f-47b8-a786-c1c317ac005f
-      EXPECTED_APP_COMMIT: c0c98baa3020a085652ee5f773310b6dfa412c5d
-      EXPECTED_DEPLOYMENT_ID: dpl_7pKfeLGuConuD2B3FEfUtQFisfGW
-      EXPECTED_WORKER_SHA: ca9057a1bb71fa3cdf80c30c9c9156b76bcad2ef
-      EXPECTED_WORKER_SOURCE: 2960d783f0196fed5375593d910a43430a101747
+      ACCEPTANCE_SOURCE_COMMIT: 6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a
+      ACCEPTANCE_SOURCE_TREE: 15017013716b71640bac10686115776b511c639d
+      EXPECTED_APP_COMMIT: d75bee79966ff55c881e9f96b73ce51a98fb290c
+      EXPECTED_DEPLOYMENT_ID: dpl_61wk7f6f45GWWeKAo7fvgVEiyaAC
+      EXPECTED_WORKER_SHA: 2a681021ca9abc8ab99e2fabc3204da8335c7440
+      EXPECTED_WORKER_SOURCE: d75bee79966ff55c881e9f96b73ce51a98fb290c
+      EXPECTED_TEMPLATE_DESKTOP: s6swykcsuo8f0b6eu81w
+      EXPECTED_TEMPLATE_CLAUDE: bz7ndr3h9ebhtrmo4kzm
+      EXPECTED_TEMPLATE_CODEX: y8izpijfajwxhegmfia8
+      ACCEPTANCE_STRATEGY: derived
+      EXPECTED_DIAGNOSTIC_BOT_ID: fdeea45f-8cb2-450a-96a4-d9a682f71482
+      EXPECTED_DIAGNOSTIC_ENV_ID: QcozBsITe0pKk1vw
+      EXPECTED_DIAGNOSTIC_VALUE_SHA256: f2baf7a7b15e4622d18219f038edeb7589fd8d7f59244a2468568e6ff8f521d0
+      EXPECTED_DIAGNOSTIC_EXPIRES_AT: 2026-11-07T17:45:00.280Z
+      DIAGNOSTIC_HELPER_COMMIT: e33f18f4a210391d3e14f15364a4d7db2d8565a2
+      DIAGNOSTIC_HELPER_SHA256: a2bbe3fa092dcae61123b0669b532189d5ba8f1bbc888dcc12ff5976285b36dc
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.ACCEPTANCE_SOURCE_COMMIT }}
           persist-credentials: false
+      - name: Check out only the reviewed diagnostic-window cleanup helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DIAGNOSTIC_HELPER_COMMIT }}
+          path: .acceptance-window-helper
+          persist-credentials: false
+      - name: Await the exact upstream runtime and cleanup before credentials
+        id: upstream_release
+        timeout-minutes: 6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          // BEGIN UPSTREAM RELEASE WAIT GUARD
+          // Read-only external GitHub metadata. No application, account, database, or VM I/O.
+          const UPSTREAM_RELEASE = Object.freeze({
+            repository: 'alexj11324/Mikka', runId: 42388793981, runAttempt: 1,
+            sourceCommit: 'd75bee79966ff55c881e9f96b73ce51a98fb290c',
+            event: 'push', branch: 'main', path: '.github/workflows/e2b-official-runtime.yml',
+          })
+          const UPSTREAM_JOBS = Object.freeze(['test', 'check', 'validate / build', 'await-web',
+            'subscriptions', 'publish / deploy', 'cleanup'])
+          const UPSTREAM_RUN_PATH = `/repos/${UPSTREAM_RELEASE.repository}/actions/runs/${UPSTREAM_RELEASE.runId}`
+          const UPSTREAM_JOBS_PATH = `${UPSTREAM_RUN_PATH}/attempts/${UPSTREAM_RELEASE.runAttempt}/jobs?per_page=100`
+          const UPSTREAM_STATES = new Set(['queued', 'in_progress', 'completed', 'waiting', 'pending', 'requested'])
+          const UPSTREAM_CONCLUSIONS = new Set(['success', 'failure', 'neutral', 'cancelled', 'skipped', 'timed_out',
+            'action_required', 'stale', 'startup_failure'])
+          class UpstreamReleaseError extends Error {
+            constructor(code, cause) { super(code, cause === undefined ? undefined : { cause }); this.code = code }
+          }
+          function upstreamRequire(condition, code) {
+            if (!condition) throw new UpstreamReleaseError(code)
+          }
+          function upstreamStatus(record) {
+            upstreamRequire(record && UPSTREAM_STATES.has(record.status)
+              && (record.status === 'completed' ? UPSTREAM_CONCLUSIONS.has(record.conclusion) : record.conclusion === null),
+            'upstream_metadata_invalid')
+          }
+          function upstreamRun(record) {
+            upstreamRequire(record?.id === UPSTREAM_RELEASE.runId && record.run_attempt === UPSTREAM_RELEASE.runAttempt
+              && record.head_sha === UPSTREAM_RELEASE.sourceCommit && record.head_branch === UPSTREAM_RELEASE.branch
+              && record.event === UPSTREAM_RELEASE.event && record.path === UPSTREAM_RELEASE.path
+              && record.repository?.full_name === UPSTREAM_RELEASE.repository, 'upstream_identity_mismatch')
+            upstreamStatus(record)
+          }
+          function upstreamJobs(record) {
+            upstreamRequire(Array.isArray(record?.jobs) && record.total_count === record.jobs.length
+              && record.jobs.length <= UPSTREAM_JOBS.length, 'upstream_jobs_invalid')
+            const ids = new Set(), names = new Set()
+            for (const job of record.jobs) {
+              upstreamRequire(Number.isSafeInteger(job.id) && job.id > 0 && !ids.has(job.id)
+                && UPSTREAM_JOBS.includes(job.name) && !names.has(job.name)
+                && job.run_id === UPSTREAM_RELEASE.runId && job.run_attempt === UPSTREAM_RELEASE.runAttempt
+                && job.head_sha === UPSTREAM_RELEASE.sourceCommit && job.head_branch === UPSTREAM_RELEASE.branch,
+              'upstream_job_identity_mismatch')
+              upstreamStatus(job); ids.add(job.id); names.add(job.name)
+            }
+            return record.jobs.map(({ id, name, status, conclusion }) => ({ id, name, status, conclusion }))
+              .sort((a, b) => UPSTREAM_JOBS.indexOf(a.name) - UPSTREAM_JOBS.indexOf(b.name))
+          }
+          function githubMetadataReader(token, fetchMetadata = fetch) {
+            return async (path, remainingMs) => {
+              upstreamRequire(path === UPSTREAM_RUN_PATH || path === UPSTREAM_JOBS_PATH, 'upstream_metadata_path_invalid')
+              upstreamRequire(typeof token === 'string' && token.length > 0, 'upstream_guard_environment_invalid')
+              const signal = AbortSignal.timeout(Math.max(1, Math.ceil(remainingMs)))
+              try {
+                const response = await fetchMetadata(`https://api.github.com${path}`, { method: 'GET', redirect: 'error', signal,
+                  headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } })
+                upstreamRequire(response.status === 200, 'upstream_metadata_http_failed')
+                const value = await response.json()
+                upstreamRequire(!signal.aborted, 'upstream_wait_timeout')
+                return value
+              } catch (cause) {
+                if (signal.aborted) throw new UpstreamReleaseError('upstream_wait_timeout', cause)
+                if (cause instanceof UpstreamReleaseError) throw cause
+                throw new UpstreamReleaseError('upstream_metadata_request_failed', cause)
+              }
+            }
+          }
+          async function waitForUpstreamRelease({ readJson, beforeRead = () => {},
+            pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+            monotonic = () => performance.now(), wallClock = Date.now, maxWaitMs = 300_000 }) {
+            const started = monotonic(), deadline = started + maxWaitMs
+            const receipt = { version: 1, scope: 'exact_upstream_runtime_completion_only', upstream: UPSTREAM_RELEASE,
+              requiredJobs: UPSTREAM_JOBS, maxWaitMs, pollIntervalMs: 5000, startedAt: new Date(wallClock()).toISOString(),
+              status: 'waiting', observations: 0, metadataReadAttempts: 0, runStatus: null, runConclusion: null, jobs: [] }
+            const remaining = () => Math.max(0, deadline - monotonic())
+            const get = async path => {
+              upstreamRequire(remaining() > 0, 'upstream_wait_timeout')
+              receipt.metadataReadAttempts += 1
+              let value
+              try { value = await readJson(path, remaining()) }
+              catch (cause) {
+                if (remaining() === 0) throw new UpstreamReleaseError('upstream_wait_timeout', cause)
+                if (cause instanceof UpstreamReleaseError) throw cause
+                throw new UpstreamReleaseError('upstream_metadata_request_failed', cause)
+              }
+              upstreamRequire(remaining() > 0, 'upstream_wait_timeout')
+              return value
+            }
+            const observeRun = run => {
+              upstreamRun(run); receipt.runStatus = run.status; receipt.runConclusion = run.conclusion
+              upstreamRequire(run.status !== 'completed' || run.conclusion === 'success', 'upstream_run_failed')
+            }
+            try {
+              upstreamRequire(Number.isFinite(maxWaitMs) && maxWaitMs > 0 && maxWaitMs <= 300_000,
+                'upstream_guard_environment_invalid')
+              beforeRead()
+              while (true) {
+                const run = await get(UPSTREAM_RUN_PATH)
+                observeRun(run)
+                receipt.jobs = upstreamJobs(await get(UPSTREAM_JOBS_PATH)); receipt.observations += 1
+                upstreamRequire(receipt.jobs.every(job => job.status !== 'completed' || job.conclusion === 'success'),
+                  'upstream_job_failed')
+                if (run.status === 'completed') {
+                  upstreamRequire(receipt.jobs.length === UPSTREAM_JOBS.length
+                    && receipt.jobs.every(job => job.status === 'completed' && job.conclusion === 'success'),
+                  'upstream_jobs_incomplete')
+                  // Re-read the run after the attempt-specific jobs; a newly started rerun is not this proof.
+                  const finalRun = await get(UPSTREAM_RUN_PATH)
+                  observeRun(finalRun)
+                  upstreamRequire(finalRun.status === 'completed', 'upstream_metadata_invalid')
+                  receipt.status = 'passed'; break
+                }
+                upstreamRequire(remaining() > 0, 'upstream_wait_timeout')
+                await pause(Math.min(5000, remaining()))
+              }
+            } catch (error) {
+              receipt.status = 'failed'
+              receipt.code = error instanceof UpstreamReleaseError ? error.code : 'upstream_guard_internal_error'
+            }
+            receipt.finishedAt = new Date(wallClock()).toISOString()
+            receipt.waitMs = Math.round((monotonic() - started) * 1000) / 1000
+            return receipt
+          }
+          // END UPSTREAM RELEASE WAIT GUARD
+          
+          import { writeFile } from 'node:fs/promises'
+          import { join } from 'node:path'
+          const receipt = await waitForUpstreamRelease({ readJson: githubMetadataReader(process.env.GITHUB_TOKEN), beforeRead: () => {
+            upstreamRequire(process.env.GITHUB_REPOSITORY === UPSTREAM_RELEASE.repository
+              && typeof process.env.GITHUB_TOKEN === 'string' && process.env.GITHUB_TOKEN.length > 0,
+            'upstream_guard_environment_invalid')
+          } })
+          try {
+            await writeFile(join(process.env.RUNNER_TEMP, 'issue1505-upstream-release-wait.json'),
+              JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 })
+          } catch {
+            console.error(JSON.stringify({ status: 'failed', code: 'upstream_receipt_write_failed' }))
+            process.exitCode = 1
+          }
+          console.log(JSON.stringify(receipt))
+          if (receipt.status !== 'passed') process.exitCode = 1
+          JS
+      - name: Verify the exact merged acceptance source
+        id: source_ready
+        run: |
+          test "$(git rev-parse HEAD)" = "$ACCEPTANCE_SOURCE_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$ACCEPTANCE_SOURCE_TREE"
+          test "$(git -C .acceptance-window-helper rev-parse HEAD)" = "$DIAGNOSTIC_HELPER_COMMIT"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const env=process.env;
+          assert.match(env.EXPECTED_DIAGNOSTIC_BOT_ID??'',/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i);
+          assert.match(env.EXPECTED_DIAGNOSTIC_ENV_ID??'',/^[A-Za-z0-9_-]{1,200}$/);assert.ok(!env.EXPECTED_DIAGNOSTIC_ENV_ID.startsWith('READY_'));
+          assert.match(env.EXPECTED_DIAGNOSTIC_VALUE_SHA256??'',/^[a-f0-9]{64}$/);
+          assert.ok(Number.isFinite(Date.parse(env.EXPECTED_DIAGNOSTIC_EXPIRES_AT)));
+          assert.ok(Date.parse(env.EXPECTED_DIAGNOSTIC_EXPIRES_AT)-Date.now()>=45*60_000,'acceptance_diagnostic_window_budget_insufficient');
+          assert.match(env.DIAGNOSTIC_HELPER_COMMIT??'',/^[a-f0-9]{40}$/);assert.match(env.DIAGNOSTIC_HELPER_SHA256??'',/^[a-f0-9]{64}$/);
+          assert.equal(createHash('sha256').update(readFileSync('.acceptance-window-helper/scripts/ops/issue1505-diagnostic-window.mjs')).digest('hex'),env.DIAGNOSTIC_HELPER_SHA256);
+          JS
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - name: Read the existing acceptance account
+      - name: Read the existing SMOKE shared-team acceptance account
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -42,7 +233,8 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Read the existing token for read-only production version checks
+      - name: Read the existing token for version checks and exact owned-window cleanup
+        id: platform_token
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -53,54 +245,486 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
-      - name: Check the production log query before dispatch
+      - name: Check the exact production tuple and log access before dispatch
         run: |
           node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
           import { api, PROJECT, TEAM } from './scripts/ops/deployment-regression.mjs';
-          const result=await api('/v1/observability/events',{token:process.env.VERCEL_TEAM_TOKEN,
+          import { readProductionWorkerRelease,createSessionClient } from './scripts/acceptance/cloud-startup.mjs';
+          const env=process.env,commit=env.EXPECTED_APP_COMMIT;
+          for(const key of ['EXPECTED_APP_COMMIT','EXPECTED_WORKER_SHA','EXPECTED_WORKER_SOURCE'])assert.match(env[key]??'',/^[a-f0-9]{40}$/,'unfilled_ready_pin');
+          assert.match(env.EXPECTED_DEPLOYMENT_ID??'',/^dpl_[A-Za-z0-9]+$/,'unfilled_deployment_pin');
+          assert.ok(['derived','pool','combined'].includes(env.ACCEPTANCE_STRATEGY),'strategy_invalid');
+          const templates={desktop:env.EXPECTED_TEMPLATE_DESKTOP,claude:env.EXPECTED_TEMPLATE_CLAUDE,codex:env.EXPECTED_TEMPLATE_CODEX};
+          for(const [kind,id] of Object.entries(templates)){
+            assert.match(id??'',/^[A-Za-z0-9_-]{1,100}$/,'template_pin_invalid');assert.ok(!id.startsWith('READY_'),'unfilled_template_pin');
+            if(env.ACCEPTANCE_STRATEGY==='derived')assert.notEqual(id,kind,'derived_template_required');
+          }
+          const release=await readProductionWorkerRelease({token:env.VERCEL_TEAM_TOKEN});
+          assert.deepEqual(release,{workerSha:env.EXPECTED_WORKER_SHA,sourceCommit:env.EXPECTED_WORKER_SOURCE,templates},'production_release_mismatch');
+          const deployment=await api(`/v13/deployments/${env.EXPECTED_DEPLOYMENT_ID}`,{token:env.VERCEL_TEAM_TOKEN});
+          assert.equal(deployment.readyState,'READY');assert.equal(deployment.target,'production');
+          assert.equal(deployment.gitSource?.sha??deployment.meta?.githubCommitSha,commit,'deployment_source_mismatch');
+          const client=createSessionClient('https://app.aspectlylabs.com');
+          assert.equal((await client.json('/api/version')).build,commit,'public_build_mismatch');client.clear();
+          const end=new Date(),start=new Date(end.getTime()-60000);
+          const logs=await api('/v1/observability/events',{token:env.VERCEL_TEAM_TOKEN,
             headers:{'x-vercel-observability-query-reason':'cli/logs-runtime'},body:{event:'vercel.log',scope:{ownerId:TEAM,projectIds:[PROJECT]},
-            timeRange:{start:'2026-11-06T20:05:14.236Z',end:'2026-11-06T20:06:51.492Z'},select:['deploymentId','environment','message','truncated'],
-            order:'desc',limit:1,filter:`deploymentId:"${process.env.EXPECTED_DEPLOYMENT_ID}" AND environment:production AND (wrun_41M6S7EH0Q0GHTKW08JP0XJPQE) AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`}});
-          if(!Array.isArray(result.events)||typeof result.pagination?.hasMore!=='boolean')throw Error('logs_contract_invalid');
-          console.log(JSON.stringify({productionLogQuery:'accepted',records:result.events.length}));
+            timeRange:{start:start.toISOString(),end:end.toISOString()},select:['deploymentId','environment','message','truncated'],
+            order:'desc',limit:1,filter:`deploymentId:"${env.EXPECTED_DEPLOYMENT_ID}" AND environment:production AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`}});
+          assert.ok(Array.isArray(logs.events)&&typeof logs.pagination?.hasMore==='boolean','logs_contract_invalid');
+          console.log(JSON.stringify({productionReadyTuple:'verified',build:commit,deploymentId:env.EXPECTED_DEPLOYMENT_ID,release,logs:'accepted'}));
           JS
-      - name: Measure three fresh repository starts on each official subscription
+      - name: Accept three fresh repository starts on each official subscription
         run: |
           node --check scripts/acceptance/cloud-startup.mjs
           node --input-type=module <<'JS'
           import { mkdir, writeFile } from 'node:fs/promises';
-          import { parseOptions, readProductionWorkerRelease, runCloudStartup } from './scripts/acceptance/cloud-startup.mjs';
+          import { createHash } from 'node:crypto';
+          import { parseOptions, readProductionWorkerRelease, runCloudStartup, hasStartupInitialization } from './scripts/acceptance/cloud-startup.mjs';
           import { collectProductionTimings,markdown } from './scripts/acceptance/cloud-startup-report.mjs';
+          import { readRuntimeTiming,runtimeEvidence } from './scripts/acceptance/cloud-startup-evidence.mjs';
+          import { api, activeAlias, PRODUCTION_ALIAS, PROJECT } from './scripts/ops/deployment-regression.mjs';
+          // BEGIN DIAGNOSTIC WINDOW PIN
+          /** Ops-only control-plane pins. No product request, account call, or polling. */
+          function diagnosticWindowPins(env) {
+            const value = { botId: env.EXPECTED_DIAGNOSTIC_BOT_ID, id: env.EXPECTED_DIAGNOSTIC_ENV_ID,
+              valueSha256: env.EXPECTED_DIAGNOSTIC_VALUE_SHA256, expiresAt: env.EXPECTED_DIAGNOSTIC_EXPIRES_AT }
+            if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value.botId ?? '')
+              || !/^[A-Za-z0-9_-]{1,200}$/.test(value.id ?? '') || value.id.startsWith('READY_')
+              || !/^[a-f0-9]{64}$/.test(value.valueSha256 ?? '')
+              || typeof value.expiresAt !== 'string' || !Number.isFinite(Date.parse(value.expiresAt)))
+              throw new Error('acceptance_diagnostic_window_pin_invalid')
+            return value
+          }
+          
+          /** Only the verified value's closed identity hashes leave this function. */
+          async function readDiagnosticWindowPin(expected, { api, projectId, now = Date.now }) {
+            const key = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
+            const bad = () => { throw new Error('acceptance_diagnostic_window_changed') }
+            const { envs } = await api(`/v10/projects/${projectId}/env`)
+            if (!Array.isArray(envs)) bad()
+            const rows = envs.filter(row => row.key === key || row.id === expected.id)
+            if (rows.length !== 1 || rows[0].id !== expected.id || rows[0].key !== key || rows[0].type !== 'encrypted'
+              || rows[0].target?.length !== 1 || rows[0].target[0] !== 'production' || rows[0].gitBranch
+              || rows[0].customEnvironmentIds?.length) bad()
+            const { value } = await api(`/v1/projects/${projectId}/env/${encodeURIComponent(expected.id)}`)
+            const hash = text => createHash('sha256').update(text).digest('hex')
+            if (typeof value !== 'string' || hash(value) !== expected.valueSha256) bad()
+            let parsed
+            try { parsed = JSON.parse(value) } catch { bad() }
+            const fields = ['version', 'requesterId', 'workspaceId', 'botId', 'repository', 'expiresAt']
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.keys(parsed).length !== fields.length
+              || Object.keys(parsed).some(name => !fields.includes(name)) || parsed.version !== 1
+              || typeof parsed.requesterId !== 'string' || !parsed.requesterId.length || parsed.requesterId.length > 128
+              || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(parsed.workspaceId ?? '')
+              || parsed.botId !== expected.botId || typeof parsed.repository !== 'string'
+              || parsed.repository.toLowerCase() !== 'alexj11324/mikka-handoff'
+              || parsed.expiresAt !== expected.expiresAt || Date.parse(parsed.expiresAt) <= now()) bad()
+            return { status: 'passed', scope: 'dedicated_bot_repository_window', key, ...expected,
+              requesterHash: hash(parsed.requesterId).slice(0, 16), workspaceHash: hash('team-workspace\0' + parsed.workspaceId),
+              observedAt: new Date(now()).toISOString() }
+          }
+          // END DIAGNOSTIC WINDOW PIN
+          // BEGIN OFFLINE FORMAL REPORT
+          /** Offline-only #1505 attachment and independent evidence gate.
+           * Embedded verbatim in the unpublished ops workflow; no product or network I/O.
+           * This profile is specifically six fresh repository tasks on derived templates.
+           */
+          const FORMAL_DISPATCH_PHASES = Object.freeze(['authorizeDispatch', 'executionWorkspace', 'requestedAgentProfile',
+            'resolveRepository', 'resolveModelDispatch', 'queueCloudRun', 'ensureThreadMachine', 'startLifecycle'])
+          const FORMAL_THREAD_PHASES = Object.freeze(['admission', 'execution_identity', 'connect', 'record_sandbox',
+            'post_connect_admission', 'runtime_configuration', 'read_worker', 'verify_worker', 'read_refreshed_worker',
+            'verify_refreshed_worker', 'start_desktop', 'credential_bootstrap', 'publish_bootstrap', 'start_worker',
+            'worker_register', 'verify_runtime', 'finish'])
+          const FORMAL_CLAIM_PHASES = Object.freeze(['authorize', 'identity', 'admission', 'acquire_lease',
+            'provenance', 'assignment_context', 'credentials_wait', 'response_fence'])
+          const FORMAL_SERVER_SPANS = Object.freeze(['cloud.sandbox.credentials', 'cloud.sandbox.create', 'cloud.thread.ensure',
+            'cloud.worker.claim', 'cloud.worker.claim.native_credentials', 'cloud.worker.claim.github_credentials'])
+          
+          const formalMs = value => Number.isFinite(value) && value >= 0
+          const formalDate = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
+          const formalInterval = value => Number.isSafeInteger(value?.startedAt) && value.startedAt > 0
+            && Number.isSafeInteger(value.endedAt) && value.endedAt >= value.startedAt && formalMs(value.ms ?? value.totalMs)
+          const formalSeconds = value => formalMs(value) ? (value / 1000).toFixed(3) : 'unavailable'
+          const formalUnionMs = phases => {
+            let total = 0, end = 0
+            for (const phase of [...phases].sort((a, b) => a.startMs - b.startMs)) {
+              total += Math.max(0, phase.endMs - Math.max(end, phase.startMs)); end = Math.max(end, phase.endMs)
+            }
+            return total
+          }
+          const formalStats = values => {
+            const available = values.filter(formalMs).sort((a, b) => a - b), middle = Math.floor(available.length / 2)
+            return { valuesMs: values, observed: available.length,
+              medianMs: available.length ? available.length % 2 ? available[middle] : (available[middle - 1] + available[middle]) / 2 : null,
+              maxMs: available.length ? available.at(-1) : null }
+          }
+          const formalReleaseMatches = (actual, expected) => Boolean(actual && expected && actual.workerSha === expected.workerSha
+            && actual.sourceCommit === expected.sourceCommit && ['desktop', 'claude', 'codex'].every(kind => actual.templates?.[kind] === expected.templates?.[kind]))
+          const formalWindowMatches = (actual, expected) => Boolean(actual && expected && actual.status === 'passed'
+            && actual.scope === 'dedicated_bot_repository_window' && actual.key === 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
+            && ['botId', 'id', 'valueSha256', 'expiresAt'].every(key => actual[key] === expected[key])
+            && formalDate(actual.observedAt) && formalDate(actual.expiresAt) && Date.parse(actual.observedAt) < Date.parse(actual.expiresAt))
+          const formalPinMatches = (pin, sequence, expectedDeploymentId, expectedRelease, expectedDiagnosticWindow) => pin?.status === 'passed'
+            && pin.sequence === sequence && pin.expectedDeploymentId === expectedDeploymentId && pin.deploymentId === expectedDeploymentId
+            && formalDate(pin.startedAt) && formalDate(pin.finishedAt) && Date.parse(pin.finishedAt) >= Date.parse(pin.startedAt)
+            && formalReleaseMatches(pin.workerRelease, expectedRelease)
+            && formalWindowMatches(pin.diagnosticWindow, expectedDiagnosticWindow)
+          
+          function formalActualAcceptance(sample) {
+            const timing = sample.timing, runtime = sample.runtimeTiming
+            const expectedKind = sample.harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'
+            if (timing?.status !== 'aligned' || timing.dispatchBoundary !== 'dispatch_run_entry'
+              || runtime?.harness !== sample.harness || runtime.agentAccepted?.kind !== expectedKind
+              || !formalMs(runtime.executionStartMs) || !formalMs(runtime.agentAccepted.ms)
+              || !formalDate(timing.dispatchStartedAt) || !formalDate(sample.agentStart?.storedAt)) return null
+            const stageMs = Date.parse(sample.agentStart.storedAt) - Date.parse(timing.dispatchStartedAt)
+            const ackAfterStageMs = Math.max(0, runtime.agentAccepted.ms - runtime.executionStartMs)
+            const elapsedMs = stageMs + ackAfterStageMs
+            if (!formalMs(stageMs) || !formalMs(timing.dispatchToExecutionStartMs)
+              || Math.abs(elapsedMs - timing.dispatchToExecutionStartMs) > 0.01) return null
+            return { kind: expectedKind, elapsedMs, stageMs, ackAfterStageMs,
+              source: 'stage_database_receipt_plus_same_daemon_monotonic_later_ack_upper_bound' }
+          }
+          
+          function formalStageCoverage(sample, logs, verifyStartupInitialization) {
+            const own = logs.filter(log => log.msg === 'cloud_startup_timing' && log.runIdHash === sample.runIdHash)
+            const dispatch = logs.filter(log => log.msg === 'dispatch_timing' && log.workflowRunId === sample.workflowRunId
+              && log.boundary === 'dispatch_run_entry' && log.failed === false && formalInterval(log)
+              && log.startedAt === Date.parse(sample.timing?.dispatchStartedAt) && log.endedAt === Date.parse(sample.timing?.dispatchEndedAt))
+            const values = {}, missing = []
+            const add = (name, records, valid) => {
+              const accepted = records.filter(valid)
+              values[name] = accepted.length ? accepted.reduce((sum, item) => sum + item.ms, 0) : null
+              if (!accepted.length || accepted.length !== records.length) missing.push(name)
+            }
+            if (dispatch.length !== 1) missing.push('dispatch.start_finish')
+            for (const phase of FORMAL_DISPATCH_PHASES)
+              add(`dispatch.${phase}`, dispatch.flatMap(log => log.phases ?? []).filter(item => item.phase === phase), item => formalMs(item.ms))
+            for (const stage of FORMAL_SERVER_SPANS) add(stage, own.filter(log => log.stage === stage), formalInterval)
+            for (const [stage, phases, prefix] of [['cloud.thread.phases', FORMAL_THREAD_PHASES, 'cloud.thread'],
+              ['cloud.worker.claim.phases', FORMAL_CLAIM_PHASES, 'cloud.worker.claim']]) {
+              const records = own.filter(log => log.stage === stage).flatMap(log => log.phases ?? [])
+              for (const phase of phases) add(`${prefix}.${phase}`, records.filter(item => item.phase === phase), formalInterval)
+            }
+            for (const stage of ['repository', 'worktree', 'agent_start'])
+              add(`daemon.stage.${stage}`, (sample.stages ?? []).filter(item => item.stage === stage), item => item.ok === true && formalMs(item.ms))
+            const daemon = sample.daemonStartupTiming
+            if (sample.startupTimingStatus !== 'complete' || daemon?.outcome !== 'ok' || daemon.truncated
+              || daemon.runIdHash !== sample.runIdHash || daemon.harness !== sample.harness || !formalInterval(daemon)) missing.push('daemon.adapter.start.start_finish')
+            values['daemon.adapter.start'] = formalMs(daemon?.ms) ? daemon.ms : null
+            const cli = (daemon?.phases ?? []).filter(phase => phase.name === 'daemon.adapter.cli_init' && phase.outcome === 'ok'
+              && formalMs(phase.startMs) && formalMs(phase.endMs) && phase.endMs >= phase.startMs && formalMs(phase.ms))
+            values['daemon.adapter.cli_init'] = cli.length ? formalUnionMs(cli) : null
+            // Use the exact checkout's reader for both paths. A supplied invalid, failed
+            // or truncated early receipt cannot fall back to an old late-root phase.
+            const initialized = typeof verifyStartupInitialization === 'function' && verifyStartupInitialization(sample) === true
+            const prepared = initialized && sample.preparationTimingStatus === 'complete' ? sample.daemonPreparationTiming : null
+            values['daemon.adapter.preparation'] = prepared ? prepared.ms : null
+            if (prepared) for (const name of new Set(prepared.phases.map(phase => phase.name)))
+              values[name.replace('daemon.adapter.', 'daemon.preparation.')] = formalUnionMs(prepared.phases.filter(phase => phase.name === name))
+            const initialization = initialized ? { source: prepared ? 'prepared_agent_start' : 'adapter_start',
+              phase: 'daemon.adapter.cli_init', ms: prepared
+                ? formalUnionMs(prepared.phases.filter(phase => phase.name === 'daemon.adapter.cli_init' && phase.outcome === 'ok'))
+                : values['daemon.adapter.cli_init'] } : null
+            if (!initialized) missing.push('daemon.adapter.cli_init')
+            const bootstrap = own.filter(log => log.stage === 'cloud.sandbox.bootstrap' && formalInterval(log))
+            return { status: missing.length ? 'incomplete' : 'complete', missing, valuesMs: values,
+              initialization, preparation: prepared ? { source: prepared.source, startedAt: prepared.startedAt,
+                endedAt: prepared.endedAt, ms: prepared.ms, durationRule: 'independent_origin_overlaps_checkout_and_late_adapter_do_not_sum' } : null,
+              dispatchStartFinishRecords: dispatch.length,
+              installation: { expectedBranch: 'derived_template_no_bootstrap_call', observedBootstrapRecords: bootstrap.length,
+                measuredMs: bootstrap.length ? bootstrap.reduce((sum, log) => sum + log.ms, 0) : null,
+                basis: 'published_template_catalog_and_exact_release_pin_plus_source_branch; absence_of_logs_alone_is_not_proof',
+                perVmTemplateIdReceipt: 'unavailable' } }
+          }
+          
+          function finalizeAcceptanceReport(report, { expectedBuild, expectedDeploymentId, expectedRelease, expectedDiagnosticWindow, verifyRuntimeEvidence, verifyStartupInitialization }) {
+            const reasons = [], samples = report.samples ?? [], logs = report.serverTimingLogs ?? [], pins = report.versionPins ?? []
+            const collection = report.serverLogCollection
+            if (report.status !== 'passed') reasons.push('driver_not_passed')
+            if (report.mode !== 'acceptance' || report.target !== 'cloud' || report.requestedStrategy !== 'derived') reasons.push('branch_profile_unavailable')
+            if (samples.length !== 6 || ['claude_code', 'codex'].some(harness => samples.filter(sample => sample.harness === harness).length !== 3)) reasons.push('sample_count_or_harness_distribution')
+            if (report.build !== expectedBuild || report.revision !== expectedBuild || !formalReleaseMatches(report.workerRelease?.configuration, expectedRelease)) reasons.push('production_tuple_unconfirmed')
+            const pinsComplete = report.versionPinCoverage?.status === 'complete' && pins.length === 14
+              && pins.every((pin, index) => formalPinMatches(pin, index + 1, expectedDeploymentId, expectedRelease, expectedDiagnosticWindow))
+            if (!pinsComplete) reasons.push('version_pin_coverage_incomplete')
+            const logsComplete = collection?.status === 'query_complete' && collection.deploymentId === expectedDeploymentId
+              && collection.invalid === 0 && collection.truncated === 0 && collection.records === logs.length
+              && formalDate(collection.windowStart) && formalDate(collection.windowEnd) && Date.parse(collection.windowEnd) >= Date.parse(collection.windowStart)
+            if (!logsComplete) reasons.push('server_logs_incomplete')
+            if (!Array.isArray(report.cleanup?.errors) || report.cleanup.errors.length) reasons.push('global_cleanup_incomplete')
+            if (report.officialTiming?.enabled !== true || report.officialTiming.cleaned !== true) reasons.push('official_timing_incomplete')
+            const teamConfirmed = report.team?.teamWorkspaceConfirmed === true && report.team.teamAdminMembershipVerified === true
+              && report.team.teamSelectionBasis === 'unique-active-admin-identity-match'
+              && /^[a-f0-9]{64}$/.test(report.team.teamWorkspaceHash ?? '') && /^[a-f0-9]{16}$/.test(report.accountHash ?? '')
+            if (!teamConfirmed) reasons.push('shared_team_identity_unconfirmed')
+            const diagnosticWindowConfirmed = pinsComplete && report.officialTiming?.source === 'trusted_claim'
+              && report.officialTiming.scope === 'dedicated_bot_repository_window' && report.officialTiming.botId === expectedDiagnosticWindow?.botId
+              && pins.every(pin => pin.diagnosticWindow.requesterHash === report.accountHash
+                && pin.diagnosticWindow.workspaceHash === report.team?.teamWorkspaceHash)
+            if (!diagnosticWindowConfirmed) reasons.push('diagnostic_window_unconfirmed')
+            const cases = samples.map((sample, index) => {
+              const failures = [], acceptance = formalActualAcceptance(sample), stages = formalStageCoverage(sample, logs, verifyStartupInitialization)
+              if (sample.status !== 'execution_proved_awaiting_server_timing') failures.push('execution_proof_incomplete')
+              if (!acceptance) failures.push('strict_entry_or_actual_ack_unavailable')
+              else if (acceptance.elapsedMs > report.maxStartupMs || report.maxStartupMs !== 5000) failures.push('startup_threshold_exceeded')
+              if (sample.execution?.credentialType !== 'subscription' || sample.execution?.identity?.model !== 'subscription'
+                || sample.execution?.identity?.runtime !== 'e2b') failures.push('subscription_provenance_incomplete')
+              const shared = sample.execution?.sharedScope, identity = sample.execution?.identity
+              const sharedConfirmed = teamConfirmed && shared?.verified === true && shared.access === 'workspace_share'
+                && shared.requesterHash === report.accountHash && shared.payerHash !== shared.requesterHash
+                && /^[a-f0-9]{16}$/.test(shared.payerHash ?? '') && shared.workspaceHash === report.team.teamWorkspaceHash
+                && ['connectionHash', 'bindingHash'].every(key => /^[a-f0-9]{16}$/.test(shared[key] ?? ''))
+                && /^(0|[1-9][0-9]*)$/.test(shared.connectionRevision ?? '')
+                && Number.isInteger(shared.profileVersion) && shared.profileVersion > 0 && /^[a-f0-9]{64}$/.test(shared.profileDigest ?? '')
+                && identity?.requesterHash === shared.requesterHash && identity?.executionPrincipalHash === shared.requesterHash
+                && identity?.subscriptionAccess?.length === 1 && identity.subscriptionAccess[0] === 'workspace_share'
+              if (!sharedConfirmed) failures.push('shared_subscription_identity_unconfirmed')
+              if (!pinsComplete || !formalPinMatches(sample.versionPins?.before, 2 + index * 2, expectedDeploymentId, expectedRelease, expectedDiagnosticWindow)
+                || !formalPinMatches(sample.versionPins?.after, 3 + index * 2, expectedDeploymentId, expectedRelease, expectedDiagnosticWindow)) failures.push('sample_pins_incomplete')
+              if (!(sample.minToolCalls >= 1) || sample.requireReplyAfterTool !== true || sample.replyVerifiedAfterTool !== true
+                || !(sample.toolCalls ?? []).some(tool => tool.outcome === 'ok' && /^[a-f0-9]{16}$/.test(tool.toolCallHash ?? ''))) failures.push('post_tool_reply_unproved')
+              const runtime = sample.runtimeTiming, official = runtime?.officialCliTiming
+              // Reparse the raw, run-bound receipt using this exact checkout's validator;
+              // a stale cached sample.runtimeEvidence.status cannot grant this verdict.
+              const authorization = typeof verifyRuntimeEvidence === 'function' ? verifyRuntimeEvidence(sample) : null
+              if (sample.requireRuntimeReceipt !== true || runtime?.complete !== true || runtime.truncated !== false
+                || runtime.runIdHash !== sample.runIdHash || runtime.harness !== sample.harness || !formalInterval(runtime)
+                || authorization?.status !== 'passed' || authorization.extraRemoteCalls !== 0 || authorization.hostAuthorizationComplete !== true
+                || authorization.allFirstPartyHttpComplete !== false || authorization.basis !== 'host_authorization_census_and_closed_mcp_business_paths'
+                || authorization.childBusiness?.status !== 'observed' || authorization.childBusiness.generationCoverage !== 'unverified')
+                failures.push('http_census_incomplete_or_extra_calls')
+              if (sample.requireOfficialTiming !== true || official?.collection !== 'best_effort' || official.flush !== 'not_confirmed'
+                || official.truncated !== false || official.invalidEvents !== 0 || official.rejectedBatches !== 0
+                || !(authorization?.observedProviderEvents > 0)) failures.push('official_provider_observation_unavailable')
+              if (sample.cleanup?.status !== 'passed' || sample.cleanup[`machineEnded_${sample.runId}`] !== true
+                || sample.cleanup.taskDeleted !== true) failures.push('sample_cleanup_incomplete')
+              if (stages.status !== 'complete') failures.push('required_stage_coverage_incomplete')
+              if (stages.installation.observedBootstrapRecords) failures.push('derived_bootstrap_observed')
+              return { sampleId: sample.sampleId, harness: sample.harness, runIdHash: sample.runIdHash,
+                status: failures.length ? 'failed' : 'passed', failures, acceptance,
+                dispatchToFirstProviderChunkMs: formalMs(sample.timing?.dispatchToFirstProviderChunkMs) ? sample.timing.dispatchToFirstProviderChunkMs : null,
+                postToolReply: sample.replyVerifiedAfterTool === true, stages,
+                sharedSubscription: { verified: sharedConfirmed, requesterHash: shared?.requesterHash ?? null,
+                  payerHash: shared?.payerHash ?? null, workspaceHash: shared?.workspaceHash ?? null,
+                  access: shared?.access ?? null, profileVersion: shared?.profileVersion ?? null, profileDigest: shared?.profileDigest ?? null },
+                pins: { before: sample.versionPins?.before?.sequence ?? null, after: sample.versionPins?.after?.sequence ?? null,
+                  deploymentId: sample.versionPins?.before?.deploymentId ?? null, workerSha: sample.versionPins?.before?.workerRelease?.workerSha ?? null },
+                http: { hostAuthorizationComplete: authorization?.hostAuthorizationComplete === true,
+                  hostPhysicalSends: Array.isArray(sample.runtimeTiming?.requests) ? sample.runtimeTiming.requests.length : null,
+                  extraRemoteCalls: authorization?.extraRemoteCalls ?? null,
+                  allFirstPartyHttpComplete: false, allGenerationBusinessSends: null,
+                  basis: authorization?.basis ?? null, childBusiness: authorization?.childBusiness ?? null,
+                  naturalRefreshSends: sample.runtimeTiming?.counts?.filter(item => ['credential_refresh', 'github_credential_refresh'].includes(item.endpoint)).reduce((sum, item) => sum + item.started, 0) ?? null },
+                observedOfficialProviderEvents: authorization?.observedProviderEvents ?? null,
+                officialEventCompleteness: 'best_effort_flush_not_confirmed_not_a_complete_provider_count' }
+            })
+            if (cases.some(sample => sample.status !== 'passed')) reasons.push('case_evidence_failed')
+            const groups = ['claude_code', 'codex'].map(harness => {
+              const rows = cases.filter(sample => sample.harness === harness)
+              return { harness, samples: rows.length, completeCases: rows.filter(sample => sample.status === 'passed').length,
+                dispatchToActualAckUpperBound: formalStats(rows.map(sample => sample.acceptance?.elapsedMs ?? null)),
+                dispatchToAgentStage: formalStats(rows.map(sample => sample.acceptance?.stageMs ?? null)),
+                dispatchToFirstProviderChunk: formalStats(rows.map(sample => sample.dispatchToFirstProviderChunkMs)) }
+            })
+            report.formalAcceptance = { version: 1, profile: 'six_fresh_repository_tasks_on_derived_templates',
+              status: reasons.length ? 'failed' : 'passed', driverStatus: report.status, reasons, maxStartupMs: 5000,
+              logCollectionComplete: logsComplete, pinCoverageComplete: pinsComplete, sharedTeamConfirmed: teamConfirmed, cases, groups,
+              diagnosticWindow: { confirmed: diagnosticWindowConfirmed, scope: 'dedicated_bot_repository_window',
+                ...(expectedDiagnosticWindow ?? {}), projectRemovalRevokesActiveDeployment: false },
+              resources: { requestedFreshTasks: 6, sandboxCreateSpanRecords: logs.filter(log => log.msg === 'cloud_startup_timing' && log.stage === 'cloud.sandbox.create').length,
+                primaryRunMachineEndConfirmed: samples.filter(sample => sample.cleanup?.[`machineEnded_${sample.runId}`] === true).length,
+                testIssueDeletionConfirmed: samples.filter(sample => sample.cleanup?.taskDeleted === true).length,
+                countingBasis: 'observed_operations_not_a_provider_resource_inventory_or_invoice' },
+              databaseAccounting: { status: 'unavailable', reason: 'no_complete_per_run_app_database_trace_in_this_attachment',
+                httpCountsAreNotSqlCountsOrBytes: true },
+              billing: { status: 'unavailable', reason: 'actual_sandbox_configuration_and_running_seconds_not_retained_by_existing_driver',
+                actualCpuCount: null, actualMemoryGiB: null, actualRunningSeconds: null, estimatedComputeUsd: null,
+                attribution: { compute: 'E2B account bound to the acceptance execution identity', model: 'existing official Claude and Codex subscriptions',
+                  orchestration: 'existing Mikka infrastructure' },
+                referenceOnly: { cpuCount: 2, memoryGiB: 4, usdPerRunningSecond: 0.000046, usdPerRunningHour: 0.1656,
+                  sources: ['https://e2b.dev/pricing', 'https://docs.e2b.dev/faq/calculate-sandbox-price'] },
+                exclusions: ['existing_E2B_plan', 'existing_model_subscriptions', 'existing_Mikka_infrastructure'],
+                rule: 'estimate_only_from_actual_configuration_and_running_time; paused_or_killed_time_not_billed; never_use_startup_latency_or_http_count_as_running_time' } }
+            return report
+          }
+          
+          function renderAcceptanceMarkdown(report, detailMarkdown) {
+            const formal = report.formalAcceptance
+            const lines = ['# #1505 正式生产验收附件', '', `独立证据判定：**${formal.status}**；原 driver：**${formal.driverStatus}**。`,
+              `SMOKE 共享团队身份：${formal.sharedTeamConfirmed ? 'verified' : 'unavailable'}；模型付费方必须为团队管理员共享订阅，执行请求方仍为 SMOKE。`,
+              `验收使用完整 dispatch_run_entry → later(stage, 真实官方任务 ACK) 的保守上界，每轮门槛 5.000 秒。`,
+              `服务端日志：${formal.logCollectionComplete ? 'query_complete，必要分段另逐轮核对' : 'incomplete / unavailable'}；版本 pin：${formal.pinCoverageComplete ? '14 / 14' : 'incomplete / unavailable'}。`,
+              `诊断窗口：${formal.diagnosticWindow.confirmed ? 'verified' : 'unavailable'}；专用 Bot ${formal.diagnosticWindow.botId ?? 'unavailable'}，到期 ${formal.diagnosticWindow.expiresAt ?? 'unavailable'}。每个原版本检查点同时核对该环境 ID / value SHA；不是单 run 授权。删除项目配置不等于撤销活动 DPL 中的配置，后者仍由 expiresAt 停止开启新任务。`,
+              ...(formal.reasons.length ? [`失败原因：${formal.reasons.map(reason => `\`${reason}\``).join('、')}。`] : []),
+              '', '## 每轮真实任务接收与执行证据', '', '秒；ACK 上界使用同进程单调时钟差，不相减服务器与 daemon 墙钟。缺失值是 unavailable。',
+              '', '| Sample | Harness | Run hash | stage | 真实 ACK 上界 | 首 provider/tool chunk | 工具后 marker | 宿主鉴权完整 / 额外鉴权 | pin before / after | 判定 |',
+              '|---|---|---|---:|---:|---:|---|---|---|---|']
+            for (const sample of formal.cases) lines.push(`| ${sample.sampleId} | ${sample.harness} | ${sample.runIdHash ?? 'unavailable'} | ${formalSeconds(sample.acceptance?.stageMs)} | ${formalSeconds(sample.acceptance?.elapsedMs)} | ${formalSeconds(sample.dispatchToFirstProviderChunkMs)} | ${sample.postToolReply} | ${sample.http.hostAuthorizationComplete} / ${sample.http.extraRemoteCalls ?? 'unavailable'} | ${sample.pins.before ?? 'unavailable'} / ${sample.pins.after ?? 'unavailable'} | ${sample.status}${sample.failures.length ? `: ${sample.failures.join(', ')}` : ''} |`)
+            lines.push('', '## 冻结共享订阅身份', '', '| Sample | 已验证 | 请求方 hash | 订阅付费方 hash | 访问类型 | Profile version / digest |',
+              '|---|---|---|---|---|---|')
+            for (const sample of formal.cases) {
+              const shared = sample.sharedSubscription
+              lines.push(`| ${sample.sampleId} | ${shared.verified} | ${shared.requesterHash ?? 'unavailable'} | ${shared.payerHash ?? 'unavailable'} | ${shared.access ?? 'unavailable'} | ${shared.profileVersion ?? 'unavailable'} / ${shared.profileDigest ?? 'unavailable'} |`)
+            }
+            lines.push('', '宿主鉴权判定范围为 daemon HttpServerLink/taskFetch 的鉴权/代理入口，结合固定 worker 的 MCP 两类业务 fetch 路径审计及本轮实际收到的MCP业务收据；claim内目录校验通过时，目录GET可以为0。它不表示全部 HTTP 已计数。子进程 generationCoverage=unverified、allFirstPartyHttpComplete=false；未收到的世代业务请求总量为 unavailable，缺 close 不会被改写成已完成。宿主声明的 remote MCP 配置须为 0；不把它外推成官方 CLI 任意 HOME/项目/插件网络的全量清单。',
+              '', '| Sample | 宿主已观测 sends | MCP 目录 / 决策 / pending | 已观测配对完整 / child 终态完整 | 全世代业务总数 |', '|---|---:|---:|---|---|')
+            for (const sample of formal.cases) {
+              const child = sample.http.childBusiness
+              lines.push(`| ${sample.sampleId} | ${sample.http.hostPhysicalSends ?? 'unavailable'} | ${child?.observedCatalogueSends ?? 'unavailable'} / ${child?.observedDecisionSends ?? 'unavailable'} / ${child?.pendingObservedSends ?? 'unavailable'} | ${child?.observedComplete ?? 'unavailable'} / ${child?.childLifecycleComplete ?? 'unavailable'} | unavailable |`)
+            }
+            lines.push('', '## 三次一组的原始值、median 与 max', '', '统计仅描述已观测值；completeCases 不足 3 的组不能通过。n=3 不估算 P95。',
+              '', '| Harness | 完整轮数 / 3 | 真实 ACK 原始秒 | 真实 ACK median / max | stage median / max | 首 chunk median / max |', '|---|---:|---|---:|---:|---:|')
+            for (const group of formal.groups) lines.push(`| ${group.harness} | ${group.completeCases} / 3 | ${group.dispatchToActualAckUpperBound.valuesMs.map(formalSeconds).join(', ')} | ${formalSeconds(group.dispatchToActualAckUpperBound.medianMs)} / ${formalSeconds(group.dispatchToActualAckUpperBound.maxMs)} | ${formalSeconds(group.dispatchToAgentStage.medianMs)} / ${formalSeconds(group.dispatchToAgentStage.maxMs)} | ${formalSeconds(group.dispatchToFirstProviderChunk.medianMs)} / ${formalSeconds(group.dispatchToFirstProviderChunk.maxMs)} |`)
+            lines.push('', '## 每个已有版本检查点', '', '| Pin | UTC start | UTC finish | DPL | Worker | 状态 |', '|---:|---|---|---|---|---|')
+            for (const pin of report.versionPins ?? []) lines.push(`| ${pin.sequence} | ${pin.startedAt ?? 'unavailable'} | ${pin.finishedAt ?? 'unavailable'} | ${pin.deploymentId ?? 'unavailable'} | ${pin.workerRelease?.workerSha ?? 'unavailable'} | ${pin.status}${pin.reason ? `: ${pin.reason}` : ''} |`)
+            lines.push('', '## 必要阶段完整性', '', '以下只要求本轮全新仓库任务的正常派生模板路径。安装/旧 VM 升级/question recovery 不属于必需阶段。父子与并行时长重叠，不能跨行相加；claim 凭据准备与 assignment_context / credentials_wait 尤其如此。',
+              '', '预热收据使用独立的预热起点：daemon.adapter.preparation 与 daemon.preparation.* 含等待 checkout 的时间，可与 repository 和晚期 adapter.start 重叠，不能相加。相同阶段只在各自收据内取区间并集；早期 cli_init 不写入晚期 daemon.adapter.cli_init。两条路径都必须由固定 checkout 的 hasStartupInitialization 验证真实成功的 cli_init；缺失或无效收据不补 0，也不回退掩盖。',
+              '', '| Sample | 初始化证据来源 | cli_init 秒 | 预热开始 UTC | 预热结束 UTC | 预热总秒 |', '|---|---|---:|---|---|---:|')
+            for (const sample of formal.cases) lines.push(`| ${sample.sampleId} | ${sample.stages.initialization?.source ?? 'unavailable'} | ${formalSeconds(sample.stages.initialization?.ms)} | ${sample.stages.preparation ? new Date(sample.stages.preparation.startedAt).toISOString() : 'unavailable'} | ${sample.stages.preparation ? new Date(sample.stages.preparation.endedAt).toISOString() : 'unavailable'} | ${formalSeconds(sample.stages.preparation?.ms)} |`)
+            const stageNames = [...new Set(formal.cases.flatMap(sample => Object.keys(sample.stages.valuesMs)))].sort()
+            lines.push('', `| 阶段（秒） | ${formal.cases.map(sample => sample.sampleId).join(' | ')} |`, `|---|${formal.cases.map(() => '---:|').join('')}`)
+            for (const name of stageNames) lines.push(`| ${name} | ${formal.cases.map(sample => formalSeconds(sample.stages.valuesMs[name])).join(' | ')} |`)
+            lines.push('', '安装分支依据为已发布模板目录、精确版本 pin 与固定源码中仅官方 bare-template 调用 bootstrap 的条件；这不是通过缺日志推得的 0ms。当前安全收据不带逐 VM template ID，因此逐 VM 安装时长未观测时仍记 unavailable。实际 bootstrap 记录如出现，会作为分支异常使本轮失败。',
+              '', '| Sample | start/finish 与必需阶段 | 缺失 | bootstrap 观测条数 / 秒 |', '|---|---|---|---|')
+            for (const sample of formal.cases) lines.push(`| ${sample.sampleId} | ${sample.stages.status} | ${sample.stages.missing.join(', ') || 'none'} | ${sample.stages.installation.observedBootstrapRecords} / ${formalSeconds(sample.stages.installation.measuredMs)} |`)
+            lines.push('', '## 资源、数据库与费用口径', '',
+              `请求的全新任务 ${formal.resources.requestedFreshTasks} 个；已观测 sandbox create 日志 ${formal.resources.sandboxCreateSpanRecords} 条；主 run machine end 成功确认 ${formal.resources.primaryRunMachineEndConfirmed} 个；自有测试 issue 删除确认 ${formal.resources.testIssueDeletionConfirmed} 个。这些是操作收据，不是 provider 账单或独立资源清单。`,
+              '', 'HTTP 记录只表示上述明确范围的实际发送，不是全部业务 HTTP 总数，也不等于 SQL 次数、数据库传输字节或美元。完整逐 run APP DB 数据：unavailable；未用采样外推为实际数。官方 provider OTLP 是 best_effort、flush=not_confirmed，观测事件数不代表完整 provider 总调用数。',
+              '', '新增计算归属冻结执行身份绑定的 E2B 账号；模型使用现有官方 Claude/Codex 订阅；编排使用现有 Mikka 基础设施。没有创建额外订阅。',
+              '', '本附件未保留实际 VM CPU/内存及 running 秒数，所以本批实际计算时长与费用估算均为 unavailable。仅作费率参考：2 vCPU / 4 GiB 为 $0.000046/运行秒（$0.1656/运行小时）；paused/killed 不计运行费。将来只有拿到实际配置与运行时长后才可计算估算，且不包含既有套餐、模型订阅与编排费用，也不冒充账单。',
+              '', '费率来源：[E2B pricing](https://e2b.dev/pricing)、[E2B calculate sandbox price](https://docs.e2b.dev/faq/calculate-sandbox-price)。任务 VM 的暂停由实际 safePoint 与生命周期处理决定；本批 finally 清理通过正常 owner end 回执和当前 run 链机器视图确认回收，15 分钟超时策略不代替该确认。',
+              '', '## 原始 driver 分段与 HTTP 明细', '', '下方保留原 driver 的观测结果；正式结论以前面的独立证据判定为准。', '')
+            if (typeof detailMarkdown === 'function') lines.push(detailMarkdown(report).replace(/^## #1505 生产云启动测量\n/, '').replaceAll('—', 'unavailable'))
+            return lines.join('\n') + '\n'
+          }
+          // END OFFLINE FORMAL REPORT
           const commit=process.env.EXPECTED_APP_COMMIT;
           if(!/^[a-f0-9]{40}$/.test(commit??''))throw Error('baseline_expected_deployment_missing');
           const release=await readProductionWorkerRelease({token:process.env.VERCEL_TEAM_TOKEN});
           if(release.workerSha!==process.env.EXPECTED_WORKER_SHA||release.sourceCommit!==process.env.EXPECTED_WORKER_SOURCE
-            ||JSON.stringify(release.templates)!==JSON.stringify({desktop:'desktop',claude:'claude',codex:'codex'}))throw Error('baseline_worker_pin_mismatch');
-          const options=parseOptions(['--workspace',process.env.MIKKA_ACCEPTANCE_WORKSPACE_ID,'--bot-id',process.env.MIKKA_ACCEPTANCE_BOT_ID,
-            '--runs','6','--harness','both','--mode','baseline','--strategy','official','--expected-build',commit,'--revision',commit,
-            '--expected-worker-sha',process.env.EXPECTED_WORKER_SHA,'--expected-worker-source',process.env.EXPECTED_WORKER_SOURCE,'--timeout-ms','240000']);
-          const report=await runCloudStartup(options);
-          report.workflow={repository:process.env.GITHUB_REPOSITORY,runId:process.env.GITHUB_RUN_ID,commit:process.env.GITHUB_SHA};
-          await collectProductionTimings(report,{token:process.env.VERCEL_TEAM_TOKEN,deploymentId:process.env.EXPECTED_DEPLOYMENT_ID});
+            ||JSON.stringify(release.templates)!==JSON.stringify({desktop:process.env.EXPECTED_TEMPLATE_DESKTOP,claude:process.env.EXPECTED_TEMPLATE_CLAUDE,codex:process.env.EXPECTED_TEMPLATE_CODEX}))throw Error('acceptance_worker_pin_mismatch');
+          // Use the independently prepared dedicated Bot/window. The strict
+          // driver selects the normal SMOKE team and creates its normal shared Profiles.
+          const expectedDiagnosticWindow=diagnosticWindowPins(process.env);
+          const options=parseOptions(['--runs','6','--harness','both','--mode','acceptance','--strategy',process.env.ACCEPTANCE_STRATEGY,'--runtime-evidence','required','--official-timing','enabled','--expected-build',commit,'--revision',commit,
+            '--expected-worker-sha',process.env.EXPECTED_WORKER_SHA,'--expected-worker-source',process.env.EXPECTED_WORKER_SOURCE,'--max-startup-ms','5000','--timeout-ms','240000','--bot-id',expectedDiagnosticWindow.botId],{});
+          const versionPins=[];
+          const expectedDeploymentId=process.env.EXPECTED_DEPLOYMENT_ID;
+          const expectedRelease={workerSha:process.env.EXPECTED_WORKER_SHA,sourceCommit:process.env.EXPECTED_WORKER_SOURCE,
+            templates:{desktop:process.env.EXPECTED_TEMPLATE_DESKTOP,claude:process.env.EXPECTED_TEMPLATE_CLAUDE,codex:process.env.EXPECTED_TEMPLATE_CODEX}};
+          // This hook runs only inside the driver's existing initial, before/after
+          // each sample, and final pins. No independent timer or production DB read.
+          const readPinnedWorkerRelease=async()=>{
+            const pin={sequence:versionPins.length+1,startedAt:new Date().toISOString(),expectedDeploymentId};
+            let reason='control_plane_unavailable';
+            try{
+              const rawAlias=await api(`/v4/aliases/${PRODUCTION_ALIAS}`,{token:process.env.VERCEL_TEAM_TOKEN});
+              reason='alias_invalid';
+              const alias=activeAlias(rawAlias);
+              pin.deploymentId=alias.deploymentId;pin.aliasUpdatedAt=new Date(alias.updatedAt).toISOString();
+              reason='deployment_changed';
+              if(alias.deploymentId!==expectedDeploymentId)throw Error('startup_worker_release_changed');
+              reason='control_plane_unavailable';
+              const current=await readProductionWorkerRelease({token:process.env.VERCEL_TEAM_TOKEN});
+              pin.workerRelease=current;reason='runtime_tuple_changed';
+              if(JSON.stringify(current)!==JSON.stringify(expectedRelease))throw Error('startup_worker_release_changed');
+              reason='diagnostic_window_changed';
+              pin.diagnosticWindow=await readDiagnosticWindowPin(expectedDiagnosticWindow,{projectId:PROJECT,
+                api:path=>api(path,{token:process.env.VERCEL_TEAM_TOKEN})});
+              pin.status='passed';return current;
+            }catch{
+              pin.status='failed';pin.reason=reason;
+              // Reuse the driver's closed version-drift code: abort the batch,
+              // preserve its owned sample, run cleanup, and collect its logs.
+              throw Error('startup_worker_release_changed');
+            }finally{pin.finishedAt=new Date().toISOString();versionPins.push(pin)}
+          };
+          const report=await runCloudStartup(options,{readWorkerRelease:readPinnedWorkerRelease});
+          report.versionPins=versionPins;
+          report.diagnosticWindowExpected={...expectedDiagnosticWindow,helperCommit:process.env.DIAGNOSTIC_HELPER_COMMIT,helperSha256:process.env.DIAGNOSTIC_HELPER_SHA256};
+          const bracketed=report.samples.length===6&&report.samples.every(sample=>sample.status==='execution_proved_awaiting_server_timing')
+            &&versionPins.length===14&&versionPins.every(pin=>pin.status==='passed');
+          report.versionPinCoverage={status:bracketed?'complete':'incomplete',source:'existing_driver_pin_hook',expectedChecks:14,observedChecks:versionPins.length};
+          if(bracketed)for(let i=0;i<report.samples.length;i++)report.samples[i].versionPins={before:versionPins[1+i*2],after:versionPins[2+i*2]};
+          else{report.error??='startup_version_pin_coverage_incomplete';report.status='failed'}
+          report.workflow={repository:process.env.GITHUB_REPOSITORY,runId:process.env.GITHUB_RUN_ID,commit:process.env.GITHUB_SHA,
+            sourceCommit:process.env.ACCEPTANCE_SOURCE_COMMIT,sourceTree:process.env.ACCEPTANCE_SOURCE_TREE};
           await mkdir('acceptance-results',{recursive:true});
-          await writeFile('acceptance-results/cloud-startup-baseline.json',JSON.stringify(report,null,2)+'\n',{mode:0o600});
-          await writeFile('acceptance-results/cloud-startup-baseline.md',markdown(report),{mode:0o600});
+          await writeFile('acceptance-results/cloud-startup-acceptance.json',JSON.stringify(report,null,2)+'\n',{mode:0o600});
+          try {
+            await collectProductionTimings(report,{token:process.env.VERCEL_TEAM_TOKEN,deploymentId:process.env.EXPECTED_DEPLOYMENT_ID});
+          } finally {
+            finalizeAcceptanceReport(report,{expectedBuild:commit,expectedDeploymentId,expectedRelease,expectedDiagnosticWindow,
+              verifyStartupInitialization:hasStartupInitialization,
+              verifyRuntimeEvidence:sample=>runtimeEvidence(readRuntimeTiming(sample.runtimeTiming,sample),{requireOfficial:true})});
+            await writeFile('acceptance-results/cloud-startup-acceptance.json',JSON.stringify(report,null,2)+'\n',{mode:0o600});
+            await writeFile('acceptance-results/cloud-startup-acceptance.md',renderAcceptanceMarkdown(report,markdown),{mode:0o600});
+          }
           console.log(JSON.stringify({status:report.status,applicationBuild:report.build,revision:report.revision,workerRelease:report.workerRelease,
+            team:report.team,accountHash:report.accountHash,officialTiming:report.officialTiming,
+            versionPins:report.versionPins,versionPinCoverage:report.versionPinCoverage,
+            formalAcceptance:{status:report.formalAcceptance.status,reasons:report.formalAcceptance.reasons,
+              groups:report.formalAcceptance.groups,logCollectionComplete:report.formalAcceptance.logCollectionComplete,
+              pinCoverageComplete:report.formalAcceptance.pinCoverageComplete},
             serverLogCollection:report.serverLogCollection,summary:report.summary,
             samples:report.samples.map(sample=>({sampleId:sample.sampleId,status:sample.status,error:sample.error,dispatchRefusal:sample.dispatchRefusal,issueId:sample.issueId,runId:sample.runId,
               workflowRunId:sample.workflowRunId,runIdHash:sample.runIdHash,requestTraceId:sample.requestTraceId,harness:sample.harness,
               agentStart:sample.agentStart,firstProviderChunk:sample.firstProviderChunk,stages:sample.stages,daemonStartupTiming:sample.daemonStartupTiming,
-              toolCalls:sample.toolCalls,replyVerified:sample.replyVerified,cleanup:sample.cleanup,timing:sample.timing,
-              serverStartupTimings:sample.serverStartupTimings,nativeProxyTimings:sample.nativeProxyTimings,nativeProviderCalls:sample.nativeProviderCalls}))}));
-          if(report.status==='failed')process.exitCode=1;
+              daemonPreparationTiming:sample.daemonPreparationTiming,preparationTimingStatus:sample.preparationTimingStatus,
+              execution:sample.execution,toolCalls:sample.toolCalls,replyVerified:sample.replyVerified,requireReplyAfterTool:sample.requireReplyAfterTool,
+              replyVerifiedAfterTool:sample.replyVerifiedAfterTool,cleanup:sample.cleanup,timing:sample.timing,
+              serverStartupTimings:sample.serverStartupTimings,nativeProxyTimings:sample.nativeProxyTimings,nativeProviderCalls:sample.nativeProviderCalls,
+              runtimeTiming:sample.runtimeTiming,runtimeEvidence:sample.runtimeEvidence}))}));
+          if(report.status!=='passed'||report.formalAcceptance.status!=='passed')process.exitCode=1;
+          JS
+      - name: Remove only the exact prepared project diagnostic window
+        if: always() && steps.source_ready.outcome == 'success' && steps.platform_token.outcome == 'success'
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdir, readFile, writeFile, appendFile } from 'node:fs/promises';
+          import { removeOwnedWindow, SOURCE, TREE, PROJECT, TEAM, KEY } from './.acceptance-window-helper/scripts/ops/issue1505-diagnostic-window.mjs';
+          const env=process.env;
+          // These are reviewed target pins from the prepare receipt, not a newly fabricated creation receipt.
+          const expected={version:1,issue:1505,sourceCommit:SOURCE,sourceTree:TREE,projectId:PROJECT,teamId:TEAM,
+            window:{key:KEY,id:env.EXPECTED_DIAGNOSTIC_ENV_ID,valueSha256:env.EXPECTED_DIAGNOSTIC_VALUE_SHA256,expiresAt:env.EXPECTED_DIAGNOSTIC_EXPIRES_AT}};
+          const codes=new Set(['cleanup_record_invalid','cleanup_window_changed','cleanup_absence_unconfirmed','platform_token_missing',
+            'platform_transport_failed','platform_request_refused','platform_response_invalid']);
+          let cleanup;
+          try{cleanup={status:'passed',...await removeOwnedWindow(expected,{token:env.VERCEL_TEAM_TOKEN})};}
+          catch(error){cleanup={status:'failed',code:codes.has(error?.windowCode)?error.windowCode:'diagnostic_window_cleanup_failed',
+            key:KEY,id:expected.window.id,activeDeploymentRevoked:false,originalExpiresAt:expected.window.expiresAt};process.exitCode=1;}
+          await mkdir('acceptance-results',{recursive:true});
+          await writeFile('acceptance-results/diagnostic-window-cleanup.json',JSON.stringify(cleanup,null,2)+'\n',{mode:0o600});
+          let report;
+          try{report=JSON.parse(await readFile('acceptance-results/cloud-startup-acceptance.json','utf8'));}
+          catch(error){if(error?.code!=='ENOENT')throw error;}
+          if(report){
+            report.diagnosticWindowCleanup=cleanup;
+            if(cleanup.status!=='passed'){
+              report.status='failed';report.cleanup.errors.push({step:'diagnostic_window_remove',code:cleanup.code});
+              if(report.formalAcceptance){report.formalAcceptance.status='failed';report.formalAcceptance.reasons.push('diagnostic_window_cleanup_failed');}
+              try{
+                const priorMarkdown=await readFile('acceptance-results/cloud-startup-acceptance.md','utf8');
+                await writeFile('acceptance-results/cloud-startup-acceptance.md',priorMarkdown.replace('独立证据判定：**passed**','独立证据判定：**failed**'),{mode:0o600});
+              }catch(error){if(error?.code!=='ENOENT')throw error;}
+            }
+            await writeFile('acceptance-results/cloud-startup-acceptance.json',JSON.stringify(report,null,2)+'\n',{mode:0o600});
+            await appendFile('acceptance-results/cloud-startup-acceptance.md',`\n## 诊断窗口配置收尾\n\n${cleanup.status==='passed'?'精确项目配置已删除，ID 404 与同 key 缺席均已回读。':'配置清理未确认，保留目标身份供后续恢复；整批不能通过。'} 删除项目配置不撤销活动 DPL 的既有环境；expiresAt=${cleanup.originalExpiresAt} 仍是该 DPL 停止开启新诊断任务的期限。\n`);
+          }
+          console.log(JSON.stringify(cleanup));
           JS
       - name: Upload only the sanitized measurement report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue-1505-startup-baseline
+          name: issue-1505-startup-acceptance
           path: |
-            acceptance-results/cloud-startup-baseline.json
-            acceptance-results/cloud-startup-baseline.md
+            acceptance-results/cloud-startup-acceptance.json
+            acceptance-results/cloud-startup-acceptance.md
+            acceptance-results/diagnostic-window-cleanup.json
+            ${{ runner.temp }}/issue1505-upstream-release-wait.json
           if-no-files-found: warn
           retention-days: 7
