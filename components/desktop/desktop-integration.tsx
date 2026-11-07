@@ -39,6 +39,12 @@ export function DesktopIntegration({ userId }: { userId: string }) {
   const { data: preferences } = useSWR(desktop ? settingsKeys.preferences() : null, () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'), { shouldRetryOnError: false })
   const finished = preferences !== undefined && pushAllowed(preferences, ['finished'])
   const previous = useRef<Map<string, DesktopRun['status']> | null>(null)
+  const lifetime = useRef(0)
+
+  useEffect(() => {
+    lifetime.current++
+    return () => { lifetime.current++ }
+  }, [desktop, userId])
 
   useEffect(() => {
     if (!desktop || !data) return
@@ -49,9 +55,12 @@ export function DesktopIntegration({ userId }: { userId: string }) {
     previous.current = update.next
     void bridge.notifications.setBadge(update.badge).catch(() => {})
     if (!update.notifications.length) return
+    const current = lifetime.current
     // The notification id is run:<issueId>:<kind>:<stamp>.
     void chooseDesktopNotifications(update.notifications.map(notification => ({ id: notification.id, issueId: notification.id.split(':')[1], kind: notification.kind })))
       .then(result => {
+        // A decision can finish after this account's integration unmounted.
+        if (lifetime.current !== current) return
         const show = new Set('show' in result && result.show ? result.show : [])
         for (const notification of update.notifications) if (show.has(notification.id)) void bridge.notifications.show(notification).catch(() => {})
       })
@@ -62,7 +71,9 @@ export function DesktopIntegration({ userId }: { userId: string }) {
     if (!desktop) return
     const bridge = window.mikka
     if (!bridge) return
+    let live = true
     const open = (href: string) => {
+      if (!live) return
       const target = appHref(href)
       if (target && !openAppLink(target)) router.push(target)
     }
@@ -70,8 +81,8 @@ export function DesktopIntegration({ userId }: { userId: string }) {
     void bridge.notifications.consumePendingClick()
       .then(href => { if (href) open(href) })
       .catch(() => {})
-    return unsubscribe
-  }, [desktop, router])
+    return () => { live = false; unsubscribe() }
+  }, [desktop, router, userId])
 
   // Installing the app makes this computer a device (Alex, 2026-11-02): once per
   // signed-in account, when it is not yet one of mine and online, main installs or restarts
