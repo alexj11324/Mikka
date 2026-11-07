@@ -62,6 +62,17 @@ source identifiers only. No task bodies or credentials go into that report.
 Operators must resolve the evidence before ownership is assigned. There is no
 automatic creator/scope fallback.
 
+Discovery takes no application row locks. Each batch locks candidate workspaces
+in a stable order before relation/source locks and application rows, then rereads
+the evidence. If a source changes during discovery, the task stays pending and
+is reported immediately; a later pass can bind it from fresh evidence. This
+order also permits a normal workspace deletion to finish without a cross-database
+lock cycle. Already-bound or deleted rows are excluded again after locking.
+
+Legacy Linear team settings without a workspace binding also require an explicit,
+authorized workspace selection before synchronization resumes. Existing provider
+receipts are retained; their owner or old scope does not choose that binding.
+
 ## Old state to target state
 
 | Existing state | Result |

@@ -254,6 +254,103 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.equal((await activeTaskWorkspaces(owner, beta))[0]?.id, beta)
       assert.equal((await activeTaskWorkspaces(owner, personal))[0]?.id, personal)
     })
+    const migrationFrom = randomUUID(), migrationTo = randomUUID(), fromTeam = randomUUID(), toTeam = randomUUID()
+    const fromBot = randomUUID(), toBot = randomUUID()
+    for (const [tenant, group, bot] of [[migrationFrom, fromTeam, fromBot], [migrationTo, toTeam, toBot]]) {
+      await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Migration lock fixture\',\'team\')', [tenant, owner])
+      await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'admin\',\'active\')', [tenant, owner])
+      await workspace.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Migration source\',\'LOCK\')', [group, tenant, owner])
+      await app.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Migration source\')', [bot, owner, tenant])
+    }
+    const waitForWorkspaceLock = async (blockingPid: number) => {
+      for (let attempt = 0; attempt < 500; attempt++) {
+        const { rows: [state] } = await workspace.query(`SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'
+          AND $1::int=ANY(pg_blocking_pids(pid)) AND query LIKE '%mikka_workspaces%FOR SHARE%'
+        ) AS waiting`, [blockingPid])
+        if (state.waiting) return
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      assert.fail('migration did not reach the real workspace authority lock')
+    }
+    await t.test('migration locks workspace before relations and APP rows; changed task evidence stays unresolved until a fresh pass', async () => {
+      const task = randomUUID()
+      await app.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Unresolved legacy task\',\'{"type":"doc"}\',\'todo\',\'normal\',\'personal\')', [task, owner])
+      await workspace.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [task, fromTeam, migrationFrom, owner])
+      const original = (await app.query('SELECT content,"scopeVersion" FROM issues WHERE id=$1', [task])).rows[0]
+      const tenantWriter = await workspace.connect(), appWriter = await app.connect()
+      let migrating: ReturnType<typeof backfillTaskWorkspaces> | undefined
+      try {
+        await tenantWriter.query('BEGIN')
+        await tenantWriter.query('SELECT id FROM mikka_workspaces WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[migrationFrom, migrationTo]])
+        const { rows: [{ pid }] } = await tenantWriter.query('SELECT pg_backend_pid() AS pid')
+        migrating = backfillTaskWorkspaces(app, workspace)
+        void migrating.catch(() => {})
+        await waitForWorkspaceLock(pid)
+        const { rows: [{ acquired }] } = await tenantWriter.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")
+        assert.equal(acquired, true, 'migration cannot hold the relation advisory while waiting for workspace authority')
+        await appWriter.query('BEGIN')
+        await appWriter.query("SET LOCAL lock_timeout='1s'")
+        await appWriter.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [task])
+        await appWriter.query('UPDATE issues SET title=\'Normal workspace writer committed\' WHERE id=$1', [task])
+        await appWriter.query('COMMIT')
+        await tenantWriter.query('UPDATE mikka_team_issues SET "workspaceId"=$2,"teamId"=$3 WHERE "issueId"=$1', [task, migrationTo, toTeam])
+        await tenantWriter.query('COMMIT')
+        const report = await migrating
+        assert.equal((await app.query('SELECT "workspaceId" FROM issues WHERE id=$1', [task])).rows[0].workspaceId, null,
+          'a source discovered under different workspace authority cannot bind in this pass')
+        assert.equal((await app.query('SELECT reason FROM issue_workspace_repairs WHERE "issueId"=$1', [task])).rows[0]?.reason, 'conflicting_evidence',
+          'a first-pass race is included in the actionable pending list immediately')
+        assert.equal(report.pending, (await app.query('SELECT count(*)::int AS total FROM issues WHERE "workspaceId" IS NULL')).rows[0].total)
+      } finally {
+        await appWriter.query('ROLLBACK'); await tenantWriter.query('ROLLBACK')
+        appWriter.release(); tenantWriter.release()
+        await migrating?.catch(() => {})
+      }
+      const resumed = await backfillTaskWorkspaces(app, workspace)
+      assert.equal(resumed.bound, 1)
+      const current = (await app.query('SELECT title,content,"scopeVersion","workspaceId","ownershipState" FROM issues WHERE id=$1', [task])).rows[0]
+      assert.equal(current.workspaceId, migrationTo); assert.equal(current.ownershipState, 'bound')
+      assert.equal(current.title, 'Normal workspace writer committed')
+      assert.deepEqual({ content: current.content, scopeVersion: current.scopeVersion }, original)
+      assert.equal((await app.query('SELECT count(*)::int AS total FROM issue_workspace_repairs WHERE "issueId"=$1', [task])).rows[0].total, 0)
+      assert.equal((await backfillTaskWorkspaces(app, workspace)).bound, 0, 'a completed migration is repeatable and does not move bound tasks')
+    })
+    await t.test('derived migration holds no APP row while waiting for workspace; changed computer authority is retried safely', async () => {
+      const run = randomUUID()
+      // A quarantined task-free legacy run is legal. The durable computer
+      // binding supplies its tenant; no trigger is disabled to construct it.
+      await app.query('INSERT INTO agent_runs(id,"userId","agentId",status) VALUES($1,$2,$3,\'succeeded\')', [run, owner, agent])
+      await app.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)', [run, fromBot, migrationFrom, owner])
+      const tenantWriter = await workspace.connect(), appWriter = await app.connect()
+      let migrating: ReturnType<typeof backfillTaskWorkspaces> | undefined
+      try {
+        await tenantWriter.query('BEGIN')
+        await tenantWriter.query('SELECT id FROM mikka_workspaces WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[migrationFrom, migrationTo]])
+        const { rows: [{ pid }] } = await tenantWriter.query('SELECT pg_backend_pid() AS pid')
+        migrating = backfillTaskWorkspaces(app, workspace)
+        void migrating.catch(() => {})
+        await waitForWorkspaceLock(pid)
+        await appWriter.query('BEGIN')
+        await appWriter.query("SET LOCAL lock_timeout='1s'")
+        await appWriter.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE', [run])
+        await appWriter.query('UPDATE agent_runs SET prompt=\'Normal resource writer committed\' WHERE id=$1', [run])
+        await appWriter.query('UPDATE computer_run_bindings SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1', [run, migrationTo, toBot])
+        await appWriter.query('COMMIT')
+        await tenantWriter.query('COMMIT')
+        await migrating
+        assert.equal((await app.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1', [run])).rows[0].workspaceId, null,
+          'a changed resource proof cannot borrow a workspace lock from its discovery snapshot')
+      } finally {
+        await appWriter.query('ROLLBACK'); await tenantWriter.query('ROLLBACK')
+        appWriter.release(); tenantWriter.release()
+        await migrating?.catch(() => {})
+      }
+      assert.equal((await backfillTaskWorkspaces(app, workspace)).runsBound, 1)
+      const current = (await app.query('SELECT "workspaceId",prompt FROM agent_runs WHERE id=$1', [run])).rows[0]
+      assert.deepEqual(current, { workspaceId: migrationTo, prompt: 'Normal resource writer committed' })
+      assert.equal((await backfillTaskWorkspaces(app, workspace)).runsBound, 0, 'a completed resource migration is repeatable')
+    })
   } finally {
     await Promise.all([moduleApp?.end(), moduleWorkspace?.end()])
     await dropTestDatabase(admin, appName, app)
