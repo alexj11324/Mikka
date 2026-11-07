@@ -301,13 +301,19 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
 
     // The menu and the resolver read one readiness: a route that does not answer chats is never offered.
     const settings = new ExecutionSettings(appPool)
-    const before = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
-    t.after(() => { process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = before })
-    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'codex_cpa'
-    assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
-    assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
-    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
-    assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+    const saved = { MIKKA_EDITION: process.env.MIKKA_EDITION, MIKKA_BYOS_VALIDATED_MODEL_ROUTES: process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES }
+    try {
+      // This part exercises the official cloud rollout ceiling; community
+      // subscriptions deliberately need no Mikka PostHog configuration.
+      process.env.MIKKA_EDITION = 'cloud'
+      process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'codex_cpa'
+      assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
+      assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
+      process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
+      assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+    } finally {
+      for (const [name, value] of Object.entries(saved)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+    }
   })
 
   await t.test('由我的卡支付这个团队: one member\'s card per team; leaving releases it with a 7-day grace that admins see', async () => {
