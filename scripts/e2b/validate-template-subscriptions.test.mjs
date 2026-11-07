@@ -19,17 +19,38 @@ const report = { sourceCommit: COMMIT, workerSha: WORKER, templates: Object.from
 }])) }
 const proof = { deviceId: DEVICE, binarySha256: 'c'.repeat(64), version: '0.163.0' }
 const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscription_proved', accountHash: hash(OWNER).slice(0, 16), team,
-  cleanup: { errors: [], workspaceRestored: true }, samples: [{
+  cleanup: { errors: [], workspaceRestored: true }, officialTiming: { enabled: true, cleaned: true }, samples: [{
   status: 'execution_proved_awaiting_server_timing', sourceCommit: COMMIT, harness, runId: RUN,
   execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription', sharedScope: { ...sharedScope } },
   credentialRoute: 'subscription', replyVerified: true, cleanup: { status: 'passed' },
   minToolCalls: 1, requireReplyAfterTool: true, replyVerifiedAfterTool: true, toolCalls: [{ toolCallHash: 'd'.repeat(16), outcome: 'ok' }],
-  requireAgentAcceptance: true, runtimeTiming: { version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit',
+  requireAgentAcceptance: true, requireRuntimeReceipt: true, requireOfficialTiming: true,
+  runtimeTiming: { version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit',
+    scope: 'daemon_http_server_link_and_task_fetch', allFirstPartyHttpComplete: false,
     runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness, complete: true, truncated: false,
     startedAt: 1000, endedAt: 2000, ms: 1000, executionStartMs: 100, executionEndMs: 900,
     requests: [], counts: [], providerOutputChunks: 1, toolCallsStarted: 1, toolCallsCompleted: 1, toolCallsFailed: 0,
-    agentAccepted: { kind: harness === 'codex' ? 'codex_turn_start_ack' : 'claude_user_ack', at: 1100, ms: 100 } },
+    agentAccepted: { kind: harness === 'codex' ? 'codex_turn_start_ack' : 'claude_user_ack', at: 1100, ms: 100 },
+    mcpHttpTiming: { version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
+      generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
+      runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness, startedAt: 1010, endedAt: 1900,
+      expectedChildren: 1, observedChildren: 1, closedChildren: 0, observedComplete: true, childLifecycleComplete: false,
+      rejectedEvents: 0, truncated: false,
+      children: [{ child: 1, startedAt: 1020, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
+      requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: 1040, endedAt: 1050, durationMs: 10, status: 200, outcome: 'ok' }] },
+    officialCliTiming: { version: 1, source: 'official_cli_otlp', runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16),
+      harness, startedAt: 1010, endedAt: 1900, collection: 'best_effort', flush: 'not_confirmed', cliExitObserved: true,
+      batches: 1, recordsReceived: 1, duplicates: 0, rejectedBatches: 0, invalidEvents: 0, ignoredRecords: 0, truncated: false,
+      events: [{ name: `${harness}.api_request`, kind: 'provider', receivedAt: 1600, eventAt: 1500, durationMs: 100,
+        model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', outcome: 'ok', status: 200, attempt: 1, sequence: 1 }] } },
 }] })
+
+test('the production gate logs in as SMOKE without pinning an owner workspace or bot', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+  assert.match(workflow, /secret-name: SMOKE_OWNER_EMAIL/)
+  assert.match(workflow, /secret-name: SMOKE_OWNER_PASSWORD/)
+  assert.doesNotMatch(workflow, /ACME_DEMO_|MIKKA_ACCEPTANCE_(?:WORKSPACE|BOT)_ID:/)
+})
 
 test('a different application commit is refused before login, enrollment or candidate creation', async () => {
   const calls = []
@@ -49,7 +70,10 @@ test('a release receipt names the actual candidate, revision, model and register
     deviceId: DEVICE, officialBinarySha256: proof.binarySha256, officialCliVersion: proof.version,
     sharedScope,
     agentAcceptance: { runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness: 'codex', kind: 'codex_turn_start_ack', at: 1100, ms: 100 },
-    runtimeAuthorization: { source: 'http_server_link', complete: true, truncated: false, extraRemoteCalls: 0 } })
+    runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
+      hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
+      mcpHttpTiming: accepted('codex').samples[0].runtimeTiming.mcpHttpTiming,
+      observedProviderEvents: 1, officialDelivery: 'best_effort_not_a_complete_call_count' } })
   for (const mutate of [
     sample => { sample.replyVerified = false }, sample => { sample.execution.credentialType = 'api_key' },
     sample => { sample.execution.deviceId = RUN }, sample => { sample.execution.model = 'other' },
@@ -58,6 +82,11 @@ test('a release receipt names the actual candidate, revision, model and register
     sample => { sample.runtimeTiming.runIdHash = 'f'.repeat(16) },
     sample => { delete sample.runtimeTiming.agentAccepted },
     sample => { sample.runtimeTiming.truncated = true },
+    sample => { delete sample.runtimeTiming.mcpHttpTiming },
+    sample => { sample.runtimeTiming.mcpHttpTiming.remoteMcpServerCount = 1 },
+    sample => { sample.runtimeTiming.mcpHttpTiming.allFirstPartyHttpComplete = true },
+    sample => { sample.runtimeTiming.officialCliTiming.events = [] },
+    sample => { sample.requireOfficialTiming = false },
     sample => { sample.minToolCalls = 0 }, sample => { sample.toolCalls = [] },
     sample => { sample.toolCalls[0].outcome = 'error' }, sample => { sample.toolCalls[0].toolCallHash = 'raw-tool-id' },
     sample => { sample.replyVerifiedAfterTool = false }, sample => { sample.requireReplyAfterTool = false },
@@ -128,6 +157,8 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false }
     runAcceptance: async options => {
       assert.equal(options.minToolCalls, 1)
       assert.equal(options.workspace, TEAM); assert.equal(options.botId, RUN)
+      assert.equal(options.runtimeEvidence, 'required')
+      assert.equal(options.officialTiming, 'enabled')
       events.push(`tested-${options.harness}`)
       return runAcceptance(options)
     },

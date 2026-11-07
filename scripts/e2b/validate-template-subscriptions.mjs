@@ -56,7 +56,7 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
   const sample = acceptance.samples?.[0]
   check(acceptance.mode === 'candidate' && acceptance.status === 'candidate_subscription_proved' && acceptance.samples?.length === 1 && !acceptance.error
     && !acceptance.cleanup?.errors?.length && sample?.status === 'execution_proved_awaiting_server_timing'
-    && sample.cleanup?.status === 'passed', 'execution_failed')
+    && sample.cleanup?.status === 'passed' && acceptance.officialTiming?.enabled === true && acceptance.officialTiming.cleaned === true, 'execution_failed')
   check(sample.harness === harness && sample.execution?.harness === harness && sample.execution?.model === model
     && sample.execution?.deviceId === proof.deviceId && sample.execution?.credentialType === 'subscription'
     && sample.credentialRoute === 'subscription' && sample.replyVerified === true
@@ -76,8 +76,9 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
   check(sample.minToolCalls === 1 && sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true && tool, 'tool_reply_evidence_missing')
   const runIdHash = createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
   const runtime = readRuntimeTiming(sample.runtimeTiming, { runIdHash, harness })
-  const authorization = runtimeEvidence(runtime)
-  check(sample.requireAgentAcceptance === true && runtime?.complete === true && runtime.truncated === false
+  const authorization = runtimeEvidence(runtime, { requireOfficial: true })
+  check(sample.requireAgentAcceptance === true && sample.requireRuntimeReceipt === true && sample.requireOfficialTiming === true
+    && runtime?.complete === true && runtime.truncated === false
     && runtime.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
     && authorization.status === 'passed', 'official_agent_acceptance_missing')
   return { status: 'passed', templateId: report.templates[kind].templateId, sourceCommit: report.sourceCommit,
@@ -89,7 +90,11 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
       workspaceHash: scope.workspaceHash, connectionHash: scope.connectionHash, bindingHash: scope.bindingHash,
       connectionRevision: scope.connectionRevision, profileVersion: scope.profileVersion, profileDigest: scope.profileDigest },
     agentAcceptance: { runIdHash, harness, ...runtime.agentAccepted },
-    runtimeAuthorization: { source: runtime.source, complete: true, truncated: false, extraRemoteCalls: authorization.extraRemoteCalls } }
+    runtimeAuthorization: { source: runtime.source, scope: runtime.scope, complete: true, truncated: false,
+      hostAuthorizationComplete: authorization.hostAuthorizationComplete, basis: authorization.basis,
+      allFirstPartyHttpComplete: false, extraRemoteCalls: authorization.extraRemoteCalls,
+      mcpHttpTiming: runtime.mcpHttpTiming, observedProviderEvents: authorization.observedProviderEvents,
+      officialDelivery: authorization.officialDelivery } }
 }
 
 export async function validateTemplateSubscriptions(report, { env = process.env, fetchImpl = fetch,
@@ -163,7 +168,8 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
           acceptance = await runAcceptance({ origin, workspace: scope.workspaceId,
             botId: bot.botId, mode: 'candidate', strategy: 'derived', runs: 1, harness,
             deviceId, agentId: matching[0].id, revision: report.sourceCommit, expectedBuild: version.build,
-            timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1 }, { env, fetchImpl })
+            timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1,
+            runtimeEvidence: 'required', officialTiming: 'enabled' }, { env, fetchImpl })
           stage = 'receipt'
           passed[kind] = candidateReceipt(report, kind, proof, acceptance, scope)
         } finally { clearTimeout(timer) }

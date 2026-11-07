@@ -151,8 +151,12 @@ export interface DaemonOptions {
   modelProbe?: boolean
   /** Anonymous official-CLI probes held in memory by the trusted preloader. */
   preloadedModels?: HostedModelProbe
+  /** One-use control-plane locator; the existing registered claim still authorizes it. */
+  initialRunId?: string
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
+  /** Trusted acceptance launcher only; collect hosted CLI diagnostics without task-secret injection. */
+  collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
   e2bContainerRuntime?: boolean
   /** Trusted infrastructure supplies its already-listening review broker. */
@@ -284,12 +288,16 @@ export class Daemon {
   private ended = new Set<string>()
   /** The server pass in flight; the next one starts after it. */
   private syncing: Promise<void> = Promise.resolve()
+  private initialRunHint?: string
+  /** An early claim must retain the first sync's complete repository settings. */
+  private initialRepositorySync?: { runId: string; ready: Promise<void> }
   /** Cuts the poll loop's pause short (the device just registered). */
   private wakeCommands: (() => void) | null = null
 
   constructor(private readonly options: DaemonOptions) {
     this.paths = daemonPaths(options.dataDir)
     this.log = options.log ?? createLogger({ dir: this.paths.logs })
+    this.initialRunHint = options.initialRunId
     // A cloud computer runs the daemon built with this deployment, whose server
     // pushes every run-control write (notifyRunControl). Off the gateway (no
     // ticket yet, a refused ticket, a dropped socket) its runs use the 20 s
@@ -423,6 +431,7 @@ export class Daemon {
           link: this.options.link,
           journal: this.journal,
           binaries: this.options.harnessBinaries,
+          collectCliTiming: this.options.collectCliTiming,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.
@@ -1370,6 +1379,17 @@ export class Daemon {
       this.server = "unregistered"
       return
     }
+    const initialRunId = this.initialRunHint
+    let resolveRepositories: (() => void) | undefined, rejectRepositories: ((error: unknown) => void) | undefined
+    const repositoriesReady = initialRunId ? new Promise<void>((resolve, reject) => {
+      resolveRepositories = resolve; rejectRepositories = reject
+    }) : undefined
+    if (initialRunId && repositoriesReady) {
+      this.initialRepositorySync = { runId: initialRunId, ready: repositoriesReady }
+      // A failed sync may settle before the claim response. The claim still
+      // observes this same rejection before any repository or CLI effects.
+      void repositoriesReady.catch(() => undefined)
+    }
     try {
       // Once per start: refreshes version and harnesses, and keeps the id
       // (and the runs pinned to it) across restarts and re-logins.
@@ -1377,7 +1397,12 @@ export class Daemon {
         await this.register(credential)
       }
       const deviceId = this.device.deviceId as string
-      // Heartbeat first: lease renewal must not wait on anything else.
+      if (initialRunId) {
+        this.initialRunHint = undefined
+        this.claimQueued([initialRunId])
+      }
+      // Lease renewal still precedes repository/discovery work; the hinted
+      // claim above runs concurrently without delaying this heartbeat.
       const quotas = this.quota?.snapshot().quotas
       const receiptsVersion = this.deviceReceiptsVersion
       const heartbeat = {
@@ -1452,6 +1477,7 @@ export class Daemon {
       const checkpointRun = link.checkpointRun?.bind(link)
       if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
       this.saveDevice({ repos: await link.listRepos(deviceId) })
+      resolveRepositories?.()
       this.server = "online"
       await this.outbox.flushAll()
       // Resume only reservations already made while a run was live. Do not
@@ -1473,6 +1499,7 @@ export class Daemon {
       await this.pruneWorktrees()
       await this.sweepEmptyRuns()
     } catch (error) {
+      rejectRepositories?.(error)
       if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
@@ -1480,6 +1507,11 @@ export class Daemon {
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
       }
+    } finally {
+      // Early exits (including uninstall) cannot release a claim with missing
+      // setup/copyFiles. Already-resolved/rejected promises remain unchanged.
+      rejectRepositories?.(new ServerUnreachableError("Initial repository sync unavailable"))
+      if (this.initialRepositorySync?.ready === repositoriesReady) this.initialRepositorySync = undefined
     }
   }
 
@@ -1537,12 +1569,14 @@ export class Daemon {
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
+    const repositoriesReady = this.initialRepositorySync?.runId === runId ? this.initialRepositorySync.ready : undefined
     const assignment = await daemonTracer.span("daemon.run.lease", { "mikka.run.id_hash": runIdHash(runId) }, async span => {
       const claimed = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
       span.set("mikka.harness", claimed.harness)
       return claimed
     }, { root: true })
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    if (repositoriesReady) await repositoriesReady
     // A hosted workspace can be registered after this daemon starts. Resolve
     // that server-owned registration before the synchronous repository check.
     if (this.usesHostedWorkspace(assignment) && !this.device.repos?.some(repo => repo.repoId === assignment.repoId))
