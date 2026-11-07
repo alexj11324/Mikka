@@ -77,14 +77,23 @@ export async function runAuthAudit({ env = process.env, fetchImpl = fetch } = {}
     const settings = await client.json('/api/workspace')
     const other = settings.choices.find(row => row.id !== teamId && row.kind === 'personal')
     check(uuid(teamId) && uuid(other?.id), 'workspace_missing')
-    // Both resources come from normal owner reads; no guessed foreign ID.
-    const ownIssues = await client.rpc('issues.listWorkspaceIssues', [teamId])
-    const otherIssues = await client.rpc('issues.listWorkspaceIssues', [other.id])
-    const own = ownIssues.find(row => uuid(row.id)), foreign = otherIssues.find(row => uuid(row.id))
-    check(own && foreign, 'issue_missing')
-    const foreignPath = '/api/factory/tasks?issueId=' + foreign.id
-    const baseline = await client.json(foreignPath)
-    check(Array.isArray(baseline.tasks), 'issue_missing')
+    // Legacy lists may include personal issues in a team view (#1608). Bind
+    // each probe to Factory's server-resolved scope, not the list selector.
+    // This is a bounded enumeration of existing owner-readable resources.
+    const factoryIssue = async (workspaceId, scope) => {
+      const issues = await client.rpc('issues.listWorkspaceIssues', [workspaceId])
+      for (const issue of issues.filter(row => uuid(row.id) && (!row.scope || row.scope === scope)).slice(0, 20)) {
+        const response = await client.request('/api/factory/tasks?issueId=' + issue.id)
+        if (response.status !== 200) { await response.body?.cancel(); continue }
+        const baseline = await response.json()
+        if (Array.isArray(baseline.tasks) && baseline.liveWorkspaceId === workspaceId) return { issue, baseline }
+      }
+      throw new Error('issue_missing')
+    }
+    const own = await factoryIssue(teamId, 'workspace')
+    const foreign = await factoryIssue(other.id, 'personal')
+    const foreignPath = '/api/factory/tasks?issueId=' + foreign.issue.id
+    const baseline = foreign.baseline
     token = await client.rpc('tokens.createAccessToken', [{ name: '测试 audit ' + randomUUID(),
       expiresAt: new Date(Date.now() + 600000).toISOString() }, teamId])
     check(uuid(token?.id) && /^mkp_[A-Za-z0-9_-]{43}$/.test(token.token ?? ''), 'pat_create_failed')
@@ -93,7 +102,7 @@ export async function runAuthAudit({ env = process.env, fetchImpl = fetch } = {}
       const response = await raw(path, { headers: { authorization: 'Bearer ' + token.token } })
       return { status: response.status, body: await response.json() }
     }
-    const positive = await pat('/api/factory/tasks?issueId=' + own.id)
+    const positive = await pat('/api/factory/tasks?issueId=' + own.issue.id)
     check(positive.status === 200, 'pat_scope_failed')
     const denied = await pat(foreignPath)
     check(denied.status === 404 && denied.body?.error === 'factoryNotFound', 'pat_refusal_failed')
