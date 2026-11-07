@@ -92,7 +92,7 @@ dbTest('full and compact chat reads use one snapshot across a concurrent inbox c
         assert.deepEqual([failedFull.working, failedFull.error, failedCompact.working, failedCompact.error],
           [false, 'model_tool_unavailable', false, 'model_tool_unavailable'], 'a released lease must not nullify its session error in either snapshot reader')
         assert.equal(failedFull.streamRunId, undefined)
-        assert.deepEqual(chatFailure(failedFull), { kind: 'failed', reason: 'tools' })
+        assert.deepEqual(chatFailure(failedFull), { kind: 'failed', reason: 'tools', raw: 'model_tool_unavailable' })
       })
     } finally { reader.release(); writer.release() }
   })
