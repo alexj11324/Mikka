@@ -1,0 +1,16 @@
+{
+  "phase": "source-loader-red",
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern",
+    "exact reviewed sources compile",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+  ],
+  "exitCode": 1,
+  "durationMs": 91,
+  "log": "/vercel/recovery/disabled-preparer-batch1615/logs/source-loader-red.log",
+  "sha256": "71e36704c511d4e777fba005ba2da39a999c7410268255c1759d99c50da8a8cd",
+  "expectedFailure": "live_source_import_invalid",
+  "network": "forbidden_by_fixture"
+}

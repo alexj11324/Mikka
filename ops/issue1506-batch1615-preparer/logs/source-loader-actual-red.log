@@ -1,0 +1,24 @@
+(node:6061) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ exact reviewed sources compile and import actual exported classes without external dependencies (26.138488ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 164.250778
+
+✖ failing tests:
+
+test at scripts/acceptance/issue-1506-alex/live-consumer.test.mjs:75:1
+✖ exact reviewed sources compile and import actual exported classes without external dependencies (26.138488ms)
+  Error: live_source_import_invalid
+      at prepareLiveSource (file:///vercel/recovery/disabled-preparer-batch1615/red/scripts/acceptance/issue-1506-alex/live-source.mjs:53:63)
+      at prepare (file:///vercel/recovery/disabled-preparer-batch1615/red/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs:17:25)
+      at TestContext.<anonymous> (file:///vercel/recovery/disabled-preparer-batch1615/red/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs:76:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)

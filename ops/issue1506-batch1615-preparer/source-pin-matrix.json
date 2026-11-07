@@ -1,0 +1,98 @@
+[
+  {
+    "path": "lib/live/channel.ts",
+    "baseAcceptanceSha256": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+    "product83Sha256": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+    "candidateSha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
+    "changedFrom83": true,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/live/tab-share.ts",
+    "baseAcceptanceSha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "product83Sha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "candidateSha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/live/revisions.ts",
+    "baseAcceptanceSha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "product83Sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "candidateSha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/live/events.ts",
+    "baseAcceptanceSha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "product83Sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "candidateSha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/live/presence.ts",
+    "baseAcceptanceSha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "product83Sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "candidateSha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/swr/persistent-cache.ts",
+    "baseAcceptanceSha256": "d1e65d589ea138d3fde4e2287a5945a28697222e7b5d5efb9967e6de5fe0650a",
+    "product83Sha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+    "candidateSha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/swr/cache-policy.ts",
+    "baseAcceptanceSha256": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+    "product83Sha256": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+    "candidateSha256": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "lib/swr/indexed-db.ts",
+    "baseAcceptanceSha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "product83Sha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "candidateSha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "changedFrom83": false,
+    "role": "runtime"
+  },
+  {
+    "path": "hooks/use-live-key.tsx",
+    "baseAcceptanceSha256": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
+    "product83Sha256": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
+    "candidateSha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+    "changedFrom83": true,
+    "role": "provenance_only"
+  },
+  {
+    "path": "components/coordinator/coordinator-chat.tsx",
+    "baseAcceptanceSha256": "f0bb1d01bc52fc801187c47564e0b247f99ec92b8548ebcd99f841765d6ffad9",
+    "product83Sha256": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473",
+    "candidateSha256": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473",
+    "changedFrom83": false,
+    "role": "provenance_only"
+  },
+  {
+    "path": "lib/swr/read-observer.ts",
+    "baseAcceptanceSha256": null,
+    "product83Sha256": null,
+    "candidateSha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+    "changedFrom83": true,
+    "role": "runtime"
+  },
+  {
+    "path": "components/swr-defaults.tsx",
+    "baseAcceptanceSha256": null,
+    "product83Sha256": null,
+    "candidateSha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+    "changedFrom83": true,
+    "role": "provenance_only"
+  }
+]

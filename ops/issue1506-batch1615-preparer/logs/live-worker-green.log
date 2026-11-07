@@ -1,0 +1,28 @@
+(node:6097) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ live scope refuses another owner, another Bot and a personal workspace before a worker is created (1.465445ms)
+✔ initial catch-up reads and unproven old adoption cannot count as production live coverage (0.33158ms)
+✔ an unset or malformed published source pin fails before any checkout or runtime work (0.425227ms)
+✔ a missing published source pin stops cache-live before its model driver or observer starts (0.674477ms)
+✔ an unrelated commit cannot label otherwise matching source bytes (3.514986ms)
+✔ source pin rejects drift in lib/live/presence.ts before creating a worker (4.836318ms)
+✔ source pin rejects drift in hooks/use-live-key.tsx before creating a worker (1.710408ms)
+✔ source pin rejects drift in components/coordinator/coordinator-chat.tsx before creating a worker (2.499594ms)
+✔ source pin rejects drift in lib/swr/read-observer.ts before creating a worker (1.799009ms)
+✔ source pin rejects drift in components/swr-defaults.tsx before creating a worker (2.036338ms)
+✔ exact reviewed sources compile and import actual exported classes without external dependencies (38.802463ms)
+✔ three separate actual-core workers share one revision read (2289.528409ms)
+✔ three separate actual-core workers share one revision read and reject a held older result (4207.628955ms)
+✔ the same actual sockets latch an early revision, deduplicate all tabs and propagate a genuine socket close (2271.21745ms)
+✔ only exact pinned runtime dependencies can cross directories (0.705112ms)
+✔ same-realm observed read respects the real push boundary: after (2154.903088ms)
+✔ same-realm observed read respects the real push boundary: before (2183.353953ms)
+✔ same-realm observed read respects the real push boundary: later-revision (4185.904128ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17467.721923

@@ -1,0 +1,304 @@
+diff --git a/prepare.py b/prepare.py
+--- a/prepare.py
++++ b/prepare.py
+@@ -10,8 +10,8 @@
+ import subprocess
+ 
+ ROOT = Path(__file__).resolve().parent
+-CONTRACT_SHA256 = "2f2954125ed0398b26673fe93a935baa78d7710618ac5f73321ad80cce4e913a"
+-TEMPLATE_SHA256 = "9d321bbf818749fa50339043bc88e60d9c2398dce6b1c4148d4b9695f1ef8da2"
++CONTRACT_SHA256 = "b0ffc8c3a4c346e6db04be3625302c8c7b361a09cec02a77035f756c539d84cc"
++TEMPLATE_SHA256 = "a3086b32eaefa29742ebc9bb819123ed53e76f0a7dddb1d79ae636df891b4ac4"
+ SHA40 = re.compile(r"^[0-9a-f]{40}$")
+ sha256 = lambda value: hashlib.sha256(value).hexdigest()
+ 
+@@ -101,12 +101,17 @@
+     require(base["tree"] == c["baseTree"], "base_tree_mismatch")
+     require(checkpoint["tree"] == c["checkpointTree"] and checkpoint["parents"] == [c["base"]], "checkpoint_provenance_mismatch")
+     ancestor(repo, c["productAncestor"], application_sha)
++    ancestor(repo, c["reviewedSourceAncestor"], application_sha)
+     changes = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", c["base"], c["checkpoint"]).decode().splitlines()
+     require(set(changes) == set(c["checkpointFiles"]) and len(changes) == 4, "checkpoint_scope_mismatch")
+     for path, transition in c["transitions"].items():
+         require(c["basePins"][path] == transition["old"] and c["expectedPins"][path] == transition["new"], "transition_contract_mismatch")
+         ancestor(repo, transition["introducedBy"], application_sha)
+         require(sha256(blob(repo, transition["introducedBy"], path)) == transition["new"], "introduced_pin_mismatch")
++    for path, addition in c["sourceAdditions"].items():
++        require(c["expectedPins"][path] == addition["sha256"], "addition_contract_mismatch")
++        ancestor(repo, addition["introducedBy"], application_sha)
++        require(sha256(blob(repo, addition["introducedBy"], path)) == addition["sha256"], "introduced_addition_mismatch")
+     source_proof = []
+     for path, expected in c["expectedPins"].items():
+         data = blob(repo, application_sha, path)
+@@ -123,21 +128,27 @@
+         data = blob(repo, c["base"], path)
+         require(sha256(data) == expected, "base_file_mismatch")
+         values[path] = data.decode("utf-8")
++    for path, entry in c["extraOverlayFiles"].items():
++        local = (ROOT / entry["path"]).resolve()
++        require(local.is_relative_to(ROOT), "extra_overlay_path_invalid")
++        data = local.read_bytes()
++        require(sha256(data) == entry["sha256"], "extra_overlay_digest_mismatch")
++        values[path] = data.decode("utf-8")
+     protected = {}
+     for path, expected in c["protected"].items():
+         data = blob(repo, c["base"], path)
+         require(sha256(data) == expected["sha256"], "protected_file_mismatch")
+         protected[path] = {**expected, "unchanged": True}
+-    live_path, continue_path, docs_path, mcp_path = c["paths"][4:]
++    live_path, continue_path, docs_path, mcp_path = c["paths"][4:8]
+     original_live = values[live_path]
+     parsed = dict(re.findall(r"  '([^']+)': '([0-9a-f]{64})',", original_live))
+     require(parsed == c["basePins"] and len(parsed) == 10, "source_pin_list_changed")
+-    live = replace_once(original_live,
+-        "export const LIVE_SOURCE_COMMIT = 'efb95d951ddbeca1af04bc80d011ccbc2a9f0188'",
+-        "export const LIVE_SOURCE_COMMIT = '" + application_sha + "'", "live_source_reference_mismatch")
+-    for path, transition in c["transitions"].items():
+-        live = replace_once(live, "'" + path + "': '" + transition["old"] + "'",
+-            "'" + path + "': '" + transition["new"] + "'", "live_pin_replacement_mismatch")
++    template = (ROOT / "live-source.template.mjs").read_bytes()
++    require(sha256(template) == c["liveTemplateSha256"], "live_template_digest_mismatch")
++    live = template.decode("utf-8")
++    parsed = dict(re.findall(r"  '([^']+)': '([0-9a-f]{64})',", live))
++    require(parsed == c["expectedPins"] and len(parsed) == 12, "reviewed_pin_list_changed")
++    live = replace_once(live, "@APPLICATION_SHA@", application_sha, "live_source_reference_mismatch")
+     values[live_path] = live
+     continuation = replace_once(values[continue_path], "ref: efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+         "ref: " + application_sha, "continuation_source_reference_mismatch")
+@@ -156,7 +167,7 @@
+     template = (ROOT / "LIVE-ACCEPTANCE.template.md").read_bytes()
+     require(sha256(template) == TEMPLATE_SHA256, "template_digest_mismatch")
+     values[docs_path] = template.decode().replace("@APPLICATION_SHA@", application_sha).replace("@APPLICATION_TREE@", application_tree)
+-    require(set(values) == set(c["paths"]) and len(values) == 8 and control_path not in values, "overlay_scope_mismatch")
++    require(set(values) == set(c["paths"]) and len(values) == 11 and control_path not in values, "overlay_scope_mismatch")
+     elements = [{"path": p, "mode": "100644", "type": "blob", "content": values[p]} for p in c["paths"]]
+     expected_tree = hash_overlay_tree(repo, c["baseTree"], elements)
+     patch = ""
+@@ -169,13 +180,15 @@
+             patch += "new file mode 100644\n"
+         patch += "".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True),
+             fromfile="a/" + path if old else "/dev/null", tofile="b/" + path))
+-    manifest = {"schemaVersion": 1, "recoveryVersion": "disabled-eight-path-recovery-v1",
++    manifest = {"schemaVersion": 1, "recoveryVersion": "disabled-eleven-path-batch1615-v2",
+         "base": base, "checkpoint": checkpoint, "application": app, "expectedTree": expected_tree,
+         "productionDeploymentVerified": False, "activationAuthorized": False,
+         "controlUnchanged": control, "stopCase": "during_tool", "presenceDisabled": True,
+         "mcpDisabled": True, "mcpApplicationSha": "", "mcpTimeoutMinutes": 12,
+         "legacyResumeUnchanged": True, "sourcePins": source_proof,
+         "decoderSha256": c["decoderSha256"], "approvedTransitions": c["transitions"],
++        "reviewedSourceAncestor": c["reviewedSourceAncestor"], "sourceAdditions": c["sourceAdditions"],
++        "modelMessagesAddedForLive": 0, "nextPhaseRecommendation": "cache-live",
+         "protected": protected, "files": [{"path": p, "bytes": len(values[p].encode()),
+             "sha256": sha256(values[p].encode())} for p in c["paths"]]}
+     return {"base_tree_sha": c["baseTree"], "tree_elements": elements}, patch, manifest
+diff --git a/contract.json b/contract.json
+--- a/contract.json
++++ b/contract.json
+@@ -12,7 +12,10 @@
+     "scripts/acceptance/issue-1506-alex/live-source.mjs",
+     ".github/workflows/issue-1506-alex-continue.yml",
+     "scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md",
+-    ".github/workflows/issue-1212-mcp-reply.yml"
++    ".github/workflows/issue-1212-mcp-reply.yml",
++    "scripts/acceptance/issue-1506-alex/live-worker.mjs",
++    "scripts/acceptance/issue-1506-alex/live-worker-offline.mjs",
++    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+   ],
+   "checkpointFiles": {
+     "scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs": "5a1b3958c03248b283d6e17fbf2c852abd420c13d2f960fd90a7d999a7c9f491",
+@@ -24,7 +27,10 @@
+     "scripts/acceptance/issue-1506-alex/live-source.mjs": "db89226e718c96fcee6560536b4f6276127235eb14328f8c5a259c34be6d1124",
+     ".github/workflows/issue-1506-alex-continue.yml": "248893696c39c5b341f9a1fccf98296801e6233c902e5a5fa8cf3029ecd09198",
+     "scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md": "09750fb14b2f5a6b2881e67c31963eacc96a6f7f842dd1ecd85439c6f7b567b7",
+-    ".github/workflows/issue-1212-mcp-reply.yml": "fb977960f2cdf9be4b9cc88e7d9a03bb7d8d70527dd252465f3a84d452bb3f2f"
++    ".github/workflows/issue-1212-mcp-reply.yml": "fb977960f2cdf9be4b9cc88e7d9a03bb7d8d70527dd252465f3a84d452bb3f2f",
++    "scripts/acceptance/issue-1506-alex/live-worker.mjs": "9a528bb66ca7a29c5d200170b533c3161ef2aaffd5e5ec0cd5c9b539a899e710",
++    "scripts/acceptance/issue-1506-alex/live-worker-offline.mjs": "832198570fd895bec1ef2090f4f530a7880921f56d7ef8bedc602e22b413642e",
++    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs": "23aceda5254c76665a90f715059c65823779d59128a3b11ad8878631d13dc544"
+   },
+   "basePins": {
+     "lib/live/channel.ts": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+@@ -39,7 +45,7 @@
+     "components/coordinator/coordinator-chat.tsx": "f0bb1d01bc52fc801187c47564e0b247f99ec92b8548ebcd99f841765d6ffad9"
+   },
+   "expectedPins": {
+-    "lib/live/channel.ts": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
++    "lib/live/channel.ts": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
+     "lib/live/tab-share.ts": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+     "lib/live/revisions.ts": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+     "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+@@ -47,8 +53,10 @@
+     "lib/swr/persistent-cache.ts": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+     "lib/swr/cache-policy.ts": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+     "lib/swr/indexed-db.ts": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+-    "hooks/use-live-key.tsx": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
+-    "components/coordinator/coordinator-chat.tsx": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473"
++    "hooks/use-live-key.tsx": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
++    "components/coordinator/coordinator-chat.tsx": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473",
++    "lib/swr/read-observer.ts": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
++    "components/swr-defaults.tsx": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33"
+   },
+   "decoderPath": "lib/coordinator-stream-client.ts",
+   "decoderSha256": "490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4",
+@@ -140,6 +148,45 @@
+       "old": "d1e65d589ea138d3fde4e2287a5945a28697222e7b5d5efb9967e6de5fe0650a",
+       "new": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+       "introducedBy": "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
++    },
++    "lib/live/channel.ts": {
++      "old": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
++      "new": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
++      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
++    },
++    "hooks/use-live-key.tsx": {
++      "old": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
++      "new": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
++      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
+     }
+-  }
++  },
++  "reviewedSourceAncestor": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
++  "reviewedSourceTree": "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d",
++  "sourceAdditions": {
++    "lib/swr/read-observer.ts": {
++      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
++      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
++      "role": "runtime_dependency"
++    },
++    "components/swr-defaults.tsx": {
++      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
++      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
++      "role": "provenance_only_not_executed"
++    }
++  },
++  "extraOverlayFiles": {
++    "scripts/acceptance/issue-1506-alex/live-worker.mjs": {
++      "path": "overlays/scripts/acceptance/issue-1506-alex/live-worker.mjs",
++      "sha256": "805e785c02b90a2098573c756a71b757a6e0ed58de58d1b116399c14e2979067"
++    },
++    "scripts/acceptance/issue-1506-alex/live-worker-offline.mjs": {
++      "path": "overlays/scripts/acceptance/issue-1506-alex/live-worker-offline.mjs",
++      "sha256": "b35437894d38fdb089cc362ae2983e177e5c3c1542bac279be339e2ad27120d1"
++    },
++    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs": {
++      "path": "overlays/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs",
++      "sha256": "91f9eb331caa35f5293cca2f66a487c7dff10ebf32b9d76c5c402497abfa3e36"
++    }
++  },
++  "liveTemplateSha256": "3c488c96753f32c622c4a39fdbc05681d5c661930c4ea52e16c87789b960bf29"
+ }
+diff --git a/LIVE-ACCEPTANCE.template.md b/LIVE-ACCEPTANCE.template.md
+--- a/LIVE-ACCEPTANCE.template.md
++++ b/LIVE-ACCEPTANCE.template.md
+@@ -1,4 +1,4 @@
+-# Coordinator 后续验收：禁用准备稿（恢复版）
++# Coordinator 后续验收：禁用准备稿（batch1615 V2）
+ 
+ 本稿由新的离线恢复准备器生成。旧执行环境不可用，不能将本稿或新四文件哈希冒充旧准备器的字节恢复。
+ 本稿没有执行生产登录、模型、SQL、部署或控制激活，也不构成新的生产通过证明。
+@@ -8,7 +8,9 @@
+ 应用源码输入：@APPLICATION_SHA@，tree：@APPLICATION_TREE@。
+ 这只是不可变 Git 源码绑定；真实 production alias、READY、公开版本及发布配置需由执行者另行核实。
+ 
+-十个 live 源码 pin 均按实际应用 Git blob 校验。只接受已审的 ad224 Coordinator 组件和 a65 persistent-cache 两个精确漂移；decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。未知源变化拒绝准备。加载器只替换源码引用和两个 pin，不改产品算法。Hook 与组件用于来源核对，不在 Node 渲染 React。
++十二个来源 pin 均按实际应用 Git blob 校验：原十项，加上实际 read-observer 运行时依赖和 components/swr-defaults.tsx 接线来源。只接受已审 ad224/a65 漂移及 0d379dd92fd2d7b3f2b307030c3bcd8234426d0e 中 channel、use-live-key、read-observer、SWR defaults 的精确字节；不自动接纳 db988 或未来变更。decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。加载器只将相对导入解析到已固定的运行时模块，拒绝未列目标、外部包和越界路径。Hook、Coordinator 组件和 SWR defaults 仅核来源，不在 Node 渲染 React。
++
++本版明确输出十一条路径：原八条，加 live-worker.mjs、live-worker-offline.mjs、live-consumer.test.mjs。worker 使用实际源码 readBoundary/readFresh/observeSWRRead/acceptSWRRead/failSWRRead，读取正常 RPC 快照后才接受并提交同一对象；保留 owner/namespace、required+held+local revision、local-write identity 与关闭守卫。离线平台夹具的 fixture-read 命令只在测试模块中，生产 worker 不接收该命令。没有复制或改写产品算法。
+ 
+ 继续使用原 ACME 自有工作区与 Haiku/Luna retained fixture receipt，不重建、不重新选模型。普通停止/工具未覆盖修正来自独立恢复 checkpoint 344fafb353d1128f89475bc827a404eff4520451，其四文件已单独离线 RED→14/14 GREEN；本稿没有新增生产 Stop 成绩。
+ 
+@@ -18,11 +20,11 @@
+ 
+ ## 下一次缓存阶段的固定分母
+ 
+-未来只有 root 在确认实际部署后，另行将 continuation control 显式改为 enabled=true、phase=cache、expectedSha=该实际应用SHA、cacheTurns=3，才授权一轮缓存验收。单改源码 pin、上传本稿或 disabled job 成功都不是生产授权。
++未来只有 root 在确认实际部署后，另行将 continuation control 显式改为 enabled=true、phase=cache-live、expectedSha=该实际应用SHA、cacheTurns=3，才授权一轮缓存验收。单改源码 pin、上传本稿或 disabled job 成功都不是生产授权。
+ 
+ 固定 Haiku 三轮、Luna 三轮，最多六次用户发送；后四槽 H2/H3/L2/L3 是预先定义的 warm 槽，每槽客户端 send→firstText 目标不超过 3000ms。失败、未发送和未覆盖保留原槽，不补跑、不只挑命中或较快结果。一次模型首轮失败会停止该模型的后续轮次；另一个模型通过独立进程/会话继续运行，保持两份独立 continuation wrapper 为权威收据。
+ 
+-phase=cache 不启动三 worker live 验收；旧 live 传输/核心消费者结果只按已审核源码兼容范围复用，不称为新窗口 React、浏览器或三 tab 通过。若将来需要 cache-live，必须另行授权，不能从本控制变更推导。
++未来授权的 phase=cache-live 在原六条自然短答上附加三个独立 worker、原生 WebSocket/BroadcastChannel 与实际核心消费者；它调用同一个 runCacheTurns，不发送额外模型消息。observer 只代理正常 ticket/chat 读取，保留24次 chat 上限和有界关闭；没有定时 DB 轮询。现有一次返回响应延迟只改变该测试客户端的交付，真实新 revision 必须来自 socket，未覆盖即如实记录。新的 source/worker 离线证明不是新的生产通过，也不是 React/浏览器渲染证明。原六槽与 Stop 十槽失败分母不改变。
+ 
+ ## 流、停止和证据
+ 
+diff --git a/test_prepare.py b/test_prepare.py
+--- a/test_prepare.py
++++ b/test_prepare.py
+@@ -11,8 +11,8 @@
+ p = importlib.util.module_from_spec(spec)
+ spec.loader.exec_module(p)
+ REPO = "/vercel/Mikka"
+-APP = "83d2365feade7736a6691fb0d5b480fb7a7f8a45"
+-TREE = "668dceb058fe34655a77d9e60b5d973410df09b4"
++APP = "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
++TREE = "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d"
+ 
+ class RecoveryGuards(unittest.TestCase):
+     @classmethod
+@@ -25,9 +25,9 @@
+             for path in self.c["checkpointFiles"]]
+         self.assertEqual(p.hash_overlay_tree(REPO, self.c["baseTree"], elements), self.c["checkpointTree"])
+ 
+-    def test_eight_paths_remain_disabled_and_four_checkpoint_bytes_are_exact(self):
++    def test_eleven_paths_remain_disabled_and_four_checkpoint_bytes_are_exact(self):
+         payload, delta, manifest = p.render(REPO, APP, TREE)
+-        self.assertEqual(len(payload["tree_elements"]), 8)
++        self.assertEqual(len(payload["tree_elements"]), 11)
+         self.assertEqual(set(e["path"] for e in payload["tree_elements"]), set(self.c["paths"]))
+         entries = {e["path"]: e["content"] for e in payload["tree_elements"]}
+         for path, expected in self.c["checkpointFiles"].items():
+@@ -42,13 +42,16 @@
+         self.assertFalse(manifest["productionDeploymentVerified"])
+         flow = entries[".github/workflows/issue-1506-alex-continue.yml"]
+         self.assertIn("tool-stop-no-boundary.test.mjs", flow)
++        self.assertEqual(len(manifest["sourcePins"]), 12)
++        self.assertEqual(manifest["modelMessagesAddedForLive"], 0)
++        self.assertEqual(manifest["nextPhaseRecommendation"], "cache-live")
+         self.assertIn("ref: " + APP, flow)
+         self.assertIn("continue-on-error: true", flow)
+         self.assertIn("steps.haiku.outcome != 'skipped'", flow)
+         self.assertNotIn("scripts/acceptance/issue-1506-alex/control/continue.json", entries)
+-        (ROOT / "offline-preview-83.json").write_text(json.dumps({
++        (ROOT / "offline-preview-0d.json").write_text(json.dumps({
+             "notActualMergedOrDeployedApplication": True, "payload": payload, "manifest": manifest}, ensure_ascii=False, indent=2) + "\n")
+-        (ROOT / "offline-preview-83.patch").write_text(delta)
++        (ROOT / "offline-preview-0d.patch").write_text(delta)
+ 
+     def test_application_tree_mismatch_is_rejected(self):
+         with self.assertRaisesRegex(ValueError, "application_tree_mismatch"):
+@@ -60,7 +63,7 @@
+             data = original(repo, ref, path)
+             return data + b"\n// unknown drift\n" if ref == APP and path == "lib/live/channel.ts" else data
+         with patch.object(p, "blob", changed):
+-            with self.assertRaisesRegex(ValueError, "unreviewed_source_pin:lib/live/channel.ts"):
++            with self.assertRaisesRegex(ValueError, "unreviewed_source_pin:lib/live/channel.ts|introduced_pin_mismatch"):
+                 p.render(REPO, APP, TREE)
+ 
+     def test_decoder_drift_is_rejected(self):
+@@ -80,6 +83,26 @@
+             return data + b"\n" if ref == self.c["checkpoint"] and path == target else data
+         with patch.object(p, "blob", changed):
+             with self.assertRaisesRegex(ValueError, "checkpoint_file_mismatch"):
++                p.render(REPO, APP, TREE)
++
++    def test_new_observer_and_wiring_source_drift_is_rejected(self):
++        original = p.blob
++        for target in ["lib/swr/read-observer.ts", "components/swr-defaults.tsx"]:
++            def changed(repo, ref, path):
++                data = original(repo, ref, path)
++                return data + b"\\n" if ref == APP and path == target else data
++            with patch.object(p, "blob", changed):
++                with self.assertRaisesRegex(ValueError, "introduced_addition_mismatch|unreviewed_source_pin"):
++                    p.render(REPO, APP, TREE)
++
++    def test_frozen_worker_overlay_cannot_silently_change(self):
++        original = Path.read_bytes
++        target = (ROOT / self.c["extraOverlayFiles"]["scripts/acceptance/issue-1506-alex/live-worker.mjs"]["path"]).resolve()
++        def changed(path):
++            data = original(path)
++            return data + b"\\n" if path.resolve() == target else data
++        with patch.object(Path, "read_bytes", changed):
++            with self.assertRaisesRegex(ValueError, "extra_overlay_digest_mismatch"):
+                 p.render(REPO, APP, TREE)
+ 
+     def test_disabled_guards_reject_activation_and_legacy_resume_mutation(self):

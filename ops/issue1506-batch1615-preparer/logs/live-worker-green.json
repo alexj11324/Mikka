@@ -1,0 +1,13 @@
+{
+  "phase": "live-worker-green",
+  "command": [
+    "node",
+    "--test",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+  ],
+  "exitCode": 0,
+  "durationMs": 17500,
+  "sha256": "f219f0b0e70453d700fbf23bdcc2817cc94a260074581023e8c518502b1771c5",
+  "sourceSha": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "network": "forbidden_by_fixture"
+}

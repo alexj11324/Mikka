@@ -1,0 +1,7 @@
+{
+  "log": "source-loader-red.log",
+  "classification": "fixture_setup_failure_not_expected_RED",
+  "reason": "missing_unchanged_decoder_dependency",
+  "fixedBy": "copy_exact_decoder_490572",
+  "productOrAssertionChanged": false
+}

@@ -1,0 +1,192 @@
+{
+  "base": "fcce5474bc35d8f353458b44561ed1f6d3b175f8",
+  "baseTree": "bbb6791d8a1fb2add72b3639223dbdd64161c33d",
+  "checkpoint": "344fafb353d1128f89475bc827a404eff4520451",
+  "checkpointTree": "be51d6c30d873f1785d6239fe92e4099cbde7352",
+  "productAncestor": "83d2365feade7736a6691fb0d5b480fb7a7f8a45",
+  "paths": [
+    "scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs",
+    "scripts/acceptance/issue-1506-alex/stop-completion.test.mjs",
+    "scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs",
+    "scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs",
+    "scripts/acceptance/issue-1506-alex/live-source.mjs",
+    ".github/workflows/issue-1506-alex-continue.yml",
+    "scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md",
+    ".github/workflows/issue-1212-mcp-reply.yml",
+    "scripts/acceptance/issue-1506-alex/live-worker.mjs",
+    "scripts/acceptance/issue-1506-alex/live-worker-offline.mjs",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+  ],
+  "checkpointFiles": {
+    "scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs": "5a1b3958c03248b283d6e17fbf2c852abd420c13d2f960fd90a7d999a7c9f491",
+    "scripts/acceptance/issue-1506-alex/stop-completion.test.mjs": "782528401d68d00e02802be1cac232987d3972e6a4cfd3dbcd9a5b38411be1fd",
+    "scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs": "6df4c1579208a28fc337f5279ef43ce31bf12b19239ddfde8daf269fb4f7adc0",
+    "scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs": "f368e68a0c9510fb9b86e9771db4de36355969ced9a3db96f49ebc5be15ea90e"
+  },
+  "baseFiles": {
+    "scripts/acceptance/issue-1506-alex/live-source.mjs": "db89226e718c96fcee6560536b4f6276127235eb14328f8c5a259c34be6d1124",
+    ".github/workflows/issue-1506-alex-continue.yml": "248893696c39c5b341f9a1fccf98296801e6233c902e5a5fa8cf3029ecd09198",
+    "scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md": "09750fb14b2f5a6b2881e67c31963eacc96a6f7f842dd1ecd85439c6f7b567b7",
+    ".github/workflows/issue-1212-mcp-reply.yml": "fb977960f2cdf9be4b9cc88e7d9a03bb7d8d70527dd252465f3a84d452bb3f2f",
+    "scripts/acceptance/issue-1506-alex/live-worker.mjs": "9a528bb66ca7a29c5d200170b533c3161ef2aaffd5e5ec0cd5c9b539a899e710",
+    "scripts/acceptance/issue-1506-alex/live-worker-offline.mjs": "832198570fd895bec1ef2090f4f530a7880921f56d7ef8bedc602e22b413642e",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs": "23aceda5254c76665a90f715059c65823779d59128a3b11ad8878631d13dc544"
+  },
+  "basePins": {
+    "lib/live/channel.ts": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+    "lib/live/tab-share.ts": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "lib/live/revisions.ts": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "lib/live/presence.ts": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "lib/swr/persistent-cache.ts": "d1e65d589ea138d3fde4e2287a5945a28697222e7b5d5efb9967e6de5fe0650a",
+    "lib/swr/cache-policy.ts": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+    "lib/swr/indexed-db.ts": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "hooks/use-live-key.tsx": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
+    "components/coordinator/coordinator-chat.tsx": "f0bb1d01bc52fc801187c47564e0b247f99ec92b8548ebcd99f841765d6ffad9"
+  },
+  "expectedPins": {
+    "lib/live/channel.ts": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
+    "lib/live/tab-share.ts": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "lib/live/revisions.ts": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "lib/live/presence.ts": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "lib/swr/persistent-cache.ts": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+    "lib/swr/cache-policy.ts": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+    "lib/swr/indexed-db.ts": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "hooks/use-live-key.tsx": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+    "components/coordinator/coordinator-chat.tsx": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473",
+    "lib/swr/read-observer.ts": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+    "components/swr-defaults.tsx": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33"
+  },
+  "decoderPath": "lib/coordinator-stream-client.ts",
+  "decoderSha256": "490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4",
+  "protected": {
+    "scripts/acceptance/issue-1506-alex/control/continue.json": {
+      "sha256": "38462d629ce5f71936c6db615551eafc940001600f25f28521f2e5f0f6157361",
+      "gitBlob": "71df6d8897ec0bc9b89e33cce761ff498482f920"
+    },
+    ".github/workflows/issue-1212-presence.yml": {
+      "sha256": "1c38904244a9add541f060ce018efe4309ce7de5b545b52e4813cda1333dedd4",
+      "gitBlob": "d9a29e65abe16933d5f87e2b82bd39cc74a42ce9"
+    },
+    ".github/workflows/issue-1506-alex-resume.yml": {
+      "sha256": "d312aded4456dd46b8c224df31448ab4a60f4767f0b08e8a42083c7df32e5033",
+      "gitBlob": "2d0bc0818256abba7a3e6a0ee67e0b14749446ae"
+    },
+    "scripts/acceptance/issue-1506-alex/control/resume-baseline.json": {
+      "sha256": "316b3188e4a445429afafc112dd8c2fb6934ad12e8d6312323262b52a08529ef",
+      "gitBlob": "88d631a34bd01918dedd5a047961a32669bc4624"
+    },
+    "lib/coordinator-stream-client.ts": {
+      "sha256": "490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4",
+      "gitBlob": "6dc3c33a745108c229ef3ebce33d2459ba122e5b"
+    },
+    "scripts/acceptance/issue-1212-mcp/README.md": {
+      "sha256": "230509cb4a3b8654ba77a64f25ece9859804e0c268262e5c6f0d257e3255c3d5",
+      "gitBlob": "7cb3d43e35e21ae2e90d2c7fb2d98c16cb046793"
+    },
+    "scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs": {
+      "sha256": "65a76df6a9eb39c04df9837d0f548bf3be623331cdfef543607f7f14d6d27e22",
+      "gitBlob": "e1940ccc6e4533532870c943414d82ffdd342058"
+    },
+    "scripts/acceptance/issue-1212-mcp/mcp-reply-production.test.mjs": {
+      "sha256": "6e51ebdf54c97c233dcbf8c32dddaa1e465f96839e983d9e5daac8b4297e1ad8",
+      "gitBlob": "0676f35107d018475a39120d4b74908db1ce99b7"
+    },
+    "scripts/acceptance/issue-1212-mcp/pkce-session.mjs": {
+      "sha256": "66bda21e04553537d7c9f5b02009ae26a12421079ff10f9dc9d2abc55cb76ad9",
+      "gitBlob": "9d0036ce45380ab2c63b510150cf21ba4796c571"
+    },
+    "scripts/acceptance/issue-1504-1506/coordinator-baseline.mjs": {
+      "sha256": "b74010d8f8800d7935e362c16bdf42a653d9db67531476a474e78ed9028ea3a7",
+      "gitBlob": "df6fef8611acfa1806d78e60a7b63a6137c483b8"
+    },
+    "scripts/acceptance/issue-1504-1506/coordinator-setup.mjs": {
+      "sha256": "6f0d1629ec98d2c13418086f76a5dcd3aacc45423e19f1ae3e3eaf02a1dba243",
+      "gitBlob": "cd3b45c79bd432e8b95f068abce10fa7520feb15"
+    },
+    "scripts/acceptance/issue-1504-1506/production-session.mjs": {
+      "sha256": "874f8a2b20a958078f5db1e5732a917229695cc5671c1973bb910da3d5388916",
+      "gitBlob": "bdcfaaea1f77bae3fa9458570575f7046d6407e7"
+    },
+    "scripts/acceptance/issue-1504-1506/routing-cleanup-receipt.json": {
+      "sha256": "98c1e4e6592b13b8a612ff4fe7745c8d31daf2bba01bcfd60a7d3fa7503dee52",
+      "gitBlob": "d55c9b72225fe5663021fbbe65d02218c27972ed"
+    },
+    "scripts/acceptance/issue-1504-1506/routing-production.mjs": {
+      "sha256": "fbb9d763ef6c11fd1c30479d732d34775db1426a06464bba4deb71584080146e",
+      "gitBlob": "9fee608cab0bf7f2fc72ce8ef63a543df97949ae"
+    },
+    "scripts/acceptance/issue-1504-1506/workspace-provision.mjs": {
+      "sha256": "2224fa46b13980ba93d6f5fd8c5f80846e321484821ffc391664215eead61fab",
+      "gitBlob": "e5ca5186103ef68037941279b1b945415c64380f"
+    },
+    "scripts/acceptance/issue-1504-1506/workspace-subscriptions.mjs": {
+      "sha256": "ce42fe2b04c478dc5a8de5a0d02b7452ab2e0e69783e358880cab184c77f8390",
+      "gitBlob": "11c292c96675f2b3ccd097e9f1db441c6239cfdb"
+    },
+    "scripts/acceptance/issue-1506-alex/receipts/fixtures-failed-42284845261.json": {
+      "sha256": "62f1a1972b700506902f767a19c9ba41aa4588c7ad8cfadb89a8290d3ca038b1",
+      "gitBlob": "b082d403cc752741a7723fb7fcea65d9cfda835b"
+    },
+    "scripts/acceptance/issue-1506-alex/receipts/fixtures-ready-42286389783.json": {
+      "sha256": "aa58d54fee5826627696a0d1328cb0acaab2707f1d4254aa15f1b6ae420fb9fe",
+      "gitBlob": "cf232fa8fcdc687e4b645caf1062a762c7bc72ba"
+    },
+    "scripts/acceptance/issue-1506-alex/receipts/workspace-42284845261.json": {
+      "sha256": "ca8e01afd498e0feb98bbf45fbd0251aa0daf23873e5998fa60c9e2192175884",
+      "gitBlob": "ff2076e3f04b87131ae01a6fb95d696d16557904"
+    }
+  },
+  "transitions": {
+    "components/coordinator/coordinator-chat.tsx": {
+      "old": "f0bb1d01bc52fc801187c47564e0b247f99ec92b8548ebcd99f841765d6ffad9",
+      "new": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473",
+      "introducedBy": "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5"
+    },
+    "lib/swr/persistent-cache.ts": {
+      "old": "d1e65d589ea138d3fde4e2287a5945a28697222e7b5d5efb9967e6de5fe0650a",
+      "new": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+      "introducedBy": "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+    },
+    "lib/live/channel.ts": {
+      "old": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+      "new": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
+      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
+    },
+    "hooks/use-live-key.tsx": {
+      "old": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
+      "new": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
+    }
+  },
+  "reviewedSourceAncestor": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "reviewedSourceTree": "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d",
+  "sourceAdditions": {
+    "lib/swr/read-observer.ts": {
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+      "role": "runtime_dependency"
+    },
+    "components/swr-defaults.tsx": {
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+      "introducedBy": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+      "role": "provenance_only_not_executed"
+    }
+  },
+  "extraOverlayFiles": {
+    "scripts/acceptance/issue-1506-alex/live-worker.mjs": {
+      "path": "overlays/scripts/acceptance/issue-1506-alex/live-worker.mjs",
+      "sha256": "805e785c02b90a2098573c756a71b757a6e0ed58de58d1b116399c14e2979067"
+    },
+    "scripts/acceptance/issue-1506-alex/live-worker-offline.mjs": {
+      "path": "overlays/scripts/acceptance/issue-1506-alex/live-worker-offline.mjs",
+      "sha256": "b35437894d38fdb089cc362ae2983e177e5c3c1542bac279be339e2ad27120d1"
+    },
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs": {
+      "path": "overlays/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs",
+      "sha256": "91f9eb331caa35f5293cca2f66a487c7dff10ebf32b9d76c5c402497abfa3e36"
+    }
+  },
+  "liveTemplateSha256": "3c488c96753f32c622c4a39fdbc05681d5c661930c4ea52e16c87789b960bf29"
+}

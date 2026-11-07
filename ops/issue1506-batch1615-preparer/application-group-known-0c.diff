@@ -1,0 +1,109 @@
+diff --git a/lib/coordinator/group-turns.ts b/lib/coordinator/group-turns.ts
+index 6812a3e0..5bca6e20 100644
+--- a/lib/coordinator/group-turns.ts
++++ b/lib/coordinator/group-turns.ts
+@@ -1,9 +1,10 @@
+ import { createHash, randomUUID } from 'node:crypto'
++import { serverRunFailure } from '@/lib/run-failure-details'
+ 
+ import { hostedBillingScope } from '@/lib/abuse/context'
+ import type { Pool, PoolClient } from 'pg'
+ import { checkedCorrection, GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
+ export { GroupJudgmentPendingError } from './group-correction'
+ import { addsNothing, followUpInstructions, mentionRoute, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
+ import { appendGroupExchange } from './group-exchanges'
+ import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
+@@ -131,17 +132,17 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
+     const acquired = await client.query(`SELECT pg_try_advisory_lock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0)) AS acquired`, [conversationId])
+     session.assertHeld()
+     if (!acquired.rows[0].acquired) return false
+     locked = true
+     // An unavailable routing decision has not woken a responder. Retry only
+     // that judgment with bounded backoff, never an interrupted generation.
+     const requeued = await client.query(`UPDATE group_turns SET status='queued',error=NULL,"nextDecisionAt"=NULL WHERE "conversationId"=$1 AND status='failed' AND error='group_judgment_pending' AND "nextDecisionAt"<=now()`,[conversationId])
+     // Recover only this group's linked chat runs; never alter daemon/issue runs.
+-    const interruptedRuns = await client.query<{ id: string }>(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running' RETURNING id`, [conversationId])
++    const interruptedRuns = await client.query<{ id: string }>(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now(),"failureDetails"=$2::jsonb || jsonb_build_object('runId',id) WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running' RETURNING id`, [conversationId, JSON.stringify(serverRunFailure('interrupted_group_turn', new Date()))])
+     for (const row of interruptedRuns.rows) { await runListChanged(client, row.id); await runChanged(client, row.id) }
+     const interrupted = await client.query(`UPDATE group_turns SET "activeRunId"=NULL,status='failed',"agentId"=NULL,"botId"=NULL,error='interrupted_generation_not_replayed',trace=trace || '{"status":"failed"}'::jsonb,"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
+     // Who is answering shows on the group's page (its messages read's agentStatus).
+     if (requeued.rowCount || interrupted.rowCount) await groupChatChanged(client, conversationId)
+     const { rows } = await client.query(`SELECT t.*, m.body,m.mentions,m.position,c."workspaceId",c."createdBy",c."leadAgentId",c."leadBotId" FROM group_turns t
+       JOIN conversation_messages m ON m.id=t."messageId" JOIN conversations c ON c.id=t."conversationId"
+       WHERE t."conversationId"=$1 AND t.status='queued' ORDER BY m.position LIMIT 1`, [conversationId])
+     const root = rows[0]
+diff --git a/lib/db/schema.ts b/lib/db/schema.ts
+index 46cb7a1e..d537271b 100644
+--- a/lib/db/schema.ts
++++ b/lib/db/schema.ts
+@@ -1,15 +1,16 @@
+ import type { ExecutionIdentity } from '../execution-identity'
+ import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
+ import type { SendKey } from '../send-key'
+ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+ import { sql } from 'drizzle-orm'
+ import type { JSONContent } from '@tiptap/react'
+ import type { HarnessInfo } from '@mikka/protocol/harness'
++import type { RunFailure } from '@mikka/protocol/run-failure'
+ import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
+ import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
+ import type { AttentionLevel } from '@/lib/attention/judgment'
+ import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
+ 
+ export const users = pgTable('user', {
+   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
+ })
+@@ -375,16 +376,17 @@ export const agentRuns = pgTable('agent_runs', {
+   promptTaskStart: integer('promptTaskStart'), promptTaskLength: integer('promptTaskLength'),
+   /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */
+   dispatchKey: text('dispatchKey'),
+   /** Hash of the original dispatch parameters; rejects reuse for different work. */
+   dispatchFingerprint: text('dispatchFingerprint'),
+   baseBranch: text('baseBranch').default('main'),
+   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
+   stopReason: text('stopReason'), error: text('error'),
++  failureDetails: jsonb('failureDetails').$type<RunFailure | null>(),
+   report: jsonb('report').$type<Record<string, unknown> | null>(),
+   /** The opening of the agent's last reply (240 characters), written as its text arrives; the right column's row shows it. */
+   lastReply: text('lastReply'),
+   /** The text part (chunk id) lastReply comes from: more text for it appends, another part replaces it. */
+   lastReplyPart: text('lastReplyPart'),
+   lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
+   /** How the run came out once it ended (lib/run-outcome.ts); null until judged. The right column groups by it. */
+   outcome: text('outcome').$type<RunOutcome | null>(),
+@@ -556,16 +558,17 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
+   botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
+   leaseHolder: text('leaseHolder'),
+   leaseUntil: timestamp('leaseUntil', { withTimezone: true }),
+   summary: text('summary'),
+   summaryThrough: integer('summaryThrough').notNull().default(0),
+   memory: text('memory').notNull().default(''),
+   /** Why the last turn failed; cleared when a turn answers. */
+   lastError: text('lastError'),
++  lastFailure: jsonb('lastFailure').$type<RunFailure | null>(),
+   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
+   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+ }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
+ 
+ // --- Suggestions (MIK-41) ---------------------------------------------------
+ //
+ // External notifications from connected apps, rated by fixed rules or the
+ // decision model with the attention levels of lib/attention (R-20). Every
+@@ -1096,16 +1099,17 @@ export const coordinatorRuntimeSettings = pgTable('coordinator_runtime_settings'
+   userId: text('userId').primaryKey(), runtime: jsonb('runtime').notNull(),
+   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+ })
+ export const nativeCoordinatorTurns = pgTable('native_coordinator_turns', {
+   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+   deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+   holder: text('holder').notNull(), round: integer('round').notNull(), payload: jsonb('payload').notNull(),
+   status: text('status').notNull().default('queued'), reply: text('reply'),
++  failureDetails: jsonb('failureDetails').$type<RunFailure | null>(),
+   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+ }, table => [unique().on(table.userId, table.holder, table.round), index('native_coordinator_pending_idx').on(table.deviceId, table.status, table.createdAt)])
+ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
+   turnId: uuid('turnId').notNull().references(() => nativeCoordinatorTurns.id, { onDelete: 'cascade' }),
+   callId: text('callId').notNull(), name: text('name').notNull(), input: jsonb('input').notNull(),
+   status: text('status').notNull().default('pending'), output: jsonb('output'),
+   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

@@ -1,0 +1,697 @@
+diff --git a/scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs b/scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs
+--- a/scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs
++++ b/scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs
+@@ -24,7 +24,7 @@
+   'first_text_missing', 'unexpected_tool', 'stop_request_failed', 'stop_boundary_missed',
+   'stop_not_quiescent', 'post_stop_chat_failed', 'live_push_missing', 'live_close_failed',
+   'committed_invalid', 'stream_incomplete', 'chat_completion_error', 'reply_failed_or_stopped',
+-  'chat_revision_stale', 'stream_replay_unproven', 'reply_not_persisted', 'timeout_invalid',
++  'chat_revision_stale', 'stream_replay_unproven', 'reply_not_persisted', 'timeout_invalid', 'stopped_text_mismatch',
+ ])
+ const code = error => fixedErrors.has(error?.message) ? error.message : 'acceptance_unexpected_failure'
+ const fail = name => { throw new Error(name) }
+@@ -64,7 +64,7 @@
+       report.initialCursor = initial.cursor
+       report.botRef = fixture.botRef
+       report.menu = fixture.menu
+-      let live, streamController, stopPromise = null, sent = false, streamId = null, error = null, completed = null, started
++      let live, streamController, stopPromise = null, sent = false, streamId = null, error = null, completed = null, liveText = '', started
+       const since = () => milliseconds(performance.now() - started)
+       const requestStop = trigger => {
+         if (stopPromise) return stopPromise
+@@ -125,6 +125,7 @@
+               }
+               if (event.type === 'tool') { void requestStop('unexpected_tool'); fail('unexpected_tool') }
+               if (event.type === 'text' || event.type === 'reset') {
++                liveText = event.type === 'text' ? liveText + event.delta : event.text
+                 const characters = Array.from(event.type === 'text' ? event.delta : event.text).length
+                 report.streamEvents.textCharacters += characters
+                 if (report.stop.requested) report.streamEvents.textCharactersAfterStop += characters
+@@ -153,6 +154,12 @@
+             working: completed.chat.working, activeStream: Boolean(completed.chat.streamRunId),
+             ownPersistedItems: ownItems.length, stoppedMarker: ownItems.some(item => item.stopped === true),
+             stoppedPosition: ownItems.find(item => item.stopped === true && item.position > initial.cursor && item.position <= completed.committed.through)?.position ?? null }
++          const persistedText = ownItems.filter(item => item.from === 'coordinator' && !item.pending &&
++            item.position > initial.cursor && item.position <= completed.committed.through)
++            .sort((a, b) => a.position - b.position).map(item => typeof item.text === 'string' ? item.text : '').join('')
++          report.textConsistency = { matches: liveText === persistedText,
++            liveCharacters: Array.from(liveText).length, persistedCharacters: Array.from(persistedText).length }
++          if (!report.textConsistency.matches) fail('stopped_text_mismatch')
+           report.metrics.postStopChatMs = since()
+           report.metrics.stopToObservedIdleMs = milliseconds(report.metrics.postStopChatMs - report.metrics.stopRequestedMs)
+           report.metrics.streamClosedMs = since()
+diff --git a/scripts/acceptance/issue-1506-alex/stop-completion.test.mjs b/scripts/acceptance/issue-1506-alex/stop-completion.test.mjs
+--- a/scripts/acceptance/issue-1506-alex/stop-completion.test.mjs
++++ b/scripts/acceptance/issue-1506-alex/stop-completion.test.mjs
+@@ -81,3 +81,73 @@
+   releaseRead.resolve(); await Promise.resolve(); releaseCancel.resolve()
+   await assert.rejects(pending, /stream_error/); assert.equal(f.subscriptions, 0)
+ })
++
++
++// Recovery regression: preserve the real driver/decoder and vary only offline I/O.
++function withOrdinaryFrames(f, { persistedText, beforeCommitted = [] } = {}) {
++  return { ...f.options, sessionProvider: (work, options) => f.provider(session => work({ ...session,
++    async request(path, input = {}) {
++      const response = await session.request(path, input)
++      if (path.startsWith('/api/coordinator/stream')) {
++        let buffered = '', sequence = 0
++        const decoder = new TextDecoder(), encoder = new TextEncoder()
++        return new Response(response.body.pipeThrough(new TransformStream({
++          transform(chunk, controller) {
++            buffered += decoder.decode(chunk, { stream: true })
++            let newline
++            while ((newline = buffered.indexOf('\n')) !== -1) {
++              const line = buffered.slice(0, newline); buffered = buffered.slice(newline + 1)
++              if (!line.trim()) continue
++              const frame = JSON.parse(line)
++              const frames = frame.type === 'committed'
++                ? [...beforeCommitted.map(event => ({ ...event, id: frame.id })), frame] : [frame]
++              for (const event of frames) controller.enqueue(encoder.encode(JSON.stringify({ ...event, sequence: ++sequence }) + '\n'))
++            }
++          },
++        })), { status: response.status, headers: response.headers })
++      }
++      if (persistedText !== undefined && input.body?.action === 'coordinator.syncCoordinatorChat' && f.state.sends) {
++        const value = await response.json()
++        for (const item of value.result.chat.items) item.text = persistedText
++        return Response.json(value)
++      }
++      return response
++    },
++  }), options) }
++}
++
++test('ordinary Stop compares the final visible stream with its own persisted stopped reply without logging text', async () => {
++  const f = stoppedSession({ kind: 'ordinary', releaseDuringRead: true })
++  const report = await runOrdinaryStop(withOrdinaryFrames(f, { persistedText: '42 tail',
++    beforeCommitted: [{ type: 'text', delta: ' tail' }] }))
++  assert.equal(report.status, 'observed', JSON.stringify(report))
++  assert.equal(report.textConsistency.matches, true)
++  assert.equal(report.textConsistency.liveCharacters, 7)
++  assert.equal(report.textConsistency.persistedCharacters, 7)
++  assert.equal(report.streamEvents.textCharactersAfterStop, 5)
++  assert.equal(f.state.stops, 1); assert.equal(f.state.clientCancelled, true)
++  assert.equal(report.cleanup.status, 'complete'); assert.equal(f.state.signouts, 1)
++  assert.equal(JSON.stringify(report).includes('42 tail'), false)
++})
++
++test('ordinary Stop retains a failed slot when persisted stopped text differs from the visible stream', async () => {
++  const f = stoppedSession({ kind: 'ordinary' })
++  const report = await runOrdinaryStop(withOrdinaryFrames(f, { persistedText: PRIVATE }))
++  assert.equal(report.status, 'failed')
++  assert.equal(report.error, 'stopped_text_mismatch')
++  assert.equal(report.textConsistency.matches, false)
++  assert.equal(f.state.stops, 1); assert.equal(f.state.signouts, 1)
++  assert.equal(report.cleanup.status, 'complete'); assert.equal(f.state.clientCancelled, true)
++  assert.equal(JSON.stringify(report).includes(PRIVATE), false)
++})
++
++test('ordinary Stop uses reset replacement when comparing persisted text', async () => {
++  const f = stoppedSession({ kind: 'ordinary' })
++  const report = await runOrdinaryStop(withOrdinaryFrames(f, { persistedText: 'final',
++    beforeCommitted: [{ type: 'reset', text: 'final' }] }))
++  assert.equal(report.status, 'observed', JSON.stringify(report))
++  assert.equal(report.textConsistency.matches, true)
++  assert.equal(report.textConsistency.liveCharacters, 5)
++  assert.equal(report.textConsistency.persistedCharacters, 5)
++  assert.equal(f.state.stops, 1); assert.equal(f.state.clientCancelled, true)
++})
+diff --git a/scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs b/scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs
+--- a/scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs
++++ b/scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs
+@@ -69,7 +69,7 @@
+       report.initialCursor = initial.cursor
+       report.botRef = fixture.botRef
+       report.menu = fixture.menu
+-      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, completed = null, started = null
++      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, completed = null, lastObservedChat = null, naturalIdleConfirmed = false, started = null
+       let delayedStop = null, delayTimer = null, settleDelayedStop = null
+       const since = () => started === null ? null : ms(performance.now() - started)
+       const stop = trigger => {
+@@ -107,7 +107,8 @@
+             initialChat: initial, live, signal: controller.signal,
+             readChat: async signal => {
+               report.completionChatReads++; report.postStopChatReads++
+-              return validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal }))
++              lastObservedChat = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal }))
++              return lastObservedChat
+             },
+             onEvent: (event, _rounds, sequence) => {
+               if (event.type === 'start') { streamId = event.id; report.streamId = event.id; report.metrics.streamStartedMs = since() }
+@@ -157,6 +158,33 @@
+           if (!report.triggerCallRef) fail('tool_boundary_not_observed')
+           if (!await (stopPromise ?? delayedStop)) fail('stop_not_acknowledged')
+         } catch (error) {
++          // A natural reply has no stopped marker. Reclassify only after this
++          // same new committed round is durably present and its lease is idle.
++          // The strict shared helper and all actual Stop predicates stay intact.
++          const chat = lastObservedChat, commit = report.committed
++          const own = chat?.items.filter(item => item.streamId === streamId) ?? []
++          if (error?.message === 'reply_not_persisted' && report.tools.length === 0 &&
++            !report.triggerCallRef && !report.stop.requested && commit?.id === streamId &&
++            commit?.quiet === false && Number.isSafeInteger(commit?.through) && commit.through > initial.cursor &&
++            !initial.persistedStreamIds.includes(commit.id) &&
++            chat?.botId === botId && chat.enabled && chat.error === null && !chat.working && !chat.streamRunId &&
++            chat.cursor >= commit.through && chat.persistedStreamIds.includes(commit.id) &&
++            chat.live?.ownerId === initial.live?.ownerId && chat.live?.workspaceId === initial.live?.workspaceId &&
++            Number.isSafeInteger(chat.live?.revisions?.['bot_chat:' + botId.toLowerCase()]) &&
++            chat.live.revisions['bot_chat:' + botId.toLowerCase()] >= live.revision &&
++            !own.some(item => item.stopped || item.failure) &&
++            own.some(item => item.from === 'coordinator' && !item.pending && typeof item.text === 'string' &&
++              item.text.length > 0 && Number.isSafeInteger(item.position) &&
++              item.position > initial.cursor && item.position <= commit.through)) {
++            naturalIdleConfirmed = true
++            completed = { chat, committed: commit }
++            report.termination = report.streamEof ? 'eof' : 'client_cancel_after_natural_committed_idle'
++            report.afterStop = { cursor: chat.cursor, committedPersisted: true, working: false, activeStream: false,
++              ownPersistedItems: own.length, stoppedMarker: false, stoppedPosition: null }
++            report.sample.classification = 'tool_boundary_not_observed'
++            report.runtimeBoundary.classification = 'not_covered'
++            fail('tool_boundary_not_observed')
++          }
+           if (controller.signal.aborted && error?.name === 'AbortError') fail('stream_deadline')
+           throw error
+         }
+@@ -169,7 +197,8 @@
+           report.sample.delayCancelledByFailure = true
+         }
+         if (sent) {
+-          if (!stopPromise) void stop('error_cleanup')
++          if (!stopPromise && !naturalIdleConfirmed) void stop('error_cleanup')
++          if (naturalIdleConfirmed) report.cleanup.stopSkippedBecause = 'natural_completion_confirmed_idle'
+           await stopPromise; controller?.abort()
+           if (!completed) {
+             report.postStopChatReads++; report.cleanupChatReads++
+diff --git a/scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs b/scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs
+@@ -0,0 +1,98 @@
++import assert from 'node:assert/strict'
++import test from 'node:test'
++import { runToolStop } from './coordinator-tool-stop.mjs'
++import { fakeSession, PRIVATE } from './fixture-support.mjs'
++
++globalThis.fetch = () => { throw new Error('network_forbidden') }
++
++function naturalFixture({ busy = false, mutateChat, publicError = false } = {}) {
++  const f = fakeSession({ readyBots: true, stream: 'complete', noEof: true, afterActive: busy })
++  const options = { ...f.options, env: { ...f.options.env, MIKKA_STOP_CASE: 'before_tool' },
++    streamTimeoutMs: 100, stopTimeoutMs: 100,
++    sessionProvider: (work, sessionOptions) => f.provider(session => work({ ...session,
++      async request(path, input = {}) {
++        const response = await session.request(path, input)
++        if (publicError && path.startsWith('/api/coordinator/stream')) {
++          let buffered = ''
++          const decoder = new TextDecoder(), encoder = new TextEncoder()
++          return new Response(response.body.pipeThrough(new TransformStream({
++            transform(chunk, controller) {
++              buffered += decoder.decode(chunk, { stream: true })
++              let newline
++              while ((newline = buffered.indexOf('\n')) !== -1) {
++                const line = buffered.slice(0, newline); buffered = buffered.slice(newline + 1)
++                if (!line.trim()) continue
++                const frame = JSON.parse(line)
++                controller.enqueue(encoder.encode(line + '\n'))
++                if (frame.type === 'committed') controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', sequence: frame.sequence + 1 }) + '\n'))
++              }
++            },
++          })), { status: response.status, headers: response.headers })
++        }
++        if (mutateChat && f.state.sends && input.body?.action === 'coordinator.syncCoordinatorChat') {
++          const value = await response.json(); mutateChat(value.result.chat)
++          return Response.json(value)
++        }
++        return response
++      },
++    }), sessionOptions) }
++  return { ...f, options }
++}
++
++test('a normal no-tool committed reply remains a failed boundary sample and performs no redundant Stop after authoritative idle', async () => {
++  const f = naturalFixture()
++  const report = await runToolStop(f.options)
++  assert.equal(report.status, 'failed')
++  assert.equal(report.error, 'tool_boundary_not_observed')
++  assert.equal(report.sample.classification, 'tool_boundary_not_observed')
++  assert.equal(report.sample.countedEvenIfBoundaryMissed, true)
++  assert.equal(report.messageSendAttempts, 1); assert.equal(report.publicRunningCallCount, 0)
++  assert.equal(report.stop.requested, false); assert.equal(report.stop.acknowledged, false)
++  assert.equal(f.state.stops, 0)
++  assert.equal(report.termination, 'client_cancel_after_natural_committed_idle')
++  assert.equal(report.streamEof, false); assert.equal(f.state.clientCancelled, true)
++  assert.equal(report.afterStop.committedPersisted, true); assert.equal(report.afterStop.stoppedMarker, false)
++  assert.equal(report.afterStop.working, false); assert.equal(report.afterStop.activeStream, false)
++  assert.equal(report.cleanup.stopSkippedBecause, 'natural_completion_confirmed_idle')
++  assert.equal(report.cleanupChatReads, 0)
++  assert.equal(report.cleanup.status, 'complete'); assert.equal(f.state.liveClosed, true); assert.equal(f.state.signouts, 1)
++  assert.equal(JSON.stringify(report).includes(PRIVATE), false)
++})
++
++test('no-tool samples still stop for cleanup when authoritative chat remains active', async () => {
++  const f = naturalFixture({ busy: true })
++  const report = await runToolStop(f.options)
++  assert.equal(report.status, 'failed')
++  assert.notEqual(report.error, 'tool_boundary_not_observed')
++  assert.equal(f.state.sends, 1); assert.equal(f.state.stops, 1)
++  assert.equal(report.cleanup.status, 'needs_followup')
++  assert.equal(report.cleanup.stopSkippedBecause, undefined)
++  assert.equal(f.state.liveClosed, true); assert.equal(f.state.signouts, 1)
++})
++
++test('missing or wrong persisted scope cannot be reclassified as a natural no-tool completion', async () => {
++  for (const mutateChat of [
++    chat => { chat.cursor = 1 },
++    chat => { chat.persistedStreamIds = ['wrun_foreign:0'] },
++    chat => { chat.items[0].position = 0 },
++    chat => { chat.items[0].pending = true },
++  ]) {
++    const f = naturalFixture({ mutateChat })
++    const report = await runToolStop(f.options)
++    assert.equal(report.status, 'failed')
++    assert.equal(report.error, 'reply_not_persisted')
++    assert.equal(f.state.sends, 1); assert.equal(f.state.stops, 1)
++    assert.equal(report.cleanup.stopSkippedBecause, undefined)
++    assert.equal(f.state.liveClosed, true); assert.equal(f.state.signouts, 1)
++  }
++})
++
++test('a public stream error survives a concurrently durable idle no-tool reply', async () => {
++  const f = naturalFixture({ publicError: true })
++  const report = await runToolStop(f.options)
++  assert.equal(report.status, 'failed'); assert.equal(report.error, 'stream_error')
++  assert.equal(f.state.sends, 1); assert.equal(f.state.stops, 1)
++  assert.equal(report.cleanup.stopSkippedBecause, undefined)
++  assert.equal(f.state.liveClosed, true); assert.equal(f.state.signouts, 1)
++  assert.equal(JSON.stringify(report).includes(PRIVATE), false)
++})
+diff --git a/scripts/acceptance/issue-1506-alex/live-source.mjs b/scripts/acceptance/issue-1506-alex/live-source.mjs
+--- a/scripts/acceptance/issue-1506-alex/live-source.mjs
++++ b/scripts/acceptance/issue-1506-alex/live-source.mjs
+@@ -4,26 +4,37 @@
+ import { execFileSync } from 'node:child_process'
+ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+ import { tmpdir } from 'node:os'
+-import { dirname, join, resolve } from 'node:path'
++import { dirname, join, resolve, posix } from 'node:path'
+ import { stripTypeScriptTypes } from 'node:module'
+ 
+ // Local content review base, not a claim that this commit has been published.
+-export const LIVE_SOURCE_CONTENT_BASE = 'aaecbdba0472af1a4ad921913267118741e74f1a'
++export const LIVE_SOURCE_CONTENT_BASE = '0d379dd92fd2d7b3f2b307030c3bcd8234426d0e'
+ // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
+ // until the separately verified production application SHA is supplied.
+-export const LIVE_SOURCE_COMMIT = 'efb95d951ddbeca1af04bc80d011ccbc2a9f0188'
++export const LIVE_SOURCE_COMMIT = '0d379dd92fd2d7b3f2b307030c3bcd8234426d0e'
+ export const LIVE_SOURCE_HASHES = Object.freeze({
+-  'lib/live/channel.ts': 'd68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7',
++  'lib/live/channel.ts': '8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b',
+   'lib/live/tab-share.ts': '38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f',
+   'lib/live/revisions.ts': 'bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328',
+   'lib/live/events.ts': 'd32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5',
+   'lib/live/presence.ts': '03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0',
+-  'lib/swr/persistent-cache.ts': 'd1e65d589ea138d3fde4e2287a5945a28697222e7b5d5efb9967e6de5fe0650a',
++  'lib/swr/persistent-cache.ts': 'b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f',
+   'lib/swr/cache-policy.ts': 'abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f',
+   'lib/swr/indexed-db.ts': 'a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809',
+-  'hooks/use-live-key.tsx': 'd5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397',
+-  'components/coordinator/coordinator-chat.tsx': 'f0bb1d01bc52fc801187c47564e0b247f99ec92b8548ebcd99f841765d6ffad9',
++  'hooks/use-live-key.tsx': '5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857',
++  'components/coordinator/coordinator-chat.tsx': '53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473',
++  'lib/swr/read-observer.ts': '4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463',
++  'components/swr-defaults.tsx': 'cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33',
+ })
++
++/** Only imports resolving to another exact pinned runtime module are allowed. */
++export function resolveLiveImport(path, dependency) {
++  if (!/^\.\.?\/[a-zA-Z0-9_./-]+$/.test(dependency) || dependency.includes('\\')) throw new Error('live_source_import_invalid')
++  const target = posix.normalize(posix.join(posix.dirname(path), dependency.endsWith('.ts') ? dependency : dependency + '.ts'))
++  if (!target.endsWith('.ts') || !Object.hasOwn(LIVE_SOURCE_HASHES, target)) throw new Error('live_source_import_invalid')
++  const relative = posix.relative(posix.dirname(path), target.replace(/\.ts$/, '.mjs'))
++  return relative.startsWith('.') ? relative : './' + relative
++}
+ 
+ export function prepareLiveSource(sourceRoot, { sourceBase = LIVE_SOURCE_COMMIT } = {}) {
+   if (!/^[0-9a-f]{40}$/.test(sourceBase ?? '')) throw new Error('live_source_commit_unset')
+@@ -47,8 +58,8 @@
+     for (const [path, source] of sources) {
+       if (!path.endsWith('.ts')) continue // Hook/component are provenance checks, not a simulated React render.
+       const transformed = stripTypeScriptTypes(source, { mode: 'transform', sourceMap: false })
+-        .replace(/(from\s*['"])(\.[^'"]+)(['"])/g, (_, prefix, dependency, suffix) => prefix + dependency + '.mjs' + suffix)
+-      if (/from\s*['"](?:[^.]|\.\.)/.test(transformed)) throw new Error('live_source_import_invalid')
++        .replace(/(from\s*['"])([^'"]+)(['"])/g, (_, prefix, dependency, suffix) =>
++          prefix + resolveLiveImport(path, dependency) + suffix)
+       const destination = join(directory, path.replace(/\.ts$/, '.mjs'))
+       mkdirSync(dirname(destination), { recursive: true }); writeFileSync(destination, transformed)
+     }
+diff --git a/.github/workflows/issue-1506-alex-continue.yml b/.github/workflows/issue-1506-alex-continue.yml
+--- a/.github/workflows/issue-1506-alex-continue.yml
++++ b/.github/workflows/issue-1506-alex-continue.yml
+@@ -39,7 +39,7 @@
+         if: steps.control.outputs.enabled == 'true'
+         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+         with:
+-          ref: efb95d951ddbeca1af04bc80d011ccbc2a9f0188
++          ref: 0d379dd92fd2d7b3f2b307030c3bcd8234426d0e
+           path: live-source
+           persist-credentials: false
+       - name: Verify the continuation and actual-source live harness offline
+@@ -47,7 +47,7 @@
+         env:
+           MIKKA_LIVE_SOURCE_ROOT: live-source
+         run: |
+-          node --test scripts/acceptance/issue-1506-alex/acceptance.test.mjs scripts/acceptance/issue-1506-alex/selection-canonical.test.mjs scripts/acceptance/issue-1506-alex/continuation.test.mjs scripts/acceptance/issue-1506-alex/live-consumer.test.mjs scripts/acceptance/issue-1506-alex/tool-boundaries.test.mjs scripts/acceptance/issue-1506-alex/stop-completion.test.mjs
++          node --test scripts/acceptance/issue-1506-alex/acceptance.test.mjs scripts/acceptance/issue-1506-alex/selection-canonical.test.mjs scripts/acceptance/issue-1506-alex/continuation.test.mjs scripts/acceptance/issue-1506-alex/live-consumer.test.mjs scripts/acceptance/issue-1506-alex/tool-boundaries.test.mjs scripts/acceptance/issue-1506-alex/stop-completion.test.mjs scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs
+       - name: Read Alex's existing email only
+         if: steps.control.outputs.enabled == 'true'
+         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+diff --git a/scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md b/scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md
+--- a/scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md
++++ b/scripts/acceptance/issue-1506-alex/LIVE-ACCEPTANCE.md
+@@ -1,67 +1,41 @@
+-# 真实 live 传输与核心消费者验收
++# Coordinator 后续验收：禁用准备稿（batch1615 V2）
+ 
+-## 执行入口与范围
++本稿由新的离线恢复准备器生成。旧执行环境不可用，不能将本稿或新四文件哈希冒充旧准备器的字节恢复。
++本稿没有执行生产登录、模型、SQL、部署或控制激活，也不构成新的生产通过证明。
+ 
+-这是待最终部署完成后使用的源码与 workflow 切换稿，尚未上传或执行。`continue.json` 保持 disabled、生产 SHA 为空；presence after job 也显式禁用。当前生产上的 cache-only 诊断仍使用原 `7cd5a2c0836ee5ee1e0b91213e0a9fcee35c2032`，因此不能提前上传这份切换稿。未来 cache-live 继续复用 ready receipt `receipts/fixtures-ready-42286389783.json` 和已经保留的两个模型 fixture；各模型阶段前后核验实际版本，不重新创建工作区或选择模型。
++## 源码与禁用边界
+ 
+-默认 `cache-live` 会运行已经授权的两条短缓存验收消息。live observer 不再增加模型消息：它复用这两轮正常消息产生的真实 `bot_chat` 推送。`cacheTurns` 可为 2 或 3，`liveTabs` 可为 2 或 3；默认三独立消费者。
++应用源码输入：0d379dd92fd2d7b3f2b307030c3bcd8234426d0e，tree：c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d。
++这只是不可变 Git 源码绑定；真实 production alias、READY、公开版本及发布配置需由执行者另行核实。
+ 
+-## 实际加载的产品代码
++十二个来源 pin 均按实际应用 Git blob 校验：原十项，加上实际 read-observer 运行时依赖和 components/swr-defaults.tsx 接线来源。只接受已审 ad224/a65 漂移及 0d379dd92fd2d7b3f2b307030c3bcd8234426d0e 中 channel、use-live-key、read-observer、SWR defaults 的精确字节；不自动接纳 db988 或未来变更。decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。加载器只将相对导入解析到已固定的运行时模块，拒绝未列目标、外部包和越界路径。Hook、Coordinator 组件和 SWR defaults 仅核来源，不在 Node 渲染 React。
+ 
+-内容基准为本地 batch commit `aaecbdba0472af1a4ad921913267118741e74f1a`，包含 #1538 presence client 和 main #1501 的 Coordinator 组件。十个源码文件的 SHA256 逐一固定，新增 `lib/live/presence.ts`，更新 `channel.ts`、`hooks/use-live-key.tsx` 和 `coordinator-chat.tsx` 的哈希；其余六项保持原值。
++本版明确输出十一条路径：原八条，加 live-worker.mjs、live-worker-offline.mjs、live-consumer.test.mjs。worker 使用实际源码 readBoundary/readFresh/observeSWRRead/acceptSWRRead/failSWRRead，读取正常 RPC 快照后才接受并提交同一对象；保留 owner/namespace、required+held+local revision、local-write identity 与关闭守卫。离线平台夹具的 fixture-read 命令只在测试模块中，生产 worker 不接收该命令。没有复制或改写产品算法。
+ 
+-发布用 `LIVE_SOURCE_COMMIT` 和未来 continuation workflow 的 source checkout 均固定为本次明确输入的 application source commit `efb95d951ddbeca1af04bc80d011ccbc2a9f0188`，tree 为 `fd7fb13f41c5a87df865f539d498b32e3a4fb83b`。十个文件已逐一核对该 Git commit 的实际 blob；本地内容基准 aaec 仅保留为审查来源。源码加载同时校验文件哈希和 checkout 的实际 Git HEAD，不能给另一提交的字节贴上新版本标签。本文件仅记录准备核验的源码；实际生产应用 SHA 仍是另一个验收输入，目前未赋值；最终部署确认、文件一致性确认后，才可填写并启用现有 control。
++继续使用原 ACME 自有工作区与 Haiku/Luna retained fixture receipt，不重建、不重新选模型。普通停止/工具未覆盖修正来自独立恢复 checkpoint 344fafb353d1128f89475bc827a404eff4520451，其四文件已单独离线 RED→14/14 GREEN；本稿没有新增生产 Stop 成绩。
+ 
+-Node 24 的 `stripTypeScriptTypes(..., {mode:'transform'})` 将八个纯 TypeScript 模块编译到临时目录；唯一文本转换是给相对 import 补 `.mjs` 后缀。实际加载的运行类是 `LiveChannel`、`TabShare`、`PersistentReadCache`，并使用原版 `coversLiveRevisions` / `heldRevision`。没有复制、删改、简化这些产品算法。`hooks/use-live-key.tsx` 和 Coordinator 组件用于 hash/protocol 核对，不在 Node 中渲染 React。
++continue.json 完全保留 fcce 原件：enabled=false、phase=tool、expectedSha=null、cacheTurns=3。continuation workflow 的 MIKKA_STOP_CASE 仍是 during_tool。
++presence workflow 保持原 literal false 和空应用 SHA；legacy resume workflow/control 原样，不给没有 enabled 字段的旧控制文件添加或修改字段。
++MCP workflow 保留 literal false、12 分钟 timeout 和原 reader/cleanup 路径，只清空旧应用 SHA。MCP 四个支持文件原样。
+ 
+-当前 Coordinator 的聊天订阅没有 device presence proof，与 worker 的订阅参数一致。实际 `LiveChannel` 会请求 `presence=1` 并解析 presence readiness；本稿加载完整的新依赖，但聊天验收不覆盖设备 presence watch/ack 场景。#1501 组件使用的 `readCachedCoordinatorChat` 页面缓存恢复流程也不在此核心消费者验收范围内。
++## 下一次缓存阶段的固定分母
+ 
+-worker 的 refresh 接线遵守该 hook 的完整条件：
++未来只有 root 在确认实际部署后，另行将 continuation control 显式改为 enabled=true、phase=cache-live、expectedSha=该实际应用SHA、cacheTurns=3，才授权一轮缓存验收。单改源码 pin、上传本稿或 disabled job 成功都不是生产授权。
+ 
+-- 同一授权 namespace，且 cache 仍有效。
+-- 共享结果覆盖要求的 revision，也覆盖本地已经持有的 revision。
+-- 采用结果前检查本地 data identity 未变；本地发生写入时重新读。
+-- 保留 `requiredRevisions` 和 `reuseCompleted`，不把新推送变为无条件旧结果共享。
+-- 保留生产 Coordinator 的 `CHAT_MERGE_MS=2000`。
++固定 Haiku 三轮、Luna 三轮，最多六次用户发送；后四槽 H2/H3/L2/L3 是预先定义的 warm 槽，每槽客户端 send→firstText 目标不超过 3000ms。失败、未发送和未覆盖保留原槽，不补跑、不只挑命中或较快结果。一次模型首轮失败会停止该模型的后续轮次；另一个模型通过独立进程/会话继续运行，保持两份独立 continuation wrapper 为权威收据。
+ 
+-这里验收真实 gateway 传输和实际核心消费者。报告明确 `reactSWRRendered=false`、`browserReactRender=not_run`；不能把结果称为浏览器 React/SWR 页面实测。
++未来授权的 phase=cache-live 在原六条自然短答上附加三个独立 worker、原生 WebSocket/BroadcastChannel 与实际核心消费者；它调用同一个 runCacheTurns，不发送额外模型消息。observer 只代理正常 ticket/chat 读取，保留24次 chat 上限和有界关闭；没有定时 DB 轮询。现有一次返回响应延迟只改变该测试客户端的交付，真实新 revision 必须来自 socket，未覆盖即如实记录。新的 source/worker 离线证明不是新的生产通过，也不是 React/浏览器渲染证明。原六槽与 Stop 十槽失败分母不改变。
+ 
+-## 三个独立 tab 的实现
++## 流、停止和证据
+ 
+-每个 tab 是单独 Node worker，具有独立 heap、模块实例、缓存、`LiveChannel`、`TabShare` 和真实 WebSocket。跨 worker 通过原生 BroadcastChannel 仲裁共享读取。每个 worker 的环境是空对象，不接收 GitHub runner 的 ACME 密码或任何其他环境凭据。
++正常短回复以对应新 committed、持久化回复/cursor、权威 idle 收敛，再取消本 reader；持续 HTTP 的 EOF 不是回合成功前提。旧 prefix 不供新首字/新 committed 计数；真实 stream error、版本变化和 scope 不符仍失败。
+ 
+-正常 email 登录和 cookie 只保留在 parent 进程内存。worker 只可请求两个固定方法：该 Bot 的正常 `syncCoordinatorChat`，以及服务器授权初始 chat 指定的 transport scope 的 live ticket。代理不会接受任意 URL、action 或 Bot ID。ticket 只在两个进程的短期内存之间传递，不写文件或日志。
++普通 Stop 需本次 Stop ACK、同一新 committed、持久化 stopped 标记、idle，并核 live append/reset 最终正文与该 stream 新持久化正文一致。客户端读流关闭不等于 provider 物理停止。
+ 
+-三个 tab 的 read namespace 完全相同，包含实际账号、当前专属 team、生产 build 和 admin role；各自 tab ID / heap 独立。transport scope 从正常 chat 的 `live.workspaceId` 取得，Coordinator 的 owner-home channel 可以不同于当前 team，不能猜测替代。parent 同时核验 initial chat 的 owner/Bot，以及每次实际 chat 响应的相同 owner/Bot/transport scope。
++工具没到真实边界仍是 failed/not_covered；自然无工具回复只有在严格持久化与 idle 确认后才省去多余 cleanup Stop。before/during 的分类仍须对应 server body/Stop/audit 区间，不凭 public running 或固定延迟宣布覆盖。
+ 
+-正常产品 `LiveChannel` 在 socket 打开时会执行 catch-up read。报告将这些请求标为 `initial`，只有所有 tab 的真实 ready 和初始读取结束后才允许缓存测试发送消息。`initial` 请求不能计入 revision 驱动的读取证据。
++每个模型的 wrapper 保留真实发送、workflowRunId、所有失败和 cleanup；Actions step conclusion 不能代替内部 outcome。artifact 名仍为 issue-1506-alex-continue-<run_id>，包含 issue-1506-alex-report/*.json。Luna 早失败时不要用可能覆盖的 standalone 默认文件代替两份独立 wrapper。
+ 
+-每个 tab 只取得一个票据并建立一次 socket。断线或重新申请 ticket 使验收失败，harness 不增加重连或 fallback 轮询。原类的 heartbeat / 合并调度属于实际被测逻辑；ready 能力确认后原类本身关闭 fallback read。最多 24 个实际 chat 读取，单次 RPC / ticket 有超时，最终覆盖等待有界。所有 observer 都结束后清理自己的 worker、socket、BroadcastChannel 和临时编译目录。
++服务端日志遵守既定最多 cache6+ordinaryStop2 共8个 exact-wrun 请求、每个一次 limit100；没有新增查询预算。rawCache 是 SDK 兼容 usage 边界，不是原 provider HTTP 字节；missing 不证明 provider 没返回。各独立时钟不跨钟相减，嵌套跨度不相加。
+ 
+-## 证据与旧结果竞态
+-
+-产物 `coordinator-live-haiku.json` / `coordinator-live-luna.json` 包含脱敏网络计数、时间、revision、每个 tab 的 refresh/adopt/reject，以及原短回复缓存测试结果。没有 prompt、reply、聊天历史、cookie、完整 ticket 或协议凭据。
+-
+-必须分别观察：真实 socket revision → 原消费者 refresh → 正常 chat HTTP/RPC → 响应覆盖目标 revision → 其他 tab 通过原版 TabShare 采用正确结果。共享读取指标需要真实采用结果和网络数量减少；仅看到多个 socket 推送或一次手动 GET 不合格。最终关闭前，所有 tab 必须持有已观察到的最高 revision，不能靠重复 GET 补齐。
+-
+-默认不人为制造竞态。若自然运行中没有旧结果被新 revision 拒绝，报告 `staleResultProtection=not_covered`，不把代码测试当成生产覆盖。可显式设置 `delayOneReturnedResult=true`：只在 parent 中暂缓交付一个**已经从生产正常返回、完整读完**的 chat 响应，最长 8 秒，直到另一个真实更高 revision 到来再交付。它不阻塞生产请求、不伪造服务器事件、不修改产品消费者算法；报告记录这个客户端测试适配、旧结果 revision、交付原因与时间。若期限内没有新 revision，按时释放旧响应并标明竞态未覆盖。
+-
+-这个适配只用于验证新 revision 不能被旧共享结果满足，不用于改善或计算模型首字时间。模型的 send→firstText 始终来自独立正常 NDJSON 流。
+-
+-## 离线验证
+-
+-十一项 live harness 测试通过，包含 sourceBase 未设置/格式错误、checkout HEAD 不符、新 presence 模块和 hook/组件内容漂移，以及 pin 缺失时模型 driver/observer 不得启动。两项 live 测试真正启动三个独立 worker，加载上述同 hash 产品源码，使用原生 BroadcastChannel；只把 WebSocket 换为明确的离线事件夹具，网络 fetch 全部禁用。夹具同时核验新消费者请求 `revisions=1&presence=1`，并发送明确的离线 presence readiness 帧。
+-
+-- 一次 revision：三个 tab 最终同步，仅一个权威 chat 读取。
+-- 暂缓已返回的 revision 2 响应，真实形状的 revision 3 夹具进入后：旧结果被原算法拒绝，最终总共两个权威读取覆盖 revision 2 和 3。
+-
+-这两项是离线 harness 证据，不是生产 live 成功的替代品。测试专用入口 `live-worker-offline.mjs` 仅由测试 WorkerClass 加载；生产始终启动 `live-worker.mjs` 和原生 WebSocket。
+-
+-```bash
+-MIKKA_LIVE_SOURCE_ROOT=<精确候选代码 checkout> \
+-MIKKA_LIVE_TEST_SOURCE_BASE=<该 checkout 的完整 40 位 SHA> node --test \
+-  scripts/acceptance/issue-1506-alex/continuation.test.mjs \
+-  scripts/acceptance/issue-1506-alex/live-consumer.test.mjs
+-```
+-
+-当前作者没有执行新增生产请求或模型调用。最终结论以正式 invocation 的产物、实际部署 SHA 和对应服务端日志为准。
++MCP 是独立、仍禁用的三 reader 阶段：latest、90s quiet、headers后5s abort；0模型、0业务写工具/聊天任务写入、0Stop、0MCP DELETE。正常 OAuth 创建/撤销会改变其授权记录，不能称所有 DB 零 mutation。未来实际执行需单独激活、服务器证据与授权清理，当前没有该通过证明。
+diff --git a/.github/workflows/issue-1212-mcp-reply.yml b/.github/workflows/issue-1212-mcp-reply.yml
+--- a/.github/workflows/issue-1212-mcp-reply.yml
++++ b/.github/workflows/issue-1212-mcp-reply.yml
+@@ -24,7 +24,7 @@
+     # deadline and must have time to finish after a transport failure.
+     timeout-minutes: 12
+     env:
+-      MIKKA_ACCEPTANCE_SHA: '26ef4de15129e22503e152258ee9cb2e4aeae8bd' # Only the verified final production application SHA.
++      MIKKA_ACCEPTANCE_SHA: '' # Only the verified final production application SHA.
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+         with:
+diff --git a/scripts/acceptance/issue-1506-alex/live-worker.mjs b/scripts/acceptance/issue-1506-alex/live-worker.mjs
+--- a/scripts/acceptance/issue-1506-alex/live-worker.mjs
++++ b/scripts/acceptance/issue-1506-alex/live-worker.mjs
+@@ -6,9 +6,10 @@
+ const { sourceDirectory, tabId, ownerId, workspaceId, transportScope, build, botId, initialChat } = workerData
+ const source = path => import(pathToFileURL(sourceDirectory + '/' + path).href)
+ const [{ LiveChannel }, { TabShare, tabShareChannelName }, { coversLiveRevisions, heldRevision },
+-  { liveInvalidation, liveReadiness }, { PersistentReadCache, readCacheShareNamespace }] = await Promise.all([
++  { liveInvalidation, liveReadiness }, { PersistentReadCache, readCacheShareNamespace },
++  { readBoundary, readFresh, observeSWRRead, acceptSWRRead, failSWRRead }] = await Promise.all([
+   source('lib/live/channel.mjs'), source('lib/live/tab-share.mjs'), source('lib/live/revisions.mjs'),
+-  source('lib/live/events.mjs'), source('lib/swr/persistent-cache.mjs'),
++  source('lib/live/events.mjs'), source('lib/swr/persistent-cache.mjs'), source('lib/swr/read-observer.mjs'),
+ ])
+ const entity = 'bot_chat:' + botId.toLowerCase()
+ // A deterministic serialized cache key for the core harness; no React/SWR render is claimed.
+@@ -74,39 +75,60 @@
+   emitState(); return data
+ }
+ 
+-// Same authorization, required-revision, local-revision and local-write identity
+-// checks as the exact reviewed hooks/use-live-key.tsx refresh closure.
+-async function refresh(requestedKey, requiredRevisions, reuseCompleted) {
+-  if (closing || requestedKey !== key) return
++// This adapter preserves the production observeSWRRead -> onSuccess -> cache
++// commit order. It is a normalized RPC consumer, not a React/SWR render.
++const current = () => !closing && cache.isEnabled
++
++// Used by the real refresh path; the offline platform fixture can independently
++// start this same actual read to exercise an in-flight same-realm obligation.
++export function readSnapshot(requiredRevision = 0, reuseCompleted = false) {
++  const promise = observeSWRRead(cache, key, async () => {
++    metadata.networkReads++
++    const requestedAt = performance.now()
++    const next = await request('chat', { requiredRevision, reuseCompleted: reuseCompleted === true })
++    return { ...next, requestedAt }
++  })
++  return promise.then(data => {
++    if (!current()) return
++    try {
++      acceptSWRRead(cache, key, data)
++      return storeSnapshot(data)
++    } catch (error) {
++      failSWRRead(cache, key, data, error)
++      throw error
++    }
++  })
++}
++
++// Same current-lifetime, authorization, required/held/local revision and
++// local-write identity guards as the pinned use-live-key refresh closure.
++async function refresh(requestedKey, requiredRevisions, reuseCompleted, after = readBoundary()) {
++  if (!current() || requestedKey !== key) return
+   metadata.refreshCalls++; activeRefreshes++
+   const requiredRevision = requiredRevisions?.[entity] ?? 0
+   post({ type: 'refresh', requiredRevision, reuseCompleted: reuseCompleted === true }); emitState()
+-  const mutate = async (data, revalidate = true) => {
+-    if (!revalidate) return storeSnapshot(data)
+-    metadata.networkReads++
+-    const requestedAt = performance.now()
+-    const next = await request('chat', { requiredRevision, reuseCompleted: reuseCompleted === true })
+-    if (closing) return
+-    return storeSnapshot({ ...next, requestedAt })
+-  }
+   try {
+     const authorized = () => ownerId && namespace && readCacheShareNamespace(cache, ownerId) === namespace
+-    if (!authorized()) return mutate()
+-    const previous = cache.get(key)?.data
++    const heldAtStart = { ...cache.get(key)?.data?.live?.revisions }
+     const accepts = data => {
+-      const accepted = coversLiveRevisions(data, requiredRevisions) && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
++      const accepted = coversLiveRevisions(data, requiredRevisions)
++        && coversLiveRevisions(data, heldAtStart)
++        && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
+       if (!accepted) metadata.rejectedOlderResults++
+       post({ type: 'acceptance', requiredRevision, localRevision: revision(cache.get(key)?.data), resultRevision: revision(data), accepted })
+       return accepted
+     }
+-    return await tabs.run(key, () => mutate(), data => {
+-      if (!authorized()) return
++    const read = () => readFresh(cache, key, after, () => readSnapshot(requiredRevision, reuseCompleted), accepts, current)
++    if (!authorized()) return await read()
++    const previous = cache.get(key)?.data
++    return await readFresh(cache, key, after, () => tabs.run(key, read, data => {
++      if (!current() || !authorized()) return
+       if (cache.get(key)?.data === previous) {
+         metadata.adopted++; post({ type: 'adopt', requiredRevision, resultRevision: revision(data) })
+-        return mutate(data, false)
++        return storeSnapshot(data)
+       }
+-      return mutate()
+-    }, accepts, reuseCompleted)
++      return read()
++    }, accepts, reuseCompleted), accepts, current)
+   } catch { fatal() }
+   finally { activeRefreshes--; firstReadSettled = true; emitState(); tryReady() }
+ }
+diff --git a/scripts/acceptance/issue-1506-alex/live-worker-offline.mjs b/scripts/acceptance/issue-1506-alex/live-worker-offline.mjs
+--- a/scripts/acceptance/issue-1506-alex/live-worker-offline.mjs
++++ b/scripts/acceptance/issue-1506-alex/live-worker-offline.mjs
+@@ -23,8 +23,14 @@
+   send(value) { if (value !== 'ping') throw new Error('offline_socket_write') }
+   close() { if (this.readyState === 3) return; this.readyState = 3; sockets.delete(this); this.dispatchEvent(new Event('close')); this.onclose?.(new Event('close')) }
+ }
++const workerModule = import('./live-worker.mjs')
+ parentPort.on('message', message => {
++  if (message?.type === 'fixture-read') {
++    void workerModule.then(module => module.readSnapshot(message.requiredRevision ?? 0)).then(
++      () => parentPort.postMessage({ type: 'fixture-read-result', ok: true }),
++      () => parentPort.postMessage({ type: 'fixture-read-result', ok: false }))
++  }
+   if (message?.type === 'fixture-push') for (const socket of sockets) socket.packet({ kind: 'bot_chat', id: message.botId, rev: message.revision })
+   if (message?.type === 'fixture-disconnect') for (const socket of sockets) socket.close()
+ })
+-await import('./live-worker.mjs')
++await workerModule
+diff --git a/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs b/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs
+--- a/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs
++++ b/scripts/acceptance/issue-1506-alex/live-consumer.test.mjs
+@@ -58,7 +58,7 @@
+   assert.throws(() => prepareLiveSource(sourceRoot, { sourceBase: '0'.repeat(40) }), /live_source_commit_mismatch/)
+ })
+ 
+-for (const path of ['lib/live/presence.ts', 'hooks/use-live-key.tsx', 'components/coordinator/coordinator-chat.tsx']) {
++for (const path of ['lib/live/presence.ts', 'hooks/use-live-key.tsx', 'components/coordinator/coordinator-chat.tsx', 'lib/swr/read-observer.ts', 'components/swr-defaults.tsx']) {
+   test(`source pin rejects drift in ${path} before creating a worker`, { skip: !sourceRoot }, () => {
+     const directory = mkdtempSync(join(tmpdir(), 'mikka-live-pin-test-'))
+     try {
+@@ -80,7 +80,7 @@
+     const presence = await import(pathToFileURL(source.directory + '/lib/live/presence.mjs').href)
+     assert.equal(typeof channel.LiveChannel, 'function'); assert.equal(typeof shares.TabShare, 'function')
+     assert.equal(shares.CLAIM_WINDOW_MS, 30)
+-    assert.equal(Object.keys(source.hashes).length, 10)
++    assert.equal(Object.keys(source.hashes).length, 12)
+     assert.equal(source.sourceCommit, sourceBase)
+     assert.deepEqual(presence.presenceReply({ type: 'presence_ready', version: 1 }), { type: 'presence_ready', version: 1 })
+   } finally { source.close() }
+@@ -203,3 +203,85 @@
+     await Promise.allSettled(workers.map(worker => worker.terminate())); source.close()
+   }
+ })
++
++
++test('only exact pinned runtime dependencies can cross directories', async () => {
++  const { resolveLiveImport } = await import('./live-source.mjs')
++  assert.equal(resolveLiveImport('lib/live/channel.ts', '../swr/read-observer'), '../swr/read-observer.mjs')
++  assert.equal(resolveLiveImport('lib/live/channel.ts', './events'), './events.mjs')
++  for (const path of ['node:fs', 'react', '../../outside', '../swr/not-pinned', '../swr/read-observer?x=1', '../swr/../swr/defaults.tsx', '..\\swr\\read-observer']) {
++    assert.throws(() => resolveLiveImport('lib/live/channel.ts', path), /live_source_import_invalid/)
++  }
++})
++
++for (const order of ['after', 'before', 'later-revision']) test(
++  'same-realm observed read respects the real push boundary: ' + order,
++  { skip: !sourceRoot, timeout: 8_000 }, async () => {
++    const source = prepare(sourceRoot), records = []
++    let worker, phase = 'initial', held, released = false, refreshObserved = false, lastState
++    let ready, readStarted, finished, closed
++    const readyPromise = new Promise(resolve => { ready = resolve })
++    const readStartedPromise = new Promise(resolve => { readStarted = resolve })
++    const finishPromise = new Promise(resolve => { finished = resolve })
++    const closedPromise = new Promise(resolve => { closed = resolve })
++    const watchdog = setTimeout(() => { ready(false); readStarted(false); finished(false); closed(false) }, 6_000)
++    const target = order === 'later-revision' ? 3 : 2
++    const reply = (message, value) => worker.postMessage({ type: 'response', id: message.id, ok: true, value })
++    const push = revision => worker.postMessage({ type: 'fixture-push', botId: BOT_IDS[0], revision })
++    try {
++      worker = new Worker(new URL('./live-worker-offline.mjs', import.meta.url), { env: {}, workerData: {
++        sourceDirectory: source.directory, tabId: 1, ownerId: ALEX_OWNER_ID,
++        workspaceId: WORKSPACE_ID, transportScope: WORKSPACE_ID, build: SHA,
++        botId: BOT_IDS[0], initialChat: chatAt(1),
++      } })
++      worker.on('error', () => { ready(false); readStarted(false); finished(false) })
++      worker.on('message', message => {
++        if (message.type === 'request') {
++          if (message.method === 'ticket') {
++            reply(message, { url: 'wss://offline.invalid/v1/live/' + 'a'.repeat(64) + '/socket',
++              protocol: PRIVATE, expiresAt: Date.now() + 60_000 })
++          } else {
++            assert.equal(message.method, 'chat')
++            if (phase === 'initial') reply(message, chatAt(1))
++            else {
++              records.push({ id: message.id, requiredRevision: message.requiredRevision })
++              if (!held) { held = message; readStarted(true) }
++              else reply(message, chatAt(target))
++            }
++          }
++        } else if (message.type === 'ready') ready(true)
++        else if (message.type === 'refresh' && phase === 'turns' && message.requiredRevision >= 2 && !released) {
++          refreshObserved = true
++          assert.ok(held, 'the independent actual read was already in flight at this flush')
++          released = true
++          if (order === 'later-revision') push(3)
++          reply(held, chatAt(2))
++        } else if (message.type === 'state') {
++          lastState = message
++          if (phase === 'turns' && released && refreshObserved && message.latestRevision >= target && message.activeRefreshes === 0) finished(true)
++        } else if (message.type === 'fatal') finished(false)
++        else if (message.type === 'closed') closed(true)
++      })
++      assert.equal(await readyPromise, true)
++      phase = 'turns'
++      if (order === 'before') {
++        worker.postMessage({ type: 'fixture-read', requiredRevision: 0 })
++        assert.equal(await readStartedPromise, true)
++        push(2)
++      } else {
++        push(2)
++        worker.postMessage({ type: 'fixture-read', requiredRevision: 0 })
++        assert.equal(await readStartedPromise, true)
++      }
++      assert.equal(await finishPromise, true, JSON.stringify({ records, lastState }))
++      assert.equal(lastState.latestRevision, target)
++      assert.equal(records.length, order === 'after' ? 1 : 2,
++        'only an actual read beginning after this push can satisfy it; a later push still needs a new read')
++      worker.postMessage({ type: 'close' })
++      assert.equal(await closedPromise, true)
++    } finally {
++      clearTimeout(watchdog)
++      await worker?.terminate()
++      source.close()
++    }
++  })

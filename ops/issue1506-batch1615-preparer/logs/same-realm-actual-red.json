@@ -1,0 +1,15 @@
+{
+  "phase": "same-realm-actual-red",
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern",
+    "same-realm observed read respects the real push boundary: after$",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+  ],
+  "exitCode": 1,
+  "durationMs": 2371,
+  "sha256": "321c2cf4d7ddb27a949dbf81236fc3690c2e5f8ed2258dc8673e06391840ff81",
+  "expectedFailure": "extra_actual_read_2_vs_1",
+  "fixtureBaseline": "fcce refresh semantics, only existing RPC read lifted for independent fixture invocation; new source/import resolver held constant"
+}

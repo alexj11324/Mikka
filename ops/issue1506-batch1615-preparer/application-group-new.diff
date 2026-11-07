@@ -1,0 +1,42 @@
+diff --git a/lib/coordinator/group-runtime.ts b/lib/coordinator/group-runtime.ts
+index bab00fa8..7f384f21 100644
+--- a/lib/coordinator/group-runtime.ts
++++ b/lib/coordinator/group-runtime.ts
+@@ -11,16 +11,17 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
+ import type { GroupRuntime } from './group-turns'
+ import { createGroupJudgment } from './group-judgment'
+ import { invokeDecision } from './decide'
+ import { freezeGroupBotModel, resolveGroupBotModel } from './group-bot-model'
+ import { groupReplySystemPrompt } from './group-reply-prompt'
+ import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+ import type { UserModelMessage } from 'ai'
+ import { groupBotCatalog } from './group-member-catalog'
++import { withAiMetadata } from '@/lib/tracing/ai'
+ 
+ const judgment = createGroupJudgment(invokeDecision)
+ 
+ /** Group replies read only public duties and host capabilities. Actual work is
+  * delegated through Factory with requester-owned resources; chat generation
+  * never imports private standing instructions or another member's sessions.
+  */
+ export const groupRuntime: GroupRuntime = {
+@@ -82,17 +83,17 @@ export const groupRuntime: GroupRuntime = {
+       messages: [{ role: 'user' as const, content }],
+       output: Output.object({ schema: z.object({ text: z.string().max(32000), mentions: z.array(z.string().uuid()).max(100), privateTo: z.uuid().nullable() }) }),
+       maxOutputTokens: 4000, maxRetries: 0, abortSignal: signal,
+       onError: ({ error }: { error: unknown }) => { streamFailure = error },
+     }
+     // Existing subscription transports are streaming-only. Never switch the
+     // selected Bot to the generic Coordinator's paid model on refusal.
+     try {
+-      if (agent.memberType === 'bot') return await streamText(options).output
+-      return (await generateText(options)).output
++      if (agent.memberType === 'bot') return await withAiMetadata({ operation: 'bot' }, () => streamText(options).output)
++      return (await withAiMetadata({ operation: 'coordinator' }, () => generateText(options))).output
+     } catch (error) {
+       // The SDK's final NoOutput error can hide the actual stream failure or timeout.
+       if (signal.aborted) throw new Error('group_generation_interrupted', { cause: signal.reason })
+       throw streamFailure ?? error
+     }
+   },
+ }

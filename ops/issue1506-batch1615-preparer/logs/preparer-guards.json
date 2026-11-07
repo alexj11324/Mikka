@@ -1,0 +1,10 @@
+{
+  "phase": "preparer-guards",
+  "command": [
+    "python3",
+    "test_prepare.py"
+  ],
+  "exitCode": 0,
+  "durationMs": 504,
+  "sha256": "5cf214fb95dc2d6ece8b7a902300ac6e6f23299a0a90ce7a5452f61c32de0f97"
+}

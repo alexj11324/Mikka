@@ -1,0 +1,13 @@
+{
+  "phase": "source-provenance-green",
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern",
+    "exact reviewed sources compile",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+  ],
+  "exitCode": 0,
+  "durationMs": 182,
+  "sha256": "5a8f09cd62d5f51f7f18b8460a4030d1b2acf0cd415f150ed216081e193de3ff"
+}

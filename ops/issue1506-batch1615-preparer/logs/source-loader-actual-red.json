@@ -1,0 +1,14 @@
+{
+  "phase": "source-loader-actual-red",
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern",
+    "exact reviewed sources compile",
+    "scripts/acceptance/issue-1506-alex/live-consumer.test.mjs"
+  ],
+  "exitCode": 1,
+  "durationMs": 205,
+  "sha256": "24ad445c233cc2a2f298030c8c65846f42cfc366b135dfbb1e8b7ccc273138e1",
+  "expectedFailureObserved": true
+}
