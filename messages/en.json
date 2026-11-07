@@ -2559,6 +2559,7 @@
     },
     "billing": {
       "loading": "Loading billing",
+      "loadFailed": "Couldn’t load billing",
       "plan": "Plan",
       "team": "Team",
       "free": "Free",
