@@ -820,6 +820,24 @@ test('trusted candidate timing cannot claim a host without a pinned device and a
   assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
 })
 
+test('lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics', async () => {
+  const io = fixture()
+  io.onDetail = (sample, detail) => {
+    if (sample.reads > 1) {
+      sample.finished = true
+      detail.thread.status = 'stopped'
+      detail.thread.attempts[0].status = 'stopped'
+    }
+  }
+  const report = await runCloudStartup({ ...options(['--mode', 'candidate', '--runs', '2', '--harness', 'both']), leaseAudit: true }, { env, ...io })
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  assert.deepEqual(report.samples.map(sample => sample.harness), ['claude_code', 'codex'])
+  assert.ok(report.samples.every(sample => sample.requireTerminal && sample.requireReplyAfterTool
+    && sample.replyVerifiedAfterTool && sample.lastStatus === 'stopped' && sample.cleanup.status === 'passed'))
+  assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  assert.ok(io.calls.some(call => /^\/api\/threads\/.*\/machine$/.test(call.path)))
+})
+
 test('member cloud diagnostics fail before creating any variable they cannot delete', async () => {
   const io = fixture({ runtime: true })
   const report = await runCloudStartup(options(['--runtime-evidence', 'required', '--official-timing', 'enabled']), { env, ...io })

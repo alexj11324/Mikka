@@ -1,5 +1,6 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { createHash } from 'node:crypto'
 import { runCloudStartup } from './cloud-startup.mjs'
 import { auditTarget } from './auth-audit-production.mjs'
 
@@ -37,21 +38,72 @@ export function leaseAuditReceipt(chunks, runId, harness) {
 export function naturalRenewalEvidence(sample) {
   const lease = sample.leaseAudit
   const renewals = sample.runtimeTiming?.counts?.filter(row => row.endpoint === 'credential_refresh') ?? []
-  return lease?.status === 'renewed' && lease.valid && lease.renewValid && lease.naturalWindowObserved
-    && lease.httpStatus === 200 && lease.renewHttpStatus === 200 && lease.renewExpiresAt > lease.expiresAt
-    && sample.runtimeTiming?.complete === true && sample.runtimeTiming.truncated === false
+  const observed = sample.daemonRenewal
+  const traced = typeof sample.runId === 'string' && observed?.source === 'posthog_daemon_refresh_span'
+    && observed.runIdHash === createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
+    && observed.harness === sample.harness && observed.started > 0
+    && observed.completed === observed.started && observed.errors === 0
+    && sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true
+    && ['succeeded', 'completed', 'stopped'].includes(sample.lastStatus)
+  const timed = sample.runtimeTiming?.complete === true && sample.runtimeTiming.truncated === false
     && renewals.some(row => row.started > 0 && row.completed === row.started && row.errors === 0)
     && renewals.every(row => row.errors === 0)
+  return lease?.status === 'renewed' && lease.valid && lease.renewValid && lease.naturalWindowObserved
+    && lease.httpStatus === 200 && lease.renewHttpStatus === 200 && lease.renewExpiresAt > lease.expiresAt
+    && (timed || traced)
 }
 
-export async function runLeaseAudit(env = process.env) {
+/** Read only completed daemon refresh spans for this owned run's real expiry.
+ * The Python tool's requests do not produce daemon.adapter.auth.refresh spans.
+ * No performance opt-in, workspace variable, provider token or production write.
+ */
+export async function readDaemonRenewal(sample, { env = process.env, fetchImpl = fetch } = {}) {
+  if (sample.leaseAudit?.status !== 'renewed') return undefined
+  if (!/^[a-f0-9-]{36}$/.test(sample.runId ?? '') || !['claude_code', 'codex'].includes(sample.harness)
+    || !Number.isSafeInteger(sample.leaseAudit.expiresAt) || sample.leaseAudit.expiresAt <= 60
+    || !/^phx_[A-Za-z0-9_-]{8,}$/.test(env.POSTHOG_PERSONAL_API_KEY ?? '')) throw Error('lease_audit_trace_scope')
+  const runIdHash = createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
+  const expiry = sample.leaseAudit.expiresAt
+  const query = `SELECT uniqExact(span_id),
+    uniqExactIf(span_id, status_code != 2 AND attributes['mikka.outcome'] = 'ok'),
+    uniqExactIf(span_id, status_code = 2 OR attributes['mikka.outcome'] != 'ok')
+    FROM posthog.trace_spans WHERE service_name = 'mikka-daemon'
+    AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'
+    AND name = 'daemon.adapter.auth.refresh' AND attributes['mikka.run.id_hash'] = '${runIdHash}'
+    AND attributes['mikka.harness'] = '${sample.harness}'
+    AND timestamp >= toDateTime(${expiry - 60}) AND timestamp <= toDateTime(${expiry + 30}) LIMIT 1`
+  const response = await fetchImpl('https://us.posthog.com/api/projects/670821/query/', {
+    method: 'POST', redirect: 'error', headers: { authorization: `Bearer ${env.POSTHOG_PERSONAL_API_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ query: { kind: 'HogQLQuery', query }, refresh: 'force_blocking' }), signal: AbortSignal.timeout(30000),
+  })
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {})
+    throw Error(`lease_audit_trace_http_${response.status}`)
+  }
+  const value = await response.json(), row = value?.results?.[0]
+  if (value?.results?.length !== 1 || !Array.isArray(row) || row.length !== 3
+    || !row.every(count => Number.isSafeInteger(count) && count >= 0 && count <= 1000)
+    || row[1] + row[2] !== row[0]) throw Error('lease_audit_trace_invalid')
+  return { source: 'posthog_daemon_refresh_span', runIdHash, harness: sample.harness,
+    started: row[0], completed: row[1], errors: row[2] }
+}
+
+export async function runLeaseAudit(env = process.env, { runStartup = runCloudStartup, readRenewal = readDaemonRenewal } = {}) {
   const applicationSha = auditTarget(env)
-  const report = await runCloudStartup({ origin: 'https://app.aspectlylabs.com', runs: 2, harness: 'both',
+  const report = await runStartup({ origin: 'https://app.aspectlylabs.com', runs: 2, harness: 'both',
     mode: 'candidate', strategy: 'derived', revision: applicationSha, expectedBuild: applicationSha,
-    timeoutMs: 720000, maxStartupMs: 60000, runtimeEvidence: 'required', officialTiming: 'enabled', leaseAudit: true })
+    timeoutMs: 600000, maxStartupMs: 60000, runtimeEvidence: 'optional', officialTiming: 'disabled', leaseAudit: true }, { env })
+  for (const sample of report.samples) {
+    try { sample.daemonRenewal = await readRenewal(sample, { env }) }
+    catch (error) {
+      const match = /^lease_audit_trace_http_([45][0-9]{2})$/.exec(error?.message ?? '')
+      sample.daemonRenewal = { source: 'posthog_daemon_refresh_span', status: 'unavailable', ...(match ? { httpStatus: Number(match[1]) } : {}) }
+    }
+  }
   const samples = report.samples.map(sample => ({ harness: sample.harness, model: sample.requestedModel,
     runId: sample.runId, status: sample.status, failure: sample.failure, cleanup: sample.cleanup,
     lease: sample.leaseAudit, naturalRenewalVerified: naturalRenewalEvidence(sample),
+    daemonRenewal: sample.daemonRenewal,
     credentialRefresh: sample.runtimeTiming?.counts?.filter(row => row.endpoint === 'credential_refresh') ?? [] }))
   return { issue: 1598, applicationSha, startedAt: report.startedAt, finishedAt: report.finishedAt,
     status: report.status !== 'candidate_subscription_proved' || report.cleanup.errors.length || samples.length !== 2
