@@ -45,3 +45,5 @@ test('production readiness uses only the shared account and logs closed capabili
  await readiness({env:{SMOKE_OWNER_EMAIL:email,SMOKE_OWNER_PASSWORD:'private-password'},fetcher,report});assert.equal(report.result,'production_readiness_verified');assert.equal(report.teamAdminAvailable,true);assert.equal(report.ownSessionSignedOut,true);assert.equal(report.businessAcceptanceComplete,false);for(const value of ['private-cookie','private-password','private-csrf','private-team-name','private-repo-name',email])assert.ok(!JSON.stringify(report).includes(value));assert.equal(calls.at(-1),'/mikka/api/auth/sign-out')
 })
 test('readiness refuses a non-smoke account before any network request',async()=>{const {readiness}=await import('./self-hosting-release.mjs');let calls=0;await assert.rejects(readiness({env:{SMOKE_OWNER_EMAIL:'alex@example.test',SMOKE_OWNER_PASSWORD:'synthetic'},fetcher:async()=>{calls++},report:{http:[]}}),/SHARED_SMOKE_ACCOUNT_REQUIRED/);assert.equal(calls,0)})
+
+// Production readiness also reads fixed project/alias metadata inside the runner.

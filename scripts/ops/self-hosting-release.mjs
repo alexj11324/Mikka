@@ -3,7 +3,7 @@ import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: '8cdb0113e2a771f3235ce1bff2edefaa9209f44a', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: '4350b2602ee00297a7580264edac36e1b9b67180', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -83,6 +83,12 @@ export async function readiness({env=process.env,fetcher=fetch,report}) {
  const email=env.SMOKE_OWNER_EMAIL,password=env.SMOKE_OWNER_PASSWORD
  demand(typeof email==='string' && /^[^@\s]+\+mikka-smoke(?:-[a-z0-9]+)*@[^@\s]+$/i.test(email) && password,'SHARED_SMOKE_ACCOUNT_REQUIRED')
  const publicOrigin='https://app.aspectlylabs.com', privateOrigin='https://mikka-cloud.vercel.app';let cookie=''
+ if(env.VERCEL_TEAM_TOKEN){
+  const ver=async path=>{const r=await fetcher('https://api.vercel.com'+path,{headers:{authorization:'Bearer '+env.VERCEL_TEAM_TOKEN},redirect:'error',signal:AbortSignal.timeout(20000)});report.requests.push({operation:'private_deployment_metadata',status:r.status});demand(r.ok,'READINESS_VERCEL_METADATA');return r.json()}
+  const p=await ver('/v9/projects/'+TARGET.app+'?teamId='+TARGET.team);demand(p.id===TARGET.app&&p.accountId===TARGET.team,'READINESS_VERCEL_TARGET');const d=p.targets?.production;report.privateDeployment={id:d?.id??null,source:d?.meta?.githubCommitSha??null,state:d?.readyState??null,url:d?.url??null,ssoDeploymentType:p.ssoProtection?.deploymentType??null,passwordProtectionEnabled:!!p.passwordProtection};
+  const a=await ver('/v4/aliases/mikka-cloud.vercel.app?teamId='+TARGET.team);report.privateAlias={projectMatches:(a.projectId??a.project?.id)===TARGET.app,deploymentId:a.deploymentId??a.deployment?.id??null}
+ }
+
  const request=async(operation,origin,path,body)=>{demand([publicOrigin,privateOrigin].includes(origin) && path.startsWith('/mikka/'),'READINESS_REQUEST_SCOPE');let r
  try {r=await fetcher(origin+path,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(30000),headers:{origin:publicOrigin,'cache-control':'no-store',...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})})}catch{throw Error('READINESS_TRANSPORT')}
  report.http.push({operation,status:r.status});return r}
@@ -93,7 +99,7 @@ export async function readiness({env=process.env,fetcher=fetch,report}) {
  const gr=await request('shared_account_github',publicOrigin,'/mikka/api/integrations/github');const gh=gr.ok?await gr.json():null;report.github={status:gr.status,configured:gh?.configured===true,connected:gh?.connected===true,installed:gh?.installed===true,repositoryCount:Array.isArray(gh?.repositories)?gh.repositories.length:0}
  const br=await request('shared_account_bots',publicOrigin,'/mikka/api/bots');const bots=br.ok?await br.json():[];const bot=Array.isArray(bots)?bots.find(x=>x.name==='Smoke Bot'):null
  if(bot && /^[a-f0-9-]{36}$/.test(bot.id)){const mr=await request('shared_subscription_options',publicOrigin,'/mikka/api/mobile/model?bot='+bot.id);const menu=mr.ok?await mr.json():null;report.subscriptionOptions=(menu?.groups??[]).filter(g=>g.kind==='subscription').flatMap(g=>g.options??[]).map(x=>({modelId:typeof x.modelId==='string'&&/^[a-zA-Z0-9/_.:-]{1,100}$/.test(x.modelId)?x.modelId:'OTHER',available:x.available===true}))}
- const hr=await request('private_health',privateOrigin,'/mikka/cloud/health');demand(hr.ok && (await hr.json()).ok===true,'READINESS_PRIVATE_HEALTH')
+ const hr=await request('private_health',privateOrigin,'/mikka/cloud/health');report.privateHealth={status:hr.status,vercelError:['DEPLOYMENT_NOT_FOUND','FUNCTION_INVOCATION_FAILED','FUNCTION_NOT_FOUND','AUTHENTICATION_REQUIRED'].includes(hr.headers.get('x-vercel-error'))?hr.headers.get('x-vercel-error'):null};demand(hr.ok && (await hr.json()).ok===true,'READINESS_PRIVATE_HEALTH')
  const dr=await request('private_discovery',privateOrigin,'/mikka/cloud/.well-known/oauth-authorization-server');demand(dr.ok && (await dr.json()).issuer===publicOrigin+'/mikka/cloud','READINESS_ISSUER')
  const cr=await request('private_browser_context',privateOrigin,'/mikka/cloud/v1/management/context');demand(cr.ok,'READINESS_CONTEXT_HTTP');const context=await cr.json();demand(Array.isArray(context.workspaces) && typeof context.csrfToken==='string','READINESS_CONTEXT_SCHEMA')
  report.workspaces=context.workspaces.map(w=>({kind:['personal','team'].includes(w.kind)?w.kind:'OTHER',role:['admin','member'].includes(w.role)?w.role:'OTHER'}));report.teamAdminAvailable=context.workspaces.some(w=>w.kind==='team'&&w.role==='admin');report.enabledScopes=(context.enabledScopes??[]).filter(x=>['github','push','models'].includes(x))
