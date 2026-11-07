@@ -32,6 +32,10 @@ const iso = value => new Date(value).toISOString()
 const fail = (code, cause) => { throw new Error(`lifecycle_${code}`, cause ? { cause } : undefined) }
 const assert = (value, code) => { if (!value) fail(code) }
 export const safeError = error => /^(?:lifecycle|startup)_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'lifecycle_failed'
+const FAILURE_PHASES = new Set(['unknown', 'runtime_validation', 'source_pin', 'account_validation', 'build_pin',
+  'sign_in', 'session_identity', 'workspace_selection', 'subscription_catalogue', 'owner_cloud_capability',
+  'subscription_selection', 'bot_create', 'chat_model_selection', 'profile_create', 'profile_validation', 'run_case'])
+const failureAt = (error, phase) => ({ phase: FAILURE_PHASES.has(phase) ? phase : 'unknown', code: safeError(error) })
 const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 const noAbort = signal => { if (signal?.aborted) fail('interrupted') }
 
@@ -62,24 +66,27 @@ export function createProviderObserver({ apiKey, getInfo, now = Date.now }) {
   const proven = new Map()
   return async ({ sandboxId, workspaceId, originRunId }) => {
     assert(VM_ID.test(sandboxId ?? '') && UUID.test(workspaceId ?? '') && UUID.test(originRunId ?? ''), 'provider_scope_invalid')
-    const base = { observedAt: iso(now()), vmHash: lifecycleHash('vm', sandboxId) }
-    if (!apiKey) return { ...base, status: 'blocked', reason: 'observation_key_unavailable', ownershipVerified: false }
+    const base = { requestedAt: apiKey ? iso(now()) : null, vmHash: lifecycleHash('vm', sandboxId) }
+    // A response observation is timed after the awaited RPC, including missing
+    // and failed responses. It is not the provider's exact transition instant.
+    const observed = value => ({ ...base, observedAt: iso(now()), ...value })
+    if (!apiKey) return observed({ status: 'blocked', reason: 'observation_key_unavailable', ownershipVerified: false })
     let info
     try { info = await getInfo(sandboxId, { apiKey, requestTimeoutMs: 15000 }) }
     catch (error) {
       const missing = error?.status === 404 || error?.statusCode === 404 || error?.name === 'SandboxNotFoundError'
       if (missing && proven.get(sandboxId) === `${workspaceId}:${originRunId}`)
-        return { ...base, status: 'observed', state: 'missing', ownershipVerified: true }
-      return { ...base, status: 'blocked', reason: missing ? 'account_mapping_unproven_404' : 'provider_observation_unavailable',
-        ownershipVerified: proven.get(sandboxId) === `${workspaceId}:${originRunId}` }
+        return observed({ status: 'observed', state: 'missing', ownershipVerified: true })
+      return observed({ status: 'blocked', reason: missing ? 'account_mapping_unproven_404' : 'provider_observation_unavailable',
+        ownershipVerified: proven.get(sandboxId) === `${workspaceId}:${originRunId}` })
     }
     if (info?.sandboxId !== sandboxId || info.metadata?.application !== 'mikka-thread'
       || info.metadata?.workspaceId !== workspaceId || info.metadata?.runId !== originRunId
       || !UUID.test(info.metadata?.operationId ?? '') || !['running', 'paused'].includes(info.state))
-      return { ...base, status: 'blocked', reason: 'provider_metadata_mismatch', ownershipVerified: false }
+      return observed({ status: 'blocked', reason: 'provider_metadata_mismatch', ownershipVerified: false })
     proven.set(sandboxId, `${workspaceId}:${originRunId}`)
-    return { ...base, status: 'observed', state: info.state, ownershipVerified: true,
-      operationHash: lifecycleHash('operation', info.metadata.operationId) }
+    return observed({ status: 'observed', state: info.state, ownershipVerified: true,
+      operationHash: lifecycleHash('operation', info.metadata.operationId) })
   }
 }
 
@@ -362,6 +369,17 @@ export async function cleanupLifecycleCase(client, record, { observeProvider, sc
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
 }
 
+function terminalObservation(detail, runId, now) {
+  // The thread may project a whole continuation chain. Only the exact attempt
+  // owns this completion timestamp; an absent timestamp never becomes a gate.
+  const matches = Array.isArray(detail.thread?.attempts) ? detail.thread.attempts.filter(item => item.runId === runId) : []
+  const attempt = matches.length === 1 ? matches[0] : null
+  const status = TERMINAL.has(attempt?.status) ? attempt.status : null
+  const finished = status && typeof attempt.finishedAt === 'string' ? Date.parse(attempt.finishedAt) : NaN
+  return { runId, status, finishedAt: Number.isFinite(finished) ? iso(finished) : null,
+    observedAt: iso(now()), source: 'normal_owner_thread_attempt' }
+}
+
 export async function runLifecycleCase({ client, botId, profile, scope, harness, sourceCommit, source, observeProvider, pin,
   caseId = randomUUID(), markerValue = randomUUID().replaceAll('-', ''), timeoutMs = 360000,
   WebSocketImpl = globalThis.WebSocket, now = Date.now, signal, wait = watchRun }) {
@@ -369,7 +387,8 @@ export async function runLifecycleCase({ client, botId, profile, scope, harness,
   const markerBody = JSON.stringify({ caseId, sourceCommit, markerValue }) + '\n'
   const record = { caseId, harness, model: MODELS[harness], sourceCommit, botId, profileId: profile.id, startedAt: iso(now()),
     status: 'running', issueAcceptance: 'incomplete', phase: 'preflight', markerValue, markerSha256: sha(markerBody), markerBytes: Buffer.byteLength(markerBody),
-    provider: {}, correlation: {}, placement: { kind: 'cloud' }, limits: ['automatic_next_stage_profile_not_pinned', 'markdown_download_not_tested'] }
+    provider: {}, correlation: {}, terminal: { origin: null, continuation: null }, placement: { kind: 'cloud' },
+    limits: ['automatic_next_stage_profile_not_pinned', 'markdown_download_not_tested'] }
   let originQuestion
   const fence = async () => { noAbort(signal); await pin(); noAbort(signal) }
   const waitPhase = async (runId, observe) => wait(client, { issueId: record.issueId, runId }, timeoutMs, WebSocketImpl, now, undefined, {
@@ -396,6 +415,7 @@ export async function runLifecycleCase({ client, botId, profile, scope, harness,
     await subscriptionProof(client, record, scope, profile)
     await waitPhase(record.runId, async (detail, hooks) => {
       noAbort(signal)
+      if (TERMINAL.has(detail.thread?.status)) record.terminal.origin = terminalObservation(detail, record.runId, now)
       const snapshot = await factorySnapshot(client, record, hooks)
       const proof = nativeEvidence(detail, record)
       const machine = await readMachine(client, record, scope, observeProvider,
@@ -429,6 +449,7 @@ export async function runLifecycleCase({ client, botId, profile, scope, harness,
     record.phase = 'waiting_for_same_session_delivery'
     await waitPhase(record.continuationRunId, async (detail, hooks) => {
       noAbort(signal)
+      if (TERMINAL.has(detail.thread?.status)) record.terminal.continuation = terminalObservation(detail, record.continuationRunId, now)
       const snapshot = await factorySnapshot(client, record, hooks)
       const proof = nativeEvidence(detail, { ...record, runId: record.continuationRunId })
       const machine = await readMachine(client, record, scope, observeProvider, TERMINAL.has(detail.thread?.status) ? 'after_delivery' : 'resumed_running', hooks.checkActive)
@@ -529,36 +550,47 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
     excluded: ['provider_fault_injection_separate_driver', 'natural_timeout_expiry', 'markdown_download', 'automatic_final_stage_model_selection',
       'final_factory_submission', 'independent_coding_stage_completion'] }
   const client = createClient(ORIGIN, fetchImpl), profiles = [], bots = new Set()
-  let loggedIn = false, ownerId, originalWorkspaceId, scope
+  let loggedIn = false, ownerId, originalWorkspaceId, scope, phase = 'runtime_validation'
   const pin = async () => {
     noAbort(signal)
+    const priorPhase = phase
+    phase = 'build_pin'
     const version = await client.json('/api/version')
     noAbort(signal)
     assert(version.build === options.sourceCommit, 'production_source_mismatch')
     report.build = version.build
+    phase = priorPhase
   }
   const observeProvider = createProviderObserver({ apiKey: env.E2B_API_KEY, getInfo, now })
   try {
     assert(SHA.test(options.sourceCommit ?? '') && typeof WebSocketImpl === 'function', 'runtime_invalid')
+    phase = 'source_pin'
     const source = await readSource(options.sourceCommit)
     report.source = { path: source.path, sha256: source.sha256 }
+    phase = 'account_validation'
     const account = smokeAcceptanceAccount(env)
     await pin()
+    phase = 'sign_in'
     const login = await client.request('/api/auth/sign-in/email', post({ ...account, rememberMe: false }))
     assert(login.ok, 'sign_in_failed'); loggedIn = true
+    phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
     assert(identity.user?.email?.toLowerCase() === account.email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'session_identity_mismatch')
     ownerId = identity.user.id
     report.ownerHash = lifecycleHash('owner', ownerId)
+    phase = 'workspace_selection'
     scope = await selectAcceptanceTeam(client, { ownerId }, value => { originalWorkspaceId = value })
     report.team = scope.evidence
+    phase = 'subscription_catalogue'
     const order = await client.rpc('model-order.getModelOrder', [scope.workspaceId])
-    const keyStatus = await client.rpc('workspace-secrets.getE2BKey', [scope.workspaceId])
+    phase = 'owner_cloud_capability'
+    const keyStatus = await client.rpc('workspace-secrets.getE2BKeyCapability', [scope.workspaceId])
     assert(typeof keyStatus.configured === 'boolean' && typeof keyStatus.byoEnabled === 'boolean', 'owner_cloud_status_invalid')
     report.ownerCloud = { configured: keyStatus.configured, byoEnabled: keyStatus.byoEnabled,
       lastErrorCode: ['invalid', 'rate_limited', 'unavailable'].includes(keyStatus.lastErrorCode) ? keyStatus.lastErrorCode : null,
       observedAt: iso(now()), source: 'normal_owner_status_no_key_value' }
     for (const [harness, model] of Object.entries(MODELS)) {
+      phase = 'subscription_selection'
       if (report.cases.some(item => item.cleanup.status !== 'passed')) {
         report.cases.push({ harness, model, status: 'blocked', error: 'lifecycle_previous_cleanup_unconfirmed',
           cleanup: { status: 'passed', errors: [], history: 'no_case_created' } })
@@ -579,16 +611,19 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
         // A separate unique Bot per leg also isolates each canonical deliverable
         // workspace. No pre-existing Bot or workspace model preference changes.
         setupPhase = 'bot_create'
+        phase = 'bot_create'
         fixture = await acceptanceBot(client, undefined, randomUUID(), { issue: 1593,
           rememberCreated: botId => { bots.add(botId); fixture = { botId, created: true, retention: 'retained_no_delete_api', validation: 'unconfirmed' } } })
         const caseScope = { ...scope, botId: fixture.botId }
         setupPhase = 'new_bot_model_choice'
         await pin()
+        phase = 'chat_model_selection'
         await chooseSharedChatModel(client, fixture.botId, harness)
         // This is the new Bot's ordinary Coordinator preference. The coding
         // leg itself is separately pinned and proved by its frozen Profile.
         await pin()
         setupPhase = 'profile_create'
+        phase = 'profile_create'
         profileReceipt = { id: randomUUID(), version: null, cleaned: false }
         profiles.push(profileReceipt)
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: profileReceipt.id, profile: {
@@ -596,12 +631,14 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
           harness, model: { mode: 'fixed', harness, model, source: candidates[0].source }, effort: 'low', roles: [], skills: [],
           instructions: 'Use only this fixed official subscription for the assigned lifecycle review. Do not submit: final submission selects an unpinned independent Profile. Complete the two actual decision boundaries and retain the useful report in the canonical workspace. No extra agents, credentials, configuration changes, remote repos, commits or PRs.',
         } }))
+        phase = 'profile_validation'
         const profile = created.profile
         if (profile?.id === profileReceipt.id && Number.isSafeInteger(profile.version) && profile.version > 0) profileReceipt.version = profile.version
         assert(profile?.id === profileReceipt.id && Number.isSafeInteger(profile.version) && profile.version > 0 && DIGEST.test(profile.digest ?? '')
           && profile.harness === harness && profile.model?.mode === 'fixed' && profile.model.harness === harness && profile.model.model === model
           && profile.model.source?.kind === 'subscription' && profile.model.source.connectionId === candidates[0].source.connectionId, 'profile_source_mismatch')
         setupPhase = 'run_case'
+        phase = 'run_case'
         caseReport = await runCase({ client, botId: fixture.botId, profile, scope: caseScope, harness, sourceCommit: options.sourceCommit, source,
           observeProvider, pin, timeoutMs: options.timeoutMs, WebSocketImpl, now, signal })
         assert(caseReport?.cleanup && ['passed', 'failed'].includes(caseReport.cleanup.status), 'cleanup_receipt_missing')
@@ -613,7 +650,8 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
         }
         const unknown = setupPhase === 'run_case' || setupPhase === 'bot_create' && !fixture
           || setupPhase === 'profile_create' && !profileReceipt?.cleaned
-        caseReport = { harness, model, status: unknown ? 'failed' : 'blocked', error: safeError(error), setupPhase,
+        const failure = failureAt(error, phase)
+        caseReport = { harness, model, status: unknown ? 'failed' : 'blocked', error: failure.code, failure, setupPhase,
           cleanup: { status: unknown ? 'failed' : 'passed', scope: 'setup_only_no_confirmed_task_dispatch',
             errors: unknown ? [{ step: setupPhase, code: profileCleanupError ?? 'lifecycle_cleanup_receipt_missing' }] : [] } }
       }
@@ -621,7 +659,7 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
       if (profileReceipt) caseReport.profileId = profileReceipt.id
       report.cases.push(caseReport)
     }
-  } catch (error) { report.error = safeError(error) }
+  } catch (error) { report.failure = failureAt(error, phase); report.error = report.failure.code }
   finally {
     const clean = async (step, work) => { try { await work() } catch (error) { report.cleanup.errors.push({ step, code: safeError(error) }) } }
     if (loggedIn) {
@@ -634,7 +672,8 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
     }
     client.clear()
     for (const [harness, model] of Object.entries(MODELS)) if (!report.cases.some(item => item.harness === harness))
-      report.cases.push({ harness, model, status: 'blocked', error: report.error ?? 'lifecycle_precondition_failed', cleanup: { status: 'passed', errors: [] } })
+      report.cases.push({ harness, model, status: 'blocked', error: report.error ?? 'lifecycle_precondition_failed',
+        ...(report.failure ? { failure: { ...report.failure } } : {}), cleanup: { status: 'passed', errors: [] } })
     report.cleanup.status = report.cleanup.errors.length || report.cases.some(item => item.cleanup.status !== 'passed') ? 'failed' : 'passed'
     report.status = report.cleanup.status === 'failed' || report.cases.some(item => item.status === 'failed') ? 'failed'
       : report.cases.every(item => item.status === 'blocked') ? 'blocked'
