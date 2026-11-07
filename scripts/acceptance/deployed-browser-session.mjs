@@ -9,6 +9,12 @@ const SIGN_OUT = ORIGIN + '/mikka/api/auth/sign-out'
 const SESSION = ORIGIN + '/mikka/api/auth/get-session'
 const REPORT = 'production-deployed-browser-report/report.json'
 const MODE = 'deployed-target'
+// Only named smoke operations may enter a report; never a locator or page value.
+const BROWSER_STAGES = new Set([
+  'sign-in', 'session-identity', 'team-selection', 'navigation', 'signed-in-route',
+  'coordinator-selection', 'composer', 'feature-coordinator', 'feature-credential-vault',
+  'feature-approved-writes', 'computer-panel', 'computer-tab', 'required-coordinator', 'required-features',
+])
 const CODES = new Set([
   'browser_mode_rejected', 'browser_origin_rejected', 'browser_contract_rejected',
   'browser_assertions_failed', 'browser_session_not_observed', 'browser_cleanup_failed',
@@ -98,7 +104,7 @@ export async function selectBrowserTeamWorkspace({ page, baseURL, ownerId }) {
   throw new TeamWorkspaceError(closedFailure.detail)
 }
 
-/** Runs the unchanged browser assertions only in the explicit deployed-target mode.
+/** Runs the browser assertions only in the explicit deployed-target mode.
  * The page and its request context belong to this single Playwright test.
  * The caller's actual identity assertion marks the normal owner session; no
  * cookie, email, password, user ID or raw failure is retained in this report. */
@@ -113,6 +119,7 @@ export async function runDeployedBrowserSmoke({
     status: 'blocked', code: null, startedAt: new Date(now()).toISOString(),
     targetBeforeVerified: false, targetAfterVerified: false,
     browserExecuted: false, assertionsPassed: false, pageErrorCount: 0,
+    browserStage: null, failedStage: null,
     signInAttempted: false, normalSessionObserved: false,
     teamWorkspaceConfirmed: false, teamWorkspaceHash: null, teamAdminMembershipVerified: false,
     teamSelectionBasis: null, teamOwnerAttribution: null, teamWorkspaceFailure: null,
@@ -126,6 +133,12 @@ export async function runDeployedBrowserSmoke({
   let originalFailure, failure, listening = false, targetBefore
   const onPageError = () => { report.pageErrorCount++ }
   const scope = Object.freeze({
+    async step(stage, operation) {
+      check(BROWSER_STAGES.has(stage) && typeof operation === 'function', 'browser_contract_rejected')
+      report.browserStage = stage
+      try { return await operation() }
+      catch (error) { report.failedStage = stage; throw error }
+    },
     signInAttempted() { report.signInAttempted = true },
     identityConfirmed() {
       check(report.signInAttempted, 'browser_session_not_observed')
