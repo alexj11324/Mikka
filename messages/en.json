@@ -5259,6 +5259,22 @@
     "renderHint": "Retry to reopen the view."
   },
   "HostedSettings": {
+    "memory": {
+      "title": "Memory",
+      "count": "{count, plural, one {# memory} other {# memories}}",
+      "off": "Learning is off",
+      "offNote": "Nothing new is learnt from your connected apps. What is here stays.",
+      "category": "Kind",
+      "all": "All",
+      "search": "Search memories",
+      "closeSearch": "Close search",
+      "noMatch": "No memory mentions “{query}”",
+      "noneHere": "No memories here",
+      "editing": "Enter to save · Esc to cancel",
+      "deleted": "Deleted “{text}”",
+      "learned": "Learnt from your connected apps",
+      "edited": "You corrected it"
+    },
     "security": {
       "othersDone": "Other devices are signed out",
       "othersTitle": "Sign out other devices",

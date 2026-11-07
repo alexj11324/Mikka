@@ -5259,6 +5259,22 @@
     "renderHint": "请重试打开页面。"
   },
   "HostedSettings": {
+    "memory": {
+      "title": "记忆",
+      "count": "{count} 条记忆",
+      "off": "已停止学习",
+      "offNote": "不再从已连接的 App 中学习新的记忆，已有的记忆会保留。",
+      "category": "类别",
+      "all": "全部",
+      "search": "搜索记忆",
+      "closeSearch": "关闭搜索",
+      "noMatch": "没有提到「{query}」的记忆",
+      "noneHere": "这一类没有记忆",
+      "editing": "Enter 保存 · Esc 取消",
+      "deleted": "已删除「{text}」",
+      "learned": "从已连接的 App 学到",
+      "edited": "你更正过"
+    },
     "security": {
       "othersDone": "其他设备已退出",
       "othersTitle": "退出其他设备",
