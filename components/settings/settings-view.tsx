@@ -8,9 +8,9 @@ import { SettingsContentFrame } from '@ui-slot/settings-content'
 import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SecurityAndSignIn } from '@ui-slot/settings-security'
 import { PreferencesSettings } from '@ui-slot/settings-preferences'
+import { WorkspaceGeneral } from '@ui-slot/settings-general'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
-import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
@@ -26,7 +26,6 @@ import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
-import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { settingsHref, TEAM_ONLY_SECTIONS, type SettingsSectionId } from '@/lib/settings-sections'
 import { useRouter } from '@/i18n/navigation'
@@ -123,7 +122,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} /> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).
-    case 'general': return <><WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />{team && workspaceId && !preview && <ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} />}</>
+    case 'general': return <WorkspaceGeneral userKey={userKey ?? user.email} workspaceId={workspaceId} showArchived={Boolean(team && workspaceId && !preview)} />
     case 'computers': return null
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
