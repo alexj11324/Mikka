@@ -41,6 +41,62 @@ it("records Codex numeric strings, status and websocket requests without treatin
   expect(JSON.stringify(receipt)).not.toContain("PRIVATE")
 })
 
+it.each(["0", "000", undefined])("keeps unknown OTLP event time %s nullable without deduplicating unidentified requests", timeUnixNano => {
+  let observedAt = 1000
+  const collector = new OfficialCliTimingCollector("run", "codex", () => observedAt++)
+  collector.accept(batch(...[876, 932].map(duration => ({
+    ...record({ "event.name": "codex.api_request", duration_ms: duration, "http.response.status_code": 200, attempt: 0 }),
+    timeUnixNano,
+  }))))
+  const receipt = collector.finish(true)
+  expect(receipt.events.map(event => ({ eventAt: event.eventAt, receivedAt: event.receivedAt, durationMs: event.durationMs }))).toEqual([
+    { eventAt: null, receivedAt: 1001, durationMs: 876 },
+    { eventAt: null, receivedAt: 1002, durationMs: 932 },
+  ])
+  expect(receipt).toMatchObject({ recordsReceived: 2, duplicates: 0, rejectedBatches: 0, invalidEvents: 0, truncated: false })
+  expect(receipt.events.every(event => event.status === 200 && event.outcome === "ok" && event.sequence === null)).toBe(true)
+  expect(JSON.stringify(receipt)).not.toContain("PRIVATE")
+})
+
+it("still deduplicates a positive nanosecond identity or an explicit sequence when event time is unknown", () => {
+  for (const identity of [{ timeUnixNano: "1793980800000000000" },
+    { timeUnixNano: "0", sequence: 0 }, { timeUnixNano: undefined, sequence: 1 }]) {
+    const collector = new OfficialCliTimingCollector("run", "codex", () => 1000)
+    const first = { ...record({ "event.name": "codex.api_request", duration_ms: 876,
+      ...(identity.sequence === undefined ? {} : { "event.sequence": identity.sequence }) }), timeUnixNano: identity.timeUnixNano }
+    collector.accept(batch(first, first))
+    const receipt = collector.finish()
+    expect(receipt).toMatchObject({ recordsReceived: 2, duplicates: 1, invalidEvents: 0 })
+    expect(receipt.events).toHaveLength(1)
+  }
+})
+
+it("preserves a valid event timestamp while keeping observed time independent", () => {
+  const collector = new OfficialCliTimingCollector("run", "codex", () => 2000)
+  collector.accept(batch(...["0", undefined, "1793980800000000000"].map(timeUnixNano => ({
+    ...record({ "event.name": "codex.api_request", duration_ms: 876, "event.timestamp": "2026-11-07T05:52:14.123Z" }),
+    timeUnixNano,
+  }))))
+  const receipt = collector.finish()
+  expect(receipt.events.map(event => [event.eventAt, event.receivedAt])).toEqual([
+    [1794030734123, 2000], [1794030734123, 2000], [1794030734123, 2000],
+  ])
+  expect(receipt.duplicates).toBe(0)
+})
+
+it("does not let a zero event timestamp replace a valid nanosecond fallback or an unknown time", () => {
+  const collector = new OfficialCliTimingCollector("run", "codex", () => 2000)
+  collector.accept(batch(...["1793980800000000000", "0", undefined].map(timeUnixNano => ({
+    ...record({ "event.name": "codex.api_request", duration_ms: 876, "event.timestamp": "1970-01-01T00:00:00.000Z" }),
+    timeUnixNano,
+  }))))
+  const receipt = collector.finish()
+  expect(receipt.events.map(event => [event.eventAt, event.receivedAt])).toEqual([
+    [1793980800000, 2000], [null, 2000], [null, 2000],
+  ])
+  expect(receipt.duplicates).toBe(0)
+})
+
 it("marks missing, malformed, truncated and duplicate evidence explicitly rather than claiming complete zero calls", () => {
   const empty = new OfficialCliTimingCollector("run", "codex").finish(true)
   expect(empty).toMatchObject({ events: [], collection: "best_effort", flush: "not_confirmed", cliExitObserved: true })

@@ -95,10 +95,12 @@ export class OfficialCliTimingCollector {
     if (typeof candidate !== "string" || !EVENTS.has(candidate as EventName) || !candidate.startsWith(`${this.harness}.`)) { this.ignoredRecords++; return }
     const name = candidate as EventName, durationMs = number(fields.duration_ms, 86_400_000)
     if (durationMs === null) { this.invalidEvents++; return }
-    const nanos = typeof record?.timeUnixNano === "string" && /^\d{1,20}$/.test(record.timeUnixNano) ? record.timeUnixNano : null
+    // OTLP uses zero for an unknown timestamp, so it cannot identify duplicate events.
+    const nanos = typeof record?.timeUnixNano === "string" && /^\d{1,20}$/.test(record.timeUnixNano)
+      && Number(record.timeUnixNano) > 0 ? record.timeUnixNano : null
     const timestamp = typeof fields["event.timestamp"] === "string" && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(fields["event.timestamp"])
       ? Date.parse(fields["event.timestamp"]) : NaN
-    const eventAt = Number.isFinite(timestamp) ? timestamp : nanos ? Number(nanos) / 1_000_000 : null
+    const eventAt = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : nanos ? Number(nanos) / 1_000_000 : null
     const sequence = number(fields["event.sequence"], Number.MAX_SAFE_INTEGER)
     const identity = nanos || sequence !== null ? `${name}:${nanos}:${sequence}` : null
     if (identity && this.seen.has(identity)) { this.duplicates++; return }
