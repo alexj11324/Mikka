@@ -127,7 +127,9 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   // the team it is grouped under does. Kept with the view's filters, so another workspace's team never carries over.
   const [teamFilter, setTeamFilter] = useViewState<string>('board:team', TEAM_ALL)
   const { data: teams = [] } = useSWR('teams', listTeams)
-  const team = teamFilter === TEAM_ALL || teamFilter === NONE || teams.some(item => item.id === teamFilter) ? teamFilter : TEAM_ALL
+  // 团队 are groups inside a shared workspace (glossary): with none (a personal workspace, or a shared one without teams) there is no picker and no team filter.
+  const showTeams = teams.length > 0
+  const team = showTeams && (teamFilter === NONE || teams.some(item => item.id === teamFilter)) ? teamFilter : TEAM_ALL
   useListExpiry(display.completed === 'all' ? [] : issues.filter(issue => issue.status === 'done')
     .map(issue => new Date(issue.updatedAt).getTime() + COMPLETED_DAYS[display.completed] * 86_400_000))
   const listScroll = useViewScroll<HTMLDivElement>(`${stateKey}:list`, view === 'list')
@@ -230,14 +232,14 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
       <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
-        <Select value={team} onValueChange={value => { if (value) setTeamFilter(value) }} items={[{ value: TEAM_ALL, label: t('team.all') }, { value: NONE, label: t('team.none') }, ...teams.map(item => ({ value: item.id, label: `${item.identifier} · ${item.name}` }))]}>
+        {showTeams && <Select value={team} onValueChange={value => { if (value) setTeamFilter(value) }} items={[{ value: TEAM_ALL, label: t('team.all') }, { value: NONE, label: t('team.none') }, ...teams.map(item => ({ value: item.id, label: `${item.identifier} · ${item.name}` }))]}>
           <SelectTrigger size="sm" className="h-7 min-w-28 max-w-56" aria-label={t('team.label')}><Users data-icon="inline-start" className="text-muted-foreground" /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
           <SelectContent align="start" alignItemWithTrigger={false} className="min-w-48"><SelectGroup>
             <SelectItem value={TEAM_ALL}>{t('team.all')}</SelectItem>
             <SelectItem value={NONE}>{t('team.none')}</SelectItem>
             {teams.map(item => <SelectItem key={item.id} value={item.id}><span className="truncate">{item.identifier} · {item.name}</span></SelectItem>)}
           </SelectGroup></SelectContent>
-        </Select>
+        </Select>}
         <Separator orientation="vertical" className="mx-1 h-5" />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
