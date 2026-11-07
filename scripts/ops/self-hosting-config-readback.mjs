@@ -40,7 +40,15 @@ export async function readVercelFallback(env, fetcher = fetch) {
       // Only a selected, validated provider ID reaches this fixed project path.
       const item = await get(`/v1/projects/${VERCEL_PROJECT}/env/${rows[0].id}?teamId=${VERCEL_TEAM}`)
       if (item?.key !== name || item.id !== rows[0].id || typeof item.value !== 'string'
-        || !Array.isArray(item.target) || !item.target.includes('production') || item.gitBranch) throw new ProbeFailure('vercel_response_invalid')
+        || !Array.isArray(item.target) || !item.target.includes('production') || item.gitBranch) {
+        evidence[name] = { status: 'vercel_response_invalid', metadata: {
+          type: ['system', 'secret', 'sensitive', 'encrypted', 'plain'].includes(item?.type) ? item.type : 'other',
+          has_value: typeof item?.value === 'string', key_match: item?.key === name, id_match: item?.id === rows[0].id,
+          target_match: Array.isArray(item?.target) && item.target.includes('production'), branch_bound: Boolean(item?.gitBranch),
+          decrypted: item?.decrypted === true ? 'true' : item?.decrypted === false ? 'false' : 'unset',
+        } }
+        continue
+      }
       resolved[name] = item.value; resolved[`READ_${name}`] = 'success'; evidence[name] = 'found'
     } catch (error) { evidence[name] = error instanceof ProbeFailure ? error.code : 'unexpected_failure' }
   }

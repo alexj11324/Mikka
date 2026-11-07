@@ -42,6 +42,16 @@ test('representation diagnostics disclose only closed shapes and lengths', () =>
   for (const value of Object.values(env)) assert.ok(!JSON.stringify(diagnostics).includes(value))
 })
 
+test('a withheld sensitive Vercel value reports only safe metadata and is never treated as credentials', async () => {
+  const env = { READ_VERCEL_DEPLOY_TOKEN: 'success', VERCEL_DEPLOY_TOKEN: 'fixture-deploy-token' }
+  const selected = { id: 'key-id', key: 'GITHUB_APP_PRIVATE_KEY', target: ['production'], type: 'sensitive' }
+  const { env: result, evidence } = await readVercelFallback(env, async url => String(url).includes('/v10/')
+    ? Response.json({ envs: [selected] }) : Response.json({ ...selected, decrypted: false, comment: 'never-return-this', extra: 'never-return-this-either' }))
+  assert.equal(result.GITHUB_APP_PRIVATE_KEY, undefined)
+  assert.deepEqual(evidence.GITHUB_APP_PRIVATE_KEY, { status: 'vercel_response_invalid', metadata: { type: 'sensitive', has_value: false, key_match: true, id_match: true, target_match: true, branch_bound: false, decrypted: 'false' } })
+  assert.ok(!JSON.stringify(evidence).includes('never-return'))
+})
+
 test('flags expose only exact enums and distinguish a failed read from an unset value', () => {
   const env = Object.fromEntries([...BOOLEAN_NAMES, 'MIKKA_EDITION'].map(name => [`READ_${name}`, 'success']))
   Object.assign(env, { MIKKA_BYOS_ENABLED: '1', MIKKA_BYOS_CLAUDE_OAUTH: '0', MIKKA_BYOS_CODEX_OAUTH: 'not-a-boolean', MIKKA_EDITION: 'cloud' })
