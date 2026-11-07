@@ -9,3 +9,5 @@ test('untrusted execution cannot start a release',()=>{assert.throws(()=>assertE
 // Prepare dispatch uses a YAML block scalar for the colon-bearing commit prefix.
 
 // API refusals are classified without printing raw errors or request bodies.
+
+// Only the exact closed PR316 Preview sync can be reused; production syncs are not retargeted.

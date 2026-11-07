@@ -3,7 +3,7 @@ import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: 'c0839251df609a03531abd11ad940e5befb073dd', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: '9a6239665652a5dbedc26eeddd68139dfadf185a', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -51,7 +51,13 @@ export async function prepare({env=process.env,fetcher=fetch,report}) {
  }
  report.dataKeyPersistedBeforeSync=true
  const existing=syncs.secretSyncs.filter(s=>s.destinationConfig?.app===TARGET.app&&s.destinationConfig?.env==='production');demand(existing.length<=1,'SYNC_AMBIGUOUS')
- if(!existing.length){const created=await inf('/api/v1/secret-syncs/vercel','POST',syncBody());report.syncId=created.secretSync?.id;report.syncCreated=true}
+ if(!existing.length){
+  const retired=syncs.secretSyncs.filter(s=>s.name==='mikka-vercel-skill-acceptance'&&s.destinationConfig?.app===TARGET.publicApp&&s.destinationConfig?.env==='preview'&&s.destinationConfig?.branch==='codex/self-improvement-acceptance-20261026');demand(retired.length===1,'RETIRED_SYNC_NOT_EXACT')
+  const prResponse=await fetcher('https://api.github.com/repos/alexj11324/Mikka/pulls/316',{headers:{accept:'application/vnd.github+json',...(env.GITHUB_TOKEN?{authorization:'Bearer '+env.GITHUB_TOKEN}:{})},redirect:'error',signal:AbortSignal.timeout(15000)});demand(prResponse.ok,'RETIRED_PR_HTTP');const pr=await prResponse.json();demand(pr.state==='closed'&&pr.head?.ref==='codex/self-improvement-acceptance-20261026','RETIRED_PR_ACTIVE')
+  const body=syncBody();delete body.projectId
+  const updated=await inf('/api/v1/secret-syncs/vercel/'+retired[0].id,'PATCH',body);report.syncId=updated.secretSync?.id;report.retiredPreviewSyncReused=true;report.retiredPullRequest=316;report.existingProductionSyncsUnchanged=true
+ }
+
  else {const s=existing[0];demand(s.connection?.id===TARGET.connection&&s.folder?.path===TARGET.path&&s.environment?.slug==='prod'&&s.syncOptions?.disableSecretDeletion===true&&!s.syncOptions?.includeAllSubFolders,'SYNC_SCOPE');report.syncId=s.id}
  demand(typeof report.syncId==='string','SYNC_CREATE_SCHEMA')
  report.result='source_and_sync_prepared'

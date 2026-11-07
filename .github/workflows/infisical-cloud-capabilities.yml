@@ -70,3 +70,5 @@ jobs:
           recursive: false
           include-imports: false
       - run: node scripts/ops/self-hosting-release.mjs --prepare
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
