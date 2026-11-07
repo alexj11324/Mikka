@@ -52,3 +52,18 @@ test('each tool call is timed by name, failures included, and its result is unch
   assert.equal(tools.schema_only.execute, undefined, 'a tool without execute is left as it is')
   assert.deepEqual(timings, [{ tool: 'dispatch_run', ms: 2_500, failed: false }, { tool: 'broken', ms: 400, failed: true }])
 })
+
+test('the cacheable prefix is logged as short hashes of the tools and each system message, never their text', async () => {
+  const { promptPrefix } = await import('./model-call-timing')
+  const tools = [{ type: 'function', name: 'create_issue', description: 'secret tool text', inputSchema: {} }]
+  const one = await promptPrefix([{ role: 'system', content: 'RULES secret' }, { role: 'system', content: 'memory: today' }, { role: 'user', content: 'hi' }], tools)
+  const two = await promptPrefix([{ role: 'system', content: 'RULES secret' }, { role: 'system', content: 'memory: tomorrow' }, { role: 'user', content: 'again' }], tools)
+  assert.equal(one.tools, two.tools)
+  assert.equal(one.system[0], two.system[0], 'the stable rules hash the same')
+  assert.notEqual(one.system[1], two.system[1], 'the part that changed is the one that differs')
+  assert.match(one.tools, /^[0-9a-f]{12}$/)
+  assert.doesNotMatch(JSON.stringify([one, two]), /secret|memory|create_issue/)
+  const lines: ModelCallTiming[] = []
+  await drain(timedModelStream({ stream: streamOf([{ type: 'finish', usage: {} }]) }, { route: 'subscription', model: 'm', tools: 1, startedAt: 0, requestedAt: 0, prefix: one }, clock(1), line => lines.push(line)).stream)
+  assert.deepEqual(lines[0].prefix, one)
+})

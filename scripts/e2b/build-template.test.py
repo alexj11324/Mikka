@@ -15,6 +15,16 @@ spec = importlib.util.spec_from_file_location('build_template', Path(__file__).w
 bt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bt)
 
+def mcp_timing(run_id, harness):
+    return {'version': 1, 'source': 'mikka_mcp_physical_fetch', 'scope': 'observed_mikka_mcp_children',
+            'generationCoverage': 'unverified', 'allFirstPartyHttpComplete': False, 'remoteMcpServerCount': 0, 'childPathAuditVersion': 1,
+            'runIdHash': hashlib.sha256(run_id.encode()).hexdigest()[:16], 'harness': harness, 'startedAt': 1010, 'endedAt': 1900,
+            'expectedChildren': 1, 'observedChildren': 1, 'closedChildren': 0, 'observedComplete': True, 'childLifecycleComplete': False,
+            'rejectedEvents': 0, 'truncated': False,
+            'children': [{'child': 1, 'startedAt': 1020, 'closedAt': None, 'lastSequence': 3, 'sent': 1, 'completed': 1, 'lost': 0}],
+            'requests': [{'child': 1, 'sequence': 1, 'operation': 'decision_catalogue', 'startedAt': 1040,
+                          'endedAt': 1050, 'durationMs': 10, 'status': 200, 'outcome': 'ok'}]}
+
 class FakeResponse(io.BytesIO):
     def __enter__(self): return self
     def __exit__(self, *_): return False
@@ -434,6 +444,9 @@ class Publish(unittest.TestCase):
             verify = next(i for i, command in enumerate(commands) if 'official-files.py verify' in command)
             self.assertLess(capture, install)
             self.assertLess(install, verify)
+            self.assertLess(commands.index(bt.NPM_RUNTIME_CHECK), verify)
+            self.assertNotIn('--e2b-finalization', commands[verify])
+            self.assertIn(f'--e2b-finalization {kind}', called['ready'])
             self.assertIn(' '.join(['a' * 40, 'b' * 40, kind]), commands[install])
             self.assertFalse(any('apt-get' in command or 'ln -sf' in command or 'systemctl' in command for command in commands))
             self.assertEqual(called['start'], 'bash /opt/mikka/start-prebuilt.sh')
@@ -471,7 +484,12 @@ class Publish(unittest.TestCase):
                    'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
                    'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
                                        'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
-                   'runtimeAuthorization': {'source': 'http_server_link', 'complete': True, 'truncated': False, 'extraRemoteCalls': 0},
+                   'runtimeAuthorization': {'source': 'http_server_link', 'scope': 'daemon_http_server_link_and_task_fetch',
+                                            'complete': True, 'truncated': False, 'extraRemoteCalls': 0,
+                                            'hostAuthorizationComplete': True, 'allFirstPartyHttpComplete': False,
+                                            'basis': 'host_authorization_census_and_closed_mcp_business_paths',
+                                            'mcpHttpTiming': mcp_timing('run-' + kind, harness), 'observedProviderEvents': 1,
+                                            'officialDelivery': 'best_effort_not_a_complete_call_count'},
                    'replyVerifiedAfterTool': True, 'toolEvidence': {'toolCallHash': 'd' * 16, 'outcome': 'ok'},
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
@@ -489,6 +507,37 @@ class Publish(unittest.TestCase):
         invalid['templates']['desktop']['conservation']['after']['sha256'] = 'e' * 64
         with self.assertRaisesRegex(ValueError, 'release_conservation_invalid desktop'):
             bt.verify_release_evidence(invalid)
+
+    def test_publication_keeps_child_lifecycle_unknown_and_refuses_missing_or_overstated_observations(self):
+        valid = mcp_timing('run-codex', 'codex')
+        check = lambda value: bt.observed_mcp_business_evidence(value, valid['runIdHash'], 'codex')
+        self.assertTrue(check(valid), 'a missing child close is retained; it is not an extra auth request')
+        for field, changed in [('runIdHash', 'f' * 16), ('harness', 'claude_code'), ('generationCoverage', 'complete'),
+                               ('allFirstPartyHttpComplete', True), ('remoteMcpServerCount', 1), ('remoteMcpServerCount', False),
+                               ('childPathAuditVersion', 2), ('childLifecycleComplete', True), ('truncated', True),
+                               ('rejectedEvents', 1), ('requests', []), ('observedChildren', 0)]:
+            value = copy.deepcopy(valid)
+            value[field] = changed
+            self.assertFalse(check(value), field)
+        self.assertFalse(check(None))
+        for mutate in [lambda value: value.pop('remoteMcpServerCount'),
+                       lambda value: value['children'][0].pop('closedAt'),
+                       lambda value: value['children'][0].update(lastSequence=4),
+                       lambda value: value['requests'][0].update(operation='permission_check'),
+                       lambda value: value['requests'][0].update(sequence=2),
+                       lambda value: value['requests'][0].update(status=503),
+                       lambda value: value['requests'][0].update(status=None),
+                       lambda value: value['requests'][0].pop('status'),
+                       lambda value: value['requests'].append(copy.deepcopy(value['requests'][0]))]:
+            value = copy.deepcopy(valid)
+            mutate(value)
+            self.assertFalse(check(value))
+        pending = copy.deepcopy(valid)
+        pending['observedComplete'] = False
+        pending['children'][0].update(sent=2, lastSequence=4)
+        pending['requests'].append({'child': 1, 'sequence': 2, 'operation': 'decision_record', 'startedAt': 1800,
+                                    'endedAt': None, 'durationMs': None, 'status': None, 'outcome': 'pending'})
+        self.assertTrue(check(pending), 'known pending business work cannot become a permission-only count')
 
     def test_patches_public_and_verifies_ready(self):
         opener, calls = fake({'public': True, 'buildStatus': 'ready', 'builds': [{'buildID': 'b1', 'status': 'ready'}]})

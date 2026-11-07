@@ -34,7 +34,11 @@ export interface ModelCallTiming {
   finishReason: string | null
   /** The stream failed or was cancelled before it finished. */
   interrupted: boolean
+  /** Short hashes of what a provider caches first (tools, then each system message): the one that changes between turns explains a cache miss. Never the content. */
+  prefix?: PromptPrefix
 }
+
+export type PromptPrefix = { tools: string; system: string[] }
 
 export interface ModelCallStart {
   route: ModelRoute
@@ -47,6 +51,7 @@ export interface ModelCallStart {
   workflowRunId?: string | null
   stepId?: string | null
   attempt?: number | null
+  prefix?: PromptPrefix
 }
 
 type Part = { type: string; usage?: unknown; finishReason?: unknown }
@@ -80,6 +85,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
   let usage: unknown
   let finishReason: string | null = null
   let toolCalls = 0
+  let failed = false
   let logged = false
   const emit = (interrupted: boolean) => {
     if (logged) return
@@ -98,6 +104,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         cacheWriteTokens: cache(usage, 'cacheWrite'),
         outputTokens: usage && typeof usage === 'object' && 'outputTokens' in usage ? total(usage.outputTokens) : null,
         toolCalls, finishReason, interrupted,
+        ...(start.prefix ? { prefix: start.prefix } : {}),
       })
     } catch { /* timing never fails the call */ }
   }
@@ -106,11 +113,12 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
     async pull(controller) {
       let next: ReadableStreamReadResult<P>
       try { next = await reader.read() } catch (error) { emit(true); throw error }
-      if (next.done) { emit(false); controller.close(); return }
+      if (next.done) { emit(failed); controller.close(); return }
       const part = next.value
       if (firstToken === null && FIRST_TOKEN.has(part.type)) firstToken = now()
       if (firstText === null && part.type === 'text-delta') firstText = now()
       if (part.type === 'tool-call') toolCalls++
+      if (part.type === 'error') failed = true
       if (part.type === 'finish') { usage = part.usage; finishReason = reason(part.finishReason) }
       controller.enqueue(part)
     },
@@ -126,4 +134,14 @@ export async function stepIdentity(): Promise<Pick<ModelCallStart, 'workflowRunI
     const step = getStepMetadata()
     return { workflowRunId: getWorkflowMetadata().workflowRunId, stepId: step.stepId, attempt: step.attempt }
   } catch { return {} }
+}
+
+const shortHash = async (value: unknown) => (await import('node:crypto')).createHash('sha256').update(JSON.stringify(value) ?? '').digest('hex').slice(0, 12)
+
+/** The cacheable prefix of a model call as short hashes: the tools as sent, then each system message's text. */
+export async function promptPrefix(prompt: readonly { role: string; content: unknown }[], tools: unknown): Promise<PromptPrefix> {
+  return {
+    tools: await shortHash(tools ?? null),
+    system: await Promise.all(prompt.filter(message => message.role === 'system').map(message => shortHash(message.content))),
+  }
 }

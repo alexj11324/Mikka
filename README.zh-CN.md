@@ -139,10 +139,10 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-zh-dark.svg">
-  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web、桌面和 iOS 应用，Telegram、Slack，通知来源和 MCP 客户端接入 Vercel 上的 Next.js 应用，应用状态存储在 Postgres，支付通过 Stripe。每分钟 Worker 和应用事件唤醒 Coordinator，Coordinator 将运行派发给你的 Mac、Linux 主机或 SSH 主机上的 daemon，并唤醒每个 bot 的 Mikka Cloud 电脑。Agent 通过 MCP 回报。Factory 阶段由监控驱动，位于 Coordinator 之上，审批后写入回到已连接应用。已关闭的 Linear 同步以虚线表示。">
+  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web、桌面和 iOS 应用，Telegram、Slack，通知来源和 MCP 客户端接入 Vercel 上的 Hono/Nitro API，应用状态存储在 Postgres，支付通过 Stripe。每分钟 Worker 和应用事件唤醒 Coordinator，Coordinator 将运行派发给你的 Mac、Linux 主机或 SSH 主机上的 daemon，并唤醒每个 bot 的 Mikka Cloud 电脑。Agent 通过 MCP 回报。Factory 阶段由监控驱动，位于 Coordinator 之上，审批后写入回到已连接应用。已关闭的 Linear 同步以虚线表示。">
 </picture>
 
-Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
+Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Hono/Nitro API。Web 与桌面复用由 Vite 构建的 React 界面。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
 
 运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 Agent CLI。新线程的模型、Agent 和机器由每个人在 设置 › 模型与订阅 中的「优先使用的模型」列表（按顺序）和 运行位置（云端 / 本地）决定；每台电脑在 设置 › 设备 中有一个 参与调度 开关（[执行设置](docs/execution-rules.md)）。设备掉线时，运行会按检查点交接到拥有同一仓库的另一台在线设备。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
 
@@ -158,7 +158,7 @@ Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox
 
 | 层级 | 技术 |
 | --- | --- |
-| 应用 | Next.js 16、React 19、Tailwind CSS 4、shadcn/ui、ReUI，bot 回复使用 OpenUI |
+| 应用 | Vite、Hono/Nitro、React 19、Tailwind CSS 4、shadcn/ui、ReUI，bot 回复使用 OpenUI |
 | 桌面端 | [`apps/desktop`](apps/desktop) 中的 Electron 与 electron-updater（macOS，Apple Silicon） |
 | 移动端 | [`apps/mobile`](apps/mobile) 中的 Expo 与 Expo Router（React Native），使用原生标签栏 |
 | Bot | Vercel AI SDK；托管的默认模型走 ZeroCat，Vercel AI Gateway 作为回退；包括 Coordinator 在内的所有 bot 都是运行在 [Vercel Workflow](workflows/coordinator) 上的持久化循环 |
@@ -173,14 +173,18 @@ Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox
 | 订阅 | [`packages/subscription-worker`](packages/subscription-worker) 中的 Go worker，密钥存放在 Infisical |
 | Agent | Mikka daemon 为每个线程通过 CLI 适配器运行 Claude Code、Codex 或 Cursor |
 
+现行构建、启动和回退操作见[共享运行时运维说明](docs/operations/web-runtime.md)。
+
 ## 目录结构
 
 ```text
-app/                 # Next.js 路由、server actions 与 API（MCP、webhook、cron、daemon /v1）
+app/                 # 共享页面、动作源码与 API handler（MCP、webhook、cron、daemon /v1）
 components/          # React 界面组件
 lib/                 # 业务逻辑：Coordinator、任务、计费、Factory、云端电脑、MCP、认证
 workflows/           # 持久化 workflow（Coordinator、Slack、网页分身、线程机器、运行发布）
 agents/              # 内置 bot 定义
+apps/frontend/       # Web 与桌面共享的 Vite renderer
+apps/api/            # Hono/Nitro 运行时与服务端兼容适配
 apps/desktop/        # macOS 桌面应用（Electron）
 apps/mobile/         # iOS 应用（Expo）
 packages/daemon/     # 本地 daemon 和 Agent CLI 适配器
@@ -234,10 +238,10 @@ pnpm desktop:dev
 
 | 测试 | 需要 | 为什么不在 CI 中 |
 | --- | --- | --- |
-| `pnpm test:factory-http`（`tests/factory-{query,question,monitor-cycle}-http.test.ts`） | 生产构建（`next build`），以及 `eval "$(bash scripts/dev/bootstrap-local.sh)"`（从一个随机生成的本地文件导出 `BETTER_AUTH_SECRET`）。运行器把其服务器的 `BETTER_AUTH_URL` 指向自己的 origin。在本地测试账号模式下，运行器会在回环地址的 `*_e2e` 数据库上为探针创建各自的非超级用户数据库角色（`factory192`、`factoryquestions192`、`factorycycle192`） | CI 不做生产构建（[决定](docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md)，第 3 条） |
-| `pnpm test:test-accounts-http`（`tests/test-account-pool.http.test.mjs`） | 生产构建，以及用 `scripts/test-accounts/bootstrap.mjs` 注册的一次性测试环境 | 同上：CI 不做生产构建 |
+| `pnpm test:factory-http`（`tests/factory-{query,question,monitor-cycle}-http.test.ts`） | 生产构建（`pnpm build`），以及 `eval "$(bash scripts/dev/bootstrap-local.sh)"`（从一个随机生成的本地文件导出 `BETTER_AUTH_SECRET`）。运行器把其服务器的 `BETTER_AUTH_URL` 指向自己的 origin。在本地测试账号模式下，运行器会在回环地址的 `*_e2e` 数据库上为探针创建各自的非超级用户数据库角色（`factory192`、`factoryquestions192`、`factorycycle192`） | 需显式运行于已准备的隔离构建；CI 的运行时构建和浏览器检查另行执行 |
+| `pnpm test:test-accounts-http`（`tests/test-account-pool.http.test.mjs`） | 生产构建，以及用 `scripts/test-accounts/bootstrap.mjs` 注册的一次性测试环境 | 同样需要已准备的隔离构建 |
 | `pnpm test:local-loop` 及其 `:mailbox`、`:cloud`、`:worker-mailbox` 变体 | `dev:local`、真实的 daemon、一个模型 API key；云端那一项还需要 E2B 模板 | 需要真实凭据，且在 CI 身份下拒绝运行 |
-| `tests/byos-handoff-browser.test.mjs` | `/usr/bin/chromium` 上的 Chromium | 它会驱动浏览器；CI 不跑浏览器测试（[决定](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md)） |
+| `tests/byos-handoff-browser.test.mjs` | `/usr/bin/chromium` 上的 Chromium | 独立的 Linux 浏览器与 loopback 交接检查，不在 `pnpm test:byos` 中；HTTPS 目标在测试内拦截。CI 另有 Analytics 和桌面浏览器检查。 |
 | `packages/daemon/test/codex-contract.node-test.mts` | 官方 Codex CLI，通过 `CODEX_CONTRACT_BIN` 传入；没有时跳过 | CI 不下载 Codex 二进制 |
 
 建议首先阅读以下文档：
@@ -253,6 +257,22 @@ pnpm desktop:dev
 ## 获取访问权限
 
 Mikka 目前处于早期体验阶段。请发送邮件至 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) 申请邀请，然后参照 [快速入门](https://aspectlylabs.com/mikka/docs/quickstart) 开始使用。
+
+## 致谢
+
+<p>
+  <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标志" width="32" height="32">
+    </picture>
+  <strong>OpenAI · Codex for Open Source</strong>
+</p>
+
+Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划的支持。
+
+衷心感谢 OpenAI 和 Codex 团队为 Mikka 的维护者提供六个月的 ChatGPT Pro 使用资格。这份支持让我们有更多空间探索有挑战性的想法、改进工程质量和用户体验，并回馈开源社区。
+
+Mikka 是独立开源项目，与 OpenAI 不存在隶属关系，也未获得 OpenAI 官方背书。OpenAI 名称及标志均为 OpenAI 的商标。
 
 ## 许可证
 

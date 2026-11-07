@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import type { RequestLogEntry } from '../../../../../lib/request-log'
+import type { SharedSubscription } from '../../../../../lib/db/listen'
 import { MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 
 // Keep the real wait helper while replacing database-backed route operations.
@@ -22,7 +23,8 @@ let releases: Versions | undefined
 const daemonVersions = mock.fn(async (): Promise<Versions> => releases ?? { min: '0.0.299' })
 const cachedDaemonVersions = mock.fn((): Versions | undefined => releases)
 const sleep = mock.fn(async (ms: number, signal?: AbortSignal) => actual.sleep(ms, signal))
-type Push = { reset(): void; next(ms: number, signal?: AbortSignal): Promise<void>; readonly lost: boolean; close(): void }
+type Push = SharedSubscription
+type Wake = Awaited<ReturnType<Push['next']>>
 const deviceWorkSubscription = mock.fn(async (_deviceId: string, _tokenId: string): Promise<Push | null> => null)
 /** A stand-in for the shared LISTEN session: `fire` is a NOTIFY for this device. */
 function fakePush(options: { lost?: boolean } = {}) {
@@ -30,12 +32,14 @@ function fakePush(options: { lost?: boolean } = {}) {
   const push = {
     lost: options.lost ?? false,
     reset: mock.fn(() => { heard = false }),
-    next: mock.fn((ms: number, signal?: AbortSignal) => new Promise<void>(resolve => {
-      if (heard || signal?.aborted) { resolve(); return }
-      const done = () => { clearTimeout(timer); wake = undefined; resolve() }
-      const timer = setTimeout(done, ms)
-      wake = done
-      signal?.addEventListener('abort', done, { once: true })
+    next: mock.fn((ms: number, signal?: AbortSignal) => new Promise<Wake>(resolve => {
+      if (signal?.aborted) { resolve('aborted'); return }
+      if (heard) { resolve('notified'); return }
+      const done = (reason: Wake) => { clearTimeout(timer); signal?.removeEventListener('abort', abort); wake = undefined; resolve(reason) }
+      const abort = () => done('aborted')
+      const timer = setTimeout(() => done('timeout'), ms)
+      wake = () => done('notified')
+      signal?.addEventListener('abort', abort, { once: true })
     })),
     close: mock.fn(),
   }
@@ -301,6 +305,29 @@ test('with push, a lost notification still ends the poll at its deadline with on
   assert.deepEqual(await (await GET(request(undefined, 1), params)).json(), { commands: [] })
   assert.equal(deviceMayHaveWork.mock.callCount(), 2, 'an idle poll: the first check and the final one')
   assert.equal(logs.at(-1)?.outcome, 'empty')
+})
+
+test('with push, timeout causes exactly one final check when the wall clock is just before the deadline', async () => {
+  const { push } = fakePush()
+  deviceWorkSubscription.mock.mockImplementation(async () => push)
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
+  let now = Date.now(), waits = 0
+  const clock = mock.method(Date, 'now', () => now)
+  // Timers and Date.now need not reach their millisecond boundary together.
+  // Reproduce the first timer waking 1 ms before the route's wall-clock deadline.
+  push.next.mock.mockImplementation(async ms => {
+    now += ++waits === 1 ? ms - 1 : ms
+    return 'timeout'
+  })
+  try {
+    assert.deepEqual(await (await GET(request(undefined, 1), params)).json(), { commands: [] })
+    assert.equal(deviceMayHaveWork.mock.callCount(), 2, 'the initial read and exactly one final read')
+    assert.equal(push.next.mock.callCount(), 1, 'a timeout does not start a second wait')
+    assert.equal(deviceWork.mock.callCount(), 0)
+    assert.equal(sleep.mock.callCount(), 0)
+    assert.equal(push.close.mock.callCount(), 1)
+    assert.equal(logs.at(-1)?.outcome, 'empty')
+  } finally { clock.mock.restore() }
 })
 
 test('with push, a dropped LISTEN session falls back to the 5 s check; disconnect stops the wait and releases the subscription', async () => {

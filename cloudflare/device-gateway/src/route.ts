@@ -1,12 +1,16 @@
 import { bearerMatches, deviceGatewayTicketValid } from '../../../lib/device-gateway-ticket'
 import type { LiveInvalidation } from '../../../lib/live/events'
 import { handleLiveRequest } from './live-route'
+import type { DevicePresenceWatch } from './session'
 
 export interface DeviceSessionStub {
   notify(): Promise<void>
   notifyLive(events: LiveInvalidation[]): Promise<void>
   status(): Promise<{ online: boolean; lastSeenAt: string | null }>
   fetch(request: Request): Promise<Response>
+  watchPresence(input: DevicePresenceWatch): Promise<{ accepted: boolean; changed: boolean }>
+  unwatchPresence(observer: string): Promise<void>
+  presenceChanged(observers: string[], home: string): Promise<string[]>
 }
 
 export interface GatewayEnv {

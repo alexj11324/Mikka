@@ -2,6 +2,8 @@ import { useRef, useState, type FormEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
+import { Button } from '@/components/ui/button'
+import { ServerDialog, ServerName, useDesktopServers } from '@/components/desktop/desktop-server'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { signInRefusal } from '@/lib/signup-refusal'
 import { rendererHost } from './host'
@@ -29,6 +31,14 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState('')
   const [unverified, setUnverified] = useState(false)
+  // Which server this sign-in goes to (#1557). Choosing another one while
+  // signed out reloads the page from that server; adding an account keeps the
+  // current one open and signs in with the methods the other server reported.
+  const servers = useDesktopServers()
+  const serverT = useTranslations('DesktopServer')
+  const [choosing, setChoosing] = useState(false)
+  const target = servers.state?.target ?? null
+  const methods = target?.signIn && target.url !== servers.state?.current.url ? target.signIn : null
   function begin() {
     if (pendingRef.current) return false
     pendingRef.current = true
@@ -69,6 +79,11 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     finally { done() }
   }
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={() => social('google')} onGitHubSignIn={() => social('github')} />
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={methods?.google ?? googleEnabled} githubEnabled={methods?.github ?? githubEnabled} emailEnabled={methods?.email ?? emailEnabled} showGoogleLinkHint={Boolean(error && (methods?.google ?? googleEnabled))} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={() => social('google')} onGitHubSignIn={() => social('github')} />
+    {target && <div data-desktop-only className="flex max-w-[26rem] items-center gap-1 text-sm">
+      <ServerName server={target} />
+      <Button type="button" variant="link" size="sm" disabled={pending} onClick={() => setChoosing(true)}>{serverT('change')}</Button>
+    </div>}
+    {target && <ServerDialog key={String(choosing)} open={choosing} onOpenChange={setChoosing} current={target} onSelected={next => { setChoosing(false); servers.setState(next) }} />}
   </Auth>
 }

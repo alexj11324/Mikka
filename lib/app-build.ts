@@ -61,32 +61,18 @@ export async function checkPageBuildBeforeAction(): Promise<boolean> {
   return false
 }
 
-const RELOADED_AT = 'mikka-stale-build-reload'
-const RELOAD_GAP_MS = 60_000
-
-/**
- * Reload once for a server action the server no longer has. A second miss
- * within a minute does not reload again (the new page has the same gap), so
- * the caller falls back to asking.
- */
-export function reloadOnce(storage: Pick<Storage, 'getItem' | 'setItem'> | null, now: number, reload: () => void): boolean {
-  if (!storage) return false
-  try {
-    const last = Number(storage.getItem(RELOADED_AT) ?? 0)
-    if (now - last < RELOAD_GAP_MS) return false
-    storage.setItem(RELOADED_AT, String(now))
-  } catch {
-    return false
-  }
-  reload()
-  return true
-}
-
 /** Next answers a server action it does not have with this response header. */
 export const ACTION_NOT_FOUND_HEADER = 'x-nextjs-action-not-found'
 
-/** Raised when a removed action could not reload the page; VersionGuard offers 刷新. */
+/** Raised when an action targets an obsolete build; VersionGuard offers an explicit 刷新. */
 export const STALE_BUILD_EVENT = 'mikka:stale-build'
+
+/** Subscribe first, then catch a marker raised before the update view mounted. */
+export function subscribePageRefresh(target: Pick<Window, 'addEventListener' | 'removeEventListener'>, offer: () => void) {
+  target.addEventListener(STALE_BUILD_EVENT, offer)
+  if (pageNeedsRefresh()) offer()
+  return () => { target.removeEventListener(STALE_BUILD_EVENT, offer) }
+}
 
 /**
  * Watches window.fetch, which every server action goes through, for a removed
@@ -95,7 +81,6 @@ export const STALE_BUILD_EVENT = 'mikka:stale-build'
  */
 export function watchRemovedActions(target: Window) {
   const original = target.fetch.bind(target)
-  const session = () => { try { return target.sessionStorage } catch { return null } }
   target.fetch = async (...args: Parameters<typeof fetch>) => {
     const input = args[0]
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, target.location.href)
@@ -104,7 +89,10 @@ export function watchRemovedActions(target: Window) {
     const callerSignal = args[1]?.signal ?? (input instanceof Request ? input.signal : undefined)
     const init = business ? { ...args[1], signal: callerSignal ? AbortSignal.any([callerSignal, pageRefreshSignal()]) : pageRefreshSignal() } : args[1]
     const response = await original(input, init)
-    if (response.headers.has(ACTION_NOT_FOUND_HEADER) && !reloadOnce(session(), Date.now(), () => { target.location.reload() })) {
+    if (business && response.headers.has(ACTION_NOT_FOUND_HEADER)) {
+      // Retire the old request stream, not the page. A background response must
+      // never discard unsaved input by reloading or replaying the user's action.
+      markPageNeedsRefresh()
       target.dispatchEvent(new Event(STALE_BUILD_EVENT))
     }
     return response

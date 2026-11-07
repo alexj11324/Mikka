@@ -1,7 +1,7 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUp, Check } from 'lucide-react'
 import type { CommentAnchor, ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
@@ -10,8 +10,10 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useViewState } from '@/lib/hooks/view-state'
 
-export function IssueActivity({ author, threads, anchors, events, onComment, onReply, onResolve, onSelect }: {
+export function IssueActivity({ issueId, author, threads, anchors, events, onComment, onReply, onResolve, onSelect }: {
+  issueId: string
   author: string
   threads: ThreadRecord[]
   anchors: CommentAnchor[]
@@ -23,9 +25,9 @@ export function IssueActivity({ author, threads, anchors, events, onComment, onR
 }) {
   const t = useTranslations('Workspace.activity')
   const format = useFormatter()
-  const [body, setBody] = useState('')
-  const [replyTo, setReplyTo] = useState<string | null>(null)
-  const [reply, setReply] = useState('')
+  const [body, setBody] = useViewState(`task:${issueId}:comment`, '')
+  const [replyTo, setReplyTo] = useViewState<string | null>(`task:${issueId}:reply-to`, null)
+  const [reply, setReply] = useViewState(`task:${issueId}:reply`, '')
   const pressed = useRef<'reply' | 'resolve' | null>(null)
   function submit() {
     if (!body.trim()) return
