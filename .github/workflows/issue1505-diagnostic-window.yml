@@ -1,4 +1,6 @@
 # Root-reviewed preparation only. It creates no model task, Profile or VM.
+# New run at attempt 1 after run 42356924285 was cancelled before any runner step.
+# Publish this normal fast-forward only after the coordinated account window and exact CI review.
 name: Issue 1505 prepare scoped diagnostic window
 on:
   push:
