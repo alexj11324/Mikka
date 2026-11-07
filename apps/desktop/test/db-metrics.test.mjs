@@ -9,6 +9,7 @@ import test from 'node:test'
 import { EventEmitter } from 'node:events'
 import { createLifecycleQueryCounter, projectQuerySnapshot, queryCountDelta } from './lifecycle-query-counts.mjs'
 import queryOperations from './db-query-operations.cjs'
+import unattributedSourceKeys from './db-query-unattributed-sources.cjs'
 
 const require = createRequire(import.meta.url)
 const run = promisify(execFile)
@@ -66,6 +67,7 @@ const localRequire = id => id === 'node:http' ? { createServer: callback => {
   assert.equal(path, '/tmp/mikka-fixture.sock'); assert.equal(mode, 0o600); chmods++
 } } : Module.createRequire(metricsPath)(id)
 const source = fs.readFileSync(metricsPath, 'utf8')
+const sourceKeys = Module.createRequire(metricsPath)('./db-query-unattributed-sources.cjs')
 const load = () => vm.runInContext('(function(require) {' + source + '\n})', context)(localRequire)
 const snapshot = (reset = false) => {
   let result
@@ -134,13 +136,32 @@ assert.equal(require.cache[selectedEntry], undefined, 'tracing setup itself does
   assert.equal(attributed.queryOperations['/api/live/ticket'], 1)
   assert.equal(attributed.queryOperations.unattributed, 2, 'missing and unrecognized contexts remain counted')
   assert.equal(Object.values(attributed.queryOperations).reduce((total, count) => total + count, 0), attributed.queryCalls)
+  assert.deepEqual(attributed.unattributedSources, Object.fromEntries(sourceKeys.map(key => [key, ['otherScoped', 'noScope'].includes(key) ? 1 : 0])))
   assert.equal(JSON.stringify(attributed).includes('PRIVATE_'), false)
+  const labels = sourceKeys.filter(key => !['otherScoped', 'noScope'].includes(key))
+  const unlisted = ['noScope', '/v1/devices/PRIVATE_ID_CANARY/heartbeat', { private: 'PRIVATE_SCOPE_CANARY' }]
+  await Promise.all([...labels, ...unlisted].map(route => routeScope.run(route, async () => {
+    await Promise.resolve()
+    await new Promise(resolve => client.query('SELECT 1', () => resolve()))
+  })))
+  const refined = snapshot()
+  assert.equal(refined.queryCalls, 4 + labels.length + unlisted.length)
+  assert.equal(refined.queryOperations['/actions/coordinator/poll'], 1)
+  assert.equal(refined.queryOperations['/api/live/ticket'], 1)
+  assert.equal(refined.unattributedSources.noScope, 1)
+  assert.equal(refined.unattributedSources.otherScoped, 4, 'concrete IDs, non-string scopes and reserved bucket names are not templates')
+  for (const label of labels) assert.equal(refined.unattributedSources[label], 1, label)
+  assert.equal(Object.values(refined.unattributedSources).reduce((total, count) => total + count, 0), refined.queryOperations.unattributed)
+  assert.equal(Object.values(refined.queryOperations).reduce((total, count) => total + count, 0), refined.queryCalls)
+  assert.equal(JSON.stringify(refined).includes('PRIVATE_'), false)
+  assert.ok(Buffer.byteLength(JSON.stringify(refined)) <= 8192, 'the unchanged metric response bound includes the closed refinement')
   const outsider = new other.Client()
   outsider._queryable = false
   await new Promise(resolve => outsider.query('SELECT 1', () => resolve()))
-  assert.equal(snapshot().queryCalls, 4, 'the unselected source/traced copy must not be counted')
+  assert.equal(snapshot().queryCalls, refined.queryCalls, 'the unselected source/traced copy must not be counted')
   assert.equal(snapshot(true).pgProtocolReceiveBytes, 0)
   assert.equal(Object.values(snapshot().queryOperations).reduce((total, count) => total + count, 0), 0)
+  assert.equal(Object.values(snapshot().unattributedSources).reduce((total, count) => total + count, 0), 0)
   stream.bytesRead += 19; stream.bytesWritten += 7; stream.emit('close')
   const end = snapshot()
   assert.equal(end.pgProtocolReceiveBytes, 19); assert.equal(end.pgProtocolSendBytes, 7)
@@ -203,6 +224,7 @@ test('lifecycle query windows retain exact counter deltas and omit unrelated con
 })
 
 const operationCounts = (overrides = {}) => ({ ...Object.fromEntries(queryOperations.map(key => [key, 0])), ...overrides })
+const sourceCounts = (overrides = {}) => ({ ...Object.fromEntries(unattributedSourceKeys.map(key => [key, 0])), ...overrides })
 
 test('operation SQL counts partition the original full window without removing unknown or background work', () => {
   const before = projectQuerySnapshot(counterSample({ queryOperations: operationCounts({ '/api/live/ticket': 2, unattributed: 3 }) }), counterIdentity)
@@ -230,6 +252,58 @@ test('operation SQL attribution refuses unknown labels, missing buckets, inconsi
   const decreased = projectQuerySnapshot(counterSample({ endedAt: 2500, queryCalls: 6,
     queryOperations: operationCounts({ '/api/live/ticket': 2, unattributed: 4 }) }), counterIdentity)
   assert.throws(() => queryCountDelta(before, decreased), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+})
+
+test('unattributed source refinement conserves the original partition and full-window deltas', () => {
+  const before = projectQuerySnapshot(counterSample({
+    queryOperations: operationCounts({ '/api/live/ticket': 2, unattributed: 3 }),
+    unattributedSources: sourceCounts({ '/api/settings/model-order': 2, noScope: 1 }),
+  }), counterIdentity)
+  const after = projectQuerySnapshot(counterSample({ endedAt: 2500, queryCalls: 10,
+    queryOperations: operationCounts({ '/api/live/ticket': 3, '/actions/threads/poll': 2, unattributed: 5 }),
+    unattributedSources: sourceCounts({ '/api/settings/model-order': 3, 'after:live-notify': 1, noScope: 1 }),
+  }), counterIdentity)
+  assert.deepEqual(before.unattributedSources, sourceCounts({ '/api/settings/model-order': 2, noScope: 1 }))
+  const delta = queryCountDelta(before, after)
+  assert.equal(delta.queryCalls, 5)
+  assert.deepEqual(delta.queryOperations, operationCounts({ '/api/live/ticket': 1, '/actions/threads/poll': 2, unattributed: 2 }))
+  assert.deepEqual(delta.unattributedSources, sourceCounts({ '/api/settings/model-order': 1, 'after:live-notify': 1 }))
+  assert.equal(Object.values(delta.unattributedSources).reduce((sum, count) => sum + count, 0), delta.queryOperations.unattributed)
+  assert.equal(Object.values(delta.queryOperations).reduce((sum, count) => sum + count, 0), delta.queryCalls)
+})
+
+test('unattributed source refinement rejects incomplete evidence without upgrading legacy reports', () => {
+  const operations = operationCounts({ '/api/live/ticket': 2, unattributed: 3 })
+  const sources = sourceCounts({ '/api/settings/model-order': 2, noScope: 1 })
+  const before = projectQuerySnapshot(counterSample({ queryOperations: operations, unattributedSources: sources }), counterIdentity)
+  const missing = { ...sources }; delete missing.otherScoped
+  for (const value of [null, [], missing, { ...sources, PRIVATE_SOURCE_CANARY: 0 },
+    sourceCounts({ noScope: 2 }), sourceCounts({ noScope: 3.5 }), sourceCounts({ noScope: -1 }),
+    sourceCounts({ noScope: Number.MAX_SAFE_INTEGER + 1 })]) {
+    assert.throws(() => projectQuerySnapshot(counterSample({ queryOperations: operations, unattributedSources: value }), counterIdentity),
+      /LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID/)
+  }
+  assert.throws(() => projectQuerySnapshot(counterSample({ unattributedSources: sources }), counterIdentity),
+    /LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID/)
+  const legacy = projectQuerySnapshot(counterSample({ queryOperations: operations }), counterIdentity)
+  assert.equal('unattributedSources' in legacy, false, 'historical absence does not prove a zero source partition')
+  assert.throws(() => queryCountDelta(before, legacy), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+  assert.throws(() => queryCountDelta(legacy, before), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+  const decreased = projectQuerySnapshot(counterSample({ endedAt: 2500, queryCalls: 6,
+    queryOperations: operationCounts({ '/api/live/ticket': 2, unattributed: 4 }),
+    unattributedSources: sourceCounts({ '/api/settings/model-order': 1, noScope: 3 }),
+  }), counterIdentity)
+  assert.throws(() => queryCountDelta(before, decreased), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+})
+
+test('unattributed source refinement fits the unchanged control-response limit at the largest safe count', () => {
+  const value = counterSample({ queryCalls: Number.MAX_SAFE_INTEGER,
+    queryOperations: operationCounts({ unattributed: Number.MAX_SAFE_INTEGER }),
+    unattributedSources: sourceCounts({ otherScoped: Number.MAX_SAFE_INTEGER }),
+    excludes: ['connection_handshake', 'TCP_TLS_overhead', 'other_processes'],
+  })
+  assert.ok(Buffer.byteLength(JSON.stringify(value)) <= 8192)
+  assert.equal(projectQuerySnapshot(value, counterIdentity).unattributedSources.otherScoped, Number.MAX_SAFE_INTEGER)
 })
 
 test('lifecycle query windows refuse a changed process, reset, missing driver and unknown readings', () => {

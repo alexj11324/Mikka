@@ -435,6 +435,15 @@ that issued a shared query, not every logical batch item that awaits it; connect
 bytes are not allocated to individual operations. Historical reports without this
 partition remain unavailable for this breakdown, rather than acquiring zeroes.
 
+`unattributedSources` refines only that existing `unattributed` bucket. Its
+test-only list names exact source-owned settings, device, daemon and background
+job templates; `otherScoped` and `noScope` retain every remaining call without
+exporting the underlying label. Its counts must sum to `queryOperations.unattributed`
+at every snapshot and delta, while the original operation buckets and total stay
+unchanged. Missing historical refinements are unavailable, and a mixed or invalid
+partition fails validation. This diagnoses concurrent work without retaining SQL,
+parameters, request data, arbitrary routes or identity values.
+
 ### Changing them
 
 `scripts/ops/posthog-observability.mjs` holds the dashboard, its insights

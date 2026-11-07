@@ -5,6 +5,7 @@ import { open, readFile } from 'node:fs/promises'
 import { request } from 'node:http'
 import { dirname, resolve } from 'node:path'
 import queryOperations from './db-query-operations.cjs'
+import unattributedSourceKeys from './db-query-unattributed-sources.cjs'
 
 const fields = ['pid', 'startedAt', 'endedAt', 'instrumentedClients', 'queryCalls',
   'pgProtocolReceiveBytes', 'pgProtocolSendBytes', 'activeConnections', 'closedConnections', 'unknownReadings']
@@ -270,8 +271,19 @@ export function projectQuerySnapshot(value, expected) {
     }
     operations = Object.fromEntries(queryOperations.map(key => [key, counts[key]]))
   }
+  let sources
+  if (value.unattributedSources !== undefined) {
+    const counts = value.unattributedSources
+    if (!operations || !counts || Array.isArray(counts) || Object.keys(counts).length !== unattributedSourceKeys.length
+      || unattributedSourceKeys.some(key => !Object.hasOwn(counts, key) || !Number.isSafeInteger(counts[key]) || counts[key] < 0)
+      || unattributedSourceKeys.reduce((sum, key) => sum + counts[key], 0) !== operations.unattributed) {
+      throw new Error('LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID')
+    }
+    sources = Object.fromEntries(unattributedSourceKeys.map(key => [key, counts[key]]))
+  }
   return { version: 1, runtime: value.runtime, ...Object.fromEntries(fields.map(key => [key, value[key]])),
-    ...(operations ? { queryOperations: operations } : {}) }
+    ...(operations ? { queryOperations: operations } : {}),
+    ...(sources ? { unattributedSources: sources } : {}) }
 }
 
 export function queryCountDelta(before, after) {
@@ -291,6 +303,17 @@ export function queryCountDelta(before, after) {
       throw new Error('LIFECYCLE_QUERY_COUNTER_CHANGED')
     }
   }
+  let sources
+  if (before.unattributedSources !== undefined || after.unattributedSources !== undefined) {
+    if (!operations || !before.unattributedSources || !after.unattributedSources
+      || unattributedSourceKeys.some(key => after.unattributedSources[key] < before.unattributedSources[key])) {
+      throw new Error('LIFECYCLE_QUERY_COUNTER_CHANGED')
+    }
+    sources = Object.fromEntries(unattributedSourceKeys.map(key => [key, after.unattributedSources[key] - before.unattributedSources[key]]))
+    if (Object.values(sources).reduce((sum, count) => sum + count, 0) !== operations.unattributed) {
+      throw new Error('LIFECYCLE_QUERY_COUNTER_CHANGED')
+    }
+  }
   return {
     startedAt: new Date(before.endedAt).toISOString(), finishedAt: new Date(after.endedAt).toISOString(),
     durationMs: after.endedAt - before.endedAt,
@@ -299,6 +322,7 @@ export function queryCountDelta(before, after) {
     pgProtocolSendBytes: after.pgProtocolSendBytes - before.pgProtocolSendBytes,
     closedConnections: after.closedConnections - before.closedConnections, unknownReadings: 0,
     ...(operations ? { queryOperations: operations } : {}),
+    ...(sources ? { unattributedSources: sources } : {}),
   }
 }
 

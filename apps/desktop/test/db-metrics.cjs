@@ -7,6 +7,8 @@ const { chmodSync, lstatSync, realpathSync } = require('node:fs')
 const { resolve, sep } = require('node:path')
 const operations = require('./db-query-operations.cjs')
 const knownOperations = new Set(operations)
+const unattributedSourceKeys = require('./db-query-unattributed-sources.cjs')
+const knownUnattributedSources = new Set(unattributedSourceKeys.filter(key => key !== 'otherScoped' && key !== 'noScope'))
 
 const socketPath = process.env.MIKKA_DESKTOP_METRICS_SOCKET
 const target = new URL(process.env.E2E_DATABASE_URL ?? 'invalid:')
@@ -46,6 +48,7 @@ if (previous) {
 function startMetrics() {
   let queries = 0
   const queryOperations = Object.fromEntries(operations.map(operation => [operation, 0]))
+  const unattributedSources = Object.fromEntries(unattributedSourceKeys.map(source => [source, 0]))
   let receiveBytes = 0
   let sendBytes = 0
   let closedConnections = 0
@@ -74,7 +77,12 @@ function startMetrics() {
       // total, without importing application code or recording arbitrary labels.
       let operation
       try { operation = globalThis[Symbol.for('mikka.requestRoute')]?.getStore() } catch { /* keep unattributed calls */ }
-      queryOperations[knownOperations.has(operation) ? operation : 'unattributed']++
+      const bucket = knownOperations.has(operation) ? operation : 'unattributed'
+      queryOperations[bucket]++
+      if (bucket === 'unattributed') {
+        const source = operation == null ? 'noScope' : knownUnattributedSources.has(operation) ? operation : 'otherScoped'
+        unattributedSources[source]++
+      }
       return originalQuery.apply(this, args)
     }
     const originalConnect = Client.prototype.connect
@@ -126,6 +134,7 @@ function startMetrics() {
       runtime, instrumentedClients,
       queryCalls: queries, pgProtocolReceiveBytes: received, pgProtocolSendBytes: sent,
       queryOperations: { ...queryOperations },
+      unattributedSources: { ...unattributedSources },
       activeConnections: streams.size, closedConnections, unknownReadings,
       measurement: 'all_pg_client_calls_and_connection_protocol_bytes',
       excludes: ['connection_handshake', 'TCP_TLS_overhead', 'other_processes'],
@@ -136,6 +145,7 @@ function startMetrics() {
     if (request.url === '/reset' && request.method === 'POST') {
       queries = 0; receiveBytes = 0; sendBytes = 0; closedConnections = 0; unknownReadings = 0
       for (const operation of operations) queryOperations[operation] = 0
+      for (const source of unattributedSourceKeys) unattributedSources[source] = 0
       for (const [stream, entry] of streams) {
         entry.received = read(stream, 'bytesRead'); entry.sent = read(stream, 'bytesWritten')
       }
