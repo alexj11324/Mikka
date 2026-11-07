@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { verifyAuditExport } from '../audit/integrity'
@@ -131,6 +132,52 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(manageIdentity(organizationId, session, { action: 'policy', enforceSso: false, allowMachineCredentials: true }, 'https://fixture.example.invalid'), error => (error as { detail?: string }).detail === 'feature_unavailable')
     assert.deepEqual(await manageIdentity(organizationId, session, { action: 'policy', enforceSso: false, allowMachineCredentials: false }, 'https://fixture.example.invalid'), { enforceSso: false, allowMachineCredentials: false })
     await pool.query('update mikka_organization_entitlements set "expiresAt"=now()+interval \'1 hour\' where "organizationId"=$1', [organizationId])
+  })
+  await t.test('an identity mutation retains Organization authorization until its Auth DB commit', async () => {
+    const sessionId = randomUUID()
+    await pool.query('insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, randomUUID(), admin.id])
+    const session = { user: { id: admin.id }, session: { id: sessionId } }
+    const blocker = await pool.connect(), revoker = await pool.connect()
+    const blockerPid = (await blocker.query('select pg_backend_pid() as pid')).rows[0].pid
+    const revokerPid = (await revoker.query('select pg_backend_pid() as pid')).rows[0].pid
+    let mutation: Promise<unknown> | undefined, revocation: Promise<void> | undefined
+    let mutationDone = false, roleChanged = false, mutationError: unknown, revocationError: unknown
+    const until = async (ready: () => Promise<boolean>) => {
+      const deadline = Date.now() + 3000
+      while (!await ready()) {
+        assert.ok(Date.now() < deadline, 'the database lock barrier must become observable')
+        await delay(10)
+      }
+    }
+    try {
+      await blocker.query('begin')
+      await blocker.query('select "organizationId" from enterprise_org_policy where "organizationId"=$1 for update', [organizationId])
+      mutation = manageIdentity(organizationId, session, { action: 'policy', enforceSso: false, allowMachineCredentials: true }, 'https://fixture.example.invalid')
+        .then(value => { mutationDone = true; return value }, error => { mutationDone = true; mutationError = error })
+      await until(async () => mutationDone || (await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) as blocked', [blockerPid])).rows[0].blocked)
+      assert.equal(mutationDone, false, 'the mutation has passed authorization and is waiting on the real Auth DB row')
+      // This is the same Organization-first row lock taken by role changes. Its
+      // dedicated backend PID makes the competing transaction observable without sleeps.
+      revocation = (async () => {
+        await revoker.query('begin')
+        await revoker.query('select id from mikka_organizations where id=$1 for update', [organizationId])
+        await revoker.query('update mikka_organization_members set role=\'member\' where "organizationId"=$1 and "userId"=$2', [organizationId, admin.id])
+        await revoker.query('commit'); roleChanged = true
+      })().catch(error => { revocationError = error; roleChanged = true })
+      await until(async () => roleChanged || (await pool.query('select exists(select 1 from pg_stat_activity where pid=$1 and wait_event_type=\'Lock\') as blocked', [revokerPid])).rows[0].blocked)
+      assert.equal(roleChanged, false, 'the administrator cannot be revoked before its already-authorized identity write commits')
+      await blocker.query('rollback')
+      await mutation; await revocation
+      assert.equal(mutationError, undefined); assert.equal(revocationError, undefined)
+      assert.equal((await pool.query('select "allowMachineCredentials" from enterprise_org_policy where "organizationId"=$1', [organizationId])).rows[0].allowMachineCredentials, true)
+      await assert.rejects(manageIdentity(organizationId, session, { action: 'policy', enforceSso: false, allowMachineCredentials: false }, 'https://fixture.example.invalid'), error => (error as { detail?: string }).detail === 'access_denied')
+    } finally {
+      await blocker.query('rollback'); blocker.release()
+      await Promise.allSettled([mutation, revocation].filter(value => value !== undefined))
+      await revoker.query('rollback'); revoker.release()
+      await org.updateOrganizationMember(organizationId, owner.id, { userId: admin.id, role: 'admin' })
+      await pool.query('update enterprise_org_policy set "allowMachineCredentials"=false where "organizationId"=$1', [organizationId])
+    }
   })
   await t.test('resource owners request explicit approval; an Org admin cannot bypass the Workspace source grant', async () => {
     await configureOrganizationResourcePolicy(organizationId, owner.id, policy)
