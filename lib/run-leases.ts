@@ -25,6 +25,7 @@ import { deviceOnlineStates } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 import { readmitLostLocalRun, type AdmittedTakeover, type CloudRecoverySource } from './run-repository-retry'
 import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
+import { serverRunFailure } from './run-failure-details'
 import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
 import type { RunReport } from '@mikka/protocol/run'
 import messages from '@/messages/zh-CN.json'
@@ -263,7 +264,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   }
   const retried = await db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
-      .set({ status: 'failed', stopReason: 'device_lost', error: `The machine went offline; ${where} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
+      .set({ status: 'failed', stopReason: 'device_lost', failureDetails: serverRunFailure(run.id, now), error: `The machine went offline; ${where} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
@@ -435,7 +436,7 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
             AND previous.status IN ('succeeded','failed','stopped','cancelled'))`)
     if (retained.rowCount) return null
     const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null,
-      stopReason: 'device_lost', error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
+      stopReason: 'device_lost', failureDetails: serverRunFailure(runId, now), error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
       .where(eq(agentRuns.id, runId)).returning()
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
     await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
@@ -464,7 +465,7 @@ async function noMachineCard() {
 async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date, expiredLease = false, noMachine?: unknown): Promise<boolean> {
   return db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
-      .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
+      .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', failureDetails: end.status === 'failed' ? serverRunFailure(runId, now) : null, error: end.error, finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from]),
         end.status === 'failed' ? isNull(agentRuns.stopRequestedAt) : undefined,
         expiredLease ? lt(agentRuns.leaseExpiresAt, now) : undefined))
@@ -484,7 +485,7 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
 export async function failRunForDaemonUpgrade(runId: string, deviceId: string, userId: string, now = new Date()): Promise<boolean> {
   const ended = await db.transaction(async tx => {
     const [run] = await tx.update(agentRuns)
-      .set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: DAEMON_UPGRADE_REQUIRED, finishedAt: now, updatedAt: now })
+      .set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', failureDetails: serverRunFailure(runId, now), error: DAEMON_UPGRADE_REQUIRED, finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       .returning()
     if (!run) return null
@@ -512,7 +513,7 @@ export async function failQueuedSubscriptionRuntime(runId: string, deviceId: str
     const summary = messages.RunErrors.subscription_local_runtime_unavailable[detail ?? 'default']
     const report: RunReport = { summary, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }
     const [run] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: error.message,
-      report, finishedAt: now, updatedAt: now })
+      report, failureDetails: serverRunFailure(runId, now, error), finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'),
         isNull(agentRuns.startedAt), isNull(agentRuns.sessionId), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.leaseExpiresAt), lt(agentRuns.leaseExpiresAt, now)),
         sql`EXISTS (SELECT 1 FROM agents a WHERE a.id=${agentRuns.agentId} AND a."userId"=${userId}

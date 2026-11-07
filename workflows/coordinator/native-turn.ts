@@ -5,6 +5,7 @@ import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/c
 import * as native from './native-steps'
 import type { NativeToolScope } from './tool-scope'
 import { nativeTurnToken } from './native-wake'
+import { captureRunFailure, RunFailureError } from '@mikka/protocol/run-failure'
 
 /** The device's job expires 180 s after it is queued (lib/coordinator/native-store.ts). */
 const NATIVE_TURN_MS = 180_000
@@ -34,7 +35,7 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
       // 停止: closing the turn below refuses the device's later tool calls and reply.
       if (signal?.aborted) return { text: '', responseMessages, finishReason: 'stop' }
       const state = await native.poll(userId,holder,turnId)
-      if (state.status === 'failed' || state.status === 'closed') throw new Error('nativeCoordinatorFailed: check the selected device and CLI login')
+      if (state.status === 'failed' || state.status === 'closed') throw new RunFailureError(captureRunFailure(state.failureDetails ? { failureDetails: state.failureDetails } : new Error('nativeCoordinatorFailed'), { runId: holder, provider: runtime.harness, credential: 'subscription' }))
       for (const call of state.calls) {
         if (!completed.has(call.callId)) {
           const selected = createTools({ holder, turnId, callId: call.callId })[call.name]
@@ -64,6 +65,6 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
       if (Date.now() >= deadline) break
       await Promise.race([changed, stopped, sleep(Math.max(1_000, Math.min(NATIVE_TURN_FALLBACK_MS, deadline - Date.now())))])
     }
-    throw new Error('nativeCoordinatorTimedOut: no fallback model was used')
+    throw new RunFailureError(captureRunFailure({ name: 'TimeoutError', code: 'ETIMEDOUT' }, { runId: holder, provider: runtime.harness, credential: 'subscription' }))
   } finally { changed.dispose(); await native.close(userId,holder,turnId) }
 }

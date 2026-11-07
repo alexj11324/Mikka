@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
+import type { RunFailure } from '@mikka/protocol/run-failure'
+import { APP_BUILD } from '../lib/app-build'
+import { measured } from './helpers/read-metrics'
 import type { PublishedPullRequest } from '../lib/run-publication-result'
 import type { OwnerPullRequestOpener } from '../lib/run-publications'
 import { remoteKey as repositoryKey } from '@mikka/protocol/repository'
@@ -92,6 +95,92 @@ test('run result publication commits one owner-scoped result through retries and
 
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+
+    await t.test('runtime failure details survive an independent connection and first-completion replay', async () => {
+      const { Client } = await import('pg')
+      const { visibleRuns } = await import('../lib/agent-runs')
+      const { newestTaskRuns } = await import('../lib/task-block-runs')
+      const f = await fixture()
+      const before = await visibleRuns(f.userId, { issueId: f.issueId, teams: [] })
+      assert.equal(before[0]?.failureDetails, null, 'old rows have no invented diagnostic')
+      const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+        providerMessage: 'Provider fixture: authentication refused for this account', causes: [{ name: 'APIError', code: 'invalid_api_key' }],
+        recovery: 'configure_api_key', runId: 'untrusted-run', appVersion: 'untrusted-version', occurredAt: '2026-11-07T12:00:00.000Z' }
+      await persistRunCompletion(f.userId, f.runId, { stopReason: 'error', failureDetails })
+      const reload = new Client({ connectionString: connection })
+      await reload.connect()
+      let stored: RunFailure
+      try {
+        const { rows: [row] } = await reload.query('select status,"failureDetails" from agent_runs where id=$1', [f.runId])
+        assert.equal(row.status, 'failed')
+        stored = row.failureDetails
+        assert.equal(stored.runId, f.runId)
+        assert.equal(stored.appVersion, APP_BUILD || 'unknown')
+        assert.equal(stored.providerMessage, failureDetails.providerMessage)
+      } finally { await reload.end() }
+      const full = await measured(() => visibleRuns(f.userId, { issueId: f.issueId, teams: [] }))
+      const brief = await measured(() => visibleRuns(f.userId, { issueId: f.issueId, teams: [], brief: true }))
+      assert.deepEqual(full.value[0].failureDetails, stored!)
+      assert.equal(brief.value[0].failureDetails?.code, 'run_api_key_invalid')
+      assert.equal(Object.hasOwn(brief.value[0].failureDetails!, 'providerMessage'), false)
+      assert.equal(Object.hasOwn(brief.value[0].failureDetails!, 'causes'), false)
+      assert.equal(brief.statements, full.statements, 'brief reads use the existing query budget')
+      assert.ok(brief.resultBytes < full.resultBytes)
+      const blocks = await newestTaskRuns(f.userId, [f.issueId])
+      assert.equal(blocks[0]?.failureDetails?.code, 'run_api_key_invalid')
+      assert.doesNotMatch(JSON.stringify(blocks), /Provider fixture|APIError/)
+      await Promise.all([
+        persistRunCompletion(f.userId, f.runId, { stopReason: 'cancelled' }),
+        persistRunCompletion(f.userId, f.runId, { stopReason: 'error', failureDetails: { ...failureDetails, code: 'run_quota_exceeded', category: 'quota' } }),
+      ])
+      const current = (await pool.query('select status,"failureDetails" from agent_runs where id=$1', [f.runId])).rows[0]
+      assert.equal(current.status, 'failed')
+      assert.deepEqual(current.failureDetails, stored!)
+      assert.deepEqual(await counts(f), { versions: 0, events: 1 })
+    })
+
+    await t.test('normal completion clears stale diagnostics while failed verification stores a generic code', async () => {
+      const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_quota_exceeded', category: 'quota', providerMessage: 'Must not label a normal completion', causes: [],
+        runId: null, appVersion: 'worker', occurredAt: '2026-11-07T12:00:00.000Z' }
+      for (const stopReason of ['cancelled', 'submitted'] as const) {
+        const f = await fixture()
+        await pool.query('update agent_runs set "failureDetails"=$2 where id=$1', [f.runId, JSON.stringify(failureDetails)])
+        await persistRunCompletion(f.userId, f.runId, { ...completion(f), stopReason, failureDetails })
+        assert.equal((await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails, null)
+      }
+      for (const stopReason of ['submitted', 'blocked'] as const) {
+        const f = await fixture()
+        const submitted = completion(f)
+        await persistRunCompletion(f.userId, f.runId, { ...submitted, stopReason, failureDetails, report: { ...submitted.report!, verify: { status: 'failed' } } })
+        const row = (await pool.query('select status,"failureDetails" from agent_runs where id=$1', [f.runId])).rows[0]
+        assert.equal(row.status, stopReason === 'submitted' ? 'failed' : 'stopped')
+        if (stopReason === 'submitted') {
+          assert.equal(row.failureDetails.code, 'run_failed')
+          assert.equal(row.failureDetails.providerMessage, undefined)
+        } else assert.equal(row.failureDetails, null)
+      }
+    })
+
+    await t.test('device completion and server terminal transitions persist diagnostics under their existing fences', async () => {
+      const { completeRunForDevice } = await import('../lib/run-completion')
+      const { failRunForDaemonUpgrade } = await import('../lib/run-leases')
+      const f = await fixture()
+      const stranger = await fixture()
+      assert.equal(await completeRunForDevice(stranger.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'timeout' }), null)
+      assert.ok(await completeRunForDevice(f.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'timeout' }))
+      const first = (await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails
+      assert.equal(first.code, 'run_timeout')
+      assert.equal(first.runId, f.runId)
+      assert.equal(await completeRunForDevice(f.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'error' }), null)
+      assert.deepEqual((await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails, first)
+      const queued = await fixture()
+      await pool.query("update agent_runs set status='queued' where id=$1", [queued.runId])
+      assert.equal(await failRunForDaemonUpgrade(queued.runId, stranger.deviceId, queued.userId), false)
+      assert.equal(await failRunForDaemonUpgrade(queued.runId, queued.deviceId, stranger.userId), false)
+      assert.equal(await failRunForDaemonUpgrade(queued.runId, queued.deviceId, queued.userId), true)
+      assert.equal((await pool.query('select "failureDetails" from agent_runs where id=$1', [queued.runId])).rows[0].failureDetails.code, 'run_failed')
+      assert.equal(await failRunForDaemonUpgrade(queued.runId, queued.deviceId, queued.userId), false)
+    })
 
     await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')

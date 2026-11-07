@@ -1,3 +1,4 @@
+import { captureRunFailure } from '@mikka/protocol/run-failure'
 import { runHostedWorkflowTurn, type ToolTiming } from '@/lib/subscription-workflow-turn'
 import { isStepCount } from 'ai'
 import { createHook, getWorkflowMetadata, getWritable } from 'workflow'
@@ -176,14 +177,15 @@ export async function coordinatorTurn(userId: string, botId: string) {
         if (failedPreparation) await kit.failAgentPreparation(userId,botId,holder,round)
         else await kit.finishAgentExecution(userId,botId,execution?.id,'turn_failed')
       } catch { /* the durable execution remains inspectable */ }
+      const failureDetails = captureRunFailure(error, { runId: holder })
       const reason = error instanceof Error ? error.message : String(error)
       const completed = reason === 'model_tool_unavailable' && finished.length ? { messages:finished,streamId } : undefined
-      try { await steps.failTurn(userId,holder,reason,botId,completed) }
+      try { await steps.failTurn(userId,holder,reason,botId,completed,failureDetails) }
       catch (persistenceError) {
         // A credential guard can refuse these receipts before the transaction.
         // Still release the failed turn's lease once, without persisting unsafe
         // output, and retain both causes for server diagnostics.
-        if (completed) await steps.failTurn(userId,holder,reason,botId)
+        if (completed) await steps.failTurn(userId,holder,reason,botId,undefined,failureDetails)
         throw new AggregateError([error,persistenceError],reason,{ cause:persistenceError })
       }
       throw error

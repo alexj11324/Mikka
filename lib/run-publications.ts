@@ -1,4 +1,5 @@
 import { runChanged } from './live/panels'
+import { completionFailureDetails } from './run-failure-details'
 import 'server-only'
 import { isCurrentFactoryDeliverable } from './factory/execution-kind'
 import { issueListChanged, runListChanged } from './live/lists'
@@ -206,6 +207,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       }
       // A paused run holds no lease, so it is never reclaimed as lost; it is not finished yet.
       ;[run] = await tx.update(agentRuns).set({ status, pauseReason: paused ? 'quota_exhausted' : null, resumeStatus: null, stopReason: completion.stopReason, report: persistedReport ?? null,
+        failureDetails: completionFailureDetails(completion, runId, { status, stopRequested: Boolean(run.stopRequestedAt), sensitiveText: [run.prompt, run.agentDefinition?.instructions ?? ''] }),
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await runListChanged(tx, runId)

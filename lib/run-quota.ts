@@ -1,4 +1,6 @@
 import { runChanged } from './live/panels'
+import { serverRunFailure } from './run-failure-details'
+import { CodedError } from '@mikka/protocol/coded-error'
 import 'server-only'
 import { freezeExecutionIdentity, revalidateExecutionIdentity } from './execution-identity'
 import type { PoolClient } from 'pg'
@@ -159,7 +161,7 @@ export async function queueCloudQuotaContinuation(run: Run, cloud: CloudBinding,
 
 /** Ends a quota-paused run once its continuation exists; false when something else ended it first. */
 async function endPausedRun(tx: Tx, runId: string, userId: string): Promise<boolean> {
-  const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, finishedAt: new Date(), updatedAt: new Date() })
+  const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_quota_exceeded')), finishedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'paused'), eq(agentRuns.pauseReason, 'quota_exhausted'))).returning({ id: agentRuns.id })
   if (ended) { await runListChanged(tx, runId); await runChanged(tx, runId) }
   return Boolean(ended)
