@@ -12,6 +12,8 @@ import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
 import { mkdirSync } from "node:fs"
 import { daemonTracer, runIdHash } from "../tracing"
 import { CodexGenerationMetrics } from './generation-metrics'
+import { codexGenerationReceiptAttributes, codexTraceEnvironment, startCodexGenerationCollector } from '../codex-generation-telemetry'
+import type { GenerationMetrics } from '../tracing-ai'
 import { runRuntimeTimings } from '../run-runtime-timing'
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
@@ -80,6 +82,8 @@ export interface CodexAdapterOptions {
   ensureBinary?: () => Promise<string>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
+  /** Trusted acceptance-only logs configuration, applied before native traces. */
+  cliTiming?: { env: Record<string, string>; args: string[] }
   /** Persist an owner-bound session before any prompt can execute. */
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
@@ -416,6 +420,16 @@ export class CodexAdapter implements AgentAdapter {
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
     const mcp = ctx.mcpServer()
+    const traceContext = options.traceContext ?? daemonTracer.capture()
+    let nativeGenerations: Awaited<ReturnType<typeof startCodexGenerationCollector>> | undefined
+    let nativeUnavailableReason: GenerationMetrics['nativeUnavailableReason']
+    const closeNativeGenerations = (cliExitObserved: boolean) => {
+      if (!nativeGenerations) return
+      const drain = nativeGenerations.close(cliExitObserved).then(receipt =>
+        daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', ...codexGenerationReceiptAttributes(receipt) }, async () => {}, { traceContext }))
+      daemonTracer.registerGenerationDrain(drain)
+      void drain.then(() => daemonTracer.flush()).catch(() => {})
+    }
     const argv = [
       binary,
       "app-server",
@@ -453,15 +467,40 @@ export class CodexAdapter implements AgentAdapter {
         "-c",
         `shell_environment_policy.set.${key}=${toml(value)}`,
       ]),
+      ...(this.options.cliTiming?.args ?? []),
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home,
+        ...this.options.cliTiming?.env },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
-    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
+    if (daemonTracer.generationsEnabled && traceContext) {
+      const bypass = codexTraceEnvironment(spawnOptions.env)
+      if (!bypass) {
+        nativeUnavailableReason = 'platform_proxy_unverified'
+        void daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', 'mikka.ai.native_unavailable_reason': nativeUnavailableReason },
+          async () => {}, { traceContext }).catch(() => {})
+      } else {
+        try {
+          nativeGenerations = await startCodexGenerationCollector(metrics => daemonTracer.generation(metrics, traceContext))
+          argv.push(...nativeGenerations.args)
+          Object.assign(spawnOptions.env, nativeGenerations.env, bypass)
+        } catch (error) {
+          nativeUnavailableReason = 'receiver_start_failed'
+          void daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', 'mikka.ai.rejected_batches': 1, 'mikka.ai.native_flush_confirmed': false,
+            'mikka.ai.native_unavailable_reason': nativeUnavailableReason }, async span => { span.fail(error) }, { traceContext }).catch(() => {})
+        }
+      }
+    }
+    let child: Awaited<ReturnType<typeof spawnCli>>
+    try { child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions) }
+    catch (error) { closeNativeGenerations(false); throw error }
+    // Existing owned-child shutdown determines the deadline. The receiver
+    // stays live through native exporter shutdown and drains in the background.
+    void child.exited.then(() => closeNativeGenerations(true))
     // A revoked run gate stops the CLI (no sandbox launcher owns it any more).
     const off = options.toolApproval!.onRevoke(() => { void child.kill().catch(() => undefined) })
     void child.exited.finally(off)
@@ -491,8 +530,9 @@ export class CodexAdapter implements AgentAdapter {
     let quota: QuotaSignal | undefined
     let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
-    const traceContext = options.traceContext ?? daemonTracer.capture()
-    const generations = new CodexGenerationMetrics(metrics => daemonTracer.generation(metrics, traceContext))
+    const generations = new CodexGenerationMetrics(metrics => nativeGenerations
+      ? nativeGenerations.collector.observeFallback(metrics, sessionId)
+      : daemonTracer.generation({ ...metrics, nativeUnavailableReason }, traceContext))
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     // Match the host-created MCP server's advertised capabilities. A fixed
     // check may inspect its artifact, but cannot select another repository.
@@ -607,7 +647,6 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "item/agentMessage/delta": {
-          generations.firstToken()
           const { itemId, delta } = params as DeltaNotification
           if (!streamed.has(itemId)) {
             streamed.add(itemId)
@@ -617,7 +656,6 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "item/reasoning/summaryTextDelta": {
-          generations.firstToken()
           const { itemId, delta } = params as DeltaNotification
           if (!streamed.has(itemId)) {
             streamed.add(itemId)

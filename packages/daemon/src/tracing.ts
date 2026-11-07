@@ -11,7 +11,7 @@ import { HARNESSES, type Harness } from "@mikka/protocol/harness"
 import { safeErrorAttributes, scrubLocalString } from "@mikka/protocol/tracing"
 import { TRACE_FIELDS, runTraceHeaders, sanitizeTraceContext, telemetryId, traceAttributes, type RunTraceContext } from "@mikka/protocol/trace-context"
 import { createLogProvider, StageLogProcessor } from "./tracing-logs"
-import { AI_NUMBERS, createAiSink, generationAttributes, generationEvent, modelLabel, type AiSink, type GenerationMetrics } from "./tracing-ai"
+import { AI_METADATA, AI_NUMBERS, createAiSink, generationAttributes, generationEvent, modelLabel, type AiSink, type GenerationMetrics } from "./tracing-ai"
 import { DaemonRetainingSpanProcessor, DaemonSampler, RETENTIONS, RUN_CONTEXT, sampleRate, spanSamplingAttributes } from "./tracing-sampling"
 
 // Traces of the daemon's own operations (docs/operations/tracing.md, "Daemon"):
@@ -66,7 +66,7 @@ type StartupScope = {
   runIdHash: string; harness: Harness; startedAt: number; started: number
   phases: DaemonStartupPhase[]; phaseCount: number; truncated: boolean; closed: boolean
 }
-type SpanOptions = { root?: boolean; traceContext?: RunTraceContext; startedAt?: number; onStartupTiming?: (timing: DaemonStartupTiming) => void }
+type SpanOptions = { root?: boolean; traceContext?: RunTraceContext; startedAt?: number; endedAt?: number; onStartupTiming?: (timing: DaemonStartupTiming) => void }
 const milliseconds = (value: number) => Math.max(0, Math.round(value * 1_000) / 1_000)
 
 /** The only attributes a daemon span may carry. Everything else is dropped before export. */
@@ -78,7 +78,11 @@ const ALLOWED = new Set([
   "mikka.trace.sample_rate", "mikka.trace.critical", "mikka.trace.retention",
   ...Object.values(TRACE_FIELDS),
   ...Object.values(AI_NUMBERS).map(([attribute]) => attribute),
+  ...AI_METADATA,
   "mikka.ai.provider", "mikka.ai.model", "mikka.ai.operation",
+  "mikka.ai.native_generations", "mikka.ai.fallback_generations", "mikka.ai.matched_fallbacks", "mikka.ai.missing_native",
+  "mikka.ai.incomplete_requests", "mikka.ai.invalid_spans", "mikka.ai.rejected_batches", "mikka.ai.duplicate_completions",
+  "mikka.ai.collection_truncated", "mikka.ai.cli_exit_observed", "mikka.ai.native_flush_confirmed",
 ])
 const ID_ATTRIBUTES = new Set<string>(Object.values(TRACE_FIELDS))
 
@@ -161,10 +165,20 @@ export class DaemonTracer {
   private provider: BasicTracerProvider | null = null
   private logProvider: LoggerProvider | null = null
   private ai: AiSink | null = null
+  private readonly generationDrains = new Set<Promise<unknown>>()
   private readonly scope = new AsyncLocalStorage<Context>()
   private readonly startupScope = new AsyncLocalStorage<StartupScope>()
 
   get enabled(): boolean { return this.provider !== null }
+  get generationsEnabled(): boolean { return this.provider !== null && this.ai !== null }
+
+  /** Only already-closing collectors register here; never wait for an active
+   * model/CLI. Existing flush/shutdown budgets cover their final safe receipts. */
+  registerGenerationDrain(work: Promise<unknown>): void {
+    const safe = work.catch(() => {})
+    this.generationDrains.add(safe)
+    void safe.then(() => this.generationDrains.delete(safe))
+  }
 
   /** Starts exporting with the server's settings. Called again (a new registration) it keeps the first provider. */
   configure(settings: TraceSettings | undefined, { version, env = process.env, exporter, logExporter, aiSink }: { version?: string; env?: Env; exporter?: SpanExporter; logExporter?: LogRecordExporter; aiSink?: AiSink | null } = {}): boolean {
@@ -254,7 +268,7 @@ export class DaemonTracer {
     return pending.then(value => { end(failed); return value }, (error: unknown) => { end(true); throw error })
   }
 
-  private traceSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, { root = false, traceContext, startedAt }: SpanOptions): Promise<T> {
+  private traceSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, { root = false, traceContext, startedAt, endedAt }: SpanOptions): Promise<T> {
     const provider = this.provider
     let span: Span | undefined
     let scope = root ? ROOT_CONTEXT : this.scope.getStore() ?? ROOT_CONTEXT
@@ -287,7 +301,7 @@ export class DaemonTracer {
           span?.setAttributes({ ...safeErrorAttributes(error), "mikka.outcome": outcomeOf(span) ?? "error" })
           span?.setStatus({ code: SpanStatusCode.ERROR })
         } else if (outcomeOf(span) === undefined) span?.setAttribute("mikka.outcome", "ok")
-        span?.end()
+        span?.end(endedAt === undefined ? undefined : new Date(endedAt))
       } catch { /* tracing never breaks the daemon */ }
     }
     let pending: Promise<T>
@@ -320,7 +334,11 @@ export class DaemonTracer {
     if (!this.provider || !carrier) return
     const parentId = carrier.traceparent.slice(36, 52)
     const duration = metrics.latencyMs
-    const startedAt = typeof duration === 'number' && Number.isFinite(duration) && duration >= 0 ? Date.now() - duration : undefined
+    const nativeInterval = typeof metrics.startedAt === 'number' && Number.isFinite(metrics.startedAt) && metrics.startedAt >= 0
+      && typeof metrics.endedAt === 'number' && Number.isFinite(metrics.endedAt) && metrics.endedAt >= metrics.startedAt
+      && metrics.endedAt <= 8_640_000_000_000_000
+    const startedAt = nativeInterval ? metrics.startedAt : typeof duration === 'number' && Number.isFinite(duration) && duration >= 0 ? Date.now() - duration : undefined
+    const endedAt = nativeInterval ? metrics.endedAt : undefined
     void this.span('daemon.ai.generation', generationAttributes(metrics), async span => {
       const active = this.capture()
       if (metrics.outcome === 'error') span.fail({ name: 'ProviderError' })
@@ -329,7 +347,7 @@ export class DaemonTracer {
         const event = generationEvent(metrics, active, parentId, startedAt === undefined ? undefined : new Date(startedAt))
         if (event) { try { this.ai?.capture(event) } catch { /* Telemetry never blocks an agent. */ } }
       }
-    }, { traceContext: carrier, startedAt }).catch(() => {})
+    }, { traceContext: carrier, startedAt, endedAt }).catch(() => {})
   }
 
   /** W3C parent and safe run references, confined to outgoing Mikka requests. */
@@ -350,20 +368,29 @@ export class DaemonTracer {
     const provider = this.provider
     const logs = this.logProvider
     const ai = this.ai
-    this.provider = null
-    this.logProvider = null
-    this.ai = null
     if (!provider && !logs && !ai) return
+    const detach = () => {
+      if (this.provider === provider) this.provider = null
+      if (this.logProvider === logs) this.logProvider = null
+      if (this.ai === ai) this.ai = null
+    }
+    const work = Promise.allSettled(this.generationDrains).then(async () => {
+      detach()
+      await Promise.allSettled([provider?.shutdown(), logs?.shutdown(), ai?.shutdown()])
+    })
     let timer: NodeJS.Timeout | undefined
     await Promise.race([
-      Promise.allSettled([provider?.shutdown(), logs?.shutdown(), ai?.shutdown()]),
+      work,
       new Promise<void>(resolve => { timer = setTimeout(resolve, timeoutMs); timer.unref() }),
-    ]).finally(() => clearTimeout(timer))
+    ]).finally(() => { clearTimeout(timer); detach() })
   }
 
   /** Run completion starts a background drain; tests can await the same queues. */
   async flush(): Promise<void> {
-    try { await Promise.allSettled([this.provider?.forceFlush(), this.logProvider?.forceFlush(), this.ai?.flush()]) }
+    try {
+      await Promise.allSettled(this.generationDrains)
+      await Promise.allSettled([this.provider?.forceFlush(), this.logProvider?.forceFlush(), this.ai?.flush()])
+    }
     catch { /* A collector cannot break the run's completion. */ }
   }
 }

@@ -129,8 +129,8 @@ export interface ErrorNotification {
 export interface TokenUsageNotification {
   threadId: string
   tokenUsage: {
-    total: { inputTokens: number; outputTokens: number; cachedInputTokens?: number }
-    last?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number }
+    total: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; cacheWriteInputTokens?: number }
+    last?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; cacheWriteInputTokens?: number }
   }
 }
 

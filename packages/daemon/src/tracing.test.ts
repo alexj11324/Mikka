@@ -81,6 +81,64 @@ describe("daemon tracing", () => {
     await tracer.shutdown()
   })
 
+  it('preserves actual native generation timestamps after delayed export and labels first-output TTFT', async () => {
+    const spans = new InMemorySpanExporter(), tracer = new DaemonTracer()
+    const events: NonNullable<ReturnType<typeof generationEvent>>[] = []
+    expect(tracer.generationsEnabled).toBe(false)
+    tracer.configure(settings, { exporter: spans, logExporter: new InMemoryLogRecordExporter(), env: {}, aiSink: {
+      capture: event => { events.push(event) }, flush: async () => {}, shutdown: async () => {},
+    } })
+    const startedAt = 1_793_980_800_000, endedAt = startedAt + 500
+    const carrier = { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01', runId: 'native_run' }
+    expect(tracer.generationsEnabled).toBe(true)
+    await tracer.span('daemon.run', {}, async () => {
+      tracer.generation({ harness: 'codex', provider: 'openai', model: 'gpt-6-luna', inputTokens: 50, outputTokens: 20,
+        startedAt, endedAt, latencyMs: 500, ttftMs: 150, firstOutputMs: 150,
+        timingBasis: 'official_cli_trace', ttftBasis: 'request_to_first_output_item', modelBasis: 'native_sampling_config' })
+    }, { traceContext: carrier })
+    await tracer.flush()
+    const generation = spans.getFinishedSpans().find(span => span.name === 'daemon.ai.generation')!
+    const millis = (time: [number, number]) => time[0] * 1000 + time[1] / 1_000_000
+    expect(millis(generation.startTime)).toBe(startedAt)
+    expect(millis(generation.endTime)).toBe(endedAt)
+    expect(millis(generation.duration)).toBe(500)
+    expect(events[0].timestamp?.getTime()).toBe(startedAt)
+    expect(events[0].properties).toMatchObject({ $ai_latency: 0.5, $ai_time_to_first_token: 0.15,
+      'mikka.ai.timing_basis': 'official_cli_trace', 'mikka.ai.ttft_basis': 'request_to_first_output_item',
+      'mikka.ai.first_output_item_ms': 150, 'mikka.ai.model_basis': 'native_sampling_config' })
+    expect(generation.attributes['mikka.ai.ttft_basis']).toBe('request_to_first_output_item')
+    await tracer.shutdown()
+    expect(tracer.generationsEnabled).toBe(false)
+  })
+
+  it('drains already-closing generation collectors before shutting down the sink within the existing deadline', async () => {
+    const spans = new InMemorySpanExporter(), tracer = new DaemonTracer()
+    const events: NonNullable<ReturnType<typeof generationEvent>>[] = []
+    let sinkClosed = false
+    tracer.configure(settings, { exporter: spans, logExporter: new InMemoryLogRecordExporter(), env: {}, aiSink: {
+      capture: event => { expect(sinkClosed).toBe(false); events.push(event) }, flush: async () => {}, shutdown: async () => { sinkClosed = true },
+    } })
+    const carrier = { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01', runId: 'native_drain' }
+    tracer.registerGenerationDrain(new Promise<void>(resolve => setImmediate(() => {
+      tracer.generation({ harness: 'codex', provider: 'openai', model: 'gpt-6-luna', inputTokens: 5, outputTokens: 1,
+        timingBasis: 'app_server_usage' }, carrier)
+      resolve()
+    })))
+    await tracer.shutdown(100)
+    expect(events).toHaveLength(1)
+    expect(sinkClosed).toBe(true)
+    expect(tracer.generationsEnabled).toBe(false)
+    const stalled = new DaemonTracer()
+    stalled.configure(settings, { exporter: new InMemorySpanExporter(), logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
+    let release!: () => void
+    stalled.registerGenerationDrain(new Promise<void>(resolve => { release = resolve }))
+    const started = performance.now()
+    await stalled.shutdown(20)
+    expect(performance.now() - started).toBeLessThan(250)
+    expect(stalled.enabled).toBe(false)
+    release()
+  })
+
   it("exports only allowlisted, scrubbed attributes", async () => {
     const memory = new InMemorySpanExporter()
     const tracer = new DaemonTracer()

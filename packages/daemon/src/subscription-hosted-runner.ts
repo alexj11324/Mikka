@@ -228,13 +228,16 @@ export async function createHostedBotRunner(host: {
         }
         const spawnHosted = (config: SpawnOptions, oauthToken?: string): SpawnedProcess => {
           assertOpen()
-          const childEnv = { ...env, ...config.env, ...cliTiming?.env }
+          // Codex applies the trusted timing config in its adapter, before its
+          // normal native trace receiver. Do not overwrite that last argument.
+          const hostedTiming = kind === 'claude_code' ? cliTiming : undefined
+          const childEnv = { ...env, ...config.env, ...hostedTiming?.env }
           if (oauthToken !== undefined) {
             childEnv.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = '3'
             delete childEnv.CLAUDE_CODE_OAUTH_TOKEN
             delete childEnv.ANTHROPIC_API_KEY
           }
-          const child = spawn(binaries[kind]!, [...config.args, ...(cliTiming?.args ?? [])], {
+          const child = spawn(binaries[kind]!, [...config.args, ...(hostedTiming?.args ?? [])], {
             cwd, env: childEnv, detached: true,
             stdio: oauthToken === undefined ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe', 'pipe'],
           })
@@ -264,7 +267,7 @@ export async function createHostedBotRunner(host: {
         }
         const adapter = kind === 'codex'
           ? new CodexAdapter({ stateDir: host.stateDir, binary: binaries.codex, sandbox: directSpawnOnly,
-            spawnCli: codexSpawn, computerMcp, onHostedSession: record,
+            spawnCli: codexSpawn, cliTiming, computerMcp, onHostedSession: record,
             ...(subscription ? { subscriptionAuth: { accountId: subscription.first.accountId,
               token: async () => {
                 assertOpen()

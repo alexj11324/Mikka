@@ -374,6 +374,82 @@ compaction, title/profile and daemon agent calls use the same convention.
 See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
 and [AI traces](https://posthog.com/docs/ai-observability/traces).
 
+#### Native Codex request measurements
+
+When daemon tracing and AI capture are enabled on Linux, each Codex child gets
+one random-path loopback OTLP/HTTP JSON receiver. Its normal HOME, subscription
+credentials and provider connection stay on the existing runtime path. The
+receiver keeps only request ancestry, bounded model/conversation identifiers
+and numeric measurements; native resource attributes, events, text, tool
+arguments and errors are discarded. It accepts at most four connections,
+1 MiB per batch and 4,096 pending records. It adds no database query or polling.
+
+The child adds the receiver's `127.0.0.1` address to its existing proxy-bypass
+lists, preserving the separate uppercase/lowercase values and all provider
+proxy URLs. macOS and Windows currently retain app-server usage instead of
+enabling native capture: Codex's optional system/PAC proxy policy can ignore
+environment bypass lists. Telemetry never disables the user's provider proxy
+policy to obtain native measurements.
+
+For the pinned Codex 0.163 runtime, request identity is the native trace ID plus
+the `try_run_sampling_request` span ID. `stream_request` and
+`receiving_stream` must share that exact parent. Latency starts at
+`stream_request` and ends at the `receiving` child of the completed response
+handler. The enclosing request/stream spans can remain open while tools run,
+so their end times and app-server notification arrival times are not used as
+model latency. Native timestamps also position the APM generation span and
+AI event independently of when an OTLP batch arrives.
+
+`mikka.ai.timing_basis=official_cli_trace` identifies these native measurements.
+`mikka.ai.ttft_basis=request_to_first_output_item` means time to the first
+`output_item_added` receipt in the same request. This follows the official
+[PostHog Responses SDK predicate](https://github.com/PostHog/posthog-js/blob/90e846aa04281713fb2d60e0afb88d6a1280c0ac/packages/ai/src/openai/utils.ts):
+an output item can precede visible text. A `response.created` or `in_progress`
+event does not establish TTFT. `mikka.ai.first_output_item_ms` retains the same
+boundary explicitly. `mikka.ai.model_basis=native_sampling_config` identifies
+the CLI's requested model; it is not a separate provider attestation of the
+served model. The completed handler's closed reasoning-effort enum is retained
+as `mikka.ai.effort` when supplied. This describes the native selected/default
+configuration; the CLI can normalize or pin request effort, so this field is
+not a separate wire-level or provider-served effort receipt.
+
+Child shutdown starts a background drain within the daemon's existing shutdown
+budget. Reordered batches and repeated exports are reconciled before emission.
+Each successfully reconstructed native request consumes at most one matching
+app-server usage receipt, matching conversation, model and all four numeric
+token/cache fields as a multiset. Missing values remain distinct from zero.
+Unmatched app-server receipts still produce generations with
+`mikka.ai.timing_basis=app_server_usage`, without invented latency or TTFT.
+The `daemon.ai.collection` span records native/fallback/matched counts,
+`mikka.ai.missing_native`, incomplete requests, rejected batches, truncation
+and whether CLI exit was observed. `mikka.ai.native_flush_confirmed=false`
+remains explicit: observing process exit does not prove the native exporter
+flushed every request. Check these fields in production alongside the actual
+generation count; a successful run alone does not prove complete telemetry.
+An incomplete native request is not automatically a failed generation: Codex
+can preempt a stream without a completed response and still continue normally.
+The existing run/adapter/provider error spans retain proven failures; missing
+native outcomes remain unknown instead of being inferred from timing alone.
+
+#### Cost provenance
+
+The pinned SDK's normalized usage can omit cache-write counts even when the
+provider supplied them. The web wrapper therefore reads only numeric
+`prompt_tokens_details.cache_write_tokens` or `cached_creation_tokens` as a
+fallback; it never traverses response content. Codex app-server receipts also
+retain `cacheWriteInputTokens` when present. Input totals remain inclusive of
+both cache buckets and are not incremented a second time.
+
+Production evidence records `$ai_cost_model_source`, `$ai_model_cost_used`
+and `$ai_cost_model_provider` with any calculated amount. The official
+[PostHog price catalogue](https://github.com/PostHog/posthog/blob/89fe024b36426acdfbec69f746f7e1706f2522fa/nodejs/src/ingestion/pipelines/ai/costs/providers/llm-costs.json)
+contains Claude Haiku 5.5 and GPT-6 Luna, and its matcher normalizes the
+punctuation in their model IDs. That source check does not prove which
+ingestion version the project is running: inspect an actual captured event.
+Model-catalog costs are API-equivalent estimates, subject to the applicable
+context tier and cache lifetime. They are not per-call subscription charges.
+No missing usage, missing cost or missing timing is filled with a synthetic zero.
+
 ### Structured Logs
 
 Web and daemon log exporters send OTLP/HTTP protobuf to
@@ -631,6 +707,15 @@ Separately, the AI wrapper microbenchmark on Node 24.22.1, after warm-up over
 3,000 generations, measured mean **0.0359 ms**, p95 **0.0604 ms** and p99
 **0.1571 ms** per generation. It included JSON capture and OTel batching and
 excluded network, database and actual model latency.
+
+The native Codex JSON receiver's numeric projection was measured separately
+on Node 24.22.1: 120 warm-up iterations, then 500 samples of a synthetic
+512-span / 116,505-byte batch. JSON parsing plus projection measured p50
+**1.242 ms** and p95 **2.219 ms**. This excludes the official Rust exporter,
+HTTP transport, model calls and cloud CPU scheduling; it does not estimate
+their combined overhead. The [receipt](evidence/1512-native-generation-benchmark.json)
+binds the measurement to the collector's SHA-256. Reproduce with
+`node --import tsx scripts/ops/native-generation-projection-bench.mjs`.
 
 ## Configuration
 

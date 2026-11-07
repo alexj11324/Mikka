@@ -14,6 +14,16 @@ export interface GenerationMetrics {
   totalCostUsd?: number
   latencyMs?: number
   ttftMs?: number
+  /** May precede visible text; PostHog Responses TTFT uses this boundary. */
+  firstOutputMs?: number
+  timingBasis?: 'official_cli_trace' | 'app_server_usage'
+  ttftBasis?: 'request_to_first_output_item'
+  modelBasis?: 'native_sampling_config'
+  effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'persistent'
+  nativeUnavailableReason?: 'platform_proxy_unverified' | 'receiver_start_failed' | 'native_trace_missing' | 'native_trace_truncated'
+  /** Actual native interval, independent of export/batch arrival time. */
+  startedAt?: number
+  endedAt?: number
   outcome?: 'ok' | 'error' | 'cancelled'
 }
 
@@ -25,7 +35,28 @@ export const AI_NUMBERS = {
   totalCostUsd: ['mikka.ai.total_cost_usd', '$ai_total_cost_usd'],
   latencyMs: ['mikka.ai.latency_ms', '$ai_latency'],
   ttftMs: ['mikka.ai.ttft_ms', '$ai_time_to_first_token'],
+  firstOutputMs: ['mikka.ai.first_output_item_ms', 'mikka.ai.first_output_item_ms'],
 } as const
+
+export const AI_METADATA = ['mikka.ai.timing_basis', 'mikka.ai.ttft_basis', 'mikka.ai.model_basis', 'mikka.ai.effort', 'mikka.ai.native_unavailable_reason'] as const
+/** Fixed Codex 0.163 ReasoningEffort variants. Custom(String) is not telemetry.
+ * https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/protocol/src/openai_models.rs */
+export function generationEffort(value: unknown): GenerationMetrics['effort'] {
+  return typeof value === 'string' && ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent'].includes(value)
+    ? value as GenerationMetrics['effort'] : undefined
+}
+function provenance(input: GenerationMetrics): Record<string, string> {
+  const result: Record<string, string> = {}
+  if (input.timingBasis === 'official_cli_trace' || input.timingBasis === 'app_server_usage') result['mikka.ai.timing_basis'] = input.timingBasis
+  if (input.ttftBasis === 'request_to_first_output_item') result['mikka.ai.ttft_basis'] = input.ttftBasis
+  if (input.modelBasis === 'native_sampling_config') result['mikka.ai.model_basis'] = input.modelBasis
+  const effort = generationEffort(input.effort)
+  if (effort !== undefined) result['mikka.ai.effort'] = effort
+  if (input.nativeUnavailableReason && ['platform_proxy_unverified', 'receiver_start_failed', 'native_trace_missing', 'native_trace_truncated'].includes(input.nativeUnavailableReason)) {
+    result['mikka.ai.native_unavailable_reason'] = input.nativeUnavailableReason
+  }
+  return result
+}
 
 export function metric(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
@@ -36,7 +67,7 @@ export function modelLabel(value: unknown): string | undefined {
 }
 export function generationAttributes(input: GenerationMetrics): Record<string, string | number | boolean> {
   const result: Record<string, string | number | boolean> = { 'mikka.harness': input.harness,
-    'mikka.ai.provider': input.provider, 'mikka.ai.operation': 'agent', 'mikka.outcome': input.outcome ?? 'ok' }
+    'mikka.ai.provider': input.provider, 'mikka.ai.operation': 'agent', 'mikka.outcome': input.outcome ?? 'ok', ...provenance(input) }
   const model = modelLabel(input.model)
   if (model) result['mikka.ai.model'] = model
   for (const [key, [attribute]] of Object.entries(AI_NUMBERS)) {
@@ -56,7 +87,7 @@ export function generationEvent(input: GenerationMetrics, carrier: RunTraceConte
     ...traceAttributes(carrier), '$ai_trace_id': carrier.traceparent.slice(3, 35),
     '$ai_span_id': carrier.traceparent.slice(36, 52), '$ai_provider': input.provider,
     '$ai_is_error': input.outcome === 'error', '$ai_cache_reporting_exclusive': false,
-    'mikka.ai.operation': 'agent', 'mikka.harness': input.harness,
+    'mikka.ai.operation': 'agent', 'mikka.harness': input.harness, ...provenance(input),
   }
   if (parentId && /^[0-9a-f]{16}$/.test(parentId)) properties.$ai_parent_id = parentId
   if (telemetryId(carrier.sessionId)) {

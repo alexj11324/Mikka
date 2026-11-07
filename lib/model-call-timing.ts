@@ -27,7 +27,7 @@ export interface ModelCallTiming {
   inputTokens: number | null
   /** Input tokens read from the provider's prompt cache. */
   cacheReadTokens: number | null
-  /** Input tokens written to the cache (reported by Anthropic routes only). */
+  /** Input tokens written to the provider's cache when reported by the receipt. */
   cacheWriteTokens: number | null
   outputTokens: number | null
   toolCalls: number
@@ -69,10 +69,15 @@ export function modelTokenUsage(usage: unknown): Pick<ModelCallTiming, 'inputTok
   const raw = usage && typeof usage === 'object' ? usage as Record<string, unknown> : {}
   const input = raw.inputTokens && typeof raw.inputTokens === 'object' ? raw.inputTokens as Record<string, unknown> : {}
   const details = raw.inputTokenDetails && typeof raw.inputTokenDetails === 'object' ? raw.inputTokenDetails as Record<string, unknown> : {}
+  // The pinned OpenAI-compatible SDK retains CPA cache writes only in raw usage.
+  // Read these two numeric receipt fields; never copy or traverse other raw data.
+  const providerUsage = raw.raw && typeof raw.raw === 'object' ? raw.raw as Record<string, unknown> : {}
+  const promptDetails = providerUsage.prompt_tokens_details && typeof providerUsage.prompt_tokens_details === 'object' ? providerUsage.prompt_tokens_details as Record<string, unknown> : {}
   return {
     inputTokens: total(raw.inputTokens), outputTokens: total(raw.outputTokens),
     cacheReadTokens: modelMetric(input.cacheRead) ?? modelMetric(details.cacheReadTokens),
-    cacheWriteTokens: modelMetric(input.cacheWrite) ?? modelMetric(details.cacheWriteTokens),
+    cacheWriteTokens: modelMetric(input.cacheWrite) ?? modelMetric(details.cacheWriteTokens)
+      ?? modelMetric(promptDetails.cache_write_tokens) ?? modelMetric(promptDetails.cached_creation_tokens),
   }
 }
 

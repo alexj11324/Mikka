@@ -26,21 +26,37 @@ it('records final Claude usage once per message, including interleaved subagents
 
 it('uses Codex last-request usage, ignores resume history and deduplicates total replays', () => {
   const captured: GenerationMetrics[] = []
-  let now = 10
-  const tracker = new CodexGenerationMetrics(value => captured.push(value), () => now)
+  const tracker = new CodexGenerationMetrics(value => captured.push(value))
   tracker.observe({ total: { inputTokens: 1000, outputTokens: 500 }, last: { inputTokens: 500, outputTokens: 200 } })
   expect(captured).toHaveLength(0)
   tracker.startTurn()
-  now = 50; tracker.firstToken()
-  now = 90
   const first = { total: { inputTokens: 1050, outputTokens: 520 }, last: { inputTokens: 50, outputTokens: 20, cachedInputTokens: 30 } }
   tracker.observe(first, 'gpt-6-luna')
   tracker.observe(first, 'gpt-6-luna')
   tracker.observe({ total: { inputTokens: 1090, outputTokens: 530 }, last: { inputTokens: 40, outputTokens: 10 } }, 'gpt-6-luna')
   tracker.endTurn()
   expect(captured).toHaveLength(2)
-  expect(captured[0]).toMatchObject({ inputTokens: 50, outputTokens: 20, cacheReadTokens: 30, latencyMs: 80, ttftMs: 40 })
-  expect(captured[1].latencyMs).toBeUndefined()
+  expect(captured[0]).toMatchObject({ inputTokens: 50, outputTokens: 20, cacheReadTokens: 30, timingBasis: 'app_server_usage' })
+  for (const generation of captured) {
+    expect(generation.latencyMs).toBeUndefined()
+    expect(generation.ttftMs).toBeUndefined()
+  }
+})
+
+it('preserves Codex 0.163 cache writes per request without adding them to inclusive input or inventing unknowns', () => {
+  const captured: GenerationMetrics[] = []
+  const tracker = new CodexGenerationMetrics(value => captured.push(value))
+  tracker.startTurn()
+  for (const [index, cacheWriteInputTokens] of [12, 0, undefined, -1].entries()) {
+    tracker.observe({ total: { inputTokens: 50 * (index + 1), outputTokens: 10 * (index + 1) },
+      last: { inputTokens: 50, outputTokens: 10, cachedInputTokens: 20, cacheWriteInputTokens } }, 'gpt-6-luna')
+  }
+  tracker.endTurn()
+  const events = captured.map(value => generationEvent(value,
+    { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01', runId: 'run_1' })!)
+  expect(events.map(event => event.properties.$ai_cache_creation_input_tokens)).toEqual([12, 0, undefined, undefined])
+  expect(events.map(event => event.properties.$ai_input_tokens)).toEqual([50, 50, 50, 50])
+  expect(events.every(event => event.properties.$ai_cache_reporting_exclusive === false)).toBe(true)
 })
 
 it('omits unknown/invalid numeric data and content from AI Analytics instead of inventing zeros or costs', () => {

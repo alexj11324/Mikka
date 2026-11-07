@@ -3,6 +3,7 @@ import { after, before, beforeEach, test } from 'node:test'
 import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
 import { AlwaysOnSampler, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 import { observedModel, observeAiRequest, recordAiRoute, recordAiUsage, withAiMetadata } from './ai'
 import { withRunSpan, withTraceMetadata } from './context'
@@ -107,6 +108,48 @@ test('missing and invalid token counts stay absent; public v7 and provider v4 ca
   assert.deepEqual(modelTokenUsage({ inputTokens: { total: NaN, cacheRead: -1, cacheWrite: Infinity }, outputTokens: -2 }), { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null })
   assert.deepEqual(modelTokenUsage(undefined), { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null })
   assert.equal(modelTokenUsage({ inputTokens: { total: 0, cacheRead: 0, cacheWrite: 0 }, outputTokens: 0 }).inputTokens, 0)
+})
+
+test('actual subscription SDK streams retain numeric cache writes from both pinned CPA usage spellings', async () => {
+  for (const [modelId, providerName] of [['claude-haiku-5-5', 'anthropic'], ['gpt-6-luna', 'openai']] as const) {
+    for (const [field, cacheWrites] of [['cache_write_tokens', 12], ['cached_creation_tokens', 0]] as const) {
+      let requests = 0
+      const compatible = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', fetch: async () => {
+        requests++
+        const chunks = [
+          { id: 'fixture', object: 'chat.completion.chunk', created: 1, model: modelId, choices: [{ index: 0, delta: { content: 'PRIVATE_RESPONSE' }, finish_reason: null }] },
+          { id: 'fixture', object: 'chat.completion.chunk', created: 1, model: modelId, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55, prompt_tokens_details: { cached_tokens: 30, [field]: cacheWrites }, opaque: 'PRIVATE_USAGE_CONTENT' } },
+        ]
+        return new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+      } })
+      const model = observedModel(compatible(modelId), { modelId, provider: providerName, route: 'subscription', posthog: sink })
+      const parts = await drain((await model.doStream(args)).stream)
+      const finish = parts.find(part => part.type === 'finish')
+      assert.equal(finish?.type, 'finish')
+      if (finish?.type !== 'finish') throw new Error('missing SDK finish')
+      assert.equal(finish.usage.inputTokens.cacheWrite, undefined, 'the pinned SDK leaves this normalized field empty')
+      assert.equal(requests, 1, 'the SDK only uses the in-memory fake fetch')
+      const properties = captured.at(-1)!.properties!
+      assert.equal(properties.$ai_model, modelId)
+      assert.equal(properties.$ai_input_tokens, 50, 'cache writes are already included in the provider input total')
+      assert.equal(properties.$ai_output_tokens, 5)
+      assert.equal(properties.$ai_cache_read_input_tokens, 30)
+      assert.equal(properties.$ai_cache_creation_input_tokens, cacheWrites)
+      assert.equal(properties.$ai_cache_reporting_exclusive, false)
+    }
+  }
+  assert.equal(captured.length, 4, 'each stream produces exactly one generation')
+  privacy()
+})
+
+test('cache write fallback reads only numeric receipt fields and keeps normalized values authoritative', () => {
+  const raw = { prompt_tokens_details: { cache_write_tokens: 12, cached_creation_tokens: 99 }, get content(): never { throw new Error('PRIVATE_CONTENT_MUST_NOT_BE_READ') } }
+  assert.equal(modelTokenUsage({ raw }).cacheWriteTokens, 12)
+  assert.equal(modelTokenUsage({ inputTokens: { cacheWrite: 0 }, raw }).cacheWriteTokens, 0)
+  assert.equal(modelTokenUsage({ inputTokenDetails: { cacheWriteTokens: 7 }, raw }).cacheWriteTokens, 7)
+  for (const value of [undefined, null, -1, Infinity, NaN, '12', 'PRIVATE_CONTENT']) {
+    assert.equal(modelTokenUsage({ raw: { prompt_tokens_details: { cache_write_tokens: value } } }).cacheWriteTokens, null)
+  }
 })
 
 test('credential-looking labels and URLs are omitted from AI events and spans', async () => {

@@ -87,12 +87,9 @@ export class ClaudeGenerationMetrics {
 export class CodexGenerationMetrics {
   private active = false
   private previousTotal: string | undefined
-  private requestStartedAt: number | undefined
-  private firstTokenAt: number | undefined
-  constructor(private readonly emit: Emit, private readonly now: () => number = Date.now) {}
-  startTurn(): void { this.active = true; this.requestStartedAt = this.now(); this.firstTokenAt = undefined }
-  endTurn(): void { this.active = false; this.requestStartedAt = undefined; this.firstTokenAt = undefined }
-  firstToken(): void { if (this.requestStartedAt !== undefined && this.firstTokenAt === undefined) this.firstTokenAt = this.now() }
+  constructor(private readonly emit: Emit) {}
+  startTurn(): void { this.active = true }
+  endTurn(): void { this.active = false }
   observe(value: unknown, model?: string | null): void {
     try {
       const usage = record(value), last = record(usage.last), total = record(usage.total)
@@ -105,12 +102,10 @@ export class CodexGenerationMetrics {
       if (!this.active) return
       const inputTokens = metric(last.inputTokens), outputTokens = metric(last.outputTokens)
       if (inputTokens === undefined && outputTokens === undefined) return
-      const latencyMs = this.requestStartedAt === undefined ? undefined : Math.max(0, this.now() - this.requestStartedAt)
-      const ttftMs = this.requestStartedAt === undefined || this.firstTokenAt === undefined ? undefined : Math.max(0, this.firstTokenAt - this.requestStartedAt)
-      this.requestStartedAt = undefined
-      this.firstTokenAt = undefined
+      // 0.163 emits tokenUsage after pending tools drain. Neither this receipt
+      // time nor turn/start is a reliable per-request model timing boundary.
       this.emit({ harness: 'codex', provider: 'openai', model, inputTokens, outputTokens,
-        cacheReadTokens: metric(last.cachedInputTokens), latencyMs, ttftMs, outcome: 'ok' })
+        cacheReadTokens: metric(last.cachedInputTokens), cacheWriteTokens: metric(last.cacheWriteInputTokens), timingBasis: 'app_server_usage', outcome: 'ok' })
     } catch { /* A CLI telemetry frame cannot interrupt the session. */ }
   }
 }
