@@ -5,8 +5,8 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { alexSession } from '../issue-1506-readonly/alex-session.mjs'
 import { FIXTURE_ERRORS, openAcceptanceFixture, verifyOwnModel } from './coordinator-fixtures.mjs'
-import { PROTOCOL_SOURCE_SHA, openLiveObserver, readJson, readStream,
-  requireExactSha, rpc, validateChat } from '../issue-1504-1506/coordinator-baseline.mjs'
+import { readJson, requireExactSha, rpc, validateChat } from '../issue-1504-1506/coordinator-baseline.mjs'
+import { CACHE_PROTOCOL_SOURCE_SHA, openCacheLive, observeCacheCompletion } from './coordinator-cache-completion.mjs'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const RUN = /^wrun_[a-zA-Z0-9_-]{1,160}$/
@@ -26,7 +26,8 @@ const ERRORS = new Set([...FIXTURE_ERRORS,
   'stream_sequence_invalid', 'stream_turn_mismatch', 'stream_error', 'stream_deadline',
   'first_text_missing', 'committed_missing', 'unexpected_tool', 'reply_too_long', 'reply_missing', 'reply_not_persisted',
   'stop_request_failed', 'stop_not_quiescent', 'post_stop_chat_failed', 'live_close_failed',
-  'turn_count_invalid', 'turn_timeout_invalid',
+  'turn_count_invalid', 'turn_timeout_invalid', 'committed_invalid', 'stream_incomplete',
+  'chat_completion_error', 'reply_failed_or_stopped', 'chat_revision_stale', 'stream_replay_unproven',
 ])
 const code = error => ERRORS.has(error?.message) ? error.message : 'acceptance_unexpected_failure'
 const PROMPTS = [
@@ -42,10 +43,10 @@ const requestSummary = requests => requests.filter(row => routes.has(row.path)).
 const liveCounters = summary => ({ matchingPushes: counter(summary?.matchingPushes),
   versionedPushes: counter(summary?.versionedPushes), newerPushes: counter(summary?.newerPushes) })
 
-export async function runCacheTurns({ env = process.env, sessionProvider = alexSession, openLive = openLiveObserver,
+export async function runCacheTurns({ env = process.env, sessionProvider = alexSession, openLive = openCacheLive,
   fixtureReceipt = null, turnTimeoutMs = 60_000, stopTimeoutMs = 20_000, checkpoint = true } = {}) {
   const report = { schemaVersion: 1, issue: 1506, case: 'complete-short-turns', status: 'failed',
-    protocolSourceSha: PROTOCOL_SOURCE_SHA, applicationSha: null, startedAt: new Date().toISOString(),
+    protocolSourceSha: CACHE_PROTOCOL_SOURCE_SHA, applicationSha: null, startedAt: new Date().toISOString(),
     messageSendAttempts: 0, taskCreationRequests: 0, modelSelectionWrites: 0, turns: [],
     runtimeEvidence: { confirmed: false, required: 'model_call_timing_for_each_workflowRunId',
       cacheReadTokens: 'not_observed', cacheWriteTokens: 'not_observed' },
@@ -73,7 +74,7 @@ export async function runCacheTurns({ env = process.env, sessionProvider = alexS
       report.workspace = { ref: fixture.workspace.ref, kind: 'team', switchedThroughProductAction: true }
       let chat = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [fixture.botId]))
       if (chat.botId !== fixture.botId) fail('fixture_scope_mismatch')
-      if (!chat.enabled || chat.working || chat.streamRunId) fail('chat_not_idle')
+      if (!chat.enabled || chat.working || chat.streamRunId || chat.error) fail('chat_not_idle')
       const botId = fixture.botId
       report.botRef = fixture.botRef
       report.menu = fixture.menu
@@ -85,7 +86,7 @@ export async function runCacheTurns({ env = process.env, sessionProvider = alexS
           const timeout = setTimeout(() => controller.abort('turn_deadline'), turnTimeoutMs)
           const row = { index: index + 1, status: 'failed', messageSendAttempted: false, metrics: {},
             streamEvents: { start: 0, text: 0, reset: 0, thinking: 0, tool: 0, committed: 0 },
-            replyCharacters: 0, postTurnChatReads: 0, committedObserved: false, confirmedIdle: false }
+            replyCharacters: 0, postTurnChatReads: 0, cleanupChatReads: 0, chatReads: [], committedObserved: false, confirmedIdle: false }
           report.turns.push(row)
           const previousCounters = liveCounters(live.summary)
           active = { row, controller, sent: false, idle: false, stopPromise: null, start: null }
@@ -123,51 +124,47 @@ export async function runCacheTurns({ env = process.env, sessionProvider = alexS
               await response.body?.cancel(); fail('stream_headers_invalid')
             }
             row.workflowRunId = runId; save()
-            let streamId = null
-            row.termination = await readStream(response.body, event => {
-              if (!event.id.startsWith(runId + ':')) fail('stream_turn_mismatch')
-              row.streamEvents[event.type]++
-              if (event.type === 'start') {
-                if (streamId) fail('stream_turn_mismatch')
-                streamId = event.id; row.metrics.streamStartedMs = since()
-              }
-              if (!streamId || event.id !== streamId) fail('stream_turn_mismatch')
-              if (event.type === 'tool') { void stop(); fail('unexpected_tool') }
-              if (event.type === 'text' || event.type === 'reset') {
-                const characters = Array.from(event.text).length
-                row.replyCharacters = event.type === 'reset' ? characters : row.replyCharacters + characters
-                if (characters && row.metrics.firstTextMs === undefined) {
+            const completed = await observeCacheCompletion({ body: response.body, runId, botId,
+              initialChat: chat, live, signal: controller.signal,
+              readChat: async signal => {
+                row.postTurnChatReads++
+                return validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal }))
+              },
+              onEvent: (event, rounds) => {
+                row.streamEvents[event.type]++
+                row.rounds = rounds.map(round => ({ ...round }))
+                if (event.type === 'start') row.metrics.streamStartedMs ??= since()
+                row.replyCharacters = rounds.reduce((total, round) => total + round.replyCharacters, 0)
+                if ((event.type === 'text' || event.type === 'reset') && row.replyCharacters && row.metrics.firstTextMs === undefined) {
                   row.metrics.firstTextMs = since()
                   row.metrics.headersToFirstTextMs = ms(row.metrics.firstTextMs - row.metrics.streamHeadersMs)
                   row.firstTextTargetMet = row.metrics.firstTextMs <= 3_000
                 }
-              }
-              if (event.type === 'committed') { row.committedObserved = true; row.metrics.committedMs = since() }
-              // A committed reply precedes releaseLease. Continue to bounded EOF;
-              // only then does the one normal chat read check idle.
-              return false
-            }, controller.signal)
-            row.metrics.streamClosedMs = since(); row.streamClosed = true
-            if (row.termination !== 'eof') fail('stream_deadline')
-            row.postTurnChatReads++
-            chat = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal: controller.signal }))
-            row.metrics.chatObservedMs = since()
-            if (chat.botId !== botId) fail('chat_invalid')
-            row.afterTurn = { working: chat.working, activeStream: Boolean(chat.streamRunId),
-              ownPersistedItems: chat.items.filter(item => item.streamId === streamId).length }
-            active.idle = !chat.working && !chat.streamRunId; row.confirmedIdle = active.idle
-            if (!active.idle) fail('chat_not_idle')
+                if (event.type === 'committed') {
+                  row.committedObserved = true; row.metrics.committedMs = since()
+                  row.committed = { id: event.id, through: event.through, quiet: event.quiet }
+                }
+              },
+              onRead: evidence => { row.chatReads.push({ ...evidence, observedMs: since() }); row.metrics.chatObservedMs = since() },
+              onClosed: evidence => { row.streamClosed = evidence.readerReleased; row.naturalEofObserved = evidence.eof; row.metrics.streamClosedMs = since() },
+            })
+            row.termination = completed.termination
+            row.replayedRounds = completed.replayedRounds
+            chat = completed.chat
+            row.afterTurn = { working: chat.working, activeStream: Boolean(chat.streamRunId), cursor: chat.cursor,
+              ownPersistedItems: chat.items.filter(item => completed.rounds.some(round => round.id === item.streamId)).length,
+              persistedStreamIds: completed.rounds.map(round => round.id), errorObserved: false, failedOrStopped: false }
+            active.idle = true; row.confirmedIdle = true
+            row.completionEvidence = 'committed_persisted_idle_no_failure_or_stopped'
             if (row.metrics.firstTextMs === undefined) fail('first_text_missing')
-            if (!row.committedObserved) fail('committed_missing')
-            if (row.replyCharacters === 0) fail('reply_missing')
-            if (row.afterTurn.ownPersistedItems === 0) fail('reply_not_persisted')
-            if (row.replyCharacters > 30) fail('reply_too_long')
             row.status = 'observed'; row.metrics.sendToIdleMs = since()
           } catch (error) {
             row.error = controller.signal.aborted ? 'stream_deadline' : code(error)
+            row.termination ??= !row.workflowRunId ? 'not_opened' : controller.signal.aborted ? 'timeout' :
+              row.naturalEofObserved ? 'eof_before_confirmed_idle' : 'client_cancel_after_error'
             throw new Error(row.error, { cause: error })
           } finally {
-            clearTimeout(timeout); controller.abort(); row.streamClosed = true
+            clearTimeout(timeout); controller.abort()
             const current = liveCounters(live.summary)
             row.live = { baselineRevision: number(live.summary.baselineRevision),
               matchingPushes: current.matchingPushes - previousCounters.matchingPushes,
@@ -186,10 +183,10 @@ export async function runCacheTurns({ env = process.env, sessionProvider = alexS
           const acknowledged = await active.stop()
           report.cleanup.stopAcknowledged = acknowledged
           active.controller.abort()
-          // At most one post-turn chat read. If the one after EOF already found
-          // activity, record pending cleanup rather than read repeatedly to pass.
-          if (active.row.postTurnChatReads === 0) {
-            active.row.postTurnChatReads++
+          // One explicit post-Stop cleanup read. Normal completion reads are
+          // separately counted and happen only on committed/live change events.
+          if (active.row.cleanupChatReads === 0) {
+            active.row.cleanupChatReads++
             try {
               const after = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId]))
               if (after.botId !== botId) fail('chat_invalid')

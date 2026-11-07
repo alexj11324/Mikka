@@ -23,7 +23,7 @@ export function fakeSession({ readyWorkspace = true, readyBots = false, wrongOwn
   lostWorkspaceAck = false, lostBotAck = false, lostSelectionAck = false, wrongBotOwner = false,
   fallback = false, busy = false, stream = 'text', noEof = false, afterActive = false, sendLost = false } = {}) {
   const state = { sessions: 0, creates: 0, botCreates: 0, choices: 0, switches: 0, subWrites: 0, creditWrites: 0,
-    sends: 0, stops: 0, syncs: 0, hidden: [], signouts: 0, actions: [], eof: false, liveClosed: false }
+    sends: 0, stops: 0, syncs: 0, hidden: [], signouts: 0, actions: [], eof: false, clientCancelled: false, liveClosed: false }
   let hasWorkspace = readyWorkspace, selected = false, sub = false, credit = false, controller = null, ended = false, run = null
   const bots = readyBots ? BOT_IDS.map((id, index) => ({ id, ownerId: ALEX_OWNER_ID, workspaceId: WORKSPACE_ID, name: fixtureName(RUN_KEY, FIXTURE_MODELS[index].key) })) : []
   const choices = new Map(readyBots ? BOT_IDS.map((id, index) => [id, OPTION_IDS[index]]) : [])
@@ -97,12 +97,13 @@ export function fakeSession({ readyWorkspace = true, readyBots = false, wrongOwn
               state.syncs++; assert.ok(BOT_IDS.includes(args[0]), 'no null or existing Coordinator chat')
               result = { chat: { botId: args[0], enabled: true, working: state.sends ? afterActive : busy,
                 ...((state.sends && afterActive) || !state.sends && busy ? { streamRunId: run ?? 'wrun_preexisting' } : {}),
-                items: state.sends ? [{ streamId: run + ':0', text: PRIVATE, stopped: state.stops > 0 }] : [],
+                cursor: state.sends * 2, persistedStreamIds: state.sends ? [run + ':0'] : [], error: null,
+                items: state.sends ? [{ streamId: run + ':0', position: state.sends * 2, from: 'coordinator', text: '42', stopped: state.stops > 0 }] : [],
                 live: { ownerId: ALEX_OWNER_ID, workspaceId: WORKSPACE_ID, revisions: { ['bot_chat:' + args[0]]: 10 + state.sends } } } }
             } else if (action === 'coordinator.sendCoordinatorMessage') {
               assert.ok(BOT_IDS.includes(args[2])); assert.equal(args[1], null)
-              if (state.sends) assert.equal(state.eof, true)
-              state.sends++; run = 'wrun_fixture' + state.sends; state.eof = false; ended = false
+              if (state.sends) assert.ok(state.eof || state.clientCancelled, 'previous reader must be released before another send')
+              state.sends++; run = 'wrun_fixture' + state.sends; state.eof = false; state.clientCancelled = false; ended = false
               if (sendLost) throw new Error(PRIVATE)
               result = { queued: true }
             } else if (action === 'coordinator.stopCoordinatorTurn') {
@@ -118,11 +119,11 @@ export function fakeSession({ readyWorkspace = true, readyBots = false, wrongOwn
               const frames = [{ type: 'start', id: turn, sequence: 1 }, stream === 'tool'
                 ? { type: 'tool', id: turn, sequence: 2, name: 'web_search', call: PRIVATE, state: 'running', input: PRIVATE }
                 : { type: 'text', id: turn, sequence: 2, delta: '42' }]
-              if (stream === 'complete') frames.push({ type: 'committed', id: turn, sequence: 3, through: state.sends, quiet: false })
+              if (stream === 'complete') frames.push({ type: 'committed', id: turn, sequence: 3, through: state.sends * 2, quiet: false })
               const bytes = new TextEncoder().encode(frames.map(frame => JSON.stringify(frame)).join('\n') + '\n')
               for (let i = 0; i < bytes.length; i += 13) controller.enqueue(bytes.slice(i, i + 13))
               if (stream === 'complete' && !noEof) { controller.close(); ended = true; state.eof = true }
-            }, cancel() { ended = true } }), { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': run, 'x-mikka-stream-key': PRIVATE } })
+            }, cancel() { ended = true; state.clientCancelled = true } }), { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': run, 'x-mikka-stream-key': PRIVATE } })
           } else assert.fail('unexpected path: ' + path)
           requests.push({ path: '/mikka' + route, method: input.method ?? (input.body ? 'POST' : 'GET'), status: response.status, headersMs: 0 })
           return response
@@ -131,7 +132,8 @@ export function fakeSession({ readyWorkspace = true, readyBots = false, wrongOwn
   }
   const openLive = async () => {
     const summary = { ready: true, revisionCapable: true, baselineRevision: 10, matchingPushes: 0, versionedPushes: 0, newerPushes: 0, maxRevision: 10, closed: false }
-    return { summary, begin() { summary.matchingPushes++; summary.versionedPushes++; summary.newerPushes++; summary.maxRevision++ },
+    return { summary, get revision() { return summary.maxRevision }, subscribe() { return () => {} },
+      begin() { summary.matchingPushes++; summary.versionedPushes++; summary.newerPushes++; summary.maxRevision++ },
       async close() { state.liveClosed = true; summary.closed = true; return true } }
   }
   return { state, provider, openLive, options: { env: { MIKKA_ACCEPTANCE_SHA: SHA, MIKKA_FIXTURE_RUN_KEY: RUN_KEY, MIKKA_FIXTURE_KIND: 'haiku' },
