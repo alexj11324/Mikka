@@ -1,0 +1,66 @@
+name: Issue 1503 one-time Core flags observation
+on:
+  push:
+    branches: [ops/issue-1503-core-flags-diagnostic-0c12]
+    paths:
+      - .github/workflows/issue1503-core-flags-diagnostic.yml
+      - scripts/ops/issue1503/core-flags-diagnostic.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  observe:
+    if: github.repository == 'alexj11324/Mikka' && github.run_attempt == 1 && github.ref == 'refs/heads/ops/issue-1503-core-flags-diagnostic-0c12'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      - name: Require the exact deployed source before credentials
+        run: node --import tsx scripts/ops/issue1503/core-flags-diagnostic.mjs --attest
+      - name: Read the existing smoke email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing smoke password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Observe one bootstrap and close this normal session
+        timeout-minutes: 3
+        run: node --import tsx scripts/ops/issue1503/core-flags-diagnostic.mjs
+      - name: Retain the bounded safe observation
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1503-core-flags-observation
+          path: issue1503-core-flags-report/*.json
+          if-no-files-found: warn
+          retention-days: 3
