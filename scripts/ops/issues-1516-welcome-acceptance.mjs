@@ -340,6 +340,8 @@ export async function runAcceptance() {
       check(prior.length===1 && hash(prior[0].id)==='4a9f4e5aae4a8adee6cbf3a07d6dac69480c3d438093f0b803775a590659d49d','diagnostic_fixture_mismatch')
       const rows=await readSql(`SELECT m.message FROM coordinator_messages m JOIN bots b ON b.id=m."botId"
         WHERE m."userId"=$1 AND m."botId"=$2 AND b."ownerId"=$1 AND b."workspaceId"=$3 AND m.message->>'role'='assistant' ORDER BY m.position`,[ownerId,prior[0].id,teamScope.workspaceId])
+      const [{createParser},{createAgentLibrary},{getAgentUIIssue}]=await Promise.all([import('@openuidev/react-lang'),import('../../lib/agent-ui-catalog.ts'),import('../../lib/agent-ui-status.ts')])
+      const library=createAgentLibrary(), productionParser=createParser(library.toJSONSchema(),library.root)
       report.originalWelcomeShape=rows.map(row=>{
         const content=row.message?.content
         const text=typeof content==='string'?content:Array.isArray(content)?content.filter(part=>part?.type==='text').map(part=>part.text??'').join(''):''
@@ -357,7 +359,17 @@ export async function runAcceptance() {
           }
           walk(value);return{parsed:value!==null,components,questions}
         }
-        return{chars:text.length,sha256:hash(text),matchesFailedStream:hash(text)==='7fa055e80740129680755d4a1c0c88e1928f72e9d5032d3fa827c879e85499e7',detectedAsUI:detected.isOpenUI,raw:shape(parseOpenUI(text)),rendered:shape(parseOpenUI(detected.source))}
+        const parsed=productionParser.parse(detected.source), productionQuestions=[]
+        const walkProduction=(node,depth=0)=>{
+          if(depth>25 || !node || typeof node!=='object')return
+          if(Array.isArray(node)){for(const child of node)walkProduction(child,depth+1);return}
+          if(node.type==='element'){
+            if(node.typeName==='BeQuestions')for(const q of node.props?.questions??[])productionQuestions.push({id:q?.id==='start'?'start':'other',options:q?.options?.length??0,validValues:q?.options?.filter(o=>['a','b','c','d'].includes(o?.value)).length??0})
+            for(const child of Object.values(node.props??{}))walkProduction(child,depth+1)
+          }
+        }
+        walkProduction(parsed.root)
+        return{production:{hasRoot:Boolean(parsed.root),issuePresent:Boolean(getAgentUIIssue(parsed)),incomplete:parsed.meta.incomplete,unresolved:parsed.meta.unresolved.length,errors:parsed.meta.errors.length,questions:productionQuestions},chars:text.length,sha256:hash(text),matchesFailedStream:hash(text)==='7fa055e80740129680755d4a1c0c88e1928f72e9d5032d3fa827c879e85499e7',detectedAsUI:detected.isOpenUI,raw:shape(parseOpenUI(text)),rendered:shape(parseOpenUI(detected.source))}
       })
       check(report.originalWelcomeShape.length>0,'diagnostic_welcome_missing')
     }

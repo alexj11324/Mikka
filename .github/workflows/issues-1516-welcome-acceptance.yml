@@ -53,11 +53,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 24
-      - name: Install isolated read-only diagnostic dependency
-        run: npm install --prefix "$RUNNER_TEMP/issue1515-diagnostic" --no-audit --no-fund pg@8.16.3
+      - uses: ./.github/actions/pnpm-install
       - name: Read application database through the existing workload identity
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -100,7 +96,7 @@ jobs:
         env:
           APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
           ACCEPTANCE_CASES: ${{ inputs.acceptance_cases }}
-        run: MIKKA_OPS_DEPENDENCIES="$RUNNER_TEMP/issue1515-diagnostic" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
+        run: MIKKA_OPS_DEPENDENCIES="${{ github.workspace }}" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
