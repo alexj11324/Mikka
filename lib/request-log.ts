@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
 import { channel } from 'node:diagnostics_channel'
+import { context, SpanStatusCode, trace } from '@opentelemetry/api'
 import { withNativeSessionCache } from './desktop-rpc/session-cache-context.ts'
 
 // Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
@@ -9,7 +10,7 @@ import { withNativeSessionCache } from './desktop-rpc/session-cache-context.ts'
 
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
 type RequestMetadata = { requestId: string; userIdHash?: string; rpcAction?: string }
-type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata }
+type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata; sink?: LogSink; route?: string; method?: string; rpcItemCount?: number }
 const requestScope = new AsyncLocalStorage<Store>()
 const requestClientChannel = channel('mikka.request.client')
 const requestErrorChannel = channel('mikka.request.error')
@@ -84,6 +85,7 @@ export type RequestLogEntry = {
   durationMs: number
   userIdHash: string | null
   rpcAction?: string
+  rpcItemCount?: number
   outcome?: RequestLogOutcome
   error?: string
 }
@@ -98,6 +100,50 @@ const defaultSink: LogSink = (line, level) => {
 
 function levelFor(status: number): RequestLogEntry['level'] {
   return status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info'
+}
+
+/** A logical action inside one authenticated HTTP request. Each item owns its
+ * metadata object and span; only the physical request ID is shared. This is
+ * ordinary sampled work, never a reason to force retention of all reads. */
+export async function withRpcActionLog<T>(action: string, work: () => Promise<T>, status?: (value: T) => number): Promise<T> {
+  const parent = requestScope.getStore()
+  if (!parent?.sink || !['/api/desktop/rpc', '/api/rpc'].includes(parent.route ?? '')
+    || action.length > 120 || !/^[a-z][\w-]*\.[a-z]\w*$/i.test(action)) return work()
+  parent.rpcItemCount = (parent.rpcItemCount ?? 0) + 1
+  const store: Store = { ...parent, outcome: undefined, metadata: { ...parent.metadata, rpcAction: action } }
+  const invocationId = randomUUID(), started = performance.now()
+  const span = trace.getTracer('mikka.rpc').startSpan('rpc.action', { attributes: { 'mikka.rpc.action': action } })
+  const write = (completed?: number, error?: unknown) => {
+    const level = completed === undefined ? 'info' : levelFor(completed)
+    try {
+      parent.sink!(JSON.stringify({ level, msg: completed === undefined ? 'rpc_action_started' : 'rpc_action',
+        timestamp: new Date().toISOString(), invocationId, httpInvocationId: parent.metadata.requestId,
+        route: parent.route, method: parent.method, rpcAction: action,
+        ...(completed === undefined ? {} : { status: completed, durationMs: Math.round(performance.now() - started),
+          userIdHash: store.metadata.userIdHash ?? null,
+          ...(error === undefined ? {} : { error: error instanceof Error ? error.name : 'unknown' }) }),
+      }), level)
+    } catch { /* logging cannot change an action result */ }
+  }
+  return context.with(trace.setSpan(context.active(), span), () => requestScope.run(store, async () => {
+    publishMetadata(store.metadata)
+    write()
+    try {
+      const value = await work()
+      let resultStatus = 200
+      try { if (status) resultStatus = status(value) } catch { resultStatus = 500 }
+      if (!Number.isInteger(resultStatus) || resultStatus < 100 || resultStatus > 599) resultStatus = 500
+      span.setAttribute('mikka.rpc.item_status_code', resultStatus)
+      if (resultStatus >= 400) span.setStatus({ code: SpanStatusCode.ERROR })
+      write(resultStatus)
+      return value
+    } catch (error) {
+      try { requestErrorChannel.publish(error) } catch { /* tracing is best effort */ }
+      span.setStatus({ code: SpanStatusCode.ERROR })
+      write(500, error)
+      throw error
+    } finally { span.end() }
+  }))
 }
 
 /**
@@ -115,7 +161,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
     const requestId = requestIdFor(request), invocationId = randomUUID()
     // This internal UUID is available before authentication SQL. External request
     // headers remain log context and never become the telemetry attribution key.
-    const store: Store = { metadata: { requestId: invocationId } }
+    const store: Store = { metadata: { requestId: invocationId }, sink, route, method: request.method }
     publishMetadata(store.metadata)
     // A built-in diagnostic channel keeps plain-Node ops scripts independent of the tracing SDK.
     // Its only subscriber stamps the active Next span; requests work identically with tracing off.
@@ -137,6 +183,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
         durationMs: Math.round(performance.now() - started),
         userIdHash: store.metadata.userIdHash ?? null,
         ...(store.metadata.rpcAction ? { rpcAction: store.metadata.rpcAction } : {}),
+        ...(store.rpcItemCount === undefined ? {} : { rpcItemCount: store.rpcItemCount }),
         ...(store.outcome ? { outcome: store.outcome } : {}),
       }
       // Error class name only: messages can echo user input or secrets.

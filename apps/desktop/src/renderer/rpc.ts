@@ -1,24 +1,25 @@
 import { withBasePath } from '@/lib/base-path'
 import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
-import { localeOf } from './location'
+import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
+import { localeOf, type Locale } from './location'
 import { setTransportState } from './transport-state'
+import { DesktopTransportError, enqueueRead } from './read-batch'
 
-export class DesktopTransportError extends Error {
-  readonly status?: number
-  constructor(readonly code: string, options?: ErrorOptions & { status?: number }) {
-    super(code, options)
-    this.name = 'DesktopTransportError'
-    this.status = options?.status
-  }
-}
+export { DesktopTransportError, resetReadBatchScope } from './read-batch'
+
+const nativeTransport = { endpoint: '/api/desktop/rpc', credentials: 'omit', header: 'x-mikka-desktop-protocol' } as const
+const workspaceSelector = () => new URLSearchParams(window.location.search).get('workspace')
 
 /** The renderer has no auth headers. Electron's scheme handler supplies them in
  * main, so even a compromised page cannot read or export its session credential. */
 export function callAction<T = unknown>(action: string, args: unknown[], isCurrent?: () => boolean): Promise<T> {
-  return callRemoteAction(action, args, { endpoint: '/api/desktop/rpc', credentials: 'omit', header: 'x-mikka-desktop-protocol', isCurrent })
+  if (!isBatchReadAction(action)) return callRemoteAction(action, args, { ...nativeTransport, isCurrent })
+  return enqueueRead(action, args, {
+    locale: localeOf(window.location.pathname), workspace: workspaceSelector(), currentWorkspace: workspaceSelector, isCurrent,
+  }, (action, args, context) => callRemoteAction(action, args, { ...nativeTransport, ...context }))
 }
 
-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: () => boolean }): Promise<T> {
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: () => boolean; locale?: Locale }): Promise<T> {
   // Web supplies its existing SDK owner generation; bootstrap also fences
   // retired page phases. Native identity authorization remains in main.
   const assertCurrent = (cause?: unknown) => {
@@ -32,7 +33,7 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
       method: 'POST',
       cache: 'no-store',
       credentials: transport.credentials,
-      headers: { 'content-type': 'application/json', [transport.header]: String(DESKTOP_RPC_VERSION), 'x-mikka-locale': localeOf(window.location.pathname) },
+      headers: { 'content-type': 'application/json', [transport.header]: String(DESKTOP_RPC_VERSION), 'x-mikka-locale': transport.locale ?? localeOf(window.location.pathname) },
       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
     })
   } catch (cause) {

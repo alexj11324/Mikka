@@ -378,3 +378,55 @@ test('RPC phase attribution refuses private labels and non-partition boundaries 
     assert.equal(JSON.stringify(result).includes('PRIVATE_PHASE_CANARY'), false)
   }
 })
+
+const batchItem = (id, parent, at, complete, action = 'task-runs.pollTaskRuns', extra = {}) => rpcEvent(id, at, complete, {
+  msg: complete ? 'rpc_action' : 'rpc_action_started', httpInvocationId: rpcEvent(parent, 0).invocationId,
+  rpcAction: action, ...extra,
+})
+
+test('RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries', async t => {
+  const f = await rpcLogFixture(t)
+  const events = [rpcEvent(1, 2100), rpcEvent(1, 2500, true, { rpcAction: 'desktop.readBatch', rpcItemCount: 2 }),
+    batchItem(10, 1, 2110, false), batchItem(10, 1, 2400, true),
+    batchItem(11, 1, 2310, false, 'issues.syncIssueList'), batchItem(11, 1, 2450, true, 'issues.syncIssueList'),
+    rpcEvent(2, 2600), rpcEvent(2, 2800, true, { rpcAction: 'desktop.bootstrap' })]
+  await f.write([...events, events[2], events[3]])
+  const nativeLogin = { ...rpcWindows.nativeLogin, segments: [
+    { phase: 'common-email-authentication', startedAt: new Date(2000).toISOString(), finishedAt: new Date(2000).toISOString() },
+    { phase: 'native-pkce-and-automatic-renderer-to-public-session', startedAt: new Date(2000).toISOString(), finishedAt: new Date(2300).toISOString() },
+    { phase: 'workspace-selection-to-usable', startedAt: new Date(2300).toISOString(), finishedAt: new Date(3000).toISOString() },
+  ] }
+  const result = await f.counter.rpcActions({ ...rpcWindows, nativeLogin })
+  assert.equal(result.status, 'complete')
+  assert.equal(result.windows.nativeLogin.actions.reduce((n, row) => n + row.startedInWindow, 0), 2)
+  assert.equal(result.logical.status, 'complete')
+  assert.equal(result.logical.duplicateRecords, 2)
+  assert.equal(result.logical.windows.nativeLogin.actions.reduce((n, row) => n + row.startedInWindow, 0), 3)
+  assert.ok(result.logical.windows.nativeLogin.actions.every(row => row.rpcAction !== 'desktop.readBatch'))
+  const [, handoff, workspace] = result.logical.windows.nativeLogin.segments
+  assert.equal(handoff.actions.find(row => row.rpcAction === 'task-runs.pollTaskRuns').crossesEnd, 1)
+  assert.equal(workspace.actions.find(row => row.rpcAction === 'issues.syncIssueList').startedInWindow, 1)
+  for (const id of [1, 2, 10, 11]) assert.ok(!JSON.stringify(result).includes(rpcEvent(id, 0).invocationId))
+})
+
+test('RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence', async t => {
+  const f = await rpcLogFixture(t)
+  const parent = [rpcEvent(1, 2100), rpcEvent(1, 2500, true, { rpcAction: 'desktop.readBatch', rpcItemCount: 2 })]
+  const one = [batchItem(10, 1, 2110, false), batchItem(10, 1, 2400, true)]
+  const two = [batchItem(11, 1, 2120, false), batchItem(11, 1, 2450, true)]
+  for (const [events, reason] of [
+    [[...parent, ...one], 'batch_item_count_mismatch'],
+    [[...parent, ...one, batchItem(11, 99, 2120, false), batchItem(11, 99, 2450, true)], 'batch_parent_unobserved'],
+    [[...parent, ...one, batchItem(11, 1, 2000, false), two[1]], 'batch_item_outside_parent'],
+    [[...parent, ...one, two[0], batchItem(11, 1, 2450, true, 'issues.syncIssueList')], 'batch_item_binding_mismatch'],
+    [[...parent, ...one, batchItem(11, 1, 2120, false, 'PRIVATE ACTION CANARY'), two[1]], 'invalid_batch_item'],
+  ]) {
+    await f.write(events)
+    const result = await f.counter.rpcActions(rpcWindows)
+    assert.equal(result.status, 'incomplete')
+    assert.equal(result.logical.status, 'incomplete')
+    assert.ok(result.logical.reasons.includes(reason), reason)
+    assert.equal(result.windows.nativeLogin.actions[0].startedInWindow, 1)
+    assert.equal(JSON.stringify(result).includes('PRIVATE ACTION CANARY'), false)
+  }
+})

@@ -7,6 +7,7 @@ import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { CodedError } from '../../packages/protocol/src/coded-error'
 import { mobileTraceHeaders } from '../../packages/protocol/src/trace-context'
 import { hashUserId, noteLogUser, requestClientAttributes, withRequestLog } from '../request-log'
+import * as requestLog from '../request-log'
 import { dispatchRpc } from '../desktop-rpc/handler'
 import { SafeExporter, createTracerProvider } from './node'
 
@@ -171,4 +172,88 @@ test('request attribution channel projects only valid closed metadata', async ()
   assert.equal(span.attributes['mikka.user_id_hash'], undefined)
   assert.equal(span.attributes['mikka.rpc.action'], undefined)
   assert.doesNotMatch(JSON.stringify(span.attributes), /PRIVATE_|private@example|private\.test/)
+})
+
+test('read-batch actions retain separate parent chains and one physical request identity', async () => {
+  assert.equal(typeof requestLog.withRpcActionLog, 'function')
+  memory.reset()
+  const tracer = provider.getTracer('read-batch-attribution')
+  const logs: string[] = []
+  let entered = 0, release!: () => void
+  const bothStarted = new Promise<void>(resolve => { release = resolve })
+  await context.with(ROOT_CONTEXT, () => tracer.startActiveSpan('physical-read-batch', { kind: SpanKind.SERVER }, async root => {
+    await withRequestLog('/api/desktop/rpc', async () => {
+      noteLogUser('PRIVATE_BATCH_OWNER')
+      requestLog.noteLogRpcAction('desktop.readBatch')
+      const values = await Promise.all(['task-runs.pollTaskRuns', 'issues.syncIssueList'].map(action => requestLog.withRpcActionLog(action, async () => {
+        if (++entered === 2) release()
+        await bothStarted
+        tracer.startSpan(`query:${action}`).end()
+        return { status: 200, privateValue: 'PRIVATE_RESULT' }
+      }, value => value.status)))
+      assert.ok(values.every(value => value.privateValue === 'PRIVATE_RESULT'))
+      tracer.startSpan('after-batch-query').end()
+      return new Response('{}')
+    }, line => { logs.push(line) })(new Request('https://mikka.test/api/desktop/rpc', { method: 'POST', body: 'PRIVATE_ARGUMENTS' }))
+    root.end()
+  }))
+  await provider.forceFlush()
+  const spans = memory.getFinishedSpans(), roots = spans.filter(span => span.name === 'physical-read-batch')
+  assert.equal(roots.length, 1)
+  const root = roots[0], physicalId = root.attributes['mikka.request_id']
+  assert.equal(root.attributes['mikka.rpc.action'], 'desktop.readBatch')
+  for (const action of ['task-runs.pollTaskRuns', 'issues.syncIssueList']) {
+    const child = spans.find(span => span.name === 'rpc.action' && span.attributes['mikka.rpc.action'] === action)!
+    const query = spans.find(span => span.name === `query:${action}`)!
+    assert.ok(child)
+    assert.equal(child.parentSpanContext?.spanId, root.spanContext().spanId)
+    assert.equal(query.parentSpanContext?.spanId, child.spanContext().spanId)
+    for (const span of [child, query]) {
+      assert.equal(span.attributes['mikka.rpc.action'], action)
+      assert.equal(span.attributes['mikka.request_id'], physicalId)
+      assert.equal(span.attributes['mikka.user_id_hash'], hashUserId('PRIVATE_BATCH_OWNER'))
+      assert.notEqual(span.attributes['mikka.trace.critical'], true)
+    }
+  }
+  assert.equal(spans.find(span => span.name === 'after-batch-query')?.attributes['mikka.rpc.action'], 'desktop.readBatch')
+  const entries = logs.map(line => JSON.parse(line))
+  assert.equal(entries.filter(entry => entry.msg === 'api_request_started').length, 1)
+  assert.equal(entries.filter(entry => entry.msg === 'api_request').length, 1)
+  const started = entries.filter(entry => entry.msg === 'rpc_action_started'), completed = entries.filter(entry => entry.msg === 'rpc_action')
+  assert.equal(started.length, 2); assert.equal(completed.length, 2)
+  assert.equal(new Set(completed.map(entry => entry.invocationId)).size, 2)
+  for (const end of completed) {
+    assert.equal(end.httpInvocationId, physicalId)
+    assert.equal(end.route, '/api/desktop/rpc')
+    assert.equal(end.status, 200)
+    assert.equal(started.find(entry => entry.invocationId === end.invocationId)?.rpcAction, end.rpcAction)
+  }
+  assert.doesNotMatch(JSON.stringify({ entries, spans: spans.map(span => span.attributes) }), /PRIVATE_/)
+})
+
+test('read-batch failures retain error status without exporting payloads or forcing ordinary sampling', async () => {
+  assert.equal(typeof requestLog.withRpcActionLog, 'function')
+  memory.reset()
+  const logs: string[] = [], privateError = new CodedError('read_failed', { detail: 'unavailable', cause: new Error('PRIVATE_CAUSE') })
+  const tracer = provider.getTracer('read-batch-failure')
+  await context.with(ROOT_CONTEXT, () => tracer.startActiveSpan('physical', async root => {
+    await withRequestLog('/api/desktop/rpc', async () => {
+      requestLog.noteLogRpcAction('desktop.readBatch')
+      const value = await requestLog.withRpcActionLog('issues.syncIssueList', async () => ({ status: 403, privateValue: 'PRIVATE_VALUE' }), result => result.status)
+      assert.equal(value.privateValue, 'PRIVATE_VALUE')
+      await assert.rejects(requestLog.withRpcActionLog('task-runs.pollTaskRuns', async () => { throw privateError }), error => error === privateError)
+      return new Response('{}')
+    }, line => { logs.push(line) })(new Request('https://mikka.test/api/desktop/rpc', { method: 'POST' }))
+    root.end()
+  }))
+  await provider.forceFlush()
+  const actions = memory.getFinishedSpans().filter(span => span.name === 'rpc.action')
+  assert.equal(actions.length, 2)
+  assert.ok(actions.every(span => span.status.code === 2 && span.attributes['mikka.trace.critical'] !== true))
+  assert.equal(actions.find(span => span.attributes['mikka.rpc.action'] === 'task-runs.pollTaskRuns')?.attributes['mikka.error.code'], 'read_failed')
+  const entries = logs.map(line => JSON.parse(line)).filter(entry => entry.msg === 'rpc_action')
+  assert.deepEqual(entries.map(entry => entry.status), [403, 500])
+  assert.doesNotMatch(JSON.stringify({ entries, actions: actions.map(span => span.attributes) }), /PRIVATE_/)
+  const result = await withRequestLog('/api/desktop/rpc', () => requestLog.withRpcActionLog('issues.syncIssueList', async () => new Response('ok')), () => { throw new Error('sink failure') })(new Request('https://mikka.test/api/desktop/rpc', { method: 'POST' }))
+  assert.equal(result.status, 200)
 })

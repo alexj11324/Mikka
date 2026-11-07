@@ -17,7 +17,7 @@ const rpcPhases = {
 const maxLogBytes = 16 * 1024 * 1024
 const rpcBoundary = {
   assignment: 'requests belong to the half-open window [startedAt, finishedAt) containing their api_request_started timestamp',
-  counts: 'RPC invocations, not SQL calls; all primary API requests are included, without user attribution',
+  counts: 'physical HTTP RPC requests, not logical batch items or SQL calls; all primary API requests are included, without user attribution',
   overlap: 'completedInWindow includes carried-in requests; crossesStart/crossesEnd are confirmed by paired receipts and are not additive',
   statusCounts: 'observed completions of requests intersecting the window, including completions after its end',
   unknown: 'completionNotObserved means no completion in this one log snapshot, not proof the request is still running; without a start its window remains unknown',
@@ -57,7 +57,7 @@ function actionsInInterval(records, from, to) {
 
 // The server owns these two JSON-line shapes. Retain only closed request
 // metadata; invocation IDs are used in RAM and never enter the report.
-function projectRpcActions(text, windows) {
+function projectTransportRpcActions(text, windows) {
   const reasons = new Set(), requests = new Map()
   let duplicateRecords = 0, conflictingInvocations = 0
   for (const line of text.split('\n')) {
@@ -132,6 +132,97 @@ function projectRpcActions(text, windows) {
   }
   return { version: 1, status: reasons.size ? 'incomplete' : 'complete', reasons: [...reasons],
     duplicateRecords, conflictingInvocations, boundary: rpcBoundary, windows: measured }
+}
+
+// Batch item receipts are logical invocations, not extra HTTP requests. Keep
+// the original physical report and independently bind every child to the
+// parent's completion count and time window before projecting logical reads.
+function projectLogicalRpcActions(text, windows) {
+  const reasons = new Set(), parents = new Map(), items = new Map(), physical = [], logical = []
+  const identifier = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
+  const actionName = value => typeof value === 'string' && value.length <= 120 && /^[a-z][\w-]*\.[a-z]\w*$/i.test(value)
+  for (const line of text.split('\n')) {
+    let value
+    try { value = JSON.parse(line) } catch {
+      if (/"msg"\s*:\s*"rpc_action(?:_started)?"/.test(line)) reasons.add('invalid_batch_item')
+      else physical.push({ line })
+      continue
+    }
+    if (!['/api/rpc', '/api/desktop/rpc'].includes(value?.route)) continue
+    if (['api_request_started', 'api_request'].includes(value.msg)) {
+      physical.push({ line, id: value.invocationId })
+      if (!identifier(value.invocationId)) continue
+      const parent = parents.get(value.invocationId) ?? {}
+      if (value.msg === 'api_request_started') parent.start ??= value
+      else {
+        parent.complete ??= value
+        if (value.rpcAction === 'desktop.readBatch') parent.batch = true
+      }
+      parents.set(value.invocationId, parent)
+      continue
+    }
+    if (!['rpc_action_started', 'rpc_action'].includes(value.msg)) continue
+    const complete = value.msg === 'rpc_action', at = logTime(value.timestamp)
+    if (!identifier(value.invocationId) || !identifier(value.httpInvocationId) || !actionName(value.rpcAction)
+      || value.rpcAction === 'desktop.readBatch' || value.method !== 'POST' || !Number.isFinite(at)
+      || (complete && (!Number.isInteger(value.status) || value.status < 100 || value.status > 599))) {
+      reasons.add('invalid_batch_item')
+      continue
+    }
+    const item = items.get(value.invocationId) ?? { parent: value.httpInvocationId, route: value.route, action: value.rpcAction }
+    if (item.parent !== value.httpInvocationId || item.route !== value.route || item.action !== value.rpcAction) reasons.add('batch_item_binding_mismatch')
+    if (complete) item.end ??= at
+    else item.start ??= at
+    items.set(value.invocationId, item)
+    logical.push(JSON.stringify({ msg: complete ? 'api_request' : 'api_request_started', timestamp: value.timestamp,
+      invocationId: value.invocationId, route: value.route, method: value.method,
+      ...(complete ? { rpcAction: value.rpcAction, status: value.status } : {}) }))
+  }
+  const counts = new Map()
+  for (const item of items.values()) {
+    const parent = parents.get(item.parent)
+    counts.set(item.parent, (counts.get(item.parent) ?? 0) + 1)
+    if (!parent?.batch || !parent.start || !parent.complete) { reasons.add('batch_parent_unobserved'); continue }
+    if (parent.start.route !== item.route || parent.complete.route !== item.route) reasons.add('batch_item_binding_mismatch')
+    const from = logTime(parent.start.timestamp), to = logTime(parent.complete.timestamp)
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from
+      || (item.start !== undefined && item.start < from) || (item.end !== undefined && item.end > to)) reasons.add('batch_item_outside_parent')
+  }
+  for (const [id, parent] of parents) {
+    if (!parent.batch) continue
+    const count = parent.complete?.rpcItemCount, observed = counts.get(id) ?? 0
+    // Invalid arguments/auth may end before any action is invoked. A successful
+    // batch must report at least one item, and missing whole pairs stay visible.
+    const expected = count === undefined && parent.complete?.status !== 200 ? 0 : count
+    if (!Number.isInteger(expected) || expected < (parent.complete?.status === 200 ? 1 : 0) || expected > 16) reasons.add('invalid_batch_item_count')
+    else if (expected !== observed) reasons.add('batch_item_count_mismatch')
+  }
+  const lines = [...physical.filter(entry => !parents.get(entry.id)?.batch).map(entry => entry.line), ...logical]
+  const result = projectTransportRpcActions(lines.join('\n'), windows)
+  result.boundary = { ...rpcBoundary,
+    counts: 'logical action invocations: each ordinary HTTP RPC once, each read-batch item once; batch envelopes excluded; not SQL calls',
+    statusCounts: 'logical action result statuses; they are not additional HTTP responses',
+    batchEvidence: 'each item is paired and bound to its physical request; the parent completion count detects missing entire item pairs',
+  }
+  for (const reason of result.reasons) reasons.add(reason)
+  result.reasons = [...reasons]
+  if (reasons.size) {
+    result.status = 'incomplete'
+    for (const window of Object.values(result.windows)) if (window.status !== 'unavailable') {
+      window.status = 'incomplete'
+      if (window.segmentStatus === 'complete') window.segmentStatus = 'incomplete'
+    }
+  }
+  return result
+}
+
+function projectRpcActions(text, windows) {
+  const physical = projectTransportRpcActions(text, windows)
+  const logical = projectLogicalRpcActions(text, windows)
+  return { ...physical, logical,
+    status: physical.status === 'complete' && logical.status === 'complete' ? 'complete' : 'incomplete',
+    reasons: [...physical.reasons, ...logical.reasons.map(reason => `logical_${reason}`)],
+  }
 }
 
 // One read after the existing samples and cleanup. Never upload the mixed

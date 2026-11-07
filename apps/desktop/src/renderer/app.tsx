@@ -22,6 +22,7 @@ import { readAuthentication, readBootstrap, type AuthenticationBootstrap, type B
 import { Link } from './i18n-navigation'
 import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
+import { resetReadBatchScope } from './read-batch'
 import { Offline } from './offline'
 import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, bootstrapScope, PlatformExtras, requireUpdate } from 'mikka:platform'
@@ -64,7 +65,7 @@ function SessionApplication() {
     if (inFlight.current?.scope === request.scope && inFlight.current.workspace === request.workspace && !changedOwner) return inFlight.current.promise
     const changedScope = changedOwner || request.scope !== lastRequested.current.scope || request.workspace !== lastRequested.current.workspace
     lastRequested.current = request
-    if (changedScope) setBootstrap(null)
+    if (changedScope) { resetReadBatchScope(); setBootstrap(null) }
     if (changedOwner) { setClientConfiguration(null); setSession(null) }
     const current = ++generation.current
     setPending(true)
@@ -123,6 +124,7 @@ function SessionApplication() {
     // A confirmed expiry discards every owner-scoped cache together. Network
     // failures retain the visible conversation and its unsent local draft.
     if (state === 'unauthenticated' && bootstrap?.value.user) {
+      resetReadBatchScope()
       generation.current++
       inFlight.current = null
       setClientConfiguration(null)

@@ -347,6 +347,21 @@ requires a fresh workspace bootstrap, even when the workspace selector stays
 empty; identity-only data cannot mount workspace readers. Both the existing
 owner/session fence and the current bootstrap phase reject obsolete responses.
 
+The installed renderer groups eligible workspace reads that are already queued
+in the same microtask into a bounded `desktop.readBatch`. Each item retains its
+registered argument schema and original authorization. Bootstrap, sign-in,
+account/workspace switches, credentials, catalog loading and explicit writes
+remain separate. The allowlisted views may perform their existing idempotent
+initialization; this is not a database `READ ONLY` transaction. Batches share
+only the current request's workspace memo and real owner/revision reads, never
+a cross-request authorization cache. Revision keys are combined before each
+reader proceeds to its data, preserving the original Live catch-up behavior.
+No task/thread list is truncated or substituted for another. Queued reads are
+discarded when their owner/session/workspace generation retires, and in-flight
+responses retain Main's existing identity fence. There is no timed collection
+window. An older server's explicit unknown-action response is the only reason
+to fall back to individual reads; transport failures do not replay a batch.
+
 Startup counts come from the first pair of the unchanged five-pair lifecycle:
 bundled Electron versus the preserved hosted Web renderer in the same compiled
 Electron shell, with retained authenticated state and the same warm backend.
@@ -379,6 +394,19 @@ database read. These groups distinguish a handoff read from a required workspace
 authorization read, without assigning guessed SQL counts to either. A missing
 startup window keeps the overall report incomplete while independently complete
 login records retain their own status.
+
+`rpcActions.windows` continues to count physical HTTP requests. The separate
+`rpcActions.logical.windows` counts ordinary RPCs once and batch items once,
+excluding the batch envelope. Every item has a paired `rpc_action_started` /
+`rpc_action` receipt with its own invocation ID, parent HTTP invocation ID,
+fixed action, status and duration. The parent completion's `rpcItemCount`
+detects even a missing whole pair. The diagnostic verifies parent identity,
+route and time containment; incomplete logical evidence stays incomplete.
+Internal IDs are used only during projection and are not copied to the report.
+Each item also owns an ordinary sampled span and independent metadata scope,
+so parallel reads cannot overwrite another action's SQL attribution. Shared
+queries are attributed once to the action that starts them, without multiplying
+their query count by the number of waiting readers.
 
 ### Changing them
 
