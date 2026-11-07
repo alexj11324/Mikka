@@ -52,8 +52,8 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
   const names = [`mcp_reply_app_${randomUUID().replaceAll('-', '')}_e2e`, `mcp_reply_workspace_${randomUUID().replaceAll('-', '')}_e2e`]
   const pools: Pool[] = []
   const created: string[] = []
-  const appSql = await readFile(new URL('../../drizzle/20261106215800_mcp_reply_notifications.sql', import.meta.url), 'utf8')
-  const workspaceSql = await readFile(new URL('../../drizzle/20261106215801_mcp_membership_notifications.sql', import.meta.url), 'utf8')
+  const appSql = await readFile(new URL('../../drizzle/20261107120001_mcp_reply_notifications.sql', import.meta.url), 'utf8')
+  const workspaceSql = await readFile(new URL('../../drizzle/20261107120002_mcp_membership_notifications.sql', import.meta.url), 'utf8')
   try {
     for (const name of names) {
       await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
