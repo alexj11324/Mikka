@@ -2,7 +2,7 @@ import type { ChatTool } from './context'
 import { projectedToolResult, toolCallMetadata } from './tool-metadata'
 
 /** Only display metadata crosses this boundary, never message text or previews. */
-export type ChatToolMetadataPart = { ordinal: number; toolCallId: string } & (
+export type ChatToolMetadataPart = { ordinal: number; toolCallId: string; mikkaInvalidToolCall?: true } & (
   | { type: 'tool-call'; toolName: string; target?: string; operationName?: string }
   | { type: 'tool-result'; status: 'done' | 'error'; errorCode?: string; errorDetail?: string }
 )
@@ -25,6 +25,9 @@ export function restoreChatToolMetadata<T extends Item>(items: T[], rows: ChatTo
     while (group + 1 < items.length && items[group + 1].position <= row.position) group++
     let ordinal = 0
     for (const part of row.parts) {
+      // A pre-fix disk cache may still contain the invalid activity itself.
+      // Rebuild through the bounded snapshot, which pairs and removes it.
+      if (part.mikkaInvalidToolCall) return undefined
       if (!Number.isSafeInteger(part.ordinal) || part.ordinal <= ordinal || !['tool-call', 'tool-result'].includes(part.type)) return undefined
       ordinal = part.ordinal
       // The disk window can begin after an older reply's start. Those rows

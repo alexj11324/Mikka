@@ -1,9 +1,42 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, deviceModelEvidence, dispatchOrder, latestDefaultCandidates, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
+
+test('untouched defaults keep the newest release per account and family while retaining the full catalogue', () => {
+  const models = ['claude-opus-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-haiku-5-5', 'claude-fable-5-1', 'claude-fable-5', 'claude-3-5-sonnet-20241022', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
+  const catalogue = models.map((model, index) => ({ ...sub(String(index), model.startsWith('gpt-') ? 'codex' : 'claude_code', model), name: model }))
+  assert.deepEqual(latestDefaultCandidates(catalogue).map(item => item.model), ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6.1-terra', 'gpt-6-luna'])
+  assert.deepEqual(catalogue.map(item => item.model), models, 'manual choices retain every release')
+  const future = [...catalogue, { ...sub('future', 'claude_code', 'claude-opus-5-10'), name: 'new Opus' }]
+  assert.deepEqual(latestDefaultCandidates(future).filter(item => item.model.includes('opus')).map(item => item.model), ['claude-opus-5-10'], 'versions compare numerically and replace old defaults')
+  const otherAccount = { ...sub('other', 'claude_code', 'claude-opus-5', 'other-account'), name: 'other' }
+  assert.ok(latestDefaultCandidates([...future, otherAccount]).includes(otherAccount), 'another account has its own catalogue')
+  const unknown = { ...sub('unknown', 'claude_code', 'reported-new-family'), name: 'unknown' }
+  assert.ok(latestDefaultCandidates([...future, unknown]).includes(unknown), 'unversioned or unfamiliar IDs are not guessed obsolete')
+})
+
+test('Claude full IDs use the exact broker account catalogue, not another account or the shortcut menu', () => {
+  const entry = sub('historical', 'claude_code', 'claude-sonnet-5', 'own-connection')
+  const local = device('local', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, subscriptionModelCatalogue: true, models: ['opus', 'sonnet', 'haiku', 'fable'] }], subscriptionModels: { 'own-connection': ['claude-sonnet-5', 'claude-sonnet-5-5'] } })
+  assert.equal(deviceModel(local, entry), entry.model)
+  assert.equal(placeStage(local, [entry], 'claude_code'), 'ready', 'the settings place uses the same account catalogue as dispatch')
+  assert.equal(deviceModelEvidence(local, entry), 'account_catalogue')
+  assert.equal(deviceModel(local, { ...entry, model: 'unlisted-model' }), null)
+  assert.equal(deviceModel(local, { ...entry, source: { kind: 'subscription', connectionId: 'other-connection' } }), null)
+  assert.equal(deviceModel({ ...local, subscriptionModels: undefined }, entry), null, 'no catalogue is not evidence of full-ID support')
+  assert.equal(deviceModel({ ...local, harnesses: [{ ...local.harnesses[0], subscriptionBroker: undefined }] }, entry), null)
+  const oldDaemon = { ...local, harnesses: [{ ...local.harnesses[0], subscriptionModelCatalogue: undefined }] }
+  assert.equal(deviceModel(oldDaemon, entry), null)
+  assert.equal(placeStage(oldDaemon, [entry], 'claude_code'), 'needsUpdate')
+  assert.deepEqual(whyNoDevice([oldDaemon], entry), { why: 'needsUpdate', device: 'local', count: 1, modelEvidence: 'only_latest_confirmed' })
+  assert.equal(deviceModelEvidence(local, { ...entry, source: { kind: 'subscription', connectionId: 'other-connection' } }), 'only_latest_confirmed')
+  assert.equal(deviceModelEvidence({ ...local, harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, subscriptionModelCatalogue: true }], subscriptionModels: {} }, entry), 'unknown')
+  assert.equal(deviceModel({ ...local, harnesses: [{ ...local.harnesses[0], subscriptionPreflight: 'adapter_start_failed' }] }, entry), null)
+  assert.equal(deviceModel({ ...local, online: false }, entry), null)
+})
 const key = (id: string, harness: OrderEntry['harness'], model: string): OrderEntry => ({ id, harness, model, source: { kind: 'api_key', keyId: 'key-1' } })
 const device = (id: string, over: Partial<PoolDevice> = {}): PoolDevice => ({
   id, name: id, online: true, enabled: true, server: false, activeRuns: 0, joinedAt: 0,

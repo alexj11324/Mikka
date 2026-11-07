@@ -84,7 +84,7 @@ const sources = new Map([
   ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
   ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
   ['/lib/github/user-access.ts', 'export async function githubTokenForUser(owner){const p=globalThis.claimResponseProbe;p.credentialOwners.push(owner);await p.beforeCredential?.();if(p.credentialFailure)throw p.credentialFailure;return {token:"fixture-claim-github-token",githubAccountId:"123",expiresAt:new Date("2030-01-01T00:00:00.000Z")}}'],
-  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){const p=globalThis.claimResponseProbe;if(!p.nativeLease)throw new Error("unexpected subscription access");return {async nativeRun(owner,device,run){(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}},async nativeLease(use){(p.nativeLeaseCalls??=[]).push(use);return p.nativeLease}}}'],
+  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){const p=globalThis.claimResponseProbe;if(!p.nativeLease)throw new Error("unexpected subscription access");return {async nativeRun(owner,device,run){(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}},async nativeLease(use,_signal,includeCatalogue){(p.nativeLeaseCalls??=[]).push(use);p.nativeLeaseCapabilities.push(includeCatalogue);return p.nativeLease}}}'],
 ])
 registerHooks({
   resolve(specifier,context,next){

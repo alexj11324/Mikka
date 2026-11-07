@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, lte, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { agentRuns, agents, coordinatorBots, coordinatorSessions, devices, bots, conversations, groupTurns } from '@/lib/db/schema'
 import type * as schema from '@/lib/db/schema'
@@ -66,7 +66,7 @@ export async function listActiveAgents(database: Database, userId: string, now =
       .where(and(
         eq(agentRuns.userId, userId),
         inArray(agentRuns.status, [...WORKING_RUN_STATUSES]),
-        or(gt(agentRuns.leaseExpiresAt, now), and(isNull(agentRuns.leaseExpiresAt), gt(devices.lastSeenAt, onlineSince))),
+        or(gt(agentRuns.leaseExpiresAt, now), and(isNull(agentRuns.leaseExpiresAt), gt(devices.lastSeenAt, onlineSince), lte(devices.lastSeenAt, now))),
       )),
     // The Coordinator's chat is its bot row's (coordinator_bots).
     database.select({ botId: coordinatorBots.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, updatedAt: coordinatorSessions.updatedAt })
