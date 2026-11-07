@@ -13,6 +13,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
+import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 
 test('quota exhausted mid-run: continue on the person\'s key, else pause with the reset; resume and retry actions', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
@@ -57,6 +58,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_api_keys WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM user_e2b_keys WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM workspace_subscription_shares WHERE "ownerId" = ANY($1)', [users])
@@ -522,6 +524,11 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
 
   const pausedCloud = async (p: Person) => {
     await subscribe(p)
+    // Cloud admission requires the requester's own runtime account even when
+    // the test never starts a VM or calls the provider.
+    const sealed = sealSecret('synthetic-quota-e2b-fixture', userE2bKeyAad(p.id))
+    await pool.query('INSERT INTO user_e2b_keys ("userId",ciphertext,iv,"keyVersion",last4) VALUES ($1,$2,$3,$4,\'test\')',
+      [p.id,sealed.ciphertext,sealed.iv,sealed.keyVersion])
     // Production metadata registration allocates no VM and makes no provider call.
     const { ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
     const runtime = await ensureBotCloudRuntime(pool,{userId:p.id,workspaceId:p.workspaceId},p.botId,{harness:'claude_code',model:'subscription-model'})
@@ -536,7 +543,13 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
       title:'Quota tenant continuation',body:'Synthetic metadata-only continuation.',model:'subscription-model',readOnly:true,withoutBot:true})
     await pool.query(`UPDATE agent_runs SET status='paused',"pauseReason"='quota_exhausted',"stopReason"='quota_exhausted',
       "sessionId"=$2,"startedAt"=now(),"leaseExpiresAt"=NULL WHERE id=$1`,[runId,`quota-cloud-${runId}`])
-    return row(runId)
+    const paused = await row(runId)
+    assert.equal(paused.workspaceId,p.workspaceId)
+    assert.equal(paused.agentDefinition.executionIdentity.workspaceId,p.workspaceId)
+    assert.equal(paused.agentDefinition.executionIdentity.billingAccount.model.kind,'subscription')
+    assert.deepEqual(paused.agentDefinition.executionIdentity.billingAccount.runtime,
+      {kind:'e2b',ownerId:p.id,resourceId:p.id,amount:'provider_unknown'})
+    return paused
   }
 
   await t.test('cloud quota queue waits for WS without retaining APP, freezes its persisted tenant and keeps one child', {timeout:20000}, async () => {

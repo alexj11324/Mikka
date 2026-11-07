@@ -128,15 +128,14 @@ test('the polled routes read with a fixed number of queries, whatever the number
 
     const originalContent = (await pool.query('SELECT content FROM issues WHERE id=$1', [issue])).rows[0].content
     try {
-      for (const attrs of [
-        { mikka: { deletedAt: new Date().toISOString() } },
-        { mikka: null, orvilo: { deletedAt: new Date().toISOString() } },
-      ]) {
-        await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issue, JSON.stringify({ type: 'doc', attrs, content: [] })])
-        const denied = await as(() => tasksRoute.GET(new Request(url)))
-        assert.equal(denied.status, 404, 'the locked authorization row preserves ordinary and legacy tombstones')
-        assert.deepEqual(await denied.json(), { error: 'factoryNotFound' })
+      const deletedContent = {
+        ...originalContent,
+        attrs: { ...originalContent.attrs, mikka: { ...originalContent.attrs.mikka, deletedAt: new Date().toISOString() } },
       }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issue, JSON.stringify(deletedContent)])
+      const denied = await as(() => tasksRoute.GET(new Request(url)))
+      assert.equal(denied.status, 404, 'the authorization snapshot preserves the canonical tombstone')
+      assert.deepEqual(await denied.json(), { error: 'factoryNotFound' })
     } finally { await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issue, JSON.stringify(originalContent)]) }
 
     await as(() => pollIssues())

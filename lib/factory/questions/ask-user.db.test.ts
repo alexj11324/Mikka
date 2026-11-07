@@ -251,6 +251,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
         assert.equal((await within(store.read("owner", b.taskId), "task-detail read")).task.id, b.taskId);
         const issueId = (await pool.query<{ issueId: string }>('SELECT "issueId" FROM factory_tasks WHERE id=$1', [b.taskId])).rows[0].issueId;
         assert.ok((await within(store.listForIssue("owner", issueId), "listForIssue")).tasks.some((x) => x.id === b.taskId));
+        assert.ok((await within(store.listPublicForIssue("owner", issueId), "listPublicForIssue")).tasks.some((x) => x.id === b.taskId));
         // Control: a real write path (dispatch -> lockForDispatch, FOR UPDATE on the task) does wait.
         const snap = await store.read("owner", b.taskId);
         const write = dispatch("owner", { binding: factoryBinding(snap.task), agentId: fixture.owner.agentId, deviceRepoId: fixture.owner.repoId }).then(() => "done", () => "done");

@@ -172,8 +172,9 @@ export interface FactorySnapshot {
   attempts: FactoryAttempt[];
   candidates: FactoryCandidate[];
 }
-/** A row read by this store under FOR SHARE in the same APP transaction.
- * It can replace a second issue read, never the current membership check. */
+/** A store-owned issue snapshot from the same APP transaction. GETs use MVCC;
+ * write callers lock their own rows. This replaces a second issue read, never
+ * the current membership check. */
 export type FactoryLockedIssue = FactoryIssueScope & { id: string; deleted: boolean };
 export type FactoryAuthorize = (
   userId: string,
@@ -402,7 +403,7 @@ export function createFactoryStore(
         `SELECT id,"userId",scope,"scopeVersion","workspaceId","ownershipState",
           jsonb_build_object('type','doc','attrs',content->'attrs') AS content,
           coalesce(content->'attrs'->'mikka',content->'attrs'->'orvilo')->>'deletedAt' IS NOT NULL AS deleted
-          FROM issues WHERE id=$1 FOR SHARE`, [issueId],
+          FROM issues WHERE id=$1`, [issueId],
       );
       // Preserve both halves of issueForUser's deletion check, including a
       // JSON-null mikka key whose legacy orvilo metadata still has a tombstone.
