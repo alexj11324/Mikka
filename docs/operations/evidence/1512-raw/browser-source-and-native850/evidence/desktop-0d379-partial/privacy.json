@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "scope": "available_original_json_files",
+  "files": [
+    {
+      "path": "parity/parity.json",
+      "bytes": 6709,
+      "sha256": "6065ab622cf18c119bed491d84a6382c800a5456c04291252499acbfb470be86",
+      "gitBlob": "5f48d21c51f72b5b65368e8ab1ad129aff21183a"
+    },
+    {
+      "path": "smoke.json",
+      "bytes": 3105,
+      "sha256": "bdc188e76ec80254fe88f054f4091ccb189941a6631ccfed7317896b7218bd41",
+      "gitBlob": "944815b62c8d43e82638e1cd0c00167a05511e30"
+    },
+    {
+      "path": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "a144c7f18939ce51a382b46115cabea427b1c24c63efcd82935bc4ad70b8cbbd",
+      "gitBlob": "50d1c693e1e147b3acb28a315fdb8e91088ae6e3"
+    },
+    {
+      "path": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "e51a6ff3ac061b300963def703861fb8a41a0dfaea22294f16410b43d7a1438f",
+      "gitBlob": "5d68429ccd1813833cd30f0d842067cc4291a700"
+    }
+  ],
+  "findings": 0,
+  "email": 0,
+  "bearer": 0,
+  "privateKey": 0,
+  "signedQuery": 0,
+  "sensitiveStringFields": 0,
+  "scannedBeforePersistence": true
+}

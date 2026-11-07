@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "root_source_and_evidence_binding",
+  "observedAt": "2026-11-07 19:45:58 UTC",
+  "source": {
+    "pr": 1665,
+    "head": "58089592b806caba919fd0f5184ea3f8499419fa",
+    "headTree": "3c133adda2e362b550853a7779d815a0da95af67",
+    "previousCandidate": "db988428a95a47637f04089ffc51aad37343c9dd",
+    "originalBase": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+    "changedFiles": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "blob": "f83fe9042319ae5d3db6fc98a584fa46e51c83c5",
+        "status": "modified"
+      },
+      {
+        "path": "lib/live/channel.test.ts",
+        "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+        "status": "modified"
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "blob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "status": "modified"
+      },
+      {
+        "path": "package.json",
+        "blob": "f9e2026a028654c5774c3764e6081f93b4c8ebf2",
+        "status": "modified"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "blob": "9dfb48921351483e25cba98c539332a93569ace6",
+        "status": "added"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "blob": "53510145147173e0063c174fe93098667654ee82",
+        "status": "added"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-workflow.mjs",
+        "blob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "status": "modified"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+        "blob": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "status": "modified"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "blob": "7ac65eb8c2bbd545f4d133016f2af8454b67929c",
+        "status": "modified"
+      }
+    ],
+    "allNineExpectedFilesMatch": true,
+    "sourceBodiesIndependentlyReadBack": true,
+    "packageReverseEditRestoresOriginal": true
+  },
+  "main": {
+    "sha": "4672c4188c8468d9be5109181d2397c4d0910099",
+    "tree": "dd63c992297ee01a495049e3d11eea079b670ce1",
+    "parents": [
+      "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "8506229488914d3d02815d098e7c6dd73d75ef23"
+    ],
+    "batchPr": 1615,
+    "mergedAt": "2026-11-07T19:37:51Z",
+    "deploymentsInProgress": true
+  },
+  "retarget": {
+    "from": "batch/20261107-audit-auth-lease",
+    "to": "main",
+    "headUnchanged": true,
+    "normalApiRetarget": true,
+    "forcePush": false,
+    "rebase": false
+  },
+  "ci": {
+    "run": 42407115281,
+    "sourceMetadata": {
+      "sha": "c3b6b1525a36f5567a38d1720f03b588988c4036",
+      "tree": "d318ecd149d2679955ec88a1389aeeeb0e3aab3b",
+      "parents": [
+        "8506229488914d3d02815d098e7c6dd73d75ef23",
+        "58089592b806caba919fd0f5184ea3f8499419fa"
+      ]
+    },
+    "actualCheckoutReportedByReviewers": "c3b6b1525a36f5567a38d1720f03b588988c4036",
+    "actualCheckoutRootLogRead": false,
+    "baseTreeEqualsMergedMainTree": true,
+    "oldBaseParentNotRelabeledAsMain": true,
+    "fullWorkflowConclusion": "pending",
+    "observedFailure": {
+      "job": 128507454598,
+      "step": "pnpm lint:code",
+      "conclusion": "failure",
+      "cause": "pending_exact_diagnostic"
+    },
+    "testApiStep": "success",
+    "doesNotAttestFullCiPass": true
+  },
+  "offline": {
+    "liveTests": 59,
+    "driverAndHelperTests": 39,
+    "actorTests": 30,
+    "actualActorHelperImportWithFakeTransport": true,
+    "actualBrowserLaunched": false,
+    "productionRequests": 0,
+    "modelsInvoked": 0
+  },
+  "native850": {
+    "workflow": 42405040257,
+    "source": "f23dcd19fcd890578f5907d536f405146bb0e320",
+    "loginNative": 211,
+    "loginWeb": 210,
+    "startupNative": 177,
+    "startupHostedElectron": 118,
+    "bothBudgetsFailed": true,
+    "rootMathViolations": 0,
+    "crossingCountsNotUsedToAdjustWindows": true,
+    "doesNotApplyTo1665": true
+  },
+  "partial0d": {
+    "workflow": 42403906939,
+    "nativeStepEnteredThenCancelled": true,
+    "lifecycleReportMissing": true,
+    "budgets": null,
+    "parityCleanup": null,
+    "smokeCleanupNotExtendedToLaterScopes": true
+  },
+  "originalReceipts": {
+    "contemporaneousUnreferencedBlobStatePreserved": true,
+    "currentCandidatePublishedSeparately": true
+  },
+  "productionAcceptance": null,
+  "issueClosed": false
+}

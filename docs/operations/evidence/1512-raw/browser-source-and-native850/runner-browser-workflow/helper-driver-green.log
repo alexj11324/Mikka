@@ -1,0 +1,47 @@
+✔ fixed progress bridge posts verified fixture once and keeps every token alias out of the driver (86.010217ms)
+✔ flags, single-case binding and missing token reject before any child or network request (3.097894ms)
+✔ modified or expanded readiness never becomes an external comment or console content (17.199745ms)
+✔ one failed or uncertain POST sends SIGTERM, waits for cleanup and is never retried (5.396622ms)
+✔ duplicate readiness cannot post twice and preserves a nonzero driver exit (2.645202ms)
+✔ ordinary preflight passes safe stdout through without GitHub access and forwards termination for cleanup (1.778591ms)
+✔ runner mode rejects non-main, mismatched revision and incomplete mode flags before starting anything (0.954553ms)
+✔ runner gets only validated readiness and token-free child env, with its flag removed from the driver (2.512859ms)
+✔ runner continues consuming readiness while the actor starts and aborts a duplicate without a second actor (2.483778ms)
+✔ runner startup failure stops the driver, waits for its cleanup and exports no error text (1.544076ms)
+✔ runner cleanup failure cannot be hidden by a successful driver return or replace a nonzero exit (3.877334ms)
+✔ driver exit aborts pending actor startup and still awaits the late owned browser close (1.611191ms)
+✔ runner never starts after invalid readiness or a failed progress POST and cannot pass with missing readiness (2.712194ms)
+✔ preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks (101.42336ms)
+✔ a default team switches only this login session to its verified personal workspace before reading Coordinator (8.414181ms)
+✔ workspace selection rejects ambiguous choices, teams and another account personal membership before switching (29.699226ms)
+✔ workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session (8.100063ms)
+✔ unsafe configuration blocks before any model call and reports only closed failure codes (13.042169ms)
+✔ two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence (43.626431ms)
+✔ successful terminal runs close only their own machines and retain task evidence (22.794551ms)
+✔ a missing machine requires a fresh owned run and an explicit null machine read (24.021949ms)
+✔ machine failures never turn a completed task green and do not prevent closing another owned machine (158.199107ms)
+✔ legacy Factory tasks still require review and verify before the normal deliverable acceptance (17.856185ms)
+✔ missing, failed or stale Factory checks never reach approval, including legacy verify (50.662351ms)
+✔ deliverable approval requires its receipt, never accepts a repository and never retries a lost response (38.698587ms)
+✔ uncertain mutation responses never resubmit and still reconcile own temporary settings (9.819593ms)
+✔ wrong provider/model and an extra native attempt stop the case without retrying (17.833051ms)
+✔ pure source and budget guards reject shared credentials, inherited model choices and retries (1.517078ms)
+✔ cleanup preserves a concurrent model edit and reports incomplete restoration (9.740829ms)
+✔ prepare is explicit, requires execution and restores only its acknowledged settings (13.245307ms)
+✔ prepare refuses owner-wide activity and inherited model choices without changing settings (4.681579ms)
+✔ a blocked case does not prevent preparation and execution of another available model (16.015759ms)
+✔ preparation failures restore acknowledged writes but never guess after a lost response (12.381408ms)
+✔ restoration failures and concurrent edits remain visible without overwriting them (63.556028ms)
+✔ issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan (1.519879ms)
+✔ browser submission requires one executed case and does not authenticate on invalid options (0.289465ms)
+✔ browser mode publishes readiness then observes the real-shaped UI click through push without an API submission (30.423178ms)
+✔ browser waiting times out or blocks changed UI text without sending or repeating a task (11.107667ms)
+✔ live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports (2.898909ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1263.659305

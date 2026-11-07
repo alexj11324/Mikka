@@ -1,0 +1,14 @@
+[
+  {
+    "path": "scripts/acceptance/run-observability-browser.mjs",
+    "exitCode": 0,
+    "stdoutBytes": 0,
+    "stderrBytes": 0
+  },
+  {
+    "path": "scripts/acceptance/run-observability-browser.test.mjs",
+    "exitCode": 0,
+    "stdoutBytes": 0,
+    "stderrBytes": 0
+  }
+]

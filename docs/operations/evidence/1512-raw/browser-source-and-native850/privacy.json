@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "scope": "selected Git-backed source and existing acceptance evidence",
+  "rootRemoteReadbackAllPayloads": true,
+  "actualProductionBrowserRun": false,
+  "actualProductionCredentialsUsedInOfflineTests": false,
+  "syntheticCanariesAllowedOnlyInExplicitOfflineFixtures": true,
+  "sourceIsPublicRepositoryCode": true,
+  "nativeOriginalJsonCount": 10,
+  "originalNativeArchiveDigestsVerifiedByRecovery": 5,
+  "compiledManifest850Verified": true,
+  "rawZipPersisted": false,
+  "rawProductionLogsPersisted": false,
+  "imagesPersisted": false,
+  "signedDownloadUrlsPersisted": false,
+  "rootSelectedPersistenceScanFindings": [],
+  "sourceScopeHashOnlyForUncopiedReviewFiles": true,
+  "limits": [
+    "Privacy scans are scoped to retained files; they do not assert platform-wide absence of secrets.",
+    "Missing cancelled-run reports remain unknown; later workflow success does not fill them.",
+    "Actor receipt and API safeguards are source/offline evidence only."
+  ]
+}

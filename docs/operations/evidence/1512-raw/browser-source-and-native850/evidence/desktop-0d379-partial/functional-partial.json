@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "kind": "cancelled_native_functional_partial",
+  "runId": 42403906939,
+  "head": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "source": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+  "workflowConclusion": "cancelled",
+  "nativeStepActuallyEntered": true,
+  "crypto": {
+    "passed": true,
+    "launches": 3,
+    "distinctProcesses": 3,
+    "sameImmutablePackage": true,
+    "cleanup": "passed"
+  },
+  "package": {
+    "passed": true,
+    "signatureVerifiedStrictDeep": true,
+    "architecture": "arm64"
+  },
+  "smoke": {
+    "startedAt": "2026-11-07T19:10:06.042Z",
+    "finishedAt": "2026-11-07T19:10:34.509Z",
+    "result": "passed",
+    "checks": 10,
+    "passed": 10,
+    "cleanup": {
+      "aggregate": "unknown",
+      "nativeCleaned": true,
+      "stages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "account": {
+        "observed": true,
+        "state": "released",
+        "blocked": false,
+        "ownerAfterBaseline": true,
+        "peerAfterBaseline": true
+      }
+    }
+  },
+  "parity": {
+    "startedAt": "2026-11-07T19:10:34.721Z",
+    "finishedAt": null,
+    "completedScreens": 8,
+    "passedScreens": 8,
+    "requiredScreenListCount": 50,
+    "themeCount": 2,
+    "completedNativeProfiles": null,
+    "result": "incomplete",
+    "cleanup": "unknown",
+    "lease": "unknown",
+    "quarantine": "unknown"
+  },
+  "lifecycle": {
+    "reportPresent": false,
+    "windows": "unknown",
+    "cleanup": "unknown",
+    "lease": "unknown",
+    "quarantine": "unknown"
+  },
+  "boundaries": {
+    "smokeCleanupAppliesOnlyToSmokeScope": true,
+    "parityPartialDoesNotShowFinalCleanup": true,
+    "absentLifecycleDoesNotProveResourceCleanup": true,
+    "fullNativeAcceptance": null,
+    "performanceAcceptance": null,
+    "productionAcceptance": null,
+    "cancellationActorOrReason": "unknown",
+    "noRerunOrCancellationRequestedByObserver": true
+  }
+}

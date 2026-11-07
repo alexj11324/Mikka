@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Independent root recomputation from exact original 850 Desktop lifecycle.json; no product or measurement changes",
+  "source": {
+    "blob": "b9d601b5ddae49bfe34fd8df090297e1974fd5e9",
+    "bytes": 267882,
+    "sha256": "ed715982f83aade1c94e03452a6131c70031f565bbee7a244c37d1e2e81daf52",
+    "workflowRunId": 42405040257,
+    "actualSource": "f23dcd19fcd890578f5907d536f405146bb0e320",
+    "tree": "dd63c992297ee01a495049e3d11eea079b670ce1"
+  },
+  "method": {
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "operationPartition": true,
+    "unattributedSourcePartition": true,
+    "segmentSubtraction": true,
+    "totalEndpointSubtraction": true,
+    "totalSegmentSum": true,
+    "samePid": true,
+    "sameCounterEpoch": true,
+    "monotonicCumulativeCounters": true,
+    "unknownReadingsZero": true,
+    "subtractionsOrResampling": false,
+    "originalWindowStatusComplete": true
+  },
+  "windows": {
+    "webLogin": {
+      "rawStatus": "complete",
+      "startedAt": "2026-11-07T19:33:27.811Z",
+      "finishedAt": "2026-11-07T19:33:30.814Z",
+      "durationMs": 3003,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 191
+        }
+      ],
+      "total": 210
+    },
+    "nativeLogin": {
+      "rawStatus": "complete",
+      "startedAt": "2026-11-07T19:33:32.191Z",
+      "finishedAt": "2026-11-07T19:33:37.067Z",
+      "durationMs": 4876,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 13
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 179
+        }
+      ],
+      "total": 211
+    },
+    "startup-bundled": {
+      "rawStatus": "complete",
+      "startedAt": "2026-11-07T19:34:01.621Z",
+      "finishedAt": "2026-11-07T19:34:06.057Z",
+      "durationMs": 4436,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 177
+        }
+      ],
+      "total": 177
+    },
+    "startup-hosted": {
+      "rawStatus": "complete",
+      "startedAt": "2026-11-07T19:34:07.466Z",
+      "finishedAt": "2026-11-07T19:34:10.743Z",
+      "durationMs": 3277,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 118
+        }
+      ],
+      "total": 118
+    }
+  },
+  "budgets": {
+    "login": {
+      "native": 211,
+      "webChromium": 210,
+      "passed": false
+    },
+    "startup": {
+      "native": 177,
+      "hostedElectron": 118,
+      "passed": false
+    }
+  },
+  "rows": [
+    {
+      "label": "webLogin:checkpoint:0",
+      "queryCalls": 26091,
+      "operationKeys": 17,
+      "operationSum": 26091,
+      "unattributed": 7856,
+      "sourceKeys": 75,
+      "sourceSum": 7856,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:checkpoint:1",
+      "queryCalls": 26110,
+      "operationKeys": 17,
+      "operationSum": 26110,
+      "unattributed": 7856,
+      "sourceKeys": 75,
+      "sourceSum": 7856,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:checkpoint:2",
+      "queryCalls": 26110,
+      "operationKeys": 17,
+      "operationSum": 26110,
+      "unattributed": 7856,
+      "sourceKeys": 75,
+      "sourceSum": 7856,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:checkpoint:3",
+      "queryCalls": 26301,
+      "operationKeys": 17,
+      "operationSum": 26301,
+      "unattributed": 7902,
+      "sourceKeys": 75,
+      "sourceSum": 7902,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:segment:common-email-authentication",
+      "queryCalls": 19,
+      "operationKeys": 17,
+      "operationSum": 19,
+      "unattributed": 0,
+      "sourceKeys": 75,
+      "sourceSum": 0,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:segment:web-navigation-to-dom-content-loaded",
+      "queryCalls": 0,
+      "operationKeys": 17,
+      "operationSum": 0,
+      "unattributed": 0,
+      "sourceKeys": 75,
+      "sourceSum": 0,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:segment:workspace-selection-to-usable",
+      "queryCalls": 191,
+      "operationKeys": 17,
+      "operationSum": 191,
+      "unattributed": 46,
+      "sourceKeys": 75,
+      "sourceSum": 46,
+      "unknownReadings": 0
+    },
+    {
+      "label": "webLogin:total",
+      "queryCalls": 210,
+      "operationKeys": 17,
+      "operationSum": 210,
+      "unattributed": 46,
+      "sourceKeys": 75,
+      "sourceSum": 46,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:checkpoint:0",
+      "queryCalls": 26301,
+      "operationKeys": 17,
+      "operationSum": 26301,
+      "unattributed": 7902,
+      "sourceKeys": 75,
+      "sourceSum": 7902,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:checkpoint:1",
+      "queryCalls": 26320,
+      "operationKeys": 17,
+      "operationSum": 26320,
+      "unattributed": 7902,
+      "sourceKeys": 75,
+      "sourceSum": 7902,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:checkpoint:2",
+      "queryCalls": 26333,
+      "operationKeys": 17,
+      "operationSum": 26333,
+      "unattributed": 7902,
+      "sourceKeys": 75,
+      "sourceSum": 7902,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:checkpoint:3",
+      "queryCalls": 26512,
+      "operationKeys": 17,
+      "operationSum": 26512,
+      "unattributed": 7952,
+      "sourceKeys": 75,
+      "sourceSum": 7952,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:segment:common-email-authentication",
+      "queryCalls": 19,
+      "operationKeys": 17,
+      "operationSum": 19,
+      "unattributed": 0,
+      "sourceKeys": 75,
+      "sourceSum": 0,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:segment:native-pkce-and-automatic-renderer-to-public-session",
+      "queryCalls": 13,
+      "operationKeys": 17,
+      "operationSum": 13,
+      "unattributed": 0,
+      "sourceKeys": 75,
+      "sourceSum": 0,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:segment:workspace-selection-to-usable",
+      "queryCalls": 179,
+      "operationKeys": 17,
+      "operationSum": 179,
+      "unattributed": 50,
+      "sourceKeys": 75,
+      "sourceSum": 50,
+      "unknownReadings": 0
+    },
+    {
+      "label": "nativeLogin:total",
+      "queryCalls": 211,
+      "operationKeys": 17,
+      "operationSum": 211,
+      "unattributed": 50,
+      "sourceKeys": 75,
+      "sourceSum": 50,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-bundled:checkpoint:0",
+      "queryCalls": 26887,
+      "operationKeys": 17,
+      "operationSum": 26887,
+      "unattributed": 8176,
+      "sourceKeys": 75,
+      "sourceSum": 8176,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-bundled:checkpoint:1",
+      "queryCalls": 27064,
+      "operationKeys": 17,
+      "operationSum": 27064,
+      "unattributed": 8220,
+      "sourceKeys": 75,
+      "sourceSum": 8220,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-bundled:segment:launch-to-usable",
+      "queryCalls": 177,
+      "operationKeys": 17,
+      "operationSum": 177,
+      "unattributed": 44,
+      "sourceKeys": 75,
+      "sourceSum": 44,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-bundled:total",
+      "queryCalls": 177,
+      "operationKeys": 17,
+      "operationSum": 177,
+      "unattributed": 44,
+      "sourceKeys": 75,
+      "sourceSum": 44,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-hosted:checkpoint:0",
+      "queryCalls": 27072,
+      "operationKeys": 17,
+      "operationSum": 27072,
+      "unattributed": 8225,
+      "sourceKeys": 75,
+      "sourceSum": 8225,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-hosted:checkpoint:1",
+      "queryCalls": 27190,
+      "operationKeys": 17,
+      "operationSum": 27190,
+      "unattributed": 8261,
+      "sourceKeys": 75,
+      "sourceSum": 8261,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-hosted:segment:launch-to-usable",
+      "queryCalls": 118,
+      "operationKeys": 17,
+      "operationSum": 118,
+      "unattributed": 36,
+      "sourceKeys": 75,
+      "sourceSum": 36,
+      "unknownReadings": 0
+    },
+    {
+      "label": "startup-hosted:total",
+      "queryCalls": 118,
+      "operationKeys": 17,
+      "operationSum": 118,
+      "unattributed": 36,
+      "sourceKeys": 75,
+      "sourceSum": 36,
+      "unknownReadings": 0
+    }
+  ],
+  "violations": [],
+  "boundaries": {
+    "budgetFailureRetained": true,
+    "hostedCrossEndCount": 3,
+    "crossEndNotAddedToWindow": true,
+    "rpcOccurrencesNotConvertedToSql": true,
+    "doesNotApplyTo1665": true,
+    "productionAcceptance": null
+  },
+  "passed": true
+}

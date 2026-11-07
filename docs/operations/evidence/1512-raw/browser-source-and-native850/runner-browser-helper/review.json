@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "runner_browser_final_cross_review",
+  "status": "no_blocking_findings",
+  "sourceBase": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "actor": {
+    "blob": "9dfb48921351483e25cba98c539332a93569ace6",
+    "sha256": "bfee425d6409815942c7acbc4df91cf9b21a4cf4d61892f91d8c2ca11707a54a",
+    "bytes": 22407
+  },
+  "tests": {
+    "blob": "53510145147173e0063c174fe93098667654ee82",
+    "rawTapBlob": "1c24f61eaab1aa9311441b09c6804080775af55a",
+    "tests": 30,
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "actualHelperBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+    "chromium": "offline_fake",
+    "realBrowserExecuted": false
+  },
+  "inspectedSources": [
+    {
+      "path": "components/auth-form.tsx",
+      "bytes": 15839,
+      "sha256": "0463b526e110ba5ff2e7238b8560c7dc1975473439cbe5593ef2d9c3cec11175"
+    },
+    {
+      "path": "components/blocks/auth-19/components/sign-in-card.tsx",
+      "bytes": 9866,
+      "sha256": "5c894e93a060d8b8f6288da083db85e032f7b9f8a4267fae346630193647126c"
+    },
+    {
+      "path": "components/workspace-menu.tsx",
+      "bytes": 7622,
+      "sha256": "62e9397fb7ebbdbf93b5862818068ebdcbae2b72b2d376e12cd41d030bd334f0"
+    },
+    {
+      "path": "hooks/use-workspace-switcher.ts",
+      "bytes": 4608,
+      "sha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8"
+    },
+    {
+      "path": "components/nav/global-search.tsx",
+      "bytes": 15123,
+      "sha256": "02769dd288e8e7b715016fd6e45233f9e0a156b22f2795f44c8bfe1adec27541"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "bytes": 53931,
+      "sha256": "25a328b89a516f54f90a44e0d498fb28253634cfc5fe82b09fa89fdc11f5927e"
+    },
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "bytes": 17352,
+      "sha256": "bed604f301a2b545666858d055c60e86bc728ccfb05991e75b3713f62fb72e27"
+    },
+    {
+      "path": "components/coordinator/task-profile-picker.tsx",
+      "bytes": 5147,
+      "sha256": "d069b15ee5062684180d354d6f7797e2237dcdef7dc1a1a24389c8f312f49c10"
+    },
+    {
+      "path": "components/coordinator/use-coordinator-submit.ts",
+      "bytes": 2799,
+      "sha256": "3003276c7cb3fbabc98ce823809439de500aa327cbbe7709cad7a5ea29b9f5a0"
+    },
+    {
+      "path": "lib/web-connection/client.ts",
+      "bytes": 17768,
+      "sha256": "57c246ffa01d78689a354cc89a03dca0b5c18061178ef910d08a307fb023b642"
+    },
+    {
+      "path": "apps/frontend/src/web/rpc.ts",
+      "bytes": 911,
+      "sha256": "7bc78b61a059c9de3f519811f225be747346985f761f40ceb8b30928a06ded56"
+    },
+    {
+      "path": "scripts/error-cause-policy.mjs",
+      "bytes": 11981,
+      "sha256": "928721fa2385ec594a0cc5de8dbb6d93f378af9bdb7e9349abc8f4012bf758f8"
+    }
+  ],
+  "checks": {
+    "ordinaryEmailLoginSelectors": true,
+    "globalSearchNewTaskSelectors": true,
+    "exactWorkspaceOwnerAndUniqueName": true,
+    "workspaceSwitchWaitsNextDocument": true,
+    "coordinatorDefaultWhenPickerAbsent": true,
+    "profileMarkerExact": true,
+    "freshContextNoInjectedCredentials": true,
+    "officialRendererBusinessResponseRequired": true,
+    "foreignBusinessRequestRefusesSubmission": true,
+    "exactDeploymentBeforeLoginAndSubmit": true,
+    "singleClickUnknownOutcomeNoRetry": true,
+    "pageClosePrecedesLogoutWait": true,
+    "independentCleanupDeadline": true,
+    "normalSignoutAndAnonymousReadback": true,
+    "lateAllocationDisposal": true,
+    "closedErrorsNoRawCause": true
+  },
+  "findings": [],
+  "limits": [
+    "Only fixed-source and offline integration evidence; no production UI execution or acceptance result.",
+    "The foreign-business request observer detects a request; it is not a network firewall.",
+    "scripts/acceptance is outside the current error-cause scanner roots; closed error projection is an intentional privacy boundary."
+  ],
+  "resource": {
+    "owner": "daemon_impl",
+    "reportedStopConfirmed": true,
+    "stoppedAt": "2026-11-07T19:31:34.559Z",
+    "reviewerCreatedResources": 0
+  }
+}

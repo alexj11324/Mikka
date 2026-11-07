@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "minimal_lint_correction_source_binding",
+  "observedAt": "2026-11-07 19:52:48 UTC",
+  "original": {
+    "head": "58089592b806caba919fd0f5184ea3f8499419fa",
+    "actorBlob": "9dfb48921351483e25cba98c539332a93569ace6",
+    "bytes": 22407,
+    "actualCiSource": "c3b6b1525a36f5567a38d1720f03b588988c4036",
+    "ciRun": 42407115281,
+    "sourceJob": 128507454598,
+    "lintConclusion": "failure",
+    "lintWarnings": 1,
+    "lintErrors": 0,
+    "warning": "Promise.allSettled accepts an iterable, so it is unnecessary to convert the iterable to an array."
+  },
+  "corrected": {
+    "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+    "tree": "d2fa45666174643799ec4e32a8161aec61e9e075",
+    "parents": [
+      "58089592b806caba919fd0f5184ea3f8499419fa"
+    ],
+    "actorBlob": "163ab8697bd91613a9acde23653dd8abbbfb3823",
+    "bytes": 22402,
+    "sha256": "5e342db8e2335568418daf25c4248c687c61f598020bca5169b85b606a1e6bf2",
+    "onlyChange": {
+      "from": "Promise.allSettled([...allocating])",
+      "to": "Promise.allSettled(allocating)",
+      "deletedCharacters": 5
+    },
+    "rootFullStringEqualityAfterReplacement": true,
+    "remoteCompareExactlyOneFile": true,
+    "normalFastForward": true,
+    "newCiRun": 42407923900,
+    "newDesktopRun": 42407923882,
+    "fullCiConclusion": "pending",
+    "noOldTestsRelabeledAsNewSource": true
+  },
+  "oldDesktop": {
+    "workflow": 42407115221,
+    "conclusion": "cancelled",
+    "nativeStep": "skipped",
+    "nativeBudget": null
+  },
+  "productionAcceptance": null
+}

@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "pr1665_source_checks_failed_receipt",
+  "status": "failure",
+  "candidate": "58089592b806caba919fd0f5184ea3f8499419fa",
+  "run": {
+    "id": 42407115281,
+    "attempt": 1,
+    "event": "pull_request"
+  },
+  "job": {
+    "id": 128507454598,
+    "name": "Source checks",
+    "status": "completed",
+    "conclusion": "failure",
+    "startedAt": "2026-11-07T19:43:13Z",
+    "completedAt": "2026-11-07T19:45:52Z",
+    "steps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:43:14Z",
+        "completedAt": "2026-11-07T19:43:14Z"
+      },
+      {
+        "number": 2,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:43:14Z",
+        "completedAt": "2026-11-07T19:43:17Z"
+      },
+      {
+        "number": 3,
+        "name": "Run ./.github/actions/pnpm-install",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:43:17Z",
+        "completedAt": "2026-11-07T19:43:59Z"
+      },
+      {
+        "number": 4,
+        "name": "Run pnpm check:cloud-boundary",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:43:59Z",
+        "completedAt": "2026-11-07T19:44:10Z"
+      },
+      {
+        "number": 5,
+        "name": "Verify all production release credentials use existing Infisical OIDC",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:44:10Z",
+        "completedAt": "2026-11-07T19:44:10Z"
+      },
+      {
+        "number": 6,
+        "name": "Run pnpm lint:code",
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-07T19:44:10Z",
+        "completedAt": "2026-11-07T19:44:11Z"
+      },
+      {
+        "number": 7,
+        "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:44:11Z",
+        "completedAt": "2026-11-07T19:44:11Z"
+      },
+      {
+        "number": 8,
+        "name": "Run pnpm lint:runtime",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:44:11Z",
+        "completedAt": "2026-11-07T19:44:12Z"
+      },
+      {
+        "number": 9,
+        "name": "Run pnpm test:api",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:44:12Z",
+        "completedAt": "2026-11-07T19:44:29Z"
+      },
+      {
+        "number": 10,
+        "name": "Run pnpm --filter @mikka/frontend test",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:44:29Z",
+        "completedAt": "2026-11-07T19:45:02Z"
+      },
+      {
+        "number": 11,
+        "name": "Run pnpm typecheck",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:45:02Z",
+        "completedAt": "2026-11-07T19:45:50Z"
+      },
+      {
+        "number": 12,
+        "name": "Run pnpm --filter @mikka/protocol typecheck",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:45:50Z",
+        "completedAt": "2026-11-07T19:45:50Z"
+      },
+      {
+        "number": 13,
+        "name": "Run pnpm --filter @mikka/mobile typecheck",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:45:50Z",
+        "completedAt": "2026-11-07T19:45:50Z"
+      },
+      {
+        "number": 25,
+        "name": "Post Run ./.github/actions/pnpm-install",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:45:50Z",
+        "completedAt": "2026-11-07T19:45:51Z"
+      },
+      {
+        "number": 26,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:45:51Z",
+        "completedAt": "2026-11-07T19:45:51Z"
+      },
+      {
+        "number": 27,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T19:45:51Z",
+        "completedAt": "2026-11-07T19:45:51Z"
+      }
+    ]
+  },
+  "checkout": {
+    "actual": "c3b6b1525a36f5567a38d1720f03b588988c4036",
+    "tree": "d318ecd149d2679955ec88a1389aeeeb0e3aab3b",
+    "parents": [
+      "8506229488914d3d02815d098e7c6dd73d75ef23",
+      "58089592b806caba919fd0f5184ea3f8499419fa"
+    ],
+    "source": "job git log -1 --format=%H and Git commit metadata"
+  },
+  "node": "v24.22.2",
+  "lint": {
+    "command": "oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory",
+    "exitCode": 1,
+    "warnings": 1,
+    "errors": 0,
+    "diagnostic": {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "line": 182,
+      "column": 95,
+      "message": "Promise.allSettled accepts an iterable, so it is unnecessary to convert the iterable to an array."
+    },
+    "laterChainedLintChecks": "not_executed"
+  },
+  "tests": {
+    "api": [
+      {
+        "tests": 84,
+        "pass": 84,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "tests": 58,
+        "pass": 58,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    ],
+    "frontend": {
+      "tests": 45,
+      "pass": 45,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "aliasFileDeclaredInApiCommand": false
+  },
+  "typechecks": {
+    "canonical": "success",
+    "protocol": "skipped",
+    "mobile": "skipped"
+  },
+  "originalLog": {
+    "retained": "memory_only_not_published",
+    "utf8Bytes": 101066,
+    "sha256": "50ce7098eadb1967037d0389ee414745c404ee666c03361d814233fdc7fca831"
+  },
+  "nextCandidate": {
+    "sha": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+    "actorBlob": "163ab8697bd91613a9acde23653dd8abbbfb3823",
+    "change": "Promise.allSettled([...allocating]) to Promise.allSettled(allocating)",
+    "ci": "not_validated_by_this_receipt"
+  },
+  "boundaries": [
+    "This receipt preserves the failed original candidate; successful API, frontend and canonical typecheck do not override lint failure.",
+    "No old candidate or offline result is substituted for the next candidate CI.",
+    "No raw mixed job log, runtime credential, private account or signed URL is published.",
+    "No rerun, cancellation or ref mutation was performed by this reviewer."
+  ]
+}

@@ -1,0 +1,487 @@
+{
+  "version": 1,
+  "kind": "issue1512_batch850_native_evidence",
+  "repository": "alexj11324/Mikka",
+  "runId": 42405040257,
+  "attempt": 1,
+  "head": "8506229488914d3d02815d098e7c6dd73d75ef23",
+  "source": "f23dcd19fcd890578f5907d536f405146bb0e320",
+  "tree": "dd63c992297ee01a495049e3d11eea079b670ce1",
+  "parents": [
+    "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "8506229488914d3d02815d098e7c6dd73d75ef23"
+  ],
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "status": "actual_budgets_failed",
+  "workflowConclusion": "success",
+  "jobsPassed": 4,
+  "actualNativeStep": {
+    "startedAt": "2026-11-07T19:26:11Z",
+    "completedAt": "2026-11-07T19:35:05Z",
+    "conclusion": "success"
+  },
+  "subsequentBatchMerge": {
+    "sha": "4672c4188c8468d9be5109181d2397c4d0910099",
+    "at": "2026-11-07T19:37:51Z",
+    "doesNotChangeObservedBudgets": true
+  },
+  "budgets": {
+    "loginNativeVsWeb": {
+      "first": 211,
+      "second": 210,
+      "difference": 1,
+      "firstNotAboveSecond": false
+    },
+    "startupBundledVsHosted": {
+      "first": 177,
+      "second": 118,
+      "difference": 59,
+      "firstNotAboveSecond": false
+    }
+  },
+  "phases": {
+    "nativeLogin": {
+      "status": "complete",
+      "queryCalls": 211,
+      "unknownReadings": 0,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 13,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 179,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "webLogin": {
+      "status": "complete",
+      "queryCalls": 210,
+      "unknownReadings": 0,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 191,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "startup-bundled": {
+      "status": "complete",
+      "queryCalls": 177,
+      "unknownReadings": 0,
+      "pair": 1,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 177,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "startup-hosted": {
+      "status": "complete",
+      "queryCalls": 118,
+      "unknownReadings": 0,
+      "pair": 1,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 118,
+          "unknownReadings": 0
+        }
+      ]
+    }
+  },
+  "counterIntegrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 26987,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true
+  },
+  "partitions": {
+    "operations": 17,
+    "unattributedSources": 75,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "allConserve": true
+  },
+  "rpcTotals": {
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 8,
+        "completedInWindow": 8,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 7,
+        "completedInWindow": 7,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 13,
+        "completedInWindow": 10,
+        "crossesStart": 0,
+        "crossesEnd": 3,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 20,
+        "completedInWindow": 20,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 18,
+        "completedInWindow": 18,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 13,
+        "completedInWindow": 10,
+        "crossesStart": 0,
+        "crossesEnd": 3,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    }
+  },
+  "crossingBoundary": {
+    "bundledStartupCrossesEnd": 0,
+    "hostedStartupCrossesEnd": 3,
+    "unknownActions": 0,
+    "unpairedCompletions": 0,
+    "countsNotConvertedToSql": true,
+    "windowTotalsNotAdjusted": true
+  },
+  "extraStartupLogicalOccurrences": [
+    {
+      "action": "bots.pollBots",
+      "first": {
+        "started": 2,
+        "completed": 2,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 1,
+        "completed": 1,
+        "crossesEnd": 0
+      },
+      "startedDifference": 1
+    },
+    {
+      "action": "coordinator.pollBotChatSummaries",
+      "first": {
+        "started": 2,
+        "completed": 2,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 1,
+        "completed": 1,
+        "crossesEnd": 0
+      },
+      "startedDifference": 1
+    },
+    {
+      "action": "coordinator.syncCoordinatorChat",
+      "first": {
+        "started": 2,
+        "completed": 2,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 1,
+        "completed": 0,
+        "crossesEnd": 1
+      },
+      "startedDifference": 1
+    },
+    {
+      "action": "issues.syncIssueList",
+      "first": {
+        "started": 2,
+        "completed": 2,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 1,
+        "completed": 1,
+        "crossesEnd": 0
+      },
+      "startedDifference": 1
+    },
+    {
+      "action": "task-runs.syncThreadList",
+      "first": {
+        "started": 2,
+        "completed": 2,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 1,
+        "completed": 1,
+        "crossesEnd": 0
+      },
+      "startedDifference": 1
+    }
+  ],
+  "functional": {
+    "lifecycleChecks": 8,
+    "parityChecks": 100,
+    "smokeChecks": 10,
+    "cryptoProcesses": 3,
+    "recordedChecksPassed": true
+  },
+  "cleanup": {
+    "recordedStagesPassed": true,
+    "nativeCleaned": true,
+    "lifecycleAndSmokeLease": "released",
+    "lifecycleAndSmokeOwnerPeerAfterBaseline": true,
+    "parityAccountObservation": "unknown",
+    "absentAggregateCleanup": "unknown"
+  },
+  "rawOriginals": 6,
+  "originalBytesPreservedBeforeAndAfterReaders": true,
+  "zipDigestsVerified": 3,
+  "compiledManifestIdentityVerified": true,
+  "privacyFindings": 0,
+  "rawLogsSaved": false,
+  "imagesSaved": false,
+  "signedUrlsPersisted": false,
+  "observerSandbox": {
+    "id": "sbx_93unfWJUU2De5cE2Lq5xZIgWd2Xe",
+    "status": "stopped",
+    "explicitStop": true,
+    "readbackVerified": true,
+    "durationMs": 154629
+  },
+  "readers": {
+    "desktop-native-summary.mjs": {
+      "gitBlob": "dad196c96077ab1504fd8858343d31b00cf0da3a",
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b"
+    },
+    "desktop-query-operations-summary.mjs": {
+      "gitBlob": "17a54954b618fc3373715dbc73fa86669c2aa739",
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2"
+    },
+    "desktop-1bd4-unattributed-sources-summary.mjs": {
+      "gitBlob": "28f3a63f0b9c4604b79f935dd82420f9994a9e4a",
+      "sha256": "0d10210d5403a8e1efa6539a382872025d773fdbf949a1b6e4965dca952ab4f4"
+    },
+    "desktop-1bd4-query-sources.cjs": {
+      "gitBlob": "d470c1d71454dff12f60cf7e0dd373624bd8b314",
+      "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb"
+    }
+  },
+  "readerExitCodes": [
+    0,
+    0,
+    0
+  ],
+  "payloadCount": 20,
+  "payloadBytes": 598976,
+  "files": [
+    {
+      "path": "evidence/desktop-850622/lifecycle.json",
+      "bytes": 267882,
+      "sha256": "ed715982f83aade1c94e03452a6131c70031f565bbee7a244c37d1e2e81daf52",
+      "gitBlob": "b9d601b5ddae49bfe34fd8df090297e1974fd5e9",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/parity/parity.json",
+      "bytes": 106875,
+      "sha256": "90a1bed8c8a75f5ce4bd7e75504a2ba6054e166353579e1234145e4ecffd0c55",
+      "gitBlob": "8540ce529bcebcbf22b17dfe67aaf1d5bd7edf20",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/smoke.json",
+      "bytes": 3105,
+      "sha256": "5118f4b24921a6db2a5fa1c2a4f94a1f3c1c6d4ccd72eecba3f578065ae59927",
+      "gitBlob": "27e6d0cacad6fce9729e200bd0d68577e68e09d4",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "b748da3ac962ef0e8fb233cacc63b903943377c4b88364fda10556a2b7ceabb7",
+      "gitBlob": "7d9e52494e4ee6241f129af42217105128f1b16d",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "d44379dd46a1a3640e69803d44044b0eec467f1d77df630ddbcbbc4afa23717c",
+      "gitBlob": "2f20ae5c5e86bb40a8efa76e70281dc9fcc6e852",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "0eb05c4015048b3585f5c0b74dc98cc8d6502db1d207f20df770d5d7f46bd267",
+      "gitBlob": "54f56e07809f5d3d44469969e829670fa1b65c69",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/download-validation.json",
+      "bytes": 3826,
+      "sha256": "128fe42010af3542efab025315dff9387619156a54187f1f9d4a83c804140c64",
+      "gitBlob": "73d5a875ed9c41550b9c6ee7d95bcde220e21282",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/privacy.json",
+      "bytes": 1516,
+      "sha256": "41c6176811fc85c2be6b176c9d956496c5b69e37e82b39497e8c51f257b1e582",
+      "gitBlob": "3d4e78395cbd5fb7e54796cbc89511622ffabf34",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/summary.json",
+      "bytes": 100638,
+      "sha256": "41175c5d7fea75661f2068be675390931fd79683404ca6b5f800418b89ee312d",
+      "gitBlob": "c267344ac350362d5ad4ee3d4dce4459e32527ef",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/query-operations.json",
+      "bytes": 14780,
+      "sha256": "8f7b47e83c7a7446aac3c79c59232e4e17d54bdae2179c45a84a58e43b7e895d",
+      "gitBlob": "547ad162c081a85057d6f322a7da0df0737ca49b",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/unattributed-sources.json",
+      "bytes": 13473,
+      "sha256": "36ec7e7fe5eb5038812dd88f6935b629a3c8fb50f87353ee1412dffa684c933f",
+      "gitBlob": "23c3bd0be2c8d0b3d9c99885e3977165515ef81b",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/summary.stdout.json",
+      "bytes": 589,
+      "sha256": "bedfd5767e1bb20b94147ff3b6d002503ec3db5f0e869cd322d7a9ff33824dc4",
+      "gitBlob": "99a41bb2f44e079faa8ea4f7799e9933654effa7",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/query-operations.stdout.json",
+      "bytes": 401,
+      "sha256": "3affd6985cef19ea405d8bef247c710e5b0bc77da2a46dda133d9fcb4237ffea",
+      "gitBlob": "ee8e8cc8a0fd6ba6eb29967ae5e62bba11ffc6f9",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/unattributed-sources.stdout.json",
+      "bytes": 423,
+      "sha256": "61dc09450eebefb638741d5a3573bc415143b6e0d860f27faa3f68ddf2783f9e",
+      "gitBlob": "b5a6ff69f8d7ab32a4481efaf1f5ec4f45c936eb",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/closed-diagnostic.json",
+      "bytes": 10129,
+      "sha256": "0b3c5b95c08f6fa04dc39cdb8aeda258e3f6194cae971a231ae6539a5cc8f3f1",
+      "gitBlob": "f0fab43ddab0967c6181f03128fdbc8fdf56b592",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/source-binding.json",
+      "bytes": 4838,
+      "sha256": "c15e283cb947b747a87249ea26ca04e8cafd644f983b0426546ac83b346d9808",
+      "gitBlob": "7c8e3bc1afb1a0d5a094a05ceba968e3a24a2e2f",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/ci-final.json",
+      "bytes": 22698,
+      "sha256": "dd1b044d2b4c2451b94ed2599e88bf56035ba0c95865ff0891b3effbbc6b7966",
+      "gitBlob": "127e0bdc36473a8b04e8342678291d106c851d41",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/integration-difference.json",
+      "bytes": 31463,
+      "sha256": "1993f38a93bee3f4eceaf98d51567d168f03a8a011e4df44188c1771f3038fd5",
+      "gitBlob": "10a639483752b85c4271ef7bdf89cceb3dc77ccf",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/observer-cleanup.json",
+      "bytes": 1346,
+      "sha256": "d32b212ce60b1bfa38833ae35dcc05a83e5535349c47bdba43f1098399ea6178",
+      "gitBlob": "d45f0ae9571e39a07e46b7a6d98566147ff31516",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-850622/original-post-reader-identity.json",
+      "bytes": 2738,
+      "sha256": "5b6f46462b9a76c4879a59a2cefc4b8341b9c765ef409e5b03b537579276bc06",
+      "gitBlob": "fc7831234432aacaf2c600bf69cc65186fb07258",
+      "exactRemoteReadback": true
+    }
+  ],
+  "productionAcceptance": null,
+  "doesNotApplyToPr1665": true,
+  "createdAsUnreferencedBlobsOnly": true,
+  "gitRefsModified": false
+}

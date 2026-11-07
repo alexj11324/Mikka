@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "runner-browser-workflow-source-verification",
+  "status": "source_verified_not_production_validated",
+  "base": {
+    "sha": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+    "tree": "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d",
+    "parents": [
+      "0cc83be3b86cd19b2e5487fb2f4c778ffb0cb51e"
+    ]
+  },
+  "files": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "original": {
+        "bytes": 8496,
+        "sha256": "24fc57680a4e92b4f97ab56393b8b1687dc5f691eca361ef7738defb45bf152e",
+        "gitBlob": "67424002a30a507fac9b3861e3cbe721c37a72d2"
+      },
+      "final": {
+        "bytes": 9483,
+        "sha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4",
+        "gitBlob": "f83fe9042319ae5d3db6fc98a584fa46e51c83c5",
+        "readbackVerified": true
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "original": {
+        "bytes": 9293,
+        "sha256": "895bdc5f72d4abacb7dac3a5a7dc10e5b54704a676dbd1e795db46cc251268c0",
+        "gitBlob": "7b1f7ce280dae69466356e34cb1ae23eaeaa0337"
+      },
+      "final": {
+        "bytes": 11693,
+        "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+        "gitBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "readbackVerified": true
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+      "original": {
+        "bytes": 9277,
+        "sha256": "7b3557a4533c1ad9621cf2728f36eb7a79fdada3ca12a0bb8d179048b6f71156",
+        "gitBlob": "637da6d91c652cb99035a3ce69a666f7e93e803e"
+      },
+      "final": {
+        "bytes": 16308,
+        "sha256": "68262ea98e61e7a6b02fc004f5e7ab3a3aa21c3aa405f7b3f81369cde2536e9a",
+        "gitBlob": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "readbackVerified": true
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "original": {
+        "bytes": 14346,
+        "sha256": "820302076bdc2e457fa06cc2ffc061045b58da5b66424d6eda65dff99f8a881b",
+        "gitBlob": "31397debbfb337036cece723b5d8d0999e69d1d0"
+      },
+      "final": {
+        "bytes": 17815,
+        "sha256": "e650d7b617ff7bbb11c064d9ce7a7971f6926b5a8c1adea4028f8d9cc8ffd6f7",
+        "gitBlob": "7ac65eb8c2bbd545f4d133016f2af8454b67929c",
+        "readbackVerified": true
+      }
+    },
+    {
+      "path": "package.json",
+      "original": {
+        "bytes": 77381,
+        "sha256": "91c04950f058356764b835dd15593891c6e89f65852c6431a0bb3eceb0df4df5",
+        "gitBlob": "91180d10ca9646d7c75b3786eaaebccfbdd29343"
+      },
+      "final": {
+        "bytes": 77435,
+        "sha256": "a22483a1575eb6a0e47e7c596e8546b5a5f9a1467f0236b39b9233ed29a67b98",
+        "gitBlob": "f9e2026a028654c5774c3764e6081f93b4c8ebf2",
+        "readbackVerified": true
+      }
+    }
+  ],
+  "scope": {
+    "workflowInputsAdded": 0,
+    "driverSourceChanged": false,
+    "actorSourceOwnedBy": "daemon_impl",
+    "helperOnlyFlag": "--runner-browser",
+    "driverReceivesRunnerFlag": false,
+    "requiredRunnerContext": [
+      "GITHUB_ACTIONS=true",
+      "GITHUB_EVENT_NAME=workflow_dispatch",
+      "GITHUB_REPOSITORY=alexj11324/Mikka",
+      "GITHUB_REF=refs/heads/main",
+      "GITHUB_SHA=MIKKA_EXPECTED_DEPLOYMENT_SHA"
+    ],
+    "existingMainOidcDeploymentGuardsPreserved": true,
+    "manualCliPreserved": true,
+    "oneValidatedReady": true,
+    "startFailureRequestsDriverCleanup": true,
+    "stdoutDrainedDuringActorStart": true,
+    "actorCloseAwaitedBeforeExitDecision": true,
+    "cleanupFailureTurnsZeroToFailure": true,
+    "existingNonzeroExitPreserved": true,
+    "browserDependenciesBeforeAccountCredentials": true,
+    "playwrightLockVersion": "1.64.1",
+    "pnpmVersion": "10.34.3",
+    "artifactPaths": [
+      "production-run-observability-report/report.json",
+      "production-run-observability-report/browser-actor.receipt.json"
+    ]
+  },
+  "packageChange": {
+    "path": "package.json",
+    "original": {
+      "bytes": 77381,
+      "sha256": "91c04950f058356764b835dd15593891c6e89f65852c6431a0bb3eceb0df4df5",
+      "gitBlobSha1": "91180d10ca9646d7c75b3786eaaebccfbdd29343"
+    },
+    "updated": {
+      "bytes": 77435,
+      "sha256": "a22483a1575eb6a0e47e7c596e8546b5a5f9a1467f0236b39b9233ed29a67b98",
+      "gitBlobSha1": "f9e2026a028654c5774c3764e6081f93b4c8ebf2"
+    },
+    "onlyChange": {
+      "script": "test:dev-local",
+      "insertedFile": "scripts/acceptance/run-observability-browser.test.mjs",
+      "afterFile": "scripts/acceptance/run-observability-workflow.test.mjs"
+    },
+    "reverseEditMatchesBase": true
+  },
+  "verification": {
+    "node": "v24.22.1",
+    "runner": "one shared 1 CPU / 2 GiB deny-all Sandbox",
+    "red": {
+      "command": "node --test --test-name-pattern=^runner\\ gets\\ only\\ validated\\ readiness scripts/acceptance/run-observability-workflow.test.mjs",
+      "originalHelper": true,
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "skipped": 0,
+      "exitCode": 1,
+      "closedError": "configuration_required"
+    },
+    "green": {
+      "command": "node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs",
+      "driverTests": 26,
+      "helperTests": 13,
+      "tests": 39,
+      "pass": 39,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "syntax": {
+      "nodeCheckFiles": 2,
+      "exitCode": 0,
+      "workflowBashBlocks": 4,
+      "bashExitCode": 0,
+      "yamlParserExecuted": false
+    },
+    "originalStdoutByteVerified": true,
+    "browserLaunched": false,
+    "productionModelCalls": false,
+    "productionDatabaseCalls": false,
+    "acceptanceEvidence": false,
+    "actorModuleTests": "separately owned and pending daemon report"
+  },
+  "evidence": [
+    {
+      "path": "runner-browser-workflow/helper-red.log",
+      "bytes": 1373,
+      "sha256": "d4ae6ff5a4b5b701afc6675c14117c2c182a635eb862a7d4de530289f07b878a",
+      "gitBlob": "15bb325699c4114bbf4b5d7b1671ddd4ff97df20",
+      "readbackVerified": true
+    },
+    {
+      "path": "runner-browser-workflow/helper-driver-green.log",
+      "bytes": 4449,
+      "sha256": "e0009f59fcabe949772c604d52e696f5e05c8b378f6864451c1604350bac608a",
+      "gitBlob": "737b37a6a631a48b6cc40672b1710c30fe1e55a1",
+      "readbackVerified": true
+    },
+    {
+      "path": "runner-browser-workflow/receipt.json",
+      "bytes": 3545,
+      "sha256": "a4e2072ab03584b55ac4f7cd8c245071e83ec418918bfaac3fa18eebcd17aead",
+      "gitBlob": "87e8e841036b4f2a6c02fdd4457ba519622fe703",
+      "readbackVerified": true
+    }
+  ],
+  "boundaries": [
+    "No real browser login or task was executed in this validation.",
+    "Source guards and fake transport tests do not prove deployment, model availability, PostHog ingestion or Replay.",
+    "The actor's own lifecycle tests and real main-only acceptance remain separate gates.",
+    "Shared Sandbox stop is owned by daemon_impl; this agent's commands are complete."
+  ],
+  "privacy": {
+    "runtimeInputs": "only fixed test canaries",
+    "rawProductionLogs": false,
+    "cookies": false,
+    "signedUrls": false,
+    "actualAccountCredentials": false
+  },
+  "publication": {
+    "mode": "unreferenced_git_blobs_only",
+    "remoteRefsChanged": false,
+    "sourceWorkingTreeChanged": false
+  }
+}

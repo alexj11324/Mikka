@@ -1,0 +1,566 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "runner-browser-actor-offline-source-validation",
+  "createdAt": "2026-11-07T19:36:26.705Z",
+  "repository": "alexj11324/Mikka",
+  "base": {
+    "commit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+    "tree": "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d"
+  },
+  "mutations": {
+    "unreferencedBlobsOnly": true,
+    "commitsCreated": 0,
+    "refsChanged": 0,
+    "productionSourceDeployed": false
+  },
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "bytes": 22407,
+      "sha256": "bfee425d6409815942c7acbc4df91cf9b21a4cf4d61892f91d8c2ca11707a54a",
+      "gitBlob": "9dfb48921351483e25cba98c539332a93569ace6"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "bytes": 21446,
+      "sha256": "0f2350cc5b77e8cd4d00ae46ce0e2dc607fb0718ed5457c7d0f3d400e894f34f",
+      "gitBlob": "53510145147173e0063c174fe93098667654ee82"
+    }
+  ],
+  "dependencies": {
+    "baseCommitFiles": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 56471,
+        "sha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398",
+        "gitBlob": "1eedff30eee7021fa6503c760253fe499664c7d0"
+      },
+      {
+        "path": "scripts/acceptance/response-cookie-jar.mjs",
+        "bytes": 2277,
+        "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178",
+        "gitBlob": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+        "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+        "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a"
+      },
+      {
+        "path": "messages/en.json",
+        "bytes": 242738,
+        "sha256": "caf861daca2c9c6931215284bced65eeba0e5bb4eb942e8502ec4b80fb3091a5",
+        "gitBlob": "342938b09a019dcca8c80b2e9019eaefe176371f"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "bytes": 233758,
+        "sha256": "ceaf201fc46a57062ac6bc61190fea2f22b555bba7b5472af4559c002bc0bf84",
+        "gitBlob": "2edc1ba94678de93517e04200c4b2800ebdfee09"
+      }
+    ],
+    "workflowHelper": {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+      "gitBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7"
+    },
+    "helperWorkspacePackage": {
+      "path": "package.json",
+      "gitBlob": "f9e2026a028654c5774c3764e6081f93b4c8ebf2",
+      "bytes": 77435,
+      "sha256": "a22483a1575eb6a0e47e7c596e8546b5a5f9a1467f0236b39b9233ed29a67b98",
+      "source": "Helper implementation owner confirmed exact package uploaded to shared offline workspace; existing product package with actor test command appended"
+    },
+    "executedManifestSourceBytesCompared": true,
+    "manifestCoverage": [
+      "six base commit import files",
+      "final actor source",
+      "final actor tests",
+      "final workflow helper source"
+    ]
+  },
+  "scope": {
+    "implementationFiles": 2,
+    "realChromiumLaunched": false,
+    "realBrowserUITested": false,
+    "actualProductionRequests": 0,
+    "actualModelCalls": 0,
+    "databaseConnections": 0,
+    "validation": "Node v24.22.1 with dependency-injected Chromium, child process, API replies and report sink",
+    "nodeImageLabel": "node22",
+    "actualNodeVersion": "v24.22.1",
+    "sourceOnly": true,
+    "productionAcceptance": "not_performed",
+    "overallAcceptance": null,
+    "playwrightImportedInOfflineValidation": false,
+    "dependenciesInstalledForValidation": false
+  },
+  "contract": {
+    "entrypoint": "startObservabilityBrowser({ready,env,signal})",
+    "reportPath": "production-run-observability-report/browser-actor.receipt.json",
+    "readiness": "Deep equality to existing CASES/fixtureTask plus source, UUIDs and bounded expiry",
+    "sourceFence": [
+      "GITHUB_ACTIONS=true",
+      "GITHUB_EVENT_NAME=workflow_dispatch",
+      "GITHUB_REPOSITORY=alexj11324/Mikka",
+      "GITHUB_REF=refs/heads/main",
+      "GITHUB_SHA=MIKKA_EXPECTED_DEPLOYMENT_SHA",
+      "official /api/version exact build before login and before submit"
+    ],
+    "identity": "Fresh browser context; ordinary UI email sign-in; session owner readback; unique owner workspace display name retained only in memory; UI switch and exact workspace readback",
+    "backendEvidence": "Fresh context plus actual page fetch/XHR success at an official business endpoint; reject any observed fixed business-path request to a foreign origin; version alone is insufficient",
+    "submit": "Existing Search everything quick action -> New task -> Coordinator -> Mikka Cloud -> exact fixture marker Agent profile -> Task description -> Create task once",
+    "allowedDirectReads": [
+      "/api/version",
+      "/api/auth/get-session",
+      "/api/workspace",
+      "/api/workspace/switcher"
+    ],
+    "allowedDirectMutation": "POST own-session /api/auth/sign-out only",
+    "duplicatePrevention": "submitClicks is set to 1 before click; ambiguous click outcome stays unknown; never retry business submission",
+    "browserKeptAlive": "After one UI submission, return close handle while existing driver observes and cleans its fixture",
+    "cleanup": "Independent bounded 30-second cleanup: cancel page actions first, keep context API cookie jar for normal sign-out and anonymous readback, then close context/browser; process stop fallback if page cannot close; late allocations are disposed and never falsely marked settled",
+    "privacy": "No account, response body, DOM, raw error, screenshot, trace, video, HAR, cookie, token, arbitrary URL or tool input in actor report; launcher passes only OS prerequisites",
+    "errorCauseBoundary": "Closed actor errors deliberately do not retain Playwright/write errors whose free-form cause can contain typed account fields",
+    "configurationDoesNotChange": [
+      "PKCE",
+      "profile authority",
+      "Factory driver terminal checks",
+      "cleanup ownership",
+      "production gate",
+      "Replay SDK configuration"
+    ]
+  },
+  "validation": {
+    "reviewRegressionRed": {
+      "command": "node --test --test-reporter=tap --test-name-pattern=workspace switch waits|abort cancels a pending scripts/acceptance/run-observability-browser.test.mjs",
+      "actorDraft": {
+        "gitBlob": "9707fb78020e8ad7824fc3149077a18290db65ec",
+        "bytes": 20728,
+        "sha256": "686bef7d73a7c19607ff2f1f241fbbd1701e95c2d45790929fb0126ac61cb188"
+      },
+      "testsDraft": {
+        "gitBlob": "cacbf71d103c5626e1c7ff446bd1407797592e0d",
+        "bytes": 18388,
+        "sha256": "bd6a1829455cb86661e428866a7f5a75d92e720edf9ee88cadd333187fc93550"
+      },
+      "exitCode": 1,
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "skipped": 0,
+      "failures": [
+        "workspace switch waits for the new HOME document, not the old HOME URL or hidden menu",
+        "abort cancels a pending actionable click before any logout await"
+      ],
+      "attribution": "The actor is a new file; red used its earlier reviewed draft, not a pre-existing 0d379 product implementation"
+    },
+    "intermediateGreen": {
+      "exitCode": 0,
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0
+    },
+    "addedPageCloseFailureGuard": {
+      "exitCode": 0,
+      "tests": 29,
+      "pass": 29,
+      "fail": 0,
+      "skipped": 0
+    },
+    "final": {
+      "command": "node --test --test-reporter=tap scripts/acceptance/run-observability-browser.test.mjs",
+      "exitCode": 0,
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "skipped": 0,
+      "actualHelperImport": true,
+      "actualActorImport": true,
+      "helperSourceGitBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "integrationAssertions": [
+        "runner flag excluded from child argv",
+        "progress token excluded from actor env",
+        "single UI submit attempt",
+        "driver completion aborts business signal",
+        "helper awaits normal sign-out",
+        "anonymous session readback",
+        "page/context/browser closed"
+      ]
+    },
+    "syntax": {
+      "productExitCode": 0,
+      "testExitCode": 0,
+      "finalThirtyTestSyntaxExitCode": 0,
+      "stdoutBytes": 0,
+      "stderrBytes": 0
+    },
+    "notRun": [
+      "repository-wide tests",
+      "canonical typecheck",
+      "lint",
+      "real Chromium",
+      "production browser acceptance",
+      "model execution"
+    ],
+    "commandCompletion": [
+      {
+        "label": "red-and-green",
+        "outerExitCode": 0,
+        "durationMs": 701,
+        "startedAt": 1794079675866
+      },
+      {
+        "label": "final-29",
+        "outerExitCode": 0,
+        "durationMs": 475,
+        "startedAt": 1794079713048
+      },
+      {
+        "label": "final-30-combined",
+        "outerExitCode": 0,
+        "durationMs": 517,
+        "startedAt": 1794079866808
+      },
+      {
+        "label": "syntax",
+        "outerExitCode": 0,
+        "durationMs": 118,
+        "startedAt": 1794079778930
+      }
+    ]
+  },
+  "reviewFindingsClosed": [
+    {
+      "finding": "Old page already HOME can satisfy waitForURL before workspace switch completes",
+      "resolution": "Establish actual next navigation before menu click, await DCL response and then exact workspace readback",
+      "redGreen": true
+    },
+    {
+      "finding": "Pending actionability click could dispatch during asynchronous logout after business abort",
+      "resolution": "Page closes before authentication awaits; page close failure stops owning browser before another asynchronous cleanup step",
+      "redGreen": true
+    },
+    {
+      "finding": "Driver helper with fake starter alone did not demonstrate the real actor integration",
+      "resolution": "Final test invokes real helper and real actor with only Chromium/child transport substituted",
+      "redGreen": null
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "red.tap",
+      "bytes": 1978,
+      "sha256": "126490f5dd8e1fe4daaa65e07cc4d8c74fa1208be63dc7afff39a33262d1a748",
+      "gitBlob": "de622e8271d2b1358b14c0cb3d1a57a1aec6f527"
+    },
+    {
+      "path": "red.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "green.tap",
+      "bytes": 5904,
+      "sha256": "401e967e127f5925be08ca38c45bb4448bec3265ad6585c6cc017baca4cd0c87",
+      "gitBlob": "ffe8cb934632e1df4ad6315fdb4c2a694c7c9193"
+    },
+    {
+      "path": "green.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "final-green.tap",
+      "bytes": 6173,
+      "sha256": "37bed809701d4ac9b273e951d2cd19fc485c8f3ecbeb1c0a0fff8b4c73d731ab",
+      "gitBlob": "4d008a31173466eedcb4632ff0595714327faad6"
+    },
+    {
+      "path": "final-green.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "test-results.json",
+      "bytes": 679,
+      "sha256": "0625f109782cd3bf7d1dfe234b7e8d919b1943bc63927f8c733c683a5db32c68",
+      "gitBlob": "869b4cc6000a8a87764e2608fd51bbe7bcb7dd1b"
+    },
+    {
+      "path": "final-results.json",
+      "bytes": 168,
+      "sha256": "43332fc8cc23dd234d76d242bbc01e3df72110ac0ea81a1b89d73164b4ab4c0f",
+      "gitBlob": "1983aaa8d851f8c8c0d946bc8eecd5cad3b74e03"
+    },
+    {
+      "path": "syntax-results.json",
+      "bytes": 278,
+      "sha256": "b03701ad7bc8834db929ff2cb25e0acc5f12475d09f40dd67caa8592ca5c2985",
+      "gitBlob": "1e47499ee7d7e7fd926847a1e6141dc16adf8eaf"
+    },
+    {
+      "path": "review-fixes.patch",
+      "bytes": 8550,
+      "sha256": "94535372fe460dfb2b2ac4ce58b7ead9b78f76b6308323309190152b0561afc0",
+      "gitBlob": "80f866ea565b024b5f783e49e64bfaf9b76a5225"
+    },
+    {
+      "path": "final-combined.tap",
+      "bytes": 6436,
+      "sha256": "2b6625a4b55ebe602a49a9e66d5cf7b1dde00ad75483d0660e5f73b6f6eed77f",
+      "gitBlob": "1c24f61eaab1aa9311441b09c6804080775af55a"
+    },
+    {
+      "path": "final-combined.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "final-combined-results.json",
+      "bytes": 168,
+      "sha256": "f945902e0695f460ca1658862fc50bdeef8cea426e7980e5dcbc871b3c955def",
+      "gitBlob": "3c9e39c7d99accdfdfdd6fee7df7ac8c9710a114"
+    }
+  ],
+  "remoteVerification": {
+    "sources": [
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "blob": "9dfb48921351483e25cba98c539332a93569ace6",
+        "exact": true,
+        "bytes": 22407
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "blob": "53510145147173e0063c174fe93098667654ee82",
+        "exact": true,
+        "bytes": 21446
+      }
+    ],
+    "outputs": [
+      {
+        "path": "red.tap",
+        "blob": "de622e8271d2b1358b14c0cb3d1a57a1aec6f527",
+        "exact": true
+      },
+      {
+        "path": "final-combined.stderr",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "exact": true
+      },
+      {
+        "path": "green.tap",
+        "blob": "ffe8cb934632e1df4ad6315fdb4c2a694c7c9193",
+        "exact": true
+      },
+      {
+        "path": "final-green.tap",
+        "blob": "4d008a31173466eedcb4632ff0595714327faad6",
+        "exact": true
+      },
+      {
+        "path": "test-results.json",
+        "blob": "869b4cc6000a8a87764e2608fd51bbe7bcb7dd1b",
+        "exact": true
+      },
+      {
+        "path": "final-results.json",
+        "blob": "1983aaa8d851f8c8c0d946bc8eecd5cad3b74e03",
+        "exact": true
+      },
+      {
+        "path": "syntax-results.json",
+        "blob": "1e47499ee7d7e7fd926847a1e6141dc16adf8eaf",
+        "exact": true
+      },
+      {
+        "path": "review-fixes.patch",
+        "blob": "80f866ea565b024b5f783e49e64bfaf9b76a5225",
+        "exact": true
+      },
+      {
+        "path": "final-combined.tap",
+        "blob": "1c24f61eaab1aa9311441b09c6804080775af55a",
+        "exact": true
+      },
+      {
+        "path": "final-combined-results.json",
+        "blob": "3c9e39c7d99accdfdfdd6fee7df7ac8c9710a114",
+        "exact": true
+      }
+    ],
+    "method": "UTF-8 string equality plus bytes/SHA256/Git blob compared with values computed inside the executed Sandbox",
+    "complete": true
+  },
+  "privacy": {
+    "scan": [
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [
+          {
+            "domain": "example.invalid"
+          }
+        ],
+        "canaryLabels": 14
+      },
+      {
+        "path": "red.tap",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "red.stderr",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "green.tap",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "green.stderr",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "final-green.tap",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "final-green.stderr",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "test-results.json",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "final-results.json",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "syntax-results.json",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "review-fixes.patch",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "final-combined.tap",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "final-combined.stderr",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      },
+      {
+        "path": "final-combined-results.json",
+        "privateKey": false,
+        "signedURL": false,
+        "tokenLiteral": false,
+        "emailLiterals": [],
+        "canaryLabels": 0
+      }
+    ],
+    "exceptions": [
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "kind": "explicit offline synthetic fixtures",
+        "emailDomain": "example.invalid",
+        "canaryLabelsOnly": true,
+        "realCredentials": false
+      }
+    ],
+    "originalOutputsPreserved": true,
+    "rawProductionLogsIncluded": false,
+    "signedDownloadURLsIncluded": false
+  },
+  "resource": {
+    "sandboxId": "sbx_bAqYUq99G9ksk3LUG6yxQhbGdJDR",
+    "networkPolicy": "deny-all",
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "persistent": false,
+    "timeoutMs": 600000,
+    "startedAt": "2026-11-07T19:26:32.158Z",
+    "stoppedAt": "2026-11-07T19:31:34.559Z",
+    "durationMs": 302401,
+    "activeCpuDurationMs": 9029,
+    "stopRequested": true,
+    "stopReturned": "stopped",
+    "independentReadback": "stopped",
+    "activeOwnedResources": 0
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "kind": "pr1665_superseded_desktop_pre_native_terminal",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1665,
+  "head": "58089592b806caba919fd0f5184ea3f8499419fa",
+  "runId": 42407115221,
+  "attempt": 1,
+  "status": "completed",
+  "conclusion": "cancelled",
+  "updatedAt": "2026-11-07T19:48:10Z",
+  "actualChecksSource": {
+    "jobId": 128507083649,
+    "checkout": "c3b6b1525a36f5567a38d1720f03b588988c4036",
+    "tree": "d318ecd149d2679955ec88a1389aeeeb0e3aab3b",
+    "parents": [
+      "8506229488914d3d02815d098e7c6dd73d75ef23",
+      "58089592b806caba919fd0f5184ea3f8499419fa"
+    ],
+    "method": "actual_checks_git_log_minus_1_and_immutable_git_object",
+    "rawLogPersisted": false
+  },
+  "nativeJobCheckoutObserved": false,
+  "jobs": [
+    {
+      "id": 128507083649,
+      "name": "checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:38:45Z",
+      "completedAt": "2026-11-07T19:40:32Z"
+    },
+    {
+      "id": 128507083794,
+      "name": "icon",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:37:38Z",
+      "completedAt": "2026-11-07T19:38:10Z"
+    },
+    {
+      "id": 128507083894,
+      "name": "smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:38:49Z",
+      "completedAt": "2026-11-07T19:43:31Z"
+    },
+    {
+      "id": 128508550011,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "startedAt": "2026-11-07T19:43:45Z",
+      "completedAt": "2026-11-07T19:48:09Z"
+    }
+  ],
+  "nativeJob": {
+    "id": 128508550011,
+    "conclusion": "cancelled",
+    "startedAt": "2026-11-07T19:43:45Z",
+    "completedAt": "2026-11-07T19:48:09Z",
+    "selectedSteps": [
+      {
+        "number": 12,
+        "name": "Build the production API for the native ARM64 runtime",
+        "conclusion": "cancelled",
+        "startedAt": "2026-11-07T19:46:38Z",
+        "completedAt": "2026-11-07T19:47:56Z"
+      },
+      {
+        "number": 14,
+        "name": "Package an inspector-enabled harness input",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:47:56Z",
+        "completedAt": "2026-11-07T19:47:56Z"
+      },
+      {
+        "number": 15,
+        "name": "Real Keychain encryption across three independent packaged processes",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:47:56Z",
+        "completedAt": "2026-11-07T19:47:56Z"
+      },
+      {
+        "number": 16,
+        "name": "Real packaged Apple Silicon native acceptance",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:47:56Z",
+        "completedAt": "2026-11-07T19:47:56Z"
+      },
+      {
+        "number": 20,
+        "name": "Audit native evidence",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:47:58Z",
+        "completedAt": "2026-11-07T19:47:58Z"
+      },
+      {
+        "number": 21,
+        "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T19:47:58Z",
+        "completedAt": "2026-11-07T19:47:58Z"
+      }
+    ]
+  },
+  "nativeActuallyEntered": false,
+  "nativeStepConclusion": "skipped",
+  "nativeCancelledMidExecution": false,
+  "existingArtifacts": [
+    {
+      "id": 13588380037,
+      "name": "desktop-icon",
+      "bytes": 1753549,
+      "digest": "sha256:0adcf4678c57252a69921ab2520d9becbc870361e6806359777a98f19b7b8a67",
+      "head": "58089592b806caba919fd0f5184ea3f8499419fa",
+      "expired": false
+    },
+    {
+      "id": 13587219177,
+      "name": "desktop-smoke-c3b6b1525a36f5567a38d1720f03b588988c4036",
+      "bytes": 101970,
+      "digest": "sha256:09595257afa2a74635bce921c9f363cf3a7e6a7f66ea300018ff9dbbeb968b8d",
+      "head": "58089592b806caba919fd0f5184ea3f8499419fa",
+      "expired": false
+    },
+    {
+      "id": 13587194023,
+      "name": "desktop-api-build-c3b6b1525a36f5567a38d1720f03b588988c4036",
+      "bytes": 48176869,
+      "digest": "sha256:96289f8260f9153bdf897517af0e299e58cc53a27621026a4951d5035a6fb73b",
+      "head": "58089592b806caba919fd0f5184ea3f8499419fa",
+      "expired": false
+    }
+  ],
+  "nativeOrPackageArtifactCount": 0,
+  "artifactDownloads": 0,
+  "recoverySandboxes": 0,
+  "observerRerunsOrCancellations": 0,
+  "cancellationActorAndMechanism": "not_independently_diagnosed",
+  "budgetCounts": null,
+  "performanceAcceptance": null,
+  "nativeAcceptance": null,
+  "productionAcceptance": null,
+  "nativeLeaseAndCleanupEvidence": "not_available_no_native_report",
+  "boundary": "Native step was skipped; do not reuse the earlier 0d interrupted-Native classification or infer successful native cleanup."
+}

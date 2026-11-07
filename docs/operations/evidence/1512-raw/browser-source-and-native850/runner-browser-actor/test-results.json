@@ -1,0 +1,33 @@
+{
+  "reports": [
+    {
+      "label": "red",
+      "exitCode": 1,
+      "counts": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "skipped": 0
+      },
+      "failedTests": [
+        "workspace switch waits for the new HOME document, not the old HOME URL or hidden menu",
+        "abort cancels a pending actionable click before any logout await"
+      ],
+      "stdoutBytes": 1978,
+      "stderrBytes": 0
+    },
+    {
+      "label": "green",
+      "exitCode": 0,
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "skipped": 0
+      },
+      "failedTests": [],
+      "stdoutBytes": 5904,
+      "stderrBytes": 0
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "scope": "six_original_json_files",
+  "files": [
+    {
+      "path": "lifecycle.json",
+      "bytes": 267882,
+      "sha256": "ed715982f83aade1c94e03452a6131c70031f565bbee7a244c37d1e2e81daf52",
+      "gitBlob": "b9d601b5ddae49bfe34fd8df090297e1974fd5e9"
+    },
+    {
+      "path": "parity/parity.json",
+      "bytes": 106875,
+      "sha256": "90a1bed8c8a75f5ce4bd7e75504a2ba6054e166353579e1234145e4ecffd0c55",
+      "gitBlob": "8540ce529bcebcbf22b17dfe67aaf1d5bd7edf20"
+    },
+    {
+      "path": "smoke.json",
+      "bytes": 3105,
+      "sha256": "5118f4b24921a6db2a5fa1c2a4f94a1f3c1c6d4ccd72eecba3f578065ae59927",
+      "gitBlob": "27e6d0cacad6fce9729e200bd0d68577e68e09d4"
+    },
+    {
+      "path": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "b748da3ac962ef0e8fb233cacc63b903943377c4b88364fda10556a2b7ceabb7",
+      "gitBlob": "7d9e52494e4ee6241f129af42217105128f1b16d"
+    },
+    {
+      "path": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "d44379dd46a1a3640e69803d44044b0eec467f1d77df630ddbcbbc4afa23717c",
+      "gitBlob": "2f20ae5c5e86bb40a8efa76e70281dc9fcc6e852"
+    },
+    {
+      "path": "compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "0eb05c4015048b3585f5c0b74dc98cc8d6502db1d207f20df770d5d7f46bd267",
+      "gitBlob": "54f56e07809f5d3d44469969e829670fa1b65c69"
+    }
+  ],
+  "findings": 0,
+  "email": 0,
+  "bearer": 0,
+  "privateKey": 0,
+  "signedQuery": 0,
+  "sensitiveStringFields": 0,
+  "scannedBeforePersistence": true
+}

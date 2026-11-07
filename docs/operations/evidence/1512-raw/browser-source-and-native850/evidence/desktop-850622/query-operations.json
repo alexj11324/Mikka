@@ -1,0 +1,511 @@
+{
+  "version": 1,
+  "kind": "desktop_query_operations_projection",
+  "source": {
+    "source": "f23dcd19fcd890578f5907d536f405146bb0e320",
+    "harnessRevision": "f23dcd19fcd890578f5907d536f405146bb0e320",
+    "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+    "identityMatched": true
+  },
+  "scope": "whole_primary_api_process",
+  "subtractPkceOrBackground": false,
+  "startupScope": "first_pair_only",
+  "expected": {
+    "windows": 4,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "operationKeys": 17
+  },
+  "integrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 26987,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true,
+    "cumulativeOperationsNondecreasing": true
+  },
+  "windows": {
+    "nativeLogin": {
+      "queryCalls": 211,
+      "snapshotCount": 4,
+      "segmentCount": 3,
+      "valid": true,
+      "queryOperations": {
+        "/api/auth/[...all]": 21,
+        "/api/desktop/begin": 1,
+        "/api/desktop/return": 2,
+        "/api/desktop/exchange": 8,
+        "/api/desktop/rpc": 34,
+        "/api/rpc": 0,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 4,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 41,
+        "/actions/coordinator/summaries": 6,
+        "/actions/threads/poll": 6,
+        "/actions/task-runs/read": 6,
+        "/actions/issues/poll": 15,
+        "/actions/projects/list": 1,
+        "unattributed": 50
+      },
+      "segments": [
+        {
+          "index": 0,
+          "queryOperations": {
+            "/api/auth/[...all]": 19,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          }
+        },
+        {
+          "index": 1,
+          "queryOperations": {
+            "/api/auth/[...all]": 2,
+            "/api/desktop/begin": 1,
+            "/api/desktop/return": 2,
+            "/api/desktop/exchange": 8,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          }
+        },
+        {
+          "index": 2,
+          "queryOperations": {
+            "/api/auth/[...all]": 0,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 34,
+            "/api/rpc": 0,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 4,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 41,
+            "/actions/coordinator/summaries": 6,
+            "/actions/threads/poll": 6,
+            "/actions/task-runs/read": 6,
+            "/actions/issues/poll": 15,
+            "/actions/projects/list": 1,
+            "unattributed": 50
+          }
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 210,
+      "snapshotCount": 4,
+      "segmentCount": 3,
+      "valid": true,
+      "queryOperations": {
+        "/api/auth/[...all]": 22,
+        "/api/desktop/begin": 0,
+        "/api/desktop/return": 0,
+        "/api/desktop/exchange": 0,
+        "/api/desktop/rpc": 0,
+        "/api/rpc": 36,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 8,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 44,
+        "/actions/coordinator/summaries": 10,
+        "/actions/threads/poll": 10,
+        "/actions/task-runs/read": 0,
+        "/actions/issues/poll": 16,
+        "/actions/projects/list": 2,
+        "unattributed": 46
+      },
+      "segments": [
+        {
+          "index": 0,
+          "queryOperations": {
+            "/api/auth/[...all]": 19,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          }
+        },
+        {
+          "index": 1,
+          "queryOperations": {
+            "/api/auth/[...all]": 0,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          }
+        },
+        {
+          "index": 2,
+          "queryOperations": {
+            "/api/auth/[...all]": 3,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 36,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 8,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 44,
+            "/actions/coordinator/summaries": 10,
+            "/actions/threads/poll": 10,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 16,
+            "/actions/projects/list": 2,
+            "unattributed": 46
+          }
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 177,
+      "snapshotCount": 2,
+      "segmentCount": 1,
+      "valid": true,
+      "queryOperations": {
+        "/api/auth/[...all]": 0,
+        "/api/desktop/begin": 0,
+        "/api/desktop/return": 0,
+        "/api/desktop/exchange": 0,
+        "/api/desktop/rpc": 35,
+        "/api/rpc": 0,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 4,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 46,
+        "/actions/coordinator/summaries": 8,
+        "/actions/threads/poll": 6,
+        "/actions/task-runs/read": 3,
+        "/actions/issues/poll": 14,
+        "/actions/projects/list": 1,
+        "unattributed": 44
+      },
+      "segments": [
+        {
+          "index": 0,
+          "queryOperations": {
+            "/api/auth/[...all]": 0,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 35,
+            "/api/rpc": 0,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 4,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 46,
+            "/actions/coordinator/summaries": 8,
+            "/actions/threads/poll": 6,
+            "/actions/task-runs/read": 3,
+            "/actions/issues/poll": 14,
+            "/actions/projects/list": 1,
+            "unattributed": 44
+          }
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 118,
+      "snapshotCount": 2,
+      "segmentCount": 1,
+      "valid": true,
+      "queryOperations": {
+        "/api/auth/[...all]": 3,
+        "/api/desktop/begin": 0,
+        "/api/desktop/return": 0,
+        "/api/desktop/exchange": 0,
+        "/api/desktop/rpc": 0,
+        "/api/rpc": 26,
+        "/api/workspace": 5,
+        "/api/workspace/switcher": 4,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 15,
+        "/actions/coordinator/summaries": 5,
+        "/actions/threads/poll": 4,
+        "/actions/task-runs/read": 3,
+        "/actions/issues/poll": 9,
+        "/actions/projects/list": 2,
+        "unattributed": 36
+      },
+      "segments": [
+        {
+          "index": 0,
+          "queryOperations": {
+            "/api/auth/[...all]": 3,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 26,
+            "/api/workspace": 5,
+            "/api/workspace/switcher": 4,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 15,
+            "/actions/coordinator/summaries": 5,
+            "/actions/threads/poll": 4,
+            "/actions/task-runs/read": 3,
+            "/actions/issues/poll": 9,
+            "/actions/projects/list": 2,
+            "unattributed": 36
+          }
+        }
+      ]
+    }
+  },
+  "rows": [
+    {
+      "operation": "/api/auth/[...all]",
+      "nativeLogin": 21,
+      "webLogin": 22,
+      "startup-bundled": 0,
+      "startup-hosted": 3,
+      "loginDifference": -1,
+      "startupDifference": -3
+    },
+    {
+      "operation": "/api/desktop/begin",
+      "nativeLogin": 1,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 1,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/desktop/return",
+      "nativeLogin": 2,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 2,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/desktop/exchange",
+      "nativeLogin": 8,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 8,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/desktop/rpc",
+      "nativeLogin": 34,
+      "webLogin": 0,
+      "startup-bundled": 35,
+      "startup-hosted": 0,
+      "loginDifference": 34,
+      "startupDifference": 35
+    },
+    {
+      "operation": "/api/rpc",
+      "nativeLogin": 0,
+      "webLogin": 36,
+      "startup-bundled": 0,
+      "startup-hosted": 26,
+      "loginDifference": -36,
+      "startupDifference": -26
+    },
+    {
+      "operation": "/api/workspace",
+      "nativeLogin": 10,
+      "webLogin": 10,
+      "startup-bundled": 10,
+      "startup-hosted": 5,
+      "loginDifference": 0,
+      "startupDifference": 5
+    },
+    {
+      "operation": "/api/workspace/switcher",
+      "nativeLogin": 4,
+      "webLogin": 8,
+      "startup-bundled": 4,
+      "startup-hosted": 4,
+      "loginDifference": -4,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/live/ticket",
+      "nativeLogin": 6,
+      "webLogin": 6,
+      "startup-bundled": 6,
+      "startup-hosted": 6,
+      "loginDifference": 0,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/actions/coordinator/chat",
+      "nativeLogin": 0,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 0,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/actions/coordinator/poll",
+      "nativeLogin": 41,
+      "webLogin": 44,
+      "startup-bundled": 46,
+      "startup-hosted": 15,
+      "loginDifference": -3,
+      "startupDifference": 31
+    },
+    {
+      "operation": "/actions/coordinator/summaries",
+      "nativeLogin": 6,
+      "webLogin": 10,
+      "startup-bundled": 8,
+      "startup-hosted": 5,
+      "loginDifference": -4,
+      "startupDifference": 3
+    },
+    {
+      "operation": "/actions/threads/poll",
+      "nativeLogin": 6,
+      "webLogin": 10,
+      "startup-bundled": 6,
+      "startup-hosted": 4,
+      "loginDifference": -4,
+      "startupDifference": 2
+    },
+    {
+      "operation": "/actions/task-runs/read",
+      "nativeLogin": 6,
+      "webLogin": 0,
+      "startup-bundled": 3,
+      "startup-hosted": 3,
+      "loginDifference": 6,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/actions/issues/poll",
+      "nativeLogin": 15,
+      "webLogin": 16,
+      "startup-bundled": 14,
+      "startup-hosted": 9,
+      "loginDifference": -1,
+      "startupDifference": 5
+    },
+    {
+      "operation": "/actions/projects/list",
+      "nativeLogin": 1,
+      "webLogin": 2,
+      "startup-bundled": 1,
+      "startup-hosted": 2,
+      "loginDifference": -1,
+      "startupDifference": -1
+    },
+    {
+      "operation": "unattributed",
+      "nativeLogin": 50,
+      "webLogin": 46,
+      "startup-bundled": 44,
+      "startup-hosted": 36,
+      "loginDifference": 4,
+      "startupDifference": 8
+    }
+  ],
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "originalDifference": 1,
+      "operationDifference": 1,
+      "partitionMatchesOriginal": true,
+      "firstNotAboveSecond": false
+    },
+    "startupBundledVsHosted": {
+      "originalDifference": 59,
+      "operationDifference": 59,
+      "partitionMatchesOriginal": true,
+      "firstNotAboveSecond": false
+    }
+  },
+  "valid": true,
+  "issues": [],
+  "productionAcceptance": null,
+  "files": {
+    "lifecycle.json": {
+      "bytes": 267882,
+      "sha256": "ed715982f83aade1c94e03452a6131c70031f565bbee7a244c37d1e2e81daf52"
+    },
+    "parity/parity.json": {
+      "bytes": 106875,
+      "sha256": "90a1bed8c8a75f5ce4bd7e75504a2ba6054e166353579e1234145e4ecffd0c55"
+    },
+    "smoke.json": {
+      "bytes": 3105,
+      "sha256": "5118f4b24921a6db2a5fa1c2a4f94a1f3c1c6d4ccd72eecba3f578065ae59927"
+    },
+    "native-crypto.json": {
+      "bytes": 2868,
+      "sha256": "d44379dd46a1a3640e69803d44044b0eec467f1d77df630ddbcbbc4afa23717c"
+    },
+    "mac-acceptance-package.json": {
+      "bytes": 957,
+      "sha256": "b748da3ac962ef0e8fb233cacc63b903943377c4b88364fda10556a2b7ceabb7"
+    }
+  }
+}

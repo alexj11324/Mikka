@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "source": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "node": "v24.22.1",
+  "checks": [
+    {
+      "name": "helper-red",
+      "command": "/usr/local/bin/node",
+      "args": [
+        "--test",
+        "--test-name-pattern=^runner gets only validated readiness",
+        "scripts/acceptance/run-observability-workflow.test.mjs"
+      ],
+      "exitCode": 1,
+      "signal": null,
+      "errorCode": null,
+      "path": "verification/results/helper-red.log",
+      "bytes": 1373,
+      "sha256": "d4ae6ff5a4b5b701afc6675c14117c2c182a635eb862a7d4de530289f07b878a"
+    },
+    {
+      "name": "helper-driver-green",
+      "command": "/usr/local/bin/node",
+      "args": [
+        "--test",
+        "scripts/acceptance/run-observability.test.mjs",
+        "scripts/acceptance/run-observability-workflow.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "errorCode": null,
+      "path": "verification/results/helper-driver-green.log",
+      "bytes": 4449,
+      "sha256": "e0009f59fcabe949772c604d52e696f5e05c8b378f6864451c1604350bac608a"
+    }
+  ],
+  "syntax": [
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "errorCode": null
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "errorCode": null
+    }
+  ],
+  "workflowShellBlocks": 4,
+  "noBrowserOrNetworkCalls": true,
+  "acceptanceEvidence": false,
+  "inputs": [
+    {
+      "path": "package.json",
+      "bytes": 77435,
+      "sha256": "a22483a1575eb6a0e47e7c596e8546b5a5f9a1467f0236b39b9233ed29a67b98"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 56471,
+      "sha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 44891,
+      "sha256": "109c22a0ac01c984af315c35e6b39ea680996c5bd2af72e374462575f6960bb0"
+    },
+    {
+      "path": "scripts/acceptance/response-cookie-jar.mjs",
+      "bytes": 2277,
+      "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+    },
+    {
+      "path": "messages/en.json",
+      "bytes": 242738,
+      "sha256": "caf861daca2c9c6931215284bced65eeba0e5bb4eb942e8502ec4b80fb3091a5"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "bytes": 233758,
+      "sha256": "ceaf201fc46a57062ac6bc61190fea2f22b555bba7b5472af4559c002bc0bf84"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 9483,
+      "sha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+      "bytes": 16308,
+      "sha256": "68262ea98e61e7a6b02fc004f5e7ab3a3aa21c3aa405f7b3f81369cde2536e9a"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "bytes": 17815,
+      "sha256": "e650d7b617ff7bbb11c064d9ce7a7971f6926b5a8c1adea4028f8d9cc8ffd6f7"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "kind": "cancelled_native_source_binding",
+  "repository": "alexj11324/Mikka",
+  "head": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "source": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+  "tree": "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d",
+  "parents": [
+    "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
+  ],
+  "sourceEvidence": {
+    "actualNativeJobId": 128498461159,
+    "actualCheckout": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+    "method": "previously_observed_git_log_minus_1_in_native_job_log",
+    "rawLogChars": 226244,
+    "rawLogSaved": false,
+    "checksJobId": 128497483056,
+    "checksCheckout": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2"
+  },
+  "reportClaims": [
+    {
+      "file": "parity/parity.json",
+      "field": "appRevision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "parity/parity.json",
+      "field": "harnessRevision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "smoke.json",
+      "field": "revision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "native-crypto.json",
+      "field": "revision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "parity/parity.json",
+      "field": "harnessSha256",
+      "present": true,
+      "matchesExpected": true
+    }
+  ],
+  "expectedHarnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "harnessProof": "fixed_actual_source_file_hash_sequence_prior_observation; subsequent_changes_outside_harness",
+  "sourceTable": {
+    "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+    "blob": "d470c1d71454dff12f60cf7e0dd373624bd8b314",
+    "bytes": 2686,
+    "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb",
+    "labelCount": 75
+  },
+  "compiledManifestDownloaded": false,
+  "compiledManifestVerified": null,
+  "fullReadersExecuted": false,
+  "reason": "lifecycle_report_missing",
+  "doesNotApplyToLatestBatchHead": true
+}

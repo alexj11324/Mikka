@@ -1,0 +1,26 @@
+✖ runner gets only validated readiness and token-free child env, with its flag removed from the driver (10.996916ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 223.645533
+
+✖ failing tests:
+
+test at scripts/acceptance/run-observability-workflow.test.mjs:173:1
+✖ runner gets only validated readiness and token-free child env, with its flag removed from the driver (10.996916ms)
+  Error: configuration_required
+      at check (file:///tmp/issue1512-browser-helper/scripts/acceptance/run-observability-workflow.mjs:18:60)
+      at settings (file:///tmp/issue1512-browser-helper/scripts/acceptance/run-observability-workflow.mjs:21:3)
+      at runObservabilityWorkflow (file:///tmp/issue1512-browser-helper/scripts/acceptance/run-observability-workflow.mjs:61:18)
+      at harness (file:///tmp/issue1512-browser-helper/scripts/acceptance/run-observability-workflow.test.mjs:29:18)
+      at TestContext.<anonymous> (file:///tmp/issue1512-browser-helper/scripts/acceptance/run-observability-workflow.test.mjs:176:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    code: 'configuration_required'
+  }

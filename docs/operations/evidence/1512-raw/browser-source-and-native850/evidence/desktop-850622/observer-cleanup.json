@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "kind": "native_artifact_observer_cleanup",
+  "sessionId": "sbx_93unfWJUU2De5cE2Lq5xZIgWd2Xe",
+  "createdAt": "2026-11-07T19:37:05.653Z",
+  "stoppedAt": "2026-11-07T19:39:40.282Z",
+  "durationMs": 154629,
+  "resource": {
+    "vcpus": 1,
+    "memoryMB": 2048,
+    "ttlMs": 600000,
+    "persistent": false,
+    "ports": [],
+    "downloadHosts": [
+      "sdmntprjapaneast.oaiusercontent.com",
+      "sdmntpreastus3.oaiusercontent.com"
+    ]
+  },
+  "explicitStop": true,
+  "stopStatus": "stopped",
+  "readbackStatus": "stopped",
+  "allSixOriginalsAndNineDerivedFilesRecoveredBeforeStop": true,
+  "zipDigestsVerified": 3,
+  "originalFiles": 6,
+  "zipFilesPersisted": 0,
+  "signedUrlsPersisted": 0,
+  "signedUrlsPrinted": false,
+  "rawLogsSaved": false,
+  "imagesSaved": false,
+  "compiledBundleSaved": false,
+  "compiledManifestOnly": true,
+  "providerOrModelCalls": 0,
+  "newCITriggered": false,
+  "productionCredentialsLoaded": false,
+  "readerExitCodes": [
+    0,
+    0,
+    0
+  ],
+  "sourceScripts": {
+    "downloadSha256": "d973ca5a05c6b625d280669be63481cb8d4263afd48bc57db13d02d5003d4dc6",
+    "readerSha256": "e4659491b0b66e04c6a5afff9d2bf72cde9129f3427854fb4c237eb3eee65c08",
+    "packSha256": "1824ec90f6c1e24c3ee3b4515b1cca9ffbc198b1cd50c7428953f4e140a2763d"
+  },
+  "doesNotReplaceNativeLifecycleCleanupEvidence": true
+}

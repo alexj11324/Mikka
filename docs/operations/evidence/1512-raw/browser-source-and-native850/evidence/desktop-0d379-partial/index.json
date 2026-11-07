@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "kind": "issue1512_cancelled_batch_native_partial_archive",
+  "repository": "alexj11324/Mikka",
+  "runId": 42403906939,
+  "attempt": 1,
+  "head": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "source": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+  "tree": "c7efece9d5a2f9e5fb4d01536daaf18d3bdcd97d",
+  "parents": [
+    "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
+  ],
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "status": "actual_native_execution_cancelled_during_parity",
+  "nativeEnteredAt": "2026-11-07T19:09:57Z",
+  "nativeCancelledAt": "2026-11-07T19:12:14Z",
+  "cancellationCause": "unknown",
+  "availableOriginalReports": 4,
+  "missingOriginalReports": [
+    "lifecycle.json"
+  ],
+  "originalBytesPreserved": true,
+  "rawArchiveZipDigestsVerified": 2,
+  "compiledManifestDownloaded": false,
+  "compiledManifestVerified": null,
+  "privacyFindings": 0,
+  "functional": {
+    "cryptoPassed": true,
+    "smokeChecksPassed": 10,
+    "smokeChecksTotal": 10,
+    "parityScreensRecorded": 8,
+    "parityScreensPassed": 8,
+    "parityFinalResult": "unknown",
+    "lifecycle": "report_absent"
+  },
+  "scopeBoundaries": {
+    "smokeLeaseReleased": true,
+    "smokeOwnerPeerAfterBaseline": true,
+    "parityLeaseRelease": null,
+    "parityCleanup": null,
+    "parityQuarantine": null,
+    "lifecycleCleanup": null,
+    "loginBudget": null,
+    "startupBudget": null,
+    "fullNativeAcceptance": null,
+    "productionAcceptance": null,
+    "partialDoesNotApplyToNewHead850622": true
+  },
+  "observerCleanup": {
+    "sessionId": "sbx_aOYExIi7M0ntwdIuiApAMv82nbv0",
+    "status": "stopped",
+    "explicitStop": true,
+    "readbackVerified": true,
+    "durationMs": 73681
+  },
+  "fullReadersExecuted": false,
+  "fullReaderSkipReason": "missing_lifecycle_report",
+  "allRawFilesIndependentHashMatchedBeforeAndAfterRecovery": true,
+  "rawLogsImagesCompiledBundleNotSaved": true,
+  "payloadCount": 11,
+  "payloadBytes": 45626,
+  "files": [
+    {
+      "path": "evidence/desktop-0d379-partial/parity/parity.json",
+      "bytes": 6709,
+      "sha256": "6065ab622cf18c119bed491d84a6382c800a5456c04291252499acbfb470be86",
+      "gitBlob": "5f48d21c51f72b5b65368e8ab1ad129aff21183a",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/smoke.json",
+      "bytes": 3105,
+      "sha256": "bdc188e76ec80254fe88f054f4091ccb189941a6631ccfed7317896b7218bd41",
+      "gitBlob": "944815b62c8d43e82638e1cd0c00167a05511e30",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "a144c7f18939ce51a382b46115cabea427b1c24c63efcd82935bc4ad70b8cbbd",
+      "gitBlob": "50d1c693e1e147b3acb28a315fdb8e91088ae6e3",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "e51a6ff3ac061b300963def703861fb8a41a0dfaea22294f16410b43d7a1438f",
+      "gitBlob": "5d68429ccd1813833cd30f0d842067cc4291a700",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/download-validation.json",
+      "bytes": 3115,
+      "sha256": "d954d2a9d625f891a6e0466710e49b34d0295dcd50639abc309d1669fe9e37f3",
+      "gitBlob": "e595132313c355b37a3acbd9a9b18852970aa462",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/privacy.json",
+      "bytes": 1087,
+      "sha256": "b36144ffc2a34d82f5d3b6625d396740da4dd0a9e17ea759c5d76c25efdcf023",
+      "gitBlob": "bf532bc080092da1992d137be8e19b5e921e5788",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/partial-diagnostic.json",
+      "bytes": 3578,
+      "sha256": "382fe67a75b0b96e4adf7c328b3e9777bbb5c66f922e678f8043b4d7965762ae",
+      "gitBlob": "b85cb2ef52281c14b07b90906b98c42f8130905e",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/functional-partial.json",
+      "bytes": 2384,
+      "sha256": "0017550abe8d104b96e13dd0031e66feba85ea758bd9f334ffead35f32e4fd2b",
+      "gitBlob": "bccddc3e9f4d25920a1975f0d66dca5c17c515e8",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/ci-final.json",
+      "bytes": 18532,
+      "sha256": "5d9acf1719d0f33a75faf2cc2a0ab10f75a37f6b362f26b184b7bfc8832b15f1",
+      "gitBlob": "fd090be2148fe8215af6fe82fac4a7e084e95ee0",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/source-binding.json",
+      "bytes": 2075,
+      "sha256": "bfc2f0b0d34d55fe9e8c11fa35991146c383d578ae99915593578b748c6f0ba9",
+      "gitBlob": "8c1970ca3b6101d0c21a888a1ba22f78b1340299",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-0d379-partial/observer-cleanup.json",
+      "bytes": 1216,
+      "sha256": "77d7dd5d6282cc9e7b66e866cc929b3b3eefcc49bac988c71c5a319fa28147a5",
+      "gitBlob": "42c432ba6ab42a2abcc6b03aa2af717fc4f457f1",
+      "exactRemoteReadback": true
+    }
+  ],
+  "gitRefMutations": 0,
+  "createdAsUnreferencedBlobsOnly": true
+}

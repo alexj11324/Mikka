@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "kind": "cancelled_native_partial_projection",
+  "runId": 42403906939,
+  "head": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "source": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+  "expectedHarnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "nativeActuallyEntered": true,
+  "nativeStepConclusion": "cancelled",
+  "cancellationCause": "unknown",
+  "missingAllowedReports": [
+    "lifecycle.json"
+  ],
+  "availableReports": [
+    "parity/parity.json",
+    "smoke.json",
+    "mac-acceptance-package.json",
+    "native-crypto.json"
+  ],
+  "sourceClaims": [
+    {
+      "file": "parity/parity.json",
+      "field": "appRevision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "parity/parity.json",
+      "field": "harnessRevision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "smoke.json",
+      "field": "revision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "native-crypto.json",
+      "field": "revision",
+      "present": true,
+      "matchesExpected": true
+    },
+    {
+      "file": "parity/parity.json",
+      "field": "harnessSha256",
+      "present": true,
+      "matchesExpected": true
+    }
+  ],
+  "windows": {
+    "nativeLogin": {
+      "present": false,
+      "status": "unknown",
+      "reportedQueryCalls": null,
+      "reportedUnknownReadings": null,
+      "observedCheckpointCount": null,
+      "reportedSegments": null
+    },
+    "webLogin": {
+      "present": false,
+      "status": "unknown",
+      "reportedQueryCalls": null,
+      "reportedUnknownReadings": null,
+      "observedCheckpointCount": null,
+      "reportedSegments": null
+    },
+    "startup-bundled": {
+      "present": false,
+      "status": "unknown",
+      "reportedQueryCalls": null,
+      "reportedUnknownReadings": null,
+      "observedCheckpointCount": null,
+      "reportedSegments": null
+    },
+    "startup-hosted": {
+      "present": false,
+      "status": "unknown",
+      "reportedQueryCalls": null,
+      "reportedUnknownReadings": null,
+      "observedCheckpointCount": null,
+      "reportedSegments": null
+    }
+  },
+  "rawCountsIndependentlyValidated": false,
+  "budgetAcceptance": null,
+  "fullNativeAcceptance": null,
+  "productionAcceptance": null,
+  "reportedLifecycleChecks": null,
+  "cleanup": {
+    "aggregate": "unknown",
+    "nativeCleaned": null,
+    "stages": null,
+    "account": {
+      "observed": null,
+      "state": "unknown",
+      "blocked": null,
+      "ownerAfterBaseline": null,
+      "peerAfterBaseline": null
+    }
+  },
+  "smokeCleanup": {
+    "aggregate": "unknown",
+    "nativeCleaned": true,
+    "stages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "account": {
+      "observed": true,
+      "state": "released",
+      "blocked": false,
+      "ownerAfterBaseline": true,
+      "peerAfterBaseline": true
+    }
+  },
+  "parityPresent": true,
+  "failureMetadataPresent": false,
+  "cancelledDoesNotMeanSkipped": true,
+  "absentOrUnfinishedEvidenceIsUnknown": true,
+  "readerSkippedReason": "required_full_report_identity_or_renderer_missing"
+}

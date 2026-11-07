@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "kind": "artifact_observer_resource_cleanup",
+  "scope": "bounded_existing_artifact_recovery_only",
+  "sessionId": "sbx_aOYExIi7M0ntwdIuiApAMv82nbv0",
+  "resource": {
+    "vcpus": 1,
+    "memoryMB": 2048,
+    "ttlMs": 300000,
+    "persistent": false,
+    "ports": [],
+    "downloadHosts": [
+      "sdmntprsouthcentralus.oaiusercontent.com",
+      "sdmntpreastus3.oaiusercontent.com"
+    ]
+  },
+  "createdAt": "2026-11-07T19:22:57.367Z",
+  "stoppedAt": "2026-11-07T19:24:11.048Z",
+  "durationMs": 73681,
+  "explicitStop": true,
+  "stopStatus": "stopped",
+  "readbackStatus": "stopped",
+  "allOriginalBytesRecoveredBeforeStop": true,
+  "zipFilesPersisted": 0,
+  "signedUrlsPersisted": 0,
+  "signedUrlsPrinted": false,
+  "recoveryInitialCommand": {
+    "exitCode": 1,
+    "closedCause": "local_helper_class_extraction_omitted",
+    "networkAttempted": false
+  },
+  "recoveryCorrectedCommand": {
+    "exitCode": 0
+  },
+  "rawProgramSha256": "943ddc581108ef01a0bd2f7c1c80832d448816e5104799bdf24913d3be3a5639",
+  "productionCredentialsLoaded": false,
+  "providerOrModelCalls": 0,
+  "newCITriggered": false,
+  "productResourcesModified": false,
+  "doesNotAttestInterruptedNativeResourceCleanup": true
+}

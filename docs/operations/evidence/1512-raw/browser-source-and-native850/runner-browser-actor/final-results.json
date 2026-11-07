@@ -1,0 +1,12 @@
+{
+  "exitCode": 0,
+  "counts": {
+    "tests": 29,
+    "pass": 29,
+    "fail": 0,
+    "skipped": 0
+  },
+  "failedTests": [],
+  "stdoutBytes": 6173,
+  "stderrBytes": 0
+}

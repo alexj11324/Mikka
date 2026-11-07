@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "kind": "batch850_closed_diagnostic",
+  "runId": 42405040257,
+  "source": "f23dcd19fcd890578f5907d536f405146bb0e320",
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "readers": [
+    {
+      "reader": "summary",
+      "exitCode": 0,
+      "stderrBytes": 0
+    },
+    {
+      "reader": "query-operations",
+      "exitCode": 0,
+      "stderrBytes": 0
+    },
+    {
+      "reader": "unattributed-sources",
+      "exitCode": 0,
+      "stderrBytes": 0
+    }
+  ],
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": 211,
+      "second": 210,
+      "difference": 1,
+      "firstNotAboveSecond": false
+    },
+    "startupBundledVsHosted": {
+      "first": 177,
+      "second": 118,
+      "difference": 59,
+      "firstNotAboveSecond": false
+    }
+  },
+  "counterIntegrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 26987,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true
+  },
+  "refinementIntegrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": true,
+    "refinementRowsPresent": 24,
+    "refinementRowsExpected": 24
+  },
+  "rpc": {
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 8,
+        "completedInWindow": 8,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 7,
+        "completedInWindow": 7,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 13,
+        "completedInWindow": 10,
+        "crossesStart": 0,
+        "crossesEnd": 3,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 20,
+        "completedInWindow": 20,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 18,
+        "completedInWindow": 18,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 13,
+        "completedInWindow": 10,
+        "crossesStart": 0,
+        "crossesEnd": 3,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    }
+  },
+  "crossings": {
+    "physical": {
+      "nativeLogin": [],
+      "webLogin": [],
+      "startup-bundled": [],
+      "startup-hosted": [
+        {
+          "route": "/api/rpc",
+          "action": "coordinator.syncCoordinatorChat",
+          "startedInWindow": 1,
+          "completedInWindow": 0,
+          "crossesStart": 0,
+          "crossesEnd": 1,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        {
+          "route": "/api/rpc",
+          "action": "execution-settings.getBotModelMenu",
+          "startedInWindow": 1,
+          "completedInWindow": 0,
+          "crossesStart": 0,
+          "crossesEnd": 1,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        {
+          "route": "/api/rpc",
+          "action": "team-relations.listProjectTeams",
+          "startedInWindow": 2,
+          "completedInWindow": 1,
+          "crossesStart": 0,
+          "crossesEnd": 1,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        }
+      ]
+    },
+    "logical": {
+      "nativeLogin": [],
+      "webLogin": [],
+      "startup-bundled": [],
+      "startup-hosted": [
+        {
+          "route": "/api/rpc",
+          "action": "coordinator.syncCoordinatorChat",
+          "startedInWindow": 1,
+          "completedInWindow": 0,
+          "crossesStart": 0,
+          "crossesEnd": 1,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        {
+          "route": "/api/rpc",
+          "action": "execution-settings.getBotModelMenu",
+          "startedInWindow": 1,
+          "completedInWindow": 0,
+          "crossesStart": 0,
+          "crossesEnd": 1,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        {
+          "route": "/api/rpc",
+          "action": "team-relations.listProjectTeams",
+          "startedInWindow": 2,
+          "completedInWindow": 1,
+          "crossesStart": 0,
+          "crossesEnd": 1,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        }
+      ]
+    }
+  },
+  "unknownActionProjection": [],
+  "functional": {
+    "lifecycle": {
+      "result": "passed",
+      "checks": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "unknown": 0
+      },
+      "cleanup": {
+        "result": "unknown",
+        "stages": [
+          {
+            "stage": "browser-close",
+            "result": "passed"
+          },
+          {
+            "stage": "daemon-drain",
+            "result": "passed"
+          },
+          {
+            "stage": "native-resources",
+            "result": "passed"
+          },
+          {
+            "stage": "fixtures",
+            "result": "passed"
+          },
+          {
+            "stage": "workspace-generated-name",
+            "result": "passed"
+          },
+          {
+            "stage": "lease-release",
+            "result": "passed"
+          }
+        ],
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": true,
+          "state": "released",
+          "blocked": false,
+          "ownerBeforeMatchesBaseline": false,
+          "ownerAfterMatchesBaseline": true,
+          "peerBeforeMatchesBaseline": false,
+          "peerAfterMatchesBaseline": true
+        }
+      }
+    },
+    "parity": {
+      "result": "passed",
+      "total": 100,
+      "passed": 100,
+      "pageErrorCount": 0,
+      "cleanup": {
+        "result": "passed",
+        "stages": null,
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": null,
+          "state": "unknown",
+          "blocked": null,
+          "ownerBeforeMatchesBaseline": null,
+          "ownerAfterMatchesBaseline": null,
+          "peerBeforeMatchesBaseline": null,
+          "peerAfterMatchesBaseline": null
+        }
+      }
+    },
+    "smoke": {
+      "result": "passed",
+      "checks": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "unknown": 0
+      },
+      "cleanup": {
+        "result": "unknown",
+        "stages": [
+          {
+            "stage": "browser-close",
+            "result": "passed"
+          },
+          {
+            "stage": "electron-close",
+            "result": "passed"
+          },
+          {
+            "stage": "daemon-drain",
+            "result": "passed"
+          },
+          {
+            "stage": "native-resources",
+            "result": "passed"
+          },
+          {
+            "stage": "workspace-generated-name",
+            "result": "passed"
+          },
+          {
+            "stage": "lease-release",
+            "result": "passed"
+          }
+        ],
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 0,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 0,
+          "device_tokens": 0,
+          "device_enrollments": 0,
+          "devices": 0
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": true,
+          "state": "released",
+          "blocked": false,
+          "ownerBeforeMatchesBaseline": true,
+          "ownerAfterMatchesBaseline": true,
+          "peerBeforeMatchesBaseline": true,
+          "peerAfterMatchesBaseline": true
+        }
+      }
+    },
+    "nativeCrypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "issues": [],
+  "originalBytesUnmodified": true,
+  "wholeWindowsUnchanged": true,
+  "productionAcceptance": null,
+  "doesNotApplyToLaterBatchRevisions": true
+}

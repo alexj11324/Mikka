@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "mode": "desktop",
+  "appRevision": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+  "harnessRevision": "5a0c4dadec39be798ae8a878c6116ecc1c4b91c2",
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "environmentId": "local-945c1f1e-8149-4a1b-a840-b7925f2e291c",
+  "database": "mikka_e2e",
+  "origin": "http://localhost:3000",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "colorThreshold": 0,
+  "maximumChangedRatio": 0.001,
+  "timeZone": "UTC",
+  "captureClock": {
+    "method": "playwright_set_fixed_time",
+    "wallTime": "2026-11-07T19:10:34.721Z",
+    "timers": "running",
+    "scope": "parity-renderer-only"
+  },
+  "nativeViewports": [
+    {
+      "mode": "hosted",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    },
+    {
+      "mode": "bundled",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    }
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "masksAllowed": [
+    "avatars",
+    "timestamps"
+  ],
+  "excludedDesktopOnly": [
+    "data-desktop-only: server row, Settings › 服务器"
+  ],
+  "startedAt": "2026-11-07T19:10:34.721Z",
+  "screens": [
+    {
+      "name": "sign-in",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-markdown",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-html",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-missing",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "sign-in",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-markdown",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-html",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-missing",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    }
+  ],
+  "fixtureEpoch": "2026-11-07T00:00:00.000Z",
+  "requiredScreens": [
+    "sign-in",
+    "shared-markdown",
+    "shared-html",
+    "shared-missing",
+    "workspace-link",
+    "coordinator-details",
+    "coordinator-threads",
+    "coordinator-prs",
+    "coordinator-computer",
+    "bot-details",
+    "bot-threads",
+    "bot-prs",
+    "bot-computer",
+    "group",
+    "task",
+    "task-thread",
+    "all-threads",
+    "bot-thread-list",
+    "thread",
+    "board",
+    "list",
+    "projects",
+    "team-home",
+    "team-tasks",
+    "team-projects",
+    "plugins",
+    "suggestions",
+    "artifact-library",
+    "artifact-markdown",
+    "artifact-html",
+    "new-task",
+    "settings-members",
+    "settings-preferences",
+    "settings-memory",
+    "settings-account",
+    "settings-teams",
+    "settings-notifications",
+    "settings-security",
+    "settings-connections",
+    "settings-models",
+    "settings-logins",
+    "settings-privacy",
+    "settings-computers",
+    "settings-general",
+    "settings-permissions",
+    "settings-secrets",
+    "settings-audit",
+    "settings-usage",
+    "settings-billing",
+    "offline"
+  ],
+  "nativeModeOrder": [
+    "hosted-anonymous",
+    "bundled-anonymous",
+    "bundled-authenticated",
+    "hosted-authenticated"
+  ],
+  "nativeProfiles": 1
+}

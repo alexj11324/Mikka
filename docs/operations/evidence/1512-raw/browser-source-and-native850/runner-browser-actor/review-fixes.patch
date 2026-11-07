@@ -1,0 +1,136 @@
+--- a/draft-before-review.mjs
++++ b/run-observability-browser.mjs
+@@ -55,18 +55,18 @@
+  * ready/env/signal. Chromium and its API context are created here, never supplied
+  * a stored account, cookie, bearer token or copied trace/session identity. */
+ export async function startObservabilityBrowser({ ready, env = process.env, signal, chromiumImpl,
+-  now = Date.now, writeReport = persist } = {}) {
++  now = Date.now, writeReport = persist, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout } = {}) {
+   const report = { version: 1, issue: 1512, kind: 'run-observability-browser', status: 'starting', stage: 'configuration',
+     revision: null, case: null, sourceVerified: false, versionBefore: false, versionBeforeSubmit: false,
+     freshContext: false, signInAttempted: false, signInResponseCompleted: false, normalSession: false,
+     workspaceMatched: false, workspaceSelection: null, officialBusinessResponses: 0, foreignBusinessRequests: 0,
+     cloudBackendConfirmed: false, coordinatorSelected: false, cloudDestinationSelected: false, profileMatched: false,
+-    submitClicks: 0, submissionObserved: false, pageErrorCount: 0,
++    submitClicks: 0, submissionObserved: false, submissionOutcome: 'not_attempted', pageErrorCount: 0,
+     cleanup: { status: 'pending', signOutAttempted: false, signOutSucceeded: false, anonymousAfterLogout: false,
+       pageClosed: null, contextClosed: null, browserClosed: null, pendingResourcesSettled: null },
+     startedAt: new Date(now()).toISOString(), finishedAt: null }
+   const owned = { browser: null, context: null, page: null }, allocating = new Set()
+-  let config, closing = null, disposed = false, failure = null, ownerId, cloudResolve
++  let config, closing = null, disposed = false, failure = null, ownerId, cloudResolve, signInCompletion
+   const cloudObserved = new Promise(resolve => { cloudResolve = resolve })
+   const gate = () => {
+     check(!signal?.aborted, 'browser_interrupted')
+@@ -77,7 +77,7 @@
+     let timer, abort
+     try {
+       const operation = Promise.resolve().then(work)
+-      const expires = new Promise((_, reject) => { timer = setTimeout(() => reject(refusal(code)), Math.max(1, milliseconds)) })
++      const expires = new Promise((_, reject) => { timer = setTimeoutImpl(() => reject(refusal(code)), Math.max(1, milliseconds)) })
+       const interrupted = new Promise((_, reject) => {
+         if (!abortSignal) return
+         abort = () => reject(refusal('browser_interrupted'))
+@@ -86,7 +86,7 @@
+       })
+       return await Promise.race([operation, expires, interrupted])
+     } finally {
+-      clearTimeout(timer)
++      clearTimeoutImpl(timer)
+       if (abort) abortSignal?.removeEventListener('abort', abort)
+     }
+   }
+@@ -164,18 +164,37 @@
+           report.cleanup[key] = true
+         } catch { report.cleanup[key] = false; cleanupFailed = true }
+       }
++      let pageAttempted = false
++      const stopPage = async () => {
++        if (owned.page && !pageAttempted) {
++          pageAttempted = true
++          await attempt('pageClosed', () => owned.page.close({ runBeforeUnload: false }))
++          if (report.cleanup.pageClosed === false && owned.browser) {
++            // If the page cannot be stopped, stop the owning process before
++            // another async cleanup step can leave a pending click actionable.
++            await attempt('browserClosed', () => owned.browser.close())
++          }
++        }
++      }
++      // Cancel pending locator actions before waiting on authentication cleanup.
++      // The context retains its cookie jar/API client after this page closes.
++      await stopPage()
+       if (allocating.size) await attempt('pendingResourcesSettled', () => Promise.allSettled([...allocating]))
+       else report.cleanup.pendingResourcesSettled = true
++      await stopPage()
+       if (report.signInAttempted && owned.context) {
++        if (signInCompletion && !report.signInResponseCompleted) {
++          try { await bounded(() => signInCompletion, Math.max(1, Math.min(5_000, until - now())), 'browser_cleanup_failed') }
++          catch { cleanupFailed = true }
++        }
+         report.cleanup.signOutAttempted = true
+         await attempt('signOutSucceeded', async () => { await read('/api/auth/sign-out', 'POST', until) })
+         await attempt('anonymousAfterLogout', async () => { check(await read('/api/auth/get-session', 'GET', until) === null, 'browser_cleanup_failed') })
+         if (!report.signInResponseCompleted) cleanupFailed = true
+       }
+       // Session cleanup must happen while its API context still owns cookies.
+-      for (const kind of ['page', 'context', 'browser']) {
+-        if (owned[kind]) await attempt(kind + 'Closed', () => kind === 'page'
+-          ? owned.page.close({ runBeforeUnload: false }) : owned[kind].close())
++      for (const kind of ['context', 'browser']) {
++        if (owned[kind] && report.cleanup[kind + 'Closed'] !== true) await attempt(kind + 'Closed', () => owned[kind].close())
+       }
+       disposed = true
+       report.cleanup.status = cleanupFailed ? 'failed' : 'closed'
+@@ -232,13 +251,14 @@
+     await run(ms => owned.page.getByLabel('Password', { exact: true }).fill(env.ACME_DEMO_PASSWORD, { timeout: ms }))
+     const reply = owned.page.waitForResponse(response => response.url() === ORIGIN + '/mikka/api/auth/sign-in/email'
+       && response.request().method() === 'POST', { timeout: Math.min(30_000, config.deadline - now()) })
+-    void reply.catch(() => {})
++    signInCompletion = reply.then(async response => { await response.finished(); report.signInResponseCompleted = true; return response })
++    void signInCompletion.catch(() => {})
++    const signInButton = owned.page.getByRole('button', { name: 'Sign in to the workspace', exact: true })
++    await unique(signInButton)
+     gate(); pageIsOfficial()
+     report.signInAttempted = true
+-    await click(owned.page.getByRole('button', { name: 'Sign in to the workspace', exact: true }))
+-    const loginResponse = await run(() => reply)
+-    await run(() => loginResponse.finished())
+-    report.signInResponseCompleted = true
++    await run(ms => signInButton.click({ timeout: ms }))
++    const loginResponse = await run(() => signInCompletion)
+     check(loginResponse.status() === 200, 'browser_identity_failed')
+     await run(ms => owned.page.waitForURL(url => url.origin === ORIGIN && [HOME, HOME + '/'].includes(url.href), { timeout: ms }))
+     const session = await read('/api/auth/get-session')
+@@ -260,10 +280,15 @@
+       await unique(menu)
+       const group = menu.getByRole('group').filter({ has: owned.page.getByText(owners[0].email, { exact: true }) })
+       await unique(group, 'browser_workspace_ambiguous')
++      // The old page can already be HOME. Wait for the next actual document
++      // navigation, not an immediately true URL or the menu's close animation.
++      const moved = owned.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: Math.min(30_000, config.deadline - now()) })
++      void moved.catch(() => {})
+       await click(group.getByRole('menuitem', { name: matches[0].name, exact: true }), 'browser_workspace_ambiguous')
++      const navigation = await run(() => moved)
++      check(navigation?.status() === 200 && [HOME, HOME + '/'].includes(navigation.url()), 'browser_workspace_failed')
+       report.workspaceSelection = 'switched_ui'
+-      await run(ms => menu.waitFor({ state: 'hidden', timeout: ms }))
+-      await run(ms => owned.page.waitForURL(url => [HOME, HOME + '/'].includes(url.href), { timeout: ms }))
++      homeOnly()
+     } else report.workspaceSelection = 'already_selected'
+     const workspace = await read('/api/workspace')
+     check(workspace?.currentUserId === ownerId && workspace.workspace?.id === ready.workspaceId
+@@ -317,12 +342,12 @@
+     await unique(submit)
+     check(await run(() => submit.isEnabled()), 'browser_selection_failed')
+     gate(); pageIsOfficial()
+-    report.submitClicks = 1
++    report.submitClicks = 1; report.submissionOutcome = 'unknown'
+     // Never retry, even if the click's result is unknown. The driver observes
+     // and cleans the one fixture; another click can create paid duplicate work.
+     await run(ms => submit.click({ timeout: ms }))
+     await run(ms => dialog.waitFor({ state: 'hidden', timeout: ms }))
+-    report.submissionObserved = true
++    report.submissionObserved = true; report.submissionOutcome = 'confirmed'
+     report.status = 'submitted'; report.stage = 'observing'
+     await save()
+     return { close }

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "pr1665_580_source_receipt_clarification",
+  "originalReceipt": {
+    "path": "ci-1665-580-source-failure.json",
+    "bytes": 6754,
+    "sha256": "4d9194a943398923506fc504f653e09f148469fa124dcc658781da077fdc2389",
+    "blob": "90eecf5f09f90ad61253947685a8ae97e7b90a29"
+  },
+  "originalPreserved": true,
+  "field": "tests.aliasFileDeclaredInApiCommand",
+  "originalValue": false,
+  "meaning": "The original check searched the printed command for a literal file path. It did not expand the actual apps/api/scripts/*.test.mjs glob.",
+  "correction": {
+    "literalPathPresent": false,
+    "matchedByCommandGlob": true,
+    "executionObserved": true,
+    "source": "original in-memory job log; not re-downloaded",
+    "subtests": [
+      {
+        "number": 32,
+        "name": "native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds",
+        "outcome": "ok"
+      },
+      {
+        "number": 33,
+        "name": "the actual Workflow LocalBuilder output loads natively and answers GET/HEAD health after the API alias pass",
+        "outcome": "ok"
+      },
+      {
+        "number": 34,
+        "name": "production builds register no extra pass; dev registers after both SDK build phases",
+        "outcome": "ok"
+      }
+    ]
+  },
+  "boundaries": [
+    "The original false field must not be interpreted as non-execution.",
+    "This preserves the original lint failure; it is not validation of a907."
+  ]
+}
