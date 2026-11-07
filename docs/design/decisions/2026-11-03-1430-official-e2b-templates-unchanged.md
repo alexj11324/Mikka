@@ -137,8 +137,8 @@ Mikka 请求。`mikka-mcp` 的唯一远程发送路径只允许工具目录发�
 工作区变量。CLI/MCP 收据缺失、错绑、截断，或执行期间出现额外授权往返时仍失败；
 已有工作区变量保持原状，旧 worker 的空收据不能被“可信入口”标记代替。
 
-同日候选订阅门槛在 Codex 的 `initialize` 阶段失败，尚未交付订阅凭证或发送
-`thread/start`、`turn/start`。随后在官方 Codex 0.166.0 上做无账号控制，复现原生
+同日候选订阅门槛在 Codex 的 `initialize` 阶段失败，尚未执行官方 CLI 的订阅
+登录，或发送 `thread/start`、`turn/start`。随后在官方 Codex 0.166.0 上做无账号控制，复现原生
 OTLP exporter 拒绝压缩字符串 `none`；从真实收集器导出修复配置后，同一官方 CLI
 可完成初始化。只在开启观测的 Codex 子进程最终环境中移除信号级和通用级两个
 OTLP 压缩变量，使用原生不压缩默认值；Claude 与未开启观测的环境保持原行为。

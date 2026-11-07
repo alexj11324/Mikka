@@ -143,7 +143,8 @@
   "limitations": [
     "The failed candidate no longer exists; a later official-template diagnostic is not automatically the same CLI binary.",
     "This is candidate execution diagnosis, not optimized production latency acceptance.",
-    "Parent and parallel child spans must not be added."
+    "Parent and parallel child spans must not be added.",
+    "Anonymous controls hashed the official JavaScript launcher at the recorded realpath, not the underlying native Rust executable or the complete template manifest. Full original-file conservation remains a separate release gate."
   ],
   "newAcceptanceAccountRule": {
     "source": "https://github.com/alexj11324/Mikka/issues/1515#issuecomment-6694934529",
@@ -408,7 +409,7 @@
       },
       "mcpSubstitution": "no_secret_local_node_stub_same_configuration_shape"
     },
-    "interpretation": "The original official Codex 0.166.0 rejects the injected compression string none. Unsetting both signal-specific and generic OTLP compression selects the native uncompressed default. Controls sent only initialize/initialized, never account/login, thread/start, turn/start or model prompts. These same-VM timings are diagnostic, not production latency results.",
+    "interpretation": "The original official Codex 0.166.0 rejects the injected compression string none. Unsetting both signal-specific and generic OTLP compression selects the native uncompressed default. Controls sent only initialize/initialized, never account/login, thread/start, turn/start or model prompts. These same-VM timings are diagnostic, not production latency results. The recorded before/after hash covers the original JavaScript launcher only; it does not prove the native executable or full original-file manifest.",
     "originalCandidateBinaryEstablished": false,
     "fixedSourceRegression": {
       "workflowRunId": 42341757942,
