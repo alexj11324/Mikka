@@ -41,6 +41,7 @@ test('a refused turn moves to the person\'s own subscription: the first in the m
   const { ownSubscriptionOption } = await import('../bot-model-menu-view')
   const option = (id: string, provider: string) => ({ id, modelId: id, provider })
   assert.equal(ownSubscriptionOption({ groups: [{ kind: 'hosted', options: [option('h', 'mikka')] }, { kind: 'shared', provider: 'claude', owner: '林二', options: [option('s', 'claude')] }] }), null, 'a teammate\'s shared subscription is not the person\'s own')
+  assert.equal(ownSubscriptionOption({ groups: [{ kind: 'subscription', provider: 'claude', owner: '林二', credentialLabel: '林二', options: [option('s', 'claude')] }] }), null, 'a shared subscription group cannot become an own-account recovery option')
   assert.deepEqual(ownSubscriptionOption({ groups: [
     { kind: 'hosted', options: [option('h', 'mikka')] },
     { kind: 'subscription', provider: 'claude', plan: 'Max', options: [option('opus', 'claude'), option('sonnet', 'claude')] },
