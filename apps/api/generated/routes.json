@@ -1397,7 +1397,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "fa43619f1ece2a44667ca85c60e970186710fb4f73c756dfa4123a32c04bee5b"
+      "sourceHash": "23cbf3838ceef1a597d48eba89cb523f671506253e13021b0af896a0f2908aea"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",

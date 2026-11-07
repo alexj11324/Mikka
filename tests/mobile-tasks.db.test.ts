@@ -2,6 +2,8 @@ import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
+import { createTranslator } from 'next-intl'
+import messages from '../messages/en.json'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { tokenWorkspace } from '../lib/tokens/principal'
 import { measured } from './helpers/read-metrics'
@@ -10,7 +12,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   let selectedWorkspace = ''
   let user: { id: string; name: string; email: string; [tokenWorkspace]?: string } | null = null
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' ? { value: selectedWorkspace } : undefined }) } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async (namespace: string) => namespace === 'MobileTaskSchedule'
+    ? createTranslator({ locale: 'en', messages, namespace: 'MobileTaskSchedule' }) : Object.assign((key: string) => key, { has: () => true }) } })
   mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExports: { mobileUser: async () => user, json: (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } }), unauthorized: () => Response.json({ error: 'authRequired' }, { status: 401 }) } })
   mock.module(new URL('../lib/session.ts', import.meta.url).href, { namedExports: { getSession: async () => user ? { user } : null } })
   mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
@@ -84,7 +87,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.ok(Object.hasOwn(row, 'blocked'))
     const scheduled = body.tasks.find((item: { id: string }) => item.id === noRun)
     assert.equal(scheduled.group, 'todo'); assert.equal(scheduled.bot, null)
-    assert.equal(scheduled.schedule.label, '每天 09:00')
+    assert.equal(scheduled.schedule.label, 'Every day at 09:00')
     assert.equal(Date.parse(scheduled.schedule.nextAt), Date.parse('2030-01-01T09:00:00Z'))
     await pool.query(`update issues set status='done' where id=$1`, [issueId])
     const closed = await (await list(new Request('https://app.test/api/mobile/tasks'))).json()

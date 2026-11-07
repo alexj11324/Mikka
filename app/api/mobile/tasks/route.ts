@@ -5,7 +5,7 @@ import { pollIssues, listWorkspaceIssues } from '@/app/actions/issues'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { displayTaskTitle } from '@/lib/short-title'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
-import { newestTaskRuns } from '@/lib/task-block-runs'
+import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
 import { mobileTaskGroup } from '@/lib/mobile-task-view'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,7 @@ async function handleGET(request: Request) {
   const { issues, workspaceId } = tokenWorkspaceId
     ? { issues: await actAs(user, () => listWorkspaceIssues(tokenWorkspaceId)), workspaceId: tokenWorkspaceId }
     : await pollIssues().then(snapshot => ({ issues: snapshot.items!, workspaceId: snapshot.live.selectedWorkspaceId }))
-  const snapshots = await newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId)
+  const snapshots = await newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels())
   const runs = snapshots.flatMap(row => row.runId && row.status ? [{ ...row, runId: row.runId, status: row.status }] : [])
   const byIssue = new Map(snapshots.map(row => [row.issueId, row]))
   const runByIssue = new Map(runs.map(row => [row.issueId, row]))

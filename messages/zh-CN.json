@@ -1,4 +1,8 @@
 {
+  "MobileTaskSchedule": {
+    "daily": "每天 {time}",
+    "interval": "每 {minutes} 分钟"
+  },
   "Common": {
     "appUpdated": "Mikka 已更新",
     "refresh": "刷新",
