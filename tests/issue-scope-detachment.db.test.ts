@@ -1374,7 +1374,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       await suspending
       const before=(await pool.query('select * from issues where id=$1',[id])).rows[0]
       const versions=(await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[id])).rows[0].n
-      assert.deepEqual(await withRequestContext(()=>inWorkspace(member,()=>saveIssue({id,revision:2,title:'Denied after suspension',content:JSON.parse(doc),status:'todo',priority:'normal'}))),{error:'issueNotFound'})
+      assert.deepEqual(await withRequestContext(()=>inWorkspace(member,()=>saveIssue({id,revision:2,title:'Denied after suspension',content:JSON.parse(doc),status:'todo',priority:'normal'}))),{error:'issueNotFound',params:undefined})
       assert.deepEqual((await pool.query('select * from issues where id=$1',[id])).rows[0],before)
       assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[id])).rows[0].n,versions)
       assert.equal(before.workspaceId,workspace);assert.equal(before.scopeVersion,1)

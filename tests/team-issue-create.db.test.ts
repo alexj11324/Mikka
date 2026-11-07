@@ -259,7 +259,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     // An existing association is context, not proof that this call explicitly
     // selected and authorized a destination.
     await workspace.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,teamId,workspaceId,owner])
-    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:1,scope:'workspace'})),{error:'issueNotFound'})
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:1,scope:'workspace'})),{error:'issueNotFound',params:undefined})
     assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'personal',linearSyncBlocked:false})
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
     assert.equal((await app.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
@@ -286,7 +286,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     await app.query('insert into issue_documents ("issueId","userId",state) values ($1,$2,\'synthetic\')',[id,owner])
     await app.query('insert into linear_sync_outbox (id,"issueId","scopeVersion") values ($1,$2,1)',[randomUUID(),id])
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
-    assert.deepEqual(await actAs(owner,()=>retryLinearIssue(id)),{error:'issueNotFound'})
+    await assert.rejects(actAs(owner,()=>retryLinearIssue(id)),{message:'issueNotFound'})
     assert.equal(await syncAppIssueToLinear(id),null)
     assert.equal((await app.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
     assert.equal((await app.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)

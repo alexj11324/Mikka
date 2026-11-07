@@ -161,15 +161,18 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   // Same unresolved state as the browser acceptance: no verified link, an
   // inactive sync and a committed reservation whose response was lost.
   await pool.query('update linear_connections set "revokedAt"=null where "userId"=$1', [owner])
-  const created = await collectIssueEffects([], () => actAs(owner, () => actions.saveIssue({ title: 'Unknown Linear publication', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })))
-  assert.ok('issue' in created && created.issue)
-  const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
-  const promoted = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: created.issue.id, revision: created.issue.revision, teamId, expectedTeamId: null })
-  assert.ok('issue' in promoted && promoted.issue)
-  const pendingIssue = created.issue.id, pendingSync = randomUUID(), pendingPublication = randomUUID(), pendingRemote = randomUUID()
+  // Seed a reservation that began under an explicit provider policy. A new
+  // ordinary Team task has publication disabled and cannot mint this receipt.
+  const pendingIssue = randomUUID(), pendingSync = randomUUID(), pendingPublication = randomUUID(), pendingRemote = randomUUID()
+  const { allocateIssueNumbers } = await import('../lib/issue-numbering')
+  const { issues } = await import('../lib/db/schema')
+  await db.transaction(async tx => {
+    const number = await allocateIssueNumbers(tx, owner)
+    await tx.insert(issues).values({ id: pendingIssue, userId: owner, workspaceId: workspace, ownershipState: 'bound', scope: 'workspace', scopeSetBy: 'user', linearSyncPolicy: 'explicit', linearSyncBlocked: false, title: 'Unknown Linear publication', content: { type: 'doc', content: [], attrs: { mikka: { number } } }, status: 'todo', priority: 'normal' })
+  })
   await pool.query('update linear_team_syncs set active=false where id=$1', [syncId])
   await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName",active,"workspaceId") values($1,$2,$3,\'OLD\',\'Unresolved fixture\',true,$4)', [pendingSync, owner, randomUUID(), workspace])
-  await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,$5,$6,true)', [pendingPublication, pendingIssue, owner, pendingSync, promoted.issue.scopeVersion, pendingRemote])
+  await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,1,$5,true)', [pendingPublication, pendingIssue, owner, pendingSync, pendingRemote])
   await pool.query('update linear_team_syncs set active=false where id=$1', [pendingSync])
   await retire(pendingIssue)
   const beforeUnknownReads = stateReads, beforeUnknownWrites = archiveRequests
