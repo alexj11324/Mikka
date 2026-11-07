@@ -20,7 +20,7 @@ export function settingsReadRequirements(id, fixture) {
     case 'general': return [{ action: 'workspace-settings.listArchivedBots' }]
     case 'permissions': return [{ path: `/api/workspaces/${fixture.workspace}/computer-policy` }]
     case 'billing': return [{ path: '/api/settings/credit-billing' }]
-    case 'computers': return [{ path: '/api/settings/model-order' }]
+    // 设备 no longer reads the model order (#1578): its rows render from the device list alone.
     case 'connections': return [
       { path: '/api/integrations/composio' },
       { path: '/api/integrations/github' },
