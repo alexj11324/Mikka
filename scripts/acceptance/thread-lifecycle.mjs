@@ -171,6 +171,14 @@ export function isExactNativeCommand(command, expected) {
     && ['-c', '-lc'].includes(words[1]) && words[2].trim() === expected.trim()
 }
 
+export function reviewDeliveryValidation(value, record) {
+  const text = typeof value.reportText === 'string' ? value.reportText : ''
+  return { text: typeof value.reportText === 'string', bytes: Buffer.byteLength(text) === value.reportBytes,
+    digest: sha(text) === value.reportSha256, issue: text.includes('#1593'), source: text.includes(record.sourceCommit),
+    ownerChoice: text.includes('owner_choice=provider-receipts'), evidence: text.includes('Evidence'),
+    risks: text.includes('Risks'), limits: text.includes('Limits') }
+}
+
 /** Tool pairs only: ordinary assistant text cannot satisfy any native proof. */
 export function nativeEvidence(detail, record) {
   const inputs = new Map(), pairs = []
@@ -205,9 +213,12 @@ export function nativeEvidence(detail, record) {
       assert(SHA.test(value.head ?? '') && ['rootSha256', 'trackedSha256', 'statusSha256', 'markerSha256', 'reportSha256'].every(key => DIGEST.test(value[key] ?? ''))
         && value.markerSha256 === record.markerSha256 && value.markerBytes === record.markerBytes
         && Number.isSafeInteger(value.reportBytes) && value.reportBytes >= 300 && value.reportBytes <= 2400, 'native_snapshot_mismatch')
-      if (value.phase === 'delivery') assert(typeof value.reportText === 'string' && Buffer.byteLength(value.reportText) === value.reportBytes
-        && sha(value.reportText) === value.reportSha256
-        && ['#1593', record.sourceCommit, 'owner_choice=provider-receipts', 'Evidence', 'Risks', 'Limits'].every(text => value.reportText.includes(text)), 'review_delivery_invalid')
+      if (value.phase === 'delivery') {
+        // Retain closed diagnostics before throwing. A failed report must tell
+        // integrity failures from missing content without exporting its text.
+        record.deliveryValidation = reviewDeliveryValidation(value, record)
+        assert(Object.values(record.deliveryValidation).every(Boolean), 'review_delivery_invalid')
+      }
       snapshots[value.phase] = { phase: value.phase, head: value.head, rootSha256: value.rootSha256, trackedSha256: value.trackedSha256,
         statusSha256: value.statusSha256, markerSha256: value.markerSha256, markerBytes: value.markerBytes,
         reportSha256: value.reportSha256, reportBytes: value.reportBytes, toolCallHash: sha(pair.id).slice(0, 16), commandSha256: sha(command),

@@ -175,7 +175,12 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
   }
   const { rows } = await query.query<EntryRow>(
-    'SELECT id,harness,model,"sourceKind","sourceId"::text AS "sourceId" FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
+    `SELECT e.id,e.harness,e.model,e."sourceKind",e."sourceId"::text AS "sourceId" FROM model_order_entries e
+      LEFT JOIN byos_connections c ON e."sourceKind"='subscription' AND c.id=e."sourceId"
+      LEFT JOIN model_api_keys k ON e."sourceKind"='api_key' AND k.id=e."sourceId"
+      WHERE e."ownerId"=$1 AND e."workspaceId"=$2
+      AND COALESCE((COALESCE(to_jsonb(c)->'modelSettings',to_jsonb(k)->'modelSettings')->'models'->e.model->>'enabled')::boolean,true)
+      ORDER BY e.position,e.id`,
     [scope.ownerId, scope.workspaceId])
   return { ...settings, entries: rows.map(toEntry) }
 }

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { cleanupLifecycleCase, createProviderObserver, isExactNativeCommand, lifecycleHash, MODELS, nativeEvidence, nativeSnapshotCommand,
-  readOptions, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
+  readOptions, reviewDeliveryValidation, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
 import { watchRun } from './cloud-startup.mjs'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -700,4 +700,19 @@ test('abort during an awaited pin prevents a new dispatch or answer while cleanu
   assert.equal(report.cases[0].error, 'lifecycle_interrupted')
   assert.equal(report.cleanup.workspaceRestored, true)
   assert.ok(f.calls.some(call => call.path === '/api/auth/sign-out'))
+})
+
+ test('delivery failure records the failed invariant without disclosing report content', () => {
+  const record = fixture(), valid = markerProof(record, 'delivery')
+  assert.ok(Object.values(reviewDeliveryValidation(valid, record)).every(Boolean))
+  for (const [field, token] of [['issue', '#1593'], ['source', SOURCE], ['ownerChoice', 'owner_choice=provider-receipts'],
+    ['evidence', 'Evidence'], ['risks', 'Risks'], ['limits', 'Limits']]) {
+    const text = valid.reportText.replaceAll(token, 'PRIVATE_REPORT')
+    const receipt = reviewDeliveryValidation({ ...valid, reportText: text, reportBytes: Buffer.byteLength(text), reportSha256: sha(text) }, record)
+    assert.equal(receipt[field], false)
+    assert.equal(receipt.bytes, true); assert.equal(receipt.digest, true)
+    assert.doesNotMatch(JSON.stringify(receipt), /PRIVATE_REPORT/)
+  }
+  assert.equal(reviewDeliveryValidation({ ...valid, reportSha256: '0'.repeat(64) }, record).digest, false)
+  assert.equal(reviewDeliveryValidation({ ...valid, reportBytes: 1 }, record).bytes, false)
 })

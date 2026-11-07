@@ -1,4 +1,6 @@
 import 'server-only'
+import { hostedModelEnabled } from './enabled-models'
+import { ActionFailureError } from './action-error'
 import type { Pool } from 'pg'
 import type { ExecutionSettings, ExecutionSettingsScope } from './execution-settings'
 import { HOSTED_CHOICE, type BotModelQuota } from './bot-model-menu-view'
@@ -61,7 +63,20 @@ export async function resolveBotModelChoice(
   if (key && preference.key) return { kind: 'apiKey', key, model: preference.key.model, chosen: true }
   const fallback = preference.key ? 'preference' as const : undefined
 
+  const hostedAllowed = await hostedModelEnabled(pool, scope.ownerId)
   const hosted = async (state: ChoiceState): Promise<BotModelChoice> => {
+    if (!hostedAllowed) {
+      const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
+      if (next?.kind === 'api_key') {
+        const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
+        if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'preference' }
+      }
+      if (next?.kind === 'subscription') {
+        const binding = await settings.chatBinding(scope, next.bindingId)
+        if (binding) return { kind: 'subscription', binding, chosen: false, fallback: 'preference' }
+      }
+      throw new ActionFailureError('executionModelUnknown')
+    }
     // Community defaults either spend their explicitly bound cloud workspace
     // or their own provider. Local hosted balances never redirect that choice.
     if (!isCloudEdition()) return { kind: 'hosted', ...state }
@@ -77,7 +92,7 @@ export async function resolveBotModelChoice(
     }
     return { kind: 'hosted', ...state }
   }
-  if (preference.selected === HOSTED_CHOICE && !preference.key) return hosted({ chosen: true })
+  if (preference.selected === HOSTED_CHOICE && !preference.key && hostedAllowed) return hosted({ chosen: true })
 
   const rows = cached.rows ?? await settings.chatModels(scope)
   const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined
@@ -100,6 +115,17 @@ export async function resolveBotModelChoice(
       return { kind: 'apiKey', key: next.key, model: next.model, chosen: false, fallback: 'quota', quota }
     }
     return { kind: 'subscription', binding, ...state, ...(sharedOwnerId ? { sharedOwnerId } : {}), quota }
+  }
+  if (!selected && !shared && (preference.key || preference.selected)) {
+    const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
+    if (next?.kind === 'api_key') {
+      const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
+      if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'preference' }
+    }
+    if (next?.kind === 'subscription') {
+      const nextBinding = await settings.chatBinding(scope, next.bindingId)
+      if (nextBinding) return withQuota(nextBinding)
+    }
   }
   if (shared) return withQuota(shared, shared.ownerId)
   if (binding) return withQuota(binding)
