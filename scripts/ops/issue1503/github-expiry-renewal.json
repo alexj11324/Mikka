@@ -5,10 +5,10 @@
   "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
-  "startedAt": "2026-11-07T11:32:54.738Z",
+  "startedAt": "2026-11-07T23:46:48.300Z",
   "status": "passed",
   "changed": true,
-  "inputFixtureSha256": "25924143a7cad32de244292385ad2d027bd6b6b58af08f4b8f7211fe8406bf61",
+  "inputFixtureSha256": "2d5418a9aa2d3571040595504bbd279de5d842e08db1dcf7d30b9821b280b312",
   "before": {
     "version": 1,
     "issue": 1503,
@@ -23,10 +23,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T15:07:53.000Z",
-    "connectionExpiresAt": "2026-11-07T12:32:05.327Z",
-    "connectionUpdatedAt": "2026-11-07T08:32:15.328Z",
-    "tokenSha256": "89203678a1bd0309e0785e1f54c9975408838aed1374a1fc7d0ee378a115d94a"
+    "providerExpiresAt": "2026-11-08T05:11:30.000Z",
+    "connectionExpiresAt": "2026-11-08T01:11:22.762Z",
+    "connectionUpdatedAt": "2026-11-07T21:11:32.763Z",
+    "tokenSha256": "c6e90ad02df471bf35e9455d02d4bd75a8a8b9a05d35ef2fba6d95a3e70df3a6"
   },
   "activityBefore": {
     "activeRuns": 0,
@@ -46,7 +46,7 @@
     "scopeMetadataValidated": false,
     "scopeEvidence": "original_scoped_mint_and_unchanged_token_sha256",
     "providerExpirySource": "original_scoped_mint_and_check_min",
-    "providerExpiresAt": "2026-11-07T15:07:53.000Z"
+    "providerExpiresAt": "2026-11-08T05:11:30.000Z"
   },
   "activityAtSave": {
     "activeRuns": 0,
@@ -72,10 +72,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T15:07:53.000Z",
-    "connectionExpiresAt": "2026-11-07T15:07:42.785Z",
-    "connectionUpdatedAt": "2026-11-07T11:32:58.786Z",
-    "tokenSha256": "89203678a1bd0309e0785e1f54c9975408838aed1374a1fc7d0ee378a115d94a"
+    "providerExpiresAt": "2026-11-08T05:11:30.000Z",
+    "connectionExpiresAt": "2026-11-08T03:46:40.717Z",
+    "connectionUpdatedAt": "2026-11-07T23:46:50.717Z",
+    "tokenSha256": "c6e90ad02df471bf35e9455d02d4bd75a8a8b9a05d35ef2fba6d95a3e70df3a6"
   },
   "sameToken": true,
   "activityAfter": {
@@ -90,5 +90,5 @@
   },
   "renewedFixtureStateWritten": true,
   "stage": "readback",
-  "completedAt": "2026-11-07T11:32:59.111Z"
+  "completedAt": "2026-11-07T23:46:50.879Z"
 }
