@@ -1,0 +1,57 @@
+{
+  "recordedAt": "2026-11-07T12:11:24.725557+00:00",
+  "sourceSha": "b73e477934f9fa803ea971837e37c6011db15839",
+  "sourceTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+  "overlay": {
+    "sha": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "tree": "39c0695b04f6699cf488800b9a47861254fd8058",
+    "gitBlobVerifiedCount": 214,
+    "omittedDocumentationPngCount": 73,
+    "runtimeAssetOmitted": false,
+    "sparseExportVerified": true,
+    "settingsFrameContractExportedTrue": true,
+    "privateSourceUploaded": false
+  },
+  "build": {
+    "command": [
+      "pnpm",
+      "build"
+    ],
+    "migrate": "0",
+    "node": "v24.22.1",
+    "startedAt": "2026-11-07T12:08:02.359942+00:00",
+    "completedAt": "2026-11-07T12:11:00.230790+00:00",
+    "exitCode": 0,
+    "frontendApiAndTypecheckPassed": true,
+    "mikkaBuildManifestSha256": "859edf721a17de5e55a6623e43644567d83e91e6f24bf1164437730808f213af",
+    "rendererManifestSha256": "84e6a5ec1869a9d2e230a45baea5d53dfadc8f89efaa6962352c9d5e5cddda3e",
+    "rendererBuild": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+    "generatedRouteDiffSha256": "1edec8e09305723d0c52249c931eb8d4779890a6382dab1a308de27c28c7b89f"
+  },
+  "schema": {
+    "job": "job-f5907cafa62e",
+    "exitCode": 0,
+    "sourceSha": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "subsequentSourceChange": "one test file only; no schema or migration changes"
+  },
+  "environmentBootstrap": {
+    "job": "job-2bc61433cd29",
+    "exitCode": 0,
+    "deploymentSha": "b73e477934f9fa803ea971837e37c6011db15839",
+    "environmentId": "local-0337f960-618d-4613-9179-9f4e4a0215d6"
+  },
+  "httpReady": {
+    "checkedAt": "2026-11-07T12:11:43.289Z",
+    "status": "ready",
+    "origin": "http://localhost:3110",
+    "environmentId": "local-0337f960-618d-4613-9179-9f4e4a0215d6",
+    "database": "mikka_issue1603_final5_e2e",
+    "source": "b73e477934f9fa803ea971837e37c6011db15839",
+    "compiledBuild": "b73e477934f9fa803ea971837e37c6011db15839",
+    "servedBuild": "b73e477934f9fa803ea971837e37c6011db15839",
+    "rendererBuild": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+    "overlaySha": "e290220f8beac1e52f7b33cb097cc24f55b96d48"
+  },
+  "appJob": "job-56e615d3910f",
+  "readyProbeJob": "job-322a170864fc"
+}

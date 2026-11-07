@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-07 12:44:23 UTC",
+  "repository": "alexj11324/Mikka",
+  "candidate": {
+    "sha": "b73e477934f9fa803ea971837e37c6011db15839",
+    "tree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "baseAtCreation": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "localTestedOverlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "ciAudit": "b73-ci-audit.json"
+  },
+  "previousMainReview": "b73-main-advance-audit.json",
+  "mainAdvance": {
+    "from": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+    "to": "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "commitCount": 1,
+    "pullRequest": 1632,
+    "url": "https://github.com/alexj11324/Mikka/pull/1632",
+    "title": "fix(daemon): bind task desktop authority and final checkpoint receipts",
+    "files": [
+      "app/v1/runs/[runId]/checkpoint/route.ts",
+      "docs/acceptance/issue-1593.md",
+      "lib/cloud-computer/thread-machines.ts",
+      "lib/factory/merge.db.test.ts",
+      "package.json",
+      "packages/daemon/src/main.ts",
+      "packages/daemon/src/runs/supervisor.ts",
+      "packages/daemon/src/server-link-http.ts",
+      "packages/daemon/src/server-link.ts",
+      "packages/daemon/src/subscription-hosted-runner.ts",
+      "packages/daemon/test/commands-polling.test.ts",
+      "packages/daemon/test/provider-failure-runs.test.ts",
+      "packages/daemon/test/server-link-http.test.ts",
+      "packages/daemon/test/subscription-hosted-runner.test.ts",
+      "packages/daemon/test/terminal-checkpoint.test.ts",
+      "packages/protocol/src/device.ts",
+      "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "scripts/e2b/thread-lifecycle-acceptance.ts",
+      "scripts/e2b/thread-lifecycle-archive.test.ts",
+      "scripts/e2b/thread-lifecycle-archive.ts",
+      "tests/checkpoint-recovery.db.test.ts",
+      "tests/secret-masking.db.test.ts"
+    ],
+    "totalAdvanceFileCountSinceCandidateBase": 27
+  },
+  "independentReview": {
+    "allNineProductProtocolPackagePatchesRead": true,
+    "overlapWithCandidateFiles": [
+      "package.json"
+    ],
+    "changes": [
+      {
+        "area": "Device checkpoint write response",
+        "semantics": "The authenticated POST persists and returns a strict same-run {runId,takenAt} receipt using the saved server timestamp instead of an empty 204. Existing admission row locks, owner/device/lease checks and secret masking remain."
+      },
+      {
+        "area": "Daemon final checkpoint proof",
+        "semantics": "Only a valid same-run persisted server receipt can certify the final archive. Old-server 204 remains accepted for transport compatibility but cannot certify a final archive. Server time avoids trusting device clock drift."
+      },
+      {
+        "area": "Desktop computer grant authority",
+        "semantics": "Execution is bound to authenticated run/device and, when present, the signed policy snapshot execution owner. A shared subscription payer is no longer incorrectly required to equal the execution/computer owner. Broker, lease, stopped/registered checks and policy verification remain. This is a real daemon authorization correction, not a claim of unchanged device authority semantics."
+      },
+      {
+        "area": "Thread machine retirement",
+        "semantics": "Only the existing successful provider acknowledgement update with the same owner/workspace/epoch/sandbox clears completed reconcileId/reconcileUntil claims, allowing immediate idempotent replay. Failure retry and unacknowledged creation are unchanged."
+      },
+      {
+        "area": "Acceptance and test wiring",
+        "semantics": "Adds persisted receipt, recovery/retirement, retention/idempotence, desktop owner and controlled PR-wait coverage in existing suites. package.json adds one archive test to test:workflow-wakes; our test:artifacts addition is independent."
+      }
+    ],
+    "unchangedByThisMainDelta": [
+      "React component source, layout and visual slots",
+      "BrowserNotesProvider and ComputerAgentsProvider location/state lifetime",
+      "All seven Retry toast handlers and real-Sonner UI tests",
+      "Browser user session and workspace navigation scope",
+      "SWR read keys, auth read-cache generation and invalidation",
+      "Ordinary read-only UI/API endpoints exercised by issue #1603",
+      "CI workflow definitions and production build definitions",
+      "Dependency versions, package non-script fields and lockfile",
+      "Official overlay contract and assets"
+    ],
+    "realNewBehaviorNotCoveredByB73LocalArtifact": [
+      "Device checkpoint POST response semantics",
+      "Daemon/protocol final archive receipt flow",
+      "Shared-subscription desktop computer authority correction",
+      "Thread machine retirement replay cleanup",
+      "Associated worker and subscription lifecycle acceptance"
+    ]
+  },
+  "mergeProof": {
+    "baseAtCreation": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "previousReviewedMain": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+    "newMain": "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "candidate": "b73e477934f9fa803ea971837e37c6011db15839",
+    "mergeBase": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "expectedMergeTree": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+    "mergeTreeExitCode": 0,
+    "newMainCommits": [
+      "b5271361bbef8a619e06d472a58a03925dc6489f fix(lifecycle): bind desktop authority and persisted checkpoint receipts (#1632)"
+    ],
+    "newMainDeltaFiles": [
+      "app/v1/runs/[runId]/checkpoint/route.ts",
+      "docs/acceptance/issue-1593.md",
+      "lib/cloud-computer/thread-machines.ts",
+      "lib/factory/merge.db.test.ts",
+      "package.json",
+      "packages/daemon/src/main.ts",
+      "packages/daemon/src/runs/supervisor.ts",
+      "packages/daemon/src/server-link-http.ts",
+      "packages/daemon/src/server-link.ts",
+      "packages/daemon/src/subscription-hosted-runner.ts",
+      "packages/daemon/test/commands-polling.test.ts",
+      "packages/daemon/test/provider-failure-runs.test.ts",
+      "packages/daemon/test/server-link-http.test.ts",
+      "packages/daemon/test/subscription-hosted-runner.test.ts",
+      "packages/daemon/test/terminal-checkpoint.test.ts",
+      "packages/protocol/src/device.ts",
+      "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "scripts/e2b/thread-lifecycle-acceptance.ts",
+      "scripts/e2b/thread-lifecycle-archive.test.ts",
+      "scripts/e2b/thread-lifecycle-archive.ts",
+      "tests/checkpoint-recovery.db.test.ts",
+      "tests/secret-masking.db.test.ts"
+    ],
+    "totalMainAdvanceFileCount": 27,
+    "candidateChangedFileCount": 17,
+    "overlap": [
+      "package.json"
+    ],
+    "candidateNonPackageBlobsRetainedExactly": 16,
+    "mainNonPackageBlobsRetainedExactly": 26,
+    "packageChanges": {
+      "candidateChangedScripts": [
+        "test:artifacts"
+      ],
+      "mainChangedScripts": [
+        "test:workflow-wakes"
+      ],
+      "unionPreservesBoth": true,
+      "nonScriptFieldsUnchanged": true
+    },
+    "twoWayDeltaProof": {
+      "mainDeltaEqualsUnionExtraExceptBlobIndexLines": true,
+      "candidateDeltaEqualsUnionFeatureExceptBlobIndexLines": true,
+      "mainNormalizedDeltaSha256": "7f5d3806f5e506366f6885563a40ad271071fa11fd6a65d16773f71f60f6f3eb",
+      "candidateNormalizedDeltaSha256": "cc13e2b12dbc10a248b318124ffda5862cf6b3e270cb5b73fb2314cc2cc705c7",
+      "normalization": "Only git index lines containing before/after blob hashes are omitted. package.json combines two disjoint existing test-script changes, so its blob hashes necessarily differ. All hunks, paths, modes and content otherwise match."
+    },
+    "fetchedObjectsOnly": false,
+    "candidateRefOrWorktreeModified": false,
+    "mainRefOrWorktreeModified": false,
+    "description": "Independent object-only merge-tree calculation; no candidate/main branch or worktree change. Both resulting deltas were independently checked; exact non-package blobs and package script composition were verified.",
+    "actualMergeCommitObserved": false
+  },
+  "sourceBindingDecision": {
+    "reuseB73UiApiEvidence": true,
+    "reason": "The candidate's 16 non-package blobs, including all product UI/provider/cache changes, are retained exactly. The only shared file is package.json with independent existing test-script additions. The new backend lifecycle behavior is outside the locally exercised read/UI contracts and is not relabeled as tested.",
+    "localEvidenceRemainsBoundTo": "b73e477934f9fa803ea971837e37c6011db15839 + e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "noUnrelatedUiRetestRequiredByThisDelta": true,
+    "doesNotClaimB73BuiltOrTestedNewMainOrUnionTree": true,
+    "expectedActualMergeParentsIfMainUnchanged": [
+      "b5271361bbef8a619e06d472a58a03925dc6489f",
+      "b73e477934f9fa803ea971837e37c6011db15839"
+    ],
+    "expectedActualMergeTreeIfMainUnchanged": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+    "supersededExpectedTreeOnDabOnly": "f8c9e68e805c2b0bdd917cde78940063cf56cfa4",
+    "postMergeRequirements": [
+      "Verify the actual merge commit parents and tree; recompute if main advances again.",
+      "Track actual merged-head main CI and Web deployment, including exact public source/build/overlay binding.",
+      "Track the existing source-bound worker/additive release and official subscription gates for the real new lifecycle behavior; do not treat older worker evidence or conditional skips as acceptance.",
+      "Keep local b73+e290 screenshots/build/API results at their original source identities."
+    ]
+  },
+  "githubSnapshot": {
+    "currentMain": "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "prHead": "b73e477934f9fa803ea971837e37c6011db15839",
+    "prBaseSnapshot": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "prMergeRefSnapshot": "3812194c5d8cc0f1f435bacbb8e5b0d9f1306d4b",
+    "draft": true,
+    "mergeable": true,
+    "mergeableState": "clean",
+    "note": "An earlier PR base/merge-ref response is not proof of the final merged tree. The independent union prediction is bound to b5271361 + b73e477."
+  },
+  "newMainCiAtObservation": {
+    "runs": [
+      {
+        "id": 42373759825,
+        "name": "Task VM question-resume evidence",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373759825"
+      },
+      {
+        "id": 42373704088,
+        "name": "Issue 1225 model provider acceptance",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373704088"
+      },
+      {
+        "id": 42373704099,
+        "name": "Read cache production acceptance",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373704099"
+      },
+      {
+        "id": 42373704095,
+        "name": "Project decisions production acceptance",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373704095"
+      },
+      {
+        "id": 42373587407,
+        "name": "Task VM question-resume evidence",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373587407"
+      },
+      {
+        "id": 42373510296,
+        "name": "Task VM question-resume evidence",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373510296"
+      },
+      {
+        "id": 42373342353,
+        "name": "Task VM question-resume evidence",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373342353"
+      },
+      {
+        "id": 42373330398,
+        "name": "Desktop release",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373330398"
+      },
+      {
+        "id": 42373330325,
+        "name": "Publish daemon",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373330325"
+      },
+      {
+        "id": 42373330326,
+        "name": "Mobile OTA update",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373330326"
+      },
+      {
+        "id": 42373330380,
+        "name": "E2B additive runtime release",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373330380"
+      },
+      {
+        "id": 42373330305,
+        "name": "CI",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373330305"
+      },
+      {
+        "id": 42373330466,
+        "name": "Web deploy",
+        "headSha": "b5271361bbef8a619e06d472a58a03925dc6489f",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373330466"
+      }
+    ],
+    "counts": {
+      "skipped": 12,
+      "in_progress": 9,
+      "success": 8
+    },
+    "failures": [],
+    "claimedAllGreen": false,
+    "nonSuccessfulTerminalRuns": [
+      {
+        "id": 42373759825,
+        "name": "Task VM question-resume evidence",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373759825"
+      },
+      {
+        "id": 42373704088,
+        "name": "Issue 1225 model provider acceptance",
+        "conclusion": "cancelled",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373704088"
+      },
+      {
+        "id": 42373704099,
+        "name": "Read cache production acceptance",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373704099"
+      },
+      {
+        "id": 42373704095,
+        "name": "Project decisions production acceptance",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373704095"
+      },
+      {
+        "id": 42373587407,
+        "name": "Task VM question-resume evidence",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373587407"
+      },
+      {
+        "id": 42373510296,
+        "name": "Task VM question-resume evidence",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373510296"
+      },
+      {
+        "id": 42373342353,
+        "name": "Task VM question-resume evidence",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42373342353"
+      }
+    ],
+    "note": "Current observation only; main CI and release jobs are not claimed complete. Conditional skips and the cancelled model-provider workflow are not acceptance evidence. Final merged-head results are tracked separately."
+  },
+  "mutationsByThisReview": {
+    "candidateOrMainRef": false,
+    "worktree": false,
+    "externalWrite": false,
+    "workflowTriggerOrRerun": false,
+    "objectOnlyMergeTree": true,
+    "localAudit": true
+  }
+}

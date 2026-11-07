@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "recordedAtUtc": "2026-11-07T12:32:36.792117+00:00",
+  "provenance": {
+    "source": "b73e477934f9fa803ea971837e37c6011db15839",
+    "sourceTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "rendererBuild": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+    "profile": "final5",
+    "buildAndRuntimeEvidence": "final5-b73-build-receipt.json",
+    "rawOperationsSha256": "c2d451c7cfb395e50f478e62bcb708532a5f45e2bc3c64616dc98169a822d241",
+    "rawOperationCount": 149,
+    "rawFileNotPublished": true
+  },
+  "counts": {
+    "rawPngs": 15,
+    "publicGallery": 14,
+    "excludedOperatorMisstep": 1
+  },
+  "visualReview": {
+    "reviewer": "root browser operator",
+    "status": "All 14 selected originals visually reviewed before handoff",
+    "boundary": "Visual review retains folded-toast overlap limitations; it does not claim all error screens/composers are unobstructed. Evidence-review independently verified byte hashes, Git blob hashes and PNG dimensions; it did not re-edit images."
+  },
+  "publication": {
+    "directory": "docs/design/research/issue-1603/b73/",
+    "format": "Original PNG",
+    "imageModification": false,
+    "blobMetadataSource": "root image upload metadata",
+    "gitTreeCommitRefWrittenByThisTask": false,
+    "excludedOriginalRetained": true
+  },
+  "images": [
+    {
+      "name": "hosted-settings-cold-eight-seconds.png",
+      "publish": true,
+      "relativePath": "b73/hosted-settings-cold-eight-seconds.png",
+      "gitPath": "docs/design/research/issue-1603/b73/hosted-settings-cold-eight-seconds.png",
+      "mimeType": "image/png",
+      "bytes": 20935,
+      "sha256": "4608c2f9a320d9b1c7a96d409bc0c1eceebf34bd5c4af9c3dd21692efa322cec",
+      "gitBlobSha": "8238ecd7205378b7cbc90811f4f15722d9654940",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        19,
+        23,
+        24,
+        25
+      ],
+      "caption": "Settings chunk 人为延迟 8 秒（仅命中一次），记录 hosted 冷加载界面。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "hosted-settings-loaded.png",
+      "publish": true,
+      "relativePath": "b73/hosted-settings-loaded.png",
+      "gitPath": "docs/design/research/issue-1603/b73/hosted-settings-loaded.png",
+      "mimeType": "image/png",
+      "bytes": 70504,
+      "sha256": "f5af1dd9f2bc9461b0e8b59b154e364ee1aa3a25de654ad9176326f0cfcd36a1",
+      "gitBlobSha": "6c9b09d3ee6543d7d9015f3babea1bda87cb03da",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        25,
+        27
+      ],
+      "caption": "同一导航的 hosted Settings 加载完成，保留其独立设计外观。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "library-failed-retry-still-actionable.png",
+      "publish": true,
+      "relativePath": "b73/library-failed-retry-still-actionable.png",
+      "gitPath": "docs/design/research/issue-1603/b73/library-failed-retry-still-actionable.png",
+      "mimeType": "image/png",
+      "bytes": 44929,
+      "sha256": "b9cab2078cac41b8414808bf63cab65c7ef52affd39f2582d65fd29f4b072e1e",
+      "gitBlobSha": "3c6c3108a794b313a0b3aab0f30510d67d35e279",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72
+      ],
+      "caption": "持续失败的真实指针 Retry 后局部恢复入口仍在；已实际 hover 前排 toast，折叠栈的几何重叠限制保留。",
+      "evidenceUse": "PASS_WITH_LIMITATIONS"
+    },
+    {
+      "name": "library-first-read-failure.png",
+      "publish": true,
+      "relativePath": "b73/library-first-read-failure.png",
+      "gitPath": "docs/design/research/issue-1603/b73/library-first-read-failure.png",
+      "mimeType": "image/png",
+      "bytes": 41468,
+      "sha256": "1b9c6680789c5f0a63e92d2b02cbfe56d75715065e439cfc2926993f1959f93f",
+      "gitBlobSha": "798596d8b3f443af3ea297238ac406e4bbed9a2d",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        59,
+        63,
+        64,
+        65
+      ],
+      "caption": "已有两项 Artifact 列表发生受控 503，旧列表保留并显示 Retry。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "library-recovered-by-existing-read-retry.png",
+      "publish": true,
+      "relativePath": "b73/library-recovered-by-existing-read-retry.png",
+      "gitPath": "docs/design/research/issue-1603/b73/library-recovered-by-existing-read-retry.png",
+      "mimeType": "image/png",
+      "bytes": 33552,
+      "sha256": "c2408112308a52b712dad7d46dc1280af18163e883c353dfd213325a649b22e5",
+      "gitBlobSha": "8de00df96906290474bdcbb7be718ea8c5823072",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        74,
+        75,
+        76,
+        77,
+        78
+      ],
+      "caption": "清除故障后既有读取重试恢复列表、通知消失；不算一次成功的 post-clear 指针 Retry。",
+      "evidenceUse": "AUTOMATIC_RECOVERY_ONLY"
+    },
+    {
+      "name": "notes-after-hosted-settings.png",
+      "publish": true,
+      "relativePath": "b73/notes-after-hosted-settings.png",
+      "gitPath": "docs/design/research/issue-1603/b73/notes-after-hosted-settings.png",
+      "mimeType": "image/png",
+      "bytes": 106608,
+      "sha256": "4b48a3be1b42e2847d3752f48bccab9624b2ee472041459db467a1abb7de0f91",
+      "gitBlobSha": "f221dead9105bf1fb55194886fd8e0608abe4e48",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        28,
+        29,
+        30
+      ],
+      "caption": "Back to app 后第一条批注、文字草稿及 picker 可用性保留。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "notes-before-hosted-settings.png",
+      "publish": true,
+      "relativePath": "b73/notes-before-hosted-settings.png",
+      "gitPath": "docs/design/research/issue-1603/b73/notes-before-hosted-settings.png",
+      "mimeType": "image/png",
+      "bytes": 106671,
+      "sha256": "22e8d68add75df0c4e7be7548ea108ae91b09331a932519ce15ea754156d6283",
+      "gitBlobSha": "92d6025e6bcd217e2667ff9ee6907c9cacd73b30",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        11,
+        17,
+        18
+      ],
+      "caption": "BrowserPane 真实选择器加入第一条批注；Ada 文字草稿在。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "notes-numbering-after-settings.png",
+      "publish": true,
+      "relativePath": "b73/notes-numbering-after-settings.png",
+      "gitPath": "docs/design/research/issue-1603/b73/notes-numbering-after-settings.png",
+      "mimeType": "image/png",
+      "bytes": 108381,
+      "sha256": "eadf449c5fbfc51dfc8013ddb075e5024d6c36b58bdef0d487b9a46825eccd74",
+      "gitBlobSha": "50dc11d6e6d36affa0c1f1ecf78c9076400c43e7",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        35,
+        36
+      ],
+      "caption": "实际再次选择页面元素加入第二条批注，Remove note 1／2 编号连续。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "return-workspace-restores-scoped-text-draft.png",
+      "publish": true,
+      "relativePath": "b73/return-workspace-restores-scoped-text-draft.png",
+      "gitPath": "docs/design/research/issue-1603/b73/return-workspace-restores-scoped-text-draft.png",
+      "mimeType": "image/png",
+      "bytes": 97934,
+      "sha256": "a9599058f514d29f9d245388cb72ff01d62a7f398750c33b871028d89c414551",
+      "gitBlobSha": "56cd1fa66f151a11677cf4d11f928470fb715ae3",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        137,
+        140,
+        141
+      ],
+      "caption": "返回原工作区时 notes 仍为 0，原 Ada scoped 文字草稿恢复；不声称跨工作区保留批注。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "signout-clears-populated-view-and-draft-entries.png",
+      "publish": true,
+      "relativePath": "b73/signout-clears-populated-view-and-draft-entries.png",
+      "gitPath": "docs/design/research/issue-1603/b73/signout-clears-populated-view-and-draft-entries.png",
+      "mimeType": "image/png",
+      "bytes": 25511,
+      "sha256": "ef3c35b833aa42514d2462bc29bd5dad867a128153a945f5c0513477b8523ba4",
+      "gitBlobSha": "649d4232957cbe02017ff39bb7ae0dc85573417c",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        140,
+        143,
+        145,
+        146
+      ],
+      "caption": "真实 Sign out 到登录页；view keys 16→0、含 draft 名称的键 2→0，旧文字和批注不可见。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "viewer-background-failure-retains-draft.png",
+      "publish": true,
+      "relativePath": "b73/viewer-background-failure-retains-draft.png",
+      "gitPath": "docs/design/research/issue-1603/b73/viewer-background-failure-retains-draft.png",
+      "mimeType": "image/png",
+      "bytes": 118991,
+      "sha256": "1a252387cef82e32fc4e513c1298c34ea64facb08428065f90914f5fc9b8935a",
+      "gitBlobSha": "b2eea552de97a267c666bc4d8338700184f40eb5",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        87,
+        88,
+        89,
+        90,
+        91,
+        95,
+        96
+      ],
+      "caption": "Artifact modal metadata／text 503 时文档、滚动 650、草稿与选区 5–15 保留。",
+      "evidenceUse": "PASS_WITH_LIMITATIONS"
+    },
+    {
+      "name": "viewer-keyboard-failed-retry-retained.png",
+      "publish": false,
+      "relativePath": null,
+      "gitPath": null,
+      "mimeType": "image/png",
+      "bytes": 118462,
+      "sha256": "c442241a71cfcf42432a36d08052b26551b9ce5fb43d0e35d79e6974ed8e1a13",
+      "gitBlobSha": "a6aa77cbfac1347eb12ca42761a1770f0dd83b80",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        106,
+        108,
+        109
+      ],
+      "caption": "Enter 实际落在 LI，尚未激活 Retry；仅保留原始误步记录，不进入公开图库或通过证据。",
+      "evidenceUse": "EXCLUDED_OPERATOR_MISSTEP"
+    },
+    {
+      "name": "viewer-real-keyboard-retry-stays-after-failure.png",
+      "publish": true,
+      "relativePath": "b73/viewer-real-keyboard-retry-stays-after-failure.png",
+      "gitPath": "docs/design/research/issue-1603/b73/viewer-real-keyboard-retry-stays-after-failure.png",
+      "mimeType": "image/png",
+      "bytes": 118204,
+      "sha256": "ca29c75c2d5d9fe3adfa0977d38397b158e8dd025b7570d495b034c9a53821b7",
+      "gitBlobSha": "e808b87aa1d5dcf4cafd044da1cb41ac4cf1dca0",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        111,
+        112,
+        113,
+        114,
+        115,
+        116
+      ],
+      "caption": "确认真实 BUTTON Retry 后 Enter；故障仍持续、读取命中增加、局部按钮保留。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "viewer-recovered-after-keyboard-retry.png",
+      "publish": true,
+      "relativePath": "b73/viewer-recovered-after-keyboard-retry.png",
+      "gitPath": "docs/design/research/issue-1603/b73/viewer-recovered-after-keyboard-retry.png",
+      "mimeType": "image/png",
+      "bytes": 113704,
+      "sha256": "e0b08ebf423f10a1a7c8eda20cecb61ed06d22396829304f9b1d552e56184360",
+      "gitBlobSha": "6b78e35b500b7cd2be446d97284d9f30c5a45bb5",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123
+      ],
+      "caption": "两故障清除后再次确认 BUTTON Retry 并 Enter，通知消失；同一文档／滚动／输入节点、scroll 650、草稿和选区保留，焦点回输入。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    },
+    {
+      "name": "workspace-boundary-clears-browser-notes.png",
+      "publish": true,
+      "relativePath": "b73/workspace-boundary-clears-browser-notes.png",
+      "gitPath": "docs/design/research/issue-1603/b73/workspace-boundary-clears-browser-notes.png",
+      "mimeType": "image/png",
+      "bytes": 52509,
+      "sha256": "bacfd0243365c8217e2cbb4c71bfeaa29e38e1b419c5de064ae1a28771337610",
+      "gitBlobSha": "b3bfb6fea29c6037727a6f7213a56ae9d84cf296",
+      "width": 1440,
+      "height": 1000,
+      "source": "b73e477934f9fa803ea971837e37c6011db15839",
+      "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+      "operationIndices": [
+        131,
+        133,
+        134
+      ],
+      "caption": "切换到预留 alternate workspace 后 notes=0、Coordinator 输入为空，旧批注／草稿不可见。",
+      "evidenceUse": "PASS_WITHIN_SHOWN_SCOPE"
+    }
+  ],
+  "privacy": {
+    "credentialsIncluded": false,
+    "emailsIncluded": false,
+    "rawFixtureIdentifiersIncluded": false,
+    "rawDomSnapshotsIncluded": false,
+    "rawOperationsPublished": false,
+    "imagesEdited": false,
+    "privateOverlaySourcePublished": false
+  }
+}

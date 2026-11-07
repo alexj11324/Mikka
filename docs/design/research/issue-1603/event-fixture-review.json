@@ -1,0 +1,62 @@
+{
+  "candidate": {
+    "head": "b73e477934f9fa803ea971837e37c6011db15839",
+    "tree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "parent": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "path": "scripts/thread-open-without-task.test.tsx",
+    "blob": "ad9bbebc4470c570bc5ffa4c251cdc49c5c6379a",
+    "bytes": 10477
+  },
+  "baseTested": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+  "productChanged": false,
+  "red": {
+    "tests": 13,
+    "pass": 12,
+    "fail": 1,
+    "reason": "old mock omitted real click event"
+  },
+  "green": {
+    "command": "pnpm test:issues",
+    "exitCode": 0,
+    "tests": 404,
+    "pass": 404,
+    "fail": 0,
+    "skip": 0,
+    "blocks": 11
+  },
+  "lintExitCode": 0,
+  "diffCheckExitCode": 0,
+  "reviews": [
+    "final_ci",
+    "evidence_review"
+  ],
+  "files": {
+    "red": {
+      "sha256": "309d623a5cd669c15d4b65ada7daee0f38f4f1bef21c14879d8fd1fde2c8a7ba",
+      "bytes": 2667
+    },
+    "green": {
+      "sha256": "d72c032f8442f29e7d379a83d7ef348c246962c15b43cc4dcbb864cfcd83e93c",
+      "bytes": 117215
+    },
+    "lint": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "publicationContext": {
+    "preparedAtUtc": "2026-11-07T12:10:57.290585+00:00",
+    "pullRequest": "https://github.com/alexj11324/Mikka/pull/1637",
+    "originalSnapshotSha256": "1f2a758a398022f24c26656a40bcbfd0fd0b58dc2600b044721b58d53fdfddfb",
+    "validationBoundary": "The local red was run on 6b4a3eb; green was run on that source plus the three test-only event adaptations. The resulting single-file blob is recorded in candidate b73e477. These local results are not new-head CI or production-build/UI acceptance.",
+    "changeDetails": {
+      "file": "scripts/thread-open-without-task.test.tsx",
+      "callbackTypeAdaptations": 2,
+      "callbackInvocationAdaptations": 1,
+      "event": "new Event('click', { cancelable: true })",
+      "productChanges": false
+    },
+    "remainingGates": "Exact b73e477 CI, production build/runtime binding, new UI, merge and final production acceptance remain pending.",
+    "sourceLogs": "Public copy contains log hashes and counts, not raw test logs or runtime fixtures."
+  }
+}

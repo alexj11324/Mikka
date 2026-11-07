@@ -1,0 +1,2011 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "recordedAtUtc": "2026-11-07T12:32:36.792117+00:00",
+  "provenance": {
+    "source": "b73e477934f9fa803ea971837e37c6011db15839",
+    "sourceTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "rendererBuild": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+    "profile": "final5",
+    "buildAndRuntimeEvidence": "final5-b73-build-receipt.json",
+    "rawOperationsSha256": "c2d451c7cfb395e50f478e62bcb708532a5f45e2bc3c64616dc98169a822d241",
+    "rawOperationCount": 149,
+    "rawFileNotPublished": true
+  },
+  "selection": {
+    "rawRecords": 149,
+    "curatedRecords": 102,
+    "originalIndicesRetained": true,
+    "rawExpressionsDomBodiesCredentialsIdsAndFullUrlsOmitted": true,
+    "allSuccessfulOperationsNotAllControllerAttempts": "The JSONL records completed operations; some failed locator/hit-test attempts are documented separately from operator handoff."
+  },
+  "operations": [
+    {
+      "operationIndex": 1,
+      "at": "2026-11-07T12:14:42.509Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 0,
+        "faults": []
+      }
+    },
+    {
+      "operationIndex": 2,
+      "at": "2026-11-07T12:14:46.797Z",
+      "operation": {
+        "op": "goto"
+      },
+      "result": {
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 11,
+      "at": "2026-11-07T12:15:15.990Z",
+      "operation": {
+        "op": "frameInspect",
+        "frame": "[data-slot=browser-stage] iframe"
+      },
+      "result": {
+        "frameContainsVersionJson": true,
+        "sourceBuildMatchesCandidate": true,
+        "overlayMatches": true
+      }
+    },
+    {
+      "operationIndex": 17,
+      "at": "2026-11-07T12:15:30.718Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          {
+            "text": "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+            "removeLabel": "Remove note 1"
+          }
+        ],
+        "inputs": [
+          {
+            "label": "Message Ada",
+            "value": "Continuity draft before hosted Settings, keep my browser notes."
+          }
+        ],
+        "pickDisabled": false
+      }
+    },
+    {
+      "operationIndex": 18,
+      "at": "2026-11-07T12:15:31.530Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "notes-before-hosted-settings"
+      },
+      "result": {
+        "file": "notes-before-hosted-settings.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/notes-before-hosted-settings.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 19,
+      "at": "2026-11-07T12:15:37.447Z",
+      "operation": {
+        "op": "fault",
+        "id": "hosted-settings-cold",
+        "mode": "delay",
+        "delayMs": 8000,
+        "once": true
+      },
+      "result": {
+        "id": "hosted-settings-cold",
+        "enabled": true
+      }
+    },
+    {
+      "operationIndex": 23,
+      "at": "2026-11-07T12:15:47.238Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "hosted-settings-cold-eight-seconds"
+      },
+      "result": {
+        "file": "hosted-settings-cold-eight-seconds.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/hosted-settings-cold-eight-seconds.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 24,
+      "at": "2026-11-07T12:15:47.908Z",
+      "operation": {
+        "op": "inspect"
+      },
+      "result": {
+        "visibleAccessibleLabels": [
+          "Back to app",
+          "Collapse sidebar",
+          "Search everything",
+          "Main menu"
+        ]
+      }
+    },
+    {
+      "operationIndex": 25,
+      "at": "2026-11-07T12:15:48.711Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 1,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 27,
+      "at": "2026-11-07T12:16:20.220Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "hosted-settings-loaded"
+      },
+      "result": {
+        "file": "hosted-settings-loaded.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/hosted-settings-loaded.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 28,
+      "at": "2026-11-07T12:16:21.155Z",
+      "operation": {
+        "op": "click",
+        "role": "button",
+        "name": "Back to app"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 29,
+      "at": "2026-11-07T12:16:21.965Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          {
+            "text": "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+            "removeLabel": "Remove note 1"
+          }
+        ],
+        "inputs": [
+          {
+            "label": "Message Ada",
+            "value": "Continuity draft before hosted Settings, keep my browser notes."
+          }
+        ],
+        "picker": [
+          {
+            "disabled": false
+          }
+        ],
+        "browser": true
+      }
+    },
+    {
+      "operationIndex": 30,
+      "at": "2026-11-07T12:16:22.874Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "notes-after-hosted-settings"
+      },
+      "result": {
+        "file": "notes-after-hosted-settings.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/notes-after-hosted-settings.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 35,
+      "at": "2026-11-07T12:16:34.817Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          {
+            "text": "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+            "removeLabel": "Remove note 1"
+          },
+          {
+            "text": "2 · {\"build\":\"b73e477934f9f… · Second note continues numbering after Settings.",
+            "removeLabel": "Remove note 2"
+          }
+        ],
+        "draft": "Continuity draft before hosted Settings, keep my browser notes."
+      }
+    },
+    {
+      "operationIndex": 36,
+      "at": "2026-11-07T12:16:35.594Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "notes-numbering-after-settings"
+      },
+      "result": {
+        "file": "notes-numbering-after-settings.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/notes-numbering-after-settings.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 37,
+      "at": "2026-11-07T12:16:47.675Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 38,
+      "at": "2026-11-07T12:16:48.285Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "settings": false,
+        "routePath": "/mikka/en"
+      },
+      "interpretation": "This first Back observation is an app route, not Settings; the later explicit Settings Back/Forward/Back sequence is #42–48."
+    },
+    {
+      "operationIndex": 39,
+      "at": "2026-11-07T12:16:48.989Z",
+      "operation": {
+        "op": "forward"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 40,
+      "at": "2026-11-07T12:16:49.704Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+          "2 · {\"build\":\"b73e477934f9f… · Second note continues numbering after Settings."
+        ],
+        "draft": "Continuity draft before hosted Settings, keep my browser notes."
+      }
+    },
+    {
+      "operationIndex": 42,
+      "at": "2026-11-07T12:17:08.362Z",
+      "operation": {
+        "op": "click",
+        "role": "menuitem",
+        "name": "Settings"
+      },
+      "result": {
+        "routePath": "/mikka/en/settings"
+      }
+    },
+    {
+      "operationIndex": 43,
+      "at": "2026-11-07T12:17:09.059Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 44,
+      "at": "2026-11-07T12:17:09.765Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+          "2 · {\"build\":\"b73e477934f9f… · Second note continues numbering after Settings."
+        ],
+        "draft": "Continuity draft before hosted Settings, keep my browser notes.",
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 45,
+      "at": "2026-11-07T12:17:10.472Z",
+      "operation": {
+        "op": "forward"
+      },
+      "result": {
+        "routePath": "/mikka/en/settings"
+      }
+    },
+    {
+      "operationIndex": 46,
+      "at": "2026-11-07T12:17:11.182Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "hasSettingsBack": true,
+        "routePath": "/mikka/en/settings"
+      }
+    },
+    {
+      "operationIndex": 47,
+      "at": "2026-11-07T12:17:11.884Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 48,
+      "at": "2026-11-07T12:17:12.486Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+          "2 · {\"build\":\"b73e477934f9f… · Second note continues numbering after Settings."
+        ],
+        "draft": "Continuity draft before hosted Settings, keep my browser notes.",
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 54,
+      "at": "2026-11-07T12:17:50.936Z",
+      "operation": {
+        "op": "observe",
+        "name": "windowBar",
+        "selector": "[data-slot=\"window-bar\"]"
+      },
+      "result": {
+        "name": "windowBar",
+        "selector": "[data-slot=\"window-bar\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 44,
+        "clientHeight": 44
+      }
+    },
+    {
+      "operationIndex": 55,
+      "at": "2026-11-07T12:17:51.628Z",
+      "operation": {
+        "op": "observe",
+        "name": "appWindow",
+        "selector": "section[aria-label=\"App window\"]"
+      },
+      "result": {
+        "name": "appWindow",
+        "selector": "section[aria-label=\"App window\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "operationIndex": 57,
+      "at": "2026-11-07T12:18:15.413Z",
+      "operation": {
+        "op": "observe",
+        "name": "mainNav",
+        "selector": "[role=navigation][aria-label=\"Main navigation\"]"
+      },
+      "result": {
+        "name": "mainNav",
+        "selector": "[role=navigation][aria-label=\"Main navigation\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "operationIndex": 58,
+      "at": "2026-11-07T12:18:16.119Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifactList",
+        "selector": "ul[aria-label=All]"
+      },
+      "result": {
+        "name": "artifactList",
+        "selector": "ul[aria-label=All]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 104,
+        "clientHeight": 104
+      }
+    },
+    {
+      "operationIndex": 59,
+      "at": "2026-11-07T12:18:21.129Z",
+      "operation": {
+        "op": "fault",
+        "id": "library-retry-503",
+        "action": "artifacts.listArtifacts",
+        "mode": "fulfill",
+        "status": 503
+      },
+      "result": {
+        "id": "library-retry-503",
+        "enabled": true
+      }
+    },
+    {
+      "operationIndex": 60,
+      "at": "2026-11-07T12:18:21.847Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "operationIndex": 61,
+      "at": "2026-11-07T12:18:22.536Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "operationIndex": 63,
+      "at": "2026-11-07T12:18:23.969Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "windowBar",
+          "appWindow",
+          "mainNav",
+          "artifactList"
+        ]
+      },
+      "result": [
+        {
+          "name": "windowBar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "appWindow",
+          "selector": "section[aria-label=\"App window\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "mainNav",
+          "selector": "[role=navigation][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "artifactList",
+          "selector": "ul[aria-label=All]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 104,
+          "clientHeight": 104
+        }
+      ]
+    },
+    {
+      "operationIndex": 64,
+      "at": "2026-11-07T12:18:24.666Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "toasts": [
+          {
+            "id": null,
+            "text": "Artifacts failed to load.Retry",
+            "expanded": "false"
+          }
+        ],
+        "rows": 2
+      }
+    },
+    {
+      "operationIndex": 65,
+      "at": "2026-11-07T12:18:42.799Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "library-first-read-failure"
+      },
+      "result": {
+        "file": "library-first-read-failure.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/library-first-read-failure.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 66,
+      "at": "2026-11-07T12:18:50.585Z",
+      "operation": {
+        "op": "click",
+        "role": "button",
+        "name": "Retry"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      },
+      "interpretation": "Successful real pointer Retry while the list fault remained enabled; not the later intercepted post-clear attempt."
+    },
+    {
+      "operationIndex": 67,
+      "at": "2026-11-07T12:18:51.940Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "active": "<button data-button=\"true\" data-action=\"true\" class=\"\">Retry</button>",
+        "toasts": [
+          {
+            "text": "Can't reach MikkaWaiting for the connection to recover.Retry now",
+            "expanded": "false",
+            "visible": "true",
+            "rect": {
+              "x": 1042,
+              "y": 876.125,
+              "width": 356,
+              "height": 91.875,
+              "top": 876.125,
+              "right": 1398,
+              "bottom": 968,
+              "left": 1042
+            },
+            "buttons": [
+              {
+                "text": "Retry now",
+                "disabled": false,
+                "rect": {
+                  "x": 1304.5,
+                  "y": 910.0625,
+                  "width": 76.5,
+                  "height": 24,
+                  "top": 910.0625,
+                  "right": 1381,
+                  "bottom": 934.0625,
+                  "left": 1304.5
+                }
+              }
+            ]
+          },
+          {
+            "text": "Artifacts failed to load.Retry",
+            "expanded": "false",
+            "visible": "true",
+            "rect": {
+              "x": 1050.9000244140625,
+              "y": 864.421875,
+              "width": 338.199951171875,
+              "height": 87.28125,
+              "top": 864.421875,
+              "right": 1389.0999755859375,
+              "bottom": 951.703125,
+              "left": 1050.9000244140625
+            },
+            "buttons": [
+              {
+                "text": "Retry",
+                "disabled": false,
+                "rect": {
+                  "x": 1327.4241943359375,
+                  "y": 896.6624755859375,
+                  "width": 45.5257568359375,
+                  "height": 22.800048828125,
+                  "top": 896.6624755859375,
+                  "right": 1372.949951171875,
+                  "bottom": 919.4625244140625,
+                  "left": 1327.4241943359375
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 68,
+      "at": "2026-11-07T12:19:20.306Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": [
+        {
+          "text": "Can't reach MikkaWaiting for the connection to recover.Retry now",
+          "expanded": "false",
+          "visible": "true"
+        },
+        {
+          "text": "Artifacts failed to load.Retry",
+          "expanded": "false",
+          "visible": "true"
+        }
+      ]
+    },
+    {
+      "operationIndex": 69,
+      "at": "2026-11-07T12:19:36.805Z",
+      "operation": {
+        "op": "hover",
+        "selector": "[data-sonner-toast]:first-child"
+      },
+      "result": {
+        "hovered": true
+      }
+    },
+    {
+      "operationIndex": 70,
+      "at": "2026-11-07T12:19:37.490Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 1,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          },
+          {
+            "enabled": true,
+            "hits": 12,
+            "op": "fault",
+            "id": "library-retry-503",
+            "action": "artifacts.listArtifacts",
+            "mode": "fulfill",
+            "status": 503
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 71,
+      "at": "2026-11-07T12:19:38.221Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "library-failed-retry-still-actionable"
+      },
+      "result": {
+        "file": "library-failed-retry-still-actionable.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/library-failed-retry-still-actionable.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 72,
+      "at": "2026-11-07T12:19:59.875Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "windowBar",
+          "appWindow",
+          "mainNav",
+          "artifactList"
+        ]
+      },
+      "result": [
+        {
+          "name": "windowBar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "appWindow",
+          "selector": "section[aria-label=\"App window\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "mainNav",
+          "selector": "[role=navigation][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "artifactList",
+          "selector": "ul[aria-label=All]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 104,
+          "clientHeight": 104
+        }
+      ]
+    },
+    {
+      "operationIndex": 73,
+      "at": "2026-11-07T12:20:00.567Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": [
+        {
+          "text": "Artifacts failed to load.Retry",
+          "expanded": "false"
+        }
+      ]
+    },
+    {
+      "operationIndex": 74,
+      "at": "2026-11-07T12:20:01.312Z",
+      "operation": {
+        "op": "click",
+        "role": "button",
+        "name": "Retry"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      },
+      "interpretation": "Second recorded real Retry click occurs before #75 disables the list fault."
+    },
+    {
+      "operationIndex": 75,
+      "at": "2026-11-07T12:20:02.018Z",
+      "operation": {
+        "op": "fault",
+        "id": "library-retry-503",
+        "enabled": false
+      },
+      "result": {
+        "id": "library-retry-503",
+        "enabled": false
+      }
+    },
+    {
+      "operationIndex": 76,
+      "at": "2026-11-07T12:20:29.804Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "toasts": [],
+        "rows": 2
+      },
+      "interpretation": "Recovery observed after clearing the fault, through existing read retries; no successful post-clear pointer Retry is logged."
+    },
+    {
+      "operationIndex": 77,
+      "at": "2026-11-07T12:20:50.308Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "windowBar",
+          "appWindow",
+          "mainNav",
+          "artifactList"
+        ]
+      },
+      "result": [
+        {
+          "name": "windowBar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "appWindow",
+          "selector": "section[aria-label=\"App window\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "mainNav",
+          "selector": "[role=navigation][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "artifactList",
+          "selector": "ul[aria-label=All]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 104,
+          "clientHeight": 104
+        }
+      ]
+    },
+    {
+      "operationIndex": 78,
+      "at": "2026-11-07T12:20:50.933Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "library-recovered-by-existing-read-retry"
+      },
+      "result": {
+        "file": "library-recovered-by-existing-read-retry.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/library-recovered-by-existing-read-retry.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 84,
+      "at": "2026-11-07T12:21:29.162Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Tell Codex what to do next…",
+        "value": "Keep this draft while the document read recovers."
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "operationIndex": 85,
+      "at": "2026-11-07T12:21:29.816Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Tell Codex what to do next…",
+        "start": 5,
+        "end": 15
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "operationIndex": 86,
+      "at": "2026-11-07T12:21:30.531Z",
+      "operation": {
+        "op": "scroll",
+        "selector": "[role=\"dialog\"] main .overflow-y-auto",
+        "top": 650
+      },
+      "result": {
+        "scrollTop": 650
+      }
+    },
+    {
+      "operationIndex": 87,
+      "at": "2026-11-07T12:21:31.356Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifactDoc",
+        "selector": "[data-slot=\"artifact-document\"]"
+      },
+      "result": {
+        "name": "artifactDoc",
+        "selector": "[data-slot=\"artifact-document\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 4204,
+        "clientHeight": 4204
+      }
+    },
+    {
+      "operationIndex": 88,
+      "at": "2026-11-07T12:21:32.650Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifactScroll",
+        "selector": "[role=\"dialog\"] main .overflow-y-auto"
+      },
+      "result": {
+        "name": "artifactScroll",
+        "selector": "[role=\"dialog\"] main .overflow-y-auto",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 650,
+        "scrollHeight": 4406,
+        "clientHeight": 808
+      }
+    },
+    {
+      "operationIndex": 89,
+      "at": "2026-11-07T12:21:33.369Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifactInput",
+        "selector": "[role=\"dialog\"] textarea"
+      },
+      "result": {
+        "name": "artifactInput",
+        "selector": "[role=\"dialog\"] textarea",
+        "sameNode": true,
+        "connected": true,
+        "focus": true,
+        "value": "Keep this draft while the document read recovers.",
+        "selectionStart": 5,
+        "selectionEnd": 15,
+        "scrollTop": 0,
+        "scrollHeight": 56,
+        "clientHeight": 56
+      }
+    },
+    {
+      "operationIndex": 90,
+      "at": "2026-11-07T12:21:34.068Z",
+      "operation": {
+        "op": "fault",
+        "id": "viewer-meta-503",
+        "action": "artifacts.getArtifact",
+        "mode": "fulfill",
+        "status": 503
+      },
+      "result": {
+        "id": "viewer-meta-503",
+        "enabled": true
+      }
+    },
+    {
+      "operationIndex": 91,
+      "at": "2026-11-07T12:21:34.743Z",
+      "operation": {
+        "op": "fault",
+        "id": "viewer-text-503",
+        "action": "artifacts.getArtifactText",
+        "mode": "fulfill",
+        "status": 503
+      },
+      "result": {
+        "id": "viewer-text-503",
+        "enabled": true
+      }
+    },
+    {
+      "operationIndex": 92,
+      "at": "2026-11-07T12:21:35.460Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "operationIndex": 93,
+      "at": "2026-11-07T12:21:36.155Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "operationIndex": 95,
+      "at": "2026-11-07T12:21:42.811Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "windowBar",
+          "appWindow",
+          "mainNav",
+          "artifactList",
+          "artifactDoc",
+          "artifactScroll",
+          "artifactInput"
+        ]
+      },
+      "result": [
+        {
+          "name": "windowBar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "appWindow",
+          "selector": "section[aria-label=\"App window\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "mainNav",
+          "selector": "[role=navigation][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "artifactList",
+          "selector": "ul[aria-label=All]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 104,
+          "clientHeight": 104
+        },
+        {
+          "name": "artifactDoc",
+          "selector": "[data-slot=\"artifact-document\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 4204,
+          "clientHeight": 4204
+        },
+        {
+          "name": "artifactScroll",
+          "selector": "[role=\"dialog\"] main .overflow-y-auto",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 650,
+          "scrollHeight": 4406,
+          "clientHeight": 808
+        },
+        {
+          "name": "artifactInput",
+          "selector": "[role=\"dialog\"] textarea",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Keep this draft while the document read recovers.",
+          "selectionStart": 5,
+          "selectionEnd": 15,
+          "scrollTop": 0,
+          "scrollHeight": 56,
+          "clientHeight": 56
+        }
+      ]
+    },
+    {
+      "operationIndex": 96,
+      "at": "2026-11-07T12:21:43.644Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "viewer-background-failure-retains-draft"
+      },
+      "result": {
+        "file": "viewer-background-failure-retains-draft.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/viewer-background-failure-retains-draft.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 97,
+      "at": "2026-11-07T12:21:44.311Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Alt+t"
+      },
+      "result": {
+        "pressed": true
+      }
+    },
+    {
+      "operationIndex": 98,
+      "at": "2026-11-07T12:21:44.913Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "active": {
+          "tag": "OL",
+          "role": null,
+          "text": "Can't reach MikkaWaiting for the connection to recover.Retry nowArtifact could not openRetry",
+          "label": null
+        },
+        "dialog": true,
+        "toasts": [
+          {
+            "text": "Can't reach MikkaWaiting for the connection to recover.Retry now",
+            "expanded": "true"
+          },
+          {
+            "text": "Artifact could not openRetry",
+            "expanded": "true"
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 99,
+      "at": "2026-11-07T12:21:45.517Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Tab"
+      },
+      "result": {
+        "pressed": true
+      }
+    },
+    {
+      "operationIndex": 100,
+      "at": "2026-11-07T12:21:46.222Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "active": {
+          "tag": "LI",
+          "text": "Can't reach MikkaWaiting for the connection to recover.Retry now",
+          "label": null,
+          "inToast": true
+        }
+      }
+    },
+    {
+      "operationIndex": 101,
+      "at": "2026-11-07T12:21:58.874Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Tab"
+      },
+      "result": {
+        "pressed": true
+      }
+    },
+    {
+      "operationIndex": 102,
+      "at": "2026-11-07T12:21:59.575Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "tag": "LI",
+        "text": "Can't reach MikkaWaiting for the connection to recover.Retry now",
+        "inToast": true,
+        "toast": "Can't reach MikkaWaiting for the connection to recover.Retry now"
+      }
+    },
+    {
+      "operationIndex": 103,
+      "at": "2026-11-07T12:22:00.287Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Tab"
+      },
+      "result": {
+        "pressed": true
+      }
+    },
+    {
+      "operationIndex": 104,
+      "at": "2026-11-07T12:22:00.886Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "tag": "BUTTON",
+        "text": "Retry now",
+        "inToast": true,
+        "toast": "Can't reach MikkaWaiting for the connection to recover.Retry now"
+      }
+    },
+    {
+      "operationIndex": 105,
+      "at": "2026-11-07T12:22:01.591Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Tab"
+      },
+      "result": {
+        "pressed": true
+      }
+    },
+    {
+      "operationIndex": 106,
+      "at": "2026-11-07T12:22:02.297Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "tag": "LI",
+        "text": "Artifact could not openRetry",
+        "inToast": true,
+        "toast": "Artifact could not openRetry"
+      }
+    },
+    {
+      "operationIndex": 107,
+      "at": "2026-11-07T12:22:03.000Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 1,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          },
+          {
+            "enabled": false,
+            "hits": 14,
+            "op": "fault",
+            "id": "library-retry-503",
+            "action": "artifacts.listArtifacts",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": true,
+            "hits": 11,
+            "op": "fault",
+            "id": "viewer-meta-503",
+            "action": "artifacts.getArtifact",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": true,
+            "hits": 6,
+            "op": "fault",
+            "id": "viewer-text-503",
+            "action": "artifacts.getArtifactText",
+            "mode": "fulfill",
+            "status": 503
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 108,
+      "at": "2026-11-07T12:22:03.717Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Enter"
+      },
+      "result": {
+        "pressed": true
+      },
+      "interpretation": "Enter occurred with focus on LI (#106), not an actionable Retry button. This is an operator misstep, not a product pass/fail."
+    },
+    {
+      "operationIndex": 109,
+      "at": "2026-11-07T12:22:04.585Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "viewer-keyboard-failed-retry-retained"
+      },
+      "result": {
+        "file": "viewer-keyboard-failed-retry-retained.png",
+        "publicGallery": false,
+        "relativeGalleryPath": null,
+        "documentRequests": 1
+      },
+      "interpretation": "Excluded from publicGallery because the preceding Enter did not activate a Retry button; original file remains unchanged."
+    },
+    {
+      "operationIndex": 110,
+      "at": "2026-11-07T12:22:25.363Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Tab"
+      },
+      "result": {
+        "pressed": true
+      }
+    },
+    {
+      "operationIndex": 111,
+      "at": "2026-11-07T12:22:26.054Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "tag": "BUTTON",
+        "text": "Retry",
+        "toast": "Artifact could not openRetry",
+        "expanded": "false"
+      }
+    },
+    {
+      "operationIndex": 112,
+      "at": "2026-11-07T12:22:34.816Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 1,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          },
+          {
+            "enabled": false,
+            "hits": 14,
+            "op": "fault",
+            "id": "library-retry-503",
+            "action": "artifacts.listArtifacts",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": true,
+            "hits": 12,
+            "op": "fault",
+            "id": "viewer-meta-503",
+            "action": "artifacts.getArtifact",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": true,
+            "hits": 6,
+            "op": "fault",
+            "id": "viewer-text-503",
+            "action": "artifacts.getArtifactText",
+            "mode": "fulfill",
+            "status": 503
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 113,
+      "at": "2026-11-07T12:22:35.660Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Enter"
+      },
+      "result": {
+        "pressed": true
+      },
+      "interpretation": "Real Enter after BUTTON Retry was verified in #111; #112/#115 show fault counts 12→14 metadata and 6→8 text. Automatic retry remains enabled, so the delta is not attributed exclusively to one click."
+    },
+    {
+      "operationIndex": 114,
+      "at": "2026-11-07T12:22:36.467Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "activeTag": "BUTTON",
+        "activeText": "Retry",
+        "toasts": [
+          "Can't reach MikkaWaiting for the connection to recover.Retry now",
+          "Artifact could not openRetry"
+        ],
+        "dialog": true
+      }
+    },
+    {
+      "operationIndex": 115,
+      "at": "2026-11-07T12:22:37.132Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 1,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          },
+          {
+            "enabled": false,
+            "hits": 14,
+            "op": "fault",
+            "id": "library-retry-503",
+            "action": "artifacts.listArtifacts",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": true,
+            "hits": 14,
+            "op": "fault",
+            "id": "viewer-meta-503",
+            "action": "artifacts.getArtifact",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": true,
+            "hits": 8,
+            "op": "fault",
+            "id": "viewer-text-503",
+            "action": "artifacts.getArtifactText",
+            "mode": "fulfill",
+            "status": 503
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 116,
+      "at": "2026-11-07T12:22:38.163Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "viewer-real-keyboard-retry-stays-after-failure"
+      },
+      "result": {
+        "file": "viewer-real-keyboard-retry-stays-after-failure.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/viewer-real-keyboard-retry-stays-after-failure.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 117,
+      "at": "2026-11-07T12:23:03.470Z",
+      "operation": {
+        "op": "fault",
+        "id": "viewer-meta-503",
+        "enabled": false
+      },
+      "result": {
+        "id": "viewer-meta-503",
+        "enabled": false
+      }
+    },
+    {
+      "operationIndex": 118,
+      "at": "2026-11-07T12:23:04.173Z",
+      "operation": {
+        "op": "fault",
+        "id": "viewer-text-503",
+        "enabled": false
+      },
+      "result": {
+        "id": "viewer-text-503",
+        "enabled": false
+      }
+    },
+    {
+      "operationIndex": 119,
+      "at": "2026-11-07T12:23:04.879Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "tag": "BUTTON",
+        "text": "Retry",
+        "toast": "Artifact could not openRetry"
+      }
+    },
+    {
+      "operationIndex": 120,
+      "at": "2026-11-07T12:23:05.484Z",
+      "operation": {
+        "op": "keyboard",
+        "key": "Enter"
+      },
+      "result": {
+        "pressed": true
+      },
+      "interpretation": "After both faults were disabled, #119 again verifies BUTTON Retry, followed by real Enter; #121 hides Retry and #122 retains the observed nodes and input state."
+    },
+    {
+      "operationIndex": 121,
+      "at": "2026-11-07T12:23:06.200Z",
+      "operation": {
+        "op": "waitFor",
+        "role": "button",
+        "name": "Retry",
+        "state": "hidden",
+        "timeout": 12000
+      },
+      "result": {
+        "observed": true
+      }
+    },
+    {
+      "operationIndex": 122,
+      "at": "2026-11-07T12:23:06.935Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "windowBar",
+          "appWindow",
+          "mainNav",
+          "artifactList",
+          "artifactDoc",
+          "artifactScroll",
+          "artifactInput"
+        ]
+      },
+      "result": [
+        {
+          "name": "windowBar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "appWindow",
+          "selector": "section[aria-label=\"App window\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "mainNav",
+          "selector": "[role=navigation][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "artifactList",
+          "selector": "ul[aria-label=All]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 104,
+          "clientHeight": 104
+        },
+        {
+          "name": "artifactDoc",
+          "selector": "[data-slot=\"artifact-document\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 4204,
+          "clientHeight": 4204
+        },
+        {
+          "name": "artifactScroll",
+          "selector": "[role=\"dialog\"] main .overflow-y-auto",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 650,
+          "scrollHeight": 4406,
+          "clientHeight": 808
+        },
+        {
+          "name": "artifactInput",
+          "selector": "[role=\"dialog\"] textarea",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Keep this draft while the document read recovers.",
+          "selectionStart": 5,
+          "selectionEnd": 15,
+          "scrollTop": 0,
+          "scrollHeight": 56,
+          "clientHeight": 56
+        }
+      ]
+    },
+    {
+      "operationIndex": 123,
+      "at": "2026-11-07T12:23:07.735Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "viewer-recovered-after-keyboard-retry"
+      },
+      "result": {
+        "file": "viewer-recovered-after-keyboard-retry.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/viewer-recovered-after-keyboard-retry.png",
+        "documentRequests": 1
+      }
+    },
+    {
+      "operationIndex": 124,
+      "at": "2026-11-07T12:23:33.535Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "toasts": [],
+        "latestBufferedResponseAt": "2026-11-07T12:16:21.946500+00:00",
+        "timingEntriesEligibleAsCurrentRetryEvidence": false,
+        "reason": "Buffered entries end before the Artifact failure/retry sequence; no claim of current retry HTTP 200 is derived from this sample."
+      }
+    },
+    {
+      "operationIndex": 127,
+      "at": "2026-11-07T12:25:01.118Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": [
+          "1 · {\"build\":\"b73e477934f9f… · Keep this first browser note across hosted Settings.",
+          "2 · {\"build\":\"b73e477934f9f… · Second note continues numbering after Settings."
+        ],
+        "inputs": [
+          {
+            "label": "Message Ada",
+            "value": "Continuity draft before hosted Settings, keep my browser notes."
+          }
+        ],
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 128,
+      "at": "2026-11-07T12:25:01.821Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 1,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          },
+          {
+            "enabled": false,
+            "hits": 14,
+            "op": "fault",
+            "id": "library-retry-503",
+            "action": "artifacts.listArtifacts",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": false,
+            "hits": 22,
+            "op": "fault",
+            "id": "viewer-meta-503",
+            "action": "artifacts.getArtifact",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": false,
+            "hits": 12,
+            "op": "fault",
+            "id": "viewer-text-503",
+            "action": "artifacts.getArtifactText",
+            "mode": "fulfill",
+            "status": 503
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 131,
+      "at": "2026-11-07T12:25:14.336Z",
+      "operation": {
+        "op": "click",
+        "role": "menuitem",
+        "name": "Continuity alternate"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 133,
+      "at": "2026-11-07T12:25:16.524Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": 0,
+        "inputs": [
+          {
+            "label": "Message the Coordinator",
+            "value": ""
+          }
+        ],
+        "containsPriorNote": false,
+        "containsPriorDraft": false,
+        "workspaceButton": "CContinuity alternate"
+      }
+    },
+    {
+      "operationIndex": 134,
+      "at": "2026-11-07T12:25:17.370Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "workspace-boundary-clears-browser-notes"
+      },
+      "result": {
+        "file": "workspace-boundary-clears-browser-notes.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/workspace-boundary-clears-browser-notes.png",
+        "documentRequests": 3
+      }
+    },
+    {
+      "operationIndex": 137,
+      "at": "2026-11-07T12:25:26.700Z",
+      "operation": {
+        "op": "click",
+        "role": "menuitem",
+        "name": "Desktop acceptance"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 140,
+      "at": "2026-11-07T12:25:29.971Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "notes": 0,
+        "inputs": [
+          {
+            "label": "Message Ada",
+            "value": "Continuity draft before hosted Settings, keep my browser notes."
+          }
+        ],
+        "workspace": "DDesktop acceptance",
+        "viewKeys": 16,
+        "draftKeys": 2
+      },
+      "interpretation": "On returning to the original workspace, notes stay cleared at 0 while the scoped text draft restores. Notes are not claimed to persist across workspace boundaries."
+    },
+    {
+      "operationIndex": 141,
+      "at": "2026-11-07T12:25:30.766Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "return-workspace-restores-scoped-text-draft"
+      },
+      "result": {
+        "file": "return-workspace-restores-scoped-text-draft.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/return-workspace-restores-scoped-text-draft.png",
+        "documentRequests": 5
+      }
+    },
+    {
+      "operationIndex": 143,
+      "at": "2026-11-07T12:25:51.875Z",
+      "operation": {
+        "op": "click",
+        "role": "menuitem",
+        "name": "Sign out"
+      },
+      "result": {
+        "routePath": "/mikka/en"
+      }
+    },
+    {
+      "operationIndex": 145,
+      "at": "2026-11-07T12:25:53.300Z",
+      "operation": {
+        "op": "facts"
+      },
+      "result": {
+        "viewKeys": 0,
+        "draftKeys": 0,
+        "priorDraftVisible": false,
+        "notes": 0,
+        "routePath": "/mikka/en/sign-in"
+      }
+    },
+    {
+      "operationIndex": 146,
+      "at": "2026-11-07T12:25:54.346Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "signout-clears-populated-view-and-draft-entries"
+      },
+      "result": {
+        "file": "signout-clears-populated-view-and-draft-entries.png",
+        "publicGallery": true,
+        "relativeGalleryPath": "b73/signout-clears-populated-view-and-draft-entries.png",
+        "documentRequests": 5
+      }
+    },
+    {
+      "operationIndex": 148,
+      "at": "2026-11-07T12:26:33.843Z",
+      "operation": {
+        "op": "status"
+      },
+      "result": {
+        "documentRequests": 5,
+        "faults": [
+          {
+            "enabled": false,
+            "hits": 1,
+            "op": "fault",
+            "id": "hosted-settings-cold",
+            "mode": "delay",
+            "delayMs": 8000,
+            "once": true
+          },
+          {
+            "enabled": false,
+            "hits": 14,
+            "op": "fault",
+            "id": "library-retry-503",
+            "action": "artifacts.listArtifacts",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": false,
+            "hits": 22,
+            "op": "fault",
+            "id": "viewer-meta-503",
+            "action": "artifacts.getArtifact",
+            "mode": "fulfill",
+            "status": 503
+          },
+          {
+            "enabled": false,
+            "hits": 12,
+            "op": "fault",
+            "id": "viewer-text-503",
+            "action": "artifacts.getArtifactText",
+            "mode": "fulfill",
+            "status": 503
+          }
+        ]
+      }
+    },
+    {
+      "operationIndex": 149,
+      "at": "2026-11-07T12:27:40.392Z",
+      "operation": {
+        "op": "close"
+      },
+      "result": {
+        "browserClosed": true,
+        "fixtureCleanup": true,
+        "lease": "released",
+        "evidenceAudit": {
+          "files": 17,
+          "archives": 0,
+          "archiveEntries": 0,
+          "decodedBytes": 0,
+          "result": "passed",
+          "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+        }
+      }
+    }
+  ],
+  "privacy": {
+    "credentialsIncluded": false,
+    "emailsIncluded": false,
+    "rawFixtureIdentifiersIncluded": false,
+    "rawDomSnapshotsIncluded": false,
+    "rawOperationsPublished": false,
+    "imagesEdited": false,
+    "privateOverlaySourcePublished": false
+  }
+}

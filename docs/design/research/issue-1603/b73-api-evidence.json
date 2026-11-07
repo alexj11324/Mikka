@@ -1,0 +1,357 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "harnessIssueField": 1372,
+  "recordedAt": "2026-11-07T12:21:24.673592+00:00",
+  "status": "pass",
+  "entryPoint": "node scripts/acceptance/read-cache.mjs",
+  "executionMode": "Attached to the existing exact-SHA production app; did not start a second server",
+  "source": "b73e477934f9fa803ea971837e37c6011db15839",
+  "sourceTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+  "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+  "renderer": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+  "profile": "final5",
+  "environmentId": "local-0337f960-618d-4613-9179-9f4e4a0215d6",
+  "runId": "read-cache-b98bfac6-36db-4053-8dac-6d34c5d3a3a2",
+  "jobId": "job-4c27fa63004a",
+  "startedAt": "2026-11-07T12:16:42.143Z",
+  "readsFinishedAt": "2026-11-07T12:19:20.549Z",
+  "cleanupCompletedAt": "2026-11-07T12:19:47.769Z",
+  "exitCode": 0,
+  "reads": {
+    "count": 35,
+    "surfaces": {
+      "environment": 3,
+      "bot-chat": 6,
+      "task-list": 6,
+      "thread-list": 6,
+      "task-detail": 6,
+      "task-activity": 5,
+      "settings": 3
+    },
+    "httpStatuses": {
+      "200": 35
+    },
+    "cases": [
+      {
+        "surface": "environment",
+        "scenario": "before",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 224,
+        "jsonBytes": 224
+      },
+      {
+        "surface": "environment",
+        "scenario": "scope",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 444,
+        "jsonBytes": 444
+      },
+      {
+        "surface": "bot-chat",
+        "scenario": "cold",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 53700,
+        "jsonBytes": 53667
+      },
+      {
+        "surface": "task-list",
+        "scenario": "cold",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 2789,
+        "jsonBytes": 2600
+      },
+      {
+        "surface": "thread-list",
+        "scenario": "cold",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 7871,
+        "jsonBytes": 7838
+      },
+      {
+        "surface": "task-detail",
+        "scenario": "cold",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 32131,
+        "jsonBytes": 32046
+      },
+      {
+        "surface": "task-activity",
+        "scenario": "cold",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 1953,
+        "jsonBytes": 1842
+      },
+      {
+        "surface": "settings",
+        "scenario": "cold",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 63,
+        "jsonBytes": 63
+      },
+      {
+        "surface": "bot-chat",
+        "scenario": "warm",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 357,
+        "jsonBytes": 324
+      },
+      {
+        "surface": "task-list",
+        "scenario": "warm",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 277,
+        "jsonBytes": 244
+      },
+      {
+        "surface": "thread-list",
+        "scenario": "warm",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 307,
+        "jsonBytes": 274
+      },
+      {
+        "surface": "task-detail",
+        "scenario": "warm",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 142,
+        "jsonBytes": 109
+      },
+      {
+        "surface": "task-activity",
+        "scenario": "warm",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 155,
+        "jsonBytes": 122
+      },
+      {
+        "surface": "settings",
+        "scenario": "warm",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 63,
+        "jsonBytes": 63
+      },
+      {
+        "surface": "bot-chat",
+        "scenario": "reload-restored",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 5142,
+        "jsonBytes": 5072
+      },
+      {
+        "surface": "task-list",
+        "scenario": "reload-restored",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 277,
+        "jsonBytes": 244
+      },
+      {
+        "surface": "thread-list",
+        "scenario": "reload-restored",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 307,
+        "jsonBytes": 274
+      },
+      {
+        "surface": "task-detail",
+        "scenario": "reload-restored",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 142,
+        "jsonBytes": 109
+      },
+      {
+        "surface": "task-activity",
+        "scenario": "reload-restored",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 155,
+        "jsonBytes": 122
+      },
+      {
+        "surface": "settings",
+        "scenario": "reload-restored",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 63,
+        "jsonBytes": 63
+      },
+      {
+        "surface": "bot-chat",
+        "scenario": "peer-denied",
+        "actor": "peer",
+        "httpStatus": 200,
+        "httpBytes": 88,
+        "jsonBytes": 23
+      },
+      {
+        "surface": "task-detail",
+        "scenario": "peer-denied",
+        "actor": "peer",
+        "httpStatus": 200,
+        "httpBytes": 90,
+        "jsonBytes": 25
+      },
+      {
+        "surface": "task-list",
+        "scenario": "peer-isolation",
+        "actor": "peer",
+        "httpStatus": 200,
+        "httpBytes": 299,
+        "jsonBytes": 266
+      },
+      {
+        "surface": "thread-list",
+        "scenario": "peer-isolation",
+        "actor": "peer",
+        "httpStatus": 200,
+        "httpBytes": 263,
+        "jsonBytes": 230
+      },
+      {
+        "surface": "bot-chat",
+        "scenario": "one-row-delta",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 9706,
+        "jsonBytes": 9636
+      },
+      {
+        "surface": "task-list",
+        "scenario": "one-row-delta",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 1315,
+        "jsonBytes": 1230
+      },
+      {
+        "surface": "thread-list",
+        "scenario": "one-row-delta",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 1012,
+        "jsonBytes": 979
+      },
+      {
+        "surface": "task-detail",
+        "scenario": "changed",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 32132,
+        "jsonBytes": 32047
+      },
+      {
+        "surface": "task-activity",
+        "scenario": "one-row-delta",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 1042,
+        "jsonBytes": 983
+      },
+      {
+        "surface": "task-detail",
+        "scenario": "deleted",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 90,
+        "jsonBytes": 25
+      },
+      {
+        "surface": "task-activity",
+        "scenario": "deleted",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 90,
+        "jsonBytes": 25
+      },
+      {
+        "surface": "task-list",
+        "scenario": "deleted",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 480,
+        "jsonBytes": 447
+      },
+      {
+        "surface": "thread-list",
+        "scenario": "deleted",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 510,
+        "jsonBytes": 477
+      },
+      {
+        "surface": "bot-chat",
+        "scenario": "deleted",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 53901,
+        "jsonBytes": 53868
+      },
+      {
+        "surface": "environment",
+        "scenario": "after",
+        "actor": "owner",
+        "httpStatus": 200,
+        "httpBytes": 224,
+        "jsonBytes": 224
+      }
+    ]
+  },
+  "discovery": {
+    "pagesRead": 3,
+    "chunksRead": 0,
+    "found": [
+      "syncCoordinatorChat",
+      "syncIssueList",
+      "syncThreadList",
+      "pollIssue",
+      "pollIssueVersionSummaries"
+    ],
+    "transport": "rpc",
+    "manifestsRead": 1
+  },
+  "fixtures": {
+    "issues": 3,
+    "threads": 3,
+    "chatMessages": 12,
+    "activityVersions": 3
+  },
+  "cleanup": {
+    "fixtures": "succeeded",
+    "lease": "released-clean"
+  },
+  "boundaries": {
+    "businessRequestWrites": false,
+    "modelExecution": false,
+    "browserExecution": false
+  },
+  "parallelManualIsolation": "The separate manual UI lease remained active; this clean release applies only to the read-cache acceptance lease",
+  "evidenceAudit": {
+    "jobId": "job-b0540006d495",
+    "exitCode": 0,
+    "result": "passed",
+    "files": 1,
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+    "stdoutSha256": "4826618cd5180faeb99037e96efb55eb0fc83b29cee4a2cd4c5382a80bd44cee",
+    "privateSummaryPublished": false,
+    "rawCredentialsIncluded": false
+  }
+}

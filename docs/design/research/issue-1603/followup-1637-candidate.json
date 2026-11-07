@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
   "issue": 1603,
-  "preparedAtUtc": "2026-11-07T11:57:22.887332+00:00",
+  "preparedAtUtc": "2026-11-07T12:42:54.447805+00:00",
   "pullRequest": {
     "number": 1637,
     "url": "https://github.com/alexj11324/Mikka/pull/1637",
     "draft": true,
     "merged": false,
-    "head": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
-    "tree": "d45d992a4103ce3b144eae1575204e250a94e812",
-    "base": "1edbeca687119eb0ef71f209ac3d411fbc85b888"
+    "head": "b73e477934f9fa803ea971837e37c6011db15839",
+    "tree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "base": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "parent": "6b4a3eb599179b3032e1717fc047d25284c25a9b"
   },
-  "candidateMetadataProvenance": "Root GitHub creation/readback handoff supplied exact head, tree and base; this documentation-only task did not repeat a GitHub API read or mutate refs.",
-  "changedFiles": 16,
+  "candidateMetadataProvenance": "Root push handoff and event-fixture-review.json provide the exact b73e477 head, tree, parent and corrected test blob. This documentation task did not repeat GitHub API reads or mutate refs.",
+  "changedFiles": 17,
   "localFixEvidence": [
     {
       "defect": 18,
@@ -29,7 +30,7 @@
         "pass": 8,
         "fail": 0
       },
-      "status": "Minimally fixed and locally verified; included in draft candidate"
+      "status": "Minimally fixed; local component regressions, exact b73 CI and listed targeted final5 UI completed; merge/deployment/production smoke pending"
     },
     {
       "defect": 19,
@@ -52,7 +53,7 @@
         "fail": 0
       },
       "countingBoundary": "The 10 Settings tests are included in the 30-test view-state entry, not an additional 40 unique tests.",
-      "status": "Minimally fixed and locally verified; included in draft candidate"
+      "status": "Minimally fixed; local component regressions, exact b73 CI and listed targeted final5 UI completed; merge/deployment/production smoke pending"
     }
   ],
   "baseAdvanceReview": {
@@ -69,16 +70,20 @@
     "boundary": "The source review covers overlap and affected UI paths. It does not certify all new main behavior or replace exact-candidate CI."
   },
   "gatesAtSnapshot": {
-    "exactCandidateCi": "PENDING",
-    "combinedProductionBuildAndRuntimeBinding": "PENDING",
-    "newManualUiWithCurrentHostedOverlay": "PENDING",
+    "exactCandidateCi": "PASS_8_WORKFLOWS_24_SUCCESS_7_LEGITIMATE_SKIP_4_REQUIRED_SUCCESS",
+    "combinedProductionBuildAndRuntimeBinding": "PASS_B73_OFFICIAL_E290_SOURCE_COMPILED_SERVED_MATCH",
+    "newManualUiWithCurrentHostedOverlay": "PASS_FOR_LISTED_TARGETED_SCENARIOS_WITH_LIMITATIONS",
     "mergeAndActualTreeReadback": "PENDING",
     "finalProductionDeploymentReadback": "PENDING",
-    "designatedSmokeAccountProductionAcceptance": "PENDING"
+    "designatedSmokeAccountProductionAcceptance": "PENDING",
+    "localApiReadAcceptance": "PASS_35_READS_FIXTURES_CLEANED_LEASE_RELEASED",
+    "manualFixtureCleanupAndLeaseRelease": "COMPLETED_AUDIT_PASSED",
+    "temporaryRuntimeShutdown": "COMPLETED_INDEPENDENT_RUNTIME_RECEIPT"
   },
   "expectedHostedOverlay": {
     "sha": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
-    "status": "Reviewed compatible overlay; actual new build/served binding must be recorded by runtime before acceptance."
+    "status": "Actual new production build and served runtime binding verified; see final5-b73-build-receipt.json.",
+    "tree": "39c0695b04f6699cf488800b9a47861254fd8058"
   },
   "historicalBoundary": {
     "mainBatchMerge": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
@@ -124,5 +129,114 @@
     "github": false,
     "notion": false,
     "manifest": "Not refreshed; root owns the final upload manifest."
+  },
+  "previousCandidates": [
+    {
+      "head": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+      "tree": "d45d992a4103ce3b144eae1575204e250a94e812",
+      "base": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+      "changedFiles": 16,
+      "status": "Superseded after an Integration test invocation omitted the click event; the required UI policy aggregate consequently failed.",
+      "ciEvidence": "final-ui-ci-6b4-failure.json",
+      "globalWorkflowSummary": "Not asserted by the curated failure record."
+    }
+  ],
+  "testFixtureCorrection": {
+    "evidence": "event-fixture-review.json",
+    "previousFailureEvidence": "final-ui-ci-6b4-failure.json",
+    "baseTested": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "resultingCandidate": "b73e477934f9fa803ea971837e37c6011db15839",
+    "files": 1,
+    "adaptations": 3,
+    "productChanged": false,
+    "red": {
+      "tests": 13,
+      "pass": 12,
+      "fail": 1
+    },
+    "green": {
+      "command": "pnpm test:issues",
+      "exitCode": 0,
+      "tests": 404,
+      "pass": 404,
+      "fail": 0,
+      "skipped": 0,
+      "blocks": 11
+    },
+    "lintExitCode": 0,
+    "diffCheckExitCode": 0,
+    "boundary": "Local green uses the original combined source plus the exact test-event correction; it is not new-head CI. This is test fixture maintenance for defect 18, not a twentieth product defect."
+  },
+  "snapshotVersionBoundary": "The three f722/main-review JSON copies retain their original 6b4a3eb publicationContext snapshots. This candidate record and the new event/old-CI records carry the later b73e477 transition; old results are not relabeled. Final5 is a new, separately bound b73/e290 runtime, API and targeted UI run. The prior 5a gallery remains historical. The prior reviewed main dab added ops files; main subsequently advanced to b527… and the latest independent review/final merge tree remain pending. Neither main snapshot is relabeled as the candidate runtime source.",
+  "currentCandidateEvidence": {
+    "ci": {
+      "file": "b73-ci-audit.json",
+      "observedAt": "2026-11-07 12:27:27 UTC",
+      "workflowsSuccess": 8,
+      "checksSuccess": 24,
+      "checksLegitimateSkip": 7,
+      "requiredSuccess": 4,
+      "pending": 0,
+      "failed": 0,
+      "canceled": 0,
+      "nativePackagedAcceptance": "success",
+      "browserPlaceholderIsNotActualUi": true,
+      "databaseAggregateIsNotActualUi": true
+    },
+    "buildAndRuntime": "final5-b73-build-receipt.json",
+    "readOnlyBusinessRequestApi": "b73-api-evidence.json",
+    "manualUiSummary": "b73-ui-summary.json",
+    "manualUiCuratedOperations": "b73-ui-operations.json",
+    "manualUiGallery": "b73-ui-gallery.json",
+    "rawUiOperations": 149,
+    "curatedUiOperations": 102,
+    "rawUiImages": 15,
+    "publicUiImages": 14,
+    "manualCleanup": "completed; final5-runtime-cleanup.json independently confirms both leases released and all owned compute stopped",
+    "runtimeCleanup": "final5-runtime-cleanup.json"
+  },
+  "finalMainAdvance": {
+    "baseAtCandidateCreation": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "pullRequest": 1639,
+    "changedFiles": 4,
+    "rootFullDiffReview": "Completed: external PostHog alert docs/ops script/SQL/test only; no application, build, dependencies, workflow or overlay changes.",
+    "independentReview": "COMPLETED",
+    "source": "root git fetch and full-diff review handoff",
+    "expectedMergeContainsAdditionalOpsFiles": true,
+    "candidateRuntimeResultsRelabeledAsMain": false,
+    "newProductBuildRequiredByObservedOpsOnlyDiff": false,
+    "independentReviewEvidence": "b73-main-advance-audit.json",
+    "expectedMergeTreeOnDab": "f8c9e68e805c2b0bdd917cde78940063cf56cfa4",
+    "expectedMergeTreeIsActualMerge": false,
+    "candidateDeltaMatchesUnionFeatureByteForByte": true,
+    "mainDeltaMatchesUnionExtraByteForByte": true,
+    "newMainCiStatusAtIndependentReview": "IN_PROGRESS; no observed failures; not counted as merged-head acceptance",
+    "mainAtPriorReview": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+    "reviewSnapshotStatus": "PRIOR_DAB_SNAPSHOT; main subsequently advanced to b527…",
+    "latestMainPrefixAtRootHandoff": "b527",
+    "latestMainIndependentReview": "COMPLETED_ROOT_AND_INDEPENDENT_REVIEW; 23 files after dab, 9 product/protocol/package patches; no React/provider/read-cache change; package scripts independent",
+    "finalMergeTree": "PENDING_ACTUAL_MERGE_READBACK",
+    "expectedMergeTreeOnDabBoundary": "Historical conditional prediction only; not the final merge tree after main advanced.",
+    "latestMainAtIndependentReview": "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "latestMainIndependentReviewEvidence": "b73-main-b527-advance-audit.json",
+    "expectedMergeTreeOnB527": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+    "candidateRuntimeResultsRelabeledAsLatestMain": false
+  },
+  "officialOverlayAdvance": {
+    "testedOverlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "currentOfficialOverlayAtReview": "ca99cf4719a890c214d187c146c07406ffebfba2",
+    "evidence": "b73-overlay-advance-audit.json",
+    "changedFiles": 2,
+    "changedCategories": [
+      "release workflow",
+      "README"
+    ],
+    "applicationSourceChanges": 0,
+    "runtimeAssetChanges": 0,
+    "dependencyLockChanges": 0,
+    "slotContractChanges": 0,
+    "localCa99BuildClaimed": false,
+    "candidateRuntimeIdentityRelabeled": false,
+    "remaining": "Verify actual merged deployment source/build/official overlay."
   }
 }

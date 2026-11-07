@@ -1,0 +1,31 @@
+{
+  "issue": 1603,
+  "recordedAt": "2026-11-07T12:34:58.445982+00:00",
+  "testedSource": "b73e477934f9fa803ea971837e37c6011db15839",
+  "testedOverlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+  "currentOfficialOverlay": "ca99cf4719a890c214d187c146c07406ffebfba2",
+  "comparison": {
+    "status": "ahead",
+    "totalCommits": 2,
+    "changedFiles": 2,
+    "changedCategories": [
+      "private release workflow",
+      "private README"
+    ],
+    "applicationSourceChanges": 0,
+    "runtimeAssetChanges": 0,
+    "dependencyLockChanges": 0,
+    "slotContractChanges": 0
+  },
+  "review": {
+    "reviewer": "root",
+    "patchesRead": true,
+    "summary": "The official UI repository added paired pull-request builds and isolated workflow concurrency; PR builds cannot dispatch releases. The only other change explains the CI behavior in README. No application source, assets, package, lock or slot export changes.",
+    "reuse": "b73 + e290 behavioral/build evidence remains explicitly bound to its tested identities; runtime source is unchanged in ca99. This is not a claim that ca99 was locally rebuilt.",
+    "remaining": "Verify actual merged-head Web build and production source/build/overlay; do not relabel historical local screenshots."
+  },
+  "privacy": {
+    "privateSourcePublished": false,
+    "fullPrivatePathManifestPublished": false
+  }
+}

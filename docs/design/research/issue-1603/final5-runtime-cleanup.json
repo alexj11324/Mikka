@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T12:37:26.674527+00:00",
+  "scope": "Final isolated production UI and direct read-cache acceptance for issue #1603 / PR #1637",
+  "source": "b73e477934f9fa803ea971837e37c6011db15839",
+  "sourceTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+  "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+  "renderer": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+  "profile": "final5",
+  "environmentId": "local-0337f960-618d-4613-9179-9f4e4a0215d6",
+  "preStopHttpIdentity": {
+    "checkedAt": "2026-11-07T12:27:01.287Z",
+    "status": "ready",
+    "origin": "http://localhost:3110",
+    "environmentId": "local-0337f960-618d-4613-9179-9f4e4a0215d6",
+    "database": "mikka_issue1603_final5_e2e",
+    "source": "b73e477934f9fa803ea971837e37c6011db15839",
+    "compiledBuild": "b73e477934f9fa803ea971837e37c6011db15839",
+    "servedBuild": "b73e477934f9fa803ea971837e37c6011db15839",
+    "rendererBuild": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+    "overlaySha": "e290220f8beac1e52f7b33cb097cc24f55b96d48"
+  },
+  "manual": {
+    "jobId": "job-7326367b323e",
+    "runId": "issue1603-manual-420796c5-51b8-4887-8776-fe58fb9f80c5",
+    "exitCode": 0,
+    "completedAt": "2026-11-07T12:27:40.506Z",
+    "closeClientJobId": "job-863a92bf9fbc",
+    "closeClientExitCode": 0,
+    "closeOperationCount": 1,
+    "closeCompletedAt": "2026-11-07T12:27:40.392Z",
+    "cleanup": {
+      "browserClosed": true,
+      "fixtureCleanup": true,
+      "lease": "released",
+      "evidenceAudit": {
+        "files": 17,
+        "archives": 0,
+        "archiveEntries": 0,
+        "decodedBytes": 0,
+        "result": "passed",
+        "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+      }
+    }
+  },
+  "api": {
+    "jobId": "job-4c27fa63004a",
+    "runId": "read-cache-b98bfac6-36db-4053-8dac-6d34c5d3a3a2",
+    "exitCode": 0,
+    "completedAt": "2026-11-07T12:19:47.769Z",
+    "passedReads": 35,
+    "cleanup": {
+      "fixtures": "succeeded",
+      "lease": "released-clean"
+    },
+    "evidenceAudit": {
+      "jobId": "job-b0540006d495",
+      "exitCode": 0,
+      "result": "passed",
+      "files": 1,
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+      "stdoutSha256": "4826618cd5180faeb99037e96efb55eb0fc83b29cee4a2cd4c5382a80bd44cee",
+      "privateSummaryPublished": false,
+      "rawCredentialsIncluded": false
+    }
+  },
+  "databaseCleanup": {
+    "checkedAt": "2026-11-07T12:31:24.311788+00:00",
+    "database": "mikka_issue1603_final5_e2e",
+    "applicationConnections": 0,
+    "leases": [
+      {
+        "state": "released",
+        "count": 2
+      }
+    ],
+    "poolPairs": [
+      {
+        "state": "available",
+        "count": 2
+      }
+    ],
+    "resourceDeclarations": {
+      "created": 0,
+      "cleaned": 76,
+      "retained": 7
+    },
+    "retainedResourceTypes": {
+      "session": 3,
+      "user": 4
+    },
+    "managedUserRows": 4,
+    "retainedSessions": {
+      "rows": 3,
+      "active": 0
+    },
+    "runs": [
+      {
+        "runId": "issue1603-manual-420796c5-51b8-4887-8776-fe58fb9f80c5",
+        "state": "released",
+        "releasedAt": "2026-11-07T12:27:39.995563+00:00",
+        "resources": {
+          "created": 0,
+          "cleaned": 51,
+          "retained": 3
+        },
+        "retainedResourceTypes": {
+          "session": 1,
+          "user": 2
+        }
+      },
+      {
+        "runId": "read-cache-b98bfac6-36db-4053-8dac-6d34c5d3a3a2",
+        "state": "released",
+        "releasedAt": "2026-11-07T12:19:47.421111+00:00",
+        "resources": {
+          "created": 0,
+          "cleaned": 25,
+          "retained": 4
+        },
+        "retainedResourceTypes": {
+          "session": 2,
+          "user": 2
+        }
+      }
+    ],
+    "retention": [
+      {
+        "type": "user",
+        "count": 4,
+        "reason": "Reusable managed test identities retained by the test-account pool lifecycle after clean release and baseline verification."
+      },
+      {
+        "type": "session",
+        "count": 3,
+        "reason": "Invalidated session records retained by the fenced account cleanup lifecycle. Independent PostgreSQL inspection confirmed three rows and zero unexpired retained sessions."
+      }
+    ],
+    "claim": "Clean means the isolated business fixtures were removed, all created resource declarations were resolved and both leases released cleanly. Managed identities and invalidated session records remain intentionally."
+  },
+  "allOwnedDatabases": [
+    {
+      "database": "mikka_issue1603_baseline_e2e",
+      "owner": "issue1603",
+      "connections": 0,
+      "leaseCounts": [
+        {
+          "state": "released",
+          "count": 1
+        }
+      ],
+      "retainedSessions": {
+        "rows": 2,
+        "active": 0
+      },
+      "resourceDeclarations": {
+        "created": 0,
+        "cleaned": 34,
+        "retained": 4
+      }
+    },
+    {
+      "database": "mikka_issue1603_final3_e2e",
+      "owner": "issue1603",
+      "connections": 0,
+      "leaseCounts": [
+        {
+          "state": "released",
+          "count": 1
+        }
+      ],
+      "retainedSessions": {
+        "rows": 2,
+        "active": 0
+      },
+      "resourceDeclarations": {
+        "created": 0,
+        "cleaned": 25,
+        "retained": 4
+      }
+    },
+    {
+      "database": "mikka_issue1603_final4_e2e",
+      "owner": "issue1603",
+      "connections": 0,
+      "leaseCounts": [
+        {
+          "state": "released",
+          "count": 1
+        }
+      ],
+      "retainedSessions": {
+        "rows": 1,
+        "active": 0
+      },
+      "resourceDeclarations": {
+        "created": 0,
+        "cleaned": 53,
+        "retained": 3
+      }
+    },
+    {
+      "database": "mikka_issue1603_final5_e2e",
+      "owner": "issue1603",
+      "connections": 0,
+      "leaseCounts": [
+        {
+          "state": "released",
+          "count": 2
+        }
+      ],
+      "retainedSessions": {
+        "rows": 3,
+        "active": 0
+      },
+      "resourceDeclarations": {
+        "created": 0,
+        "cleaned": 76,
+        "retained": 7
+      }
+    }
+  ],
+  "processes": {
+    "application": {
+      "jobId": "job-56e615d3910f",
+      "state": "exited",
+      "exitCode": 0,
+      "completedAt": "2026-11-07T12:29:10.016Z"
+    },
+    "localController": {
+      "bootId": "a0a71ab2-05b5-4d68-81c3-561e20317c41",
+      "sessionId": 92592,
+      "state": "stopped",
+      "exitCode": 0,
+      "stoppedAt": "2026-11-07T12:30:44.758Z",
+      "pendingRemoteStops": 0
+    },
+    "relayCleanup": {
+      "matchedBefore": 0,
+      "termSent": 0,
+      "remaining": 0,
+      "exactArgvMatch": true
+    },
+    "broker": {
+      "stoppedAt": "2026-11-07T12:37:26.605452+00:00",
+      "sessionId": 23589,
+      "stopMethod": "Intentional SIGINT through the owned PTY after Docker state stopped",
+      "reportedExitCode": 1,
+      "aliveAfterStop": false,
+      "matchedProcessesAfterStop": 0,
+      "remainingOwnedLocalProcesses": {
+        "broker": 0,
+        "controller": 0,
+        "manual": 0
+      }
+    }
+  },
+  "transport": {
+    "successfulDefaultTtlRenewals": 46,
+    "errorsDuringControllerLifetime": 0,
+    "activeAtShutdown": 0,
+    "tcpOrSqlInputReplayed": false
+  },
+  "docker": {
+    "sandboxId": "sbx_001m6t64a9jfsj7f4qmbb3wsq2t",
+    "name": "mikka-issue1603-20261107",
+    "stopRequestStatus": 202,
+    "finalState": "stopped",
+    "finalStateObservedAt": "2026-11-07T12:36:29.554156+00:00",
+    "runningCompute": false,
+    "newSandboxesCreated": false,
+    "lifecycle": "Existing owned Medium stopped with its configured preserve-memory behavior."
+  },
+  "startupEnvironmentEvent": {
+    "firstResume": "Transient running-to-stopping transition occurred before final5 app or fixtures started; the original cause was not captured.",
+    "recovery": "The same owned sandbox resumed successfully and its official running deadline was renewed. No new resource or transport bridge was created."
+  },
+  "evidence": {
+    "manualAuditFiles": 17,
+    "manualAuditResult": "passed",
+    "apiAuditFiles": 1,
+    "apiAuditResult": "passed",
+    "rawSecretsIncluded": false,
+    "privateSourceOrPrivatePathInventoryIncluded": false,
+    "sha256": {
+      "job-7326367b323e.json": "c797b552ad1d2e5008f54b3d22ce0852cd2b4d19a83b750d243777bf406b8782",
+      "job-863a92bf9fbc.json": "f7c208bf12164cef0edea1b8f839ce4975f97ca4c70f5346ef59182ea30b8244",
+      "job-56e615d3910f.json": "abae46d2a90c867655a8d8fcc8a99eb2bdb3af927090cad6d5135199d79e31b7",
+      "job-4c27fa63004a.json": "adaa39e2165633f051975e2a7bfbdcf6a959f9038ed0809c1e14a5ab28e6c8a2",
+      "final5-owned-databases.json": "15e8aadb54e23a6acbecc01af080c7e72998c48cf5c68dccebf3321011a97d5d",
+      "final5-docker-final-status.json": "20bf189442d3da229ab4e0af6ddfd3856556f43254ef867db3089c6f3d1a9d05",
+      "final5-broker-stopped.json": "e8985de4fbb60924cccb9d5cd5810ba803e773b37b8da4251f713b51a92bf0d9",
+      "final5-pre-stop-ready.json": "289005ef891f1cce34c434025ba98467cacac37f4691aecd6e888346f901bd77",
+      "operations.jsonl": "c2d451c7cfb395e50f478e62bcb708532a5f45e2bc3c64616dc98169a822d241",
+      "final5-b73-build-receipt.json": "aeb072f5ea532c42b8040508f1e7680b51ca3c6f7a9b3949a1337c16bd1e2d1e",
+      "b73-api-evidence.json": "e819281c3bea8ebb2b4a4e4eb6d522d5fdefe78e5338a69568a5718d13986ffe"
+    }
+  }
+}

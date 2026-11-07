@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-07 12:33:40 UTC",
+  "repository": "alexj11324/Mikka",
+  "purpose": "Independent read-only review of the last main advance before merging issue #1603 follow-up PR #1637.",
+  "candidate": {
+    "sha": "b73e477934f9fa803ea971837e37c6011db15839",
+    "tree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "baseAtCreation": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "ciAudit": "b73-ci-audit.json"
+  },
+  "mainAdvance": {
+    "from": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "to": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+    "commitCount": 1,
+    "mergedPullRequest": 1639,
+    "url": "https://github.com/alexj11324/Mikka/pull/1639",
+    "title": "fix(observability): stop paging on handled Workflow errors",
+    "files": [
+      "docs/operations/tracing.md",
+      "scripts/ops/posthog-observability.mjs",
+      "scripts/ops/posthog-observability.test.mjs",
+      "scripts/ops/posthog/alert-error-spike.sql"
+    ]
+  },
+  "independentDiffReview": {
+    "readFullFourFileDiff": true,
+    "intersectionWithCandidate17Files": [],
+    "runtimeOrBuildFilesChanged": [],
+    "semantics": [
+      "The PostHog hourly error-spike query excludes only recognized handled Workflow hook 404, duplicate-event 409 and terminal-run 410 chains with a recognized successful root and matching service/trace/span ancestry.",
+      "Unmatched errors, transport failures and failed/missing entry traces remain eligible for the alert. The same filtering applies to current counts and historical baselines.",
+      "The repository query adopts per-span inverse sample-rate weighting, with a legacy 0.1 default, and a 50-span floor. Documentation and insight description describe that external observability calculation.",
+      "One existing ops test file adds an in-memory SQL regression test. It remains under the existing test:lib-units entry; package.json and test-entry wiring are unchanged."
+    ],
+    "applicationEffects": {
+      "ui": "unchanged",
+      "providersAndStateLifetime": "unchanged",
+      "readCacheKeysAndInvalidation": "unchanged",
+      "authenticationSessionAndScope": "unchanged",
+      "apiRequestHandlers": "unchanged",
+      "protocolAndDaemonRuntime": "unchanged",
+      "ciWorkflowDefinitions": "unchanged",
+      "productionBuildDefinitions": "unchanged",
+      "overlayContractAndSlots": "unchanged",
+      "dependencyManifestAndLockfile": "unchanged",
+      "telemetryEmissionAndApplicationErrorHandling": "unchanged",
+      "externalHourlyAlertClassification": "changed"
+    }
+  },
+  "mergeTreeProof": {
+    "base": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "main": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+    "candidate": "b73e477934f9fa803ea971837e37c6011db15839",
+    "expectedMergeTree": "f8c9e68e805c2b0bdd917cde78940063cf56cfa4",
+    "expectedObjectType": "tree",
+    "mergedTreeVsCandidateFiles": [
+      "docs/operations/tracing.md",
+      "scripts/ops/posthog-observability.mjs",
+      "scripts/ops/posthog-observability.test.mjs",
+      "scripts/ops/posthog/alert-error-spike.sql"
+    ],
+    "mergedTreeVsMainFileCount": 17,
+    "mainDeltaExactlyEqualsMergedTreeExtra": true,
+    "candidateDeltaExactlyEqualsMergedTreeFeature": true,
+    "mainDeltaSha256": "e7848506d912343a34602745d270d9bf25394800b53eec961f3c0ebb32f4bed9",
+    "candidateDeltaSha256": "9a8dc556b8e48c2963feab3d4b8e830bb534d57e764c989ff589ea52340e9a1d",
+    "objectCreatedByThisReview": false,
+    "predictionSource": "Parent independently ran git merge-tree --write-tree with dab5439b and b73e477 and obtained exit 0. This reviewer only read the resulting tree object and independently compared both binary deltas.",
+    "notYetActualMergeCommit": true
+  },
+  "githubSnapshotBoundary": {
+    "mainBranchAndMainRef": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+    "prHead": "b73e477934f9fa803ea971837e37c6011db15839",
+    "prBaseSnapshot": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+    "prMergeRefSnapshot": "3812194c5d8cc0f1f435bacbb8e5b0d9f1306d4b",
+    "prMergeRefParents": [
+      "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+      "b73e477934f9fa803ea971837e37c6011db15839"
+    ],
+    "prMergeRefTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "explanation": "The API and actual refs/pull/1637/merge still exposed the earlier synthetic commit at observation time. That old tree is not the expected final merge tree on dab5439b.",
+    "expectedFinalTreeOnDab": "f8c9e68e805c2b0bdd917cde78940063cf56cfa4"
+  },
+  "evidenceDecision": {
+    "reuseExistingUiAndApiEvidence": true,
+    "reason": "The union tree adds only the four disjoint ops/doc/query/test files to the tested candidate; its application runtime, UI, provider, cache and build/overlay inputs are unchanged by this advance.",
+    "localProductEvidenceSource": "b73e477934f9fa803ea971837e37c6011db15839",
+    "localProductEvidenceOverlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "doesNotClaimLocalArtifactBuiltFromDabOrUnionTree": true,
+    "newOpsRegressionExecutedByCandidateCi": false,
+    "fullUiRebuildRequiredByThisDelta": false,
+    "requiresPostMergeVerification": [
+      "Read the actual merge commit and verify its parents against the actual main at merge and b73e477.",
+      "When main remains dab5439b, verify the actual merge tree equals f8c9e68e805c2b0bdd917cde78940063cf56cfa4; recompute if main advances again.",
+      "Track the actual merged-head main CI and Web deploy, including new ops test execution and exact public source/overlay binding.",
+      "Do not count conditional skips or browser placeholder success as actual hosted UI acceptance."
+    ]
+  },
+  "newMainCiAtObservation": {
+    "claimedAllGreen": false,
+    "runs": [
+      {
+        "id": 42372819629,
+        "name": "Task VM question-resume evidence",
+        "headSha": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42372819629"
+      },
+      {
+        "id": 42372716502,
+        "name": "CI",
+        "headSha": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42372716502"
+      },
+      {
+        "id": 42372716240,
+        "name": "Web deploy",
+        "headSha": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+        "status": "pending",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42372716240"
+      },
+      {
+        "id": 42372716348,
+        "name": "E2B additive runtime release",
+        "headSha": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+        "status": "pending",
+        "conclusion": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42372716348"
+      }
+    ],
+    "checkCounts": {
+      "skipped": 2,
+      "in_progress": 6,
+      "success": 4,
+      "pending": 1
+    },
+    "failures": [],
+    "note": "CI was still in progress and Web deploy pending; there were no observed failing checks. These statuses are an observation, not acceptance of the eventual merged commit."
+  },
+  "mutationsByThisReview": {
+    "source": false,
+    "branchOrPrState": false,
+    "workflowsTriggeredOrRerun": false,
+    "gitObjectsCreated": false,
+    "localAuditOnly": true
+  }
+}

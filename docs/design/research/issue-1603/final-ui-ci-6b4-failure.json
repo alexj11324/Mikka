@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "preparedAtUtc": "2026-11-07T12:10:57.290585+00:00",
+  "observedAt": "2026-11-07 12:08:01 UTC",
+  "scope": "Superseded 6b4a3eb failure attribution only; not a final all-workflow or ARM64 acceptance summary",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": "https://github.com/alexj11324/Mikka/pull/1637",
+  "candidate": {
+    "sha": "6b4a3eb599179b3032e1717fc047d25284c25a9b",
+    "tree": "d45d992a4103ce3b144eae1575204e250a94e812",
+    "parents": [
+      "1edbeca687119eb0ef71f209ac3d411fbc85b888"
+    ]
+  },
+  "syntheticMerge": {
+    "sha": "b2348cb9b77bb882dfcd763a578b3661494d3e23",
+    "tree": "d45d992a4103ce3b144eae1575204e250a94e812",
+    "parents": [
+      "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+      "6b4a3eb599179b3032e1717fc047d25284c25a9b"
+    ]
+  },
+  "integrationFailure": {
+    "runId": 42369927744,
+    "jobId": 128395857429,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42369927744/job/128395857429",
+    "step": "Run pnpm test:issues",
+    "conclusion": "failure",
+    "failedTest": "a background thread lookup failure keeps the mounted conversation and retries in place",
+    "error": "TypeError: Cannot read properties of undefined (reading 'preventDefault')",
+    "testCallSite": "scripts/thread-open-without-task.test.tsx:103",
+    "productCallSite": "components/workspace/thread-column.tsx:46",
+    "attribution": "Existing test invokes the toast action with no click event; the intended Sonner fix expects a real cancelable click event. This legacy test invocation was omitted from the event-adaptation changes."
+  },
+  "derivedRequiredFailure": {
+    "context": "UI policy (strict)",
+    "runId": 42369927744,
+    "jobId": 128398381913,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42369927744/job/128398381913",
+    "step": "Require the full suite unless only documentation changed",
+    "conclusion": "failure",
+    "attribution": "Required UI policy aggregator rejects the Integration unit checks failure; no independent second product failure observed.",
+    "independentAdditionalProductFailure": false
+  },
+  "minimalCorrection": {
+    "file": "scripts/thread-open-without-task.test.tsx",
+    "typeLines": [
+      31,
+      33
+    ],
+    "callLine": 103,
+    "change": "Declare both captured action callbacks as (event: Event) => void and pass new Event('click', { cancelable: true }) to the existing retry invocation.",
+    "productionCallbacksChanged": false,
+    "newHead": "b73e477934f9fa803ea971837e37c6011db15839",
+    "evidence": "event-fixture-review.json"
+  },
+  "independentStaticAudit": {
+    "modifiedProductHandlers": 7,
+    "missingLegacyTestInvocationSites": 1,
+    "otherFiveCapturedToastFixtures": "Already pass a cancelable Event; ArtifactViewer has two invocations.",
+    "newEightPathRegression": "Clicks real Sonner action buttons; the actual UI supplies the event.",
+    "unrelatedZeroArgumentCalls": "Native notification-center callbacks use a separate zero-argument contract and were not changed.",
+    "reviewerSourceEdits": false,
+    "reviewerTestsRun": false
+  },
+  "evidenceBoundaries": {
+    "globalCounts": "Omitted. This curated record does not assign a final result or total to all old-head workflows or Desktop/ARM64 acceptance.",
+    "skippedSteps": "Integration steps skipped after test:issues failed do not count as passing acceptance.",
+    "browserGate": "Required Browser tests (before merge) is a placeholder; the workflow only echoes that browser tests are not run.",
+    "databaseAggregate": "Production build and browser interactions is the historical name of the CI database aggregate; it is not real browser or production build acceptance.",
+    "newHead": "Old-head successes, failures and incomplete or cancelled work are not relabeled as b73e477 results; new exact-head CI is pending.",
+    "uiAndProduction": "No new production-build UI or designated-account production acceptance is established by this failure audit."
+  },
+  "originalSnapshotSha256": "7abd8249c0f45ed0b47252dc480f48f3e3801c32fc81d679b774bec718b5cebc",
+  "privacy": {
+    "rawLogsPublished": false,
+    "credentialsPublished": false,
+    "fixtureIdsPublished": false
+  },
+  "documentationOnly": true
+}

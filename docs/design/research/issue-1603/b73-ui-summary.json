@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "recordedAtUtc": "2026-11-07T12:42:54.447805+00:00",
+  "status": "PASS_FOR_LISTED_LOCAL_UI_SCENARIOS_WITH_LIMITATIONS",
+  "provenance": {
+    "source": "b73e477934f9fa803ea971837e37c6011db15839",
+    "sourceTree": "64f017ef52b2b7e42055ac305158ae71b4c87a7d",
+    "overlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "rendererBuild": "e3f0cdf800abcf2ebe10fe6bc2e63276ddc25bb8faa13730d337fc4edba52ec9",
+    "profile": "final5",
+    "buildAndRuntimeEvidence": "final5-b73-build-receipt.json",
+    "rawOperationsSha256": "c2d451c7cfb395e50f478e62bcb708532a5f45e2bc3c64616dc98169a822d241",
+    "rawOperationCount": 149,
+    "rawFileNotPublished": true
+  },
+  "execution": {
+    "firstRecordedAt": "2026-11-07T12:14:42.509Z",
+    "firstMainNavigationAt": "2026-11-07T12:14:46.797Z",
+    "lastStatusAt": "2026-11-07T12:26:33.843Z",
+    "closeOperationRecordedAt": "2026-11-07T12:27:40.392Z",
+    "controllerCloseCompletionAt": "2026-11-07T12:27:40.506Z",
+    "closeCompletionSource": "root inspected controller exit and unique close client job",
+    "rawOperations": 149,
+    "curatedOperations": 102,
+    "rawScreenshots": 15,
+    "publicGalleryScreenshots": 14,
+    "operationsEvidence": "b73-ui-operations.json",
+    "galleryEvidence": "b73-ui-gallery.json"
+  },
+  "realAndSyntheticBoundary": {
+    "runtime": "Actual local production-mode web app, real authenticated UI/API, exact source/official overlay binding recorded separately.",
+    "fixtures": "Owned, isolated synthetic test workspaces, bots, messages and artifacts; browser notes/drafts are synthetic operator input. The BrowserPane used the actual local version page and actual element picker.",
+    "faults": "Controller-injected one-time Settings chunk delay and explicit Artifact RPC 503 faults; ordinary offline/online transitions trigger existing read behavior.",
+    "messageCommentOrReplySubmissions": 0,
+    "noMessageCommentOrReplySubmissionsProvenance": "root operator handoff and recorded manual action scope; not a claim of zero SQL/auth/scope/read-receipt writes",
+    "modelExecution": false,
+    "liveToolExecution": false,
+    "fixtureSetupAndCleanupWrites": true,
+    "authScopeSwitchAndReadSideEffectsNotExcluded": true,
+    "productionSmoke": false,
+    "iOSAcceptance": false,
+    "nativeDesktopManualAcceptance": false
+  },
+  "scenarios": [
+    {
+      "id": "hosted-settings-browser-notes",
+      "status": "PASS",
+      "operationIndices": [
+        11,
+        17,
+        19,
+        23,
+        25,
+        28,
+        29,
+        35,
+        40,
+        44,
+        46,
+        48,
+        127,
+        128
+      ],
+      "observation": "One real picker note and text draft survive an actual hosted Settings round trip with an 8000 ms delayed cold chunk (1 hit). A second real picker note continues numbering 1/2. The later explicit Settings Back/Forward/Back sequence retains both notes and draft. Returning Home after Artifact checks still shows them.",
+      "mainDocumentRequestsBeforeScopeSwitch": 1,
+      "scopeLimit": "ComputerAgents registry persistence is covered by the real-provider component regression; this UI did not execute a computer/model session. Hosted Settings has its own intended visual frame, so no claim is made that the App frame stayed the same node through Settings."
+    },
+    {
+      "id": "library-persistent-retry",
+      "status": "PASS_WITH_RECOVERY_ATTRIBUTION_LIMIT",
+      "operationIndices": [
+        54,
+        55,
+        57,
+        58,
+        59,
+        63,
+        64,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        74,
+        75,
+        76,
+        77,
+        78
+      ],
+      "observation": "Actual pointer Retry while a list 503 fault remained active preserves the two existing rows and local Retry. All three shell nodes and the list remain the same connected nodes. A second recorded click precedes fault removal. After removal, existing automatic reads recover; a later intended pointer click was intercepted until recovery and is not counted as a successful action.",
+      "finalFaultHits": 14,
+      "singleActionSingleReadClaimed": false,
+      "foldedStackOverlapStillPossible": true
+    },
+    {
+      "id": "viewer-persistent-and-successful-keyboard-retry",
+      "status": "PASS",
+      "operationIndices": [
+        87,
+        88,
+        89,
+        90,
+        91,
+        95,
+        97,
+        98,
+        106,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123
+      ],
+      "observation": "Alt+T expands the actual Sonner stack in the Artifact modal. Tab navigation eventually reaches a confirmed BUTTON Retry. A real Enter while both faults persist increases observed metadata/text fault hits and retains Retry. After disabling both faults, focus is again confirmed on BUTTON Retry; Enter is followed by Retry hidden and no toast. The original document, scroll container, input, list and three shell nodes stay connected and identical.",
+      "failedRetry": {
+        "beforeOperation": 112,
+        "actionOperation": 113,
+        "afterOperation": 115,
+        "metadataHits": [
+          12,
+          14
+        ],
+        "textHits": [
+          6,
+          8
+        ],
+        "countsAreObservedDeltasNotExclusivePerClickReads": true
+      },
+      "recoveredState": {
+        "operationIndex": 122,
+        "sameConnectedNodes": [
+          "windowBar",
+          "appWindow",
+          "mainNav",
+          "artifactList",
+          "artifactDoc",
+          "artifactScroll",
+          "artifactInput"
+        ],
+        "scrollTop": 650,
+        "draft": "Keep this draft while the document read recovers.",
+        "selectionStart": 5,
+        "selectionEnd": 15,
+        "focusReturnedToInput": true
+      },
+      "excludedAttempt": {
+        "actionOperation": 108,
+        "activeElement": "LI",
+        "image": "viewer-keyboard-failed-retry-retained.png",
+        "productPassOrFail": false
+      },
+      "finalFaultHits": {
+        "metadata": 22,
+        "text": 12
+      },
+      "allToastLayoutsUnobstructedClaimed": false
+    },
+    {
+      "id": "workspace-isolation",
+      "status": "PASS",
+      "operationIndices": [
+        127,
+        128,
+        131,
+        133,
+        134,
+        137,
+        140,
+        141
+      ],
+      "observation": "Before the switch, both notes and original text draft remain. In the pre-owned alternate workspace, notes=0 and Coordinator input is empty. Returning to the original workspace keeps notes cleared and restores the scoped Ada text draft.",
+      "documentRequests": [
+        1,
+        3,
+        5
+      ],
+      "inMemoryNotesSurviveWorkspaceBoundaryClaimed": false
+    },
+    {
+      "id": "signout-clears-populated-state",
+      "status": "PASS",
+      "operationIndices": [
+        140,
+        143,
+        145,
+        146,
+        148
+      ],
+      "routeAfterSignout": "/mikka/en/sign-in",
+      "viewKeysBeforeAfter": [
+        16,
+        0
+      ],
+      "draftNamedKeysBeforeAfter": [
+        2,
+        0
+      ],
+      "priorDraftVisible": false,
+      "notesAfter": 0,
+      "mainDocumentRequests": 5,
+      "counterBoundary": "draftNamedKeys counts storage keys containing the word draft, not a claim that all remaining storage keys were enumerated."
+    }
+  ],
+  "navigationAccounting": {
+    "firstMainDocumentRequests": 1,
+    "ordinaryNavigationEndOperation": 128,
+    "ordinaryNavigationEndDocumentRequests": 1,
+    "ordinaryAdditionalMainDocumentRequests": 0,
+    "alternateWorkspaceDocumentRequests": 3,
+    "returnWorkspaceDocumentRequests": 5,
+    "afterSignoutDocumentRequests": 5,
+    "boundary": "Workspace switches are explicit scope assign/redirect navigation. Same-node measurements apply to the recorded Artifact phases, not all hosted Settings visual frames or every intermediate instant."
+  },
+  "faultAccounting": {
+    "settingsColdDelayMs": 8000,
+    "settingsColdHits": 1,
+    "library503Hits": 14,
+    "viewerMetadata503Hits": 22,
+    "viewerText503Hits": 12,
+    "allFaultsDisabledAtEnd": true,
+    "automaticReadRetriesPresent": true,
+    "oneReadPerRetryClaimed": false
+  },
+  "operatorErrorsAndEvidenceLimits": [
+    {
+      "kind": "wrong-navigation-selector",
+      "source": "root operator handoff; failed attempt absent from successful-operation JSONL",
+      "detail": "An initial nav element selector timed out; the actual element is div with role=navigation. The observed baseline uses [role=navigation][aria-label=\"Main navigation\"]. This locator failure is not a product pass/fail."
+    },
+    {
+      "kind": "zero-height-toast-container-hover",
+      "source": "root operator handoff; failed attempt absent from successful-operation JSONL",
+      "detail": "Hovering the zero-height container failed; hovering the actual first toast succeeds (#69). This helper targeting error is not a product failure."
+    },
+    {
+      "kind": "folded-toast-pointer-interception",
+      "source": "root operator handoff plus recorded folded-stack geometry at #67",
+      "detail": "The default folded stack may intercept a back toast pointer action. A post-clear Library click was not completed before automatic recovery and is not counted as success. No permanent deadlock is inferred."
+    },
+    {
+      "kind": "enter-on-li",
+      "source": "operations #106/#108/#109",
+      "detail": "The first Enter focused a toast LI rather than BUTTON Retry; its screenshot is excluded from publicGallery. The subsequent real button attempts are separately evidenced at #111–123."
+    },
+    {
+      "kind": "stale-resource-timing",
+      "source": "operation #124",
+      "sampleAt": "2026-11-07T12:23:33.535Z",
+      "latestBufferedResponseAt": "2026-11-07T12:16:21.946500+00:00",
+      "detail": "The timing buffer predates the Artifact retries and cannot prove a new HTTP 200 or exact retry response count. Recovery evidence instead uses actual button activation, disappearance of the error/Retry and preserved UI state."
+    },
+    {
+      "kind": "targeted-new-ui-scope",
+      "detail": "This run rechecks the two follow-up fixes and their scope/logout boundaries. It does not relabel the old 5a 296-operation/23-image suite, earlier API runs, native packaged CI, iOS, narrow-screen screenshots or the designated production smoke as new b73 browser coverage."
+    }
+  ],
+  "manualCleanup": {
+    "status": "COMPLETED",
+    "operationIndex": 149,
+    "browserClosed": true,
+    "fixtureCleanup": true,
+    "lease": "released",
+    "evidenceAudit": {
+      "files": 17,
+      "archives": 0,
+      "archiveEntries": 0,
+      "decodedBytes": 0,
+      "result": "passed",
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+    },
+    "controllerExitCode": 0,
+    "closeClientExitCode": 0,
+    "exitCodesProvenance": "root read the unique close job and client completion",
+    "resourceShutdownStatus": "COMPLETED_INDEPENDENT_RUNTIME_RECEIPT",
+    "resourceShutdownEvidence": "final5-runtime-cleanup.json",
+    "resourceShutdownReceiptSha256": "06c3f124d629af60218e0ef6aba73b6d3e69da04b8b2041c8cf8b96e110eddc3",
+    "runtimeShutdown": {
+      "receiptRecordedAt": "2026-11-07T12:37:26.674527+00:00",
+      "mediumObservedStoppedAt": "2026-11-07T12:36:29.554156+00:00",
+      "brokerStoppedAt": "2026-11-07T12:37:26.605452+00:00",
+      "brokerReportedExitCode": 1,
+      "brokerExitExplanation": "Intentional SIGINT after the owned Medium was confirmed stopped; no claim that all process exit codes were zero.",
+      "remainingOwnedProcesses": {
+        "broker": 0,
+        "controller": 0,
+        "manual": 0
+      },
+      "relayRemaining": 0,
+      "applicationConnections": 0,
+      "leasesReleased": 2,
+      "resourceDeclarations": {
+        "created": 0,
+        "cleaned": 76,
+        "retained": 7
+      },
+      "retainedUsers": 4,
+      "retainedSessionRows": 3,
+      "retainedSessionActive": 0,
+      "newSandboxesCreated": false
+    }
+  },
+  "relatedGates": {
+    "exactCiEvidence": "b73-ci-audit.json",
+    "localProductionBuildEvidence": "final5-b73-build-receipt.json",
+    "separate35ReadApiEvidence": "b73-api-evidence.json",
+    "separateApiLeaseNotManualLease": true,
+    "merge": "PENDING",
+    "finalProductionDeployment": "PENDING",
+    "designatedSmokeAccountProductionAcceptance": "PENDING",
+    "finalRuntimeCleanupEvidence": "final5-runtime-cleanup.json"
+  },
+  "privacy": {
+    "credentialsIncluded": false,
+    "emailsIncluded": false,
+    "rawFixtureIdentifiersIncluded": false,
+    "rawDomSnapshotsIncluded": false,
+    "rawOperationsPublished": false,
+    "imagesEdited": false,
+    "privateOverlaySourcePublished": false
+  }
+}
