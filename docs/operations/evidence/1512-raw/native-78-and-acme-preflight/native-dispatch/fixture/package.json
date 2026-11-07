@@ -1,0 +1,14 @@
+{
+  "name": "issue1512-native-dispatch-proof",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "swr": "2.5.1",
+    "happy-dom": "15.11.7",
+    "tsx": "4.23.15",
+    "semver": "7.8.5",
+    "zod": "4.6.7"
+  }
+}

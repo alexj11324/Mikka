@@ -1,0 +1,12 @@
+[
+  {
+    "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+    "exitCode": 1,
+    "output": ""
+  },
+  {
+    "path": "apps/desktop/test/db-metrics.test.mjs",
+    "exitCode": 1,
+    "output": ""
+  }
+]

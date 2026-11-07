@@ -1,0 +1,8 @@
+scope78@ /vercel/sandbox/scope78
+├── @opentelemetry/api@1.10.0
+├── @opentelemetry/instrumentation-pg@0.76.0
+├── @opentelemetry/instrumentation@0.223.0
+├── @opentelemetry/sdk-trace-node@2.12.0
+├── oxlint@1.89.0
+└── pg@8.23.1
+

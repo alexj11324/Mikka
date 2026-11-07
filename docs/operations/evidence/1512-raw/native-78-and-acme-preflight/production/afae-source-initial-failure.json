@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "kind": "main-afae-source-native-process-crash",
+  "repository": "alexj11324/Mikka",
+  "runId": 42412255314,
+  "attempt": 1,
+  "jobId": 128522948814,
+  "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+  "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+  "status": "completed",
+  "conclusion": "failure",
+  "startedAt": "2026-11-07T20:49:59Z",
+  "completedAt": "2026-11-07T20:52:44Z",
+  "steps": [
+    {
+      "number": 1,
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:50:00Z",
+      "completedAt": "2026-11-07T20:50:01Z"
+    },
+    {
+      "number": 2,
+      "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:50:01Z",
+      "completedAt": "2026-11-07T20:50:05Z"
+    },
+    {
+      "number": 3,
+      "name": "Run ./.github/actions/pnpm-install",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:50:05Z",
+      "completedAt": "2026-11-07T20:50:48Z"
+    },
+    {
+      "number": 4,
+      "name": "Run pnpm check:cloud-boundary",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:50:48Z",
+      "completedAt": "2026-11-07T20:50:59Z"
+    },
+    {
+      "number": 5,
+      "name": "Verify all production release credentials use existing Infisical OIDC",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:50:59Z",
+      "completedAt": "2026-11-07T20:50:59Z"
+    },
+    {
+      "number": 6,
+      "name": "Run pnpm lint:code",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:50:59Z",
+      "completedAt": "2026-11-07T20:51:02Z"
+    },
+    {
+      "number": 7,
+      "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:51:02Z",
+      "completedAt": "2026-11-07T20:51:02Z"
+    },
+    {
+      "number": 8,
+      "name": "Run pnpm lint:runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:51:02Z",
+      "completedAt": "2026-11-07T20:51:03Z"
+    },
+    {
+      "number": 9,
+      "name": "Run pnpm test:api",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T20:51:03Z",
+      "completedAt": "2026-11-07T20:51:20Z"
+    },
+    {
+      "number": 10,
+      "name": "Run pnpm --filter @mikka/frontend test",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:51:20Z",
+      "completedAt": "2026-11-07T20:51:55Z"
+    },
+    {
+      "number": 11,
+      "name": "Run pnpm typecheck",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:51:55Z",
+      "completedAt": "2026-11-07T20:52:41Z"
+    },
+    {
+      "number": 12,
+      "name": "Run pnpm --filter @mikka/protocol typecheck",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T20:52:41Z",
+      "completedAt": "2026-11-07T20:52:41Z"
+    },
+    {
+      "number": 13,
+      "name": "Run pnpm --filter @mikka/mobile typecheck",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T20:52:41Z",
+      "completedAt": "2026-11-07T20:52:41Z"
+    },
+    {
+      "number": 25,
+      "name": "Post Run ./.github/actions/pnpm-install",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:52:41Z",
+      "completedAt": "2026-11-07T20:52:41Z"
+    },
+    {
+      "number": 26,
+      "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:52:41Z",
+      "completedAt": "2026-11-07T20:52:42Z"
+    },
+    {
+      "number": 27,
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:52:42Z",
+      "completedAt": "2026-11-07T20:52:42Z"
+    }
+  ],
+  "failure": {
+    "step": "pnpm test:api",
+    "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+    "kind": "testCodeFailure",
+    "signal": "SIGBUS",
+    "exitCode": null,
+    "code": "ERR_TEST_FAILURE",
+    "goDeadlockTextPresent": true,
+    "goDeadlockCausalAttribution": "not_proven",
+    "firstSuite": {
+      "tests": 57,
+      "pass": 56,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "laterApiSuite": "not_executed_after_first_command_failed"
+  },
+  "sourceEqualControl": {
+    "commit": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+    "runId": 42407923900,
+    "jobId": 128509689739,
+    "receiptBlob": "6967af53717e0427cb106edbf7f9ee182eea77ca",
+    "apiSuites": [
+      84,
+      58
+    ],
+    "conclusion": "success"
+  },
+  "rawLogDigest": {
+    "bytes": 108514,
+    "sha256": "09dd6d217edc5c86c3c47ecaf2539d68bbf2052ffedee65ca1568b23aa0f9402"
+  },
+  "rawLogPersisted": false,
+  "safeExcerpt": "2026-11-07T20:50:01.9761930Z ##[endgroup]\n2026-11-07T20:50:01.9762841Z ##[group]Fetching the repository\n2026-11-07T20:50:01.9771757Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +afae721f6730434ded6be932a7f9dd585c22ee49:refs/remotes/origin/main\n2026-11-07T20:50:04.5187631Z From https://github.com/alexj11324/Mikka\n2026-11-07T20:50:04.5189568Z  * [new ref]         afae721f6730434ded6be932a7f9dd585c22ee49 -> origin/main\n2026-11-07T20:50:04.5193392Z ##[endgroup]\n2026-11-07T20:50:04.5194702Z ##[group]Determining the checkout info\n2026-11-07T20:50:04.5196129Z ##[endgroup]\n2026-11-07T20:50:04.5203520Z [command]/usr/bin/git sparse-checkout disable\n2026-11-07T20:50:04.5258450Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig\n2026-11-07T20:50:05.1662347Z branch 'main' set up to track 'origin/main'.\n2026-11-07T20:50:05.1685557Z ##[endgroup]\n2026-11-07T20:50:05.1734885Z [command]/usr/bin/git log -1 --format=%H\n2026-11-07T20:50:05.1766910Z afae721f6730434ded6be932a7f9dd585c22ee49\n2026-11-07T20:50:05.2106972Z Prepare all required actions\n2026-11-07T20:50:05.2107589Z Getting action download info\n2026-11-07T20:50:05.3461711Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)\n2026-11-07T20:50:05.7293746Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)\n2026-11-07T20:50:05.8294687Z Download action repository 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)\n2026-11-07T20:51:11.9170811Z   type: 'test'\n2026-11-07T20:51:11.9230726Z   ...\n2026-11-07T20:51:18.0703359Z # fatal error: all goroutines are asleep - deadlock!\n2026-11-07T20:51:18.0751158Z # Subtest: apps/api/scripts/workflow-development-aliases.test.mjs\n2026-11-07T20:51:18.0811049Z not ok 8 - apps/api/scripts/workflow-development-aliases.test.mjs\n2026-11-07T20:51:18.0890845Z   ---\n2026-11-07T20:51:18.0891263Z   duration_ms: 7474.025477\n2026-11-07T20:51:18.0950846Z   type: 'test'\n2026-11-07T20:51:18.0982395Z   failureType: 'testCodeFailure'\n2026-11-07T20:51:18.0983315Z   exitCode: ~\n2026-11-07T20:51:18.0983717Z   signal: 'SIGBUS'\n2026-11-07T20:51:18.0984177Z   error: 'test failed'\n2026-11-07T20:51:18.0984599Z   code: 'ERR_TEST_FAILURE'\n2026-11-07T20:51:18.0984935Z   ...\n2026-11-07T20:51:19.2517553Z # ✓ Compiled workflows in 1.5s (4 steps, 0 workflows)\n2026-11-07T20:51:19.2539888Z # Subtest: actual Nitro development output preserves Local World metadata and data-version guard\n2026-11-07T20:51:20.4377837Z   ...\n2026-11-07T20:51:20.4378044Z 1..51\n2026-11-07T20:51:20.4378319Z # tests 57\n2026-11-07T20:51:20.4378503Z # suites 0\n2026-11-07T20:51:20.4378680Z # pass 56\n2026-11-07T20:51:20.4378852Z # fail 1\n2026-11-07T20:51:20.4379035Z # cancelled 0\n2026-11-07T20:51:20.4379228Z # skipped 0\n2026-11-07T20:51:20.4379401Z # todo 0\n2026-11-07T20:51:20.4379603Z # duration_ms 11334.699771\n2026-11-07T20:51:20.4538582Z  ELIFECYCLE  Command failed with exit code 1.\n",
+  "retry": {
+    "authorizedScope": "one normal GitHub rerun of only the failed Source job",
+    "requested": false,
+    "repeatLoop": false
+  },
+  "rootCause": "not_determined",
+  "productionAcceptancePassed": false
+}

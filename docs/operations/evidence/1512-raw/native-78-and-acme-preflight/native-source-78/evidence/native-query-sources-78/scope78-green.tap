@@ -1,0 +1,29 @@
+✔ next cjs: bind the actual PG after tracing, with distinct copies and no double count (256.326631ms)
+✔ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (293.498056ms)
+✔ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (246.402072ms)
+✔ Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output (131.88231ms)
+✔ lifecycle query windows retain exact counter deltas and omit unrelated content (1.561078ms)
+✔ operation SQL counts partition the original full window without removing unknown or background work (0.764863ms)
+✔ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (1.072998ms)
+✔ unattributed source refinement conserves the original partition and full-window deltas (1.409039ms)
+✔ unattributed source refinement rejects incomplete evidence without upgrading legacy reports (2.523824ms)
+✔ unattributed source refinement fits the unchanged control-response limit at the largest safe count (0.848681ms)
+✔ the 78-source refinement rejects a historical 75-key partition without backfilling it (0.353165ms)
+✔ lifecycle query windows refuse a changed process, reset, missing driver and unknown readings (0.462142ms)
+✔ lifecycle reads only the attested primary metric socket, with bounded closed errors (2.040771ms)
+✔ RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields (19.613292ms)
+✔ RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts (17.590462ms)
+✔ RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls (3.731115ms)
+✔ RPC diagnostics accept only the descriptor-bound primary log and complete measured windows (3.736265ms)
+✔ RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable (4.448406ms)
+✔ RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases (3.865853ms)
+✔ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (3.285352ms)
+✔ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (10.312927ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1174.304231

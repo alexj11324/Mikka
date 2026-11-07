@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "source": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "commands": [
+    {
+      "log": "summary.stdout.json",
+      "exitCode": 0
+    },
+    {
+      "log": "query-operations.stdout.json",
+      "exitCode": 0
+    },
+    {
+      "log": "unattributed-sources.stdout.json",
+      "exitCode": 0
+    }
+  ]
+}

@@ -1,0 +1,703 @@
+{
+  "version": 1,
+  "kind": "native_78_source_acceptance_integration",
+  "status": "actual_budget_failed",
+  "source": {
+    "source": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+    "harnessRevision": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+    "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+    "identityMatched": true
+  },
+  "head": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+  "tree": "0fee41e2180950e01417fc7c7b14290c20e95880",
+  "runId": 42413691202,
+  "attempt": 1,
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": 212,
+      "second": 209,
+      "difference": 3,
+      "firstNotAboveSecond": false
+    },
+    "startupBundledVsHosted": {
+      "first": 174,
+      "second": 199,
+      "difference": -25,
+      "firstNotAboveSecond": true
+    }
+  },
+  "phaseCounts": {
+    "nativeLogin": {
+      "queryCalls": 212,
+      "unattributed": 49,
+      "phases": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 16,
+          "unattributed": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 177,
+          "unattributed": 49
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 209,
+      "unattributed": 46,
+      "phases": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unattributed": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 190,
+          "unattributed": 46
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 174,
+      "unattributed": 51,
+      "phases": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 174,
+          "unattributed": 51
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 199,
+      "unattributed": 49,
+      "phases": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 199,
+          "unattributed": 49
+        }
+      ]
+    }
+  },
+  "sqlOperationRows": [
+    {
+      "operation": "/api/auth/[...all]",
+      "nativeLogin": 22,
+      "webLogin": 21,
+      "startup-bundled": 0,
+      "startup-hosted": 2,
+      "loginDifference": 1,
+      "startupDifference": -2
+    },
+    {
+      "operation": "/api/desktop/begin",
+      "nativeLogin": 1,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 1,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/desktop/return",
+      "nativeLogin": 2,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 2,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/desktop/exchange",
+      "nativeLogin": 8,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 8,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/desktop/rpc",
+      "nativeLogin": 36,
+      "webLogin": 0,
+      "startup-bundled": 35,
+      "startup-hosted": 0,
+      "loginDifference": 36,
+      "startupDifference": 35
+    },
+    {
+      "operation": "/api/rpc",
+      "nativeLogin": 0,
+      "webLogin": 36,
+      "startup-bundled": 0,
+      "startup-hosted": 36,
+      "loginDifference": -36,
+      "startupDifference": -36
+    },
+    {
+      "operation": "/api/workspace",
+      "nativeLogin": 10,
+      "webLogin": 10,
+      "startup-bundled": 10,
+      "startup-hosted": 10,
+      "loginDifference": 0,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/api/workspace/switcher",
+      "nativeLogin": 4,
+      "webLogin": 8,
+      "startup-bundled": 4,
+      "startup-hosted": 8,
+      "loginDifference": -4,
+      "startupDifference": -4
+    },
+    {
+      "operation": "/api/live/ticket",
+      "nativeLogin": 6,
+      "webLogin": 6,
+      "startup-bundled": 6,
+      "startup-hosted": 6,
+      "loginDifference": 0,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/actions/coordinator/chat",
+      "nativeLogin": 0,
+      "webLogin": 0,
+      "startup-bundled": 0,
+      "startup-hosted": 0,
+      "loginDifference": 0,
+      "startupDifference": 0
+    },
+    {
+      "operation": "/actions/coordinator/poll",
+      "nativeLogin": 41,
+      "webLogin": 44,
+      "startup-bundled": 41,
+      "startup-hosted": 46,
+      "loginDifference": -3,
+      "startupDifference": -5
+    },
+    {
+      "operation": "/actions/coordinator/summaries",
+      "nativeLogin": 6,
+      "webLogin": 10,
+      "startup-bundled": 5,
+      "startup-hosted": 10,
+      "loginDifference": -4,
+      "startupDifference": -5
+    },
+    {
+      "operation": "/actions/threads/poll",
+      "nativeLogin": 6,
+      "webLogin": 10,
+      "startup-bundled": 6,
+      "startup-hosted": 8,
+      "loginDifference": -4,
+      "startupDifference": -2
+    },
+    {
+      "operation": "/actions/task-runs/read",
+      "nativeLogin": 6,
+      "webLogin": 0,
+      "startup-bundled": 4,
+      "startup-hosted": 6,
+      "loginDifference": 6,
+      "startupDifference": -2
+    },
+    {
+      "operation": "/actions/issues/poll",
+      "nativeLogin": 14,
+      "webLogin": 16,
+      "startup-bundled": 11,
+      "startup-hosted": 16,
+      "loginDifference": -2,
+      "startupDifference": -5
+    },
+    {
+      "operation": "/actions/projects/list",
+      "nativeLogin": 1,
+      "webLogin": 2,
+      "startup-bundled": 1,
+      "startup-hosted": 2,
+      "loginDifference": -1,
+      "startupDifference": -1
+    },
+    {
+      "operation": "unattributed",
+      "nativeLogin": 49,
+      "webLogin": 46,
+      "startup-bundled": 51,
+      "startup-hosted": 49,
+      "loginDifference": 3,
+      "startupDifference": 2
+    }
+  ],
+  "loginSources": [
+    {
+      "source": "/api/agent/sessions",
+      "native": 2,
+      "web": 2,
+      "difference": 0
+    },
+    {
+      "source": "/api/approved-writes",
+      "native": 20,
+      "web": 20,
+      "difference": 0
+    },
+    {
+      "source": "/api/conversations",
+      "native": 10,
+      "web": 10,
+      "difference": 0
+    },
+    {
+      "source": "/api/conversations/[id]/read",
+      "native": 9,
+      "web": 11,
+      "difference": -2
+    },
+    {
+      "source": "/api/devices/enrollment",
+      "native": 3,
+      "web": 0,
+      "difference": 3
+    },
+    {
+      "source": "/api/mobile/reactions",
+      "native": 1,
+      "web": 1,
+      "difference": 0
+    },
+    {
+      "source": "/api/pending-actions",
+      "native": 2,
+      "web": 2,
+      "difference": 0
+    },
+    {
+      "source": "/api/settings/preferences",
+      "native": 2,
+      "web": 0,
+      "difference": 2
+    }
+  ],
+  "otherScopedAndNoScope": {
+    "webLogin": {
+      "otherScoped": 0,
+      "noScope": 0
+    },
+    "nativeLogin": {
+      "otherScoped": 0,
+      "noScope": 0
+    },
+    "startup-bundled": {
+      "otherScoped": 0,
+      "noScope": 0
+    },
+    "startup-hosted": {
+      "otherScoped": 0,
+      "noScope": 0
+    }
+  },
+  "counterIntegrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 29289,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true,
+    "cumulativeOperationsNondecreasing": true
+  },
+  "sourceIntegrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": true,
+    "refinementRowsPresent": 24,
+    "refinementRowsExpected": 24
+  },
+  "sourceKeys": 78,
+  "sourceTableSha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+  "counterImplementationSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+  "rpc": {
+    "physical": {
+      "status": "complete",
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "windows": {
+        "nativeLogin": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:36.877Z",
+          "finishedAt": "2026-11-07T21:20:39.439Z",
+          "totals": {
+            "startedInWindow": 9,
+            "completedInWindow": 9,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 1
+        },
+        "webLogin": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:33.851Z",
+          "finishedAt": "2026-11-07T21:20:35.963Z",
+          "totals": {
+            "startedInWindow": 17,
+            "completedInWindow": 17,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 0
+        },
+        "startup-bundled": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:50.287Z",
+          "finishedAt": "2026-11-07T21:20:53.356Z",
+          "totals": {
+            "startedInWindow": 5,
+            "completedInWindow": 5,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 0
+        },
+        "startup-hosted": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:53.945Z",
+          "finishedAt": "2026-11-07T21:20:55.650Z",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 0
+        }
+      }
+    },
+    "logical": {
+      "status": "complete",
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "windows": {
+        "nativeLogin": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:36.877Z",
+          "finishedAt": "2026-11-07T21:20:39.439Z",
+          "totals": {
+            "startedInWindow": 21,
+            "completedInWindow": 21,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 1
+        },
+        "webLogin": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:33.851Z",
+          "finishedAt": "2026-11-07T21:20:35.963Z",
+          "totals": {
+            "startedInWindow": 17,
+            "completedInWindow": 17,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 0
+        },
+        "startup-bundled": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:50.287Z",
+          "finishedAt": "2026-11-07T21:20:53.356Z",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 0
+        },
+        "startup-hosted": {
+          "status": "complete",
+          "startedAt": "2026-11-07T21:20:53.945Z",
+          "finishedAt": "2026-11-07T21:20:55.650Z",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "unknownActionRows": 0
+        }
+      }
+    }
+  },
+  "rawNullAction": [
+    {
+      "kind": "physical",
+      "window": "nativeLogin",
+      "row": 0,
+      "rawField": "rpcAction",
+      "rawValue": null,
+      "route": "/api/desktop/rpc",
+      "started": 1,
+      "completed": 1,
+      "statusCounts": [
+        {
+          "status": 401,
+          "count": 1
+        }
+      ],
+      "phases": [
+        "common-email-authentication"
+      ]
+    },
+    {
+      "kind": "logical",
+      "window": "nativeLogin",
+      "row": 0,
+      "rawField": "rpcAction",
+      "rawValue": null,
+      "route": "/api/desktop/rpc",
+      "started": 1,
+      "completed": 1,
+      "statusCounts": [
+        {
+          "status": 401,
+          "count": 1
+        }
+      ],
+      "phases": [
+        "common-email-authentication"
+      ]
+    }
+  ],
+  "nonUnattributedOperationNetLoginDifference": 0,
+  "functional": {
+    "lifecycle": {
+      "result": "passed",
+      "checks": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "unknown": 0
+      },
+      "cleanup": {
+        "result": "unknown",
+        "stages": [
+          {
+            "stage": "browser-close",
+            "result": "passed"
+          },
+          {
+            "stage": "daemon-drain",
+            "result": "passed"
+          },
+          {
+            "stage": "native-resources",
+            "result": "passed"
+          },
+          {
+            "stage": "fixtures",
+            "result": "passed"
+          },
+          {
+            "stage": "workspace-generated-name",
+            "result": "passed"
+          },
+          {
+            "stage": "lease-release",
+            "result": "passed"
+          }
+        ],
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": true,
+          "state": "released",
+          "blocked": false,
+          "ownerBeforeMatchesBaseline": false,
+          "ownerAfterMatchesBaseline": true,
+          "peerBeforeMatchesBaseline": false,
+          "peerAfterMatchesBaseline": true
+        }
+      }
+    },
+    "parity": {
+      "result": "passed",
+      "total": 100,
+      "passed": 100,
+      "pageErrorCount": 0,
+      "cleanup": {
+        "result": "passed",
+        "stages": null,
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": null,
+          "state": "unknown",
+          "blocked": null,
+          "ownerBeforeMatchesBaseline": null,
+          "ownerAfterMatchesBaseline": null,
+          "peerBeforeMatchesBaseline": null,
+          "peerAfterMatchesBaseline": null
+        }
+      }
+    },
+    "smoke": {
+      "result": "passed",
+      "checks": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "unknown": 0
+      },
+      "cleanup": {
+        "result": "unknown",
+        "stages": [
+          {
+            "stage": "browser-close",
+            "result": "passed"
+          },
+          {
+            "stage": "electron-close",
+            "result": "passed"
+          },
+          {
+            "stage": "daemon-drain",
+            "result": "passed"
+          },
+          {
+            "stage": "native-resources",
+            "result": "passed"
+          },
+          {
+            "stage": "workspace-generated-name",
+            "result": "passed"
+          },
+          {
+            "stage": "lease-release",
+            "result": "passed"
+          }
+        ],
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 0,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 0,
+          "device_tokens": 0,
+          "device_enrollments": 0,
+          "devices": 0
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": true,
+          "state": "released",
+          "blocked": false,
+          "ownerBeforeMatchesBaseline": true,
+          "ownerAfterMatchesBaseline": true,
+          "peerBeforeMatchesBaseline": true,
+          "peerAfterMatchesBaseline": true
+        }
+      }
+    },
+    "nativeCrypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "allOriginalJsonBytesPreserved": true,
+  "wholeWindowsUnchanged": true,
+  "subtractPkceOrBackground": false,
+  "originalCrossWindowReceiptsPreserved": true,
+  "noHistorical75Reclassification": true,
+  "scope": "this exact source and original four windows",
+  "interpretation": {
+    "newLabelsExplainHistoricalDifference": "unknown",
+    "newLabelsProductPerformanceFix": false,
+    "netOperationCancellationIsCausalProof": false,
+    "unknown401MappedToSql": false,
+    "otherScopedZeroIsMeasuredHere": true,
+    "compiledManifest": "separate Linux smoke build; Native source also matched final Mac checkout and report revisions"
+  },
+  "productionAcceptance": null
+}

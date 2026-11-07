@@ -1,0 +1,958 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "kind": "main_afae_release_gate_recovery_terminal",
+  "observedAt": "2026-11-07 21:30:45 UTC",
+  "revision": "afae721f6730434ded6be932a7f9dd585c22ee49",
+  "authorization": {
+    "sourceJobRetryOwner": "root",
+    "daemonAndGatewaySingleFailedJobRetries": "root_explicit_authorization",
+    "force": false,
+    "rebuild": false,
+    "refWrites": false,
+    "otherRunsRetried": false
+  },
+  "initialFailure": {
+    "ci": {
+      "runId": 42412255314,
+      "attempt": 1,
+      "sourceJobId": 128522948814,
+      "failedStep": 9,
+      "closedCause": [
+        "SIGBUS",
+        "esbuild_go_runtime_deadlock"
+      ],
+      "evidenceOwner": "root",
+      "safeReceiptBlob": "36c673b5ce14c0e0c1e6a63945327926bed8d933",
+      "rawLogDownloadedByThisReview": false
+    },
+    "sourceEarlyRetry": {
+      "owner": "root",
+      "httpStatus": 403,
+      "reason": "workflow_still_running",
+      "newAttemptCreated": false
+    },
+    "downstream": "Daemon and gateway publication steps were skipped behind the failed main-CI gate. UI policy was an aggregate Source-result failure, not an independent product-policy finding."
+  },
+  "ciRecovery": {
+    "observedAt": "2026-11-07T21:11:30.867Z",
+    "id": 42412255314,
+    "head_sha": "afae721f6730434ded6be932a7f9dd585c22ee49",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 2,
+    "updated_at": "2026-11-07T21:10:09Z"
+  },
+  "ciRecoveryLimits": "Only the failed Source job and dependent gate were rerun. Other successful job metadata in attempt 2 does not prove those jobs re-executed.",
+  "retryGuard": {
+    "at": "2026-11-07T21:11:54.709Z",
+    "expected": "afae721f6730434ded6be932a7f9dd585c22ee49",
+    "sourceCI": {
+      "observedAt": "2026-11-07T21:11:30.867Z",
+      "id": 42412255314,
+      "head_sha": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 2,
+      "updated_at": "2026-11-07T21:10:09Z"
+    },
+    "main": {
+      "ref": "refs/heads/main",
+      "sha": "afae721f6730434ded6be932a7f9dd585c22ee49"
+    },
+    "daemon": {
+      "id": 42412255293,
+      "head_sha": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "gateway": {
+      "id": 42412255317,
+      "head_sha": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "allowed": true
+  },
+  "retries": [
+    {
+      "kind": "daemon",
+      "jobId": 128522724052,
+      "requestedAt": "2026-11-07T21:12:24.636Z",
+      "requestCount": 1,
+      "toolSuccess": true,
+      "initialReadback": {
+        "id": 42412255293,
+        "head_sha": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "run_attempt": 2,
+        "status": "queued",
+        "conclusion": null,
+        "updated_at": "2026-11-07T21:12:26Z",
+        "observedAt": "2026-11-07T21:12:31.525Z"
+      }
+    },
+    {
+      "kind": "gateway",
+      "jobId": 128523928732,
+      "requestedAt": "2026-11-07T21:12:25.299Z",
+      "requestCount": 1,
+      "toolSuccess": true,
+      "initialReadback": {
+        "id": 42412255317,
+        "head_sha": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "run_attempt": 2,
+        "status": "queued",
+        "conclusion": null,
+        "updated_at": "2026-11-07T21:12:26Z",
+        "observedAt": "2026-11-07T21:12:31.525Z"
+      }
+    }
+  ],
+  "daemon": {
+    "runId": 42412255293,
+    "terminal": {
+      "id": 42412255293,
+      "name": "Publish daemon",
+      "path": ".github/workflows/publish-daemon.yml",
+      "event": "push",
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "updatedAt": "2026-11-07T21:20:42Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255293"
+    },
+    "jobs": [
+      {
+        "id": 128522724052,
+        "name": "publish",
+        "attempt": 1,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-07T20:43:34Z",
+        "completedAt": "2026-11-07T21:03:37Z",
+        "failureSteps": [
+          {
+            "number": 15,
+            "name": "Require successful checks for this exact main commit",
+            "startedAt": "2026-11-07T20:46:47Z",
+            "completedAt": "2026-11-07T21:03:35Z"
+          }
+        ],
+        "relevantSteps": [
+          {
+            "number": 18,
+            "name": "Publish with npm trusted publishing and provenance",
+            "status": "completed",
+            "conclusion": "skipped",
+            "startedAt": "2026-11-07T21:03:35Z",
+            "completedAt": "2026-11-07T21:03:35Z"
+          }
+        ]
+      },
+      {
+        "id": 128530272895,
+        "name": "publish",
+        "attempt": 2,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T21:15:18Z",
+        "completedAt": "2026-11-07T21:20:42Z",
+        "failureSteps": [],
+        "relevantSteps": [
+          {
+            "number": 18,
+            "name": "Publish with npm trusted publishing and provenance",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:18:20Z",
+            "completedAt": "2026-11-07T21:20:39Z"
+          }
+        ]
+      }
+    ]
+  },
+  "gateway": {
+    "runId": 42412255317,
+    "terminal": {
+      "id": 42412255317,
+      "name": "Device gateway",
+      "path": ".github/workflows/device-gateway.yml",
+      "event": "push",
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "updatedAt": "2026-11-07T21:14:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255317"
+    },
+    "jobs": [
+      {
+        "id": 128522724009,
+        "name": "test",
+        "attempt": 1,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T20:44:10Z",
+        "completedAt": "2026-11-07T20:46:31Z",
+        "failureSteps": [],
+        "relevantSteps": [
+          {
+            "number": 6,
+            "name": "Run node --test scripts/device-gateway/deploy.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:44:54Z",
+            "completedAt": "2026-11-07T20:44:54Z"
+          },
+          {
+            "number": 7,
+            "name": "Run node --test cloudflare/device-gateway/test/presence.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:44:54Z",
+            "completedAt": "2026-11-07T20:44:55Z"
+          },
+          {
+            "number": 8,
+            "name": "Run node --test cloudflare/device-gateway/test/runtime.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:44:55Z",
+            "completedAt": "2026-11-07T20:46:27Z"
+          },
+          {
+            "number": 9,
+            "name": "Run node --import tsx --test lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:46:27Z",
+            "completedAt": "2026-11-07T20:46:28Z"
+          }
+        ]
+      },
+      {
+        "id": 128523928732,
+        "name": "deploy",
+        "attempt": 1,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-07T20:47:03Z",
+        "completedAt": "2026-11-07T21:03:42Z",
+        "failureSteps": [
+          {
+            "number": 6,
+            "name": "Require successful main CI for this exact source commit",
+            "startedAt": "2026-11-07T20:47:54Z",
+            "completedAt": "2026-11-07T21:03:40Z"
+          }
+        ],
+        "relevantSteps": [
+          {
+            "number": 6,
+            "name": "Require successful main CI for this exact source commit",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-07T20:47:54Z",
+            "completedAt": "2026-11-07T21:03:40Z"
+          },
+          {
+            "number": 10,
+            "name": "Wait for the fixed production application, then update the existing Worker",
+            "status": "completed",
+            "conclusion": "skipped",
+            "startedAt": "2026-11-07T21:03:40Z",
+            "completedAt": "2026-11-07T21:03:40Z"
+          }
+        ]
+      },
+      {
+        "id": 128530274856,
+        "name": "deploy",
+        "attempt": 2,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T21:13:22Z",
+        "completedAt": "2026-11-07T21:14:25Z",
+        "failureSteps": [],
+        "relevantSteps": [
+          {
+            "number": 6,
+            "name": "Require successful main CI for this exact source commit",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:14:12Z",
+            "completedAt": "2026-11-07T21:14:12Z"
+          },
+          {
+            "number": 10,
+            "name": "Wait for the fixed production application, then update the existing Worker",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:14:15Z",
+            "completedAt": "2026-11-07T21:14:21Z"
+          }
+        ]
+      },
+      {
+        "id": 128530276007,
+        "name": "test",
+        "attempt": 2,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T20:44:10Z",
+        "completedAt": "2026-11-07T20:46:31Z",
+        "failureSteps": [],
+        "relevantSteps": [
+          {
+            "number": 6,
+            "name": "Run node --test scripts/device-gateway/deploy.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:44:54Z",
+            "completedAt": "2026-11-07T20:44:54Z"
+          },
+          {
+            "number": 7,
+            "name": "Run node --test cloudflare/device-gateway/test/presence.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:44:54Z",
+            "completedAt": "2026-11-07T20:44:55Z"
+          },
+          {
+            "number": 8,
+            "name": "Run node --test cloudflare/device-gateway/test/runtime.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:44:55Z",
+            "completedAt": "2026-11-07T20:46:27Z"
+          },
+          {
+            "number": 9,
+            "name": "Run node --import tsx --test lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T20:46:27Z",
+            "completedAt": "2026-11-07T20:46:28Z"
+          }
+        ]
+      }
+    ]
+  },
+  "e2b": {
+    "runId": 42412255365,
+    "terminal": {
+      "id": 42412255365,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "event": "push",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "updatedAt": "2026-11-07T20:45:45Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255365"
+    },
+    "hashGate": {
+      "runId": 42412255365,
+      "jobId": 128523106571,
+      "actualCheckout": [
+        "afae721f6730434ded6be932a7f9dd585c22ee49"
+      ],
+      "hashComparisons": [
+        {
+          "wanted": "e8d0ebf6fabe18b9a87ef36ceb7c16e9b460a1c5",
+          "live": "e8d0ebf6fabe18b9a87ef36ceb7c16e9b460a1c5",
+          "equal": true
+        }
+      ],
+      "controlRefresh": [
+        false
+      ],
+      "rawLogPersisted": false,
+      "logCharacters": 268874
+    },
+    "newResourceBuildRequired": false,
+    "forceRefresh": false
+  },
+  "desktopRelease": {
+    "runId": 42412313645,
+    "terminal": {
+      "id": 42412313645,
+      "name": "Desktop release",
+      "path": ".github/workflows/desktop-release.yml",
+      "event": "workflow_dispatch",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "updatedAt": "2026-11-07T21:22:33Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42412313645"
+    },
+    "jobs": [
+      {
+        "id": 128522902055,
+        "name": "preflight",
+        "attempt": 1,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "failure",
+        "failureSteps": [
+          {
+            "number": 5,
+            "name": "Require the matching production Web deployment",
+            "startedAt": "2026-11-07T20:42:30Z",
+            "completedAt": "2026-11-07T21:22:30Z"
+          }
+        ],
+        "relevantSteps": [
+          {
+            "number": 5,
+            "name": "Require the matching production Web deployment",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-07T20:42:30Z",
+            "completedAt": "2026-11-07T21:22:30Z"
+          },
+          {
+            "number": 6,
+            "name": "Select the production Web overlay",
+            "status": "completed",
+            "conclusion": "skipped",
+            "startedAt": "2026-11-07T21:22:30Z",
+            "completedAt": "2026-11-07T21:22:30Z"
+          }
+        ]
+      },
+      {
+        "id": 128532748077,
+        "name": "macos",
+        "attempt": 1,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "skipped",
+        "failureSteps": [],
+        "relevantSteps": []
+      }
+    ],
+    "nativeAcceptanceExecuted": false,
+    "newBudgetEvidenceProduced": false
+  },
+  "webDispatch": {
+    "runId": 42412312491,
+    "terminal": {
+      "id": 42412312491,
+      "name": "Web deploy",
+      "path": ".github/workflows/web-deploy.yml",
+      "event": "workflow_dispatch",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+      "updatedAt": "2026-11-07T21:28:01Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42412312491"
+    },
+    "jobs": [
+      {
+        "id": 128522898248,
+        "name": "deploy",
+        "attempt": 1,
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T21:05:43Z",
+        "completedAt": "2026-11-07T21:28:00Z",
+        "failureSteps": [],
+        "relevantSteps": [
+          {
+            "number": 16,
+            "name": "Read the production values Vercel withholds from `vercel pull`",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:06:01Z",
+            "completedAt": "2026-11-07T21:06:02Z"
+          },
+          {
+            "number": 17,
+            "name": "Pull the production project settings and environment",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:06:02Z",
+            "completedAt": "2026-11-07T21:06:16Z"
+          },
+          {
+            "number": 25,
+            "name": "Upload the prebuilt output to production",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:12:51Z",
+            "completedAt": "2026-11-07T21:27:54Z"
+          },
+          {
+            "number": 26,
+            "name": "Verify the public production version before releasing the deployment queue",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-07T21:27:54Z",
+            "completedAt": "2026-11-07T21:27:56Z"
+          }
+        ]
+      }
+    ],
+    "providerAliasReadbackOwner": "root",
+    "providerReadbackPerformedHere": false
+  },
+  "allAfAeRuns": {
+    "returned": 33,
+    "totalCount": 33,
+    "paginationComplete": true,
+    "allTerminal": true,
+    "conclusionCounts": {
+      "skipped": 15,
+      "cancelled": 5,
+      "success": 11,
+      "failure": 2
+    },
+    "runs": [
+      {
+        "id": 42416010228,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:28:22Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42416010228"
+      },
+      {
+        "id": 42415988145,
+        "name": "Read cache production acceptance",
+        "path": ".github/workflows/read-cache-production.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:28:04Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415988145"
+      },
+      {
+        "id": 42415988144,
+        "name": "Project decisions production acceptance",
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:28:04Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415988144"
+      },
+      {
+        "id": 42415988226,
+        "name": "Issue 1225 model provider acceptance",
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:29:18Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415988226"
+      },
+      {
+        "id": 42415988055,
+        "name": "Mikka cloud core compatibility",
+        "path": ".github/workflows/self-hosted-production.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:29:17Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415988055"
+      },
+      {
+        "id": 42415728985,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:24:52Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415728985"
+      },
+      {
+        "id": 42415639374,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:23:33Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415639374"
+      },
+      {
+        "id": 42415353498,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:20:04Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415353498"
+      },
+      {
+        "id": 42415137960,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:17:23Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415137960"
+      },
+      {
+        "id": 42415133019,
+        "name": "Mobile native release",
+        "path": ".github/workflows/mobile-native.yml",
+        "event": "workflow_dispatch",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:22:27Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42415133019"
+      },
+      {
+        "id": 42414955875,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:15:07Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42414955875"
+      },
+      {
+        "id": 42414625186,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:11:01Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42414625186"
+      },
+      {
+        "id": 42414485539,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:09:22Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42414485539"
+      },
+      {
+        "id": 42414308970,
+        "name": "Run trace production acceptance",
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "event": "workflow_dispatch",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:09:35Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42414308970"
+      },
+      {
+        "id": 42413934656,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:02:39Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413934656"
+      },
+      {
+        "id": 42413909686,
+        "name": "Project decisions production acceptance",
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:02:20Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413909686"
+      },
+      {
+        "id": 42413909646,
+        "name": "Read cache production acceptance",
+        "path": ".github/workflows/read-cache-production.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:02:20Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413909646"
+      },
+      {
+        "id": 42413909650,
+        "name": "Issue 1225 model provider acceptance",
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:02:20Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413909650"
+      },
+      {
+        "id": 42413909709,
+        "name": "Mikka cloud core compatibility",
+        "path": ".github/workflows/self-hosted-production.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:10:23Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413909709"
+      },
+      {
+        "id": 42413703711,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:00:00Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413703711"
+      },
+      {
+        "id": 42413618145,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:58:50Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413618145"
+      },
+      {
+        "id": 42413448703,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:56:35Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42413448703"
+      },
+      {
+        "id": 42412599620,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:47:55Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412599620"
+      },
+      {
+        "id": 42412452611,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:43:58Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412452611"
+      },
+      {
+        "id": 42412313645,
+        "name": "Desktop release",
+        "path": ".github/workflows/desktop-release.yml",
+        "event": "workflow_dispatch",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:22:33Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412313645"
+      },
+      {
+        "id": 42412312491,
+        "name": "Web deploy",
+        "path": ".github/workflows/web-deploy.yml",
+        "event": "workflow_dispatch",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:28:01Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412312491"
+      },
+      {
+        "id": 42412255313,
+        "name": "Desktop release",
+        "path": ".github/workflows/desktop-release.yml",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:42:12Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255313"
+      },
+      {
+        "id": 42412255365,
+        "name": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:45:45Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255365"
+      },
+      {
+        "id": 42412255303,
+        "name": "Self-hosted image",
+        "path": ".github/workflows/self-hosted-image.yml",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T20:56:09Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255303"
+      },
+      {
+        "id": 42412255310,
+        "name": "Web deploy",
+        "path": ".github/workflows/web-deploy.yml",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:02:17Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255310"
+      },
+      {
+        "id": 42412255314,
+        "name": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "event": "push",
+        "attempt": 2,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:10:09Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255314"
+      },
+      {
+        "id": 42412255317,
+        "name": "Device gateway",
+        "path": ".github/workflows/device-gateway.yml",
+        "event": "push",
+        "attempt": 2,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:14:26Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255317"
+      },
+      {
+        "id": 42412255293,
+        "name": "Publish daemon",
+        "path": ".github/workflows/publish-daemon.yml",
+        "event": "push",
+        "attempt": 2,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "afae721f6730434ded6be932a7f9dd585c22ee49",
+        "updatedAt": "2026-11-07T21:20:42Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42412255293"
+      }
+    ]
+  },
+  "laterMain": {
+    "sha": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+    "tree": "e1f80419c2345169eb11e4225be4d97bbbfeb8ff",
+    "parents": [
+      "99e2cce720db5eebf6761b3119dbfdeeb7cc9279",
+      "5dc64de487bf9ed9daaf2e1acaa24000102cfc88"
+    ],
+    "subject": "Merge pull request #1672 from alexj11324/batch/20261107-1",
+    "observedAt": "2026-11-07 21:31:23 UTC",
+    "alreadyHasActiveWriters": true,
+    "afaeConclusionsDoNotTransfer": true
+  },
+  "preflight": {
+    "runId": 42414308970,
+    "status": "blocked",
+    "code": "workspace_busy",
+    "reportBlob": "3d77b82636263bc87794275985075cd3caf7fab5",
+    "provenanceBlob": "dc36ffa432759f81832df1f71f0b252846bf9141",
+    "businessRequestsMadeByThisReviewer": false
+  },
+  "resources": {
+    "manuallyOwnedActive": 0,
+    "downloadSandboxId": "sbx_KckxiC6aMQbIE5Ce2CfOSlo32RYr",
+    "state": "stopped",
+    "stopReadbackVerified": true,
+    "zipRetained": false,
+    "signedUrlPersisted": false
+  },
+  "limits": [
+    "Workflow success does not establish issue #1512 production acceptance.",
+    "Native login budget remains an independent failure.",
+    "The Desktop release preflight failure is preserved and not reclassified because Web completed later.",
+    "No product, authentication, CI threshold or workflow gate was modified by the two authorized retries."
+  ]
+}

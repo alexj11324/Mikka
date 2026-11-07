@@ -1,0 +1,161 @@
+{
+  "source": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+  "tree": "0fee41e2180950e01417fc7c7b14290c20e95880",
+  "parents": [
+    "afae721f6730434ded6be932a7f9dd585c22ee49",
+    "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685"
+  ],
+  "head": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+  "sourceFiles": [
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "bytes": 33092,
+      "sha256": "fbb1e0aa2d2bb5dcd3c85c18a67046eb71c7bd1ce2d23d7a28dbbf243bd25398",
+      "gitBlob": "d492efceded7f82a7cfad63e4827c2551b60e49d"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "bytes": 8336,
+      "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9"
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "bytes": 2773,
+      "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+      "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 21791,
+      "sha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+      "gitBlob": "ecc5c28718320893bb96c5902cf3cae0dd965b5b"
+    },
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "bytes": 34879,
+      "sha256": "bf48c1be5105e0e98f1143e225e6372a7741b186463bd1faa7388539df4d4a1a",
+      "gitBlob": "23f93e8e0fdde8d3d6426450ed0208e4091d1589"
+    }
+  ],
+  "harness": {
+    "source": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+    "algorithm": "sha256 of ordered exact UTF8 file bytes, no separator, as parity.mjs harnessSha256 expression",
+    "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+    "files": [
+      {
+        "path": "apps/desktop/test/parity.mjs",
+        "bytes": 34879,
+        "sha256": "bf48c1be5105e0e98f1143e225e6372a7741b186463bd1faa7388539df4d4a1a",
+        "gitBlob": "23f93e8e0fdde8d3d6426450ed0208e4091d1589"
+      },
+      {
+        "path": "apps/desktop/test/parity-fixtures.mjs",
+        "bytes": 15162,
+        "sha256": "99941a8ab30a471030b0000089ab7fd920ef6dda7786501ea6aab88a1732ba6d",
+        "gitBlob": "6f773394dee20cd247daffc152b781423b37a900"
+      },
+      {
+        "path": "apps/desktop/test/generated-workspace-name.mjs",
+        "bytes": 8508,
+        "sha256": "d0a99fe6ff036fca9fca55a18adab96ea40cbe117400ce11585909c3aad5481c",
+        "gitBlob": "1c5c05d753a284e4833b241218ad7de17d97771f"
+      },
+      {
+        "path": "apps/desktop/test/parity-images.mjs",
+        "bytes": 5493,
+        "sha256": "57147e1f1cb5eb2bdb70879bb99acf0b82737057ddfbf8261edb42386189cedc",
+        "gitBlob": "873befeef9c6246a2e640786e9a5f45b91381c15"
+      },
+      {
+        "path": "apps/desktop/test/parity-clock.mjs",
+        "bytes": 1771,
+        "sha256": "ded3031029e0793a3436c385bae34a6d8b380196216c3bbbd56ba80fd0699d3f",
+        "gitBlob": "0fa02f04de614d40c1d52d364c89a2a173b1fe29"
+      },
+      {
+        "path": "apps/desktop/test/native-viewport.mjs",
+        "bytes": 3346,
+        "sha256": "291cc975f1970a4e7cc392a8fbfc1a87352ad614efd7553a683c7adb715dc496",
+        "gitBlob": "d4e52fc817f463d7c7382ee8246ff5522463ede1"
+      },
+      {
+        "path": "apps/desktop/test/native-auth-diagnostics.mjs",
+        "bytes": 21444,
+        "sha256": "78398dcd6eb48983a7bb3a128e0756a088cf3b5f9eec17de954f8d32433024af",
+        "gitBlob": "4a37b4b6c250e550492c1b8ba49cde1e5443d200"
+      },
+      {
+        "path": "apps/desktop/test/parity-reader-defaults.mjs",
+        "bytes": 3446,
+        "sha256": "ac5d8ee6887454a65830d80c5cf37ffd7df584da999e1905d040b3a391ebd5a2",
+        "gitBlob": "61892d691e38f3a35dae7de2a701da5bd8ac1b35"
+      },
+      {
+        "path": "apps/desktop/test/parity-page-ready.mjs",
+        "bytes": 13784,
+        "sha256": "d014eeb8d83d13cd449418b112f9777b7c38da919e5006666bd9fdab6fce1db4",
+        "gitBlob": "0cad9c428f3fc790d65b68923699dbe97b2178a7"
+      },
+      {
+        "path": "apps/desktop/test/parity-settings-ready.mjs",
+        "bytes": 10358,
+        "sha256": "52dde7b6c6b6f892a6d5c161ca23190ddbb139dd14c6d0bf9b164ce480e8d3f7",
+        "gitBlob": "d7197691d9f304095859c1a3b4f327e1705c102d"
+      },
+      {
+        "path": "apps/desktop/test/native-device-ready.mjs",
+        "bytes": 10502,
+        "sha256": "9b7c98ce34e617d324a28f99fe24eb43700b9e999c21bcfa6a88699df5e53264",
+        "gitBlob": "367fa22e671d688347916cd94d46974d13050732"
+      },
+      {
+        "path": "scripts/acceptance/read-action-transport.mjs",
+        "bytes": 3915,
+        "sha256": "126fead63e72d8d835dde62bda48927176399936ce7499fda39c52350b16e8b8",
+        "gitBlob": "ef8f9c901a257e78db7241b3b386d9b7f1f5afee"
+      }
+    ],
+    "basis": "exact synthetic commit source; actual Native artifact pending"
+  },
+  "initialExecutedCheckouts": [
+    {
+      "jobId": 128527075478,
+      "checkoutGitLogHeads": [
+        "da0fe543b41f679b6a4e3f123036de8f018c225f"
+      ],
+      "actualCheckoutMatched": true,
+      "expectedSynthetic": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+      "rawLogsSaved": false
+    },
+    {
+      "jobId": 128527075703,
+      "checkoutGitLogHeads": [
+        "da0fe543b41f679b6a4e3f123036de8f018c225f"
+      ],
+      "actualCheckoutMatched": true,
+      "expectedSynthetic": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+      "rawLogsSaved": false
+    }
+  ],
+  "nativeActualCheckoutPendingFinalLog": false,
+  "boundary": "Git source identities plus artifact report revisions; native final checkout is appended separately",
+  "nativeFinalExecutedCheckout": {
+    "observedAt": "2026-11-07 21:29:33 UTC",
+    "jobId": 128528832655,
+    "heads": [
+      "da0fe543b41f679b6a4e3f123036de8f018c225f"
+    ],
+    "matched": true,
+    "markers": [
+      {
+        "kind": "native_acceptance_command_start",
+        "at": "2026-11-07T21:15:58.6970220Z"
+      }
+    ],
+    "rawLogsPersisted": false,
+    "rawLogsRetained": false
+  },
+  "bindingCompletedAfterSandboxRecovery": true,
+  "preliminaryBindingSha256": "77d0c03bee658bd696815343ee564db50fa48a37603081c9073236d3dd025a66"
+}

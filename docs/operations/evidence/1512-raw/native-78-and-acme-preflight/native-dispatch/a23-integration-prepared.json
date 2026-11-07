@@ -1,0 +1,324 @@
+{
+  "version": 1,
+  "kind": "native_dispatch_a23_integration_prepared",
+  "preparedAt": "2026-11-07 21:41:34 UTC",
+  "repository": "alexj11324/Mikka",
+  "pr": 1675,
+  "branch": "test/1512-native-query-sources-78-20261107",
+  "branchHeadUnchanged": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+  "status": "unreferenced_objects_only_awaiting_acme_patch",
+  "refsUpdated": false,
+  "forceOrRebaseUsed": false,
+  "prMerged": false,
+  "sourceCandidateReceipt": {
+    "gitBlob": "d4cbfbe21f1cf93b2696e532728e461518706978",
+    "sha256": "e279ef84a866c04210b01559ccacbc7db7d05b4e5ad86d1d7b1731f3c3559541"
+  },
+  "independentReview": {
+    "gitBlob": "5fc8974c249ef0e90a48d6c38552222973abcb2a",
+    "sha256": "07ca56c75275bd09dd3495418181fd58469fb5b1540892dee3e75d84e9f8ac8d",
+    "result": "no_blocking_findings"
+  },
+  "C": {
+    "commit": "c2f7a565dd1183f421a698131664062931d5fe77",
+    "tree": "e8c42e5518bdeff0c390f69072c50b1fc362cbae",
+    "parents": [
+      "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685"
+    ],
+    "changedFileCount": 5
+  },
+  "M": {
+    "commit": "1f441187a01a6fe423a6bdfc6e94f7ac452db605",
+    "tree": "8b9821f0618f6d93f49dda251df7cce3e68b330d",
+    "parents": [
+      "c2f7a565dd1183f421a698131664062931d5fe77",
+      "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e"
+    ],
+    "changedFilesRelativeToMain": 7,
+    "additions": 156,
+    "deletions": 13
+  },
+  "main": {
+    "commit": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+    "tree": "e1f80419c2345169eb11e4225be4d97bbbfeb8ff",
+    "sinceBase": "afae721f6730434ded6be932a7f9dd585c22ee49",
+    "commits": 11,
+    "files": 15,
+    "overlapWithSelectedPaths": 0,
+    "relatedChanges": [
+      "signed native bearer accepts only trailing padding within existing total-length and authentication checks",
+      "Factory question failure projection avoids mutation row locks",
+      "isolated lifecycle native validation commands",
+      "isolated Workflow test compiler caches",
+      "SMOKE team selection and PostHog plugin lease evidence pending state"
+    ]
+  },
+  "mergeConstruction": "Normal two-parent Git commit over the exact disjoint union of C and a23. No ref update, merge API or history rewrite.",
+  "selectedFiles": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "bytes": 5786
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "bytes": 3337
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+      "sha256": "603268415400b8c11bd3b6cd70e0064f4064139f7ec57e6548c96d8f489d3448",
+      "bytes": 4258
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+      "sha256": "057dd6f7ee07639c3e8bd44f139021b4e1796c991596016aaf43c3dbd75ae72c",
+      "bytes": 5629
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+      "sha256": "78a9ac67440cf9eff68cf73bcb62500b1e96382b70a46c2d15c28918dd4d9d5e",
+      "bytes": 58204
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+      "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+      "bytes": 2773
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99",
+      "sha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+      "bytes": 37134
+    }
+  ],
+  "baseReadback": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "baseBlob": "cb23eb39ddc29e746c437bf259ffc1db3ad08436",
+      "baseSha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+      "candidateBaseMatchesA23": true
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "baseBlob": "0a9829743d171048c720c1e9b36d09aeca3f22b5",
+      "baseSha256": "04fe899da917838e25ff414de7412341b9fc72062e9870fcb7266d4a91bd39e2",
+      "candidateBaseMatchesA23": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "baseBlob": "230766f11a150ebb2f949b32df71b5a47a73c1f0",
+      "baseSha256": "43ebb82c6c84b1de5e1cdc4f7ee4d9c54133f66183c4cac5627a9cea53b93b65",
+      "candidateBaseMatchesA23": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "baseBlob": "868622ca05b4bf700d8bc0265c3fe0757b2c1770",
+      "baseSha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+      "candidateBaseMatchesA23": true
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "baseBlob": "b0b28dfcabc4c04b4bd4cc884e0199c539b4e2fd",
+      "baseSha256": "0b62211c66eb5a229e81ac81f2cad50a785172631c73ceccc69d7907ba026979",
+      "candidateBaseMatchesA23": true
+    }
+  ],
+  "remoteVerification": [
+    {
+      "key": "C",
+      "sha": "c2f7a565dd1183f421a698131664062931d5fe77",
+      "tree": "e8c42e5518bdeff0c390f69072c50b1fc362cbae",
+      "parents": [
+        "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685"
+      ]
+    },
+    {
+      "key": "M",
+      "sha": "1f441187a01a6fe423a6bdfc6e94f7ac452db605",
+      "tree": "8b9821f0618f6d93f49dda251df7cce3e68b330d",
+      "parents": [
+        "c2f7a565dd1183f421a698131664062931d5fe77",
+        "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e"
+      ]
+    },
+    {
+      "key": "vsMain",
+      "status": "ahead",
+      "ahead": 3,
+      "behind": 0,
+      "mergeBase": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "files": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+          "additions": 2,
+          "deletions": 1
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+          "additions": 6,
+          "deletions": 1
+        },
+        {
+          "path": "apps/desktop/test/db-metrics.test.mjs",
+          "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99",
+          "additions": 21,
+          "deletions": 4
+        },
+        {
+          "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+          "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+          "additions": 3,
+          "deletions": 0
+        },
+        {
+          "path": "lib/live/list-read.ts",
+          "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+          "additions": 3,
+          "deletions": 1
+        },
+        {
+          "path": "lib/swr/read-observer.ts",
+          "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+          "additions": 24,
+          "deletions": 0
+        },
+        {
+          "path": "scripts/use-live-lists.live.test.tsx",
+          "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+          "additions": 97,
+          "deletions": 6
+        }
+      ]
+    },
+    {
+      "key": "vsC",
+      "status": "ahead",
+      "ahead": 12,
+      "behind": 0,
+      "mergeBase": "c2f7a565dd1183f421a698131664062931d5fe77",
+      "files": [
+        {
+          "path": ".github/workflows/production-smoke.yml",
+          "gitBlob": "5c55823853528b0f2084634684a97d15587039b6",
+          "additions": 5,
+          "deletions": 13
+        },
+        {
+          "path": "apps/api/scripts/workflow-development-aliases.test.mjs",
+          "gitBlob": "78212e6fdee4d17cdffd58f1bb2bc59c40a01d5a",
+          "additions": 13,
+          "deletions": 1
+        },
+        {
+          "path": "apps/api/scripts/workflow-local.test.mjs",
+          "gitBlob": "54ce7216ce94351a011e5ae0787a6d3ca8f3d5a5",
+          "additions": 12,
+          "deletions": 1
+        },
+        {
+          "path": "docs/production-smoke.md",
+          "gitBlob": "ca4a72ca8fbe8798a7bc0d288498c28d19e5232a",
+          "additions": 7,
+          "deletions": 5
+        },
+        {
+          "path": "lib/auth-config.test.ts",
+          "gitBlob": "98eb5cf683aaf540f49e55c70cfc7ed23c5c0e30",
+          "additions": 35,
+          "deletions": 0
+        },
+        {
+          "path": "lib/desktop-rpc/handler.test.ts",
+          "gitBlob": "c1fe2307b8a9c838012995ca4a634d0d6d8bc367",
+          "additions": 9,
+          "deletions": 0
+        },
+        {
+          "path": "lib/desktop-rpc/handler.ts",
+          "gitBlob": "3e568543ea258a992bdae0af0f98f46f58b8e727",
+          "additions": 3,
+          "deletions": 1
+        },
+        {
+          "path": "lib/factory/questions/execution-continuation.db.test.ts",
+          "gitBlob": "0f204920c341c9558077fc502aeca11ad0886656",
+          "additions": 20,
+          "deletions": 1
+        },
+        {
+          "path": "lib/factory/questions/wake.ts",
+          "gitBlob": "bddd4d822830a8a41ae1b328f034cd670e70b877",
+          "additions": 4,
+          "deletions": 3
+        },
+        {
+          "path": "scripts/acceptance/cloud-lease-audit.mjs",
+          "gitBlob": "f3ecae78a630f6370068efb47f6dbc31f62dd40d",
+          "additions": 25,
+          "deletions": 10
+        },
+        {
+          "path": "scripts/acceptance/cloud-lease-audit.test.mjs",
+          "gitBlob": "70f87b5243ec97f1c56174c566ba50767c8771ae",
+          "additions": 29,
+          "deletions": 0
+        },
+        {
+          "path": "scripts/acceptance/thread-lifecycle.mjs",
+          "gitBlob": "3a2ac35705b86073eb42d55ce4c6bcac8c64564d",
+          "additions": 1,
+          "deletions": 0
+        },
+        {
+          "path": "scripts/acceptance/thread-lifecycle.test.mjs",
+          "gitBlob": "780722dcd97e1dd1f75d2ab764287cf7e3ab78b1",
+          "additions": 25,
+          "deletions": 0
+        },
+        {
+          "path": "scripts/ops/production-smoke.mjs",
+          "gitBlob": "bd5e434762e9ef09dfbd75bee60b307a5a6caf90",
+          "additions": 19,
+          "deletions": 16
+        },
+        {
+          "path": "scripts/ops/production-smoke.test.mjs",
+          "gitBlob": "6325dd39510ca14b145bbd89979d45b27646979b",
+          "additions": 46,
+          "deletions": 6
+        }
+      ]
+    },
+    {
+      "key": "branch",
+      "sha": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+      "ref": "refs/heads/test/1512-native-query-sources-78-20261107"
+    }
+  ],
+  "evidenceLimits": {
+    "newCOrMSourceCi": "not_run",
+    "newNativeBudget": "not_run",
+    "prior6af6": {
+      "loginNative": 212,
+      "loginWeb": 209,
+      "loginPassed": false,
+      "startupBundled": 174,
+      "startupHosted": 199,
+      "startupFirstPairPassed": true
+    },
+    "noPerformanceExtrapolation": true,
+    "productionAcceptance": null,
+    "testsNotRepeated": true,
+    "newResourcesStarted": 0
+  },
+  "nextAuthorizedBoundary": "Hold C/M without publishing while root reviews the separate ACME preflight change. A single later fast-forward publication requires root instruction. Do not merge PR before current main writers finish."
+}

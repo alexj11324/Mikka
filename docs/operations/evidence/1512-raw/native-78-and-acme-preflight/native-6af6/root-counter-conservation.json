@@ -1,0 +1,324 @@
+{
+  "version": 1,
+  "kind": "root_independent_native6af_counter_conservation",
+  "inputGitBlob": "f776e4668055e31b926b4d2d2d9b56d53c0ce6ca",
+  "inputSha256": "e83eb48b63b31bcd8e6280930e28c8880b3f8de4889e90a888a84b8057432507",
+  "source": {
+    "revision": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+    "platform": "darwin",
+    "arch": "arm64",
+    "runtime": "nitro",
+    "pid": 29289,
+    "process": "primary API shared by lifecycle bundled, hosted and Chromium"
+  },
+  "rows": [
+    {
+      "path": "queryCounts.windows.webLogin.checkpoints.0.snapshot",
+      "queryCalls": 26129,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26129,
+      "sourceSum": 7882,
+      "unattributed": 7882,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.checkpoints.1.snapshot",
+      "queryCalls": 26148,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26148,
+      "sourceSum": 7882,
+      "unattributed": 7882,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.checkpoints.2.snapshot",
+      "queryCalls": 26148,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26148,
+      "sourceSum": 7882,
+      "unattributed": 7882,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.checkpoints.3.snapshot",
+      "queryCalls": 26338,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26338,
+      "sourceSum": 7928,
+      "unattributed": 7928,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.segments.0",
+      "queryCalls": 19,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 19,
+      "sourceSum": 0,
+      "unattributed": 0,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.segments.1",
+      "queryCalls": 0,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 0,
+      "sourceSum": 0,
+      "unattributed": 0,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.segments.2",
+      "queryCalls": 190,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 190,
+      "sourceSum": 46,
+      "unattributed": 46,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.webLogin.total",
+      "queryCalls": 209,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 209,
+      "sourceSum": 46,
+      "unattributed": 46,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.checkpoints.0.snapshot",
+      "queryCalls": 26338,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26338,
+      "sourceSum": 7928,
+      "unattributed": 7928,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.checkpoints.1.snapshot",
+      "queryCalls": 26357,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26357,
+      "sourceSum": 7928,
+      "unattributed": 7928,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.checkpoints.2.snapshot",
+      "queryCalls": 26373,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26373,
+      "sourceSum": 7928,
+      "unattributed": 7928,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.checkpoints.3.snapshot",
+      "queryCalls": 26550,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26550,
+      "sourceSum": 7977,
+      "unattributed": 7977,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.segments.0",
+      "queryCalls": 19,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 19,
+      "sourceSum": 0,
+      "unattributed": 0,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.segments.1",
+      "queryCalls": 16,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 16,
+      "sourceSum": 0,
+      "unattributed": 0,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.segments.2",
+      "queryCalls": 177,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 177,
+      "sourceSum": 49,
+      "unattributed": 49,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin.total",
+      "queryCalls": 212,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 212,
+      "sourceSum": 49,
+      "unattributed": 49,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-bundled.checkpoints.0.snapshot",
+      "queryCalls": 26925,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 26925,
+      "sourceSum": 8201,
+      "unattributed": 8201,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-bundled.checkpoints.1.snapshot",
+      "queryCalls": 27099,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 27099,
+      "sourceSum": 8252,
+      "unattributed": 8252,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-bundled.segments.0",
+      "queryCalls": 174,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 174,
+      "sourceSum": 51,
+      "unattributed": 51,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-bundled.total",
+      "queryCalls": 174,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 174,
+      "sourceSum": 51,
+      "unattributed": 51,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-hosted.checkpoints.0.snapshot",
+      "queryCalls": 27099,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 27099,
+      "sourceSum": 8252,
+      "unattributed": 8252,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-hosted.checkpoints.1.snapshot",
+      "queryCalls": 27298,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 27298,
+      "sourceSum": 8301,
+      "unattributed": 8301,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-hosted.segments.0",
+      "queryCalls": 199,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 199,
+      "sourceSum": 49,
+      "unattributed": 49,
+      "valid": true
+    },
+    {
+      "path": "queryCounts.windows.startup-hosted.total",
+      "queryCalls": 199,
+      "operations": 17,
+      "sources": 78,
+      "operationSum": 199,
+      "sourceSum": 49,
+      "unattributed": 49,
+      "valid": true
+    }
+  ],
+  "windows": [
+    {
+      "path": "queryCounts.windows.webLogin",
+      "status": "complete",
+      "checkpointCount": 4,
+      "segmentCount": 3,
+      "queryCalls": 209,
+      "segmentQueries": 209,
+      "pid": 29289,
+      "pidConsistent": true,
+      "unknownReadingsZero": true,
+      "unattributed": 46,
+      "otherScoped": 0,
+      "noScope": 0,
+      "allOperationSegmentsConserve": true,
+      "allSourceSegmentsConserve": true
+    },
+    {
+      "path": "queryCounts.windows.nativeLogin",
+      "status": "complete",
+      "checkpointCount": 4,
+      "segmentCount": 3,
+      "queryCalls": 212,
+      "segmentQueries": 212,
+      "pid": 29289,
+      "pidConsistent": true,
+      "unknownReadingsZero": true,
+      "unattributed": 49,
+      "otherScoped": 0,
+      "noScope": 0,
+      "allOperationSegmentsConserve": true,
+      "allSourceSegmentsConserve": true
+    },
+    {
+      "path": "queryCounts.windows.startup-bundled",
+      "status": "complete",
+      "checkpointCount": 2,
+      "segmentCount": 1,
+      "queryCalls": 174,
+      "segmentQueries": 174,
+      "pid": 29289,
+      "pidConsistent": true,
+      "unknownReadingsZero": true,
+      "unattributed": 51,
+      "otherScoped": 0,
+      "noScope": 0,
+      "allOperationSegmentsConserve": true,
+      "allSourceSegmentsConserve": true
+    },
+    {
+      "path": "queryCounts.windows.startup-hosted",
+      "status": "complete",
+      "checkpointCount": 2,
+      "segmentCount": 1,
+      "queryCalls": 199,
+      "segmentQueries": 199,
+      "pid": 29289,
+      "pidConsistent": true,
+      "unknownReadingsZero": true,
+      "unattributed": 49,
+      "otherScoped": 0,
+      "noScope": 0,
+      "allOperationSegmentsConserve": true,
+      "allSourceSegmentsConserve": true
+    }
+  ],
+  "valid": true,
+  "productionAcceptance": null
+}

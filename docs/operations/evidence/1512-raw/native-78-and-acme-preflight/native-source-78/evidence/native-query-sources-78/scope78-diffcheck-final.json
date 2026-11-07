@@ -1,0 +1,1 @@
+{"command": ["git", "diff", "--check"], "exitCode": 0, "output": "", "earlierNoIndexExit1Meaning": "changes_present_with_empty_check_output"}

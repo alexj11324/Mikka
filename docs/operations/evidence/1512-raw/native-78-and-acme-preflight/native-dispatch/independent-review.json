@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "kind": "native_dispatch_proof_independent_source_review",
+  "reviewedAt": "2026-11-07 21:30:21 UTC",
+  "baseRevision": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+  "result": "no_blocking_findings",
+  "files": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 5786,
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "blob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "bytes": 3337,
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "blob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "bytes": 4258,
+      "sha256": "603268415400b8c11bd3b6cd70e0064f4064139f7ec57e6548c96d8f489d3448",
+      "blob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+      "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "bytes": 5629,
+      "sha256": "057dd6f7ee07639c3e8bd44f139021b4e1796c991596016aaf43c3dbd75ae72c",
+      "blob": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+      "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 58204,
+      "sha256": "78a9ac67440cf9eff68cf73bcb62500b1e96382b70a46c2d15c28918dd4d9d5e",
+      "blob": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+      "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420"
+    }
+  ],
+  "scope": {
+    "sourceReadOnly": true,
+    "testsRerun": false,
+    "productEdits": false,
+    "refWrites": false,
+    "newResources": false,
+    "productionRequests": false
+  },
+  "findings": [
+    {
+      "code": "dispatch_lower_bound",
+      "paths": [
+        "apps/desktop/src/renderer/rpc.ts",
+        "lib/swr/read-observer.ts"
+      ],
+      "result": "preserved",
+      "evidence": "Proof is captured after argument encoding and current-scope check, immediately before native fetch; only successful decoded task snapshots or batch envelopes receive it. It is a conservative same-realm lower bound, not server receipt time."
+    },
+    {
+      "code": "logical_result_identity",
+      "paths": [
+        "apps/desktop/src/renderer/read-batch.ts",
+        "lib/desktop-rpc/wire.ts"
+      ],
+      "result": "preserved",
+      "evidence": "The fixed wire decoder makes fresh response objects. After full batch shape validation, current-scope validation and per-item success, only the matching pollTaskRuns result inherits the envelope proof; other logical results and failures do not."
+    },
+    {
+      "code": "shallow_wrapper_only",
+      "paths": [
+        "lib/live/list-read.ts",
+        "hooks/use-live-lists.ts"
+      ],
+      "result": "preserved",
+      "evidence": "The task hook checks authenticated owner before returning its actual snapshot; observeListRead preserves only that result through a shallow requestedAt wrapper. It does not move the deadline observation anchor or certify merged issue/thread deltas."
+    },
+    {
+      "code": "swr_acceptance_fences",
+      "paths": [
+        "lib/swr/read-observer.ts",
+        "components/swr-defaults.tsx",
+        "hooks/use-live-key.tsx"
+      ],
+      "result": "unchanged",
+      "evidence": "Existing accepted/onSuccess, exact committed cache identity, superseded/error, weak lifetime, required+held-at-entry+current revisions, owner namespace, visibility and retired persistent-cache checks remain unchanged. Only began can advance from an attached proof after fulfillment."
+    },
+    {
+      "code": "scope_retirement",
+      "paths": [
+        "apps/desktop/src/renderer/rpc.ts",
+        "apps/desktop/src/renderer/read-batch.ts",
+        "hooks/use-live-lists.ts"
+      ],
+      "result": "unchanged",
+      "evidence": "Session/workspace/generation fences run before and after transport, and prior to individual batch resolution. A changed owner fails the task snapshot check before SWR can receive a proof-bearing wrapper."
+    },
+    {
+      "code": "test_contract",
+      "paths": [
+        "scripts/use-live-lists.live.test.tsx"
+      ],
+      "result": "reviewed_not_rerun",
+      "evidence": "Four appended cases execute real Native queue, codec and fetch code with fixture HTTP/socket boundaries, covering single/batch dispatch after readiness and before readiness. Existing test edits only expose and reset explicit fake-socket open control."
+    }
+  ],
+  "implementerReportedValidation": {
+    "source": "llm_impl message",
+    "realSWRGuardsPassed": 22,
+    "liveChannelTestsPassed": 59,
+    "independentlyRerun": false
+  },
+  "limits": [
+    "This review does not identify the exact cause of any past Native SQL delta.",
+    "A live flush that runs before fulfillment can still conservatively revalidate before a later dispatch proof is available.",
+    "No claim is made that the patch removes all second task reads or satisfies production/Native query budgets.",
+    "No wire, authentication, TTL, measurement-window or threshold changes were introduced by the reviewed four product diffs."
+  ],
+  "validationNotes": {
+    "toolProjectionError": "One local projection expression referenced an undefined temporary variable after successful read/store; no source, test, Git mutation or validation result was affected.",
+    "resourcesActive": 0
+  }
+}

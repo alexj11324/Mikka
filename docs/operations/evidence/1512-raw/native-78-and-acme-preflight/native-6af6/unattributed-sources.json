@@ -1,0 +1,631 @@
+{
+  "version": 1,
+  "kind": "desktop_unattributed_sources_summary",
+  "status": "complete",
+  "valid": true,
+  "source": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+  "scope": "whole_primary_api_process",
+  "subtractPkceOrBackground": false,
+  "startupScope": "first_pair_only",
+  "vocabulary": {
+    "keys": 78,
+    "sourceFileSha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+    "sourceFileGitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+    "keysSha256": "901f280dc087f97122181882c33d7cf143130b8b61edff1447415bfd6d40f2c0"
+  },
+  "counterImplementation": {
+    "path": "apps/desktop/test/db-metrics.cjs",
+    "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+    "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9",
+    "projectorSha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+    "binding": "frozen_expected_source_blobs_require_separate_exact_checkout_verification"
+  },
+  "integrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": true,
+    "refinementRowsPresent": 24,
+    "refinementRowsExpected": 24
+  },
+  "windows": {
+    "nativeLogin": {
+      "queryCalls": 212,
+      "unattributed": 49,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/conversations/[id]/read",
+          "queryCalls": 9
+        },
+        {
+          "source": "/api/approved-writes",
+          "queryCalls": 20
+        },
+        {
+          "source": "/api/mobile/reactions",
+          "queryCalls": 1
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        }
+      ],
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 16,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 177,
+          "unattributed": 49,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/conversations/[id]/read",
+              "queryCalls": 9
+            },
+            {
+              "source": "/api/approved-writes",
+              "queryCalls": 20
+            },
+            {
+              "source": "/api/mobile/reactions",
+              "queryCalls": 1
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            }
+          ]
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 209,
+      "unattributed": 46,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/conversations/[id]/read",
+          "queryCalls": 11
+        },
+        {
+          "source": "/api/approved-writes",
+          "queryCalls": 20
+        },
+        {
+          "source": "/api/mobile/reactions",
+          "queryCalls": 1
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 2
+        }
+      ],
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 190,
+          "unattributed": 46,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/conversations/[id]/read",
+              "queryCalls": 11
+            },
+            {
+              "source": "/api/approved-writes",
+              "queryCalls": 20
+            },
+            {
+              "source": "/api/mobile/reactions",
+              "queryCalls": 1
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 2
+            }
+          ]
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 174,
+      "unattributed": 51,
+      "pair": 1,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/conversations/[id]/read",
+          "queryCalls": 9
+        },
+        {
+          "source": "/api/approved-writes",
+          "queryCalls": 20
+        },
+        {
+          "source": "/api/mobile/reactions",
+          "queryCalls": 1
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 3
+        },
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 4
+        }
+      ],
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 174,
+          "unattributed": 51,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/conversations/[id]/read",
+              "queryCalls": 9
+            },
+            {
+              "source": "/api/approved-writes",
+              "queryCalls": 20
+            },
+            {
+              "source": "/api/mobile/reactions",
+              "queryCalls": 1
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 3
+            },
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 4
+            }
+          ]
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 199,
+      "unattributed": 49,
+      "pair": 1,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 3
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/conversations/[id]/read",
+          "queryCalls": 9
+        },
+        {
+          "source": "/api/approved-writes",
+          "queryCalls": 20
+        },
+        {
+          "source": "/api/mobile/reactions",
+          "queryCalls": 1
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 1
+        },
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        }
+      ],
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 199,
+          "unattributed": 49,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 3
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/conversations/[id]/read",
+              "queryCalls": 9
+            },
+            {
+              "source": "/api/approved-writes",
+              "queryCalls": 20
+            },
+            {
+              "source": "/api/mobile/reactions",
+              "queryCalls": 1
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 1
+            },
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": "nativeLogin",
+      "second": "webLogin",
+      "queryDifference": 3,
+      "unattributedDifference": 3,
+      "sources": [
+        {
+          "source": "/api/agent/sessions",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/conversations",
+          "first": 10,
+          "second": 10,
+          "difference": 0
+        },
+        {
+          "source": "/api/conversations/[id]/read",
+          "first": 9,
+          "second": 11,
+          "difference": -2
+        },
+        {
+          "source": "/api/approved-writes",
+          "first": 20,
+          "second": 20,
+          "difference": 0
+        },
+        {
+          "source": "/api/mobile/reactions",
+          "first": 1,
+          "second": 1,
+          "difference": 0
+        },
+        {
+          "source": "/api/pending-actions",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 0,
+          "difference": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 0,
+          "difference": 3
+        }
+      ],
+      "sourceDifferenceSum": 3,
+      "segments": [
+        {
+          "firstPhase": "common-email-authentication",
+          "secondPhase": "common-email-authentication",
+          "queryDifference": 0,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "native-pkce-and-automatic-renderer-to-public-session",
+          "secondPhase": "web-navigation-to-dom-content-loaded",
+          "queryDifference": 16,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "workspace-selection-to-usable",
+          "secondPhase": "workspace-selection-to-usable",
+          "queryDifference": -13,
+          "unattributedDifference": 3,
+          "sources": [
+            {
+              "source": "/api/agent/sessions",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/conversations",
+              "first": 10,
+              "second": 10,
+              "difference": 0
+            },
+            {
+              "source": "/api/conversations/[id]/read",
+              "first": 9,
+              "second": 11,
+              "difference": -2
+            },
+            {
+              "source": "/api/approved-writes",
+              "first": 20,
+              "second": 20,
+              "difference": 0
+            },
+            {
+              "source": "/api/mobile/reactions",
+              "first": 1,
+              "second": 1,
+              "difference": 0
+            },
+            {
+              "source": "/api/pending-actions",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 0,
+              "difference": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 0,
+              "difference": 3
+            }
+          ],
+          "sourceDifferenceSum": 3
+        }
+      ]
+    },
+    "startupBundledVsHosted": {
+      "first": "startup-bundled",
+      "second": "startup-hosted",
+      "queryDifference": -25,
+      "unattributedDifference": 2,
+      "sources": [
+        {
+          "source": "/api/agent/sessions",
+          "first": 2,
+          "second": 3,
+          "difference": -1
+        },
+        {
+          "source": "/api/conversations",
+          "first": 10,
+          "second": 10,
+          "difference": 0
+        },
+        {
+          "source": "/api/conversations/[id]/read",
+          "first": 9,
+          "second": 9,
+          "difference": 0
+        },
+        {
+          "source": "/api/approved-writes",
+          "first": 20,
+          "second": 20,
+          "difference": 0
+        },
+        {
+          "source": "/api/mobile/reactions",
+          "first": 1,
+          "second": 1,
+          "difference": 0
+        },
+        {
+          "source": "/api/pending-actions",
+          "first": 3,
+          "second": 1,
+          "difference": 2
+        },
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 4,
+          "second": 3,
+          "difference": 1
+        }
+      ],
+      "sourceDifferenceSum": 2,
+      "segments": [
+        {
+          "firstPhase": "launch-to-usable",
+          "secondPhase": "launch-to-usable",
+          "queryDifference": -25,
+          "unattributedDifference": 2,
+          "sources": [
+            {
+              "source": "/api/agent/sessions",
+              "first": 2,
+              "second": 3,
+              "difference": -1
+            },
+            {
+              "source": "/api/conversations",
+              "first": 10,
+              "second": 10,
+              "difference": 0
+            },
+            {
+              "source": "/api/conversations/[id]/read",
+              "first": 9,
+              "second": 9,
+              "difference": 0
+            },
+            {
+              "source": "/api/approved-writes",
+              "first": 20,
+              "second": 20,
+              "difference": 0
+            },
+            {
+              "source": "/api/mobile/reactions",
+              "first": 1,
+              "second": 1,
+              "difference": 0
+            },
+            {
+              "source": "/api/pending-actions",
+              "first": 3,
+              "second": 1,
+              "difference": 2
+            },
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 4,
+              "second": 3,
+              "difference": 1
+            }
+          ],
+          "sourceDifferenceSum": 2
+        }
+      ]
+    }
+  },
+  "issues": [],
+  "productionAcceptance": null,
+  "limitations": [
+    "Lifecycle revision is checked; checkout and harness identity require their separate artifact receipts.",
+    "Closed source counts do not retain SQL, request bodies, IDs or arbitrary route values.",
+    "Legacy missing refinement is unavailable, not zero; a 75-key report is incompatible with this 78-key reader and must use its frozen historical reader. Whole-window totals are never reduced."
+  ],
+  "input": {
+    "bytes": 269694,
+    "sha256": "e83eb48b63b31bcd8e6280930e28c8880b3f8de4889e90a888a84b8057432507"
+  }
+}

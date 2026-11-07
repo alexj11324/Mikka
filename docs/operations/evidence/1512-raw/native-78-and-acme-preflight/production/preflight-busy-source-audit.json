@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "factory_workspace_quiet_static_contract_review",
+  "source": "afae721f6730434ded6be932a7f9dd585c22ee49",
+  "productionDataRead": false,
+  "productOrConfigChanged": false,
+  "findings": [
+    {
+      "code": "failed_blocked_not_uniform_terminal",
+      "sources": [
+        "lib/factory/store.ts:199-200",
+        "lib/factory/public-flow.ts:27-39"
+      ],
+      "finding": "Factory terminal mutation guard only includes cancelled/revoked. Failed/blocked are needsYou states and may legally resume."
+    },
+    {
+      "code": "blocked_can_auto_recover",
+      "sources": [
+        "lib/factory/watchdog.ts:19-35",
+        "lib/factory/watchdog.ts:59-83"
+      ],
+      "finding": "blocked with matching task_stalled watchdog request epoch can auto recover after old run termination; cron explicitly includes that subset."
+    },
+    {
+      "code": "failed_can_auto_continue",
+      "sources": [
+        "lib/factory/reconcile.ts:105-107",
+        "lib/factory/reconcile.ts:190-207",
+        "lib/factory/automatic-dispatch.ts:40-58"
+      ],
+      "finding": "Existing retry child can be adopted from failed; trusted review/verify failure can repair within budget."
+    },
+    {
+      "code": "inactive_unresolved_history_can_block_indefinitely",
+      "sources": [
+        "lib/factory/reconcile.ts:12-47",
+        "lib/factory/reconcile.ts:205-207",
+        "lib/factory/watchdog.ts:76-83"
+      ],
+      "finding": "Exhausted repair budget leaves failed. Failed without retry and blocked without the selected watchdog condition are not automatically swept into completion. Such ledger can persist until explicit owner recovery/closure, while quiet rejects it on every invocation."
+    },
+    {
+      "code": "settled_predicate_also_controls_owned_cleanup",
+      "sources": [
+        "scripts/acceptance/run-observability.mjs:59-61",
+        "scripts/acceptance/run-observability.mjs:349-358",
+        "scripts/acceptance/run-observability.mjs:524-577"
+      ],
+      "finding": "Adding failed/blocked to shared settledTask would also skip cancellation and permit cleanup success for this acceptance's own recoverable Factory work."
+    },
+    {
+      "code": "list_candidate_sha_missing_hypothesis_refuted",
+      "sources": [
+        "app/api/factory/tasks/route.ts:26",
+        "lib/factory/http.ts:33-44",
+        "lib/factory/human-store.ts:43-44",
+        "lib/factory/store.ts:388-420",
+        "lib/factory/store.ts:822"
+      ],
+      "finding": "The exact session-owned list route uses publicFlow=false. SQL selects candidateSha and every returned summary explicitly sets candidateSha: candidateSha ?? null. passed/approval no-repository history does not require a candidates argument at quiet(). Public v2 projection is not used by this route."
+    }
+  ],
+  "conclusion": "The generic workspace_busy code conflates activity and unresolved work. Status-only blanket relaxation is unsound. This static audit does not identify the actual production failing branch or task.",
+  "smallestNextEvidence": "Read only closed busy branch plus stage/status and exact task identity through the already-authorized source-bound owner API; do not expose free-form reason/evidence.",
+  "conditionalDesign": "If allowing dormant historical ledgers is later required, use a separate baseline-quiescence proof that accounts for active/queued/retrying runs, eligible watchdog recovery and unresolved external/question work. Keep owned-task closure predicate strict. No such proof or product change is implemented by this audit.",
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 56471,
+      "sha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398",
+      "gitBlob": "1eedff30eee7021fa6503c760253fe499664c7d0"
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "bytes": 82613,
+      "sha256": "eebf736fa966b7de322dc4b3dd9bb2f15f372279fa644a72e34ec245f6331260",
+      "gitBlob": "ed53fba310b0c4f2c69a3654deb14893479c50e3"
+    },
+    {
+      "path": "lib/factory/public-flow.ts",
+      "bytes": 8290,
+      "sha256": "c2a3843c11d11092a41b3313c62ccb8bbaf69c51021827f3ca70aa5385da42da",
+      "gitBlob": "5cf5d158a6775a448b3422cdf230156bc3e812fb"
+    },
+    {
+      "path": "lib/factory/reconcile.ts",
+      "bytes": 22767,
+      "sha256": "159e5ef9b5eb1bc235883c87a80d609e4ce275ae5c9f1554a6c207219db1ab06",
+      "gitBlob": "2f01685d1ce1dc3a9c4fddb55cc0df377c054e47"
+    },
+    {
+      "path": "lib/factory/watchdog.ts",
+      "bytes": 20772,
+      "sha256": "73987aa9b0b89da4c6ff305c0b43aaec54279256780df4be63aabd2d56689d7b",
+      "gitBlob": "9d9ee08ab13040e404a352082fd4e18e4d62bbf8"
+    },
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "bytes": 23615,
+      "sha256": "d4f6a06ba376045740027f2e909c19117ac0a1e737345700212f553c5bcd1857",
+      "gitBlob": "08ce3e0c6b02cc4b1d0133beef5383cd5cc30155"
+    },
+    {
+      "path": "lib/factory/task-dispatch.ts",
+      "bytes": 9476,
+      "sha256": "556aff9d8c0e84e2ee16be18dc60d4defe364dd9f2fe0e49fa704019f14318e5",
+      "gitBlob": "e9948c07b1bee57d4e3de7bd6c226e4c14dd7c67"
+    },
+    {
+      "path": "lib/factory/check-recovery.ts",
+      "bytes": 17548,
+      "sha256": "aa401ace31d0df5cfa4f5a6220d5d8c4d298e050aff309f05e52bbb5869fdb79",
+      "gitBlob": "dd35d8a8a3fd91ca90e21e02e1df991d2976c16a"
+    },
+    {
+      "path": "app/api/factory/tasks/route.ts",
+      "bytes": 3901,
+      "sha256": "1e37c85da0c2e619dda37b2a1ee1192d8a09b0e2970522bd8178ae98cd82994c",
+      "gitBlob": "20869b39ac12f9761150cb59343145b1fb623563"
+    },
+    {
+      "path": "lib/factory/http.ts",
+      "bytes": 4211,
+      "sha256": "69e8c355436e243b50912d4d7946a314858247267aeb5a9408e5048de0e8f00c",
+      "gitBlob": "ddac750aa31e5280ad7addc7891cfa4caa5f3bfd"
+    },
+    {
+      "path": "lib/factory/human-store.ts",
+      "bytes": 2831,
+      "sha256": "5e2bb9f9f67cdb206490a93ab09060a0dbb97d1451352d38d70140ad130aa9a5",
+      "gitBlob": "eb689ae7cffe2572bf0e9982975f8d63a3a3260c"
+    }
+  ]
+}

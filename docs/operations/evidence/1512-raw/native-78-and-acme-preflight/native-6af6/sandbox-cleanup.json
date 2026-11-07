@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "kind": "artifact_recovery_sandbox_cleanup",
+  "sessionId": "sbx_bvIpkD8VZhVceOLQINXrIkTip1Lu",
+  "status": "stopped",
+  "startedAt": 1794086610960,
+  "requestedStopAt": 1794086929879,
+  "stoppedAt": 1794086930140,
+  "durationMs": 319180,
+  "timeoutMs": 600000,
+  "vcpus": 1,
+  "memoryMiB": 2048,
+  "persistent": false,
+  "publicPortsRequested": [],
+  "networkAllowlist": [
+    "sdmntpreastus3.oaiusercontent.com",
+    "sdmntprsouthcentralus.oaiusercontent.com"
+  ],
+  "explicitStop": true,
+  "separateGetReadback": true,
+  "all17RecoveredFilesVerifiedBeforeStop": true,
+  "compressedReadback": {
+    "encoding": "lzw16be",
+    "parts": 98,
+    "compressedBytes": 126814,
+    "compressedSha256": "d8d1eebe7b39a126c7c9c222f707c626b0db44a0b6e28a01aeb491e4d7218559",
+    "bytes": 714545,
+    "sha256": "a5b3a44b1d4b6f876d9a07af2ccc311c886dcd919eedcad67397c58b80f9ae40",
+    "fileCount": 17,
+    "originalJsonCount": 6
+  },
+  "originalJsonCount": 6,
+  "downloadScript": {
+    "sha256": "15427510f027dab5c66fd7aa2afd3331b4cefbaabf73f6bf84f937287c66e984",
+    "bytes": 7706
+  },
+  "readerScript": {
+    "sha256": "6583096326ff1226f58d7511266f20ccc69df7a7fd0a59e1dd4bd082c7e87519"
+  },
+  "signedUrlsSavedToFiles": false,
+  "signedUrlReferencesClearedAfterRecovery": true,
+  "zipFilesPersisted": false,
+  "imagesOrPackagesExtracted": false,
+  "providerCalls": 0,
+  "productionCredentialsLoaded": false,
+  "databasesStarted": 0,
+  "browsersStarted": 0
+}

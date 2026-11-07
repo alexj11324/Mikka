@@ -1,0 +1,11 @@
+✔ the frozen 75-key historical reader stays valid while the 78-key reader refuses to reinterpret its evidence (13.633119ms)
+✔ an explicitly synthetic 78-key fixture conserves 12 checkpoints and all 24 partitions with bound source hashes (7.776217ms)
+✔ a new key with a private value cannot enter the closed projection (4.164936ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.352396

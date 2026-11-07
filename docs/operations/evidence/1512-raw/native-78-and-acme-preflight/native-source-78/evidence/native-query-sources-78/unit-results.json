@@ -1,0 +1,139 @@
+{
+  "checks": [
+    {
+      "name": "scope78-red.tap",
+      "exitCode": 1,
+      "command": [
+        "node",
+        "--test",
+        "apps/desktop/test/db-metrics.test.mjs"
+      ]
+    },
+    {
+      "name": "scope78-green.tap",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "--test",
+        "apps/desktop/test/db-metrics.test.mjs"
+      ]
+    },
+    {
+      "name": "scope78-reader.tap",
+      "exitCode": 1,
+      "command": [
+        "node",
+        "--test",
+        "readers/desktop-unattributed-sources-78-summary.test.mjs"
+      ]
+    },
+    {
+      "name": "scope78-lint.log",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/oxlint",
+        "--deny-warnings",
+        "-c",
+        "apps/desktop/oxlint.json",
+        "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "apps/desktop/test/db-metrics.test.mjs"
+      ]
+    },
+    {
+      "name": "scope78-reader-lint.log",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/oxlint",
+        "--deny-warnings",
+        "-c",
+        "apps/desktop/oxlint.json",
+        "readers/desktop-unattributed-sources-78-summary.mjs",
+        "readers/desktop-unattributed-sources-78-summary.test.mjs"
+      ]
+    },
+    {
+      "name": "check-db-query-unattributed-sources.cjs.log",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "--check",
+        "apps/desktop/test/db-query-unattributed-sources.cjs"
+      ]
+    },
+    {
+      "name": "check-db-metrics.test.mjs.log",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "--check",
+        "apps/desktop/test/db-metrics.test.mjs"
+      ]
+    },
+    {
+      "name": "check-desktop-unattributed-sources-78-summary.mjs.log",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "--check",
+        "readers/desktop-unattributed-sources-78-summary.mjs"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "scope78-green.tap",
+      "bytes": 2496,
+      "sha256": "23876650a9b7248aeb529e3451ec47a637d204244694d1b0a48afbef916cd495"
+    },
+    {
+      "path": "scope78-reader.tap",
+      "bytes": 1489,
+      "sha256": "e99442f224abb83c376eb4899371776e4293c8741ce1a96f1003f295101a1837"
+    },
+    {
+      "path": "scope78-red.tap",
+      "bytes": 10295,
+      "sha256": "9ecb04b47e2468f7241b26cdba02b83b6645fb3a9d2cb92b2136ffc0a6c4f009"
+    },
+    {
+      "path": "check-db-metrics.test.mjs.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "check-db-query-unattributed-sources.cjs.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "check-desktop-unattributed-sources-78-summary.mjs.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dependency-install-pinned.log",
+      "bytes": 215,
+      "sha256": "84bf15d193be60e2310289c5db6f05536999a0b19ac3984aed3f24282c76f3af"
+    },
+    {
+      "path": "dependency-install.log",
+      "bytes": 974,
+      "sha256": "d53fa51db760a94ba222076b1950286a2b6fb1c65098c90b418736b1a45cfc99"
+    },
+    {
+      "path": "runtime-version.log",
+      "bytes": 9,
+      "sha256": "249baf635bb43877fcb9422efa1a4904b702d0ddf14d3949b7cd0950d5229c81"
+    },
+    {
+      "path": "scope78-lint.log",
+      "bytes": 89,
+      "sha256": "ef288a5e420489ba6edfc747fe2863e605dfb0a5629dde1730b2b62ea562b71d"
+    },
+    {
+      "path": "scope78-reader-lint.log",
+      "bytes": 89,
+      "sha256": "ddb1b629e09dbc08ae80d09c08cb079e1882c6d5ae234b228ad8d77866ca11c4"
+    }
+  ]
+}

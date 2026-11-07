@@ -1,0 +1,145 @@
+✖ next cjs: bind the actual PG after tracing, with distinct copies and no double count (278.093366ms)
+✖ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (242.184657ms)
+✖ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (233.975753ms)
+✔ Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output (125.581979ms)
+✔ lifecycle query windows retain exact counter deltas and omit unrelated content (2.214886ms)
+✔ operation SQL counts partition the original full window without removing unknown or background work (0.879532ms)
+✔ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (0.825412ms)
+✔ unattributed source refinement conserves the original partition and full-window deltas (1.106509ms)
+✔ unattributed source refinement rejects incomplete evidence without upgrading legacy reports (2.077399ms)
+✔ unattributed source refinement fits the unchanged control-response limit at the largest safe count (0.698013ms)
+✖ the 78-source refinement rejects a historical 75-key partition without backfilling it (1.034909ms)
+✔ lifecycle query windows refuse a changed process, reset, missing driver and unknown readings (0.470684ms)
+✔ lifecycle reads only the attested primary metric socket, with bounded closed errors (2.103675ms)
+✔ RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields (17.333761ms)
+✔ RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts (17.86281ms)
+✔ RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls (3.696872ms)
+✔ RPC diagnostics accept only the descriptor-bound primary log and complete measured windows (3.64237ms)
+✔ RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable (2.702269ms)
+✔ RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases (3.430514ms)
+✔ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (3.294544ms)
+✔ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (4.801484ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 17
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1144.951499
+
+✖ failing tests:
+
+test at apps/desktop/test/db-metrics.test.mjs:178:3
+✖ next cjs: bind the actual PG after tracing, with distinct copies and no double count (278.093366ms)
+  Error: Command failed: /usr/local/bin/node /tmp/mikka-pg-binding-XRz0zy/probe.cjs /tmp/mikka-pg-binding-XRz0zy /vercel/sandbox/scope78/apps/desktop/test/db-metrics.cjs next cjs {"instrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/vercel/sandbox/scope78/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  AssertionError [ERR_ASSERTION]: /api/approved-writes
+  
+  undefined !== 1
+  
+      at /tmp/mikka-pg-binding-XRz0zy/probe.cjs:118:38
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/usr/local/bin/node /tmp/mikka-pg-binding-XRz0zy/probe.cjs /tmp/mikka-pg-binding-XRz0zy /vercel/sandbox/scope78/apps/desktop/test/db-metrics.cjs next cjs {"instrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/vercel/sandbox/scope78/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "AssertionError [ERR_ASSERTION]: /api/approved-writes\n\nundefined !== 1\n\n    at /tmp/mikka-pg-binding-XRz0zy/probe.cjs:118:38\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n"
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:178:3
+✖ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (242.184657ms)
+  Error: Command failed: /usr/local/bin/node /tmp/mikka-pg-binding-gf1YPV/probe.cjs /tmp/mikka-pg-binding-gf1YPV /vercel/sandbox/scope78/apps/desktop/test/db-metrics.cjs nitro cjs {"instrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/vercel/sandbox/scope78/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  AssertionError [ERR_ASSERTION]: /api/approved-writes
+  
+  undefined !== 1
+  
+      at /tmp/mikka-pg-binding-gf1YPV/probe.cjs:118:38
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/usr/local/bin/node /tmp/mikka-pg-binding-gf1YPV/probe.cjs /tmp/mikka-pg-binding-gf1YPV /vercel/sandbox/scope78/apps/desktop/test/db-metrics.cjs nitro cjs {"instrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/vercel/sandbox/scope78/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "AssertionError [ERR_ASSERTION]: /api/approved-writes\n\nundefined !== 1\n\n    at /tmp/mikka-pg-binding-gf1YPV/probe.cjs:118:38\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n"
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:178:3
+✖ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (233.975753ms)
+  Error: Command failed: /usr/local/bin/node /tmp/mikka-pg-binding-whxREx/probe.cjs /tmp/mikka-pg-binding-whxREx /vercel/sandbox/scope78/apps/desktop/test/db-metrics.cjs nitro esm {"instrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/vercel/sandbox/scope78/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  AssertionError [ERR_ASSERTION]: /api/approved-writes
+  
+  undefined !== 1
+  
+      at /tmp/mikka-pg-binding-whxREx/probe.cjs:118:38
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/usr/local/bin/node /tmp/mikka-pg-binding-whxREx/probe.cjs /tmp/mikka-pg-binding-whxREx /vercel/sandbox/scope78/apps/desktop/test/db-metrics.cjs nitro esm {"instrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/vercel/sandbox/scope78/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/vercel/sandbox/scope78/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "AssertionError [ERR_ASSERTION]: /api/approved-writes\n\nundefined !== 1\n\n    at /tmp/mikka-pg-binding-whxREx/probe.cjs:118:38\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n"
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:314:1
+✖ the 78-source refinement rejects a historical 75-key partition without backfilling it (1.034909ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  75 !== 78
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/scope78/apps/desktop/test/db-metrics.test.mjs:315:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 75,
+    expected: 78,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,739 @@
+{
+  "schemaVersion": 1,
+  "kind": "native_task_rpc_dispatch_read_proof",
+  "status": "offline_causal_red_green_candidate_not_published",
+  "source": {
+    "repository": "alexj11324/Mikka",
+    "commit": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+    "parents": [
+      "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "a9072e5835a1f7e14aae0af0033d1b682433651f"
+    ]
+  },
+  "actualAcceptance": {
+    "login": {
+      "nativeQueryCalls": 210,
+      "webQueryCalls": 188,
+      "result": "failed"
+    },
+    "firstStartup": {
+      "nativeQueryCalls": 179,
+      "hostedQueryCalls": 199,
+      "result": "passed"
+    },
+    "taskReadQueries": {
+      "native": 6,
+      "web": 0,
+      "logicalNativePollTaskRuns": 2
+    },
+    "dispatchOrderingObservedInActualNative": false,
+    "causeOfLoginDifference": "unproven",
+    "potentialReductionForThisSpecificTaskMechanismAtMostQueries": 3
+  },
+  "causalFixture": {
+    "realModules": [
+      "React",
+      "SWR",
+      "LiveChannel",
+      "useLiveTaskRunList",
+      "staleOnFocus",
+      "observeSWRRead",
+      "renderer.callAction",
+      "renderer.enqueueRead",
+      "MessageChannel",
+      "desktop RPC wire codec"
+    ],
+    "mockedBoundaries": [
+      "authenticated RPC fetch result",
+      "Live ticket fetch",
+      "WebSocket events",
+      "already-mocked action module implementations"
+    ],
+    "independentlyKnownHomeSubscription": true,
+    "noNewHomeHintOrScopeRequest": true,
+    "qualification": "The fixture has another existing home subscription. It proves a legal dispatch/readiness ordering, not that this same home-availability/order occurred during the a907 login.",
+    "positive": "fetcher/enqueue < ready < fetch() lower bound < same result commit: old source reads twice; candidate once",
+    "negative": "fetcher/enqueue < fetch() < ready with a changed revision: both sources perform a second read and display revision 6",
+    "recordedCases": [
+      {
+        "kind": "native_dispatch_order",
+        "grouped": false,
+        "beforeReady": false,
+        "phases": [
+          "task_fetcher",
+          "native_enqueued",
+          "live_ready",
+          "fetch_dispatch"
+        ],
+        "taskCalls": 1,
+        "physicalCalls": 1
+      },
+      {
+        "kind": "native_dispatch_order",
+        "grouped": false,
+        "beforeReady": true,
+        "phases": [
+          "task_fetcher",
+          "native_enqueued",
+          "fetch_dispatch",
+          "live_ready",
+          "task_fetcher",
+          "native_enqueued",
+          "fetch_dispatch"
+        ],
+        "taskCalls": 2,
+        "physicalCalls": 2
+      },
+      {
+        "kind": "native_dispatch_order",
+        "grouped": true,
+        "beforeReady": false,
+        "phases": [
+          "task_fetcher",
+          "native_enqueued",
+          "live_ready",
+          "fetch_dispatch"
+        ],
+        "taskCalls": 1,
+        "physicalCalls": 1
+      },
+      {
+        "kind": "native_dispatch_order",
+        "grouped": true,
+        "beforeReady": true,
+        "phases": [
+          "task_fetcher",
+          "native_enqueued",
+          "fetch_dispatch",
+          "live_ready",
+          "task_fetcher",
+          "native_enqueued",
+          "fetch_dispatch"
+        ],
+        "taskCalls": 2,
+        "physicalCalls": 2
+      }
+    ]
+  },
+  "implementation": {
+    "scope": "Only successful Native task-runs.pollTaskRuns responses; batch envelope proof is projected only onto that action's successful original item.",
+    "boundary": "Same-realm monotonic counter immediately before renderer fetch(), after queue/encode; a lower bound, not actual socket bytes or a server timestamp.",
+    "resultProvenance": "WeakMap keyed by the exact decoded response object, carried through its shallow observed-list wrapper. No result fields, headers, persistence, authorization cache, or separate retained response.",
+    "unchangedFences": [
+      "RPC owner/session/current checks",
+      "batch generation/workspace checks",
+      "SWR onSuccess acceptance",
+      "exact committed cache object",
+      "custom compare discard",
+      "superseded reads",
+      "required and held revisions",
+      "connection generation/coverage",
+      "owner cache retirement",
+      "visibility",
+      "permission/error propagation"
+    ],
+    "conservativeLimit": "Proof advances only when that same result is received. A Live flush arriving before the slow response remains conservative and can still start its ordinary catch-up.",
+    "noChanges": [
+      "UI measurement windows",
+      "MessageChannel scheduling",
+      "Live timers/polling",
+      "server API",
+      "SWR result cache lifetime",
+      "business notification semantics",
+      "main/1665/1675/shared refs"
+    ]
+  },
+  "validations": {
+    "node": "v24.22.1",
+    "actualCINode": "v24.22.2",
+    "exactNodeMinorMatch": false,
+    "originalSourceRed": {
+      "node": "v24.22.1",
+      "exitCode": 1,
+      "signal": null,
+      "errorCode": null,
+      "tests": 4,
+      "passed": 2,
+      "failed": 2,
+      "failures": "only post-readiness dispatch cases expect 1 but observe 2"
+    },
+    "attemptedBroadSuite": {
+      "node": "v24.22.1",
+      "exitCode": 1,
+      "signal": null,
+      "errorCode": "ETIMEDOUT",
+      "budgetMs": 90000,
+      "observedOkLines": 96,
+      "observedNotOkLines": 0,
+      "complete": false,
+      "note": "Interrupted during the existing long list suite; not a complete-suite pass. Raw output preserved unchanged."
+    },
+    "focused": {
+      "node": "v24.22.1",
+      "exitCode": 0,
+      "signal": null,
+      "tests": 22,
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "18 existing real SWR coverage/commit/revision/error/owner boundaries plus four new Native dispatch cases"
+    },
+    "channel": {
+      "node": "v24.22.1",
+      "exitCode": 0,
+      "signal": null,
+      "tests": 59,
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0,
+      "sourceUnchanged": true
+    },
+    "fullRepositoryTypecheck": "not_run_in_isolated_fixture",
+    "fullRepositoryLint": "not_run_in_isolated_fixture",
+    "remoteProductionOrNativeAcceptance": "not_run",
+    "testFilesActuallyExecutedHashesVerified": true
+  },
+  "reproduction": {
+    "fixtureSourceCount": 44,
+    "fixtureFiles": [
+      {
+        "path": "scripts/server-test.mjs",
+        "bytes": 408,
+        "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5",
+        "gitBlob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "bytes": 58204,
+        "sha256": "78a9ac67440cf9eff68cf73bcb62500b1e96382b70a46c2d15c28918dd4d9d5e",
+        "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+        "role": "original_test_with_four_added_real_module_cases"
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "bytes": 24031,
+        "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+        "gitBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/channel.test.ts",
+        "bytes": 45859,
+        "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+        "gitBlob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "bytes": 1580,
+        "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8",
+        "gitBlob": "d459548cbd8785bf2764d23543109b99ae146d18",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+        "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/revisions.ts",
+        "bytes": 4070,
+        "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+        "gitBlob": "dbef48a71d14c0f5a4f68b16c7a0aae32ecd184f",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/presence.ts",
+        "bytes": 4002,
+        "sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+        "gitBlob": "0b6ff3baba04a577b5d7f1c94a8519e77b013621",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/browser-runtime.ts",
+        "bytes": 2455,
+        "sha256": "b640f6de894ec6f94847681567148f35314134455382a2309933f769a6f17c72",
+        "gitBlob": "c2ba886fd0f55956832060eee83f7a385b1796cf",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/telemetry.ts",
+        "bytes": 2564,
+        "sha256": "b9d72ee728f8bcfe68c54dd53106fd3944610b868fb0f31f09c96008b848eea7",
+        "gitBlob": "b973a0164e2900f011bc01d7889e34803acf203e",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/list-read.ts",
+        "bytes": 3229,
+        "sha256": "04fe899da917838e25ff414de7412341b9fc72062e9870fcb7266d4a91bd39e2",
+        "gitBlob": "0a9829743d171048c720c1e9b36d09aeca3f22b5",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/live/tab-share.ts",
+        "bytes": 7849,
+        "sha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+        "gitBlob": "19b47679695258a0e89eb8c87bcbf349a299d3c2",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "bytes": 8050,
+        "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+        "gitBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "bytes": 9682,
+        "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+        "gitBlob": "ac60a59be511ec45cc372b8c91c0535861a30931",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "hooks/use-list-expiry.ts",
+        "bytes": 1233,
+        "sha256": "455bf63b9f5f0a61c8b9596da7ed612c01bfc17c5d7d18464e32360776231d06",
+        "gitBlob": "89c0b6b515860ac1315919bea4cf149f67ce4aaa",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "bytes": 4433,
+        "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+        "gitBlob": "f6be8710182ad68ce0a87f6cac910184bf1d52f3",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "bytes": 4604,
+        "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+        "gitBlob": "cb23eb39ddc29e746c437bf259ffc1db3ad08436",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/keys.ts",
+        "bytes": 3688,
+        "sha256": "baf1f5f7504143c8436341cfe23773db2f4e389d437f296199467c745b2e4fd1",
+        "gitBlob": "1470b6e51ae3a522ed57ae0937cc90fccb97f079",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/live-focus.ts",
+        "bytes": 1223,
+        "sha256": "1c67e65b189677a11043ca2c6fffcdfcb6edf10ae043e25c42e4c60f4eba8680",
+        "gitBlob": "6c8ee26a4a80471b1ec05cad106e69e83fcabb7a",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/persistent-cache.ts",
+        "bytes": 10622,
+        "sha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+        "gitBlob": "df7d4d1b5f2c744061236c54d766f68aa2137830",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/cache-policy.ts",
+        "bytes": 7250,
+        "sha256": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
+        "gitBlob": "f4fff7eeb583fee05b7f101e39bc51157432cf03",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/indexed-db.ts",
+        "bytes": 4513,
+        "sha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+        "gitBlob": "cc687bc362692456bd7e3bc512af7fc576042576",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/swr/retry.ts",
+        "bytes": 2260,
+        "sha256": "23ac4e756571418547fe67d8f42c843fcab6a342783e9f2c336b05527c67c513",
+        "gitBlob": "a44b87afb7eb933efe048e70b0183b61ed336fdb",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/base-path.ts",
+        "bytes": 841,
+        "sha256": "a631625b71ab151377ef4bff24efc4729f92415d53e3b2eb6bcb62530a387dc1",
+        "gitBlob": "ffa8c4910a5d5d5ee3ff5f60065088c097fc4ed2",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/server-pages.ts",
+        "bytes": 1933,
+        "sha256": "f83f035533078d6ffaa0aa1b59373a5cd07d62df8b2df8af3651ee62bcc1095b",
+        "gitBlob": "e0031323ec5ecd6f4ff02f11cf3d3a5899ea336d",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/app-build.ts",
+        "bytes": 5540,
+        "sha256": "3a1d9fa499b9ede523fa8ec48d505a14d324f9232ad28c384e1c97fb3531c54c",
+        "gitBlob": "29d9c1a489eec6269e4c16115fffb00278261538",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/web-connection/selection.ts",
+        "bytes": 1135,
+        "sha256": "93a06522eaecc0726d8b19b44c3531972cb953666088bbc85b5e1e54beebe467",
+        "gitBlob": "1e0d7d6513abc34654d5718269c124276dad47fc",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/cache-read-error.ts",
+        "bytes": 620,
+        "sha256": "2519013a251dc5a6fed4dd2acb837bc09ef50b03a1dc0de87de32f82df8817f1",
+        "gitBlob": "e9e8f68412436bbf3f06da90dcc572c9d2d1b59a",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/list-poll.ts",
+        "bytes": 3269,
+        "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab",
+        "gitBlob": "5dfcf8fff96e66f670513b6471f14338b77cd102",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/group-messages.ts",
+        "bytes": 9181,
+        "sha256": "6562822da2b6965bf716925da2f89cd5c8157867743ccf78eb521ad36e7689f8",
+        "gitBlob": "2ac4f3d3e4115408e2c20571f00bcf9b1a0e294d",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/device-gateway-ticket.ts",
+        "bytes": 1745,
+        "sha256": "e6358b210bd3c5955be1caaf9c21369b13533345cc72f83e00af68d278ceda88",
+        "gitBlob": "5a84bce13112ea010708fcd4406c19c683c62a50",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "bytes": 3818,
+        "sha256": "43ebb82c6c84b1de5e1cdc4f7ee4d9c54133f66183c4cac5627a9cea53b93b65",
+        "gitBlob": "230766f11a150ebb2f949b32df71b5a47a73c1f0",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "bytes": 5484,
+        "sha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+        "gitBlob": "868622ca05b4bf700d8bc0265c3fe0757b2c1770",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "apps/desktop/src/renderer/location.ts",
+        "bytes": 5462,
+        "sha256": "ea1acbd410212e5ae80b914ce33399e38186a0337fe29091eadece42d4f9903d",
+        "gitBlob": "ac2d1c163497cb165bab470c30661560ae78f053",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "apps/desktop/src/renderer/transport-state.ts",
+        "bytes": 771,
+        "sha256": "34a55a9a5ae921b8f55a1963722ef97a1dd76d34b05b8862ff8a5c52bb3c7583",
+        "gitBlob": "67f68cae303fef55b7196550fa81827ee4f700bc",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "bytes": 1004,
+        "sha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d",
+        "gitBlob": "64fabbf385b646ff9fe6f7f07d2a6eecf0211625",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+        "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "packages/protocol/src/version.ts",
+        "bytes": 2650,
+        "sha256": "1c0fa22d84ac4dffcb8617ce81ae1a9844ee35d80a2fa4e57d39a4ee06d88194",
+        "gitBlob": "92d192f02b53d981b1489353009afb6249b9c8ae",
+        "role": "exact_fixed_source"
+      },
+      {
+        "path": "app/actions/issues.ts",
+        "bytes": 97,
+        "sha256": "aa613d9a95539339e2bcc17eed11cdc6826988b17a0bc86f299d16bff7920ef1",
+        "gitBlob": "5163ae5833b33df1d0cc54e2b15e50272dfdbadd",
+        "role": "existing_mock_module_identity_stub"
+      },
+      {
+        "path": "app/actions/task-runs.ts",
+        "bytes": 97,
+        "sha256": "aa613d9a95539339e2bcc17eed11cdc6826988b17a0bc86f299d16bff7920ef1",
+        "gitBlob": "5163ae5833b33df1d0cc54e2b15e50272dfdbadd",
+        "role": "existing_mock_module_identity_stub"
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "bytes": 97,
+        "sha256": "aa613d9a95539339e2bcc17eed11cdc6826988b17a0bc86f299d16bff7920ef1",
+        "gitBlob": "5163ae5833b33df1d0cc54e2b15e50272dfdbadd",
+        "role": "existing_mock_module_identity_stub"
+      },
+      {
+        "path": "app/actions/bots.ts",
+        "bytes": 97,
+        "sha256": "aa613d9a95539339e2bcc17eed11cdc6826988b17a0bc86f299d16bff7920ef1",
+        "gitBlob": "5163ae5833b33df1d0cc54e2b15e50272dfdbadd",
+        "role": "existing_mock_module_identity_stub"
+      },
+      {
+        "path": "tsconfig.json",
+        "bytes": 334,
+        "sha256": "d5e2f33c89c511884bd4dd03b4e352936eb16a2882cab7c9c009b9d183d92e3e",
+        "gitBlob": "beb62c918d4b695d94f36eccaf97f9e07e56c623",
+        "role": "offline_fixture"
+      },
+      {
+        "path": "package.json",
+        "bytes": 274,
+        "sha256": "04fe243449dd0f76cef7c807bcdabbf1dc0c5a82071b68d27e6bbe43ae7d30c9",
+        "gitBlob": "b8d1d689b25d6a9371fdc2d2b460125f501c6716",
+        "role": "offline_fixture"
+      }
+    ],
+    "fixtureDependencies": {
+      "react": "19.3.1",
+      "react-dom": "19.3.1",
+      "swr": "2.5.1",
+      "happy-dom": "15.11.7",
+      "tsx": "4.23.15",
+      "semver": "7.8.5",
+      "zod": "4.6.7"
+    },
+    "mockIdentityContents": "// Node mock.module identity only; implementation is supplied by the existing fixture.\nexport {}\n",
+    "install": [
+      "npm",
+      "install",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund"
+    ],
+    "commonNodeArgs": [
+      "--experimental-test-module-mocks",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "--test-reporter=tap"
+    ],
+    "env": {
+      "MIKKA_BASE_PATH": "/mikka"
+    },
+    "focusedNamePattern": "native dispatch proof:|committed SWR|late live subscription|earlier connection generation|replaced committed|newer failed|live catch-ups share|starts before|later-started SWR|discarded by an optimistic|custom comparator|shared read cannot replace|completed read cannot erase|onSuccess exception|page becomes hidden|newer SWR read replaces|old cache error|shared permission failure|retiring the owner cache",
+    "packageLock": {
+      "bytes": 19715,
+      "sha256": "7feac8d33451b75e8e88eb93cf5e678e413faf844e21ae1cef5863bd1971f334",
+      "rawRecovered": false
+    },
+    "mockIdentityNote": "All four action module stubs contain these exact bytes; existing test mock.module supplies their implementations."
+  },
+  "preparationErrors": [
+    {
+      "phase": "sandbox_create_without_optional_project",
+      "result": "HTTP 400 no resource created; retried with exact prior project metadata"
+    },
+    {
+      "phase": "directory_setup",
+      "result": "python3 unavailable; Node setup then succeeded"
+    },
+    {
+      "phase": "initial_upload",
+      "result": "target directory absent following failed setup; corrected after Node mkdir"
+    },
+    {
+      "phase": "patch_upload",
+      "result": "locally double-base64-encoded tar rejected; corrected payload extracted successfully"
+    }
+  ],
+  "resource": {
+    "sandboxId": "sbx_hcsY3v1dBn5HcSZ7iJQ9otWOYENy",
+    "owned": true,
+    "persistent": false,
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 600000,
+    "actualNode": "v24.22.1",
+    "apiRuntimeMetadata": "node22",
+    "network": "registry.npmjs.org only during pinned dependency installation; deny-all before all tests",
+    "routes": [],
+    "startedAt": 1794085313156,
+    "stoppedAt": 1794085824803,
+    "durationMs": 511647,
+    "activeCpuDurationMs": 15101,
+    "stopRequested": true,
+    "independentGetStatus": "stopped"
+  },
+  "privacy": {
+    "liveCredentialsInjected": false,
+    "actualDBOrModelOrBrowserCalls": false,
+    "stdoutScope": "local synthetic tests/npm counts only; no mixed CI or production logs",
+    "secretShapeScanHits": 0,
+    "fixtureCanaries": "pre-existing fixed source tests only",
+    "rawBytesRecoveredWithPerFileSha256": true,
+    "remoteRawReadbackVerified": true
+  },
+  "sourceFiles": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 5786,
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "base": {
+        "bytes": 4604,
+        "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+        "gitBlob": "cb23eb39ddc29e746c437bf259ffc1db3ad08436"
+      }
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "bytes": 3337,
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "base": {
+        "bytes": 3229,
+        "sha256": "04fe899da917838e25ff414de7412341b9fc72062e9870fcb7266d4a91bd39e2",
+        "gitBlob": "0a9829743d171048c720c1e9b36d09aeca3f22b5"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "bytes": 4258,
+      "sha256": "603268415400b8c11bd3b6cd70e0064f4064139f7ec57e6548c96d8f489d3448",
+      "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+      "base": {
+        "bytes": 3818,
+        "sha256": "43ebb82c6c84b1de5e1cdc4f7ee4d9c54133f66183c4cac5627a9cea53b93b65",
+        "gitBlob": "230766f11a150ebb2f949b32df71b5a47a73c1f0"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "bytes": 5629,
+      "sha256": "057dd6f7ee07639c3e8bd44f139021b4e1796c991596016aaf43c3dbd75ae72c",
+      "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+      "base": {
+        "bytes": 5484,
+        "sha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+        "gitBlob": "868622ca05b4bf700d8bc0265c3fe0757b2c1770"
+      }
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 58204,
+      "sha256": "78a9ac67440cf9eff68cf73bcb62500b1e96382b70a46c2d15c28918dd4d9d5e",
+      "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+      "base": {
+        "bytes": 53571,
+        "sha256": "0b62211c66eb5a229e81ac81f2cad50a785172631c73ceccc69d7907ba026979",
+        "gitBlob": "b0b28dfcabc4c04b4bd4cc884e0199c539b4e2fd"
+      }
+    }
+  ],
+  "evidenceFiles": [
+    {
+      "path": "evidence/install.log",
+      "bytes": 25,
+      "sha256": "5836f1871d36f1a6a957b7bce369677d4dacc90dfedada066248645533c1994b",
+      "gitBlob": "6a58af00fdceb8a544011d56a4decb3a98344f83"
+    },
+    {
+      "path": "evidence/install-result.json",
+      "bytes": 64,
+      "sha256": "372d18af3b725f1e4f8b86a371c0b5e147492ad36e0dfce81a7ddeeed4946756",
+      "gitBlob": "ad16f38fd5d681327e5d568116085d05da13d12e"
+    },
+    {
+      "path": "evidence/red.tap",
+      "bytes": 3181,
+      "sha256": "af6625ce4ab7e95f8bca7ce8942bbbff5e601ae831f75e0291fbf281d4877000",
+      "gitBlob": "7f392aef6d53f168c6a21945f0ddb94dfefd1acb"
+    },
+    {
+      "path": "evidence/red-result.json",
+      "bytes": 64,
+      "sha256": "649df77b2bcd223562f4ac63516c93f2caa56815e3f13b71dcc22cd55f217e09",
+      "gitBlob": "7aeff7e7220526ea6685d66d063c8af6567bfd03"
+    },
+    {
+      "path": "evidence/attempted-full-suite-budget.tap",
+      "bytes": 23944,
+      "sha256": "027d567664fbebe0a63acb42b8d6a43fba2255a2a90dc35c2c5c4321c83af635",
+      "gitBlob": "808b49411bf82fb7c6d09b8b4d332d1ac3169e47"
+    },
+    {
+      "path": "evidence/attempted-full-suite-budget-result.json",
+      "bytes": 71,
+      "sha256": "2f2d8bae7e4f41dbee089d67fbb18b7aa7952d36ee17446246cd67ae2f1e2c12",
+      "gitBlob": "edcbc4e7e94d76a3988354442aa2bd4bacc1a94f"
+    },
+    {
+      "path": "evidence/focused.tap",
+      "bytes": 6504,
+      "sha256": "4a90af159a547a6d2c4201c6c6485bd79afffb927aea4d966cc00b1ff8396313",
+      "gitBlob": "effeccb91f9dfbd915f4e0a1375690483b503fb6"
+    },
+    {
+      "path": "evidence/focused-result.json",
+      "bytes": 47,
+      "sha256": "0b6cb034ba2279e7e036765bfd0f318a1fd534022a3d7c84e2c406264230df9c",
+      "gitBlob": "91912a88ca8c6b9711c03df2da33bf5dc8c62bb3"
+    },
+    {
+      "path": "evidence/channel.tap",
+      "bytes": 14144,
+      "sha256": "8e81fc2a543e5288f214ec0233f469ac9316c8aaafe7832345f750cec2d0ec94",
+      "gitBlob": "14f59fbde7c5c015c45508ff017d3f9ddbcfbe66"
+    },
+    {
+      "path": "evidence/channel-result.json",
+      "bytes": 47,
+      "sha256": "0b6cb034ba2279e7e036765bfd0f318a1fd534022a3d7c84e2c406264230df9c",
+      "gitBlob": "91912a88ca8c6b9711c03df2da33bf5dc8c62bb3"
+    },
+    {
+      "path": "fixture/package.json",
+      "bytes": 274,
+      "sha256": "04fe243449dd0f76cef7c807bcdabbf1dc0c5a82071b68d27e6bbe43ae7d30c9",
+      "gitBlob": "b8d1d689b25d6a9371fdc2d2b460125f501c6716"
+    },
+    {
+      "path": "fixture/tsconfig.json",
+      "bytes": 334,
+      "sha256": "d5e2f33c89c511884bd4dd03b4e352936eb16a2882cab7c9c009b9d183d92e3e",
+      "gitBlob": "beb62c918d4b695d94f36eccaf97f9e07e56c623"
+    },
+    {
+      "path": "evidence/source-final.json",
+      "bytes": 918,
+      "sha256": "8c238c9d0ef9fd2304c4831a6c7412b42324247ba9c611ff99622630f4389b4c",
+      "gitBlob": "bc63d2ae215f3ef8f990f5c9919b2cbc8d65c3ae"
+    }
+  ],
+  "priorClientAudit": {
+    "bytes": 7939,
+    "sha256": "5b247937d1c7310589ba1d3bea405f955d88ffc393c91cf1047ee4e17d0a0dd0",
+    "gitBlob": "1e825e4db6fc9d2d7da22f309ffcdb16d5fd0e7f"
+  },
+  "supersedesReceipt": {
+    "bytes": 26339,
+    "sha256": "9f76419f22906dc7b6201b2c88c9b185effe7d3fa833ffdc74847a0afc1c268b",
+    "gitBlob": "dfcd2858270d68896ae9ef8a431ce6af33d8e921",
+    "reason": "Clarify exact offline action-module identity stub bytes, including their fixture-only comment. No source, stdout or test result changed."
+  }
+}

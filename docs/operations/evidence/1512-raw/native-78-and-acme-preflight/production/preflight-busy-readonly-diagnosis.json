@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "read_only_acme_preflight_workspace_busy_diagnosis",
+  "observedAt": "2026-11-07 21:37:38 UTC",
+  "preflight": {
+    "runId": 42414308970,
+    "revision": "afae721f6730434ded6be932a7f9dd585c22ee49",
+    "reportGitBlob": "3d77b82636263bc87794275985075cd3caf7fab5",
+    "workspaceId": "4ae2a643-b09e-43eb-816c-1e5557bef170",
+    "botId": "d51efc47-1c61-4758-8c05-fd7a07e3d7b2"
+  },
+  "dataSource": {
+    "provider": "Neon",
+    "projectId": "autumn-fire-21908520",
+    "branchId": "br-autumn-rain-b5leflom",
+    "database": "orvilo_mvp",
+    "readOnly": true
+  },
+  "queries": [
+    {
+      "sql": "WITH scope AS MATERIALIZED (\n  SELECT b.\"ownerId\" AS owner_id, b.\"workspaceId\" AS workspace_id\n  FROM public.bots b\n  JOIN public.coordinator_bots c ON c.\"botId\"=b.id AND c.\"ownerId\"=b.\"ownerId\" AND c.\"workspaceId\"=b.\"workspaceId\"\n  WHERE b.id='d51efc47-1c61-4758-8c05-fd7a07e3d7b2'::uuid AND b.\"workspaceId\"='4ae2a643-b09e-43eb-816c-1e5557bef170'::uuid\n), recent_owner_runs AS MATERIALIZED (\n  SELECT r.status FROM public.agent_runs r\n  WHERE r.\"userId\"=(SELECT owner_id FROM scope) AND r.\"createdAt\">now()-interval '30 days'\n  ORDER BY r.\"createdAt\" DESC LIMIT 60\n)\nSELECT 'verified_scope' AS source, 'rows' AS state, count(*) AS row_count FROM scope\nUNION ALL\nSELECT 'workspace_bot_runs', CASE WHEN r.status IN ('queued','starting','running','stopping','waiting_input','paused','succeeded','failed','stopped','cancelled') THEN r.status ELSE 'unrecognized' END, count(*)\nFROM public.agent_runs r JOIN public.bots b ON b.id=r.\"botId\"\nWHERE b.\"workspaceId\"=(SELECT workspace_id FROM scope)\nGROUP BY 2\nUNION ALL\nSELECT 'owner_recent60_runs', CASE WHEN status IN ('queued','starting','running','stopping','waiting_input','paused','succeeded','failed','stopped','cancelled') THEN status ELSE 'unrecognized' END, count(*)\nFROM recent_owner_runs GROUP BY 2\nUNION ALL\nSELECT 'owner_factory', concat(CASE WHEN f.stage IN ('intake','plan','dispatch','execute','review','verify','repair','approval','publish','monitor') THEN f.stage ELSE 'unrecognized' END, ':', CASE WHEN f.status IN ('pending','running','waiting','passed','failed','blocked','cancelled','revoked','completed','succeeded') THEN f.status ELSE 'unrecognized' END), count(*)\nFROM public.factory_tasks f WHERE f.\"userId\"=(SELECT owner_id FROM scope)\nGROUP BY 2\nORDER BY source, state",
+      "originalToolResponse": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[\n  {\n    \"source\": \"owner_factory\",\n    \"state\": \"execute:blocked\",\n    \"row_count\": \"1\"\n  },\n  {\n    \"source\": \"owner_factory\",\n    \"state\": \"execute:cancelled\",\n    \"row_count\": \"14\"\n  },\n  {\n    \"source\": \"owner_factory\",\n    \"state\": \"review:cancelled\",\n    \"row_count\": \"1\"\n  },\n  {\n    \"source\": \"owner_recent60_runs\",\n    \"state\": \"cancelled\",\n    \"row_count\": \"30\"\n  },\n  {\n    \"source\": \"owner_recent60_runs\",\n    \"state\": \"failed\",\n    \"row_count\": \"6\"\n  },\n  {\n    \"source\": \"owner_recent60_runs\",\n    \"state\": \"stopped\",\n    \"row_count\": \"6\"\n  },\n  {\n    \"source\": \"owner_recent60_runs\",\n    \"state\": \"succeeded\",\n    \"row_count\": \"18\"\n  },\n  {\n    \"source\": \"verified_scope\",\n    \"state\": \"rows\",\n    \"row_count\": \"1\"\n  },\n  {\n    \"source\": \"workspace_bot_runs\",\n    \"state\": \"stopped\",\n    \"row_count\": \"3\"\n  },\n  {\n    \"source\": \"workspace_bot_runs\",\n    \"state\": \"succeeded\",\n    \"row_count\": \"1\"\n  }\n]"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "sql": "WITH scope AS (\n SELECT b.\"ownerId\" AS owner_id, b.\"workspaceId\" AS workspace_id\n FROM public.bots b JOIN public.coordinator_bots c ON c.\"botId\"=b.id AND c.\"ownerId\"=b.\"ownerId\" AND c.\"workspaceId\"=b.\"workspaceId\"\n WHERE b.id='d51efc47-1c61-4758-8c05-fd7a07e3d7b2'::uuid AND b.\"workspaceId\"='4ae2a643-b09e-43eb-816c-1e5557bef170'::uuid\n)\nSELECT f.id AS task_id, f.\"issueId\" AS issue_id, f.\"botId\" AS bot_id,\n f.\"botId\"='d51efc47-1c61-4758-8c05-fd7a07e3d7b2'::uuid AS same_preflight_coordinator,\n f.stage, f.status, f.revision, f.\"createdAt\" AS created_at, f.\"updatedAt\" AS updated_at,\n f.\"attemptId\" AS attempt_id, a.\"runId\" AS attempt_run_id, a.status AS attempt_status,\n r.status AS run_status, r.\"createdAt\" AS run_created_at, r.\"finishedAt\" AS run_finished_at,\n f.reason='task_stalled' AS exact_task_stalled_reason,\n f.route ? 'watchdog' AS has_watchdog_metadata,\n (i.title ~ '^m1512-[0-9a-f]{16}$') AS matches_issue1512_fixture_title,\n EXISTS(SELECT 1 FROM public.agent_runs r2 WHERE r2.\"retryOf\"=r.id AND r2.status NOT IN ('succeeded','failed','stopped','cancelled')) AS has_unfinished_retry,\n (SELECT count(*) FROM public.factory_attempts a2 WHERE a2.\"taskId\"=f.id) AS attempt_count\nFROM public.factory_tasks f\nLEFT JOIN public.factory_attempts a ON a.id=f.\"attemptId\" AND a.\"taskId\"=f.id\nLEFT JOIN public.agent_runs r ON r.id=a.\"runId\"\nLEFT JOIN public.issues i ON i.id=f.\"issueId\" AND i.\"userId\"=f.\"userId\"\nWHERE f.\"userId\"=(SELECT owner_id FROM scope) AND f.status='blocked'\nORDER BY f.\"updatedAt\" DESC LIMIT 20",
+      "originalToolResponse": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[\n  {\n    \"task_id\": \"b2e96bca-9287-4ed7-92e7-68d9b8a3285f\",\n    \"issue_id\": \"c7db3824-177c-4aac-9d86-bd0b0ed44779\",\n    \"bot_id\": \"de300001-28ee-4dd7-879b-9c0fbdea544d\",\n    \"same_preflight_coordinator\": false,\n    \"stage\": \"execute\",\n    \"status\": \"blocked\",\n    \"revision\": 3,\n    \"created_at\": \"2026-11-06T15:40:14.624Z\",\n    \"updated_at\": \"2026-11-06T15:43:31.673Z\",\n    \"attempt_id\": \"031e43c0-d57e-448f-a61e-4d1d9bf12e23\",\n    \"attempt_run_id\": \"7e632e54-2a54-40b2-8192-f5a0f2f764e6\",\n    \"attempt_status\": \"blocked\",\n    \"run_status\": \"stopped\",\n    \"run_created_at\": \"2026-11-06T15:40:14.624Z\",\n    \"run_finished_at\": \"2026-11-06T15:43:31.469Z\",\n    \"exact_task_stalled_reason\": false,\n    \"has_watchdog_metadata\": false,\n    \"matches_issue1512_fixture_title\": false,\n    \"has_unfinished_retry\": false,\n    \"attempt_count\": \"1\"\n  }\n]"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "sql": "WITH scope AS (\n SELECT b.\"ownerId\" AS owner_id FROM public.bots b JOIN public.coordinator_bots c ON c.\"botId\"=b.id AND c.\"ownerId\"=b.\"ownerId\" AND c.\"workspaceId\"=b.\"workspaceId\"\n WHERE b.id='d51efc47-1c61-4758-8c05-fd7a07e3d7b2'::uuid AND b.\"workspaceId\"='4ae2a643-b09e-43eb-816c-1e5557bef170'::uuid\n)\nSELECT b.id AS blocked_task_bot_id, b.\"workspaceId\" AS blocked_task_workspace_id,\n b.\"workspaceId\"='4ae2a643-b09e-43eb-816c-1e5557bef170'::uuid AS same_preflight_workspace,\n b.\"ownerId\"=(SELECT owner_id FROM scope) AS same_account_owner,\n b.\"archivedAt\" IS NOT NULL AS bot_archived,\n EXISTS(SELECT 1 FROM public.coordinator_bots c WHERE c.\"botId\"=b.id) AS is_coordinator\nFROM public.bots b\nJOIN public.factory_tasks f ON f.\"botId\"=b.id\nWHERE f.id='b2e96bca-9287-4ed7-92e7-68d9b8a3285f'::uuid AND f.\"userId\"=(SELECT owner_id FROM scope)",
+      "originalToolResponse": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[\n  {\n    \"blocked_task_bot_id\": \"de300001-28ee-4dd7-879b-9c0fbdea544d\",\n    \"blocked_task_workspace_id\": \"de300001-ece6-4021-8214-c986ea306bde\",\n    \"same_preflight_workspace\": false,\n    \"same_account_owner\": true,\n    \"bot_archived\": false,\n    \"is_coordinator\": true\n  }\n]"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    }
+  ],
+  "conclusion": {
+    "preflightWorkspaceRunStatusesTerminal": true,
+    "ownerRecentSixtyRunStatusesTerminal": true,
+    "blockedFactoryTaskSameOwner": true,
+    "blockedFactoryTaskSameWorkspace": false,
+    "blockedFactoryTaskRunStatus": "stopped",
+    "unrelatedHistoricalTaskModified": false,
+    "modelCalls": 0,
+    "settingsChanged": false
+  },
+  "limits": [
+    "The three read-only statements are separate snapshots, not a transaction.",
+    "The final sixty recent owner runs are diagnostic; the acceptance driver separately keeps its wider active-run gate.",
+    "A historical blocked task is not universally terminal or safe to cancel.",
+    "No email, credential, prompt, message body, raw issue content or free-form reason was selected.",
+    "The diagnosis does not establish production trace acceptance."
+  ]
+}

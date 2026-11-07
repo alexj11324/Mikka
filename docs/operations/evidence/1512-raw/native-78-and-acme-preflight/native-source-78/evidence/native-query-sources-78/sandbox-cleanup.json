@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "kind": "owned_unit_sandbox_cleanup",
+  "sessionId": "sbx_vIY24xAc8fke10DXoO36ZHD10r7I",
+  "startedAt": 1794084602801,
+  "requestedStopAt": 1794084988020,
+  "stoppedAt": 1794084988333,
+  "status": "stopped",
+  "explicitStop": true,
+  "separateGetReadback": true,
+  "vcpus": 1,
+  "memoryMiB": 2048,
+  "persistent": false,
+  "publicPortsRequested": [],
+  "maximumDurationMs": 600000,
+  "actualDurationMs": 385532,
+  "networkAllowlist": [
+    "registry.npmjs.org"
+  ],
+  "appServersStarted": 0,
+  "databaseServersStarted": 0,
+  "browsersStarted": 0,
+  "providerCalls": 0,
+  "productionCredentialsLoaded": false,
+  "gitRemoteMutatedBySandbox": false,
+  "scope": "source-only Node test execution"
+}

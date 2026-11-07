@@ -1,0 +1,403 @@
+{
+  "version": 1,
+  "kind": "native_query_sources_78_source_regression",
+  "repository": "alexj11324/Mikka",
+  "base": {
+    "commit": "afae721f6730434ded6be932a7f9dd585c22ee49",
+    "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7"
+  },
+  "scope": {
+    "productFiles": [
+      {
+        "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+        "bytes": 2773,
+        "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+        "readback": true
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99",
+        "bytes": 37134,
+        "sha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+        "readback": true
+      }
+    ],
+    "testOnly": true,
+    "previousKeys": 75,
+    "nextKeys": 78,
+    "addedKeys": [
+      "/api/approved-writes",
+      "/api/conversations/[id]/read",
+      "/api/mobile/reactions"
+    ],
+    "totalCounterUnchanged": true,
+    "operationBuckets": 17,
+    "windowsUnchanged": true,
+    "checkpointsUnchanged": true,
+    "otherScopedRetained": true,
+    "noScopeRetained": true,
+    "noRawRequestOrSqlCapture": true,
+    "packageAndCiEntrypointsUnchanged": true
+  },
+  "historicalBoundary": {
+    "nativeLogin": 210,
+    "webLogin": 188,
+    "budgetPassed": false,
+    "source": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "historicalEvidenceModified": false,
+    "queryDifferenceAttribution": "unknown",
+    "newLabelsProvenToExplainDifference": false,
+    "futureNativeEvidence": "pending",
+    "productionAcceptance": null
+  },
+  "tests": {
+    "actualNode": "v24.22.1",
+    "declaredSandboxRuntime": "node22",
+    "modes": [
+      "next cjs",
+      "nitro cjs",
+      "nitro esm"
+    ],
+    "red": {
+      "exitCode": 1,
+      "tests": 21,
+      "pass": 17,
+      "fail": 4,
+      "cause": [
+        "three imported PG/OTel binding modes: exact /api/approved-writes bucket missing",
+        "75-key vocabulary cannot satisfy new 78-key contract"
+      ]
+    },
+    "green": {
+      "exitCode": 0,
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "skip": 0
+    },
+    "readerFinal": {
+      "exitCode": 0,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0
+    },
+    "commands": [
+      {
+        "name": "scope78-red.tap",
+        "exitCode": 1,
+        "command": [
+          "node",
+          "--test",
+          "apps/desktop/test/db-metrics.test.mjs"
+        ]
+      },
+      {
+        "name": "scope78-green.tap",
+        "exitCode": 0,
+        "command": [
+          "node",
+          "--test",
+          "apps/desktop/test/db-metrics.test.mjs"
+        ]
+      },
+      {
+        "name": "scope78-reader.tap",
+        "exitCode": 1,
+        "command": [
+          "node",
+          "--test",
+          "readers/desktop-unattributed-sources-78-summary.test.mjs"
+        ]
+      },
+      {
+        "name": "scope78-lint.log",
+        "exitCode": 0,
+        "command": [
+          "node_modules/.bin/oxlint",
+          "--deny-warnings",
+          "-c",
+          "apps/desktop/oxlint.json",
+          "apps/desktop/test/db-query-unattributed-sources.cjs",
+          "apps/desktop/test/db-metrics.test.mjs"
+        ]
+      },
+      {
+        "name": "scope78-reader-lint.log",
+        "exitCode": 0,
+        "command": [
+          "node_modules/.bin/oxlint",
+          "--deny-warnings",
+          "-c",
+          "apps/desktop/oxlint.json",
+          "readers/desktop-unattributed-sources-78-summary.mjs",
+          "readers/desktop-unattributed-sources-78-summary.test.mjs"
+        ]
+      },
+      {
+        "name": "check-db-query-unattributed-sources.cjs.log",
+        "exitCode": 0,
+        "command": [
+          "node",
+          "--check",
+          "apps/desktop/test/db-query-unattributed-sources.cjs"
+        ]
+      },
+      {
+        "name": "check-db-metrics.test.mjs.log",
+        "exitCode": 0,
+        "command": [
+          "node",
+          "--check",
+          "apps/desktop/test/db-metrics.test.mjs"
+        ]
+      },
+      {
+        "name": "check-desktop-unattributed-sources-78-summary.mjs.log",
+        "exitCode": 0,
+        "command": [
+          "node",
+          "--check",
+          "readers/desktop-unattributed-sources-78-summary.mjs"
+        ]
+      }
+    ],
+    "finalDiffCheck": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "output": "",
+      "earlierNoIndexExit1Meaning": "changes_present_with_empty_check_output"
+    },
+    "focusedOnly": true,
+    "fullRepositoryChecks": "pending_normal_pr_ci"
+  },
+  "environmentBoundaries": {
+    "externalPostgresStarted": false,
+    "actualPgDriverAndOtelImported": true,
+    "pinnedDirectVersions": {
+      "pg": "8.23.1",
+      "@opentelemetry/api": "1.10.0",
+      "@opentelemetry/instrumentation": "0.223.0",
+      "@opentelemetry/instrumentation-pg": "0.76.0",
+      "@opentelemetry/sdk-trace-node": "2.12.0",
+      "oxlint": "1.89.0"
+    },
+    "transitiveInstall": "npm resolution; not a full pnpm-lock install",
+    "initialInstall": {
+      "exitCode": 1,
+      "code": "ERESOLVE",
+      "reason": "pinned OTel SDK peer range excludes pinned api 1.10.0"
+    },
+    "recovery": "installed unchanged exact direct versions with --ignore-scripts --legacy-peer-deps",
+    "initialReader": {
+      "exitCode": 1,
+      "code": "ERR_MODULE_NOT_FOUND",
+      "reason": "temporary test package omitted frozen desktop-native-summary.mjs support helper"
+    },
+    "readerRecovery": "restored unchanged archived support helper, reran reader suite only"
+  },
+  "sourceIdentities": [
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "bytes": 2773,
+      "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+      "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "bytes": 37134,
+      "sha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+      "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "bytes": 8336,
+      "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 21791,
+      "sha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+      "gitBlob": "ecc5c28718320893bb96c5902cf3cae0dd965b5b"
+    },
+    {
+      "path": "readers/desktop-unattributed-sources-78-summary.mjs",
+      "bytes": 15594,
+      "sha256": "061ce2068a701b81a7d74d85cbc7bd2b686c7a287b66d8eab905f172a6f54c49",
+      "gitBlob": "1a334ba3e881b0b163b09c4d490b5aca3d2f459b"
+    },
+    {
+      "path": "readers/desktop-unattributed-sources-78-summary.test.mjs",
+      "bytes": 3109,
+      "sha256": "526a90962586472a56cddbc25fea07e55dc668616244a922dd05d4a70637fdc8",
+      "gitBlob": "c7d6a3c488467fed685f1a280286db64e6bca47f"
+    }
+  ],
+  "audit": {
+    "path": "evidence/desktop-a9072e-other-scoped-source-audit.json",
+    "bytes": 11729,
+    "sha256": "a4478f6d4eed22b732d5c086d091225e34c88a4d382c861c003893261dc145bb",
+    "gitBlob": "6ad5880a2520107d71de7f0dd7c37811f4a34fdd",
+    "exactRemoteReadback": true
+  },
+  "sandboxCleanup": {
+    "version": 1,
+    "kind": "owned_unit_sandbox_cleanup",
+    "sessionId": "sbx_vIY24xAc8fke10DXoO36ZHD10r7I",
+    "startedAt": 1794084602801,
+    "requestedStopAt": 1794084988020,
+    "stoppedAt": 1794084988333,
+    "status": "stopped",
+    "explicitStop": true,
+    "separateGetReadback": true,
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "persistent": false,
+    "publicPortsRequested": [],
+    "maximumDurationMs": 600000,
+    "actualDurationMs": 385532,
+    "networkAllowlist": [
+      "registry.npmjs.org"
+    ],
+    "appServersStarted": 0,
+    "databaseServersStarted": 0,
+    "browsersStarted": 0,
+    "providerCalls": 0,
+    "productionCredentialsLoaded": false,
+    "gitRemoteMutatedBySandbox": false,
+    "scope": "source-only Node test execution"
+  },
+  "files": [
+    {
+      "path": "evidence/native-query-sources-78/check-db-metrics.test.mjs.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/native-query-sources-78/check-db-query-unattributed-sources.cjs.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/native-query-sources-78/check-desktop-unattributed-sources-78-summary.mjs.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/native-query-sources-78/dependency-install-pinned.log",
+      "bytes": 215,
+      "sha256": "84bf15d193be60e2310289c5db6f05536999a0b19ac3984aed3f24282c76f3af",
+      "gitBlob": "04c228099123a12b9d956b99123daaf5951fd4a3"
+    },
+    {
+      "path": "evidence/native-query-sources-78/dependency-install.log",
+      "bytes": 974,
+      "sha256": "d53fa51db760a94ba222076b1950286a2b6fb1c65098c90b418736b1a45cfc99",
+      "gitBlob": "78a8a6477e7e749314bdd99c939f4ca63a0ef80f"
+    },
+    {
+      "path": "evidence/native-query-sources-78/dependency-versions.log",
+      "bytes": 261,
+      "sha256": "1360b498bdb745faf89055873233dec709ec2d02acd22c39acea8c615e3dc117",
+      "gitBlob": "e80f43f5e65078dcecb6f84b2d6208c6355d8807"
+    },
+    {
+      "path": "evidence/native-query-sources-78/reader-result.json",
+      "bytes": 100,
+      "sha256": "2d322c0f40a022a009fdd490f2bab70c397258275d6c489d09fc390f95d694e8",
+      "gitBlob": "90edf588994d12f32632f0968ebf53ac52c35418"
+    },
+    {
+      "path": "evidence/native-query-sources-78/runtime-version.log",
+      "bytes": 9,
+      "sha256": "249baf635bb43877fcb9422efa1a4904b702d0ddf14d3949b7cd0950d5229c81",
+      "gitBlob": "474d750b50427c62736f866748c104870c431cd4"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-diffcheck.json",
+      "bytes": 213,
+      "sha256": "f9c467aa51a457a4ab60e6b8cbf5e53cbd3facc0f0ff7547571fec275557d36f",
+      "gitBlob": "46ea092027093d19e3a1e95f3b0b16c5c43bceff"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-green.tap",
+      "bytes": 2496,
+      "sha256": "23876650a9b7248aeb529e3451ec47a637d204244694d1b0a48afbef916cd495",
+      "gitBlob": "2215e8998563720ce857a520bcdb67eba7ecdde2"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-lint.log",
+      "bytes": 89,
+      "sha256": "ef288a5e420489ba6edfc747fe2863e605dfb0a5629dde1730b2b62ea562b71d",
+      "gitBlob": "371bd864263011794a29533a2d581d22f137891d"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-reader-final.tap",
+      "bytes": 452,
+      "sha256": "882a82d6f68b0eef78d703db5a70c911044d76bc8cfac2307300fb01479d7e74",
+      "gitBlob": "2e0d1bf4c364e2299a2ee3c448ec939d75f7c0a7"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-reader-lint.log",
+      "bytes": 89,
+      "sha256": "ddb1b629e09dbc08ae80d09c08cb079e1882c6d5ae234b228ad8d77866ca11c4",
+      "gitBlob": "43aef9cdba227e54b0517c3067c7d886bd5192f9"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-reader.tap",
+      "bytes": 1489,
+      "sha256": "e99442f224abb83c376eb4899371776e4293c8741ce1a96f1003f295101a1837",
+      "gitBlob": "6ba6793462110557821c3f7cea720a9776a051d3"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-red.tap",
+      "bytes": 10295,
+      "sha256": "9ecb04b47e2468f7241b26cdba02b83b6645fb3a9d2cb92b2136ffc0a6c4f009",
+      "gitBlob": "8a04e339a7dbfe76e9d60e1af8fbe20c8047ee8d"
+    },
+    {
+      "path": "evidence/native-query-sources-78/unit-results.json",
+      "bytes": 3645,
+      "sha256": "3e4270210f60dac9119685cb2eb75a97927a9d56ce4566f568be5c1b6031dcea",
+      "gitBlob": "c878703196a9db5060dada5a2cadc6f1f766afc3"
+    },
+    {
+      "path": "evidence/native-query-sources-78/scope78-diffcheck-final.json",
+      "bytes": 142,
+      "sha256": "64e61e5cc69bbe7584a39a6cbc619264d51ae85a6ff20eaa9a21296ce42b73af",
+      "gitBlob": "65999ea273f068eead506160f27bdc99de76f014"
+    },
+    {
+      "path": "readers/desktop-unattributed-sources-78-summary.mjs",
+      "bytes": 15594,
+      "sha256": "061ce2068a701b81a7d74d85cbc7bd2b686c7a287b66d8eab905f172a6f54c49",
+      "gitBlob": "1a334ba3e881b0b163b09c4d490b5aca3d2f459b"
+    },
+    {
+      "path": "readers/desktop-unattributed-sources-78-summary.test.mjs",
+      "bytes": 3109,
+      "sha256": "526a90962586472a56cddbc25fea07e55dc668616244a922dd05d4a70637fdc8",
+      "gitBlob": "c7d6a3c488467fed685f1a280286db64e6bca47f"
+    },
+    {
+      "path": "readers/desktop-unattributed-sources-78-summary.md",
+      "bytes": 1852,
+      "sha256": "4586ebdfd0b3d965957082404a3348953785bb19274a329be13c234ee19155da",
+      "gitBlob": "4c2bc21382f935c16fadc3b8f007490a23d532e5"
+    },
+    {
+      "path": "evidence/native-query-sources-78/sandbox-cleanup.json",
+      "bytes": 714,
+      "sha256": "7de5d9c560587bf12d943d52ad4440f795e536a8a934f54158f67fac10e05571",
+      "gitBlob": "cc4c7e913fe000fe08d79791ce0a1f1797aec315"
+    }
+  ]
+}

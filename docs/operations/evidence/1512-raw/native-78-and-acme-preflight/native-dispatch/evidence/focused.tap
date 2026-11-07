@@ -1,0 +1,151 @@
+TAP version 13
+# (node:1041) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1041) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a committed SWR read after connection readiness covers the pending live flush
+ok 1 - a committed SWR read after connection readiness covers the pending live flush
+  ---
+  duration_ms: 862.72812
+  type: 'test'
+  ...
+# Subtest: a late live subscription shares the committed read from its continuously ready connection
+ok 2 - a late live subscription shares the committed read from its continuously ready connection
+  ---
+  duration_ms: 334.415475
+  type: 'test'
+  ...
+# (node:1041) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# Subtest: a committed read from an earlier connection generation cannot cover a late subscription
+ok 3 - a committed read from an earlier connection generation cannot cover a late subscription
+  ---
+  duration_ms: 334.447613
+  type: 'test'
+  ...
+# Subtest: a replaced committed cache object cannot satisfy the pending live flush
+ok 4 - a replaced committed cache object cannot satisfy the pending live flush
+  ---
+  duration_ms: 330.217119
+  type: 'test'
+  ...
+# Subtest: a newer failed SWR read cannot resurrect an earlier committed provenance
+ok 5 - a newer failed SWR read cannot resurrect an earlier committed provenance
+  ---
+  duration_ms: 330.854562
+  type: 'test'
+  ...
+# Subtest: live catch-ups share an ordinary SWR read that starts after both scoped connections open
+ok 6 - live catch-ups share an ordinary SWR read that starts after both scoped connections open
+  ---
+  duration_ms: 651.528247
+  type: 'test'
+  ...
+# Subtest: a SWR read that starts before the live connection opens cannot consume its catch-up
+ok 7 - a SWR read that starts before the live connection opens cannot consume its catch-up
+  ---
+  duration_ms: 326.442529
+  type: 'test'
+  ...
+# Subtest: a later-started SWR read must still prove every required revision before covering a live push
+ok 8 - a later-started SWR read must still prove every required revision before covering a live push
+  ---
+  duration_ms: 490.804035
+  type: 'test'
+  ...
+# Subtest: a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+ok 9 - a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+  ---
+  duration_ms: 489.736584
+  type: 'test'
+  ...
+# Subtest: a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+ok 10 - a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+  ---
+  duration_ms: 489.359123
+  type: 'test'
+  ...
+# Subtest: a shared read cannot replace the revision held when the live obligation began with a lower revision
+ok 11 - a shared read cannot replace the revision held when the live obligation began with a lower revision
+  ---
+  duration_ms: 488.615759
+  type: 'test'
+  ...
+# Subtest: a completed read cannot erase the higher revision still held by the active live subscription
+ok 12 - a completed read cannot erase the higher revision still held by the active live subscription
+  ---
+  duration_ms: 650.48677
+  type: 'test'
+  ...
+# Subtest: an original onSuccess exception remains a SWR error without a shared-read retry
+ok 13 - an original onSuccess exception remains a SWR error without a shared-read retry
+  ---
+  duration_ms: 487.195486
+  type: 'test'
+  ...
+# Subtest: a discarded shared read cannot start another request after the page becomes hidden
+ok 14 - a discarded shared read cannot start another request after the page becomes hidden
+  ---
+  duration_ms: 810.285992
+  type: 'test'
+  ...
+# Subtest: a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+ok 15 - a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+  ---
+  duration_ms: 488.86506
+  type: 'test'
+  ...
+# Subtest: an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement
+ok 16 - an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement
+  ---
+  duration_ms: 649.754804
+  type: 'test'
+  ...
+# Subtest: a shared permission failure keeps SWR error handling and does not start another request
+ok 17 - a shared permission failure keeps SWR error handling and does not start another request
+  ---
+  duration_ms: 489.200174
+  type: 'test'
+  ...
+# Subtest: retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+ok 18 - retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+  ---
+  duration_ms: 807.825068
+  type: 'test'
+  ...
+# Subtest: native dispatch proof: single HTTP after readiness
+ok 19 - native dispatch proof: single HTTP after readiness
+  ---
+  duration_ms: 404.36232
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","grouped":false,"beforeReady":false,"phases":["task_fetcher","native_enqueued","live_ready","fetch_dispatch"],"taskCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: single HTTP before readiness
+ok 20 - native dispatch proof: single HTTP before readiness
+  ---
+  duration_ms: 329.985694
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","grouped":false,"beforeReady":true,"phases":["task_fetcher","native_enqueued","fetch_dispatch","live_ready","task_fetcher","native_enqueued","fetch_dispatch"],"taskCalls":2,"physicalCalls":2}
+# Subtest: native dispatch proof: batch HTTP after readiness
+ok 21 - native dispatch proof: batch HTTP after readiness
+  ---
+  duration_ms: 327.597035
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","grouped":true,"beforeReady":false,"phases":["task_fetcher","native_enqueued","live_ready","fetch_dispatch"],"taskCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: batch HTTP before readiness
+ok 22 - native dispatch proof: batch HTTP before readiness
+  ---
+  duration_ms: 333.385564
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","grouped":true,"beforeReady":true,"phases":["task_fetcher","native_enqueued","fetch_dispatch","live_ready","task_fetcher","native_enqueued","fetch_dispatch"],"taskCalls":2,"physicalCalls":2}
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14557.588562

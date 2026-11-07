@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "revision": "afae721f6730434ded6be932a7f9dd585c22ee49",
+  "mode": "preflight",
+  "status": "blocked",
+  "startedAt": "2026-11-07T21:09:26.916Z",
+  "browserReplayVerified": false,
+  "posthogIngestionVerified": false,
+  "budget": {
+    "submissionsPerModel": 1,
+    "nativeRunsByFlowVersion": {
+      "1": 3,
+      "2": 2
+    },
+    "enforcement": "stop_on_first_observed_excess",
+    "timeoutMs": 480000,
+    "paidResubmissions": 0,
+    "hardDollarCap": false
+  },
+  "modelCase": "all",
+  "submissionSource": "api",
+  "cases": [
+    {
+      "case": "claude",
+      "model": "claude-haiku-5-5",
+      "status": "blocked",
+      "cleanup": {
+        "state": "complete",
+        "profileArchived": true,
+        "modelRestored": true,
+        "evidence": "retained",
+        "ownRunsStopped": true,
+        "ownMachinesEnded": true,
+        "machines": []
+      },
+      "code": "workspace_busy",
+      "durationMs": 1590
+    },
+    {
+      "case": "codex",
+      "model": "gpt-6-luna",
+      "status": "blocked",
+      "cleanup": {
+        "state": "complete",
+        "profileArchived": true,
+        "modelRestored": true,
+        "evidence": "retained",
+        "ownRunsStopped": true,
+        "ownMachinesEnded": true,
+        "machines": []
+      },
+      "code": "workspace_busy",
+      "durationMs": 1068
+    }
+  ],
+  "sessionClosed": true,
+  "preparation": {
+    "requested": false,
+    "profilesDisabled": 0,
+    "profilesRestored": 0,
+    "fallbackChanged": false,
+    "restoration": "not_needed"
+  },
+  "workspaceId": "4ae2a643-b09e-43eb-816c-1e5557bef170",
+  "workspaceSelection": "switched_personal",
+  "botId": "d51efc47-1c61-4758-8c05-fd7a07e3d7b2",
+  "finishedAt": "2026-11-07T21:09:32.090Z"
+}

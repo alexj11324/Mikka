@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "kind": "diagnostic_pr_publication",
+  "repository": "alexj11324/Mikka",
+  "pr": 1675,
+  "url": "https://github.com/alexj11324/Mikka/pull/1675",
+  "state": "open",
+  "mergeAuthorized": false,
+  "branch": "test/1512-native-query-sources-78-20261107",
+  "head": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+  "tree": "0fee41e2180950e01417fc7c7b14290c20e95880",
+  "parents": [
+    "afae721f6730434ded6be932a7f9dd585c22ee49"
+  ],
+  "changedFiles": [
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99",
+      "additions": 21,
+      "deletions": 4
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+      "additions": 3,
+      "deletions": 0
+    }
+  ],
+  "remoteCommitAndCompareReadback": true,
+  "independentReview": {
+    "reviewer": "llm_impl",
+    "mode": "read-only exact source bytes",
+    "blockingFindings": 0,
+    "testsRepeated": false,
+    "checks": [
+      "three fixed labels only",
+      "high-cardinality/private fallback retained",
+      "whole-window and 17-operation counts unchanged",
+      "historical 75 evidence never zero-filled"
+    ]
+  },
+  "ci": "normal PR workflows pending",
+  "manualWorkflowDispatch": false,
+  "actualNativeNewVocabularyCounts": null,
+  "productionAcceptance": null,
+  "mergeRisk": "low"
+}
