@@ -371,6 +371,23 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal((await session(oidcCookies))?.user.id, userId)
     assert.ok(Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'sso.logout_failed\'', [organizationId])).rows[0].count) >= 2)
   })
+  await t.test('IdP-initiated SAML logout persists one-use requests and cannot replay against a later session', async () => {
+    const login = await samlLogin(), signedIn = await session(login.jar)
+    assert.ok(signedIn)
+    const request = samlIdp.createLogoutRequest(samlSp, 'post', { logoutNameID: samlSubject })
+    const send = () => fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
+      origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded', cookie: oidcCookies.header(),
+    }, body: new URLSearchParams({ SAMLRequest: request.context, RelayState: `${appOrigin}/signed-out` }), redirect: 'manual' })
+    const concurrent = await Promise.all([send(), send()])
+    assert.deepEqual(concurrent.map(response => response.status).sort(), [200, 400], 'native persistent replay reservation has one winner')
+    assert.equal(await session(login.jar), null)
+    const later = await samlLogin(), laterSession = await session(later.jar)
+    assert.ok(laterSession)
+    assert.notEqual(laterSession.session.id, signedIn.session.id)
+    assert.equal((await send()).status, 400, 'an earlier signed LogoutRequest cannot revoke a subsequent login')
+    assert.equal((await session(later.jar))?.session.id, laterSession.session.id)
+    assert.equal((await session(oidcCookies))?.user.id, userId)
+  })
   await t.test('SAML Redirect Single Logout verifies detached signatures and the signed RelayState in both directions', async () => {
     const login = await samlLogin(), signedIn = await session(login.jar)
     assert.ok(signedIn)
