@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: an already loaded bundled SPA auth route needs no new document navigation
+ok 1 - an already loaded bundled SPA auth route needs no new document navigation
+  ---
+  duration_ms: 6.19126
+  type: 'test'
+  ...
+# Subtest: a completed blank document and available preload cannot bypass the bundled DOMContentLoaded
+ok 2 - a completed blank document and available preload cannot bypass the bundled DOMContentLoaded
+  ---
+  duration_ms: 12.033141
+  type: 'test'
+  ...
+# Subtest: a matching bundled document still waits for both DOMContentLoaded and the real IPC predicate
+ok 3 - a matching bundled document still waits for both DOMContentLoaded and the real IPC predicate
+  ---
+  duration_ms: 1.770163
+  type: 'test'
+  ...
+# Subtest: blank, foreign, credential-bearing and non-application namespace URLs never satisfy readiness
+ok 4 - blank, foreign, credential-bearing and non-application namespace URLs never satisfy readiness
+  ---
+  duration_ms: 1.607528
+  type: 'test'
+  ...
+# Subtest: navigation evidence records bounded main-document transitions without URLs or query values
+ok 5 - navigation evidence records bounded main-document transitions without URLs or query values
+  ---
+  duration_ms: 0.451031
+  type: 'test'
+  ...
+# Subtest: same-document History routes have a closed bundled classification without revealing their paths
+ok 6 - same-document History routes have a closed bundled classification without revealing their paths
+  ---
+  duration_ms: 0.274404
+  type: 'test'
+  ...
+# Subtest: failure evidence retains a closed error class and owned source locations only
+ok 7 - failure evidence retains a closed error class and owned source locations only
+  ---
+  duration_ms: 0.554868
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 403.725068

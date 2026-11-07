@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1518,
+  "recordedAt": "2026-11-07T08:53:24.120Z",
+  "purpose": "Preserve the Native document readiness source regression and main f811 integration evidence without claiming packaged macOS acceptance.",
+  "evidenceParents": {
+    "primary": "ddca4b12ffc2721bfae7e1c41adac767a6a711ae",
+    "additional": [
+      "be49cd8531258640d036bf4774bec031a9ce421f"
+    ],
+    "reason": "Retain the latest authorized source transport history; product and ops refs are not changed by this archive."
+  },
+  "identities": {
+    "candidate": {
+      "sha": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+      "parents": [
+        "a0675e4ee029da69380b13590923231ab93a9dfe",
+        "f631038348c83a7bfa8185b2c1232d11795d5858"
+      ]
+    },
+    "mainMerge": {
+      "sha": "a0675e4ee029da69380b13590923231ab93a9dfe",
+      "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+      "parents": [
+        "f035d53f6053e549dc97d2ea809c5a71aa015dd9",
+        "f811448d805e7baa7b032fd6ae62d991f59966c8"
+      ]
+    },
+    "workflowCheckpoint": {
+      "sha": "f631038348c83a7bfa8185b2c1232d11795d5858",
+      "tree": "8dbf175585ab574628895cfc3d1f2c7bbfde1f4f",
+      "parents": [
+        "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9"
+      ]
+    },
+    "transport": {
+      "sha": "be49cd8531258640d036bf4774bec031a9ce421f",
+      "tree": "96a3c7109057b575dbdac8cb289a637728bc6e3d"
+    },
+    "independentlyReadFromGitHubCommitMetadata": true,
+    "candidateAndMainMergeProductTreesEqual": true
+  },
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/main-f811-native-document/native-document-spa-red.tap",
+      "bytes": 2349,
+      "characters": 2349,
+      "sha256": "ec3324ab720a691fa5a0a098c85093f2fd6174923b2959e2558ddcce99fb0303",
+      "gitBlobSha1": "029090395a9c3435cbbb3212fc756dbf3c24af65",
+      "kind": "original_local_test_stdout",
+      "originalScratchSource": "native-document-spa-red.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-f811-native-document/native-document-spa-green.tap",
+      "bytes": 1838,
+      "characters": 1838,
+      "sha256": "9ee5efa043dcfa581d50d5ba8ff8e56fd69c923e3b2cde76319af359e233cdda",
+      "gitBlobSha1": "7651566ab937272950d5ad0f309c2eef7d9ce1e4",
+      "kind": "original_local_test_stdout",
+      "originalScratchSource": "native-document-spa-green.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-f811-native-document/native-document-spa-lint.log",
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "original_local_test_stdout",
+      "originalScratchSource": "native-document-spa-lint.log"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-f811-native-document/main-f811-integration.tap",
+      "bytes": 26440,
+      "characters": 26070,
+      "sha256": "273be38a980a62e92a38efc842d4d095bbef032d931382cd205df6aea2b2ad66",
+      "gitBlobSha1": "4e2a14e71e8d7821c217bc0e85de788f5e1a2602",
+      "kind": "original_local_test_stdout",
+      "originalScratchSource": "main-f811-integration.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-f811-native-document/integration-receipt.json",
+      "bytes": 2892,
+      "characters": 2892,
+      "sha256": "aa4db2fc862cd21b908cd3c47a59b91fc74f6e2c9d72e4a3331319d52ba4b39e",
+      "gitBlobSha1": "fe51d9a38bd452032bb65eb4ba9efe532ea04437",
+      "kind": "owner_integration_receipt",
+      "originalScratchSource": "evidence/main-f811-native-document-integration.json"
+    }
+  ],
+  "results": {
+    "nativeDocumentRegression": {
+      "red": {
+        "tests": 6,
+        "passed": 5,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "green": {
+        "tests": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "scope": "Source-only regression using installed Playwright SDK URL matching and Frame.waitForURL source with controlled navigation, DOMContentLoaded and IPC event delivery.",
+      "sdk": "Playwright 1.64.1",
+      "browserStarted": false,
+      "electronProbeExecuted": false
+    },
+    "mainIntegration": {
+      "tests": 177,
+      "passed": 177,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "source": "Original local test stdout; its .tap filename is preserved even though the summary is the Node spec reporter format."
+    },
+    "scopedLint": {
+      "stdoutBytes": 0,
+      "exitCode": 0,
+      "exitCodeSource": "integration-receipt.json checks.scopedLintExit; empty stdout alone is not evidence of exit status."
+    },
+    "probeSyntaxCheck": {
+      "exitCode": 0,
+      "source": "integration-receipt.json checks.probeNodeCheckExit",
+      "runtimeExecution": false
+    },
+    "diffCheck": {
+      "exitCode": 0,
+      "source": "integration-receipt.json checks.diffCheckExit"
+    }
+  },
+  "limits": {
+    "packagedMacOSAcceptance": "pending",
+    "newNativeSqlTotal": null,
+    "originalFe40OtherNavigationDestination": "unknown; no URL was retained in the original fe40 report",
+    "originalFe40FailurePreservedAt": "https://github.com/alexj11324/Mikka/blob/ddca4b12ffc2721bfae7e1c41adac767a6a711ae/docs/operations/evidence/1512-raw/archive-fe40-index.json",
+    "noMeasurementWindowOrLoginRequestChanged": "Owner integration receipt states this; this archive does not rerun or reinterpret the native measurement.",
+    "noUiChanged": "Owner integration receipt states this.",
+    "newExternalResources": 0,
+    "newProviderOrDatabaseCalls": 0,
+    "testsRerunDuringArchive": false,
+    "noProductionAcceptanceClaim": true
+  },
+  "attribution": {
+    "originalOutputs": "The four stdout files are retained byte-for-byte; the red output remains the observed failing result.",
+    "integrationReceipt": "The owner-generated receipt binds source commits, output hashes and exit metadata; it is not a raw execution transcript.",
+    "independentArchiveChecks": [
+      "Original input bytes and hashes match the frozen receipt.",
+      "GitHub commit metadata confirms candidate and main-merge trees are equal and records actual parent order.",
+      "Published files will be read back exactly before the leased evidence ref is advanced."
+    ],
+    "sourceImportRun": "The success of run 42356948721 is recorded by the owner receipt; no new Actions query or rerun was performed for it during this archive."
+  },
+  "privacy": {
+    "emailMatches": 0,
+    "credentialPrefixMatches": 0,
+    "jwtMatches": 0,
+    "privateKeyMatches": 0,
+    "signedUrlMatches": 0,
+    "rawCredentialsArchived": false,
+    "rawProviderOrAccountDataArchived": false
+  },
+  "actions": {
+    "sourceFilesEdited": false,
+    "sourceRefsChanged": false,
+    "opsRefChanged": false,
+    "featureRefChanged": false,
+    "onlyEvidenceRefMutation": true
+  }
+}

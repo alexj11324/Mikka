@@ -1,0 +1,86 @@
+{
+  "recordedAt": "2026-11-07T08:50:12.733483+00:00",
+  "candidate": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+  "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+  "nativeDocumentFix": "f035d53f6053e549dc97d2ea809c5a71aa015dd9",
+  "mainIntegrated": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+  "mainMergeCommit": "a0675e4ee029da69380b13590923231ab93a9dfe",
+  "workflowCheckpoint": {
+    "sha": "f631038348c83a7bfa8185b2c1232d11795d5858",
+    "parent": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+    "onlyPath": ".github/workflows/thread-lifecycle-acceptance.yml",
+    "fileSha256": "3fb4a9de8b95600df2d1f2e69b30940f0c391adb8c4158e665aae61e354f736c",
+    "productTreeUnchangedAfterMerge": true
+  },
+  "bundle": {
+    "bytes": 61413,
+    "sha256": "76cd4b6046bc673630706e09b38e3b5753df1e10991f22ce7e879504dd696644",
+    "excluded": "f631038348c83a7bfa8185b2c1232d11795d5858"
+  },
+  "transportHead": "be49cd8531258640d036bf4774bec031a9ce421f",
+  "sourceImportRun": 42356948721,
+  "sourceImportConclusion": "success",
+  "featureRefPublished": true,
+  "logs": [
+    {
+      "path": "native-document-spa-red.tap",
+      "bytes": 2349,
+      "sha256": "ec3324ab720a691fa5a0a098c85093f2fd6174923b2959e2558ddcce99fb0303",
+      "summary": [
+        "# tests 6",
+        "# pass 5",
+        "# fail 1",
+        "# cancelled 0",
+        "# skipped 0"
+      ]
+    },
+    {
+      "path": "native-document-spa-green.tap",
+      "bytes": 1838,
+      "sha256": "9ee5efa043dcfa581d50d5ba8ff8e56fd69c923e3b2cde76319af359e233cdda",
+      "summary": [
+        "# tests 7",
+        "# pass 7",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0"
+      ]
+    },
+    {
+      "path": "native-document-spa-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": []
+    },
+    {
+      "path": "main-f811-integration.tap",
+      "bytes": 26440,
+      "sha256": "273be38a980a62e92a38efc842d4d095bbef032d931382cd205df6aea2b2ad66",
+      "summary": [
+        "\u2139 tests 177",
+        "\u2139 pass 177",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    }
+  ],
+  "checks": {
+    "scopedLintExit": 0,
+    "probeNodeCheckExit": 0,
+    "diffCheckExit": 0,
+    "sdk": "Playwright1.64.1, matching installed version and lockfile",
+    "playwrightMethod": "Actual installed urlMatches and Frame.waitForURL source; only navigation/DCL/IPC event delivery is controlled"
+  },
+  "limits": {
+    "electronProbeExecuted": false,
+    "browserStartedForRegression": false,
+    "newPackagedNativeAcceptance": "pending",
+    "historicalOtherNavigationDestination": "unknown; original fe40 report retained no URL",
+    "newNativeSqlTotal": null,
+    "noMeasurementWindowOrLoginRequestChanged": true,
+    "noUiChanged": true,
+    "newExternalResources": 0,
+    "newProviderOrDatabaseCalls": 0
+  }
+}

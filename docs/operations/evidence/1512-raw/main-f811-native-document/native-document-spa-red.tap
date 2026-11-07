@@ -1,0 +1,57 @@
+TAP version 13
+# Subtest: an already loaded bundled SPA auth route needs no new document navigation
+not ok 1 - an already loaded bundled SPA auth route needs no new document navigation
+  ---
+  duration_ms: 4.299162
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/native-document.test.mjs:57:1'
+  failureType: 'testCodeFailure'
+  error: 'NO_NEW_DOCUMENT_NAVIGATION'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.waitForNavigation (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/native-document.test.mjs:35:31)
+    Object.waitForURL (evalmachine.<anonymous>:5:20)
+    waitForBundledRootDocument (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/native-document.mjs:11:14)
+    TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/native-document.test.mjs:60:11)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: a completed blank document and available preload cannot bypass the bundled DOMContentLoaded
+ok 2 - a completed blank document and available preload cannot bypass the bundled DOMContentLoaded
+  ---
+  duration_ms: 5.727219
+  type: 'test'
+  ...
+# Subtest: a matching bundled document still waits for both DOMContentLoaded and the real IPC predicate
+ok 3 - a matching bundled document still waits for both DOMContentLoaded and the real IPC predicate
+  ---
+  duration_ms: 2.069065
+  type: 'test'
+  ...
+# Subtest: blank, foreign, credential-bearing and non-application namespace URLs never satisfy readiness
+ok 4 - blank, foreign, credential-bearing and non-application namespace URLs never satisfy readiness
+  ---
+  duration_ms: 2.0595
+  type: 'test'
+  ...
+# Subtest: navigation evidence records bounded main-document transitions without URLs or query values
+ok 5 - navigation evidence records bounded main-document transitions without URLs or query values
+  ---
+  duration_ms: 0.518984
+  type: 'test'
+  ...
+# Subtest: failure evidence retains a closed error class and owned source locations only
+ok 6 - failure evidence retains a closed error class and owned source locations only
+  ---
+  duration_ms: 0.6293
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 403.860916
