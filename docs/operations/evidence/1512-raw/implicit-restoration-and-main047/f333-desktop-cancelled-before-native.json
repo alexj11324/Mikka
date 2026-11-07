@@ -1,0 +1,348 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pr": 1675,
+  "kind": "desktop-cancelled-before-native-acceptance",
+  "observedAt": "2026-11-07T23:14:41Z",
+  "repository": "alexj11324/Mikka",
+  "run": {
+    "id": 42423295662,
+    "attempt": 1,
+    "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "startedAt": "2026-11-07T23:01:19Z",
+    "updatedAt": "2026-11-07T23:12:53Z"
+  },
+  "binding": {
+    "actualSource": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+    "tree": "07037afc103022459492e0f114cfa4bc9c0060b1",
+    "parents": [
+      "4221d9c06da079321d4fe2803879ba82043d7a1f",
+      "f3336eec99a9d8439668d516677c5389a95a7326"
+    ],
+    "allFourActualCheckoutsMatched": true,
+    "checkouts": [
+      {
+        "jobId": 128556141617,
+        "job": "icon",
+        "source": "decoded immutable job log git log -1 --format=%H",
+        "gitLogCommandObserved": true,
+        "actualCheckoutHashes": [
+          "9de3aeafe3d10ecd9e54f67860e8fde67106cf63"
+        ],
+        "expected": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+        "exactMatch": true,
+        "rawLogRetained": false
+      },
+      {
+        "jobId": 128556141176,
+        "job": "checks",
+        "source": "decoded immutable job log git log -1 --format=%H",
+        "gitLogCommandObserved": true,
+        "actualCheckoutHashes": [
+          "9de3aeafe3d10ecd9e54f67860e8fde67106cf63"
+        ],
+        "expected": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+        "exactMatch": true,
+        "rawLogRetained": false
+      },
+      {
+        "jobId": 128556141063,
+        "actualCheckoutHashes": [
+          "9de3aeafe3d10ecd9e54f67860e8fde67106cf63"
+        ],
+        "matched": true
+      },
+      {
+        "jobId": 128557308725,
+        "actualCheckoutHashes": [
+          "9de3aeafe3d10ecd9e54f67860e8fde67106cf63"
+        ],
+        "expected": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+        "matched": true,
+        "cancellationClosedCodes": [
+          "operation_canceled"
+        ],
+        "rawLogsSaved": false,
+        "rawLogsRetained": false
+      }
+    ]
+  },
+  "jobs": [
+    {
+      "id": 128556141063,
+      "name": "smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:01:21Z",
+      "completedAt": "2026-11-07T23:06:14Z",
+      "steps": [
+        {
+          "number": 13,
+          "name": "Build the production web backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:03:13Z",
+          "completedAt": "2026-11-07T23:05:10Z"
+        },
+        {
+          "number": 15,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:05:15Z",
+          "completedAt": "2026-11-07T23:05:18Z"
+        },
+        {
+          "number": 17,
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:05:25Z",
+          "completedAt": "2026-11-07T23:06:09Z"
+        },
+        {
+          "number": 18,
+          "name": "Audit runtime evidence before upload",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:06:09Z",
+          "completedAt": "2026-11-07T23:06:09Z"
+        },
+        {
+          "number": 19,
+          "name": "Keep audited Electron evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:06:09Z",
+          "completedAt": "2026-11-07T23:06:10Z"
+        },
+        {
+          "number": 38,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:06:11Z",
+          "completedAt": "2026-11-07T23:06:12Z"
+        }
+      ]
+    },
+    {
+      "id": 128556141176,
+      "name": "checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:01:21Z",
+      "completedAt": "2026-11-07T23:03:49Z",
+      "steps": []
+    },
+    {
+      "id": 128556141617,
+      "name": "icon",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:01:25Z",
+      "completedAt": "2026-11-07T23:01:50Z",
+      "steps": []
+    },
+    {
+      "id": 128557308725,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "startedAt": "2026-11-07T23:06:31Z",
+      "completedAt": "2026-11-07T23:12:52Z",
+      "steps": [
+        {
+          "number": 9,
+          "name": "Start an independent local PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:09:57Z",
+          "completedAt": "2026-11-07T23:10:17Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm migrate && pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:10:17Z",
+          "completedAt": "2026-11-07T23:10:21Z"
+        },
+        {
+          "number": 12,
+          "name": "Build the production API for the native ARM64 runtime",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "startedAt": "2026-11-07T23:10:21Z",
+          "completedAt": "2026-11-07T23:12:43Z"
+        },
+        {
+          "number": 14,
+          "name": "Package an inspector-enabled harness input",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T23:12:43Z",
+          "completedAt": "2026-11-07T23:12:43Z"
+        },
+        {
+          "number": 15,
+          "name": "Real Keychain encryption across three independent packaged processes",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T23:12:43Z",
+          "completedAt": "2026-11-07T23:12:43Z"
+        },
+        {
+          "number": 16,
+          "name": "Real packaged Apple Silicon native acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T23:12:43Z",
+          "completedAt": "2026-11-07T23:12:43Z"
+        },
+        {
+          "number": 17,
+          "name": "Keep final package integrity evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:12:43Z",
+          "completedAt": "2026-11-07T23:12:43Z"
+        },
+        {
+          "number": 18,
+          "name": "Audit closed package and crypto reports",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:12:43Z",
+          "completedAt": "2026-11-07T23:12:43Z"
+        },
+        {
+          "number": 19,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:12:43Z",
+          "completedAt": "2026-11-07T23:12:44Z"
+        },
+        {
+          "number": 20,
+          "name": "Audit native evidence",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T23:12:44Z",
+          "completedAt": "2026-11-07T23:12:44Z"
+        },
+        {
+          "number": 21,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T23:12:44Z",
+          "completedAt": "2026-11-07T23:12:44Z"
+        },
+        {
+          "number": 43,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T23:12:45Z",
+          "completedAt": "2026-11-07T23:12:51Z"
+        }
+      ]
+    }
+  ],
+  "classification": {
+    "linuxSmoke": "success",
+    "checks": "success",
+    "icon": "success",
+    "macJob": "cancelled",
+    "interruptedStep": 12,
+    "interruptedPhase": "ARM64 API build",
+    "nativeStep16": "skipped",
+    "actualNativeAttempt": false,
+    "nativeSessionLeaseAttempted": false,
+    "nativeBudget": null,
+    "nativeFailure": false,
+    "packageAndCryptoTests": "skipped",
+    "newMain047Acceptance": null
+  },
+  "cancellation": {
+    "manualCancelRequestsByThisAgent": 0,
+    "manualDispatches": 0,
+    "reruns": 0,
+    "followingHead": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "newDesktopRun": 42424186827,
+    "workflowConcurrency": {
+      "group": "desktop-${PRnumber}",
+      "cancelInProgress": true
+    },
+    "logClosedCodes": [
+      "operation_canceled"
+    ],
+    "causeEvidence": "Cancellation followed the authorized normal push and is consistent with the unchanged workflow concurrency policy. The decoded job log independently reports operation_canceled; no stronger free-form cause was retained."
+  },
+  "cleanup": {
+    "linuxStopContainers": {
+      "number": 38,
+      "name": "Stop containers",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:06:11Z",
+      "completedAt": "2026-11-07T23:06:12Z"
+    },
+    "macLocalPostgresStart": {
+      "number": 9,
+      "name": "Start an independent local PostgreSQL",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T23:09:57Z",
+      "completedAt": "2026-11-07T23:10:17Z"
+    },
+    "macJobCompleted": true,
+    "macSeparatePostgresStopReceipt": null,
+    "nativeLifecycleCleanup": "not applicable: native step skipped",
+    "nativeLeaseRelease": "not applicable: native step skipped",
+    "reviewerRecoveryResourcesCreated": 0,
+    "artifactDownloads": 0
+  },
+  "observedArtifactMetadata": [
+    {
+      "id": 13594935752,
+      "name": "desktop-smoke-9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+      "bytes": 98538,
+      "digest": "sha256:166316a935173b11c98ec52fa30e8f2eaebbb0d9accd0257a1bad972cb798c78",
+      "expired": false,
+      "runId": 42423295662,
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326"
+    },
+    {
+      "id": 13594218960,
+      "name": "desktop-icon",
+      "bytes": 1753553,
+      "digest": "sha256:901507dfdb0d71ae73567db7d603552c938130c4f0c7030389efef2a89e0c365",
+      "expired": false,
+      "runId": 42423295662,
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326"
+    },
+    {
+      "id": 13594164790,
+      "name": "desktop-api-build-9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+      "bytes": 48183968,
+      "digest": "sha256:01febdb3cd4a4546f7bd675163815eda6871beb9b26816cb249a5fdd3b0f68e4",
+      "expired": false,
+      "runId": 42423295662,
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326"
+    }
+  ],
+  "artifactBoundary": "Only inventory metadata was read. No package/native report was present in the returned first-page list; no absent report is treated as a successful runtime result. No ZIP, PNG or DMG was downloaded.",
+  "privacy": {
+    "rawLogsSaved": false,
+    "rawLogsRetained": false,
+    "credentialsIncluded": false,
+    "signedUrlsIncluded": false,
+    "personalContentsIncluded": false
+  },
+  "scope": "Historical f333/9de only. Linux success and cancellation do not establish Native acceptance on either f333 or the new 047 merge."
+}

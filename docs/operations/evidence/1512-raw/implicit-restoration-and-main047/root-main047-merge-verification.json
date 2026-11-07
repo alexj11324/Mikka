@@ -1,0 +1,22 @@
+{
+  "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "parents": [
+    "f3336eec99a9d8439668d516677c5389a95a7326",
+    "0479675e188efeac341b207d8616c4d7b9d4ee23"
+  ],
+  "main": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "previousHead": "f3336eec99a9d8439668d516677c5389a95a7326",
+  "files": 17,
+  "additions": 638,
+  "deletions": 50,
+  "frozenBlobsPreserved": true,
+  "semanticReview": "ongoing; this is PR CI candidate only, not production merge",
+  "recordedAt": "2026-11-07 23:14:46 UTC",
+  "upstreamReview": {
+    "blob": "0ab824f894b7220759cb910d318349eedc1ba8a1",
+    "scope": "source only; no concrete new generation/context regression found; Decision MCP carrier boundary receives an additional focused audit"
+  },
+  "actualNative": "f333 macOS was cancelled by normal same-PR concurrency before Native step16; fa283 not yet run",
+  "production": "not started"
+}

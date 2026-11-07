@@ -1,0 +1,41 @@
+TAP version 13
+# (node:3824) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:3824) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run
+ok 1 - bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run
+  ---
+  duration_ms: 949.108981
+  type: 'test'
+  ...
+# Subtest: mobile model API keeps normal selection and authenticates every temporary branch
+ok 2 - mobile model API keeps normal selection and authenticates every temporary branch
+  ---
+  duration_ms: 14.509274
+  type: 'test'
+  ...
+# Subtest: catalogue reads deduplicate in PostgreSQL, page without losing microseconds, and retain exact saved bindings
+ok 3 - catalogue reads deduplicate in PostgreSQL, page without losing microseconds, and retain exact saved bindings
+  ---
+  duration_ms: 65.193618
+  type: 'test'
+  ...
+# {"beforeRows":393,"afterRows":131,"beforeBytes":198859,"fullOptionBytes":79498,"catalogueBytes":28408,"cataloguePages":2,"maxPageRows":128}
+# (node:3862) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:3862) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: execution settings: migration replay, CRUD, ordering, owner and workspace boundaries
+ok 4 - execution settings: migration replay, CRUD, ordering, owner and workspace boundaries
+  ---
+  duration_ms: 483.107068
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3481.245555

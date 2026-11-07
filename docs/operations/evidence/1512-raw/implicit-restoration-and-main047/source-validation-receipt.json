@@ -1,0 +1,507 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "temporary-model-choice-restore-source-validation",
+  "recordedAt": "2026-11-07T22:51:14Z",
+  "status": "source_verified_not_production_validated",
+  "base": {
+    "commit": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "tree": "fb4220c0d31b4c8d235144a75633ce7ad9258ed0",
+    "driverBlob": "71281216d2ac2ac4a75683e84cdd29c7dddfaafe",
+    "driverTestBlob": "911d8fe775ba16cc11bdfc512e9861798a7bef00",
+    "note": "Driver and its existing workspace-scope quiet guard are based on P. The other model files are unchanged by main 9ea. No ref or commit was written."
+  },
+  "behavior": {
+    "ordinaryGetPut": "The ordinary GET and {bot,id} PUT branch remain. Opt-in choiceState=1 adds absent/present from the existing preference read, without another ordinary query.",
+    "temporary": "Only a concrete authorized bot and this owner’s connected subscription binding UUID. The existing binding clone and INSERT-if-absent share a transaction. An existing preference returns modelChanged without replacement; the clone rolls back.",
+    "receipt": "The API returns the actual stored per-bot binding UUID and xmin text, not a deduplicated menu option ID.",
+    "restore": "DELETE matches ownerId, workspaceId, botKey, stored bindingId, xmin, null apiKeyId and apiKeyModel, and the still-active bot. It restores physical absence only.",
+    "concurrency": "A preflight-to-insert human write conflicts. A committed same-value update changes xmin and survives restoration.",
+    "uncertainSelection": "No receipt after an uncertain first PUT means cleanup_incomplete: no guessed revision or DELETE and no model submission. Existing case loop breaks on cleanup.state=incomplete or aborted signal.",
+    "uncertainRestore": "With a known receipt, only request_failed/response_invalid permits one opt-in absence check after an uncertain restore. No DELETE retry. A modelChanged conflict stays incomplete.",
+    "unchangedGuards": [
+      {
+        "name": "settledTask",
+        "bytes": 345,
+        "unchanged": true
+      },
+      {
+        "name": "ownerIdle",
+        "bytes": 641,
+        "unchanged": true
+      },
+      {
+        "name": "quiet",
+        "bytes": 2171,
+        "unchanged": true
+      }
+    ],
+    "excluded": "No new table, migration, lease, polling, ordinary UI behavior, authorization cache, model fallback or production mutation."
+  },
+  "environment": {
+    "nativePostgres": "PostgreSQL 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit",
+    "actualNode": "v24.22.1",
+    "pnpmInstaller": "11.28.10",
+    "repositoryPackageManager": "pnpm@10.34.3",
+    "dependencyInstall": "Frozen P pnpm lockfile, ignore-scripts; actual installer version is reported rather than assumed identical to CI.",
+    "edition": "cloud",
+    "editionSource": "The fixed P ui-policy/desktop/web-deploy workflow environment declares MIKKA_EDITION=cloud. Initial omitted-edition run is retained as a fixture/environment failure.",
+    "database": "New private loopback-only PostgreSQL service on port 55432, database mikka_e2e; per-suite random isolated schemas, dropped in suite finally. Native PostgreSQL, not PGlite.",
+    "network": "Public package/source and OS repositories only during setup; switched to deny-all before tests. Final independent session GET confirms deny-all.",
+    "testCommands": {
+      "driver": "node --test --test-reporter=tap scripts/acceptance/run-observability.test.mjs",
+      "database": "MIKKA_EDITION=cloud REQUIRE_DB=1 E2E_DATABASE_URL=<owned-loopback-mikka_e2e> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap lib/execution-settings.db.test.ts lib/execution-model-options.db.test.ts lib/bot-model-menu.db.test.ts",
+      "lint": "./node_modules/.bin/oxlint --deny-warnings app/api/mobile/model/route.ts lib/execution-settings.ts lib/bot-model-menu.ts scripts/acceptance/run-observability.mjs lib/execution-settings.db.test.ts lib/bot-model-menu.db.test.ts scripts/acceptance/run-observability.test.mjs"
+    }
+  },
+  "results": {
+    "finalOldSourceRed": {
+      "driver": {
+        "tests": 37,
+        "pass": 31,
+        "fail": 6,
+        "skip": 0,
+        "exit": 1,
+        "raw": "raw/red-driver-fixed-fixtures.tap"
+      },
+      "database": {
+        "tests": 4,
+        "pass": 1,
+        "fail": 3,
+        "skip": 0,
+        "exit": 1,
+        "raw": "raw/red-db-fixed-fixtures.tap"
+      },
+      "note": "Final tests against original P sources fail on absent-state projection, unsupported temporary route and missing temporary method. Original driver 31 cases still pass."
+    },
+    "finalNewSourceGreen": {
+      "driver": {
+        "tests": 37,
+        "pass": 37,
+        "fail": 0,
+        "skip": 0,
+        "exit": 0,
+        "raw": "raw/green-driver-final.tap"
+      },
+      "database": {
+        "tests": 4,
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "exit": 0,
+        "raw": "raw/green-db-corrected.tap"
+      },
+      "lint": {
+        "files": 7,
+        "warnings": 0,
+        "errors": 0,
+        "exit": 0,
+        "raw": "raw/lint-corrected.log"
+      }
+    },
+    "sqlAssertions": [
+      "Receipt matches physically stored clone and xmin",
+      "Existing-row conflict rolls back newly created clone and leaves row/version intact",
+      "Two Promise.all calls each acquire their own pool client: exactly one insert wins and one conflicts",
+      "Same-value committed UPDATE changes xmin and prevents deletion",
+      "Wrong owner/workspace/bot/binding/revision cannot restore",
+      "API-key replacement is not cleared",
+      "Successful delete returns to physical absence; repeat delete fails",
+      "Original normal selection/CRUD/ordering/owner/workspace assertions remain"
+    ],
+    "countingScope": "The menu countedPool proxy observes only query calls on the explicit pool argument; settings keeps its original pool. It demonstrates no extra opt-in preference read, not a total count of every menu SQL. The source diff independently shows ordinary settings calls unchanged.",
+    "concurrencyScope": "Two real pool connections compete through Promise.all. Their SQL interleaving was not additionally forced or asserted.",
+    "firstResponseScope": "The lost/incomplete-first-response fixture runs the claude case and proves zero submissions, one temporary PUT, no restore, and cleanup_incomplete. It does not dynamically execute a second case. The unchanged outer loop breaks specifically for incomplete cleanup or abort, not all blocked results.",
+    "fixtureCorrections": [
+      "Initial default community environment lacked cloud_service_registration; reran with the fixed source cloud-edition CI environment.",
+      "The existing execution-settings points mock was installed after the first menu import; moved the same fixture before that import.",
+      "The new route test resets completed DB-fixture module mocks before installing its own.",
+      "Two new driver expectations used passed instead of the actual runtime_verified success status; corrected expectations.",
+      "The new conflict fixture cast one parameter separately to uuid/text, and the route mock corrected the opt-in argument index. No product changes were needed after the first four-source draft."
+    ],
+    "whitespace": {
+      "gitNoIndexCheckExit": 1,
+      "stdoutBytes": 0,
+      "note": "Recorded literally; no claim of exit zero. Independent changed-line check found no new trailing whitespace and every final source ends in a newline.",
+      "checks": [
+        {
+          "path": "app/api/mobile/model/route.ts",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        },
+        {
+          "path": "lib/execution-settings.ts",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        },
+        {
+          "path": "lib/bot-model-menu.ts",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        },
+        {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        },
+        {
+          "path": "lib/execution-settings.db.test.ts",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        },
+        {
+          "path": "lib/bot-model-menu.db.test.ts",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        },
+        {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "newTrailingWhitespace": [],
+          "eofNewline": true
+        }
+      ]
+    },
+    "typecheck": "Not run in this isolated verification; final integrated canonical CI remains required.",
+    "production": "No production API selection/restoration, model inference, browser acceptance, template or paid provider call was run."
+  },
+  "cleanup": {
+    "poolClosure": "Existing suites await pool.end(), DROP their isolated schema, and admin.end() in finally; all final database tests completed.",
+    "postgres": {
+      "stopExit": 0,
+      "statusExit": 3,
+      "statusText": "pg_ctl: no server running",
+      "raw": [
+        "raw/pg-stop.log",
+        "raw/pg-stop.exit",
+        "raw/pg-status-after-stop.log",
+        "raw/pg-status-after-stop.exit"
+      ]
+    },
+    "sandbox": {
+      "id": "sbx_K6yau7mczMXbpffKVnzCgaAAOJZ4",
+      "createdAt": 1794090923852,
+      "startedAt": 1794090923876,
+      "requestedStopAt": 1794091585382,
+      "stoppedAt": 1794091586509,
+      "status": "stopped",
+      "durationMs": 662633,
+      "limitMs": 900000,
+      "vcpus": 2,
+      "memoryMiB": 4096,
+      "activeCpuDurationMs": 122386,
+      "networkPolicy": {
+        "mode": "deny-all"
+      },
+      "routes": [],
+      "independentGetAfterStop": true
+    },
+    "remainingActiveOwnedResources": 0
+  },
+  "privacy": {
+    "rawLogs": {
+      "files": 33,
+      "hits": []
+    },
+    "sourceFixtures": "Only fixed test identities, canary credentials and synthetic ciphertext already used by isolated source fixtures. No production credential, email, message, model response, signed URL, or raw production log was accessed or archived.",
+    "runtimeDatabaseUri": "Not included in published logs or receipt. Database target is described by its isolated loopback binding."
+  },
+  "sources": [
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 4840,
+      "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "gitBlob": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+      "blob": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 23320,
+      "sha256": "e4acee9f6eee1d0592c83fee5aef4c9351ea9396c03420c2219e3efe7f7eae82",
+      "gitBlob": "4d90d7038808bdf8c119fbf65c416eb94b0152a9",
+      "blob": "4d90d7038808bdf8c119fbf65c416eb94b0152a9"
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "bytes": 11776,
+      "sha256": "7f5322907678b50c24d7ba34ec5b98ee4d20e757e2276de1fb4f3a3df7dfbede",
+      "gitBlob": "aff4957d4e8f07898a9dfba505a5fc439ac0d757",
+      "blob": "aff4957d4e8f07898a9dfba505a5fc439ac0d757"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "blob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+    },
+    {
+      "path": "lib/execution-settings.db.test.ts",
+      "bytes": 27767,
+      "sha256": "8afd8fbf484035cdb6582274fa46ae7430f07a71da1e8b8031d852a80d51e7c3",
+      "gitBlob": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679",
+      "blob": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679"
+    },
+    {
+      "path": "lib/bot-model-menu.db.test.ts",
+      "bytes": 41714,
+      "sha256": "0fbfe04fe1ee11a2399c308cdf98b5d340adfd4944350bea4e5f6cb1bd6c4b49",
+      "gitBlob": "f3d04df0373b052ec72d64aacb1b945959e07ef6",
+      "blob": "f3d04df0373b052ec72d64aacb1b945959e07ef6"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 55389,
+      "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3",
+      "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+      "blob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+    }
+  ],
+  "rawEvidence": [
+    {
+      "path": "raw/green-db-corrected.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+    },
+    {
+      "path": "raw/green-db-corrected.tap",
+      "bytes": 1856,
+      "sha256": "fd2be3780e16d301a6e43508a8e4d3c96c327347e9a1e3e8e57e94f41bf2a76a",
+      "gitBlob": "af3620a1073780de9bfabc84306629935e88253d",
+      "blob": "af3620a1073780de9bfabc84306629935e88253d"
+    },
+    {
+      "path": "raw/green-db-final.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/green-db-final.tap",
+      "bytes": 3196,
+      "sha256": "a3b0da397fb8efb5b73fc1294c949c8d2d5c8f49d4c8c9c36617292fa855ffbc",
+      "gitBlob": "ab471f815a7b832d5651e3df8b69bbe25a6f4432",
+      "blob": "ab471f815a7b832d5651e3df8b69bbe25a6f4432"
+    },
+    {
+      "path": "raw/green-db.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/green-db.tap",
+      "bytes": 3092,
+      "sha256": "933ed47fa24a9fcb04fbaaa0447bcae966c62277fe6e359cdc16fd96e58f3acd",
+      "gitBlob": "29f9c01d6bcf7940baed37184da231d2a9fd06ec",
+      "blob": "29f9c01d6bcf7940baed37184da231d2a9fd06ec"
+    },
+    {
+      "path": "raw/green-driver-final.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+    },
+    {
+      "path": "raw/green-driver-final.tap",
+      "bytes": 9574,
+      "sha256": "38169f7c276fbc084ca361e92f965c1920b0dbb990efdd7fa0151a8b8259da04",
+      "gitBlob": "85f07cf0f5b90441dafb9036008899f960b1d1cf",
+      "blob": "85f07cf0f5b90441dafb9036008899f960b1d1cf"
+    },
+    {
+      "path": "raw/green-driver.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/green-driver.tap",
+      "bytes": 16084,
+      "sha256": "83bae606cb48a68b41cbc1f2cdc9d3fb1182e24849059f73150346f758991c9e",
+      "gitBlob": "61ac833e579fc92defc27416a6cc98923c56da7f",
+      "blob": "61ac833e579fc92defc27416a6cc98923c56da7f"
+    },
+    {
+      "path": "raw/lint-corrected.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+    },
+    {
+      "path": "raw/lint-corrected.log",
+      "bytes": 89,
+      "sha256": "a1a7fca8c63a78a3d7f646a3a5f35e0bcb56cd23e64ad3e5a530006fe9e616e7",
+      "gitBlob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f",
+      "blob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f"
+    },
+    {
+      "path": "raw/lint-final.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+    },
+    {
+      "path": "raw/lint-final.log",
+      "bytes": 89,
+      "sha256": "a1a7fca8c63a78a3d7f646a3a5f35e0bcb56cd23e64ad3e5a530006fe9e616e7",
+      "gitBlob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f",
+      "blob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f"
+    },
+    {
+      "path": "raw/lint.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+    },
+    {
+      "path": "raw/lint.log",
+      "bytes": 90,
+      "sha256": "77d79c7748786512fd6cdc77d06234aea9a6c32a3816f4cd7b86fc321224c4fd",
+      "gitBlob": "62043353770677027dad6b8322a190246866832a",
+      "blob": "62043353770677027dad6b8322a190246866832a"
+    },
+    {
+      "path": "raw/pg-stop.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+    },
+    {
+      "path": "raw/pg-stop.log",
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d",
+      "gitBlob": "bdc448af42aa24144e661f647c52557f2e0d9b3c",
+      "blob": "bdc448af42aa24144e661f647c52557f2e0d9b3c"
+    },
+    {
+      "path": "raw/pg-version.txt",
+      "bytes": 128,
+      "sha256": "29c518785673b6dfff5f6ffc7d29f4ff650dade6e30cdf9a238ece4698dc6503",
+      "gitBlob": "b0f9a0e85e23b2a2cd07774f5b3432b579e00b8d",
+      "blob": "b0f9a0e85e23b2a2cd07774f5b3432b579e00b8d"
+    },
+    {
+      "path": "raw/red-db-cloud.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/red-db-cloud.tap",
+      "bytes": 3045,
+      "sha256": "6c83dea56c2f08b5b9b6b8279b1f9a4a9f4a4fd0a1add8521d669d86af65e28d",
+      "gitBlob": "8ae90b44fc3f91273b6aeb1ec3db7113a834abd4",
+      "blob": "8ae90b44fc3f91273b6aeb1ec3db7113a834abd4"
+    },
+    {
+      "path": "raw/red-db-fixed-fixtures.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/red-db-fixed-fixtures.tap",
+      "bytes": 3760,
+      "sha256": "c65de6b33adcd802d90f322d105813b7301f26e494a68785985b5322b71c27e5",
+      "gitBlob": "cdbd9ec51f1e9075ecda3b80b61d329957657474",
+      "blob": "cdbd9ec51f1e9075ecda3b80b61d329957657474"
+    },
+    {
+      "path": "raw/red-db.tap",
+      "bytes": 2602,
+      "sha256": "31a5750a146d490c8004c693241f7d6ff678be7262b0dbe7917b950f59111c0f",
+      "gitBlob": "213626c07c4527f049b58a2e76ee9b1aba5edb15",
+      "blob": "213626c07c4527f049b58a2e76ee9b1aba5edb15"
+    },
+    {
+      "path": "raw/red-driver-fixed-fixtures.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/red-driver-fixed-fixtures.tap",
+      "bytes": 16564,
+      "sha256": "650817ef393dbc2f433071482465643daeba376560aa5a46b705bd39118d8905",
+      "gitBlob": "478a030e31027a16934cdd9a1dbed4af3360afc3",
+      "blob": "478a030e31027a16934cdd9a1dbed4af3360afc3"
+    },
+    {
+      "path": "raw/red-driver.tap",
+      "bytes": 11669,
+      "sha256": "4aaaf7f51d6e1f5fc0d027ac45e6c6822e300e6d8ab60f64809b0076bc8c96d4",
+      "gitBlob": "4b10a8f2fae69b03dd2ee7396e893c30d0096a78",
+      "blob": "4b10a8f2fae69b03dd2ee7396e893c30d0096a78"
+    },
+    {
+      "path": "raw/red-exits.json",
+      "bytes": 20,
+      "sha256": "9a70a7e3c43062959ca35322a93f9b7f2027e3274ee74e8081bea5c46de89707",
+      "gitBlob": "0b0700d327a675d964bf315eaa8d4ed1ea1cda58",
+      "blob": "0b0700d327a675d964bf315eaa8d4ed1ea1cda58"
+    },
+    {
+      "path": "raw/diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "raw/diffcheck.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "blob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+    },
+    {
+      "path": "raw/pg-status-after-stop.log",
+      "bytes": 26,
+      "sha256": "e138ccb54fdb08283c6eb21159c53207bbbbf07077246e2804e18d22efe6e250",
+      "gitBlob": "8db096185559dfc929b529f37c3082daa4dab0f8",
+      "blob": "8db096185559dfc929b529f37c3082daa4dab0f8"
+    },
+    {
+      "path": "raw/pg-status-after-stop.exit",
+      "bytes": 2,
+      "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2",
+      "gitBlob": "00750edc07d6415dcc07ae0351e9397b0222b7ba",
+      "blob": "00750edc07d6415dcc07ae0351e9397b0222b7ba"
+    },
+    {
+      "path": "raw/actual-source-hashes.json",
+      "bytes": 1844,
+      "sha256": "7095a3696125d75865e049b9a263cccf5d5357344a869dcaa69649e3c5fe7c9e",
+      "gitBlob": "9594d1ff6a1bad23306e5e118a58f8a79fa6d669",
+      "blob": "9594d1ff6a1bad23306e5e118a58f8a79fa6d669"
+    }
+  ],
+  "verification": {
+    "actualSourceHashes": "raw/actual-source-hashes.json",
+    "allSevenRunningSourcesMatchedFrozenBytes": true,
+    "allRawFilesReadBackFromSandboxByBoundedChunksAndSha256": true,
+    "rawBlobReadbackCount": 33,
+    "rawBlobBytes": 73812,
+    "allRawGitBlobsRemotelyReadBackByteForByte": true
+  },
+  "limits": [
+    "xmin is a short-attempt PostgreSQL tuple-version receipt, not a durable or secret token; normal authentication and scope checks remain mandatory.",
+    "First selection response completely lost remains intentionally cleanup_incomplete without a guessed restore.",
+    "A later human preference write can race with an absence confirmation after an uncertain restore; the confirmation is one bounded current-state observation, not a lease.",
+    "Local PostgreSQL 18.6 is separate from the next required CI PostgreSQL 17.11 run.",
+    "Production restoration and the requested model runs remain unexecuted."
+  ]
+}

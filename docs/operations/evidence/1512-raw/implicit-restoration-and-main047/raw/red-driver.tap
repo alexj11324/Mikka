@@ -1,0 +1,157 @@
+✔ preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks (41.506924ms)
+✔ preflight excludes only a version-bound Factory task proven to belong to another workspace (4.398215ms)
+✔ preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked (25.308183ms)
+✔ preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks (3.583625ms)
+✔ preflight does not request scope details for already settled Factory tasks (11.6384ms)
+✔ foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task (12.978364ms)
+✔ a default team switches only this login session to its verified personal workspace before reading Coordinator (2.564068ms)
+✔ workspace selection rejects ambiguous choices, teams and another account personal membership before switching (10.033565ms)
+✔ workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session (5.398277ms)
+✔ unsafe configuration blocks before any model call and reports only closed failure codes (4.767351ms)
+✔ two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence (16.289186ms)
+✔ successful terminal runs close only their own machines and retain task evidence (8.029217ms)
+✔ a missing machine requires a fresh owned run and an explicit null machine read (8.687066ms)
+✔ machine failures never turn a completed task green and do not prevent closing another owned machine (79.789593ms)
+✔ legacy Factory tasks still require review and verify before the normal deliverable acceptance (6.875004ms)
+✔ missing, failed or stale Factory checks never reach approval, including legacy verify (28.300972ms)
+✔ deliverable approval requires its receipt, never accepts a repository and never retries a lost response (22.746025ms)
+✔ uncertain mutation responses never resubmit and still reconcile own temporary settings (7.084531ms)
+✔ wrong provider/model and an extra native attempt stop the case without retrying (12.74599ms)
+✔ pure source and budget guards reject shared credentials, inherited model choices and retries (0.480538ms)
+✔ cleanup preserves a concurrent model edit and reports incomplete restoration (4.710045ms)
+✔ prepare is explicit, requires execution and restores only its acknowledged settings (9.004468ms)
+✔ prepare refuses owner-wide activity and inherited model choices without changing settings (2.394432ms)
+✔ a blocked case does not prevent preparation and execution of another available model (14.095799ms)
+✔ preparation failures restore acknowledged writes but never guess after a lost response (6.477773ms)
+✔ restoration failures and concurrent edits remain visible without overwriting them (41.057363ms)
+✔ issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan (1.063285ms)
+✔ browser submission requires one executed case and does not authenticate on invalid options (0.264461ms)
+✔ browser mode publishes readiness then observes the real-shaped UI click through push without an API submission (17.36859ms)
+✔ browser waiting times out or blocks changed UI text without sending or repeating a task (11.114731ms)
+✔ live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports (1.631594ms)
+✖ implicit default preflight requires server absence evidence and never writes a preference (2.441675ms)
+✖ implicit default restores absence with the stored binding and revision, not the catalogue option (1.612601ms)
+✖ implicit default never overwrites a preference created after preflight (1.307434ms)
+✖ implicit default stops after a lost or incomplete first selection receipt without guessing ownership (1.345879ms)
+✖ implicit default preserves a same-value concurrent rewrite when the revision no longer matches (1.265641ms)
+✖ implicit default checks absence once after a lost restoration response and does not repeat deletion (1.273979ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 31
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 579.724137
+
+✖ failing tests:
+
+test at scripts/acceptance/run-observability.test.mjs:677:1
+✖ implicit default preflight requires server absence evidence and never writes a preference (2.441675ms)
+  AssertionError [ERR_ASSERTION]: {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"preflight","status":"blocked","startedAt":"2026-11-07T22:37:51.303Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"blocked","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[]},"code":"model_not_restorable","durationMs":0}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T22:37:51.304Z"}
+  
+  'blocked' !== 'ready'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:679:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:688:1
+✖ implicit default restores absence with the stored binding and revision, not the catalogue option (1.612601ms)
+  AssertionError [ERR_ASSERTION]: {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"blocked","startedAt":"2026-11-07T22:37:51.306Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"blocked","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[]},"code":"model_not_restorable","durationMs":1}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T22:37:51.307Z"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:690:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:700:1
+✖ implicit default never overwrites a preference created after preflight (1.307434ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:703:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:708:1
+✖ implicit default stops after a lost or incomplete first selection receipt without guessing ownership (1.345879ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'model_not_restorable'
+  - 'cleanup_incomplete'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:711:52)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model_not_restorable',
+    expected: 'cleanup_incomplete',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:719:1
+✖ implicit default preserves a same-value concurrent rewrite when the revision no longer matches (1.265641ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'model_not_restorable'
+  - 'cleanup_incomplete'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:721:50)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model_not_restorable',
+    expected: 'cleanup_incomplete',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:726:1
+✖ implicit default checks absence once after a lost restoration response and does not repeat deletion (1.273979ms)
+  AssertionError [ERR_ASSERTION]: {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"blocked","startedAt":"2026-11-07T22:37:51.311Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"blocked","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[]},"code":"model_not_restorable","durationMs":0}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T22:37:51.312Z"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:728:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

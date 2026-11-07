@@ -1,0 +1,118 @@
+{
+  "main": "4221d9c06da079321d4fe2803879ba82043d7a1f",
+  "previousHead": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+  "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+  "tree": "07037afc103022459492e0f114cfa4bc9c0060b1",
+  "merge": "d58d5aa19c11d28c6d1e9e0378e54f5e29e0a7b0",
+  "mergeParents": [
+    "5df3fc316c87cd282e182d0c3f54592bfc586885",
+    "4221d9c06da079321d4fe2803879ba82043d7a1f"
+  ],
+  "files": [
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "sha": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+      "additions": 17,
+      "deletions": 1
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "sha": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "sha": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+      "additions": 6,
+      "deletions": 1
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "sha": "034972a235975d43eb2e002a7556c79dc120bc99",
+      "additions": 21,
+      "deletions": 4
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "lib/bot-model-menu.db.test.ts",
+      "sha": "f3d04df0373b052ec72d64aacb1b945959e07ef6",
+      "additions": 82,
+      "deletions": 0
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "sha": "aff4957d4e8f07898a9dfba505a5fc439ac0d757",
+      "additions": 5,
+      "deletions": 3
+    },
+    {
+      "path": "lib/execution-settings.db.test.ts",
+      "sha": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679",
+      "additions": 57,
+      "deletions": 2
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "sha": "4d90d7038808bdf8c119fbf65c416eb94b0152a9",
+      "additions": 38,
+      "deletions": 2
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "sha": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "lib/preferences.ts",
+      "sha": "0a01960901e60bd66cf86e1a6733e2dc0e953c15",
+      "additions": 11,
+      "deletions": 7
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "sha": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "additions": 24,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "additions": 58,
+      "deletions": 15
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+      "additions": 153,
+      "deletions": 5
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "sha": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+      "additions": 97,
+      "deletions": 6
+    },
+    {
+      "path": "tests/desktop-session-cache.db.test.ts",
+      "sha": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "tests/settings-preferences.db.test.ts",
+      "sha": "3b54cf58a62eccae2517426e87a52e40336f9f00",
+      "additions": 59,
+      "deletions": 0
+    }
+  ],
+  "verified": true,
+  "note": "Read-only verification before the separately authorized single normal fast-forward push. This receipt does not claim CI or production acceptance.",
+  "recordedAt": "2026-11-07 22:59:16 UTC"
+}

@@ -1,0 +1,56 @@
+TAP version 13
+# (node:3610) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:3610) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run
+ok 1 - bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run
+  ---
+  duration_ms: 1391.838584
+  type: 'test'
+  ...
+# Subtest: mobile model API keeps normal selection and authenticates every temporary branch
+not ok 2 - mobile model API keeps normal selection and authenticates every temporary branch
+  ---
+  duration_ms: 2.819011
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:11:885'
+  failureType: 'testCodeFailure'
+  error: "Invalid state: Cannot mock 'file:///vercel/sandbox/model-restore/repo/lib/db/index.ts'. The module is already mocked."
+  code: 'ERR_INVALID_STATE'
+  stack: |-
+    MockTracker.module (node:internal/test_runner/mock/mock:706:13)
+    TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:437:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# 2026-11-07T22:41:57.748Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+# Subtest: execution settings: migration replay, CRUD, ordering, owner and workspace boundaries
+not ok 3 - execution settings: migration replay, CRUD, ordering, owner and workspace boundaries
+  ---
+  duration_ms: 1488.687056
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/lib/execution-settings.db.test.ts:1:610'
+  failureType: 'testCodeFailure'
+  error: 'connect ECONNREFUSED 127.0.0.1:5432'
+  code: 'ECONNREFUSED'
+  stack: |-
+    /vercel/sandbox/model-restore/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Promise.all (index 0)
+    async sharedCreditWorkspaces (/vercel/sandbox/model-restore/repo/lib/credit-shares.ts:66:36)
+    async hostedPointsHere (/vercel/sandbox/model-restore/repo/lib/points-fallback.ts:75:49)
+    async Module.botModelMenu (/vercel/sandbox/model-restore/repo/lib/bot-model-menu.ts:93:71)
+    async TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/execution-settings.db.test.ts:202:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 1
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4503.805358

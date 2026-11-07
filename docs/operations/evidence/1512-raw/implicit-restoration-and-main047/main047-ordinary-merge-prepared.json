@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pr": 1675,
+  "kind": "ordinary-main047-merge-prepared",
+  "observedAt": "2026-11-07T23:10:33.799Z",
+  "repository": "alexj11324/Mikka",
+  "branch": "f3336eec99a9d8439668d516677c5389a95a7326",
+  "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "parents": [
+    "f3336eec99a9d8439668d516677c5389a95a7326",
+    "0479675e188efeac341b207d8616c4d7b9d4ee23"
+  ],
+  "vsMain": {
+    "files": 17,
+    "additions": 638,
+    "deletions": 50,
+    "allFrozenBlobsExact": true
+  },
+  "vsFeature": {
+    "files": 75,
+    "allUpstreamBlobsAndStatusesExact": true
+  },
+  "main": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "refsUpdated": false,
+  "semanticReview": "pending root and daemon",
+  "newCi": "not triggered",
+  "nativeBudget": "not measured",
+  "treeConstruction": {
+    "baseTree": "219a51ff8ae1a0ad70ef448abfb037be0f1f1e16",
+    "appliedCandidatePaths": 17,
+    "mode": "100644",
+    "candidateMapSha256": "288fcabf369e940a0158eae23fdc55f54b3ea26389af741845997d2cc44495fe",
+    "mainChanges": 75,
+    "upstreamMapSha256": "18e8405917c98a40282c9beb4131f636cd69516d6de45be852d60391b6c20eff",
+    "overlap": 0
+  },
+  "sourceEvidence": {
+    "previousIntegrationReview": "6bba5658797c5982de3b18da0c86986ed96f6f50",
+    "f333Publication": "50dad651521ef8594ef4a2cba423a427856c48fd",
+    "newCodeOrFrozenTestEdits": false
+  },
+  "oldRun": {
+    "id": 42423295662,
+    "attempt": 1,
+    "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "actualKnownCheckout": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+    "linuxSmoke": "success",
+    "checks": "success",
+    "icon": "success",
+    "macAtLastObservation": {
+      "observedAt": "2026-11-07T23:08:07Z",
+      "jobId": 128557308725,
+      "step": 6,
+      "name": "pnpm install --frozen-lockfile",
+      "nativeStep16": "pending"
+    },
+    "cancellationRequested": false,
+    "cancellationMethodAvailable": false,
+    "followupDirection": "Let existing run complete naturally; record any workflow concurrency cancellation as observed."
+  },
+  "limits": [
+    "This verifies exact tree and ancestry preservation, not semantic compatibility of upstream daemon/tracing changes.",
+    "No CI or Native run was started for the unreferenced merge.",
+    "Results from f333/9de are not transferred to the new merge.",
+    "No ref, main branch, production setting or provider resource changed."
+  ],
+  "resourcesCreated": 0
+}

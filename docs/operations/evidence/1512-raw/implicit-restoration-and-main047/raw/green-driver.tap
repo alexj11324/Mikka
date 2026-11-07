@@ -1,0 +1,268 @@
+TAP version 13
+# Subtest: preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+ok 1 - preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+  ---
+  duration_ms: 51.708973
+  type: 'test'
+  ...
+# Subtest: preflight excludes only a version-bound Factory task proven to belong to another workspace
+ok 2 - preflight excludes only a version-bound Factory task proven to belong to another workspace
+  ---
+  duration_ms: 4.862722
+  type: 'test'
+  ...
+# Subtest: preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+ok 3 - preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+  ---
+  duration_ms: 27.541684
+  type: 'test'
+  ...
+# Subtest: preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+ok 4 - preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+  ---
+  duration_ms: 3.300107
+  type: 'test'
+  ...
+# Subtest: preflight does not request scope details for already settled Factory tasks
+ok 5 - preflight does not request scope details for already settled Factory tasks
+  ---
+  duration_ms: 10.743122
+  type: 'test'
+  ...
+# Subtest: foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+ok 6 - foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+  ---
+  duration_ms: 12.418225
+  type: 'test'
+  ...
+# Subtest: a default team switches only this login session to its verified personal workspace before reading Coordinator
+ok 7 - a default team switches only this login session to its verified personal workspace before reading Coordinator
+  ---
+  duration_ms: 2.273064
+  type: 'test'
+  ...
+# Subtest: workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+ok 8 - workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+  ---
+  duration_ms: 9.216052
+  type: 'test'
+  ...
+# Subtest: workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+ok 9 - workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+  ---
+  duration_ms: 4.34071
+  type: 'test'
+  ...
+# Subtest: unsafe configuration blocks before any model call and reports only closed failure codes
+ok 10 - unsafe configuration blocks before any model call and reports only closed failure codes
+  ---
+  duration_ms: 4.269957
+  type: 'test'
+  ...
+# Subtest: two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+ok 11 - two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+  ---
+  duration_ms: 14.91259
+  type: 'test'
+  ...
+# Subtest: successful terminal runs close only their own machines and retain task evidence
+ok 12 - successful terminal runs close only their own machines and retain task evidence
+  ---
+  duration_ms: 7.016334
+  type: 'test'
+  ...
+# Subtest: a missing machine requires a fresh owned run and an explicit null machine read
+ok 13 - a missing machine requires a fresh owned run and an explicit null machine read
+  ---
+  duration_ms: 7.65495
+  type: 'test'
+  ...
+# Subtest: machine failures never turn a completed task green and do not prevent closing another owned machine
+ok 14 - machine failures never turn a completed task green and do not prevent closing another owned machine
+  ---
+  duration_ms: 70.633618
+  type: 'test'
+  ...
+# Subtest: legacy Factory tasks still require review and verify before the normal deliverable acceptance
+ok 15 - legacy Factory tasks still require review and verify before the normal deliverable acceptance
+  ---
+  duration_ms: 6.18515
+  type: 'test'
+  ...
+# Subtest: missing, failed or stale Factory checks never reach approval, including legacy verify
+ok 16 - missing, failed or stale Factory checks never reach approval, including legacy verify
+  ---
+  duration_ms: 25.178288
+  type: 'test'
+  ...
+# Subtest: deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+ok 17 - deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+  ---
+  duration_ms: 20.390818
+  type: 'test'
+  ...
+# Subtest: uncertain mutation responses never resubmit and still reconcile own temporary settings
+ok 18 - uncertain mutation responses never resubmit and still reconcile own temporary settings
+  ---
+  duration_ms: 6.00055
+  type: 'test'
+  ...
+# Subtest: wrong provider/model and an extra native attempt stop the case without retrying
+ok 19 - wrong provider/model and an extra native attempt stop the case without retrying
+  ---
+  duration_ms: 10.940917
+  type: 'test'
+  ...
+# Subtest: pure source and budget guards reject shared credentials, inherited model choices and retries
+ok 20 - pure source and budget guards reject shared credentials, inherited model choices and retries
+  ---
+  duration_ms: 0.40172
+  type: 'test'
+  ...
+# Subtest: cleanup preserves a concurrent model edit and reports incomplete restoration
+ok 21 - cleanup preserves a concurrent model edit and reports incomplete restoration
+  ---
+  duration_ms: 4.311919
+  type: 'test'
+  ...
+# Subtest: prepare is explicit, requires execution and restores only its acknowledged settings
+ok 22 - prepare is explicit, requires execution and restores only its acknowledged settings
+  ---
+  duration_ms: 7.751236
+  type: 'test'
+  ...
+# Subtest: prepare refuses owner-wide activity and inherited model choices without changing settings
+ok 23 - prepare refuses owner-wide activity and inherited model choices without changing settings
+  ---
+  duration_ms: 1.918299
+  type: 'test'
+  ...
+# Subtest: a blocked case does not prevent preparation and execution of another available model
+ok 24 - a blocked case does not prevent preparation and execution of another available model
+  ---
+  duration_ms: 11.770515
+  type: 'test'
+  ...
+# Subtest: preparation failures restore acknowledged writes but never guess after a lost response
+ok 25 - preparation failures restore acknowledged writes but never guess after a lost response
+  ---
+  duration_ms: 5.35678
+  type: 'test'
+  ...
+# Subtest: restoration failures and concurrent edits remain visible without overwriting them
+ok 26 - restoration failures and concurrent edits remain visible without overwriting them
+  ---
+  duration_ms: 33.915125
+  type: 'test'
+  ...
+# Subtest: issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+ok 27 - issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+  ---
+  duration_ms: 0.989489
+  type: 'test'
+  ...
+# Subtest: browser submission requires one executed case and does not authenticate on invalid options
+ok 28 - browser submission requires one executed case and does not authenticate on invalid options
+  ---
+  duration_ms: 0.233897
+  type: 'test'
+  ...
+# Subtest: browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+ok 29 - browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+  ---
+  duration_ms: 14.910555
+  type: 'test'
+  ...
+# Subtest: browser waiting times out or blocks changed UI text without sending or repeating a task
+ok 30 - browser waiting times out or blocks changed UI text without sending or repeating a task
+  ---
+  duration_ms: 9.488718
+  type: 'test'
+  ...
+# Subtest: live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+ok 31 - live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+  ---
+  duration_ms: 1.473265
+  type: 'test'
+  ...
+# Subtest: implicit default preflight requires server absence evidence and never writes a preference
+ok 32 - implicit default preflight requires server absence evidence and never writes a preference
+  ---
+  duration_ms: 1.533806
+  type: 'test'
+  ...
+# Subtest: implicit default restores absence with the stored binding and revision, not the catalogue option
+not ok 33 - implicit default restores absence with the stored binding and revision, not the catalogue option
+  ---
+  duration_ms: 5.771782
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:688:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-07T22:41:53.225Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"69f3fe4bb70c8ce4891db5b297709063","parentSpanId":"63ca104296ce84a1","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":4}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T22:41:53.229Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'passed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'passed'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:690:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: implicit default never overwrites a preference created after preflight
+ok 34 - implicit default never overwrites a preference created after preflight
+  ---
+  duration_ms: 1.847015
+  type: 'test'
+  ...
+# Subtest: implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+ok 35 - implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+  ---
+  duration_ms: 3.157043
+  type: 'test'
+  ...
+# Subtest: implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+ok 36 - implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+  ---
+  duration_ms: 4.8732
+  type: 'test'
+  ...
+# Subtest: implicit default checks absence once after a lost restoration response and does not repeat deletion
+not ok 37 - implicit default checks absence once after a lost restoration response and does not repeat deletion
+  ---
+  duration_ms: 7.737683
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:726:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-07T22:41:53.241Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"758d0a9bd4167bcdb32c70bf1471808f","parentSpanId":"040b2063863c969a","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":7}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T22:41:53.248Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'passed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'passed'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/sandbox/model-restore/repo/scripts/acceptance/run-observability.test.mjs:728:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 35
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 593.450265

@@ -1,0 +1,60 @@
+{
+  "node": "v24.22.1",
+  "paths": [
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 4840,
+      "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 23320,
+      "sha256": "e4acee9f6eee1d0592c83fee5aef4c9351ea9396c03420c2219e3efe7f7eae82"
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "bytes": 11776,
+      "sha256": "7f5322907678b50c24d7ba34ec5b98ee4d20e757e2276de1fb4f3a3df7dfbede"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01"
+    },
+    {
+      "path": "lib/execution-settings.db.test.ts",
+      "bytes": 27767,
+      "sha256": "8afd8fbf484035cdb6582274fa46ae7430f07a71da1e8b8031d852a80d51e7c3"
+    },
+    {
+      "path": "lib/bot-model-menu.db.test.ts",
+      "bytes": 41714,
+      "sha256": "0fbfe04fe1ee11a2399c308cdf98b5d340adfd4944350bea4e5f6cb1bd6c4b49"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 55389,
+      "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3"
+    },
+    {
+      "path": "lib/execution-model-options.db.test.ts",
+      "bytes": 6266,
+      "sha256": "ed778597175e1cfc8f7e57192b3ba8dd25bf2319d261c08f06c71c368e2a3ba8"
+    },
+    {
+      "path": "scripts/server-test.mjs",
+      "bytes": 408,
+      "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5"
+    },
+    {
+      "path": "package.json",
+      "bytes": 77435,
+      "sha256": "a22483a1575eb6a0e47e7c596e8546b5a5f9a1467f0236b39b9233ed29a67b98"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 957400,
+      "sha256": "916b7b20b1da44670882894f628b2a7dfb98fc6bc7ffaee310ec4fa5afe13e62"
+    }
+  ]
+}

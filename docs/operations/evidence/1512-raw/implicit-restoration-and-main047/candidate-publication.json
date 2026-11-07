@@ -1,0 +1,177 @@
+{
+  "version": 2,
+  "issue": 1512,
+  "pr": 1675,
+  "kind": "candidate-publication",
+  "observedAt": "2026-11-07T23:03:55Z",
+  "repository": "alexj11324/Mikka",
+  "branch": "test/1512-native-query-sources-78-20261107",
+  "update": {
+    "expectedSha": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "newSha": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "tree": "07037afc103022459492e0f114cfa4bc9c0060b1",
+    "force": false,
+    "attempts": 1,
+    "connectorSuccess": true,
+    "exactRefReadback": true
+  },
+  "prepush": {
+    "main": "4221d9c06da079321d4fe2803879ba82043d7a1f",
+    "branch": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "prState": "open",
+    "previousPrBodyUnchanged": true
+  },
+  "pullRequest": {
+    "state": "open",
+    "base": "4221d9c06da079321d4fe2803879ba82043d7a1f",
+    "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "mergeable": true,
+    "title": "fix: preserve Native read proofs and restore temporary model defaults",
+    "bodyBytes": 10690,
+    "bodySha256": "194f386c58bc680af45055b26646dbb7e23720f5df71f4105aa493294a2013eb",
+    "titleBodyExactReadback": true,
+    "merged": false
+  },
+  "independentReview": {
+    "path": "evidence/implicit-model-default-final-integration-review.json",
+    "bytes": 15059,
+    "sha256": "df093cae31987060fdba96031ad0e1ee08889c3f3484286e495451b7e647cc2f",
+    "gitBlob": "6bba5658797c5982de3b18da0c86986ed96f6f50",
+    "remoteReadbackExact": true
+  },
+  "syntheticGitObject": {
+    "sha": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+    "tree": "07037afc103022459492e0f114cfa4bc9c0060b1",
+    "parents": [
+      "4221d9c06da079321d4fe2803879ba82043d7a1f",
+      "f3336eec99a9d8439668d516677c5389a95a7326"
+    ],
+    "basis": "Git object plus exact icon-job checkout; Linux, checks and Native execution bindings still require their own evidence."
+  },
+  "workflows": [
+    {
+      "id": 42423295668,
+      "name": "CI",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null
+    },
+    {
+      "id": 42423295654,
+      "name": "Self-hosted image",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 42423295748,
+      "name": "Browser gate",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42423295662,
+      "name": "Desktop shell",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 42423295660,
+      "name": "Device gateway",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 42423295682,
+      "name": "Analytics SSR",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 42423295657,
+      "name": "SSH device backend",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 42423295785,
+      "name": "Read cache API acceptance",
+      "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null
+    }
+  ],
+  "gates": {
+    "fullCi": "pending",
+    "actualNativeStarted": false,
+    "actualNativeResult": null,
+    "productionAcceptance": null,
+    "mainMergeAuthorized": false
+  },
+  "mutations": {
+    "singleBranchFastForward": true,
+    "pullRequestTitleBodyUpdated": true,
+    "manualDispatches": 0,
+    "reruns": 0,
+    "cancellations": 0,
+    "evidenceRefChanges": 0,
+    "mainRefChanges": 0,
+    "resourcesCreated": 0
+  },
+  "privacy": {
+    "containsRawLogs": false,
+    "containsCredentials": false,
+    "containsSignedUrls": false
+  },
+  "publishedObservedAt": "2026-11-07T23:01:33Z",
+  "workflowSnapshotAt": "2026-11-07T23:01:33Z",
+  "descriptionCorrection": {
+    "scope": "One sentence only",
+    "priorMetadataBlob": "2bb60716d526c1ab04ef11c41a859580bcbeb748",
+    "reason": "Earlier isolated deliberate-failure retention and overhead evidence already exists; final production scope remains pending.",
+    "codeOrTestsChanged": false
+  },
+  "actualCheckoutEvidence": [
+    {
+      "jobId": 128556141617,
+      "job": "icon",
+      "source": "decoded immutable job log git log -1 --format=%H",
+      "gitLogCommandObserved": true,
+      "actualCheckoutHashes": [
+        "9de3aeafe3d10ecd9e54f67860e8fde67106cf63"
+      ],
+      "expected": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+      "exactMatch": true,
+      "rawLogRetained": false
+    }
+  ],
+  "desktopProgress": {
+    "observedAt": "2026-11-07T23:03:55Z",
+    "checks": "success",
+    "icon": "success",
+    "linuxSmoke": "building production web backend",
+    "nativeJobCreated": false,
+    "nativeAcceptanceStarted": false
+  }
+}

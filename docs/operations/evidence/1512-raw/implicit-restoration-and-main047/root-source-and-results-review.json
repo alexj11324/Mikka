@@ -1,0 +1,76 @@
+{
+  "reviewedAt": "2026-11-07 22:53:22 UTC",
+  "draftBlobs": {
+    "route": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+    "settings": "4d90d7038808bdf8c119fbf65c416eb94b0152a9",
+    "menu": "aff4957d4e8f07898a9dfba505a5fc439ac0d757",
+    "driver": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+  },
+  "status": "approved_frozen_source_and_original_results",
+  "findings": [
+    "Normal menu reuses the same preference lookup and omits new metadata unless choiceState=1; no new ordinary GET SQL.",
+    "The new optional query argument defaults to the same pool on normal bindingForBot calls; temporary path supplies one transaction client for own connection validation, clone and INSERT IF ABSENT.",
+    "Choice insert conflict rolls back the clone in the same transaction, does not upsert the user's existing preference.",
+    "Restore reauthenticates via existing route; DELETE includes owner/workspace/bot/stored binding/xmin/api null and active bot existence.",
+    "True absence is target; derived fallback/availability is not substituted for explicit row restoration.",
+    "Driver records exact stored binding receipt before selection validation, fails closed without receipt, and existing case loop breaks on incomplete cleanup.",
+    "Known receipt plus uncertain restore response permits one read-only absence confirmation, never a guess-based delete.",
+    "Draft preserves all P scoped quiet guards and the existing explicit chosen model restoration branch."
+  ],
+  "remaining": [
+    "Integrated canonical CI including PostgreSQL17.11 and real Native budgets.",
+    "Actual deployed production temporary selection/restore, browser task and PostHog evidence."
+  ],
+  "finalTestBlobs": {
+    "lib/execution-settings.db.test.ts": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679",
+    "lib/bot-model-menu.db.test.ts": "f3d04df0373b052ec72d64aacb1b945959e07ef6",
+    "scripts/acceptance/run-observability.test.mjs": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+  },
+  "testFindings": [
+    "All old test assertions retained; points fixture moved before first lazy import, required existing hosted-choice migration added only to isolated test schema.",
+    "Real SQL tests assert exact stored receipt, no overwrite, clone rollback, wrong scope/receipt rejection, same-value new xmin, API replacement preservation, and concurrent calls with one winner.",
+    "Route export test exercises normal GET/PUT, opt-in presence, temporary/restore responses, strict payload rejection, auth, origin and bot-scope denial with explicit mocked boundaries.",
+    "Driver adds six cases: server absence preflight, stored binding receipt restoration, preflight race, lost/incomplete initial receipt, same-value revision conflict, and one bounded read after a lost restore response.",
+    "Menu counting proxy measures the explicit pool passed to botModelMenu, not all internal settings.pool calls; equal opt-in preference reads plus unchanged source control flow establish no added ordinary query."
+  ],
+  "originalResults": {
+    "receipt": "068f09f52ec448230376960ed52942dc95b8aad6",
+    "rawPaths": 33,
+    "rawUniqueBlobs": 21,
+    "rawBytes": 73812,
+    "allRootReadbackVerified": true,
+    "runningSevenSourcesMatch": true,
+    "oldDriver": {
+      "pass": 31,
+      "fail": 6,
+      "skip": 0
+    },
+    "newDriver": {
+      "pass": 37,
+      "fail": 0,
+      "skip": 0
+    },
+    "oldDbAndRoute": {
+      "pass": 1,
+      "fail": 3,
+      "skip": 0
+    },
+    "newDbAndRoute": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "lint": {
+      "files": 7,
+      "warnings": 0,
+      "errors": 0
+    },
+    "postgresStopExit": 0,
+    "postgresStatusExit": 3
+  },
+  "reservationAudit": {
+    "path": "lib/bot-model-selection.ts",
+    "gitBlob": "7bdfe390ddb378f267fcf5089c2f5b4600af05fb",
+    "conclusion": "With the explicit stored per-bot binding, botModel returns it without rewriting the choice and bindingForBot returns the existing per-bot binding. These normal reservation calls do not themselves advance choice.xmin. Source evidence only."
+  }
+}

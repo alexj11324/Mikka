@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pr": 1675,
+  "kind": "main047-integrated-candidate-publication",
+  "observedAt": "2026-11-07T23:12:42Z",
+  "repository": "alexj11324/Mikka",
+  "branch": "test/1512-native-query-sources-78-20261107",
+  "update": {
+    "expectedSha": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "newSha": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+    "force": false,
+    "attempts": 1,
+    "exactRefReadback": true
+  },
+  "mergeParents": [
+    "f3336eec99a9d8439668d516677c5389a95a7326",
+    "0479675e188efeac341b207d8616c4d7b9d4ee23"
+  ],
+  "prepushMain": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "pullRequest": {
+    "state": "open",
+    "base": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "mergeable": true,
+    "bodyBytes": 11265,
+    "bodySha256": "72d3a638062929e5e8d2fa8ef3d54dc40c1f318090ed5c5a53f6a3472fc04e7c",
+    "bodyExactReadback": true
+  },
+  "preservation": {
+    "candidateFiles": 17,
+    "candidateAdditions": 638,
+    "candidateDeletions": 50,
+    "allFrozenBlobsExact": true,
+    "upstreamFiles": 75,
+    "allUpstreamBlobsAndStatusesExact": true,
+    "receiptGitBlob": "5a46eef89fea4629b27f08b9de9624ecba2cff5c"
+  },
+  "synthetic": {
+    "sha": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+    "parents": [
+      "0479675e188efeac341b207d8616c4d7b9d4ee23",
+      "fa2830e0576233d8de54f72eec56ec74b4ca95d1"
+    ],
+    "basis": "Git object only; actual checkout and artifacts pending."
+  },
+  "workflows": [
+    {
+      "id": 42424187011,
+      "name": "Self-hosted image",
+      "status": "pending",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424186955,
+      "name": "Analytics SSR",
+      "status": "queued",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424186826,
+      "name": "Read cache API acceptance",
+      "status": "queued",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424187051,
+      "name": "SSH device backend",
+      "status": "queued",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424186946,
+      "name": "Browser gate",
+      "status": "queued",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424186970,
+      "name": "Device gateway",
+      "status": "queued",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424186827,
+      "name": "Desktop shell",
+      "status": "pending",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    },
+    {
+      "id": 42424187095,
+      "name": "CI",
+      "status": "in_progress",
+      "conclusion": null,
+      "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+      "attempt": 1
+    }
+  ],
+  "previousDesktop": {
+    "id": 42423295662,
+    "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "statusAtPublication": "in_progress",
+    "manualCancellationRequests": 0,
+    "knownConcurrency": "desktop-${PRnumber}, cancel-in-progress:true",
+    "finalCancellationAndNativeBoundary": "pending evidence"
+  },
+  "verification": {
+    "upstreamSemanticReview": "in progress by root and daemon",
+    "fullCi": "pending",
+    "nativeBudget": null,
+    "productionAcceptance": null
+  },
+  "mutations": {
+    "branchFastForwardOnly": true,
+    "prBodyUpdated": true,
+    "manualDispatches": 0,
+    "reruns": 0,
+    "mainMerge": false,
+    "evidenceRefChanges": 0,
+    "resourcesCreated": 0
+  },
+  "limits": [
+    "Old f333/9de results remain historical and are not new-source acceptance.",
+    "Upstream 047 modifies worker/template/tracing paths; real release verification remains required.",
+    "No frozen seven-file patch source or tests changed during the main merge."
+  ]
+}

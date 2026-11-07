@@ -1,0 +1,548 @@
+{
+  "version": 1,
+  "kind": "readonly-main-observability-compatibility-review",
+  "observedAt": "2026-11-07 23:11:25 UTC",
+  "repository": "alexj11324/Mikka",
+  "base": "4221d9c06da079321d4fe2803879ba82043d7a1f",
+  "target": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "targetTree": "219a51ff8ae1a0ad70ef448abfb037be0f1f1e16",
+  "pullRequest": 1660,
+  "scope": [
+    "tracing_privacy",
+    "trace_carrier",
+    "claude_generation",
+    "codex_generation_preservation",
+    "anonymous_preparation",
+    "mcp_transport",
+    "shutdown",
+    "worker_hash_release"
+  ],
+  "sourceOnly": true,
+  "executedTests": false,
+  "openedResources": false,
+  "readProductionData": false,
+  "changedRefs": false,
+  "conclusion": {
+    "observed1512Regression": false,
+    "mergeRisk": "medium",
+    "productionAcceptance": false,
+    "alignment": "good",
+    "impact": "large",
+    "verification": "decent",
+    "rollbackCost": "medium",
+    "errorDetection": "decent"
+  },
+  "findings": [
+    {
+      "code": "DB_REGION_METADATA_ONLY",
+      "paths": [
+        "lib/tracing/sanitize.ts",
+        "lib/tracing/tracing.test.ts"
+      ],
+      "facts": [
+        "Caller supplied mikka.db_peer_region is deleted; only actual PostgreSQL host matching the closed Neon us-east-1/us-east-2 grammar produces a regional label.",
+        "Endpoint and account-bearing host remain unexported; node exporter sanitizes the original span once. No sampling or generation fields are removed."
+      ]
+    },
+    {
+      "code": "BOOTSTRAP_CARRIER_PRESERVED",
+      "paths": [
+        "lib/cloud-computer/thread-machines.ts",
+        "packages/daemon/bin/cloud-worker.ts",
+        "packages/daemon/src/cloud-bootstrap.ts"
+      ],
+      "facts": [
+        "bootstrap JSON still contains captureTraceContext({runId}) and daemonTraceSettings before exact-byte SHA256 hints are generated.",
+        "Worker configures daemon tracing then enters withContext(config.traceContext) before optional anonymous Claude startup.",
+        "Initial run and anonymous hints are separately bounded, owned, nofollow, one-use, and bound to the original bootstrap bytes."
+      ]
+    },
+    {
+      "code": "CLAUDE_GENERATION_PATH_PRESERVED",
+      "paths": [
+        "packages/daemon/src/adapters/claude.ts",
+        "packages/daemon/src/anonymous-claude-spare.ts"
+      ],
+      "facts": [
+        "Both ordinary and anonymous SDK configuration retain includePartialMessages:daemonTracer.enabled; immutable adoption compares this value.",
+        "The same ClaudeGenerationMetrics callback captures options.traceContext and observes every consumed SDK message; iterator exceptions still call generations.fail().",
+        "Cache usage, TTFT and per-generation source implementation are outside this main diff and are not replaced by preparation timing."
+      ]
+    },
+    {
+      "code": "DIAGNOSTIC_TIMING_DISTINCT_FROM_AI",
+      "paths": [
+        "packages/daemon/src/official-cli-timing.ts",
+        "packages/daemon/src/tracing.ts",
+        "scripts/acceptance/cloud-startup.mjs"
+      ],
+      "facts": [
+        "bootstrap_claude_start keeps the original earlier timestamp and adds closed claimAuthentication/observedAuthSource fields.",
+        "Unclaimed candidate close uses publish:false; fresh matching claim can transfer the collector once.",
+        "CLOUD_STARTUP_TIMING controls persisted diagnostic collection, not normal OTel or generation instrumentation.",
+        "cloud-startup acceptance parses the new timing source and rejects unknown authentication provenance; an anonymous prewarm alone is not a completed model acceptance."
+      ]
+    },
+    {
+      "code": "MCP_SHARED_BACKEND_PRESERVES_BUSINESS_PATH",
+      "paths": [
+        "packages/daemon/src/agents/mikka-mcp.mjs",
+        "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+        "packages/daemon/src/agents/mikka-mcp-bridge.ts",
+        "packages/daemon/src/agents/mikka-mcp-worker.mjs",
+        "packages/daemon/src/agents/run-context.ts"
+      ],
+      "facts": [
+        "The existing handlers and closed MCP HTTP observer move to a shared backend used by stdio and the late-bound SDK worker.",
+        "Decision URL/token/catalogue/observation URL move through the private bound context; new worker stdout/stderr are ignored, no credentials are printed.",
+        "Bridge admission checks current local authority and one-use context binding; backend aborts held HTTP and drains accepted work.",
+        "No new W3C headers or automatic tracing SDK import are added to the MCP helper; the old decision transport also did not set those headers. No new regression is established from that absence."
+      ]
+    },
+    {
+      "code": "CODEX_AND_EXPORT_DRAIN_PRESERVED",
+      "paths": [
+        "packages/daemon/src/adapters/codex.ts",
+        "packages/daemon/src/subscription-hosted-runner.ts",
+        "packages/daemon/src/tracing.ts",
+        "packages/daemon/src/main.ts"
+      ],
+      "facts": [
+        "Codex adapter and native generation/collection/sampling modules have no change in this commit diff.",
+        "Hosted Codex still receives cliTiming before its final native trace receiver settings; Claude-only timing injection is preserved.",
+        "Daemon stop awaits candidate close before outbox and daemonTracer.shutdown; generation drain, flush/shutdown and retaining sampler bodies remain unchanged."
+      ]
+    },
+    {
+      "code": "REGISTRATION_NOTICE_IS_NOT_AUTHORITY",
+      "paths": [
+        "lib/computer/registration-command.ts",
+        "lib/cloud-computer/thread-registration.ts",
+        "lib/cloud-computer/thread-machines.ts",
+        "packages/daemon/src/cloud-registration.ts"
+      ],
+      "facts": [
+        "New release capability binds to the actual worker digest; readiness file includes only device/workspace IDs and credential hash.",
+        "Server finish still holds run then machine locks and checks current token, lease and stop marker in a subsequent SQL statement.",
+        "Legacy workers retain the old polling fallback only when the declared capability is absent; new path does not replace the fresh claim.",
+        "Registration interval can fall in start_worker when transport coalesces stdout; no interval is moved outside parent timing."
+      ]
+    },
+    {
+      "code": "NORMAL_E2B_REBUILD_REQUIRED",
+      "paths": [
+        "scripts/e2b/build-template.py",
+        "packages/daemon/scripts/build-cloud-worker.mjs",
+        "packages/daemon/scripts/build.mjs",
+        "packages/daemon/scripts/official-e2b-instance-bootstrap.sh"
+      ],
+      "facts": [
+        "Worker/recipe hash includes changed daemon and protocol source and build helpers. This main is not a test-script-only no-op hash change.",
+        "Both build outputs copy new standalone MCP backend/worker assets; cloud builder emits a capability only with a validated actual worker digest.",
+        "Bootstrap passes the worker digest, not a different source-commit identifier. Existing conservation/model receipt and independent subscription release gates remain required.",
+        "No actual worker hash or build was executed during this review."
+      ]
+    },
+    {
+      "code": "LOG_FORWARDING_AND_REGION_CHANGE_LIMITS",
+      "paths": [
+        "lib/cloud-computer/thread-machines.ts",
+        ".github/workflows/web-deploy.yml"
+      ],
+      "facts": [
+        "Fallback worker stdout forwarding is replaced by detached start and retained tee log/tail capture on registration failure. It does not replace or disable daemon OTLP export.",
+        "Web deploy now explicitly requests cle1. Earlier deployment-latency/region observations are not new-source performance proof."
+      ]
+    }
+  ],
+  "verificationNeeded": {
+    "daemon": [
+      "test/anonymous-claude-spare.test.ts",
+      "test/mikka-mcp-backend.test.ts",
+      "test/mikka-mcp-bridge.test.ts",
+      "test/hosted-cli-prefetch-lifecycle.test.ts",
+      "test/cloud-model-probe-bundle.test.ts",
+      "test/cloud-anonymous-hint.test.ts",
+      "test/cloud-registration.test.ts",
+      "existing tracing/generation/drain tests"
+    ],
+    "web": [
+      "lib/tracing/tracing.test.ts",
+      "lib/computer/claude-startup-hint.test.ts",
+      "lib/computer/registration-command.test.ts",
+      "lib/cloud-computer/thread-registration.db.test.ts",
+      "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "scripts/acceptance/cloud-startup.test.mjs"
+    ],
+    "release": "Normal immutable E2B conservation/model/subscription gates and fresh exact-source #1512 generation evidence; do not force/rebuild or reuse f333 CI as 047 proof."
+  },
+  "limitations": [
+    "Static source review only; no model, VM, provider, production database or new test execution.",
+    "New anonymous path is not covered by f333 CI, whose actual source is 9de3aeaf with 4221 base.",
+    "Full PR1660 dispatch/allowance authorization review and merge conflict resolution remain root-owned."
+  ],
+  "sourceReads": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 20245,
+      "sha256": "5c6ed942c827a66f50a2aa847536efecbb67ba80f8e2e9d476847854ea531b3c",
+      "gitBlob": "245281562212902f5042649bd41d2a3573121824"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 11196,
+      "sha256": "dcbce6870a2ea421f6b05cc3c674547763c12aed2949de504bcc62ee0fa34f17",
+      "gitBlob": "0c3d42264778526b0caaad32a63a91f2054368e8"
+    },
+    {
+      "path": ".claude/skills/merge-risk/SKILL.md",
+      "bytes": 2862,
+      "sha256": "1a11fcb7503eeb92a901755c0f729216cfdb8674a4ac2b0890e019d594e1ae17",
+      "gitBlob": "c8a545a237d7be29c0302d4aba3f1a8b7cfe9851"
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "bytes": 6160,
+      "sha256": "39093ea5a24982773e7292f2d75fbc1dc3411787f37cf4a4957088e4285bef03",
+      "gitBlob": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "bytes": 7106,
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "gitBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c"
+    },
+    {
+      "path": "lib/tracing/spans.ts",
+      "bytes": 9992,
+      "sha256": "7e11a7c2ce659d4722206e89d5339ed2588e35ccebb15b68ce0e2870ea2bd04e",
+      "gitBlob": "9822a772a135fa77f4f4bb604cf40b17f7635a96"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "bytes": 101349,
+      "sha256": "b14e2f382a8e6b662db65ff517d76a4b1e546166dfcceb4c00579258ae2b651d",
+      "gitBlob": "ad4d4dc0d83924b37939ebd17c098fcc1ced3703"
+    },
+    {
+      "path": "lib/computer/claude-startup-hint.ts",
+      "bytes": 3058,
+      "sha256": "b70699e3309176f0984713e44591c9c7bc4ea44cc107807cec4f3cb40aedfadc",
+      "gitBlob": "3500d39ea2966a810f61fa264ec965582718be18"
+    },
+    {
+      "path": "packages/protocol/src/claude-startup.ts",
+      "bytes": 1151,
+      "sha256": "d2bc4b2c80b0ef48567f199ba50cb60c56a6b8b0505ab14574d0c503298e72fc",
+      "gitBlob": "938d6bb85c861ed102a5d0d0ff74180510e494bb"
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "bytes": 27152,
+      "sha256": "98bd16f0b3c0d6f91e10134c266b646f9fd670732a5441530c5e849c2d32282f",
+      "gitBlob": "22bb17d133ec07305228881e9152fa6d2b649268"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "bytes": 51003,
+      "sha256": "1f6daa18d9038920b1d7e12841f16aca14e0f31b7a8e729418fb2c6f0394dd8d",
+      "gitBlob": "915fc448b32a1760f17d90b78d208026bfc5c03f"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "bytes": 50045,
+      "sha256": "eb2160a0da70ee718b78839fb8b8dd7f42c69fb7fd697c0b25c1cb66cd99e9da",
+      "gitBlob": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-claude-spare.ts",
+      "bytes": 14909,
+      "sha256": "bf2f8651fe7efe19587e4e26b13d2881b3d8df836c145fd420a5775ca8a9ccc3",
+      "gitBlob": "987910f3facb23aca3e95d7418a5d675268e22c9"
+    },
+    {
+      "path": "packages/daemon/src/cloud-bootstrap.ts",
+      "bytes": 8771,
+      "sha256": "263213b106cc5053b9dbf1fbc03570bce3ca18618419e7a007de3c8220f1e9ac",
+      "gitBlob": "c77d76b3856dd02c1e94eee6c65b917bb4f2ba5d"
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "bytes": 25326,
+      "sha256": "94aaa16ae1dbc1a7deb7a42eec7e9be51ff132a4fcb89e9a13a7451cfaa7568f",
+      "gitBlob": "079f163b295f488dee3c00df6139cc25f4f67dc9"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "bytes": 50016,
+      "sha256": "3b01a5f08352fda26f00379d814fdc66f0cb6e27ced78851a948606b568b84e5",
+      "gitBlob": "396e31084823ff0629cdbe930187741ae3f211ec"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-worker.mjs",
+      "bytes": 1753,
+      "sha256": "4062acb492715b5a3b603a58290c1479b23fc0f0bbc8dece7cd0b95a075c9eb5",
+      "gitBlob": "2ec93fd50826074d8b2ce049fc5f9cb191b75509"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-bridge.ts",
+      "bytes": 4777,
+      "sha256": "d9306f88f52e48f13bca81fbc32c7f4b99ce71fa01e8a9bec5bd47c80339a795",
+      "gitBlob": "c10d98d47f482b5b0c0dec2eef1fb370a686457e"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "bytes": 11656,
+      "sha256": "c3b071a59d67a72f2a08ea41906f9143a58b8c738fb4d3ca520ab18902188751",
+      "gitBlob": "47c91267b6df92fa36e3c7d61cc121a1e64cfb7c"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "bytes": 52122,
+      "sha256": "506a779375e088a62b3a795862228f9e606443e09d468efd4a2047c8e1c72dae",
+      "gitBlob": "9364dae974bb74ec636e87795670a8cd4d30b415"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-claude-spare.test.ts",
+      "bytes": 22579,
+      "sha256": "45c88900562410f3ace6f00682688831d5bbefb9dce66a1acd292383f48e32d8",
+      "gitBlob": "7a29affd7acc3bb9a805176e38f790c3ba06ed2e"
+    },
+    {
+      "path": "packages/daemon/test/mikka-mcp-backend.test.ts",
+      "bytes": 17484,
+      "sha256": "02884d08ac30b56a16b53c264d9136726de29071f9a4dd9b3aa3d428909f0c89",
+      "gitBlob": "b290001cdb08ce9064902cb6f0b858fd8c477565"
+    },
+    {
+      "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+      "bytes": 6262,
+      "sha256": "44fb682fa7711a1bc66a3515629e348b8a47c0a3d1502b73007a31204cd9eeb5",
+      "gitBlob": "745b9ba1b105bccd641dea6a1cd2fbf23a4a9bd2"
+    },
+    {
+      "path": "packages/daemon/test/hosted-cli-prefetch-lifecycle.test.ts",
+      "bytes": 6495,
+      "sha256": "085c2a554d11f024520584355a1b961d46d9b59ed8a488a7f692d3f9aaa1391f",
+      "gitBlob": "0fcc3f1e4c46393c206fb398dc2002d24d8bf00c"
+    },
+    {
+      "path": "packages/daemon/test/cloud-model-probe-bundle.test.ts",
+      "bytes": 8567,
+      "sha256": "49258fa40a6cffd7e8da03ef14637bccbdcd39818e392a095d836b8822bf0074",
+      "gitBlob": "3bace312b668a27bf7216a32b7ed1bb94612cada"
+    }
+  ],
+  "patchReads": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "gitBlob": "bc616fd637697b599f05e92b2f5efdf03e193826",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "gitBlob": "ad4d4dc0d83924b37939ebd17c098fcc1ced3703",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/computer/claude-startup-hint.test.ts",
+      "gitBlob": "dcc2ec9ee5da706c0da97fb3daa398abd4291f97",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/computer/claude-startup-hint.ts",
+      "gitBlob": "3500d39ea2966a810f61fa264ec965582718be18",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/computer/registration-command.test.ts",
+      "gitBlob": "6e357e4e670fc8a8da3cd803feb94e0d01fc24ee",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/computer/registration-command.ts",
+      "gitBlob": "470c9efaaf0a75ba5901a69b26a1bf45e16d6557",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/computer/startup-diagnostics.ts",
+      "gitBlob": "6f9f35c2d6e8049b7f4be09539866ac72e1545d2",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "gitBlob": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+      "patchAvailable": true
+    },
+    {
+      "path": "lib/tracing/tracing.test.ts",
+      "gitBlob": "93c3cea0be24210c66b5f0de6a96f4c2cf1fa9f3",
+      "patchAvailable": true
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "277d2f0d3e79789011564f0ed2d4f8616f3ca159",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "gitBlob": "d28096723689e17950e7ea6ef3db68959aeea0db",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/scripts/build-cloud-worker.mjs",
+      "gitBlob": "6dc8626dd43b720d23522f86716a986a9785827b",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/scripts/build.mjs",
+      "gitBlob": "d6a7ab1305c02de931a0849d4ff8595c7b3a1a9f",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "gitBlob": "47c91267b6df92fa36e3c7d61cc121a1e64cfb7c",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "gitBlob": "915fc448b32a1760f17d90b78d208026bfc5c03f",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/machine-github.ts",
+      "gitBlob": "7fcfe13605e9eb2d3d4d272781f54a983186c31a",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+      "gitBlob": "ac701fb183d21de2097b612bea92ace25eeca2e4",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "gitBlob": "396e31084823ff0629cdbe930187741ae3f211ec",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-bridge.ts",
+      "gitBlob": "c10d98d47f482b5b0c0dec2eef1fb370a686457e",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-worker.mjs",
+      "gitBlob": "2ec93fd50826074d8b2ce049fc5f9cb191b75509",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+      "gitBlob": "ce72e79a933115267294eb72beb8ce20a3b5ad31",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "gitBlob": "093409ce0aceb8f67dc3506e597e3cf1fa3718b1",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/anonymous-claude-spare.ts",
+      "gitBlob": "987910f3facb23aca3e95d7418a5d675268e22c9",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/cli.ts",
+      "gitBlob": "74c2edaa2223374eae190623152319dcec224f32",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/cloud-bootstrap.ts",
+      "gitBlob": "c77d76b3856dd02c1e94eee6c65b917bb4f2ba5d",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/cloud-registration.ts",
+      "gitBlob": "b4870fb638b6acbcb73596c764137b8980417756",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "gitBlob": "1e2af614dff4bca2cbdf84f67ba3d2aa864cb4d7",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/official-cli-timing.ts",
+      "gitBlob": "8a48352489f3455e0c8b74a532b7adbb09f5c835",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "gitBlob": "079f163b295f488dee3c00df6139cc25f4f67dc9",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "gitBlob": "faab2aa258b39858a3b76c311b80996913daf9eb",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "gitBlob": "22bb17d133ec07305228881e9152fa6d2b649268",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/anonymous-claude-spare.test.ts",
+      "gitBlob": "7a29affd7acc3bb9a805176e38f790c3ba06ed2e",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/cloud-anonymous-hint.test.ts",
+      "gitBlob": "0c873d733c6b426dc0b15689dfc59c2074f248d1",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/cloud-model-probe-bundle.test.ts",
+      "gitBlob": "3bace312b668a27bf7216a32b7ed1bb94612cada",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/cloud-registration.test.ts",
+      "gitBlob": "00f80b2471ba461baa12e52c8b40424ff401ef57",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/hosted-cli-prefetch-lifecycle.test.ts",
+      "gitBlob": "0fcc3f1e4c46393c206fb398dc2002d24d8bf00c",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/mikka-mcp-backend.test.ts",
+      "gitBlob": "b290001cdb08ce9064902cb6f0b858fd8c477565",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+      "gitBlob": "745b9ba1b105bccd641dea6a1cd2fbf23a4a9bd2",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "gitBlob": "06d014b910307c85bb21e61ae40b53a6214ebf9c",
+      "patchAvailable": true
+    },
+    {
+      "path": "packages/protocol/src/claude-startup.ts",
+      "gitBlob": "938d6bb85c861ed102a5d0d0ff74180510e494bb",
+      "patchAvailable": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "gitBlob": "63837298b78dfc023e49cd2916cdf696500be157",
+      "patchAvailable": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "gitBlob": "acc9fab6eff1d1b50180df8be96003b67c5aa394",
+      "patchAvailable": true
+    }
+  ]
+}

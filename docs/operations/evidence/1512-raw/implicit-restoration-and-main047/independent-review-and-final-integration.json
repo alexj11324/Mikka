@@ -1,0 +1,406 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "pullRequest": 1675,
+  "kind": "independent-implicit-default-review-and-final-integration-preparation",
+  "observedAt": "2026-11-07T22:58:13Z",
+  "status": "review_passed_candidate_prepared_unreferenced",
+  "repository": "alexj11324/Mikka",
+  "branch": "test/1512-native-query-sources-78-20261107",
+  "implementationReceipt": {
+    "gitBlob": "068f09f52ec448230376960ed52942dc95b8aad6",
+    "bytes": 22378,
+    "sha256": "bae8b0d1e58a8f3413dbb9357c14bf338928b070ebd13a6574edc412ef60d67d"
+  },
+  "integration": {
+    "head": "f3336eec99a9d8439668d516677c5389a95a7326",
+    "tree": "07037afc103022459492e0f114cfa4bc9c0060b1",
+    "merge": {
+      "head": "d58d5aa19c11d28c6d1e9e0378e54f5e29e0a7b0",
+      "tree": "cd807ca1a0f14ea6a47c460813e631f70f4d2638",
+      "parents": [
+        "5df3fc316c87cd282e182d0c3f54592bfc586885",
+        "4221d9c06da079321d4fe2803879ba82043d7a1f"
+      ]
+    },
+    "diffs": {
+      "mergeVsR": {
+        "files": 3,
+        "additions": 26,
+        "deletions": 5,
+        "allBlobsExact": true
+      },
+      "mergeVsMain": {
+        "files": 12,
+        "additions": 314,
+        "deletions": 26,
+        "allBlobsExact": true
+      },
+      "finalVsMerge": {
+        "files": 7,
+        "additions": 325,
+        "deletions": 25,
+        "allBlobsExact": true
+      },
+      "finalVsMain": {
+        "files": 17,
+        "additions": 638,
+        "deletions": 50,
+        "allBlobsExact": true
+      }
+    },
+    "candidateFiles": [
+      {
+        "path": "app/api/mobile/model/route.ts",
+        "gitBlob": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c"
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99"
+      },
+      {
+        "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+      },
+      {
+        "path": "lib/bot-model-menu.db.test.ts",
+        "gitBlob": "f3d04df0373b052ec72d64aacb1b945959e07ef6"
+      },
+      {
+        "path": "lib/bot-model-menu.ts",
+        "gitBlob": "aff4957d4e8f07898a9dfba505a5fc439ac0d757"
+      },
+      {
+        "path": "lib/execution-settings.db.test.ts",
+        "gitBlob": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679"
+      },
+      {
+        "path": "lib/execution-settings.ts",
+        "gitBlob": "4d90d7038808bdf8c119fbf65c416eb94b0152a9"
+      },
+      {
+        "path": "lib/live/list-read.ts",
+        "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969"
+      },
+      {
+        "path": "lib/preferences.ts",
+        "gitBlob": "0a01960901e60bd66cf86e1a6733e2dc0e953c15"
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420"
+      },
+      {
+        "path": "tests/desktop-session-cache.db.test.ts",
+        "gitBlob": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f"
+      },
+      {
+        "path": "tests/settings-preferences.db.test.ts",
+        "gitBlob": "3b54cf58a62eccae2517426e87a52e40336f9f00"
+      }
+    ],
+    "all15UpstreamPathsPreserved": true,
+    "remoteExpectedSha": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "currentMain": "4221d9c06da079321d4fe2803879ba82043d7a1f",
+    "refsUpdated": false
+  },
+  "ancestry": {
+    "P": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "Q": "3405f86dc2843b0e482258c117591a2e059de641",
+    "R": "5df3fc316c87cd282e182d0c3f54592bfc586885",
+    "merge": {
+      "head": "d58d5aa19c11d28c6d1e9e0378e54f5e29e0a7b0",
+      "parents": [
+        "5df3fc316c87cd282e182d0c3f54592bfc586885",
+        "4221d9c06da079321d4fe2803879ba82043d7a1f"
+      ]
+    }
+  },
+  "sourceReview": {
+    "findings": "No blocking defect found in the frozen seven files.",
+    "frozenSources": [
+      {
+        "path": "app/api/mobile/model/route.ts",
+        "bytes": 4840,
+        "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+        "gitBlob": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+      },
+      {
+        "path": "lib/execution-settings.ts",
+        "bytes": 23320,
+        "sha256": "e4acee9f6eee1d0592c83fee5aef4c9351ea9396c03420c2219e3efe7f7eae82",
+        "gitBlob": "4d90d7038808bdf8c119fbf65c416eb94b0152a9"
+      },
+      {
+        "path": "lib/bot-model-menu.ts",
+        "bytes": 11776,
+        "sha256": "7f5322907678b50c24d7ba34ec5b98ee4d20e757e2276de1fb4f3a3df7dfbede",
+        "gitBlob": "aff4957d4e8f07898a9dfba505a5fc439ac0d757"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 59415,
+        "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+        "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+      },
+      {
+        "path": "lib/execution-settings.db.test.ts",
+        "bytes": 27767,
+        "sha256": "8afd8fbf484035cdb6582274fa46ae7430f07a71da1e8b8031d852a80d51e7c3",
+        "gitBlob": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679"
+      },
+      {
+        "path": "lib/bot-model-menu.db.test.ts",
+        "bytes": 41714,
+        "sha256": "0fbfe04fe1ee11a2399c308cdf98b5d340adfd4944350bea4e5f6cb1bd6c4b49",
+        "gitBlob": "f3d04df0373b052ec72d64aacb1b945959e07ef6"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 55389,
+        "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3",
+        "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+      }
+    ],
+    "runningSourceHashesMatchFrozen": true,
+    "ordinaryModelReadAndWrite": "Opt-in absence projection reuses the existing preference read. Ordinary GET shape and ordinary PUT branch retain their existing calls and authentication/CSRF/scope checks.",
+    "temporarySelection": "Owner-only connected subscription binding is cloned if necessary within the same transaction as INSERT-if-absent. Conflict rolls back the clone and preserves the existing choice.",
+    "restoration": "Deletion requires exact authenticated owner/workspace/bot, stored binding and PostgreSQL xmin, API-key fields null and an active matching bot. Concurrent same-value rewrite or API-key replacement survives.",
+    "lostResponses": "A missing first receipt yields incomplete cleanup with no guessed deletion. A lost restoration response permits one absence observation and no repeated DELETE.",
+    "unchangedFences": {
+      "quiet": true,
+      "ownerIdle": true,
+      "settledTask": true,
+      "ownedSourcePreflight": true,
+      "outerLoopStopsOnIncompleteCleanup": true
+    },
+    "normalReservation": {
+      "basis": "source only",
+      "referenceBlob": "7bdfe390ddb378f267fcf5089c2f5b4600af05fb",
+      "existingChoiceDoesNotRewriteXmin": true
+    },
+    "testFixtureAdjustments": "The pre-existing points mock moves before first menu import; the new route test resets completed DB-fixture mocks. Original assertions remain.",
+    "workspaceNameMerge": "The three upstream workspace-name files are preserved exactly; no overlap with candidate paths."
+  },
+  "rawReview": {
+    "reviewerReranTests": false,
+    "finalOldSource": {
+      "driver": {
+        "pass": 31,
+        "fail": 6,
+        "skip": 0,
+        "exit": 1
+      },
+      "databaseAndRoute": {
+        "pass": 1,
+        "fail": 3,
+        "skip": 0,
+        "exit": 1
+      }
+    },
+    "finalNewSource": {
+      "driver": {
+        "pass": 37,
+        "fail": 0,
+        "skip": 0,
+        "exit": 0
+      },
+      "databaseAndRoute": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "exit": 0
+      },
+      "lint": {
+        "files": 7,
+        "warnings": 0,
+        "errors": 0,
+        "exit": 0
+      }
+    },
+    "rawArtifacts": [
+      {
+        "path": "raw/red-driver-fixed-fixtures.tap",
+        "bytes": 16564,
+        "sha256": "650817ef393dbc2f433071482465643daeba376560aa5a46b705bd39118d8905",
+        "gitBlob": "478a030e31027a16934cdd9a1dbed4af3360afc3"
+      },
+      {
+        "path": "raw/red-driver-fixed-fixtures.exit",
+        "bytes": 2,
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+      },
+      {
+        "path": "raw/green-driver-final.tap",
+        "bytes": 9574,
+        "sha256": "38169f7c276fbc084ca361e92f965c1920b0dbb990efdd7fa0151a8b8259da04",
+        "gitBlob": "85f07cf0f5b90441dafb9036008899f960b1d1cf"
+      },
+      {
+        "path": "raw/green-driver-final.exit",
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+      },
+      {
+        "path": "raw/red-db-fixed-fixtures.tap",
+        "bytes": 3760,
+        "sha256": "c65de6b33adcd802d90f322d105813b7301f26e494a68785985b5322b71c27e5",
+        "gitBlob": "cdbd9ec51f1e9075ecda3b80b61d329957657474"
+      },
+      {
+        "path": "raw/red-db-fixed-fixtures.exit",
+        "bytes": 2,
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d"
+      },
+      {
+        "path": "raw/green-db-corrected.tap",
+        "bytes": 1856,
+        "sha256": "fd2be3780e16d301a6e43508a8e4d3c96c327347e9a1e3e8e57e94f41bf2a76a",
+        "gitBlob": "af3620a1073780de9bfabc84306629935e88253d"
+      },
+      {
+        "path": "raw/green-db-corrected.exit",
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+      },
+      {
+        "path": "raw/lint-corrected.log",
+        "bytes": 89,
+        "sha256": "a1a7fca8c63a78a3d7f646a3a5f35e0bcb56cd23e64ad3e5a530006fe9e616e7",
+        "gitBlob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f"
+      },
+      {
+        "path": "raw/lint-corrected.exit",
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+      },
+      {
+        "path": "raw/actual-source-hashes.json",
+        "bytes": 1844,
+        "sha256": "7095a3696125d75865e049b9a263cccf5d5357344a869dcaa69649e3c5fe7c9e",
+        "gitBlob": "9594d1ff6a1bad23306e5e118a58f8a79fa6d669"
+      },
+      {
+        "path": "raw/pg-version.txt",
+        "bytes": 128,
+        "sha256": "29c518785673b6dfff5f6ffc7d29f4ff650dade6e30cdf9a238ece4698dc6503",
+        "gitBlob": "b0f9a0e85e23b2a2cd07774f5b3432b579e00b8d"
+      },
+      {
+        "path": "raw/pg-stop.log",
+        "bytes": 56,
+        "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d",
+        "gitBlob": "bdc448af42aa24144e661f647c52557f2e0d9b3c"
+      },
+      {
+        "path": "raw/pg-stop.exit",
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56"
+      },
+      {
+        "path": "raw/pg-status-after-stop.log",
+        "bytes": 26,
+        "sha256": "e138ccb54fdb08283c6eb21159c53207bbbbf07077246e2804e18d22efe6e250",
+        "gitBlob": "8db096185559dfc929b529f37c3082daa4dab0f8"
+      },
+      {
+        "path": "raw/pg-status-after-stop.exit",
+        "bytes": 2,
+        "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2",
+        "gitBlob": "00750edc07d6415dcc07ae0351e9397b0222b7ba"
+      }
+    ],
+    "resultEvidence": "Final TAPs were independently parsed and rehashed. Exit artifacts with identical content share verified blobs. Final lint, executed-source hashes, PostgreSQL version and stop/status were independently read. Earlier failed setup attempts remain in the implementation index.",
+    "engine": "native PostgreSQL 18.6",
+    "node": "v24.22.1",
+    "limits": [
+      "The menu counter observes only the explicit Pool argument, not every settings-internal query; the opt-in adds no preference read.",
+      "Competing requests used separate real pool clients via Promise.all; exact SQL interleaving was not forced.",
+      "Lost-first-response fixtures ran one Claude case. The stop before another case is supported by the unchanged production loop, not a dual-case runtime test.",
+      "PostgreSQL 18.6 verification does not replace normal CI PostgreSQL 17.11.",
+      "The corrected desktop-session-cache assertion has not been executed at this new final head.",
+      "No full integrated typecheck, CI, Native budget or production acceptance has run for this candidate.",
+      "No production model selection, inference, browser task or provider resource was invoked."
+    ]
+  },
+  "cleanup": {
+    "reviewerCreatedResources": 0,
+    "implementationPostgres": {
+      "stopExit": 0,
+      "statusExit": 3,
+      "statusText": "no server running"
+    },
+    "implementationSandbox": {
+      "id": "sbx_K6yau7mczMXbpffKVnzCgaAAOJZ4",
+      "status": "stopped",
+      "stoppedAt": 1794091586509,
+      "durationMs": 662633,
+      "networkMode": "deny-all",
+      "routes": [],
+      "basis": "Frozen implementation stop plus independent GET receipt; root also separately confirmed the GET."
+    }
+  },
+  "historicalEvidence": {
+    "previousHeadP": {
+      "status": "failed",
+      "desktopNativeStarted": false,
+      "cause": "stale preferences SQL-count test assertion",
+      "desktopReceiptBlob": "f1b21d68c02ac2e5c0ee6aed09650b94a7477dde",
+      "mainCiReceiptBlob": "89447ee68f1864630c3027ae946f45ddba0ef99a"
+    },
+    "lastMeasuredNative": {
+      "head": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+      "login": {
+        "native": 212,
+        "web": 209,
+        "passed": false
+      },
+      "firstStartupPair": {
+        "bundled": 174,
+        "hosted": 199,
+        "passed": true
+      },
+      "scope": "Historical source only; no result is transferred to the new candidate."
+    },
+    "currentProductionAcceptance": null
+  },
+  "mutations": {
+    "unreferencedGitObjectsOnly": true,
+    "refsUpdated": false,
+    "pullRequestUpdated": false,
+    "workflowTriggered": false,
+    "mainMerged": false
+  },
+  "nextGate": "Root-authorized single expected-SHA fast-forward, then normal CI and fresh actual Native source-bound evidence; main merge requires separate authorization and completion of main writers.",
+  "privacy": {
+    "rawRuntimeLogsIncluded": false,
+    "credentialsIncluded": false,
+    "personalContentIncluded": false
+  }
+}

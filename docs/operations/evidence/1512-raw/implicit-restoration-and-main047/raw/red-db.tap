@@ -1,0 +1,53 @@
+(node:3475) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3475) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run (869.169502ms)
+✖ execution settings: migration replay, CRUD, ordering, owner and workspace boundaries (104.687446ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2962.921615
+
+✖ failing tests:
+
+test at lib/bot-model-menu.db.test.ts:1:880
+✖ bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run (869.169502ms)
+  error: relation "cloud_service_registration" does not exist
+      at /vercel/sandbox/model-restore/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/model-restore/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/model-restore/repo/lib/default-model.ts:16:23)
+      at async botModelMenu (/vercel/sandbox/model-restore/repo/lib/bot-model-menu.ts:91:26)
+      at async TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:91:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 126,
+    severity: 'ERROR',
+    code: '42P01',
+    detail: undefined,
+    hint: undefined,
+    position: '116',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_relation.c',
+    line: '1498',
+    routine: 'parserOpenTable'
+  }
+
+test at lib/execution-settings.db.test.ts:1:610
+✖ execution settings: migration replay, CRUD, ordering, owner and workspace boundaries (104.687446ms)
+  TypeError [Error]: settings.setTemporaryBotModel is not a function
+      at TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/execution-settings.db.test.ts:113:37)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

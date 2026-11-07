@@ -1,0 +1,421 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "raw-evidence-checkpoint",
+  "recordedAt": "2026-11-07 23:17:10 UTC",
+  "priorCheckpoint": "d50353e8bd9cc77bc183a0a1c3d0de4d330ac255",
+  "retainedCandidate": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "currentCandidateBase": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "scope": "Implicit model default restoration; exact local and canonical CI results; source and test review; main047 compatibility review and ordinary integration; historical f333 Native cancellation before execution.",
+  "results": {
+    "implicitLocal": {
+      "postgres": "18.6",
+      "driver": "37/37",
+      "databaseAndRoute": "4/4, zero skip",
+      "oldSourceDriver": "31 pass/6 fail",
+      "oldSourceDatabaseAndRoute": "1 pass/3 fail"
+    },
+    "f333Canonical": {
+      "run": 42423295668,
+      "attempt": 1,
+      "conclusion": "success",
+      "actualCheckout": "9de3aeafe3d10ecd9e54f67860e8fde67106cf63",
+      "base": "4221d9c06da079321d4fe2803879ba82043d7a1f",
+      "jobs": "11 success/1 normal OIDC skip",
+      "postgres": "17.11; 4 shards passed",
+      "driver": "37/37 real CI cases",
+      "native": "not executed; normal same-PR concurrency cancelled macOS ARM64 build before Native step16"
+    },
+    "fa283": {
+      "canonicalCi": 42424187095,
+      "desktop": 42424186827,
+      "status": "in progress; no result inherited from f333",
+      "frozenCandidateFiles": 17
+    },
+    "productionModelAcceptance": "not started",
+    "temporaryValidationResource": "PostgreSQL stopped; sandbox independently confirmed stopped, deny-all, no exposed routes"
+  },
+  "limits": [
+    "All f333 CI results bind only their recorded actual checkout; upstream main047 changes runtime/worker/tracing and requires current integrated CI and actual release validation.",
+    "Main047 source review found no concrete new generation/context regression. A focused follow-up checks the existing Decision MCP propagation boundary; no production completeness is claimed.",
+    "Single-case first-response failure evidence and unchanged-loop source guarantee are separate; no dual-case dynamic test is claimed for that new fixture.",
+    "Menu query counter covers the explicit pool argument; source review establishes unchanged ordinary call flow. Promise.all SQL interleaving was not forced.",
+    "Historical setup and assertion failures remain alongside final passing logs. A filename containing green does not itself indicate success.",
+    "macOS cancellation has no standalone PostgreSQL stop receipt; no Native budget, lease cleanup or production acceptance is inferred."
+  ],
+  "payloadFileCount": 53,
+  "payloadBytes": 501295,
+  "files": [
+    {
+      "path": "basis/lib/bot-model-selection.ts",
+      "bytes": 3335,
+      "sha256": "9fffbe414a4d87c7a0828c034bc95674f45d1a4520e37c242a4a66eb2231a71d",
+      "gitBlob": "7bdfe390ddb378f267fcf5089c2f5b4600af05fb",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "candidate-publication.json",
+      "bytes": 5336,
+      "sha256": "a2acbe880f7b479943807f4fed8970ea93a62c934def05e4f47fd5b9e83f2897",
+      "gitBlob": "50dad651521ef8594ef4a2cba423a427856c48fd",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "f333-canonical-ci-success.json",
+      "bytes": 108124,
+      "sha256": "cbe2e868e2efebcce6596d0b3f0805884ca0d563dc6eb505234f7fcc84592f50",
+      "gitBlob": "e23cf0ec04d0f33858d6c2258f6649b803a1eb52",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "f333-desktop-cancelled-before-native.json",
+      "bytes": 11405,
+      "sha256": "19d77819e6a171aa312d921bc44bfe4de729402b3a9699df3c2c10fdd989dde8",
+      "gitBlob": "a04ded03cc2047c1afec6ba6566566a396cd1964",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "fa283-publication.json",
+      "bytes": 4216,
+      "sha256": "467508cc59708ab04fbe84787c99f926324201a10d06ddd513ab839b054d8f5a",
+      "gitBlob": "5e42ccd745efe71e0ecf195e61913666776752c8",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "independent-review-and-final-integration.json",
+      "bytes": 15059,
+      "sha256": "df093cae31987060fdba96031ad0e1ee08889c3f3484286e495451b7e647cc2f",
+      "gitBlob": "6bba5658797c5982de3b18da0c86986ed96f6f50",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "main047-observability-compatibility-review.json",
+      "bytes": 21607,
+      "sha256": "9fcd868cc9fc381f0be6685176d89fe5c3ee786d26e1b1f5fccc1c3f916d1e37",
+      "gitBlob": "0ab824f894b7220759cb910d318349eedc1ba8a1",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "main047-ordinary-merge-prepared.json",
+      "bytes": 2463,
+      "sha256": "5e64947c4893d514c57a8490413a6c3b96b63a25aeb625a3de4cc74edda38510",
+      "gitBlob": "5a46eef89fea4629b27f08b9de9624ecba2cff5c",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/actual-source-hashes.json",
+      "bytes": 1844,
+      "sha256": "7095a3696125d75865e049b9a263cccf5d5357344a869dcaa69649e3c5fe7c9e",
+      "gitBlob": "9594d1ff6a1bad23306e5e118a58f8a79fa6d669",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/diffcheck.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-db-corrected.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-db-corrected.tap",
+      "bytes": 1856,
+      "sha256": "fd2be3780e16d301a6e43508a8e4d3c96c327347e9a1e3e8e57e94f41bf2a76a",
+      "gitBlob": "af3620a1073780de9bfabc84306629935e88253d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-db-final.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-db-final.tap",
+      "bytes": 3196,
+      "sha256": "a3b0da397fb8efb5b73fc1294c949c8d2d5c8f49d4c8c9c36617292fa855ffbc",
+      "gitBlob": "ab471f815a7b832d5651e3df8b69bbe25a6f4432",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-db.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-db.tap",
+      "bytes": 3092,
+      "sha256": "933ed47fa24a9fcb04fbaaa0447bcae966c62277fe6e359cdc16fd96e58f3acd",
+      "gitBlob": "29f9c01d6bcf7940baed37184da231d2a9fd06ec",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-driver-final.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-driver-final.tap",
+      "bytes": 9574,
+      "sha256": "38169f7c276fbc084ca361e92f965c1920b0dbb990efdd7fa0151a8b8259da04",
+      "gitBlob": "85f07cf0f5b90441dafb9036008899f960b1d1cf",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-driver.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/green-driver.tap",
+      "bytes": 16084,
+      "sha256": "83bae606cb48a68b41cbc1f2cdc9d3fb1182e24849059f73150346f758991c9e",
+      "gitBlob": "61ac833e579fc92defc27416a6cc98923c56da7f",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/lint-corrected.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/lint-corrected.log",
+      "bytes": 89,
+      "sha256": "a1a7fca8c63a78a3d7f646a3a5f35e0bcb56cd23e64ad3e5a530006fe9e616e7",
+      "gitBlob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/lint-final.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/lint-final.log",
+      "bytes": 89,
+      "sha256": "a1a7fca8c63a78a3d7f646a3a5f35e0bcb56cd23e64ad3e5a530006fe9e616e7",
+      "gitBlob": "a9511dca36dfc9c2d8a5c8ebdbe1a7b952da721f",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/lint.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/lint.log",
+      "bytes": 90,
+      "sha256": "77d79c7748786512fd6cdc77d06234aea9a6c32a3816f4cd7b86fc321224c4fd",
+      "gitBlob": "62043353770677027dad6b8322a190246866832a",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/pg-status-after-stop.exit",
+      "bytes": 2,
+      "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2",
+      "gitBlob": "00750edc07d6415dcc07ae0351e9397b0222b7ba",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/pg-status-after-stop.log",
+      "bytes": 26,
+      "sha256": "e138ccb54fdb08283c6eb21159c53207bbbbf07077246e2804e18d22efe6e250",
+      "gitBlob": "8db096185559dfc929b529f37c3082daa4dab0f8",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/pg-stop.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/pg-stop.log",
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d",
+      "gitBlob": "bdc448af42aa24144e661f647c52557f2e0d9b3c",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/pg-version.txt",
+      "bytes": 128,
+      "sha256": "29c518785673b6dfff5f6ffc7d29f4ff650dade6e30cdf9a238ece4698dc6503",
+      "gitBlob": "b0f9a0e85e23b2a2cd07774f5b3432b579e00b8d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-db-cloud.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-db-cloud.tap",
+      "bytes": 3045,
+      "sha256": "6c83dea56c2f08b5b9b6b8279b1f9a4a9f4a4fd0a1add8521d669d86af65e28d",
+      "gitBlob": "8ae90b44fc3f91273b6aeb1ec3db7113a834abd4",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-db-fixed-fixtures.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-db-fixed-fixtures.tap",
+      "bytes": 3760,
+      "sha256": "c65de6b33adcd802d90f322d105813b7301f26e494a68785985b5322b71c27e5",
+      "gitBlob": "cdbd9ec51f1e9075ecda3b80b61d329957657474",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-db.tap",
+      "bytes": 2602,
+      "sha256": "31a5750a146d490c8004c693241f7d6ff678be7262b0dbe7917b950f59111c0f",
+      "gitBlob": "213626c07c4527f049b58a2e76ee9b1aba5edb15",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-driver-fixed-fixtures.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-driver-fixed-fixtures.tap",
+      "bytes": 16564,
+      "sha256": "650817ef393dbc2f433071482465643daeba376560aa5a46b705bd39118d8905",
+      "gitBlob": "478a030e31027a16934cdd9a1dbed4af3360afc3",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-driver.tap",
+      "bytes": 11669,
+      "sha256": "4aaaf7f51d6e1f5fc0d027ac45e6c6822e300e6d8ab60f64809b0076bc8c96d4",
+      "gitBlob": "4b10a8f2fae69b03dd2ee7396e893c30d0096a78",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "raw/red-exits.json",
+      "bytes": 20,
+      "sha256": "9a70a7e3c43062959ca35322a93f9b7f2027e3274ee74e8081bea5c46de89707",
+      "gitBlob": "0b0700d327a675d964bf315eaa8d4ed1ea1cda58",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "root-final-candidate-verification.json",
+      "bytes": 3436,
+      "sha256": "5bdf8d15f39edd811f8441d408a9d0b4a67f4f14c478dde213ba0a5b2bf03a6e",
+      "gitBlob": "31fb04eb88160746767425a4def8082db3f00a5b",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "root-independent-sandbox-get.json",
+      "bytes": 919,
+      "sha256": "e83ee170753bbf316314a35d9b5e0b830c05285da09e786d822d0f974bb46835",
+      "gitBlob": "5e88cdefe221521d8f8f37fc7504e43924f95867",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "root-main047-merge-verification.json",
+      "bytes": 932,
+      "sha256": "e5e834e6f13dbc244c595c5ff6bd6a75846f3a5e82c55ce8eb5ca6405c8b1d40",
+      "gitBlob": "32145233ed012e5b1712949726c20bdbde293888",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "root-source-and-results-review.json",
+      "bytes": 4052,
+      "sha256": "461bdc6f53effb0a980a42a096a9aaf1599b81a5e75e2b39bfa0eb2abb262abe",
+      "gitBlob": "3aafed7befff53ae1dc3ea15f95991a1ea880576",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source-validation-receipt.json",
+      "bytes": 22378,
+      "sha256": "bae8b0d1e58a8f3413dbb9357c14bf338928b070ebd13a6574edc412ef60d67d",
+      "gitBlob": "068f09f52ec448230376960ed52942dc95b8aad6",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/app/api/mobile/model/route.ts",
+      "bytes": 4840,
+      "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "gitBlob": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/lib/bot-model-menu.db.test.ts",
+      "bytes": 41714,
+      "sha256": "0fbfe04fe1ee11a2399c308cdf98b5d340adfd4944350bea4e5f6cb1bd6c4b49",
+      "gitBlob": "f3d04df0373b052ec72d64aacb1b945959e07ef6",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/lib/bot-model-menu.ts",
+      "bytes": 11776,
+      "sha256": "7f5322907678b50c24d7ba34ec5b98ee4d20e757e2276de1fb4f3a3df7dfbede",
+      "gitBlob": "aff4957d4e8f07898a9dfba505a5fc439ac0d757",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/lib/execution-settings.db.test.ts",
+      "bytes": 27767,
+      "sha256": "8afd8fbf484035cdb6582274fa46ae7430f07a71da1e8b8031d852a80d51e7c3",
+      "gitBlob": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/lib/execution-settings.ts",
+      "bytes": 23320,
+      "sha256": "e4acee9f6eee1d0592c83fee5aef4c9351ea9396c03420c2219e3efe7f7eae82",
+      "gitBlob": "4d90d7038808bdf8c119fbf65c416eb94b0152a9",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/scripts/acceptance/run-observability.mjs",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "rootReadbackVerified": true
+    },
+    {
+      "path": "source/scripts/acceptance/run-observability.test.mjs",
+      "bytes": 55389,
+      "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3",
+      "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+      "rootReadbackVerified": true
+    }
+  ]
+}

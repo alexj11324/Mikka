@@ -1,0 +1,87 @@
+TAP version 13
+# (node:3936) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:3936) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run
+not ok 1 - bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run
+  ---
+  duration_ms: 359.816053
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:1:880'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'absent'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'absent'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:110:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: mobile model API keeps normal selection and authenticates every temporary branch
+not ok 2 - mobile model API keeps normal selection and authenticates every temporary branch
+  ---
+  duration_ms: 61.432063
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:11:885'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'absent'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'absent'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/bot-model-menu.db.test.ts:459:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: catalogue reads deduplicate in PostgreSQL, page without losing microseconds, and retain exact saved bindings
+ok 3 - catalogue reads deduplicate in PostgreSQL, page without losing microseconds, and retain exact saved bindings
+  ---
+  duration_ms: 59.350068
+  type: 'test'
+  ...
+# {"beforeRows":393,"afterRows":131,"beforeBytes":198859,"fullOptionBytes":79498,"catalogueBytes":28408,"cataloguePages":2,"maxPageRows":128}
+# (node:3968) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:3968) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: execution settings: migration replay, CRUD, ordering, owner and workspace boundaries
+not ok 4 - execution settings: migration replay, CRUD, ordering, owner and workspace boundaries
+  ---
+  duration_ms: 57.050009
+  type: 'test'
+  location: '/vercel/sandbox/model-restore/repo/lib/execution-settings.db.test.ts:1:610'
+  failureType: 'testCodeFailure'
+  error: 'settings.setTemporaryBotModel is not a function'
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/model-restore/repo/lib/execution-settings.db.test.ts:115:37)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 1
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2344.215216
