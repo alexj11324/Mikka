@@ -21,6 +21,7 @@ permissions:
 concurrency:
   group: production-smoke
   cancel-in-progress: false
+  queue: max
 env:
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
@@ -35,6 +36,7 @@ jobs:
     concurrency:
       group: production-smoke-owner-acceptance
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write
@@ -99,6 +101,7 @@ jobs:
     concurrency:
       group: production-smoke-owner-acceptance
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write
