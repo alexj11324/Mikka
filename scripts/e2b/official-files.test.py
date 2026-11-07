@@ -244,6 +244,60 @@ class OfficialFiles(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
             files.validate_receipt(proof, 'claude')
 
+    def test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization(self):
+        # The d63 Claude fresh scan observed both the existing control-proven
+        # 0644 -> 0777 transition and a new provider CA. Codex already permits
+        # this exact path's per-boot bytes; its mode rule must not be widened.
+        path = '/usr/local/share/ca-certificates/e2b-ca.crt'
+        for kind, mode in [('claude', 0o644), ('desktop', 0o644), ('codex', 0o777)]:
+            with self.subTest(kind=kind):
+                original = {'path': path, 'kind': 'file', 'mode': mode, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
+                baseline = {'version': 1, 'entries': [original]}
+                with patch.object(files, 'entry', return_value=original):
+                    installation = files.verify(baseline)
+                rotated = {**original, 'mode': 0o777, 'sha256': 'b' * 64}
+                with patch.object(files, 'entry', return_value=rotated):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline)
+                    final = files.verify(baseline, kind)
+                self.assertEqual(final['before'], final['after'])
+                self.assertEqual(final['originalBefore'], installation['before'])
+                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                self.assertEqual(len(final['providerChanges']), 1)
+                self.assertEqual(final['providerChanges'][0]['path'], path)
+                self.assertEqual(final['providerChanges'][0]['after']['sha256'], 'b' * 64)
+                proof = {**installation, 'finalization': final}
+                self.assertIs(files.validate_receipt(proof, kind), proof)
+                proof['after'] = final['originalAfter']
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(proof, kind)
+
+    def test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards(self):
+        path = '/usr/local/share/ca-certificates/e2b-ca.crt'
+        original = {'path': path, 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
+        forbidden = [
+            ('uid', {**original, 'uid': 1000}),
+            ('gid', {**original, 'gid': 1000}),
+            ('mode', {**original, 'mode': 0o600}),
+            ('kind', {'path': path, 'kind': 'link', 'mode': 0o777, 'uid': 0, 'gid': 0, 'target': '/opt/mikka/replaced.crt'}),
+            ('invalid_hash', {**original, 'sha256': 'not-a-sha256'}),
+        ]
+        for kind in ('claude', 'desktop', 'codex'):
+            for field, updated in forbidden:
+                with self.subTest(kind=kind, field=field), patch.object(files, 'entry', return_value=updated):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [original]}, kind)
+            for other in ('/usr/local/share/ca-certificates/other-ca.crt', '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude'):
+                before = {**original, 'path': other}
+                with self.subTest(kind=kind, path=other), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [before]}, kind)
+        # Codex's measured policy still allows only byte rotation, not a new
+        # permission transition inferred from the other official templates.
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'codex')
+
     def test_an_unreadable_original_directory_cannot_be_silently_skipped(self):
         with tempfile.TemporaryDirectory() as name:
             with patch.object(files.os, 'scandir', side_effect=PermissionError('fixture unreadable directory')):
