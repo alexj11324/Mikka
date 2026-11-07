@@ -2524,6 +2524,8 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
+      "runs": "Runs",
+      "runsPerDay": "Runs per day",
       "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
