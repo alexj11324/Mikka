@@ -162,3 +162,5 @@ test('frozen-source failure matching projects locations only and never runtime t
 // Lease diagnosis uses the frozen authority function read-only and unchanged heartbeat responses.
 
 // Isolated stop-writer observation retains fixed query kinds/fingerprints only, never SQL or arguments.
+
+// Compare only owner-event provenance booleans; verify enabled Manifest preparation without creating an App.

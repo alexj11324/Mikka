@@ -399,6 +399,21 @@ export async function runCommunity(env = process.env) {
     appEnv.MIKKA_SERVER_ADMIN_USER_IDS = own.id
     await docker(['rm', '-f', '-v', name + '-app']); await startApp()
     for (let i = 0; i < 30; i++) { try { if ((await community.json('/api/version')).build === revision) break } catch {} await new Promise(r => setTimeout(r, 1000)) }
+    try {
+      const status = await community.json('/api/github/manifest')
+      check(status.admin === true && status.configured === false, 'MANIFEST_ADMIN')
+      const prepared = await community.json('/api/github/manifest', post({}))
+      const { GITHUB_APP_MANIFEST_TEMPLATE: template } = await import(pathToFileURL(source + '/lib/github/manifest-template.ts'))
+      const action = new URL(prepared.action)
+      check(action.origin === 'https://github.com' && action.pathname === '/settings/apps/new' && action.searchParams.has('state')
+        && isDeepStrictEqual(prepared.manifest.default_permissions, template.permissions)
+        && isDeepStrictEqual(prepared.manifest.default_events, [...template.events])
+        && prepared.manifest.hook_attributes.url === origin + '/mikka/api/webhooks/github'
+        && prepared.manifest.redirect_url === origin + '/mikka/api/github/manifest/callback'
+        && prepared.manifest.public === false, 'MANIFEST_TEMPLATE')
+      report.githubManifest = { status: 'passed', permissions: Object.keys(template.permissions).length, events: template.events.length,
+        authenticatedOperator: true, ownOriginAndState: true, githubAppEnvironmentProvided: false, appCreated: false }
+    } catch (error) { report.githubManifest = { status: 'failed', code: /^COMMUNITY_[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_MANIFEST_REQUEST' } }
     report.stage = 'normal-cloud-binding'
     await community.json('/api/cloud/connect', post({ action: 'register', name: 'Mikka community release ' + env.GITHUB_RUN_ID })); serverRegistered = true
     const binding = await community.json('/api/cloud/connect', post({ action: 'bind', scopes: ['github'] }))
@@ -624,7 +639,14 @@ export async function runCommunity(env = process.env) {
               attemptStatus: states.includes(value.attemptStatus) ? value.attemptStatus : 'OTHER',
               supersededOwnerRequest: /Superseded by an authenticated owner request/.test(value.attemptReason ?? ''),
               sourceMatches: safeSourceFailures(JSON.stringify(value), signatures) }))
-            row.ownerEventCount = Number((await localPool.query(`SELECT count(*) AS count FROM coordinator_events WHERE "userId"=$1 AND "issueId"=$2 AND kind='user_message'`, [own.id, issueId])).rows[0].count)
+            const events = (await localPool.query(`SELECT id,payload,"createdAt" FROM coordinator_events WHERE "userId"=$1 AND "issueId"=$2 AND kind='user_message' ORDER BY "createdAt",id LIMIT 8`, [own.id, issueId])).rows
+            row.ownerEventCount = events.length
+            const eventSources = ['host_dispatch','thread_continuation','thread_submission','user','mcp','chat']
+            row.ownerEventOrigins = events.map((event, index) => ({ index, source: eventSources.includes(event.payload?.source) ? event.payload.source : 'OTHER',
+              hasOriginEvent: UUID.test(event.payload?.originEventId ?? ''), originIsFirst: event.payload?.originEventId === events[0]?.id,
+              previousIsThisRun: event.payload?.previousRunId === runId,
+              textMatchesFirst: typeof event.payload?.text === 'string' && event.payload.text === events[0]?.payload?.text,
+              sinceFirstMs: new Date(event.createdAt).getTime() - new Date(events[0].createdAt).getTime() }))
           } catch { row.stopWriterUnavailable = true }
           try { row.serverLogSourceFailures = safeSourceFailures(await docker(['logs', '--tail', '150', name + '-app']), signatures) } catch { row.serverLogUnavailable = true }
           try {
