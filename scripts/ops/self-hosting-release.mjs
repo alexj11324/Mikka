@@ -3,13 +3,13 @@ import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: '355c066c451d079dfb11c25793f2bbeb4c2e4691', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: '7b00a7cf40b280e4d46679babf47cd81bcbe7af6', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
 }
 export function reference(path,key) { if(!/^\/[a-zA-Z0-9/_-]+$/.test(path)||!/^\w+$/.test(key))throw Error('REFERENCE_SCOPE');return '${prod.'+path.slice(1).replaceAll('/','.')+'.'+key+'}' }
-export const REQUIRED={BETTER_AUTH_SECRET:'/vercel',MIKKA_DATABASE_URL:'/vercel',GITHUB_APP_ID:'/github',GITHUB_APP_PRIVATE_KEY:'/github',GITHUB_WEBHOOK_SECRET:'/github',GITHUB_CLIENT_ID:'/vercel',GITHUB_CLIENT_SECRET:'/vercel',WORKSPACE_SECRETS_KEY:'/vercel'}
+export const REQUIRED={BETTER_AUTH_SECRET:'/vercel',MIKKA_DATABASE_URL:'/vercel',DATABASE_URL:'/neon',DATABASE_URL_UNPOOLED:'/neon',EXPO_ACCESS_TOKEN:'/platform',GITHUB_APP_ID:'/github',GITHUB_APP_PRIVATE_KEY:'/github',GITHUB_WEBHOOK_SECRET:'/github',GITHUB_CLIENT_ID:'/vercel',GITHUB_CLIENT_SECRET:'/vercel',WORKSPACE_SECRETS_KEY:'/vercel'}
 const OPTIONAL=['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','BETTER_AUTH_OAUTH_PROXY_URL','BETTER_AUTH_OAUTH_PROXY_SECRET','LINEAR_TOKEN_ENCRYPTION_KEY','OPENCODE_API_KEY','ZEROCAT_API_KEY','ZEROCAT_BASE_URL','DECISION_GATEWAY_API_KEY']
 const constants={MIKKA_EDITION:'cloud',MIKKA_CLOUD_URL:'https://app.aspectlylabs.com/mikka/cloud',BETTER_AUTH_URL:'https://app.aspectlylabs.com',MIKKA_BASE_PATH:'/mikka',GITHUB_APP_SLUG:'mikka-github'}
 function demand(v,code){if(!v)throw Error(code)}
@@ -17,7 +17,7 @@ export function secretPlan(rows) {
  demand(Array.isArray(rows)&&rows.length<3000,'SECRET_METADATA_SCHEMA')
  const exists=(p,k)=>rows.some(r=>r.secretPath===p&&r.secretKey===k)
  const plan={...constants}
- for(const [key,path] of Object.entries(REQUIRED)){demand(exists(path,key),'SOURCE_REQUIRED_'+key);plan[key]=reference(path,key)}
+ for(const [key,path] of Object.entries(REQUIRED)){const sourceKey=key==='EXPO_ACCESS_TOKEN'?'EXPO_TOKEN':key;demand(exists(path,sourceKey),'SOURCE_REQUIRED_'+key);plan[key]=reference(path,sourceKey)}
  for(const key of OPTIONAL)if(exists('/vercel',key))plan[key]=reference('/vercel',key)
  const keys=rows.filter(r=>r.secretKey==='MIKKA_CLOUD_DATA_KEY');demand(keys.length<=1,'DATA_KEY_AMBIGUOUS')
  if(keys.length&&keys[0].secretPath!==TARGET.path)plan.MIKKA_CLOUD_DATA_KEY=reference(keys[0].secretPath,'MIKKA_CLOUD_DATA_KEY')
