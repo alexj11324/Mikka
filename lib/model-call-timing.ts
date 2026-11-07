@@ -98,8 +98,8 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
   let usage: unknown
   let finishReason: string | null = null
   let toolCalls = 0
-  let logged = false
   let failed = false
+  let logged = false
   const emit = (interrupted: boolean) => {
     if (logged) return
     logged = true

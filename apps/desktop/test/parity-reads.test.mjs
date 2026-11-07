@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Window } from 'happy-dom'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
 import { observeReads, pageReady } from './parity-page-ready.mjs'
+import { compareImages } from './parity-images.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
 const coordinator = { conversationId: 'coordinator', lastReadMessageId: 'c2', lastReadPosition: 2 }
@@ -233,4 +237,119 @@ test('artifact HTML still requires the rendered iframe document', { timeout: 100
   f.update(() => { f.frame.body.innerHTML = '<h1>Desktop review</h1>' })
   await result
   assert.equal(state.completed, true)
+})
+
+const taskFixture = { issueTitle: 'Review the desktop workspace' }
+const taskMessages = {
+  Workspace: { detail: { createdTask: 'Created the task' } },
+  IssueThreads: { open: 'Open thread {name}', conversation: 'Thread conversation' },
+}
+const taskDescription = 'Review conversations, task details, artifacts and workspace settings in the desktop app.'
+const threadReply = 'The review is complete. Conversations, task details and artifacts are ready.'
+
+// Deferred Locator boundaries exercise the real readiness helper without a
+// browser. The task and its nested thread have the same accessible region name;
+// only the outer region contains #task-title. Their independent reads can finish
+// in any order, without a skeleton for the activity or the task's thread list.
+function taskReadiness(pending) {
+  const waiting = Promise.withResolvers()
+  const wait = key => key === pending ? waiting.promise : Promise.resolve()
+  const text = (value, options) => {
+    assert.equal(options.exact, true)
+    const key = new Map([[taskDescription, 'description'], [taskMessages.Workspace.detail.createdTask, 'activity']]).get(value)
+    assert.ok(key, 'task text must be one of the existing positive readiness markers')
+    return { waitFor: () => wait(key) }
+  }
+  let narrowed = false
+  const task = {
+    _apiName: 'Locator',
+    filter({ has }) {
+      assert.equal(has.selector, '#task-title')
+      narrowed = true
+      return this
+    },
+    async _expect(expression, options) {
+      assert.equal(narrowed, true, 'the nested thread shares this accessible name; select the region containing the task title')
+      assert.equal(expression, 'to.have.attribute.value')
+      assert.equal(options.expressionArg, 'aria-busy')
+      assert.equal(options.expectedText[0].string, 'false')
+      await wait('verified')
+      return { matches: true }
+    },
+    locator(selector) {
+      assert.equal(selector, '#task-title:not([readonly])')
+      return { waitFor: () => wait('editable-title') }
+    },
+    getByText: text,
+    getByRole(role, options) {
+      if (role === 'button') {
+        assert.deepEqual(options, { name: 'Open thread Review the desktop workspace', exact: true, pressed: true })
+        return { waitFor: () => wait('thread-row') }
+      }
+      assert.equal(role, 'list')
+      assert.deepEqual(options, { name: 'Thread conversation', exact: true })
+      return { getByText(value, options) {
+        assert.equal(value, threadReply)
+        assert.deepEqual(options, { exact: true })
+        return { waitFor: () => wait('thread-reply') }
+      } }
+    },
+  }
+  const page = {
+    getByRole(role, options) {
+      assert.equal(role, 'region')
+      assert.deepEqual(options, { name: taskFixture.issueTitle, exact: true })
+      return task
+    },
+    locator: selector => ({ selector }),
+    getByText() { assert.fail('a reply or activity elsewhere on the page must not satisfy task readiness') },
+  }
+  return { page, release: waiting.resolve }
+}
+
+for (const pending of ['verified', 'editable-title', 'description', 'activity', 'thread-row', 'thread-reply']) {
+  test(`task-thread capture waits for ${pending} even when all its other reads are ready`, async t => {
+    const { page, release } = taskReadiness(pending)
+    t.after(release)
+    let completed = false
+    let failure
+    const ready = pageReady(page, 'task-thread', taskFixture, taskMessages).then(() => { completed = true }, error => { failure = error })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.ifError(failure)
+    assert.equal(completed, false, 'mask collection must not begin while an independent read is unrendered')
+    release()
+    await ready
+    assert.ifError(failure)
+    assert.equal(completed, true)
+  })
+}
+
+const whitePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAD0lEQVQImWP4jwYYSBcAAHg8P8HaEZ1pAAAAAElFTkSuQmCC', 'base64')
+const blackPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWNgYGD4j4ZJFQAABloP8TIttywAAAAASUVORK5CYII=', 'base64')
+
+test('identical pixels with different mask geometry still fail and retain both geometries', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-parity-masks-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const before = { bytes: whitePng, masks: [{ kind: 'time', x: 0, y: 0, width: 1, height: 1 }] }
+  const after = { bytes: whitePng, masks: [{ kind: 'time', x: 1, y: 0, width: 1, height: 1 }] }
+  const report = await compareImages(before, after, join(directory, 'diff.png'))
+  assert.equal(report.changedPixels, 0)
+  assert.equal(report.maskGeometryMatches, false)
+  assert.equal(report.passed, false)
+  const retained = JSON.parse(JSON.stringify(report))
+  assert.deepEqual(retained.masks, before.masks)
+  assert.deepEqual(retained.afterMasks, after.masks)
+})
+
+test('matching masks preserve the unchanged strict pixel comparison', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-parity-pixels-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const original = { bytes: whitePng, masks: [] }
+  const same = await compareImages(original, original, join(directory, 'same.png'))
+  assert.equal(same.passed, true)
+  const changed = await compareImages(original, { bytes: blackPng, masks: [] }, join(directory, 'different.png'))
+  assert.equal(changed.maskGeometryMatches, true)
+  assert.equal(changed.changedRatio, 1)
+  assert.equal(changed.maximumRatio, 0.001)
+  assert.equal(changed.passed, false)
 })

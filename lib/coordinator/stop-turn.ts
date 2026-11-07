@@ -7,6 +7,7 @@ import { coordinatorSessions } from '@/lib/db/schema'
 import { coordinatorLeaseActive } from './lease'
 import { coordinatorStopToken } from './stop'
 import { chatView } from './store'
+import { withCoordinatorStopTiming } from './tool-boundary-timing'
 
 /** How long 停止 waits for a turn that is about to start (its message is still in the inbox) to take the chat. */
 const STARTING_MS = 10_000
@@ -29,7 +30,7 @@ export async function stopChatTurn(userId: string, botId: string, deadline = Dat
       const holder = coordinatorLeaseActive(session) ? session?.leaseHolder : null
       if (holder?.startsWith('wrun_')) {
         // The hook is registered before the run takes the lease; a run that just ended has none left.
-        try { await resumeHook(coordinatorStopToken(holder), {}); return true } catch { /* not listening yet, or over */ }
+        try { await withCoordinatorStopTiming(holder, () => resumeHook(coordinatorStopToken(holder), {})); return true } catch { /* not listening yet, or over */ }
       } else if (!holder && !(await chatView(userId, 1, botId)).working) return false
       if (Date.now() >= deadline) return false
       if (listener === undefined) {
