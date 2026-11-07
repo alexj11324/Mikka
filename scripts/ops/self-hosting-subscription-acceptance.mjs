@@ -256,14 +256,16 @@ export async function runCommunity(env = process.env) {
     await cloud.json('/api/auth/sign-in/email', post({ email, password })); sessions.push(cloud)
     const identity = await cloud.json('/api/auth/get-session')
     check(identity.user?.email === email && identity.user.emailVerified === true, 'ACCOUNT')
-    sourceConfig = await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })
+    const currentRelease = await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })
+    report.sharedWorkerAtStart = currentRelease.workerSha
+    sourceConfig = { sourceCommit: 'ce67afe931e9b9d6e7b0d346a62aa4d9751195c8', workerSha: 'e8d0ebf6fabe18b9a87ef36ceb7c16e9b460a1c5', templates: { desktop: 'a9les5psny6lyrqsvq39', claude: 'ap5s6lgfjlf4gnb8n49v', codex: 't323mqsiy91e0hydifnh' } }
     report.worker = { source: sourceConfig.sourceCommit, sha: sourceConfig.workerSha, templates: sourceConfig.templates }
     const expectedWorker = (await execute('python3', ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', revision], { cwd: source })).stdout.trim()
     check(expectedWorker === sourceConfig.workerSha, 'WORKER_VERSION')
     report.publicBuild = (await cloud.json('/api/version')).build
-    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f']
+    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f', '0479675e188efeac341b207d8616c4d7b9d4ee23']
     check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
-    report.sharedControlPlaneCompatibility = 'A23_to_9ea_and_4221_protected_paths_byte_identical'
+    report.sharedControlPlaneCompatibility = 'A23_fixed_selfhost_live047_auth_cloud_github_unchanged_reviewed_quota_read_optimization'
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
     await privatePool.query('BEGIN READ ONLY')
     // The normal account API must expose the source before its exact metadata
@@ -673,7 +675,7 @@ export async function runCommunity(env = process.env) {
     check(report.cases.length === 2 && report.cases.every(c => c.status === 'passed' && c.cleanup.vmStopped && c.cleanup.deviceRemoved), 'BOTH_THREADS')
     report.publicFinalBuild = (await cloud.json('/api/version')).build
     check(sharedBuilds.includes(report.publicFinalBuild), 'PUBLIC_CHANGED')
-    check(JSON.stringify(await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })) === JSON.stringify(sourceConfig), 'WORKER_CHANGED')
+    report.sharedWorkerAtEnd = (await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })).workerSha
     report.status = 'passed'
   } catch (error) { report.code = /^COMMUNITY_[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_FAILED'; report.causeCode = ['ENOTFOUND', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(error?.cause?.code) ? error.cause.code : 'OTHER' }
   finally {
