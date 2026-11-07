@@ -744,7 +744,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
     profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
-    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required'),
+    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
     stages: [], status: 'running', phase: 'build_pin', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')

@@ -24,7 +24,7 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   const text = config.text.replace(/\s+/g, ' ').trim()
   if (text.includes('select distinct on ("agent_runs"."issueId")')) {
     if (!taskRows) return { rows: [] }
-    const base = [ISSUE, RUN, 'Fixture issue', 'Codex', 'running', null]
+    const base = [ISSUE, RUN, 'Fixture issue', 'Codex', 'running', null, null]
     if (text.includes('"latest_task_runs"')) {
       return { rows: [[...base, EXPIRY, ['codex'], ...Object.values(look)],
         [ISSUE.replace(/1$/, '4'), RUN.replace(/2$/, '5'), ...base.slice(2), EXPIRY, ['codex'], null, null, null, null]] }
@@ -37,7 +37,7 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   if (text.startsWith('select min(')) return { rows: [[expiry]] }
   if (text.includes('md5(to_jsonb(thread_list_expiry)::text)')) return { rows: threadRows ? [[RUN, ROW_SIGNATURE]] : [] }
   if (text.includes('"thread_list_expiry"')) return { rows: [[RUN, null, 'Fixture agent', ISSUE, 'Fixture task', 'running',
-    '2099-01-01T00:00:00.000Z', '2099-01-02T00:00:00.000Z', 'Fixture reply', null, null, null, null, null, false, 'codex', null]] }
+    '2099-01-01T00:00:00.000Z', '2099-01-02T00:00:00.000Z', 'Fixture reply', null, null, null, null, null, false, 'codex', null, null]] }
   throw Error('Unexpected fixture query')
 } }
 const database = drizzle(client as unknown as Pool)
@@ -65,6 +65,7 @@ beforeEach(() => {
 test('task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement', async () => {
   const result = await actions.pollTaskRuns()
   assert.deepEqual(result.items.map(item => item.bot), [look, null], 'an unmatched bot is null, not a null-valued object')
+  assert.deepEqual(result.items.map(item => item.failureDetails), [null, null])
   assert.deepEqual(result.items.map(item => item.issueId), [ISSUE, ISSUE.replace(/1$/, '4')])
   assert.equal(queries.length, 1, 'bot looks must not need another main-database read')
   assert.deepEqual(order, ['auth', 'revision', 'query'], 'Live revision is observed before rows')
@@ -112,6 +113,8 @@ test('changed thread rows keep their manifest, owner hash and ordered data read 
   assert.equal(result.snapshot.items?.length, 1)
   assert.equal(result.snapshot.items?.[0].id, RUN)
   assert.equal(result.snapshot.items?.[0].createdAt, '2099-01-01T00:00:00.000Z')
+  assert.equal(result.snapshot.items?.[0].failureDetails, null)
+  assert.equal(result.snapshot.items?.[0].harness, 'codex')
   assert.deepEqual(result.snapshot.positions, [{ id: RUN, version: createHash('sha256').update(`${OWNER}:${ROW_SIGNATURE}`).digest('hex').slice(0, 32) }])
   assert.ok(queries[0].text.includes('string_agg('))
   assert.ok(queries[1].text.includes('md5(to_jsonb(thread_list_expiry)::text)'))
