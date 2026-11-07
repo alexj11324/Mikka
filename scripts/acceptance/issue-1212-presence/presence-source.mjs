@@ -1,5 +1,6 @@
 // Compile the hash-pinned actual core. Only relative import suffixes change.
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -15,6 +16,12 @@ export function preparePresenceSource(sourceRoot) {
     if (createHash('sha256').update(bytes).digest('hex') !== expected) throw new Error('presence_source_mismatch')
     sources.set(path, bytes.toString('utf8'))
   }
+  let identity
+  try { identity = execFileSync('git', ['-C', sourceRoot, 'rev-parse', 'HEAD', 'HEAD^{tree}'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5_000 }).trim().split('\n') }
+  catch { throw Object.assign(new Error('presence_source_head_invalid'), { code: 'presence_source_head_invalid' }) }
+  if (identity[0] !== manifest.sourceBase || identity[1] !== manifest.sourceTree)
+    throw Object.assign(new Error('presence_source_head_mismatch'), { code: 'presence_source_head_mismatch' })
   const device = sources.get('packages/protocol/src/device.ts'), daemon = sources.get('packages/protocol/src/daemon.ts')
   const version = /export const SOURCE_DAEMON_VERSION = '([0-9.]+)'/.exec(device)?.[1]
   const protocolVersion = Number(/export const DAEMON_PROTOCOL_VERSION = (\d+)/.exec(daemon)?.[1])
@@ -30,7 +37,7 @@ export function preparePresenceSource(sourceRoot) {
       const destination = join(directory, path.replace(/\.ts$/, '.mjs'))
       mkdirSync(dirname(destination), { recursive: true }); writeFileSync(destination, transformed)
     }
-    return { directory, sourceBase: manifest.sourceBase, hashes: manifest.hashes,
+    return { directory, sourceBase: manifest.sourceBase, sourceTree: manifest.sourceTree, hashes: manifest.hashes,
       clientPatchSha256: manifest.clientPatchSha256, version, protocolVersion, heartbeatWindowMs,
       close() { rmSync(directory, { recursive: true, force: true }) } }
   } catch (error) { rmSync(directory, { recursive: true, force: true }); throw error }

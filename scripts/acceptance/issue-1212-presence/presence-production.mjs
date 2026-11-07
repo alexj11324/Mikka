@@ -10,6 +10,7 @@ import { normalDeviceRead, openPresenceConsumers, validatePresenceRead } from '.
 import { preparePresenceSource } from './presence-source.mjs'
 import { prepareBaselineSource } from './presence-baseline-source.mjs'
 import { openBaselineConsumers, validateBaselineRead } from './presence-baseline-consumer.mjs'
+import { checkMobilePresenceSetup } from '../issue-1506-mobile-presence/mobile-api-setup.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com', BASE = ORIGIN + '/mikka'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -132,7 +133,7 @@ export async function runPresenceProof({ env = process.env, mode = env.MIKKA_PRE
       check(session.identity.userId === ALEX_OWNER_ID && session.version.build === expectedSha, 'presence_session_identity_invalid')
       report.checks.exactOwnerAndBuild = true
       let credential, issuedCredential = false, credentialExchangeAttempted = false, registrationAttempted = false, tokenBefore, devicesBefore
-      let deviceSocket, consumers, lastSeenAt = null, lastDeviceTicket
+      let deviceSocket, consumers, lastSeenAt = null, lastDeviceTicket, homeTicketCapture
       const tokens = async () => {
         const value = await session.json('/api/device-tokens')
         check(Array.isArray(value?.tokens) && value.tokens.length <= 100 && value.tokens.every(row => UUID.test(row.id)), 'presence_tokens_invalid')
@@ -218,9 +219,28 @@ export async function runPresenceProof({ env = process.env, mode = env.MIKKA_PRE
         const initialDevice = locate(initialRead)
         check(initialDevice.online && Number.isFinite(lastSeenAt), 'presence_initial_online_invalid')
         phase = 'observe'
-        consumers = await openConsumers(session, initialRead, { fixture, source, expectedSha,
+        // Keep one existing home-ticket response in memory. The three normal
+        // consumers still receive their original, unconsumed response bodies.
+        const consumerSession = mode === 'after' ? { ...session, async request(path, init) {
+          const response = await session.request(path, init)
+          if (!homeTicketCapture && response.ok && path === '/api/live/ticket?workspace=' + initialRead.live.workspaceId)
+            homeTicketCapture = response.clone().json().catch(() => null)
+          return response
+        } } : session
+        consumers = await openConsumers(consumerSession, initialRead, { fixture, source, expectedSha,
           gatewayOrigin: lastDeviceTicket.origin, checkpoint: value => { report.live = value; checkpoint(report) } })
-        if (mode === 'after') report.checks.threeExactAcknowledgements = true
+        if (mode === 'after') {
+          report.checks.threeExactAcknowledgements = true
+          phase = 'mobile-api-setup'
+          report.mobileAPISetup = await checkMobilePresenceSetup(session, {
+            expectedSha, sourceRoot, ticket: await homeTicketCapture, initialRead, fixture,
+            gatewayOrigin: lastDeviceTicket.origin, phase: 'setup-before-idle', now,
+          })
+          homeTicketCapture = undefined
+          report.checks.mobileAPISetupPassed = true
+          checkpoint(report)
+          phase = 'observe'
+        }
         else report.checks.threeOldClients = true
         // Let only the existing legacy heartbeat deadline run. This local wait
         // makes no application request; the real core owns any deadline read.
@@ -263,6 +283,7 @@ export async function runPresenceProof({ env = process.env, mode = env.MIKKA_PRE
         report.checks.naturalExpiryPushReadsBounded = true
       } catch (cause) { error(cause) }
       finally {
+        homeTicketCapture = undefined
         phase = 'close-observers'
         if (consumers) {
           try {

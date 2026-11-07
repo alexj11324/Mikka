@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { validateFixtureReceipt, OUTPUT_DIR } from './coordinator-fixtures.mjs'
 import { observeVersion } from './phase1.mjs'
 
-const phases = ['cache', 'cache-live', 'tool', 'group-public', 'group-private']
+const phases = ['cache', 'cache-live', 'ordinary-stop', 'tool', 'group-public', 'group-private']
 const fail = code => { throw new Error(code) }
 export function validateContinuation(value, receipt) {
   const keys = ['schemaVersion', 'enabled', 'phase', 'expectedSha', 'fixtureRunKey', 'workspaceId',
@@ -36,6 +36,7 @@ function loadInputs() {
 async function actualDriver(phase) {
   if (phase === 'cache') return (await import('./coordinator-cache-turns.mjs')).runCacheTurns
   if (phase === 'cache-live') return (await import('./live-cache-turns.mjs')).runLiveCacheTurns
+  if (phase === 'ordinary-stop') return (await import('./coordinator-ordinary-stop.mjs')).runOrdinaryStop
   if (phase === 'tool') return (await import('./coordinator-tool-stop.mjs')).runToolStop
   if (phase === 'group-public' || phase === 'group-private') return (await import('./group-stop.mjs')).runGroupStop
   fail('continuation_invalid')

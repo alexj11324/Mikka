@@ -3,6 +3,7 @@ import test from 'node:test'
 import { DURING_TOOL_DELAY_MS, runToolStop } from './coordinator-tool-stop.mjs'
 import { fakeSession, fixtureReceipt, PRIVATE, SHA } from './fixture-support.mjs'
 import { classifyToolBoundary } from './tool-boundary-evidence.mjs'
+import { stoppedSession } from './stop-fixture-support.mjs'
 
 globalThis.fetch = () => { throw new Error('network_forbidden') }
 
@@ -23,7 +24,7 @@ function withImmediateStream(fixture, terminal) {
 }
 
 test('before-tool sample stops once at the real public frame and still claims no runtime boundary', async () => {
-  const f = fakeSession({ readyBots: true, stream: 'tool' })
+  const f = stoppedSession({ kind: 'tool' })
   const report = await runToolStop({ ...f.options, env: { ...f.options.env, MIKKA_STOP_CASE: 'before_tool' } })
   assert.equal(report.status, 'observed'); assert.equal(f.state.sends, 1); assert.equal(f.state.stops, 1)
   assert.equal(report.sample.plannedDelayMs, 0); assert.equal(report.sample.attempts, 1)
@@ -34,7 +35,7 @@ test('before-tool sample stops once at the real public frame and still claims no
 })
 
 test('during-tool sample uses exactly one fixed 600ms delay, then one normal stop without asserting execute entered', async () => {
-  const f = fakeSession({ readyBots: true, stream: 'tool' })
+  const f = stoppedSession({ kind: 'tool' })
   const report = await runToolStop({ ...f.options, streamTimeoutMs: 2000,
     env: { ...f.options.env, MIKKA_STOP_CASE: 'during_tool' } })
   assert.equal(DURING_TOOL_DELAY_MS, 600); assert.equal(report.sample.plannedDelayMs, 600)
@@ -49,9 +50,10 @@ test('an early tool finish and EOF do not convert a delayed sample into a false 
   const f = fakeSession({ readyBots: true, stream: 'tool' })
   const report = await runToolStop({ ...f.options, streamTimeoutMs: 2000, sessionProvider: withImmediateStream(f, 'done'),
     env: { ...f.options.env, MIKKA_STOP_CASE: 'during_tool' } })
-  assert.equal(report.termination, 'eof'); assert.equal(f.state.stops, 1); assert.equal(f.state.sends, 1)
+  assert.equal(report.status, 'failed'); assert.equal(report.error, 'stream_incomplete'); assert.equal(report.streamEof, true)
+  assert.equal(f.state.stops, 1); assert.equal(f.state.sends, 1); assert.equal(report.sample.delayCancelledByFailure, true)
   assert.equal(report.tools.at(-1).state, 'done'); assert.equal(report.tools.at(-1).afterStopRequest, false)
-  assert.ok(report.metrics.streamClosedMs < report.metrics.stopRequestedMs)
+  assert.ok(report.metrics.streamClosedMs <= report.metrics.stopRequestedMs)
   assert.equal(report.runtimeBoundary.classification, 'unverified'); assert.equal(report.sample.attempts, 1)
 })
 
@@ -68,8 +70,10 @@ test('a stream error cancels the sample timer, stops once immediately for cleanu
 function evidenceFixture(requestedCase = 'during_tool') {
   const receipt = fixtureReceipt(), row = receipt.fixtures[0], run = 'wrun_boundary_production_shape', callRef = 'a'.repeat(12)
   const observation = { applicationSha: SHA, workflowRunId: run, streamId: run + ':0', triggerCallRef: callRef,
-    requestedCase, fixture: { key: row.key, botId: row.botId, runKey: receipt.runKey }, status: 'observed', termination: 'eof',
-    stop: { acknowledged: true, requestedAt: 9_000_000 },
+    requestedCase, fixture: { key: row.key, botId: row.botId, runKey: receipt.runKey }, status: 'observed', termination: 'eof', streamEof: true, initialCursor: 40, replayedRounds: [],
+    committed: { id: run + ':0', through: 42, quiet: false }, completionChatReads: 1,
+    afterStop: { cursor: 42, committedPersisted: true, working: false, activeStream: false, stoppedMarker: true, stoppedPosition: 42, ownPersistedItems: 1 },
+    stop: { requested: true, acknowledged: true, requestedAt: 9_000_000, acknowledgedAt: 9_000_050 },
     sample: { attempts: 1, countedEvenIfBoundaryMissed: true, plannedDelayMs: requestedCase === 'during_tool' ? 600 : 0 } }
   const evidence = { schemaVersion: 1,
     scope: { applicationSha: SHA, ownerRef: receipt.ownerRef, workspaceId: receipt.workspace.id, botId: row.botId,
@@ -138,4 +142,24 @@ test('a sample landing on the other side or failing its client stop remains in t
   assert.equal(result.classification, 'during_tool'); assert.equal(result.status, 'not_covered'); assert.equal(result.reason, 'observed_other_boundary')
   f.observation.requestedCase = 'during_tool'; f.observation.sample.plannedDelayMs = 600; f.observation.status = 'failed'
   assert.equal(classifyToolBoundary(f.observation, f.evidence, f.receipt).reason, 'client_stop_observation_failed')
+})
+
+
+test('a stopped committed idle client cancellation preserves strict server boundary classification', () => {
+  const f = evidenceFixture()
+  Object.assign(f.observation, { termination: 'client_cancel_after_stopped_committed_idle', streamEof: false,
+    committed: { id: f.observation.streamId, through: 42, quiet: false }, completionChatReads: 1,
+    afterStop: { cursor: 42, committedPersisted: true, working: false, activeStream: false, stoppedMarker: true, stoppedPosition: 42, ownPersistedItems: 1 } })
+  assert.equal(classifyToolBoundary(f.observation, f.evidence, f.receipt).status, 'covered')
+  for (const change of [
+    { committed: { id: 'wrun_wrong:0', through: 42, quiet: false } },
+    { committed: { id: f.observation.streamId, through: 43, quiet: false } },
+    { afterStop: { ...f.observation.afterStop, stoppedMarker: false } },
+    { afterStop: { ...f.observation.afterStop, committedPersisted: false } },
+    { afterStop: { ...f.observation.afterStop, activeStream: true } },
+    { stop: { acknowledged: false } }, { streamEof: true },
+    { committed: undefined }, { initialCursor: undefined }, { initialCursor: 42 },
+    { replayedRounds: [{ id: f.observation.streamId, through: 40 }] },
+    { afterStop: { ...f.observation.afterStop, stoppedPosition: 40 } },
+  ]) assert.equal(classifyToolBoundary({ ...f.observation, ...change }, f.evidence, f.receipt).status, 'not_covered')
 })

@@ -1,6 +1,7 @@
 name: Issue 1212 explicit owner device presence acceptance
 
-# Explicit v3 diagnostic case: retain the prior failed run; fixed socket reasons, unchanged health gates.
+# Prepared final after case. Keep disabled until the deployed application SHA
+# is verified and supplied; retain both earlier baseline records unchanged.
 on:
   push:
     branches: [acceptance/issues-1504-1506]
@@ -17,14 +18,16 @@ concurrency:
 
 jobs:
   presence:
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    if: ${{ false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      MIKKA_ACCEPTANCE_SHA: 1a70bb79d7dc4ab31418e9fa674dd39c0a1cae01
+      MIKKA_ACCEPTANCE_SHA: '' # Fill only with the verified final production SHA before enabling this job.
       MIKKA_PRESENCE_RUN_KEY: acme-1212-20261106-b
-      MIKKA_PRESENCE_MODE: baseline
+      MIKKA_PRESENCE_MODE: after
       MIKKA_PRESENCE_REPORT_DIR: presence-acceptance-report
+      MIKKA_PRESENCE_FIXTURE_RECEIPT: scripts/acceptance/issue-1212-presence/receipts/baseline-42298369783.json
+      MIKKA_PRESENCE_RECEIPT_SHA256: 0d6ebc1f97c023bcbbb989f0a168220197d9e2c9c43195b3a29410b957bddcf2
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -33,23 +36,39 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Validate the final version input and the same retained fixture before credentials
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { parseRetainedReceipt, retainedFixture } from './scripts/acceptance/issue-1212-presence/presence-production.mjs'
+          assert.match(process.env.MIKKA_ACCEPTANCE_SHA ?? '', /^[0-9a-f]{40}$/, 'final production SHA must be explicit')
+          assert.equal(process.env.MIKKA_PRESENCE_MODE, 'after')
+          assert.equal(process.env.MIKKA_PRESENCE_RUN_KEY, 'acme-1212-20261106-b')
+          const receipt = parseRetainedReceipt(readFileSync(process.env.MIKKA_PRESENCE_FIXTURE_RECEIPT), process.env.MIKKA_PRESENCE_RECEIPT_SHA256)
+          const retained = retainedFixture(receipt, process.env.MIKKA_PRESENCE_RUN_KEY)
+          assert.equal(retained.deviceId, '4a76c988-41d3-4e6c-b400-c8a4331f2a10')
+          console.log(JSON.stringify({ finalVersionFormatValid: true, baselineReceiptVerified: true, sameRetainedDevice: true, productionRequests: 0 }))
+          JS
       - name: Check out the exact old client source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: 2f84230d24f28c6b5d1ef78669f7d6cbaf438bfc
           path: presence-baseline-source
           persist-credentials: false
-      - name: Check out the reviewed new client source for offline guards
+      - name: Check out the exact final client and mobile API source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 4dee591a822bef3e68f7c078f4cdc4e488be3cce
+          ref: a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9
           path: presence-source
           persist-credentials: false
       - name: Verify exact sources and fixture boundaries without network
         env:
           MIKKA_PRESENCE_SOURCE_ROOT: presence-source
+          MIKKA_MOBILE_PRESENCE_SOURCE_ROOT: presence-source
           MIKKA_PRESENCE_BASELINE_SOURCE_ROOT: presence-baseline-source
-        run: node --test scripts/acceptance/issue-1212-presence/presence.test.mjs scripts/acceptance/issue-1212-presence/presence-baseline-diagnostics.test.mjs
+        run: |
+          node --test scripts/acceptance/issue-1212-presence/presence.test.mjs scripts/acceptance/issue-1212-presence/presence-baseline-diagnostics.test.mjs scripts/acceptance/issue-1506-mobile-presence/mobile-api-setup.test.mjs scripts/acceptance/issue-1506-mobile-presence/source-head.test.mjs
       - name: Read the issue-bound ACME email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -74,9 +93,9 @@ jobs:
           secret-name: ACME_DEMO_PASSWORD
           recursive: false
           include-imports: false
-      - name: Measure the exact old client and retain only the disabled fixture
+      - name: Measure final live presence and mobile API setup on the retained fixture
         env:
-          MIKKA_PRESENCE_SOURCE_ROOT: presence-baseline-source
+          MIKKA_PRESENCE_SOURCE_ROOT: presence-source
         run: node scripts/acceptance/issue-1212-presence/presence-production.mjs
       - name: Retain sanitized metrics and the immutable fixture receipt
         if: always()

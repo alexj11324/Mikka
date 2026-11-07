@@ -2,17 +2,19 @@
 
 ## 执行入口与范围
 
-新增 `.github/workflows/issue-1506-alex-continue.yml` 仅监听自身 YAML 和 `control/continue.json`。它复用真实 ready receipt `receipts/fixtures-ready-42286389783.json`，不调用 workspace setup、model choice、share action 或 fixture create。控制文件目前 `enabled=false`、`expectedSha=null`，因此不会读取凭据或发起生产验收。执行者在候选版本实际部署后，把这两个字段改为 `true` 和精确生产 SHA。
-
-支持的 phase 是 `cache`、`cache-live`、`tool`、`group-public`。两个模型顺序独立运行，某一项失败不会改成通过，另一个模型仍运行；每个模型阶段前后独立读取实际版本。`group-public` 只覆盖新群的公开停止路径，**不覆盖 private generation 分支**；私聊分支需要另外完成实际生成边界及服务端取消证据，当前入口不把它算作通过。
+这是待最终部署完成后使用的源码与 workflow 切换稿，尚未上传或执行。`continue.json` 保持 disabled、生产 SHA 为空；presence after job 也显式禁用。当前生产上的 cache-only 诊断仍使用原 `7cd5a2c0836ee5ee1e0b91213e0a9fcee35c2032`，因此不能提前上传这份切换稿。未来 cache-live 继续复用 ready receipt `receipts/fixtures-ready-42286389783.json` 和已经保留的两个模型 fixture；各模型阶段前后核验实际版本，不重新创建工作区或选择模型。
 
 默认 `cache-live` 会运行已经授权的两条短缓存验收消息。live observer 不再增加模型消息：它复用这两轮正常消息产生的真实 `bot_chat` 推送。`cacheTurns` 可为 2 或 3，`liveTabs` 可为 2 或 3；默认三独立消费者。
 
 ## 实际加载的产品代码
 
-工作流第二次 checkout 精确 PR #1522 head `7cd5a2c0836ee5ee1e0b91213e0a9fcee35c2032`，放在独立 `live-source/`。九个源码文件的 SHA256 已与该提交的 Git tree blob 逐项核对。运行前再按硬编码 hash 检查，任何变化都会拒绝执行该 harness。
+内容基准为本地 batch commit `aaecbdba0472af1a4ad921913267118741e74f1a`，包含 #1538 presence client 和 main #1501 的 Coordinator 组件。十个源码文件的 SHA256 逐一固定，新增 `lib/live/presence.ts`，更新 `channel.ts`、`hooks/use-live-key.tsx` 和 `coordinator-chat.tsx` 的哈希；其余六项保持原值。
 
-Node 24 的 `stripTypeScriptTypes(..., {mode:'transform'})` 将七个纯 TypeScript 模块编译到临时目录；唯一文本转换是给相对 import 补 `.mjs` 后缀。实际加载的运行类是 `LiveChannel`、`TabShare`、`PersistentReadCache`，并使用原版 `coversLiveRevisions` / `heldRevision`。没有复制、删改、简化这些产品算法。`hooks/use-live-key.tsx` 和 Coordinator 组件用于 hash/protocol 核对，不在 Node 中渲染 React。
+发布用 `LIVE_SOURCE_COMMIT` 和未来 continuation workflow 的 source checkout 均固定为本次明确输入的 application source commit `a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9`，tree 为 `1fc41beaa8fa5c06e0af34ccd85cd52e160125b7`。十个文件已逐一核对该 Git commit 的实际 blob；本地内容基准 aaec 仅保留为审查来源。源码加载同时校验文件哈希和 checkout 的实际 Git HEAD，不能给另一提交的字节贴上新版本标签。本文件仅记录准备核验的源码；实际生产应用 SHA 仍是另一个验收输入，目前未赋值；最终部署确认、文件一致性确认后，才可填写并启用现有 control。
+
+Node 24 的 `stripTypeScriptTypes(..., {mode:'transform'})` 将八个纯 TypeScript 模块编译到临时目录；唯一文本转换是给相对 import 补 `.mjs` 后缀。实际加载的运行类是 `LiveChannel`、`TabShare`、`PersistentReadCache`，并使用原版 `coversLiveRevisions` / `heldRevision`。没有复制、删改、简化这些产品算法。`hooks/use-live-key.tsx` 和 Coordinator 组件用于 hash/protocol 核对，不在 Node 中渲染 React。
+
+当前 Coordinator 的聊天订阅没有 device presence proof，与 worker 的订阅参数一致。实际 `LiveChannel` 会请求 `presence=1` 并解析 presence readiness；本稿加载完整的新依赖，但聊天验收不覆盖设备 presence watch/ack 场景。#1501 组件使用的 `readCachedCoordinatorChat` 页面缓存恢复流程也不在此核心消费者验收范围内。
 
 worker 的 refresh 接线遵守该 hook 的完整条件：
 
@@ -48,7 +50,7 @@ worker 的 refresh 接线遵守该 hook 的完整条件：
 
 ## 离线验证
 
-五项 live harness 测试和两项 continuation guard 已通过。两项 live 测试真正启动三个独立 worker，加载上述同 hash 产品源码，使用原生 BroadcastChannel；只把 WebSocket 换为明确的离线事件夹具，网络 fetch 全部禁用。
+十一项 live harness 测试通过，包含 sourceBase 未设置/格式错误、checkout HEAD 不符、新 presence 模块和 hook/组件内容漂移，以及 pin 缺失时模型 driver/observer 不得启动。两项 live 测试真正启动三个独立 worker，加载上述同 hash 产品源码，使用原生 BroadcastChannel；只把 WebSocket 换为明确的离线事件夹具，网络 fetch 全部禁用。夹具同时核验新消费者请求 `revisions=1&presence=1`，并发送明确的离线 presence readiness 帧。
 
 - 一次 revision：三个 tab 最终同步，仅一个权威 chat 读取。
 - 暂缓已返回的 revision 2 响应，真实形状的 revision 3 夹具进入后：旧结果被原算法拒绝，最终总共两个权威读取覆盖 revision 2 和 3。
@@ -56,7 +58,8 @@ worker 的 refresh 接线遵守该 hook 的完整条件：
 这两项是离线 harness 证据，不是生产 live 成功的替代品。测试专用入口 `live-worker-offline.mjs` 仅由测试 WorkerClass 加载；生产始终启动 `live-worker.mjs` 和原生 WebSocket。
 
 ```bash
-MIKKA_LIVE_SOURCE_ROOT=<精确候选代码 checkout> node --test \
+MIKKA_LIVE_SOURCE_ROOT=<精确候选代码 checkout> \
+MIKKA_LIVE_TEST_SOURCE_BASE=<该 checkout 的完整 40 位 SHA> node --test \
   scripts/acceptance/issue-1506-alex/continuation.test.mjs \
   scripts/acceptance/issue-1506-alex/live-consumer.test.mjs
 ```

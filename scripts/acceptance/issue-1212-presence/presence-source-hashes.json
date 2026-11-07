@@ -1,5 +1,5 @@
 {
-  "sourceBase": "9659e55a2d503efb62cbe1e5f9aa32586e6fd42d",
+  "sourceBase": "a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9",
   "clientPatchSha256": "163b70b7604fcd4fb8a64c5961b13422a1df223f7437c2c0b1c381693f52b570",
   "hashes": {
     "lib/live/channel.ts": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
@@ -11,9 +11,10 @@
     "lib/swr/cache-policy.ts": "abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f",
     "lib/swr/indexed-db.ts": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
     "hooks/use-live-key.tsx": "d5f25908143a4038e53a45a1f5fab8143dd6b28f7c13fabce4bd6bc2ffbc7397",
-    "components/devices/devices-settings.tsx": "1f4c27f799b38a8f59988b164b793f6d09e5348cf7645eaa794fefea76d3fdfa",
+    "components/devices/devices-settings.tsx": "989b3d2e2438ac56a7d3e972518d71ca7b0666c4d7a1a0453e331b1e35a644a9",
     "hooks/use-live-lists.ts": "2a8fb2be629a5cd80178502fe84862207de4aa0446535fc8f93ffa8b7f1d5afb",
-    "packages/protocol/src/device.ts": "6c63072e7ff69371d1547673927f0af9e3ba204b48e850d287e4f84212b30aa6",
+    "packages/protocol/src/device.ts": "3132ce40b92c2a3fe26f658dcd246337d182cfc6b7f0d7e1f3f2ade2811c2acd",
     "packages/protocol/src/daemon.ts": "8fa7015227c26b46c871166b6bacbc45f37fd1a0e031c514efa258a1115afaff"
-  }
+  },
+  "sourceTree": "1fc41beaa8fa5c06e0af34ccd85cd52e160125b7"
 }

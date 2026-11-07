@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9",
+  "hashes": {
+    "app/api/live/ticket/route.ts": "d59155ecaec99895f9195e558f921a6235b092d0de553309376b3aa657fa9250",
+    "app/api/mobile/threads/route.ts": "9f99eb75d6e4d2f5b717e56362d097aafdc897e330d2da090c40b9ea3afce604",
+    "apps/mobile/lib/api-cache.ts": "d9ac889b5dbeb09996ae6d22ec61b592c2e58f44dace4839e0dff2ff3d5f933e",
+    "apps/mobile/lib/api.ts": "f9261d4bd777bc6d941b6c34c4529671c4aff542194c4bfc041ee08e6e07e659",
+    "apps/mobile/lib/live-keys.ts": "c3a0cc322e64e1b6697a8d2753b68ab66befc3319be49f830a666da52a8bc8da",
+    "apps/mobile/lib/live.ts": "5914fda450b825fb15a9dc0f82ec025d02b3b07e2e58d9756f185097b349ce4a",
+    "apps/mobile/lib/presence-scope.ts": "3945fcb461d028c3f7545bfe1874993cbea98c8a4362de9de7a1560c9e2bfc19",
+    "apps/mobile/lib/types.ts": "4603688fc40b5b2bd29d097da72e645b3f1eab0365edcc2b284093c0cc40fe24",
+    "apps/mobile/lib/useApi.ts": "5eb3573765796e063e6a6d3a29d714dbafd681d289db32fda40499a5aa15f0c3",
+    "lib/device-gateway-ticket.ts": "0bc6f349cf603743e61f9e006566992ccc7904340b7a8b9818ff66ed9ae9b29e",
+    "lib/device-presence-grant.ts": "b1ed72a67aa438e645624da4474a4bd687318d0e57d0019ddb0355e93ed02509",
+    "lib/live/events.ts": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "lib/live/home-scope-proof.ts": "93af0c7032509522f310c9a8e56351370f42afd46723d5f6c4af4433a52206fb",
+    "lib/live/presence.ts": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "lib/live/scope.ts": "a35e7c774112bc159fb9b14af93282387cbe4fcf03dac2104a516a5c44c6f2b5",
+    "lib/mobile-threads.ts": "4f093c79d0ca53b19fa0c2d2258e084ee60616c961a58dcbbec24cef621372a0"
+  },
+  "sourceTree": "1fc41beaa8fa5c06e0af34ccd85cd52e160125b7"
+}

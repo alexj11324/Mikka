@@ -7,10 +7,13 @@ globalThis.WebSocket = class extends EventTarget {
   constructor(url, protocol) {
     super()
     if (!url.startsWith('wss://offline.invalid/') || typeof protocol !== 'string') throw new Error('offline_socket_scope')
+    const query = new URL(url).searchParams
+    if (query.get('revisions') !== '1' || query.get('presence') !== '1') throw new Error('offline_capability_request_missing')
     sockets.add(this)
     queueMicrotask(() => {
       this.readyState = 1; this.onopen?.(new Event('open'))
       this.packet({ type: 'live_ready', version: 2, kinds: ['bot_chat'], revisions: ['bot_chat'] })
+      this.packet({ type: 'presence_ready', version: 1 })
     })
   }
   packet(value) {
@@ -22,5 +25,6 @@ globalThis.WebSocket = class extends EventTarget {
 }
 parentPort.on('message', message => {
   if (message?.type === 'fixture-push') for (const socket of sockets) socket.packet({ kind: 'bot_chat', id: message.botId, rev: message.revision })
+  if (message?.type === 'fixture-disconnect') for (const socket of sockets) socket.close()
 })
 await import('./live-worker.mjs')

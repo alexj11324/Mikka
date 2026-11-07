@@ -80,7 +80,19 @@ export function classifyToolBoundary(observation, evidence, fixtureReceipt) {
       report.classification = 'before_body_interval'; return uncovered('body_began_after_stop_delivery_requires_review')
     } else return uncovered('interval_boundary_ambiguous')
   }
-  if (observation.status !== 'observed' || observation.stop?.acknowledged !== true || observation.termination !== 'eof')
+  const ended = observation.termination === 'eof' && observation.streamEof === true ||
+    observation.termination === 'client_cancel_after_stopped_committed_idle' && observation.streamEof === false
+  const committed = observation.committed, after = observation.afterStop
+  if (observation.status !== 'observed' || observation.stop?.requested !== true || observation.stop.acknowledged !== true || !ended ||
+    !time(observation.stop.requestedAt) || !time(observation.stop.acknowledgedAt) || observation.stop.acknowledgedAt < observation.stop.requestedAt ||
+    !Number.isSafeInteger(observation.initialCursor) || observation.initialCursor < 0 ||
+    committed?.id !== observation.streamId || !Number.isSafeInteger(committed.through) || committed.through <= observation.initialCursor || committed.quiet !== false ||
+    !Array.isArray(observation.replayedRounds) || observation.replayedRounds.some(round => round?.id === committed.id) ||
+    !Number.isSafeInteger(after?.cursor) || after.cursor < committed.through || after.committedPersisted !== true ||
+    after.working !== false || after.activeStream !== false || after.stoppedMarker !== true ||
+    !Number.isSafeInteger(after.stoppedPosition) || after.stoppedPosition <= observation.initialCursor || after.stoppedPosition > committed.through ||
+    !Number.isSafeInteger(after.ownPersistedItems) || after.ownPersistedItems < 1 ||
+    !Number.isSafeInteger(observation.completionChatReads) || observation.completionChatReads < 1)
     return uncovered('client_stop_observation_failed')
   if (observation.sample?.attempts !== 1 || observation.sample.countedEvenIfBoundaryMissed !== true ||
     observation.sample.plannedDelayMs !== (observation.requestedCase === 'during_tool' ? 600 : 0))

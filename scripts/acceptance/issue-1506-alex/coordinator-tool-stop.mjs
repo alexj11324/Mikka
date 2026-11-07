@@ -6,8 +6,9 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { alexSession } from '../issue-1506-readonly/alex-session.mjs'
 import { FIXTURE_ERRORS, openAcceptanceFixture } from './coordinator-fixtures.mjs'
-import { PROTOCOL_SOURCE_SHA, openLiveObserver, parseStreamLine, readJson,
+import { readJson,
   requireExactSha, rpc, validateChat } from '../issue-1504-1506/coordinator-baseline.mjs'
+import { CACHE_PROTOCOL_SOURCE_SHA, openCacheLive, observeStoppedCompletion } from './coordinator-cache-completion.mjs'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const RUN = /^wrun_[a-zA-Z0-9_-]{1,160}$/
@@ -27,54 +28,16 @@ const ERRORS = new Set([...FIXTURE_ERRORS,
   'stream_sequence_invalid', 'stream_turn_mismatch', 'stream_error', 'stream_deadline',
   'unexpected_tool', 'tool_boundary_not_observed', 'stop_not_acknowledged', 'stop_not_quiescent',
   'post_stop_chat_failed', 'live_close_failed', 'case_invalid', 'timeout_invalid',
+  'committed_invalid', 'stream_incomplete', 'chat_completion_error', 'reply_failed_or_stopped',
+  'chat_revision_stale', 'stream_replay_unproven', 'reply_not_persisted',
 ])
 const code = error => ERRORS.has(error?.message) ? error.message : 'acceptance_unexpected_failure'
 
-export function parseToolStopLine(line) {
-  const event = parseStreamLine(line)
-  if (event.type !== 'tool') return event
-  // The shared protocol parser validates call/name/state; keep only a closed tool
-  // enum and the hashed correlation handle. Inputs/results are never retained.
-  const raw = JSON.parse(line)
-  return { ...event, tool: raw.name === 'web_search' ? 'web_search' : 'unexpected', callRef: reference(raw.call) }
-}
-
-export async function readToolStopStream(body, onEvent, signal) {
-  const reader = body.getReader(), decoder = new TextDecoder()
-  let buffered = '', sequence = 0
-  const cancel = () => { void reader.cancel().catch(() => {}) }
-  signal?.addEventListener('abort', cancel, { once: true })
-  const emit = line => {
-    const event = parseToolStopLine(line)
-    if (event.type === 'error') fail('stream_error')
-    if (event.sequence !== sequence + 1) fail('stream_sequence_invalid')
-    sequence = event.sequence; onEvent(event)
-  }
-  try {
-    while (!signal?.aborted) {
-      const { done, value } = await reader.read()
-      if (signal?.aborted) return 'timeout'
-      buffered += done ? decoder.decode() : decoder.decode(value, { stream: true })
-      let newline
-      while ((newline = buffered.indexOf('\n')) !== -1) {
-        const line = buffered.slice(0, newline).trim(); buffered = buffered.slice(newline + 1)
-        if (line) emit(line)
-      }
-      if (done) { if (buffered.trim()) emit(buffered); return 'eof' }
-    }
-    return 'timeout'
-  } finally {
-    signal?.removeEventListener('abort', cancel)
-    await reader.cancel().catch(() => {}); reader.releaseLock()
-  }
-}
-
-
-export async function runToolStop({ env = process.env, sessionProvider = alexSession, openLive = openLiveObserver,
+export async function runToolStop({ env = process.env, sessionProvider = alexSession, openLive = openCacheLive,
   fixtureReceipt = null, streamTimeoutMs = 60_000, stopTimeoutMs = 20_000, checkpoint = true } = {}) {
   const report = { schemaVersion: 1, issue: 1506, case: 'real-web-search-tool-call-stop', sampleId: randomUUID(), status: 'failed',
-    protocolSourceSha: PROTOCOL_SOURCE_SHA, applicationSha: null, startedAt: new Date().toISOString(),
-    messageSendAttempts: 0, taskCreationRequests: 0, modelSelectionWrites: 0, postStopChatReads: 0,
+    protocolSourceSha: CACHE_PROTOCOL_SOURCE_SHA, applicationSha: null, startedAt: new Date().toISOString(),
+    messageSendAttempts: 0, taskCreationRequests: 0, modelSelectionWrites: 0, postStopChatReads: 0, completionChatReads: 0, cleanupChatReads: 0, chatReads: [],
     metrics: {}, tools: [], stop: { requested: false, acknowledged: false },
     runtimeBoundary: { classification: 'unverified', executeEntered: 'not_observed',
       required: 'same_build_workflowRunId_callRef_real_tool_start_finish_and_stop_ordering' },
@@ -101,11 +64,12 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
       report.workspace = { ref: fixture.workspace.ref, kind: 'team', switchedThroughProductAction: true }
       const initial = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [fixture.botId]))
       if (initial.botId !== fixture.botId) fail('fixture_scope_mismatch')
-      if (!initial.enabled || initial.working || initial.streamRunId) fail('chat_not_idle')
+      if (!initial.enabled || initial.working || initial.streamRunId || initial.error) fail('chat_not_idle')
       const botId = fixture.botId
+      report.initialCursor = initial.cursor
       report.botRef = fixture.botRef
       report.menu = fixture.menu
-      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, started = null
+      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, completed = null, started = null
       let delayedStop = null, delayTimer = null, settleDelayedStop = null
       const since = () => started === null ? null : ms(performance.now() - started)
       const stop = trigger => {
@@ -139,45 +103,64 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
           if (!RUN.test(runId ?? '') || !response.headers.get('content-type')?.startsWith('application/x-ndjson') ||
             !response.headers.get('x-mikka-stream-key') || !response.body) { await response.body?.cancel(); fail('stream_headers_invalid') }
           report.workflowRunId = runId; save()
-          report.termination = await readToolStopStream(response.body, event => {
-            if (!event.id.startsWith(runId + ':')) fail('stream_turn_mismatch')
-            if (event.type === 'start') {
-              if (streamId) fail('stream_turn_mismatch')
-              streamId = event.id; report.streamId = event.id; report.metrics.streamStartedMs = since()
-            }
-            if (!streamId || event.id !== streamId) fail('stream_turn_mismatch')
-            if ((event.type === 'text' || event.type === 'reset') && event.text.length) report.metrics.firstTextMs ??= since()
-            if (event.type === 'tool') {
-              const observation = { tool: event.tool, callRef: event.callRef, state: event.state,
-                sequence: event.sequence, observedMs: since(), afterStopRequest: report.stop.requested }
-              report.tools.push(observation)
-              if (event.tool !== 'web_search') { void stop('unexpected_tool'); fail('unexpected_tool') }
-              if (event.state === 'running' && !report.triggerCallRef && !report.stop.requested) {
-                report.triggerCallRef = event.callRef; report.metrics.toolCallObservedMs = observation.observedMs
-                const stopAtBoundary = () => {
-                  report.metrics.delayAfterToolCallMs = ms(since() - observation.observedMs)
-                  const stopped = stop(requestedCase === 'during_tool' ? 'public_web_search_running_after_fixed_delay' : 'public_web_search_running')
-                  clearTimeout(deadline); deadline = setTimeout(() => controller.abort('stop_deadline'), stopTimeoutMs)
-                  return stopped
+          completed = await observeStoppedCompletion({ body: response.body, runId, botId,
+            initialChat: initial, live, signal: controller.signal,
+            readChat: async signal => {
+              report.completionChatReads++; report.postStopChatReads++
+              return validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal }))
+            },
+            onEvent: (event, _rounds, sequence) => {
+              if (event.type === 'start') { streamId = event.id; report.streamId = event.id; report.metrics.streamStartedMs = since() }
+              if ((event.type === 'text' ? event.delta : event.type === 'reset' ? event.text : '').length) report.metrics.firstTextMs ??= since()
+              if (event.type === 'tool') {
+                const tool = event.name === 'web_search' ? 'web_search' : 'unexpected', callRef = reference(event.call)
+                const observation = { tool, callRef, state: event.state,
+                  sequence, observedMs: since(), afterStopRequest: report.stop.requested }
+                report.tools.push(observation)
+                if (tool !== 'web_search') { void stop('unexpected_tool'); fail('unexpected_tool') }
+                if (event.state === 'running' && !report.triggerCallRef && !report.stop.requested) {
+                  report.triggerCallRef = callRef; report.metrics.toolCallObservedMs = observation.observedMs
+                  const stopAtBoundary = () => {
+                    report.metrics.delayAfterToolCallMs = ms(since() - observation.observedMs)
+                    const stopped = stop(requestedCase === 'during_tool' ? 'public_web_search_running_after_fixed_delay' : 'public_web_search_running')
+                    clearTimeout(deadline); deadline = setTimeout(() => controller.abort('stop_deadline'), stopTimeoutMs)
+                    return stopped
+                  }
+                  if (requestedCase === 'during_tool') {
+                    // One client-side sample delay, never product polling or proof
+                    // that execution entered. Server intervals classify the result.
+                    delayedStop = new Promise(resolve => {
+                      settleDelayedStop = resolve
+                      delayTimer = setTimeout(() => { delayTimer = null; resolve(stopAtBoundary()) }, DURING_TOOL_DELAY_MS)
+                    })
+                  } else void stopAtBoundary()
                 }
-                if (requestedCase === 'during_tool') {
-                  // One client-side sample delay, never product polling or proof
-                  // that execution entered. Server intervals classify the result.
-                  delayedStop = new Promise(resolve => {
-                    settleDelayedStop = resolve
-                    delayTimer = setTimeout(() => { delayTimer = null; resolve(stopAtBoundary()) }, DURING_TOOL_DELAY_MS)
-                  })
-                } else void stopAtBoundary()
               }
-            }
-            if (event.type === 'committed') { report.committedObserved = true; report.metrics.committedMs = since() }
-          }, controller.signal)
+              if (event.type === 'committed') {
+                report.committedObserved = true; report.metrics.committedMs = since()
+                report.committed = { id: event.id, through: event.through, quiet: event.quiet }
+              }
+              save()
+            },
+            onRead: evidence => { report.chatReads.push(evidence); save() },
+            onClosed: evidence => { report.streamEof = evidence.eof; report.streamClosed = evidence.readerReleased },
+          })
+          report.termination = completed.termination; report.replayedRounds = completed.replayedRounds
+          const own = completed.chat.items.filter(item => item.streamId === streamId)
+          report.afterStop = { cursor: completed.chat.cursor, committedPersisted: completed.chat.persistedStreamIds.includes(completed.committed.id),
+            working: completed.chat.working, activeStream: Boolean(completed.chat.streamRunId),
+            ownPersistedItems: own.length, stoppedMarker: own.some(item => item.stopped === true),
+            stoppedPosition: own.find(item => item.stopped === true && item.position > initial.cursor && item.position <= completed.committed.through)?.position ?? null }
+          report.metrics.postStopChatMs = since()
+          report.metrics.stopToObservedIdleMs = ms(report.metrics.postStopChatMs - report.metrics.stopRequestedMs)
           report.metrics.streamClosedMs = since()
-          if (report.termination !== 'eof') fail('stream_deadline')
           if (!report.triggerCallRef) fail('tool_boundary_not_observed')
           if (!await (stopPromise ?? delayedStop)) fail('stop_not_acknowledged')
-        } catch (error) { if (controller.signal.aborted) fail('stream_deadline'); throw error }
-        finally { clearTimeout(deadline); controller.abort(); report.streamClosed = true }
+        } catch (error) {
+          if (controller.signal.aborted && error?.name === 'AbortError') fail('stream_deadline')
+          throw error
+        }
+        finally { clearTimeout(deadline); controller.abort(); report.streamClosed = true; report.metrics.streamClosedMs ??= since() }
       } catch (error) { failure = error }
       finally {
         report.cleanup.status = 'running'
@@ -188,15 +171,17 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
         if (sent) {
           if (!stopPromise) void stop('error_cleanup')
           await stopPromise; controller?.abort()
-          report.postStopChatReads++
-          try {
-            const after = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId]))
-            if (after.botId !== botId) fail('chat_invalid')
-            const own = streamId ? after.items.filter(item => item.streamId === streamId) : []
-            report.afterStop = { working: after.working, activeStream: Boolean(after.streamRunId),
-              ownPersistedItems: own.length, stoppedMarker: own.some(item => item.stopped === true) }
-            if (after.working || after.streamRunId) { failure ??= new Error('stop_not_quiescent'); report.cleanup.status = 'needs_followup' }
-          } catch (error) { failure ??= new Error('post_stop_chat_failed'); report.cleanup.status = 'needs_followup' }
+          if (!completed) {
+            report.postStopChatReads++; report.cleanupChatReads++
+            try {
+              const after = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId]))
+              if (after.botId !== botId) fail('chat_invalid')
+              const own = streamId ? after.items.filter(item => item.streamId === streamId) : []
+              report.afterStop = { working: after.working, activeStream: Boolean(after.streamRunId),
+                ownPersistedItems: own.length, stoppedMarker: own.some(item => item.stopped === true) }
+              if (after.working || after.streamRunId) { failure ??= new Error('stop_not_quiescent'); report.cleanup.status = 'needs_followup' }
+            } catch (error) { failure ??= new Error('post_stop_chat_failed'); report.cleanup.status = 'needs_followup' }
+          }
         }
         if (live) {
           try { report.cleanup.liveClosed = await live.close() }

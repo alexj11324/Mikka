@@ -4,9 +4,9 @@ This driver has not been executed in production. It sends no model prompt, insta
 
 ## Exact source and execution
 
-The after source is PR #1538 `e93d84b196cc58f4c81abd12fd0fa2146ec98b09`, stacked on #1531. `presence-source-hashes.json` pins every actual core module and its hook/component provenance. Node 24 strips TypeScript and adds relative `.mjs` import suffixes; no product algorithm is rewritten. A final merge commit with identical pinned blobs is valid.
+The after source is the explicitly supplied application commit `a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9`, tree `1fc41beaa8fa5c06e0af34ccd85cd52e160125b7`. This disabled repin output is not production deployment evidence. Both after loaders require that checkout HEAD/tree and each pinned file's SHA-256. The 13 web/core and 16 mobile/API source entries were checked directly against those Git blobs. Node 24 strips TypeScript and adds relative `.mjs` import suffixes; no product algorithm is rewritten. The serving application's exact SHA is separately checked before fixture work and after cleanup. A different source checkout commit is rejected, even with identical pinned files.
 
-Required inputs are the existing `ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD`, `MIKKA_ACCEPTANCE_SHA` (exact serving application commit), `MIKKA_PRESENCE_RUN_KEY` (unique lowercase nonce, at most 33 characters), `MIKKA_PRESENCE_SOURCE_ROOT` (checkout containing the pinned sources), and optionally `MIKKA_PRESENCE_REPORT_DIR`. `MIKKA_PRESENCE_MODE` is `baseline` or `after` (default). The runner uses the existing formal OIDC/Infisical path. Never copy secrets into these scripts, receipts or shell output.
+Required inputs are the existing `ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD`, `MIKKA_ACCEPTANCE_SHA` (exact serving application commit), `MIKKA_PRESENCE_RUN_KEY` (unique lowercase nonce, at most 33 characters), `MIKKA_PRESENCE_SOURCE_ROOT` (the exact pinned Git checkout), and optionally `MIKKA_PRESENCE_REPORT_DIR`. `MIKKA_PRESENCE_MODE` is `baseline` or `after` (default). The runner uses the existing formal OIDC/Infisical path. Never copy secrets into these scripts, receipts or shell output.
 
 ```sh
 node scripts/acceptance/issue-1212-presence/presence-production.mjs
@@ -17,7 +17,7 @@ The existing `alex-session.mjs` and its `production-session.mjs` decoder are req
 ## After phases
 
 1. Read existing device and token IDs. Mint a normal one-use enrollment grant, exchange it once, identify exactly one new credential by the complete before/after metadata, and register one unique device with no harnesses or computer capability. Disable scheduling before the single heartbeat.
-2. Open the device gateway and keep it healthy only with WS ping/pong. Open three independent native live consumers. Their actual `LiveChannel`, `TabShare` and `PersistentReadCache` use the same owner/home/build/role namespace. Only the parent performs ordinary authenticated `agents.pollDevices` reads.
+2. Open the device gateway and keep it healthy only with WS ping/pong. Open three independent native live consumers. Their actual `LiveChannel`, `TabShare` and `PersistentReadCache` use the same owner/home/build/role namespace. Only the parent performs ordinary authenticated `agents.pollDevices` reads. The after-only session wrapper clones one of the three existing home ticket responses; original bodies remain available to their consumers. After all three existing ACK gates, `mobile-api-setup` uses that copy for exactly three ordinary `/api/mobile/threads` GETs (valid proof, absent proof, tampered scope). It issues no home/ticket GET. These three setup reads remain in the parent's total request count and are recorded separately from the subsequent web idle window. Any mobile failure enters the original observer/socket/credential/device/sign-out cleanup and cannot produce a passing idle result.
 3. Wait locally until at least **92.5 seconds after the HTTP heartbeat**. Only the already existing heartbeat deadline may cause a setup read. Then count all actual application reads over **65 healthy idle seconds**; the target is zero. Setup, known-deadline and cleanup calls are excluded by explicit phase boundaries, not by subtracting arbitrary calls afterwards.
 4. Close the device socket, reconnect it, then stop its pings without closing it. Each state change must deliver both owner-home keys to all three observers and update all three normal read snapshots. Natural expiry must occur at least 88 seconds after the observed last pong with the socket still OPEN (the actual server contract is 90 seconds).
 5. Record every actual read and cross-tab adoption. Three old independent consumers are the comparison ceiling per state change; **one read and two adoptions is observed when achieved, not fabricated as a universal guarantee**. There is no artificial HTTP-response delay.
@@ -25,12 +25,18 @@ The existing `alex-session.mjs` and its `production-session.mjs` decoder are req
 
 ## Evidence limits
 
-This is API/core/transport acceptance, not a production React render or an installed daemon. The React/SWR regression suite is separate. Internal DO alarm deletion is covered by source/Miniflare tests; the public API does not expose it, so this driver records real unwatch/close and does not claim to have queried an alarm.
+This is API/core/transport acceptance, not a production React render, rendered mobile screen or an installed daemon. The mobile API subreport explicitly does not claim local signature verification or a mobile worker ACK. Its ordinary positive/negative header cases use the real client proof cache and parser with no production signing key. The React/SWR regression suite is separate. Internal DO alarm deletion is covered by source/Miniflare tests; the public API does not expose it, so this driver records real unwatch/close and does not claim to have queried an alarm.
 
 The isolated offline suite validates identity boundaries, no raw credential reporting, exact fixture cleanup, lost registration responses, receipt-bound re-enrollment, actual three-worker core state/reads, rejection of support-only readiness, and three actual old consumers each reading once on a virtual minute. Its WebSocket/clock fixtures cannot stand in for production evidence. The frozen manifest records the actual final test count.
 
 ```sh
-MIKKA_PRESENCE_SOURCE_ROOT=/absolute/candidate/checkout MIKKA_PRESENCE_BASELINE_SOURCE_ROOT=/absolute/old/checkout node --test scripts/acceptance/issue-1212-presence/presence.test.mjs
+MIKKA_PRESENCE_SOURCE_ROOT=/absolute/a1902d7/checkout \
+MIKKA_MOBILE_PRESENCE_SOURCE_ROOT=/absolute/a1902d7/checkout \
+MIKKA_PRESENCE_BASELINE_SOURCE_ROOT=/absolute/2f84230/checkout \
+node --test scripts/acceptance/issue-1212-presence/presence.test.mjs \
+  scripts/acceptance/issue-1212-presence/presence-baseline-diagnostics.test.mjs \
+  scripts/acceptance/issue-1506-mobile-presence/mobile-api-setup.test.mjs \
+  scripts/acceptance/issue-1506-mobile-presence/source-head.test.mjs
 ```
 
 ## Known low-risk duplicate read

@@ -3,6 +3,8 @@ import test from 'node:test'
 import { setupWorkspace, validateWorkspaceReceipt } from './workspace-setup.mjs'
 import { runFixtureSetup, validateFixtureReceipt } from './coordinator-fixtures.mjs'
 import { runBaseline } from './coordinator-baseline.mjs'
+import { runOrdinaryStop } from './coordinator-ordinary-stop.mjs'
+import { stoppedSession } from './stop-fixture-support.mjs'
 import { runCacheTurns } from './coordinator-cache-turns.mjs'
 import { runToolStop } from './coordinator-tool-stop.mjs'
 import { observeCacheCompletion, openCacheLive } from './coordinator-cache-completion.mjs'
@@ -55,7 +57,7 @@ test('lost bot and selection acknowledgements use discovery, with no repeated wr
 })
 
 test('all message drivers reject owner, membership, bot ownership, fallback and a busy chat without sending', async () => {
-  for (const driver of [runBaseline, runCacheTurns, runToolStop]) for (const flags of [
+  for (const driver of [runBaseline, runOrdinaryStop, runCacheTurns, runToolStop]) for (const flags of [
     { wrongOwner: true }, { extraMember: true }, { wrongBotOwner: true }, { fallback: true }, { busy: true },
   ]) {
     const f = fakeSession({ readyBots: true, ...flags })
@@ -266,7 +268,7 @@ test('cache live adapter taps one real-shaped socket and only matching newer sca
 })
 
 test('real-shaped tool-running frame triggers one stop but cannot claim execute-enter or before/during classification', async () => {
-  const f = fakeSession({ readyBots: true, stream: 'tool' })
+  const f = stoppedSession({ kind: 'tool' })
   const report = await runToolStop(f.options)
   assert.equal(report.status, 'observed', JSON.stringify(report)); assert.equal(f.state.sends, 1); assert.equal(f.state.stops, 1)
   assert.equal(report.runtimeBoundary.classification, 'unverified'); assert.equal(report.runtimeBoundary.executeEntered, 'not_observed')

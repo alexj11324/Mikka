@@ -47,3 +47,16 @@ test('private continuation reuses ready models and forwards an explicit scenario
   assert.equal(report.observation.runtimeCancellation, 'pending_provider_logs'); assert.equal(report.observation.cleanup.retainedForProviderAudit, true)
   assert.equal(report.setupWrites, 0); assert.equal(report.modelSelectionWrites, 0); assert.equal(report.shareWrites, 0)
 })
+
+
+test('ordinary Stop has the same explicit enabled gate and retained fixture, without invoking legacy resume', async () => {
+  let calls = 0, versions = 0
+  const ordinary = { ...config, phase: 'ordinary-stop' }, receipt = fixtureReceipt()
+  const driver = async options => { calls++; assert.equal(options.fixtureReceipt, receipt); return { status: 'observed' } }
+  await assert.rejects(runContinuation('haiku', { config: { ...ordinary, enabled: false }, receipt, driver, checkpoint: false }), /continuation_disabled/)
+  assert.equal(calls, 0)
+  const report = await runContinuation('haiku', { config: ordinary, receipt, driver, checkpoint: false,
+    fetchImpl: async () => { versions++; return Response.json({ build: SHA }) } })
+  assert.equal(report.status, 'observed'); assert.equal(calls, 1); assert.equal(versions, 2)
+  assert.equal(report.setupWrites, 0); assert.equal(report.modelSelectionWrites, 0); assert.equal(report.shareWrites, 0)
+})

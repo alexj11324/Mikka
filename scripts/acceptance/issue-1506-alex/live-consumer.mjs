@@ -58,6 +58,7 @@ export async function openLiveConsumers(session, initialChat, { fixture, source,
   if (![2, 3].includes(tabCount)) fail('live_tab_count_invalid')
   const scope = validateLiveScope(session, initialChat, fixture, expectedSha)
   const entity = 'bot_chat:' + scope.botId.toLowerCase()
+  if (!Number.isSafeInteger(initialChat.live?.revisions?.[entity]) || initialChat.live.revisions[entity] < 0) fail('live_revision_required')
   const report = { schemaVersion: 1, issue: 1506, case: 'real-live-core-consumers', status: 'running',
     sourceCommit: source.sourceCommit, sourceHashes: source.hashes, applicationSha: expectedSha,
     fixture: { botId: scope.botId, workspaceRef: hash(scope.workspaceId), ownerRef: hash(scope.ownerId), transportRef: hash(scope.transportScope) },
@@ -69,9 +70,17 @@ export async function openLiveConsumers(session, initialChat, { fixture, source,
   const summary = { ready: false, revisionCapable: false, matchingPushes: 0, versionedPushes: 0,
     newerPushes: 0, baselineRevision: initialChat.live.revisions?.[entity] ?? null,
     maxRevision: null, firstPushMs: null, unexpectedDisconnect: false, closed: false }
-  const workers = [], states = new Map(), active = new Map(), pushed = new Set(), listeners = new Set()
+  const workers = [], states = new Map(), active = new Map(), pushed = new Set(), listeners = new Set(), completionListeners = new Set()
   let stage = 'initial', began = null, fault = null, closePromise = null, namespace = null, gate = null, gateUsed = false
-  const seen = () => { checkpoint(report); for (const listener of [...listeners]) listener() }
+  let latestRevision = summary.baselineRevision, completionFaultReported = false
+  const seen = () => {
+    checkpoint(report)
+    if (fault && !completionFaultReported) {
+      completionFaultReported = true
+      for (const listener of [...completionListeners]) listener.error(new Error(fault))
+    }
+    for (const listener of [...listeners]) listener()
+  }
   const record = value => {
     if (report.events.length >= 500) { fault ??= 'live_event_limit'; seen(); return }
     report.events.push({ ...value, stage, atMs: milliseconds() }); seen()
@@ -95,6 +104,7 @@ export async function openLiveConsumers(session, initialChat, { fixture, source,
     gateUsed = true
     await new Promise(resolve => {
       gate = { revision, resolve, returnedAt: milliseconds(), timer: setTimeout(() => releaseGate('bounded_timeout_no_new_revision'), 8_000) }
+      seen() // Checkpoint the completed HTTP response before the bounded delivery hold.
       // A real newer push may have arrived while the HTTP response was being read.
       if ((summary.maxRevision ?? 0) > revision) { gate.nextRevision = summary.maxRevision; releaseGate('new_real_revision_already_observed') }
     })
@@ -147,6 +157,7 @@ export async function openLiveConsumers(session, initialChat, { fixture, source,
         refreshCalls: message.refreshCalls, networkReads: message.networkReads,
         adopted: message.adopted, rejectedOlderResults: message.rejectedOlderResults, socketCount: message.socketCount }
       if (Object.values(value).some(item => typeof item === 'number' && (!Number.isSafeInteger(item) || item < 0))) fault ??= 'live_metadata_invalid'
+      if (message.type === 'closed' && !closePromise) { fault ??= 'live_connection_failed'; summary.unexpectedDisconnect = true }
       states.set(tabId, value); report.tabs = [...states.values()]; seen(); return
     }
     if (message.type === 'fatal') { fault ??= 'live_worker_failed'; summary.unexpectedDisconnect = true; seen(); return }
@@ -157,6 +168,13 @@ export async function openLiveConsumers(session, initialChat, { fixture, source,
         summary.maxRevision = Math.max(summary.maxRevision ?? 0, message.revision)
         if (message.revision > (summary.baselineRevision ?? 0)) summary.newerPushes++
         summary.firstPushMs ??= Math.round((performance.now() - began) * 10) / 10
+      }
+      // These are the matching-key notifications already consumed by the same
+      // real LiveChannel workers. Latch before begin/subscribe and deduplicate
+      // the three tabs; completion never opens another socket or performs I/O.
+      if (message.revision > latestRevision) {
+        latestRevision = message.revision
+        for (const listener of [...completionListeners]) listener.change()
       }
       if (gate && message.revision > gate.revision) { gate.nextRevision = message.revision; releaseGate('new_real_revision_observed') }
       record({ type: 'push', tabId, revision: message.revision }); return
@@ -195,15 +213,22 @@ export async function openLiveConsumers(session, initialChat, { fixture, source,
       }, env: {} }) // No runner credentials or ambient secrets enter worker environments.
       workers.push({ worker, tabId })
       worker.on('message', message => receive(worker, tabId, message))
-      worker.on('error', () => { fault ??= 'live_worker_failed'; seen() })
-      worker.on('exit', code => { if (code !== 0 && !closePromise) { fault ??= 'live_worker_exited'; seen() } })
+      worker.on('error', () => { fault ??= 'live_worker_failed'; summary.unexpectedDisconnect = true; seen() })
+      worker.on('exit', () => { if (!closePromise) { fault ??= 'live_worker_exited'; summary.unexpectedDisconnect = true; seen() } })
     }
     if (!await waitUntil(() => states.size === tabCount && [...states.values()].every(row => row.ready), readyTimeoutMs)) fail('live_consumer_ready_failed')
     if (fault) fail(fault)
     summary.ready = true; summary.revisionCapable = true
     return { summary, report,
+      get revision() { return latestRevision },
+      subscribe(change, error) {
+        if (fault || closePromise || summary.closed) fail(fault ?? 'live_connection_failed')
+        const listener = { change, error }; completionListeners.add(listener)
+        return () => completionListeners.delete(listener)
+      },
       begin(started) { began = started; stage = 'turns' },
       close() {
+        completionListeners.clear()
         closePromise ??= (async () => {
           if (!fault && !await waitUntil(() => {
             const revision = summary.maxRevision ?? 0

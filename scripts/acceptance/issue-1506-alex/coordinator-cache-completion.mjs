@@ -67,8 +67,15 @@ export async function openCacheLive(session, chat, { WebSocketClass = WebSocket,
 /** A committed round is durable, not EOF. Refresh on committed and actual newer
  * keys only; a key received during a read remains dirty until a fresh read covers
  * it. No timer, retry, fixed delay, or extra model call advances this state. */
-export async function observeCacheCompletion({ body, runId, botId, initialChat, live, signal,
-  readChat, onEvent = () => {}, onRead = () => {}, onClosed = () => {} }) {
+export function observeCacheCompletion(options) { return observeCompletion(options, 'natural') }
+
+// The public protocol has no stopped frame. A stop observation needs a new
+// committed round and its persisted stopped marker; the caller also verifies
+// the current normal Stop action ACK. Old persisted prefixes never satisfy it.
+export function observeStoppedCompletion(options) { return observeCompletion(options, 'stopped') }
+
+async function observeCompletion({ body, runId, botId, initialChat, live, signal,
+  readChat, onEvent = () => {}, onRead = () => {}, onClosed = () => {} }, mode) {
   if (!Number.isSafeInteger(initialChat.cursor) || initialChat.cursor < 0 ||
     !Array.isArray(initialChat.persistedStreamIds) ||
     !validRevision(revision(initialChat, botId)) || typeof live.subscribe !== 'function' ||
@@ -92,11 +99,14 @@ export async function observeCacheCompletion({ body, runId, botId, initialChat, 
     if (event.type === 'start') {
       if (current && current.through === undefined || event.id !== `${runId}:${allRounds.length}`) fail('stream_turn_mismatch')
       current = { id: event.id, replyCharacters: 0 }; allRounds.push(current)
-      if (!prefix.has(event.id)) rounds.push(current)
+      if (!prefix.has(event.id)) {
+        rounds.push(current)
+        if (mode === 'stopped' && rounds.length !== 1) fail('stream_turn_mismatch')
+      }
       epoch++
     } else if (!current || event.id !== current.id || current.through !== undefined) fail('stream_turn_mismatch')
     const replayed = prefix.has(current.id)
-    if (event.type === 'tool' && !replayed) fail('unexpected_tool')
+    if (mode === 'natural' && event.type === 'tool' && !replayed) fail('unexpected_tool')
     if (event.type === 'text') current.replyCharacters += Array.from(event.delta).length
     if (event.type === 'reset') current.replyCharacters = Array.from(event.text).length
     if (event.type === 'committed') {
@@ -112,7 +122,7 @@ export async function observeCacheCompletion({ body, runId, botId, initialChat, 
     }
     // Old durable frames validate the replay prefix but never contribute this
     // send's first text, committed boundary, response size, or completion reads.
-    if (!replayed) onEvent(event, rounds)
+    if (!replayed) onEvent(event, rounds, nextSequence)
     notify()
   }, combined).then(() => {
     if (!combined.aborted) {
@@ -140,7 +150,7 @@ export async function observeCacheCompletion({ body, runId, botId, initialChat, 
           !Array.isArray(chat.persistedStreamIds) || !validRevision(returnedRevision)) fail('chat_invalid')
         if (chat.error !== null) fail('chat_completion_error')
         if (chat.streamRunId && chat.streamRunId !== runId) fail('stream_turn_mismatch')
-        if (chat.items.some(item => item.position > initialChat.cursor && (item.failure || item.stopped))) fail('reply_failed_or_stopped')
+        if (chat.items.some(item => item.position > initialChat.cursor && (item.failure || mode === 'natural' && item.stopped))) fail('reply_failed_or_stopped')
         onRead({ trigger, requiredRevision, returnedRevision, cursor: chat.cursor,
           working: chat.working, activeStream: Boolean(chat.streamRunId), observedRounds: rounds.length })
         if (returnedRevision < requiredRevision) fail('chat_revision_stale')
@@ -153,11 +163,13 @@ export async function observeCacheCompletion({ body, runId, botId, initialChat, 
         if (persisted.some(id => !rounds.some(round => round.id === id))) { await new Promise(resolve => { wake = resolve }); continue }
         if (chat.cursor < current.through || rounds.some(round => !persisted.includes(round.id) ||
           !chat.items.some(item => item.streamId === round.id && item.from === 'coordinator' &&
-            !item.pending && !item.failure && !item.stopped && typeof item.text === 'string' && item.text.length > 0 &&
+            !item.pending && !item.failure &&
+            (mode === 'stopped' ? item.stopped === true : !item.stopped && typeof item.text === 'string' && item.text.length > 0) &&
             Number.isSafeInteger(item.position) && item.position > initialChat.cursor && item.position <= round.through))) fail('reply_not_persisted')
-        if (rounds.some(round => !round.replyCharacters)) fail('reply_missing')
-        if (rounds.some(round => round.replyCharacters > 30)) fail('reply_too_long')
-        const termination = eof ? 'eof' : 'client_cancel_after_committed_idle'
+        if (mode === 'natural' && rounds.some(round => !round.replyCharacters)) fail('reply_missing')
+        if (mode === 'natural' && rounds.some(round => round.replyCharacters > 30)) fail('reply_too_long')
+        const termination = eof ? 'eof' : mode === 'stopped'
+          ? 'client_cancel_after_stopped_committed_idle' : 'client_cancel_after_committed_idle'
         local.abort('committed_idle'); await stream
         // The decoder's finally also awaits reader.cancel. An error already in
         // that cleanup must not disappear because our idle result arrived first.
