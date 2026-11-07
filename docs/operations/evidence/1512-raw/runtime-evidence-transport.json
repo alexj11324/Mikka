@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "scope": "Runtime release transport blocker; not production observability acceptance",
+  "observations": [
+    {
+      "runId": 42328947041,
+      "sourceCommit": "d72227c94eb25174c92d77e4c74e55abe578aa99",
+      "reportUtf8Bytes": 310446,
+      "subscriptionJob": 128277438932,
+      "cleanupJob": 128277531344,
+      "shellStarted": false,
+      "errorCode": "E2BIG"
+    },
+    {
+      "runId": 42331353700,
+      "sourceCommit": "080b14b4b1e098c055f1c6dea021a1c49d3f0131",
+      "reportUtf8Bytes": 310679,
+      "subscriptionJob": 128283538475,
+      "cleanupJob": 128283654772,
+      "shellStarted": false,
+      "errorCode": "E2BIG"
+    }
+  ],
+  "fixCommit": "c117d138de223e263767aafa0f00d51da3fbe36f",
+  "candidateHead": "e0eb1d56fdb01ba74387d594c47a7126ba1b2cc8",
+  "offlineNodeGate": {
+    "passed": 72,
+    "total": 72,
+    "realProviderCalls": 0
+  },
+  "recovery": {
+    "opsCommits": [
+      "38a6d0ba647936a709335d00494c140de18170b3",
+      "27b07bb346fd85e6098954a6fa51e7e45c1fcd4c"
+    ],
+    "reports": [
+      {
+        "file": "d722-candidate-recovery-42333273649.json",
+        "sha256": "17e5f5c7487a1e71a401bb96d868f50362c5c76a41def44d45941c837860040d"
+      },
+      {
+        "file": "080-candidate-recovery-42333571360.json",
+        "sha256": "a7b42e05ed70ecc335861604acc22e4582f470590c51481002f3b2c6dcc8a18a"
+      }
+    ],
+    "conclusion": "All six recorded candidate IDs returned 404 at recovery time; both exact-target sandbox inventories were empty and untruncated. Neither recovery issued DELETE. The earlier disappearance cause is unverified."
+  }
+}

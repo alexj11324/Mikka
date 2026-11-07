@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "operator": {
+    "repository": "alexj11324/Mikka",
+    "ref": "refs/heads/ops/1512-git-transport",
+    "opsCommit": "38a6d0ba647936a709335d00494c140de18170b3",
+    "runId": "42333273649",
+    "runAttempt": "1"
+  },
+  "sourceCodeCommit": "6adc26c6eab10deb0a873272de502cbc88828f53",
+  "targetRun": {
+    "id": 42328947041,
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "branch": "main",
+    "sourceCommit": "d72227c94eb25174c92d77e4c74e55abe578aa99",
+    "runAttempt": 1,
+    "status": "completed",
+    "conclusion": "failure"
+  },
+  "targetWorkerSha": "60ea0edacca350a3a088836d9c96e8f09e76d1d9",
+  "scope": {
+    "templates": 3,
+    "sandboxPages": 1,
+    "sandboxMutations": 0,
+    "providerCalls": 0,
+    "templateCreates": 0,
+    "configurationWrites": 0
+  },
+  "inventory": {
+    "pageLimit": 1,
+    "rows": [],
+    "truncated": false,
+    "status": "empty"
+  },
+  "status": "complete",
+  "errors": [],
+  "candidates": [
+    {
+      "kind": "desktop",
+      "templateId": "0a5qaq69lrw2bn7iz7pj",
+      "buildId": "8f58fa18-b373-4aca-8b3b-813cf1bd06e0",
+      "name": "mikka-d72227c94eb2-42328947041-1-desktop",
+      "status": "absent",
+      "deleteRequested": false,
+      "absenceConfirmedById": true,
+      "absenceHttpStatus": 404
+    },
+    {
+      "kind": "claude",
+      "templateId": "g249155wp8lskmgydask",
+      "buildId": "5601b5f1-36d7-4dfd-835f-52e8b055e727",
+      "name": "mikka-d72227c94eb2-42328947041-1-claude",
+      "status": "absent",
+      "deleteRequested": false,
+      "absenceConfirmedById": true,
+      "absenceHttpStatus": 404
+    },
+    {
+      "kind": "codex",
+      "templateId": "xjvt6dck202q4jpaabby",
+      "buildId": "b998290e-bf7a-461c-a4c4-7b3ac383c217",
+      "name": "mikka-d72227c94eb2-42328947041-1-codex",
+      "status": "absent",
+      "deleteRequested": false,
+      "absenceConfirmedById": true,
+      "absenceHttpStatus": 404
+    }
+  ]
+}
