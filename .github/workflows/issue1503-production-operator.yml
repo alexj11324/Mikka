@@ -58,14 +58,37 @@ jobs:
           secret-name: E2B_API_KEY
           recursive: false
           include-imports: false
+      - name: Import the pinned production application database
+        id: start_database
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Require the exact fixture idle and R5 lifetime after acquiring both queues
+        id: start_guard
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_database.outcome == 'success' }}
+        timeout-minutes: 2
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/start-guard.mjs
+        env:
+          NODE_ENV: production
+          VERCEL_ENV: production
+          MIKKA_EDITION: cloud
+          MIKKA_1503_START_FIXTURE_SHA256: 2d5418a9aa2d3571040595504bbd279de5d842e08db1dcf7d30b9821b280b312
       - name: Exercise explicit cloud task creation and full delivery on Claude Code
         id: claude_delivery
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_guard.outcome == 'success' }}
         run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: a23b2e0b48dc5cb2dac8bb9ecde734a03537339e
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 9ea7b2cd61deb724f20330906f86df6df2cd9828
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: claude_code
           MIKKA_1503_CODEX_QUESTION: '0'
@@ -79,12 +102,12 @@ jobs:
           retention-days: 3
       - name: Exercise explicit cloud task creation and full delivery on Codex
         id: codex_delivery
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_guard.outcome == 'success' }}
         run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: a23b2e0b48dc5cb2dac8bb9ecde734a03537339e
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 9ea7b2cd61deb724f20330906f86df6df2cd9828
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: codex
           MIKKA_1503_CODEX_QUESTION: '1'
