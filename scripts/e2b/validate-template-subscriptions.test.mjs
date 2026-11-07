@@ -8,14 +8,20 @@ import { join } from 'node:path'
 
 const COMMIT = 'a'.repeat(40), WORKER = 'b'.repeat(40)
 const DEVICE = '10000000-0000-4000-8000-000000000001', RUN = '10000000-0000-4000-8000-000000000002'
+const TEAM = '10000000-0000-4000-8000-000000000003', PERSONAL = '10000000-0000-4000-8000-000000000004'
+const OWNER = 'fixture-smoke-owner', ADMIN = 'fixture-shared-admin', EMAIL = 'acceptance+mikka-smoke@example.invalid'
+const hash = value => createHash('sha256').update(value).digest('hex')
+const team = { teamWorkspaceConfirmed: true, teamWorkspaceHash: hash('team-workspace\0' + TEAM), teamAdminMembershipVerified: true }
+const sharedScope = { verified: true, access: 'workspace_share', requesterHash: hash(OWNER).slice(0, 16), payerHash: hash(ADMIN).slice(0, 16),
+  workspaceHash: team.teamWorkspaceHash, connectionHash: 'e'.repeat(16), bindingHash: 'f'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: 'e'.repeat(64) }
 const report = { sourceCommit: COMMIT, workerSha: WORKER, templates: Object.fromEntries(['claude', 'codex'].map(kind => [kind, {
   templateId: `candidate-${kind}`, baseTemplate: kind, preinstalled: true,
 }])) }
 const proof = { deviceId: DEVICE, binarySha256: 'c'.repeat(64), version: '0.163.0' }
-const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscription_proved', cleanup: { errors: [] },
-  officialTiming: { enabled: true, cleaned: true }, samples: [{
+const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscription_proved', accountHash: hash(OWNER).slice(0, 16), team,
+  cleanup: { errors: [], workspaceRestored: true }, officialTiming: { enabled: true, cleaned: true }, samples: [{
   status: 'execution_proved_awaiting_server_timing', sourceCommit: COMMIT, harness, runId: RUN,
-  execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription' },
+  execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription', sharedScope: { ...sharedScope } },
   credentialRoute: 'subscription', replyVerified: true, cleanup: { status: 'passed' },
   minToolCalls: 1, requireReplyAfterTool: true, replyVerifiedAfterTool: true, toolCalls: [{ toolCallHash: 'd'.repeat(16), outcome: 'ok' }],
   requireAgentAcceptance: true, requireRuntimeReceipt: true, requireOfficialTiming: true,
@@ -39,11 +45,17 @@ const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscriptio
         model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', outcome: 'ok', status: 200, attempt: 1, sequence: 1 }] } },
 }] })
 
+test('the production gate logs in as SMOKE without pinning an owner workspace or bot', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+  assert.match(workflow, /secret-name: SMOKE_OWNER_EMAIL/)
+  assert.match(workflow, /secret-name: SMOKE_OWNER_PASSWORD/)
+  assert.doesNotMatch(workflow, /ACME_DEMO_|MIKKA_ACCEPTANCE_(?:WORKSPACE|BOT)_ID:/)
+})
+
 test('a different application commit is refused before login, enrollment or candidate creation', async () => {
   const calls = []
   await assert.rejects(validateTemplateSubscriptions(report, {
-    env: { GITHUB_SHA: COMMIT, ACME_DEMO_EMAIL: 'alex@acme.aspectlylabs.com', ACME_DEMO_PASSWORD: 'fixture',
-      MIKKA_ACCEPTANCE_WORKSPACE_ID: DEVICE, MIKKA_ACCEPTANCE_BOT_ID: RUN },
+    env: { GITHUB_SHA: COMMIT, SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: 'fixture' },
     fetchImpl: async input => { calls.push(new URL(input).pathname); return Response.json({ build: 'f'.repeat(40) }) },
     sandboxFactory: () => assert.fail('candidate must not be created'),
   }), /template_gate_application_build_mismatch/)
@@ -56,6 +68,7 @@ test('a release receipt names the actual candidate, revision, model and register
     harness: 'codex', model: 'gpt-6-luna', credentialRoute: 'subscription', replyVerified: true, runId: RUN,
     replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: 'd'.repeat(16), outcome: 'ok' },
     deviceId: DEVICE, officialBinarySha256: proof.binarySha256, officialCliVersion: proof.version,
+    sharedScope,
     agentAcceptance: { runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness: 'codex', kind: 'codex_turn_start_ack', at: 1100, ms: 100 },
     runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
       hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
@@ -77,24 +90,45 @@ test('a release receipt names the actual candidate, revision, model and register
     sample => { sample.minToolCalls = 0 }, sample => { sample.toolCalls = [] },
     sample => { sample.toolCalls[0].outcome = 'error' }, sample => { sample.toolCalls[0].toolCallHash = 'raw-tool-id' },
     sample => { sample.replyVerifiedAfterTool = false }, sample => { sample.requireReplyAfterTool = false },
+    sample => { sample.execution.sharedScope.verified = false }, sample => { sample.execution.sharedScope.access = 'owner' },
+    sample => { sample.execution.sharedScope.payerHash = sample.execution.sharedScope.requesterHash },
+    sample => { sample.execution.sharedScope.workspaceHash = 'f'.repeat(64) },
+    sample => { sample.execution.sharedScope.connectionRevision = 'private-response' },
   ]) {
     const value = accepted('codex'); mutate(value.samples[0])
     assert.throws(() => candidateReceipt(report, 'codex', proof, value), /template_gate_/)
   }
 })
 
-function candidateFixture(runAcceptance, cleanupFailure) {
+function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false } = {}) {
   const events = [], devices = []
   const fetchImpl = async (input, init) => {
-    const path = new URL(input).pathname
+    const url = new URL(input), path = url.pathname
     if (path.endsWith('/api/version')) return Response.json({ build: COMMIT })
-    if (path.endsWith('/api/auth/sign-in/email')) return Response.json({}, { headers: { 'set-cookie': 'session=fixture; HttpOnly' } })
-    if (path.endsWith('/api/auth/get-session')) return Response.json({ user: { email: 'alex@acme.aspectlylabs.com' } })
+    if (path.endsWith('/api/auth/sign-in/email')) {
+      assert.deepEqual(JSON.parse(init.body), { email: EMAIL, password: 'fixture', rememberMe: false })
+      return Response.json({}, { headers: { 'set-cookie': 'session=fixture; HttpOnly' } })
+    }
+    if (path.endsWith('/api/auth/get-session')) return Response.json({ user: { id: OWNER, email: EMAIL } })
     if (path.endsWith('/api/auth/sign-out')) { events.push('signed-out'); return Response.json({}) }
     assert.ok(init.headers.cookie.includes('session=fixture'))
+    if (path.endsWith('/api/workspace')) {
+      const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? PERSONAL)
+      return Response.json({ currentUserId: OWNER, workspace: { id: selected, kind: selected === TEAM ? 'team' : 'personal' },
+        role: selected === TEAM ? 'member' : 'admin', choices: [{ id: PERSONAL, kind: 'personal' }, { id: TEAM, kind: 'team' }],
+        members: selected === TEAM ? [{ userId: ADMIN, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] : [] })
+    }
+    if (path.endsWith('/api/bots/' + RUN)) return Response.json({ id: RUN, name: '测试1505 candidate fixture' })
     if (path.endsWith('/api/devices/enrollment')) return Response.json({ token: 'fixture-one-use' })
     const { action, args } = JSON.parse(init.body)
-    if (action === 'workspace.switchWorkspace') return Response.json({ ok: true, result: null })
+    if (action === 'workspace.switchWorkspace') {
+      if (args[0] === PERSONAL) {
+        events.push('restored-workspace')
+        if (failRestore) throw Error('private restore failure')
+      }
+      return Response.json({ version: 1, ok: true, result: { ok: true, data: { workspaceId: args[0] } } }, { headers: { 'set-cookie': 'mikka-workspace=' + args[0] + '; Path=/' } })
+    }
+    if (action === 'bots.createBot') { events.push('created-bot'); return Response.json({ ok: true, result: { id: RUN } }) }
     if (action === 'agents.listAgents') return Response.json({ ok: true, result: [{ id: RUN, deviceId: DEVICE, harness: devices.at(-1) }] })
     if (action === 'agents.removeDevice') {
       assert.deepEqual(args, [DEVICE]); events.push('removed')
@@ -119,10 +153,10 @@ function candidateFixture(runAcceptance, cleanupFailure) {
     }
   }
   return { events, options: { fetchImpl, sandboxFactory,
-    env: { GITHUB_SHA: COMMIT, ACME_DEMO_EMAIL: 'alex@acme.aspectlylabs.com', ACME_DEMO_PASSWORD: 'fixture',
-      MIKKA_ACCEPTANCE_WORKSPACE_ID: DEVICE, MIKKA_ACCEPTANCE_BOT_ID: RUN },
+    env: { GITHUB_SHA: COMMIT, SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: 'fixture' },
     runAcceptance: async options => {
       assert.equal(options.minToolCalls, 1)
+      assert.equal(options.workspace, TEAM); assert.equal(options.botId, RUN)
       assert.equal(options.runtimeEvidence, 'required')
       assert.equal(options.officialTiming, 'enabled')
       events.push(`tested-${options.harness}`)
@@ -137,8 +171,22 @@ test('a failed subscription still tests the other candidate and closes every cre
     return accepted(options.harness)
   })
   await assert.rejects(validateTemplateSubscriptions(report, fixture.options), /template_gate_subscription_or_cleanup_failed/)
-  assert.deepEqual(fixture.events, ['created-claude_code', 'tested-claude_code', 'removed', 'killed-claude_code',
-    'created-codex', 'tested-codex', 'removed', 'killed-codex', 'signed-out'])
+  assert.deepEqual(fixture.events, ['created-bot', 'created-claude_code', 'tested-claude_code', 'removed', 'killed-claude_code',
+    'created-codex', 'tested-codex', 'removed', 'killed-codex', 'restored-workspace', 'signed-out'])
+})
+
+test('candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session', async () => {
+  for (const failRestore of [false, true]) {
+    const fixture = candidateFixture(async options => {
+      const result = accepted(options.harness)
+      result.samples[0].execution.sharedScope.payerHash = 'c'.repeat(16)
+      return result
+    }, undefined, { failRestore })
+    await assert.rejects(validateTemplateSubscriptions(report, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+    assert.equal(fixture.events.filter(event => event === 'created-bot').length, 1)
+    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
+    assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
+  }
 })
 
 test('a real receipt rejection persists its run hash and reason without provider text or credentials', async () => {
