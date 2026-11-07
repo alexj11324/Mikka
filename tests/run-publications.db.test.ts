@@ -1,3 +1,5 @@
+// Next captures AsyncLocalStorage when its work stores are first imported.
+import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
