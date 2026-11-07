@@ -15,8 +15,9 @@ import (
 )
 
 // These tests exercise the existing public entry, the real pinned CPA
-// converter, and the final HTTP body. The baseline can compile this file
-// unchanged; its failure is a missing wire breakpoint, not a new helper import.
+// converter, and the final HTTP body. The subscription endpoint rejected the
+// marked side of production control 42349693112; public Responses API support
+// is not evidence that backend-api/codex accepts the same content-block field.
 func captureCodexCacheRequest(t *testing.T, modelID string, messages []any) map[string]any {
 	t.Helper()
 	payload, err := json.Marshal(map[string]any{
@@ -93,12 +94,12 @@ func codexCacheMessages(tail string, hinted bool) []any {
 	return messages
 }
 
-func TestCodexSubscriptionStableSystemCacheBreakpoints(t *testing.T) {
+func TestCodexSubscriptionPreservesImplicitCaching(t *testing.T) {
 	var stablePrefix []byte
 	for _, tail := range []string{"fixture-live-A", "fixture-live-B", "fixture-live-B"} {
 		body := captureCodexCacheRequest(t, "gpt-6-luna", codexCacheMessages(tail, true))
-		if count := codexCacheMarkerCount(body); count != 2 {
-			t.Fatalf("codex_stable_cache_breakpoints_missing: want 2 explicit stable-system markers, got %d", count)
+		if count := codexCacheMarkerCount(body); count != 0 {
+			t.Fatalf("codex_subscription_explicit_cache_marker: want no unsupported content-block markers, got %d", count)
 		}
 		input, _ := body["input"].([]any)
 		if len(input) != 4 || body["instructions"] != "" {
@@ -119,17 +120,13 @@ func TestCodexSubscriptionStableSystemCacheBreakpoints(t *testing.T) {
 			if part["type"] != "input_text" || part["text"] != wantText[index] {
 				t.Fatal("converted prompt text changed bytes")
 			}
-			if index < 2 {
-				if !reflect.DeepEqual(part["prompt_cache_breakpoint"], map[string]any{"mode": "explicit"}) {
-					t.Fatal("stable layer lacks its content-block explicit breakpoint")
-				}
-			} else if part["prompt_cache_breakpoint"] != nil {
-				t.Fatal("live tail or history received an explicit breakpoint")
+			if part["prompt_cache_breakpoint"] != nil {
+				t.Fatal("the subscription request contains an unsupported explicit breakpoint")
 			}
 		}
 		prefix, _ := json.Marshal(input[:2])
 		if stablePrefix != nil && !bytes.Equal(prefix, stablePrefix) {
-			t.Fatal("changing the live tail changed the explicit stable prefix")
+			t.Fatal("changing the live tail changed the implicit stable prefix")
 		}
 		stablePrefix = prefix
 		for _, key := range []string{"prompt_cache_options", "prompt_cache_key", "prompt_cache_retention", "metadata", "session_id", "mikka_cache_breakpoint"} {
@@ -141,31 +138,20 @@ func TestCodexSubscriptionStableSystemCacheBreakpoints(t *testing.T) {
 		if strings.Contains(string(raw), "mikka_cache_breakpoint") {
 			t.Fatal("private marker leaked to the provider")
 		}
-		for _, value := range input[:2] {
-			parts := objectMap(value)["content"].([]any)
-			delete(objectMap(parts[0]), "prompt_cache_breakpoint")
-		}
 		unhinted := captureCodexCacheRequest(t, "gpt-6-luna", codexCacheMessages(tail, false))
 		if !reflect.DeepEqual(body, unhinted) {
-			t.Fatal("explicit breakpoints changed other converted fields, tools or reasoning")
+			t.Fatal("legacy hints changed converted fields, tools or reasoning")
 		}
 	}
 }
 
 func TestCodexSubscriptionCacheBreakpointCompatibility(t *testing.T) {
-	for _, model := range []string{"gpt-5.6", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra"} {
-		t.Run(model, func(t *testing.T) {
-			if codexCacheMarkerCount(captureCodexCacheRequest(t, model, codexCacheMessages("tail", true))) != 2 {
-				t.Fatal("a supported canonical model lost stable-system boundaries")
-			}
-		})
-	}
-	for _, model := range []string{"gpt-5.5", "gpt-5.4", "gpt-5.6-unknown", "gpt-6", "gpt-6-unknown", "gpt-6.2-sol", "gpt-7-luna", "openai/gpt-6-luna", "claude-haiku-5-5", "fixture-model"} {
+	for _, model := range []string{"gpt-5.6", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-5.5", "gpt-5.4", "gpt-5.6-unknown", "gpt-6", "gpt-6-unknown", "gpt-6.2-sol", "gpt-7-luna", "openai/gpt-6-luna", "claude-haiku-5-5", "fixture-model"} {
 		t.Run(model, func(t *testing.T) {
 			marked := captureCodexCacheRequest(t, model, codexCacheMessages("tail", true))
 			unmarked := captureCodexCacheRequest(t, model, codexCacheMessages("tail", false))
 			if !reflect.DeepEqual(marked, unmarked) || codexCacheMarkerCount(marked) != 0 {
-				t.Fatal("an old or unknown model's request changed")
+				t.Fatal("the subscription route must ignore legacy cache hints regardless of model name")
 			}
 		})
 	}
@@ -175,20 +161,27 @@ func TestCodexSubscriptionCacheBreakpointAlignment(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		mutate func([]any) []any
-		want   int
 	}{
-		{"unhinted legacy", func(messages []any) []any { return codexCacheMessages("tail", false) }, 0},
-		{"coincident boundaries", func(messages []any) []any { return append(messages[:1], messages[2:]...) }, 1},
-		{"absent live tail", func(messages []any) []any { return append(messages[:2], messages[3:]...) }, 2},
-		{"three private markers", func(messages []any) []any { objectMap(messages[2])["mikka_cache_breakpoint"] = "stable_system_v1"; return messages }, 0},
-		{"non-string later system", func(messages []any) []any { objectMap(messages[2])["content"] = []any{map[string]any{"type": "text", "text": "tail"}}; return messages }, 0},
-		{"empty later system", func(messages []any) []any { objectMap(messages[2])["content"] = ""; return messages }, 0},
-		{"history first", func(messages []any) []any { return append(messages[3:], messages[:3]...) }, 0},
-		{"public part marker is not a private hint", func(messages []any) []any { return []any{map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": "rules", "prompt_cache_breakpoint": map[string]any{"mode": "explicit"}}}}, messages[3]} }, 0},
+		{"unhinted legacy", func(messages []any) []any { return codexCacheMessages("tail", false) }},
+		{"coincident boundaries", func(messages []any) []any { return append(messages[:1], messages[2:]...) }},
+		{"absent live tail", func(messages []any) []any { return append(messages[:2], messages[3:]...) }},
+		{"three private markers", func(messages []any) []any {
+			objectMap(messages[2])["mikka_cache_breakpoint"] = "stable_system_v1"
+			return messages
+		}},
+		{"non-string later system", func(messages []any) []any {
+			objectMap(messages[2])["content"] = []any{map[string]any{"type": "text", "text": "tail"}}
+			return messages
+		}},
+		{"empty later system", func(messages []any) []any { objectMap(messages[2])["content"] = ""; return messages }},
+		{"history first", func(messages []any) []any { return append(messages[3:], messages[:3]...) }},
+		{"public part marker is not supported on this route", func(messages []any) []any {
+			return []any{map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": "rules", "prompt_cache_breakpoint": map[string]any{"mode": "explicit"}}}}, messages[3]}
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if count := codexCacheMarkerCount(captureCodexCacheRequest(t, "gpt-6-luna", test.mutate(codexCacheMessages("tail", true)))); count != test.want {
-				t.Fatalf("want %d explicit markers, got %d", test.want, count)
+			if count := codexCacheMarkerCount(captureCodexCacheRequest(t, "gpt-6-luna", test.mutate(codexCacheMessages("tail", true)))); count != 0 {
+				t.Fatalf("want no subscription content-block markers, got %d", count)
 			}
 		})
 	}

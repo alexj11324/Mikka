@@ -51,7 +51,7 @@ test('the same model marks Claude cache breakpoints and leaves a Codex request a
   assert.equal(calls.at(-1)!.options, codexOptions)
 })
 
-test('the Codex subscription SDK request preserves only prepared stable-system cache hints', async () => {
+test('the Codex subscription SDK request preserves prepared layers without explicit cache hints', async () => {
   const system = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
   const prompt = [...system, { role: 'user' as const, content: [{ type: 'text' as const, text: 'fixture-request' }] }]
   const saved = structuredClone(prompt)
@@ -66,17 +66,19 @@ test('the Codex subscription SDK request preserves only prepared stable-system c
   } })('gpt-6-luna')
   const result = await model.doStream(forwarded)
   await result.stream.pipeTo(new WritableStream())
-  assert.deepEqual(body!.messages.map(message => message.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null], 'codex_stable_cache_hints_missing')
+  assert.deepEqual(body!.messages.map(message => message.mikka_cache_breakpoint ?? null), [null, null, null, null], 'codex_subscription_cache_hints_are_unsupported')
   assert.deepEqual(body!.messages.map(message => message.content), ['RULES', 'context', 'tail', 'fixture-request'])
   assert.equal('prompt_cache_options' in body!, false, 'implicit caching remains the default')
   assert.equal('prompt_cache_key' in body!, false)
   assert.equal(forwarded.abortSignal, options.abortSignal)
+  assert.equal(forwarded, options)
   assert.deepEqual(prompt, saved)
 })
 
-test('only the supported Codex CPA route maps prepared stable-system hints', async () => {
+test('Codex subscription and SIWC requests keep implicit cache behavior for every model', async () => {
   const prompt = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
   for (const frozen of [
+    { ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' as const },
     { ...selection, modelId: 'gpt-6-luna', route: 'openai_siwc' as const },
     { ...selection, modelId: 'gpt-5.5', route: 'codex_cpa' as const },
     { ...selection, modelId: 'gpt-6-unknown', route: 'codex_cpa' as const },

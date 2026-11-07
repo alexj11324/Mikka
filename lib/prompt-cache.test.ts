@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { cacheableInstructions, promptOptions, withCacheBreakpoints, withCodexSystemCacheBreakpoints } from './prompt-cache'
+import { cacheableInstructions, promptOptions, withCacheBreakpoints } from './prompt-cache'
 
 type Prompt = Parameters<typeof withCacheBreakpoints>[0]
 const prompt: Prompt = [
@@ -96,36 +96,4 @@ test('the actual compatible serializer retains both stable layers and the final 
     await codex.stream.pipeTo(new WritableStream())
     assert.equal(JSON.stringify(body).includes('cache_control'), false, 'without the Claude route mapping, a compatible model receives no Anthropic hints')
   }
-})
-
-test('Codex stable-system hints preserve bytes and other options, with at most two explicit layers', () => {
-  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
-  const input: Prompt = [{ ...system[0], providerOptions: { ...system[0].providerOptions, openaiCompatible: { other: 1 } } }, ...system.slice(1), ...prompt.slice(2)]
-  const saved = structuredClone(input)
-  const marked = withCodexSystemCacheBreakpoints(input, 'gpt-6-luna')
-  assert.deepEqual(marked.map(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null, null, null])
-  assert.deepEqual(marked.map(message => [message.role, message.content]), input.map(message => [message.role, message.content]))
-  assert.equal(marked[0].providerOptions?.openaiCompatible?.other, 1)
-  assert.equal(marked[2], input[2], 'the live tail is untouched')
-  assert.equal(marked[5], input[5], 'history keeps implicit caching')
-  assert.deepEqual(input, saved)
-  const extra: Prompt = [system[0], system[1], system[0], prompt[2], system[0]]
-  assert.deepEqual(withCodexSystemCacheBreakpoints(extra, 'gpt-6-luna').map(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null, null], 'only two initial system layers, never a later system message')
-  const collapsed = cacheableInstructions('RULEStail', 5, 5) as Prompt
-  assert.deepEqual(withCodexSystemCacheBreakpoints(collapsed, 'gpt-6-luna').map(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint ?? null), ['stable_system_v1', null])
-})
-
-test('Codex capability gating leaves old, unknown and unhinted prompts unchanged', () => {
-  const hinted = cacheableInstructions('RULEScontexttail', 12, 5) as Prompt
-  for (const model of ['gpt-5.6', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra']) {
-    assert.equal(withCodexSystemCacheBreakpoints(hinted, model).filter(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint === 'stable_system_v1').length, 2)
-  }
-  for (const model of ['gpt-5.5', 'gpt-5.4', 'gpt-5.6-unknown', 'gpt-6', 'gpt-6-unknown', 'gpt-6.2-sol', 'gpt-7-luna', 'openai/gpt-6-luna', 'claude-haiku-5-5', 'fixture-model']) {
-    assert.equal(withCodexSystemCacheBreakpoints(hinted, model), hinted, model)
-  }
-  const old = cacheableInstructions('RULEStail', 5) as Prompt
-  assert.equal(withCodexSystemCacheBreakpoints(old, 'gpt-6-luna'), old)
-  assert.equal(withCodexSystemCacheBreakpoints(prompt, 'gpt-6-luna'), prompt)
-  const conversationFirst: Prompt = [prompt[2], hinted[0]]
-  assert.equal(withCodexSystemCacheBreakpoints(conversationFirst, 'gpt-6-luna'), conversationFirst)
 })
