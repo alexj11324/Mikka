@@ -1,0 +1,95 @@
+--- a/lib/live/channel.ts
++++ b/lib/live/channel.ts
+@@ -51,8 +51,9 @@
+   private generation = 0
+   private connected = false
+   /** Continuous coverage starts at this generation's capability acknowledgement.
+-   * Every valid push advances it, including keys not yet subscribed here. */
++   * Pushes advance only their bounded event kind, including unsubscribed keys. */
+   private coverageAfter: number | null = null
++  private invalidationAfter = new Map<LiveKind, number>()
+   private capabilities = new Set<LiveKind>()
+   private revisionKinds = new Set<LiveKind>()
+   private presenceSupported = false
+@@ -94,7 +95,8 @@
+       if (this.runtime.visible()) { this.fallback(); void this.connect() }
+     }
+     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
+-      this.supported(subscription) ? this.coverageAfter ?? undefined : undefined)
++      this.supported(subscription) && this.coverageAfter !== null
++        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
+     this.syncPresence()
+     this.fallback()
+     this.scheduleDeadline(subscription)
+@@ -159,6 +161,7 @@
+   private closeSocket() {
+     this.connected = false
+     this.coverageAfter = null
++    this.invalidationAfter.clear()
+     this.capabilities.clear(); this.revisionKinds.clear()
+     this.presenceSupported = false
+     for (const watch of this.presenceWatches.values()) this.clear(`presence:${watch.id}`)
+@@ -422,7 +425,8 @@
+           const value = liveInvalidation(parsed, this.revisionKinds.size > 0)
+           if (value) {
+             this.observe({ event: 'received', kind: value.kind, id: value.id, rev: value.rev })
+-            const after = this.coverageAfter = readBoundary()
++            const after = readBoundary()
++            this.invalidationAfter.set(value.kind, after)
+             this.invalidate(value.kind, value.id, false, false, value.rev !== undefined && this.revisionKinds.has(value.kind) ? value.rev : undefined, after)
+           } else this.observe({ event: 'skipped', reason: 'invalid' })
+         } catch { /* malformed keys/capabilities cannot trigger reads or disable fallback */ }
+--- a/lib/live/channel.test.ts
++++ b/lib/live/channel.test.ts
+@@ -2,7 +2,7 @@
+ import test from 'node:test'
+ import { LiveChannel, LIVE_FALLBACK_MS, type LiveRuntime, type LiveSocket, type LiveTicket } from './channel'
+ import { DEVICE_GATEWAY_TICKET_SECONDS } from '../device-gateway-ticket'
+-import { readBoundary } from '../swr/read-observer'
++import { acceptSWRRead, observeSWRRead, readBoundary, readFresh } from '../swr/read-observer'
+ 
+ import { LIVE_KINDS, type LiveKind } from './events'
+ import type { PresenceProof } from './presence'
+@@ -252,6 +252,42 @@
+   f.channel.dispose()
+ })
+ 
++
++for (const scenario of ['other-kind', 'own-kind', 'reconnect', 'before-open'] as const) test(`a late read keeps exact coverage after ${scenario}`, async () => {
++  const f = fixture(), key = 'late-chat', value = { items: ['authorized'] }
++  const cache = new Map<string, { data: typeof value }>()
++  let requests = 0
++  const commit = async () => {
++    const pending = observeSWRRead(cache, key, async () => { requests++; return value })
++    const data = await pending
++    // The original SWR onSuccess accepts this response, then commits the same
++    // object. Exercise the production read proof without replacing its logic.
++    acceptSWRRead(cache, key, data)
++    cache.set(key, { data })
++    await settle()
++  }
++  f.subscribe()
++  try {
++    if (scenario === 'before-open') await commit()
++    await f.open()
++    if (scenario !== 'before-open') await commit()
++    if (scenario === 'reconnect') {
++      f.sockets[0].close()
++      await f.advance(1_000)
++      await f.open()
++    } else if (scenario !== 'before-open') {
++      f.sockets.at(-1)!.message(JSON.stringify({
++        kind: scenario === 'other-kind' ? 'factory_task' : 'bot_chat', id: other,
++      }))
++    }
++    f.channel.subscribe('bot_chat', other, [key], (_key, _required, _reuse, after) =>
++      readFresh(cache, key, after!, commit, () => true, () => true))
++    await f.advance(100)
++    assert.equal(requests, scenario === 'other-kind' ? 1 : 2,
++      'only a continuously covered read without a matching-kind event can be reused')
++  } finally { f.channel.dispose() }
++})
++
+ for (const missing of ['capabilities', 'kind', 'presence'] as const) test(`a late subscription without ${missing} coverage retains its new read boundary`, async () => {
+   const f = fixture(), after: number[] = []
+   if (missing === 'capabilities') f.capabilities(null)

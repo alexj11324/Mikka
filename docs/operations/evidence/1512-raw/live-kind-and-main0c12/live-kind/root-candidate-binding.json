@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "candidate": {
+    "branch": "fix/1512-live-kind-coverage-20261107",
+    "commit": "db988428a95a47637f04089ffc51aad37343c9dd",
+    "tree": "cdf9170d22d0f5e64e2ad63ebac8ca9011472486",
+    "parent": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e"
+  },
+  "testSource": "f753504932f69bc6d35fee28c88a033e679b26a5",
+  "originalFiles": [
+    {
+      "path": "lib/live/channel.ts",
+      "gitBlob": "2f462c3080b1a561c194c0ee8c7633a21f2c5fa5",
+      "bytes": 23821,
+      "sha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "gitBlob": "65a21869ee0d2daa2e8e04d7b4c2a3c20d0c6787",
+      "bytes": 44287,
+      "sha256": "963178edb6e99f92160230ff165aeebea6e43d9798ded176f04fe248e0a9aadd"
+    }
+  ],
+  "appliedFiles": [
+    {
+      "path": "lib/live/channel.test.ts",
+      "sha": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "additions": 37,
+      "deletions": 1
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "sha": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "additions": 7,
+      "deletions": 3
+    }
+  ],
+  "rootChecks": {
+    "sourceBlobsUnchangedBetweenTestBaseAndCandidateBase": true,
+    "onlyTwoFilesChanged": true,
+    "sourceAndTapFullBytesReadBack": true,
+    "loaderAppendsOnlyExistingRelativeTsExtensions": true,
+    "isolatedPackageOriginalRecoveredFromRetainedUploadContent": true
+  },
+  "integration": {
+    "batchRefChanged": false,
+    "mainRefChanged": false,
+    "fullCiRun": false,
+    "nativeBudgetPassed": null,
+    "productionAcceptance": false
+  },
+  "limits": [
+    "The candidate fixes a deterministically reproduced redundant read across event kinds.",
+    "No attribution of all historical extra Native reads is claimed.",
+    "Ready/presence, own-kind, reconnect and before-open read requirements are retained.",
+    "No product UI, counter window, threshold, database operation or polling was added."
+  ]
+}

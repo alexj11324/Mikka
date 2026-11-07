@@ -1,0 +1,100 @@
+{
+  "observedAt": "2026-11-07 18:58:18 UTC",
+  "projectId": 670821,
+  "scouts": [
+    {
+      "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+      "skill_name": "signals-scout-ai-observability",
+      "display_name": "Mikka AI observability scout",
+      "enabled": true,
+      "status": "active",
+      "emit": true,
+      "run_interval_minutes": 1440,
+      "last_precheck_at": "2026-11-07T07:47:10.721056Z",
+      "last_precheck_outcome": "skip",
+      "last_precheck_row_count": 0,
+      "last_run_at": "2026-11-07T07:30:00Z",
+      "consecutive_failure_count": 0,
+      "outputInbox": true,
+      "outputSlackNull": true,
+      "outputWebhookNull": true
+    },
+    {
+      "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+      "skill_name": "signals-scout-apm",
+      "display_name": "Mikka APM regression scout",
+      "enabled": true,
+      "status": "active",
+      "emit": true,
+      "run_interval_minutes": 1440,
+      "last_precheck_at": "2026-11-07T06:58:30.571703Z",
+      "last_precheck_outcome": "run",
+      "last_precheck_row_count": 1,
+      "last_run_at": "2026-11-07T06:30:00Z",
+      "consecutive_failure_count": 0,
+      "outputInbox": true,
+      "outputSlackNull": true,
+      "outputWebhookNull": true
+    }
+  ],
+  "timeline": {
+    "id": "C9vQAc1L",
+    "title": "Mikka 运行时间线 · #1512",
+    "version": 15,
+    "kernel": {
+      "status": "stopped",
+      "cpu_cores": 1,
+      "memory_gb": 2,
+      "idle_timeout_seconds": 3600
+    },
+    "variables": [
+      {
+        "name": "run_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "thread_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "task_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "trace_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "lookback_hours",
+        "type": "number",
+        "value": 24
+      }
+    ],
+    "sqlCells": [
+      {
+        "id": "8f15f2e8-8c0b-4505-b0d7-e6150c8d5cb3",
+        "status": "done",
+        "code": "SELECT\n    formatDateTime(toTimeZone(min(timestamp), 'UTC'), '%Y-%m-%d %H:%i:%S') AS started_utc,\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    arrayStringConcat(groupUniqArray(service_name), ', ') AS services,\n    arrayStringConcat(groupUniqArrayIf(attributes['mikka.run_id'], notEmpty(coalesce(attributes['mikka.run_id'], ''))), ', ') AS run_ids,\n    arrayStringConcat(groupUniqArrayIf(attributes['mikka.thread_id'], notEmpty(coalesce(attributes['mikka.thread_id'], ''))), ', ') AS thread_ids,\n    arrayStringConcat(groupUniqArrayIf(attributes['mikka.task_id'], notEmpty(coalesce(attributes['mikka.task_id'], ''))), ', ') AS task_ids,\n    count() AS observed_spans,\n    countIf(status_code = 2) AS error_spans,\n    round(dateDiff('millisecond', min(timestamp), max(end_time)), 2) AS observed_elapsed_ms\nFROM posthog.trace_spans\nWHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n  AND service_name IN ('mikka-web', 'mikka-daemon')\nGROUP BY trace_id\nORDER BY min(timestamp) DESC\nLIMIT 40"
+      },
+      {
+        "id": "3f5a1c64-b0de-4a32-be51-341666af8a79",
+        "status": "done",
+        "code": "WITH matched_traces AS (\n    SELECT DISTINCT trace_id\n    FROM posthog.trace_spans\n    WHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND (\n          ({run_id} != '' AND coalesce(attributes['mikka.run_id'], '') = {run_id})\n          OR ({thread_id} != '' AND coalesce(attributes['mikka.thread_id'], '') = {thread_id})\n          OR ({task_id} != '' AND coalesce(attributes['mikka.task_id'], '') = {task_id})\n          OR ({trace_id} != '' AND trace_id = base64Encode(unhex({trace_id})))\n      )\n    LIMIT 100\n)\nSELECT\n    formatDateTime(toTimeZone(timestamp, 'UTC'), '%Y-%m-%d %H:%i:%S') AS started_utc,\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    lower(hex(base64Decode(span_id))) AS span_id_hex,\n    lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n    service_name,\n    name AS stage,\n    dateDiff('millisecond', min(timestamp) OVER (PARTITION BY trace_id), timestamp) AS offset_ms,\n    round(duration_nano / 1000000, 2) AS duration_ms,\n    status_code,\n    is_root_span,\n    attributes['mikka.run_id'] AS run_id,\n    attributes['mikka.thread_id'] AS thread_id,\n    attributes['mikka.task_id'] AS task_id,\n    attributes['mikka.workflow_run_id'] AS workflow_run_id,\n    attributes['mikka.error.code'] AS error_code,\n    attributes['error.type'] AS error_type,\n    attributes['sessionId'] AS session_id\nFROM posthog.trace_spans\nWHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND trace_id IN (SELECT trace_id FROM matched_traces)\nORDER BY timestamp, duration_nano DESC\nLIMIT 2000"
+      },
+      {
+        "id": "3c4b2757-6de2-4d50-bfe8-0b6991b68b00",
+        "status": "done",
+        "code": "WITH matched_traces AS (\n    SELECT DISTINCT trace_id\n    FROM posthog.trace_spans\n    WHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND (\n          ({run_id} != '' AND coalesce(attributes['mikka.run_id'], '') = {run_id})\n          OR ({thread_id} != '' AND coalesce(attributes['mikka.thread_id'], '') = {thread_id})\n          OR ({task_id} != '' AND coalesce(attributes['mikka.task_id'], '') = {task_id})\n          OR ({trace_id} != '' AND trace_id = base64Encode(unhex({trace_id})))\n      )\n    LIMIT 100\n)\nSELECT\n    formatDateTime(toTimeZone(timestamp, 'UTC'), '%Y-%m-%d %H:%i:%S') AS logged_utc,\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    lower(hex(base64Decode(span_id))) AS span_id_hex,\n    service_name,\n    severity_text,\n    if(body IN ('mikka.stage.completed', 'mikka.stage.failed'), body, '') AS event_name,\n    attributes['mikka.stage'] AS stage,\n    toFloatOrNull(attributes['mikka.duration_ms']) AS duration_ms,\n    attributes['mikka.run_id'] AS run_id,\n    attributes['mikka.thread_id'] AS thread_id,\n    attributes['mikka.task_id'] AS task_id,\n    attributes['mikka.workflow_run_id'] AS workflow_run_id,\n    attributes['mikka.error.code'] AS error_code,\n    attributes['error.type'] AS error_type\nFROM logs\nWHERE timestamp >= now() - toIntervalHour(least(greatest({lookback_hours}, 1), 336))\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND trace_id IN (SELECT trace_id FROM matched_traces)\nORDER BY timestamp\nLIMIT 1000"
+      }
+    ],
+    "pythonCount": 0
+  },
+  "preProduction": true,
+  "configurationChanged": false,
+  "kernelStarted": false,
+  "productionAcceptance": false
+}

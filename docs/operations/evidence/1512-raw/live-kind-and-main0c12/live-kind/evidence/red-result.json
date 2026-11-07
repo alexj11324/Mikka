@@ -1,0 +1,28 @@
+{
+  "nodeVersion": "v24.22.1",
+  "exitCode": 1,
+  "command": [
+    "node",
+    "--experimental-transform-types",
+    "--import",
+    "./resolve-typescript.mjs",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=^a late read keeps exact coverage after ",
+    "lib/live/channel.test.ts"
+  ],
+  "stdoutBytes": 1533,
+  "stderrBytes": 0,
+  "counts": {
+    "tests": 4,
+    "pass": 3,
+    "fail": 1,
+    "skipped": 0
+  },
+  "failedTests": [
+    "a late read keeps exact coverage after other-kind"
+  ],
+  "errorCodes": [
+    "ERR_ASSERTION"
+  ]
+}

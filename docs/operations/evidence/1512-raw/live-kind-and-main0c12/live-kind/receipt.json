@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "kind": "live-kind-coverage-source-regression",
+  "createdAt": "2026-11-07T19:03:35.363Z",
+  "status": "source_patch_verified_native_budget_unmeasured",
+  "source": {
+    "repository": "alexj11324/Mikka",
+    "commit": "f753504932f69bc6d35fee28c88a033e679b26a5",
+    "tree": "872a14057e4f9fab7b54bd2c44a93854f48751c5",
+    "originalFiles": [
+      {
+        "path": "lib/live/channel.ts",
+        "gitBlob": "2f462c3080b1a561c194c0ee8c7633a21f2c5fa5",
+        "bytes": 23821,
+        "sha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b"
+      },
+      {
+        "path": "lib/live/channel.test.ts",
+        "gitBlob": "65a21869ee0d2daa2e8e04d7b4c2a3c20d0c6787",
+        "bytes": 44287,
+        "sha256": "963178edb6e99f92160230ff165aeebea6e43d9798ded176f04fe248e0a9aadd"
+      }
+    ],
+    "applyRequirement": "The two target blobs must still match these originals; do not replace whole files across other product changes.",
+    "dependencies": [
+      {
+        "path": "lib/swr/read-observer.ts",
+        "bytes": 4604,
+        "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+        "gitBlob": "cb23eb39ddc29e746c437bf259ffc1db3ad08436",
+        "kind": "exact_source_dependency"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+        "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+        "kind": "exact_source_dependency"
+      },
+      {
+        "path": "lib/live/presence.ts",
+        "bytes": 4002,
+        "sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+        "gitBlob": "0b6ff3baba04a577b5d7f1c94a8519e77b013621",
+        "kind": "exact_source_dependency"
+      },
+      {
+        "path": "lib/live/revisions.ts",
+        "bytes": 4070,
+        "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+        "gitBlob": "dbef48a71d14c0f5a4f68b16c7a0aae32ecd184f",
+        "kind": "exact_source_dependency"
+      },
+      {
+        "path": "lib/device-gateway-ticket.ts",
+        "bytes": 1745,
+        "sha256": "e6358b210bd3c5955be1caaf9c21369b13533345cc72f83e00af68d278ceda88",
+        "gitBlob": "5a84bce13112ea010708fcd4406c19c683c62a50",
+        "kind": "exact_source_dependency"
+      },
+      {
+        "path": "package.json",
+        "bytes": 33,
+        "sha256": "89c47db7851f89caec72da4f215ebc21cf1e294aeef3b45d2583562d846ab035",
+        "gitBlob": "f9ec9b62f616f5c61144ef14c6cbbb1f8454f745",
+        "kind": "isolated_test_support"
+      },
+      {
+        "path": "resolve-typescript.mjs",
+        "bytes": 543,
+        "sha256": "badb0e535ac263b8cbf4b18ec72394cbb296f25d0bdef1b4e16e88fe3a227675",
+        "gitBlob": "656deccfb15e5a349ac914476e95b66ffd7d275d",
+        "kind": "isolated_test_support"
+      }
+    ]
+  },
+  "finding": {
+    "code": "UNRELATED_LIVE_KIND_ADVANCES_LATE_READ_BARRIER",
+    "observedSequence": [
+      "supported ready acknowledgement",
+      "B ordinary read begins and commits with exact read proof",
+      "valid push for A of a different LiveKind",
+      "late B subscription on the same continuously covered channel"
+    ],
+    "oldResult": "B issues a second read despite no B-kind invalidation after its committed read",
+    "correction": "Retain the global ready/presence coverage boundary and combine it with a separate last invalidation boundary for the subscription's LiveKind.",
+    "resourceBound": {
+      "kindCount": 29,
+      "entityIdMap": false
+    },
+    "unchanged": [
+      "onopen and reconnect catch-up",
+      "ready and presence acknowledgement global barrier",
+      "unknown-kind payload validation",
+      "per-event revision matching",
+      "owner/cache/read provenance fences",
+      "fallback and visibility behavior",
+      "UI and measurement windows"
+    ],
+    "reset": "closeSocket clears both global coverage and the per-kind map; reconnect establishes a new ready barrier.",
+    "conservativeBoundary": "All events of the same kind still advance that kind's watermark, even for a different entity ID."
+  },
+  "validation": {
+    "runtime": {
+      "nodeVersion": "v24.22.1",
+      "platform": "Linux amd64",
+      "runner": "built-in Node test runner with TypeScript transform",
+      "npmInstall": false,
+      "networkPolicy": "deny-all"
+    },
+    "red": {
+      "nodeVersion": "v24.22.1",
+      "exitCode": 1,
+      "command": [
+        "node",
+        "--experimental-transform-types",
+        "--import",
+        "./resolve-typescript.mjs",
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=^a late read keeps exact coverage after ",
+        "lib/live/channel.test.ts"
+      ],
+      "stdoutBytes": 1533,
+      "stderrBytes": 0,
+      "counts": {
+        "tests": 4,
+        "pass": 3,
+        "fail": 1,
+        "skipped": 0
+      },
+      "failedTests": [
+        "a late read keeps exact coverage after other-kind"
+      ],
+      "errorCodes": [
+        "ERR_ASSERTION"
+      ],
+      "expectedFailure": true,
+      "assertion": {
+        "expectedReads": 1,
+        "actualReads": 2
+      },
+      "source": "exact original channel.ts plus four new boundary cases"
+    },
+    "green": {
+      "exitCode": 0,
+      "command": [
+        "node",
+        "--experimental-transform-types",
+        "--import",
+        "./resolve-typescript.mjs",
+        "--test",
+        "--test-reporter=tap",
+        "lib/live/channel.test.ts"
+      ],
+      "stdoutBytes": 14323,
+      "stderrBytes": 0,
+      "counts": {
+        "tests": 59,
+        "pass": 59,
+        "fail": 0,
+        "skipped": 0
+      },
+      "failedTests": [],
+      "errorCodes": [],
+      "source": "patched channel.ts plus original suite and four new boundary cases"
+    },
+    "protectedCases": [
+      "own-kind push still causes a read",
+      "reconnect still causes a read",
+      "read that starts before initial connection coverage still causes a read"
+    ],
+    "whitespace": {
+      "command": "git diff --no-index --check <original> <modified>",
+      "results": [
+        {
+          "path": "lib/live/channel.ts",
+          "exitCode": 1,
+          "stdoutBytes": 0,
+          "stderrBytes": 0
+        },
+        {
+          "path": "lib/live/channel.test.ts",
+          "exitCode": 1,
+          "stdoutBytes": 0,
+          "stderrBytes": 0
+        }
+      ],
+      "interpretation": "Both commands returned 1 with zero stdout/stderr; preserve actual no-index difference exit, not a claimed lint/typecheck exit 0."
+    },
+    "notRun": [
+      "React/SWR integration suite",
+      "canonical TypeScript compiler",
+      "full lint",
+      "database tests",
+      "actual Native or browser acceptance",
+      "production requests"
+    ],
+    "sourceOnlyBoundary": "The four new tests invoke production LiveChannel and read-observer with the accepted-then-committed object sequence. They do not run a real React/SWR renderer."
+  },
+  "historicalBudget": {
+    "candidate": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "actualSource": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "nativeLogin": 210,
+    "webLogin": 209,
+    "bundledStartup": 184,
+    "hostedStartup": 132,
+    "accepted": false,
+    "attribution": "This deterministic source defect is not evidence that it caused all six additional logical requests in that historical Native window. The original evidence has no per-read trigger/barrier timeline. All background, PKCE, and cross-window counts remain in their original denominators."
+  },
+  "resources": {
+    "sessionId": "sbx_gSDmXaj1VoZB347ZvAQGOFGpOVwf",
+    "requestedTimeoutMs": 600000,
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "networkPolicy": {
+      "mode": "deny-all"
+    },
+    "ports": [],
+    "persistent": false,
+    "startedAt": "2026-11-07T18:57:53.271Z",
+    "stoppedAt": "2026-11-07T19:02:14.539Z",
+    "durationMs": 261268,
+    "activeCpuDurationMs": 4992,
+    "stopRequested": true,
+    "independentReadbackStatus": "stopped",
+    "activeOwnedResources": 0
+  },
+  "setupFailures": [
+    {
+      "phase": "create-input-validation",
+      "code": "INVALID_ARGUMENT",
+      "resourceCreated": false,
+      "description": "The string networkPolicy was rejected; corrected to object mode deny-all before the single successful creation."
+    },
+    {
+      "phase": "source-upload",
+      "code": "ARGUMENT_LIST_TOO_LONG",
+      "commandStarted": false
+    },
+    {
+      "phase": "source-upload",
+      "code": "CWD_NOT_FOUND",
+      "commandStarted": false,
+      "description": "The assumed /vercel/sandbox directory did not exist; subsequent work used the task-owned /tmp directory."
+    }
+  ],
+  "privacy": {
+    "reviewed": "source, deterministic fixture data, complete TAP and stdout/stderr only",
+    "scan": [
+      {
+        "path": "lib/live/channel.ts",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "lib/live/channel.test.ts",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/red.tap",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/red.stderr",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/red-result.json",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/green.tap",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/green.stderr",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/green-result.json",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/live-kind.patch",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/diffcheck-result.json",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/channel.ts.diffcheck.stdout",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/channel.ts.diffcheck.stderr",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/channel.test.ts.diffcheck.stdout",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/channel.test.ts.diffcheck.stderr",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      },
+      {
+        "path": "evidence/resolve-typescript.mjs",
+        "signedQuery": false,
+        "providerKey": false,
+        "pem": false,
+        "emails": 0
+      }
+    ],
+    "exceptions": [
+      "Existing fixture UUIDs, gateway.test endpoint and synthetic presence proof strings are test data, not account or provider credentials."
+    ],
+    "credentialsRead": false,
+    "rawApplicationLogs": false
+  },
+  "files": [
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 24031,
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+      "gitBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "bytes": 45859,
+      "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+      "gitBlob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/red.tap",
+      "bytes": 1533,
+      "sha256": "86469d55343420187c5a4272d27d21036d1e2057a8d260008b589cd302c41e43",
+      "gitBlob": "d2b980ebedcf3b9f4e909e0ebb834ef11ea3f74e",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/red.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/red-result.json",
+      "bytes": 555,
+      "sha256": "3cfd5b1e612f0498f166ce575b10f528e193af565dd957d2021abf99b7377d70",
+      "gitBlob": "743801221f58c69a52767d0ab5ed434266a45947",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/green.tap",
+      "bytes": 14323,
+      "sha256": "3a8e7b8acd7978d59c6bd6f5a7e06d37e7da1dd25f48b41303fdf9bf60ab7bea",
+      "gitBlob": "4f03cd7ba6cc9ad0b07e8e0a4c0ecbf26f4585b0",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/green.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/green-result.json",
+      "bytes": 379,
+      "sha256": "a46f4c5d9e82446e0836fd06ef86770a0afa6fc738edbfdc0479d5dfa4ea888a",
+      "gitBlob": "fa995757f65bbccd401d9d9f7559b83cf993cc91",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/live-kind.patch",
+      "bytes": 4610,
+      "sha256": "b4750498e28f8feb6b272f05ef5e79f3c2fb4c54d046b9481ee8a6d57f672b27",
+      "gitBlob": "44b59804bb0470b1caa75729bc9a51dd39802de5",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/diffcheck-result.json",
+      "bytes": 220,
+      "sha256": "70e36642ab1d837baa3d7997280f13ade58979721c02a0cc97efe6b0a5b472ee",
+      "gitBlob": "ee38c80fe9cba805acaee42e73375b40f2145ec9",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/channel.ts.diffcheck.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/channel.ts.diffcheck.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/channel.test.ts.diffcheck.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/channel.test.ts.diffcheck.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    },
+    {
+      "path": "evidence/resolve-typescript.mjs",
+      "bytes": 543,
+      "sha256": "badb0e535ac263b8cbf4b18ec72394cbb296f25d0bdef1b4e16e88fe3a227675",
+      "gitBlob": "656deccfb15e5a349ac914476e95b66ffd7d275d",
+      "remoteReadback": "exact UTF-8 bytes, SHA256 and Git blob verified"
+    }
+  ],
+  "git": {
+    "mutations": "unreferenced blobs only",
+    "refsChanged": false,
+    "commitsCreated": false,
+    "mainChanged": false
+  },
+  "overallProductionAcceptance": false
+}

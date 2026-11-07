@@ -1,0 +1,14 @@
+[
+  {
+    "path": "lib/live/channel.ts",
+    "exitCode": 1,
+    "stdoutBytes": 0,
+    "stderrBytes": 0
+  },
+  {
+    "path": "lib/live/channel.test.ts",
+    "exitCode": 1,
+    "stdoutBytes": 0,
+    "stderrBytes": 0
+  }
+]

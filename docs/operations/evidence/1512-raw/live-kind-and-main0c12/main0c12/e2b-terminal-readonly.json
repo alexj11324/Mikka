@@ -1,0 +1,785 @@
+{
+  "schemaVersion": 1,
+  "kind": "main_0c12_e2b_release_terminal_readonly",
+  "recordedAt": "2026-11-07T18:59:48.404Z",
+  "repository": "alexj11324/Mikka",
+  "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+  "run": {
+    "id": 42399456431,
+    "event": "push",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-11-07T18:04:49Z",
+    "updatedAt": "2026-11-07T18:56:25Z"
+  },
+  "jobs": [
+    {
+      "id": 128483869206,
+      "name": "test",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:07:10Z",
+      "completedAt": "2026-11-07T18:07:24Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Install only the offline gate test dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run python3 scripts/e2b/build-template.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run python3 scripts/e2b/official-files.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128484537038,
+      "name": "check",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:07:37Z",
+      "completedAt": "2026-11-07T18:07:50Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before runtime validation",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Check publication-control changes across this push",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Read the Vercel team token through Infisical workload identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Compare the worker hash with production",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128484647286,
+      "name": "validate / build",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:07:53Z",
+      "completedAt": "2026-11-07T18:16:48Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before building candidates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Install the pinned E2B SDK",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Read the existing E2B build key",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Build private versioned candidates and require official file conservation",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Preserve the complete private candidate report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Close leftover probes and failed private builds",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Preserve candidate build cleanup receipt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128486956955,
+      "name": "await-web",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:16:50Z",
+      "completedAt": "2026-11-07T18:29:33Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Await this source's actual Web build and public version",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128490218116,
+      "name": "subscriptions",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:29:35Z",
+      "completedAt": "2026-11-07T18:32:55Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before real subscription work",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Require one immutable candidate artifact reference",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Download this run's complete private candidate report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Bind the candidate bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Install only the pinned gate SDKs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Read the existing candidate E2B key",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Read the authorized acceptance account email",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Read the authorized acceptance account password",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Preserve closed diagnostics and any accepted subscription proof",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Make only fully accepted candidates public",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Preserve the complete public release report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 29,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 30,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 31,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128491079589,
+      "name": "publish / deploy",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:32:57Z",
+      "completedAt": "2026-11-07T18:56:04Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Refuse an obsolete source before release work",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Require one immutable runtime release artifact reference",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Download the complete verified runtime release report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Bind the release bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Read the Vercel deploy token",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Skip documentation-only changes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Read the existing Vercel runtime release token",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Publish the verified additive runtime pair inside the deployment queue",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Read the production values Vercel withholds from `vercel pull`",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Pull the production project settings and environment",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Fill build-time values",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Choose the deployment id",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Install the pinned workspace dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Verify the official runtime stays on the cloud edition",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Build (runs migrations last, as the Vercel build did)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Audit the public output for source and source maps",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Upload the prebuilt output to production",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Verify the public production version before releasing the deployment queue",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 49,
+          "name": "Post Check out the private UI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 50,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 51,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 52,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 53,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128496826767,
+      "name": "cleanup",
+      "headSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:56:06Z",
+      "completedAt": "2026-11-07T18:56:24Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Install the pinned cleanup SDK",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Read this release's E2B key",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Close this attempt's instances and remove only its private candidates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Preserve release cleanup receipt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "releaseGates": {
+    "privateBuildAndConservation": "success",
+    "exactCandidateReportBinding": "success",
+    "realClaudeCodeAndCodexSubscriptionStep": "success",
+    "makeAcceptedCandidatesPublic": "success",
+    "releaseReportBinding": "success",
+    "runtimeEnvironmentPublication": "success",
+    "productionUpload": "success",
+    "publicProductionVersionCheck": "success",
+    "independentFinalCleanup": "success"
+  },
+  "cleanup": {
+    "evidenceKind": "exact_closed_json_projection_from_cleanup_job_log_in_memory",
+    "jobId": 128496826767,
+    "actualCheckout": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "reportLine": 259,
+    "sourceCommit": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "runId": "42399456431",
+    "sandboxEntries": 0,
+    "templateCount": 3,
+    "templates": [
+      {
+        "kind": "desktop",
+        "templateId": "j28yoio6hjib4acqa8gl",
+        "status": "retained_public"
+      },
+      {
+        "kind": "claude",
+        "templateId": "g0j7tx3sk8v7e2mx9n4y",
+        "status": "retained_public"
+      },
+      {
+        "kind": "codex",
+        "templateId": "el1fw3afp67rcaulbg9o",
+        "status": "retained_public"
+      }
+    ],
+    "errorCount": 0,
+    "interpretation": "The final bounded run-owned sandbox scan returned no sandbox entries. All three identity-checked published templates were retained because public=true. No specific earlier kill count is inferred.",
+    "rawMixedLogPersisted": false
+  },
+  "cleanupArtifact": {
+    "id": 13586546916,
+    "name": "e2b-runtime-release-cleanup",
+    "archiveBytes": 422,
+    "archiveDigest": "sha256:de300c1a1a0bae99c78b00a5749926b2fe27a4effb30ef3dd9c4066f2bdbcc47",
+    "expired": false,
+    "downloaded": false
+  },
+  "sourceBindings": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 16516,
+      "sha256": "d847428b775b84e67a216721abab1fe91a8ad3866a2385a5ad6743f8d815b7f7"
+    },
+    {
+      "path": "scripts/e2b/cleanup-template-candidates.py",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 7437,
+      "sha256": "893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 50282,
+      "sha256": "367764322b93148fea3aafad5ee7f310499134d32d6d30665ec7f957f739bb37"
+    }
+  ],
+  "independentCloudCoreFailure": {
+    "file": "main-0c12-cloud-core-readonly.json",
+    "bytes": 5144,
+    "sha256": "e1be0f4231cd2426850c30e0e14ab6f08706ade8e217c25af9cd9ebcba948876",
+    "gitBlobSha1": "8769fcf8694f7af5a8c2bf9160364f9d31e1c6ef",
+    "readbackVerified": true,
+    "refMutation": false
+  },
+  "limitations": [
+    "Subscription and conservation results here are successful workflow gates, not a duplicate examination of every full accepted-report field.",
+    "The cleanup projection is from the job's closed print; no ZIP or signed URL was downloaded for this receipt.",
+    "Cloud-core compatibility remains separately failed at core_features/flags and is not made green by the runtime release.",
+    "No workflow, resource, provider, database or repository-ref mutation was initiated by this review."
+  ]
+}

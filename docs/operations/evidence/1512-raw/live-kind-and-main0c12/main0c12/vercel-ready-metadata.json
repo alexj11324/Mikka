@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+  "sourceMetadataVerified": true,
+  "deployment": {
+    "id": "dpl_6ywamzQy4e5e69QXohG3RYo1zmsY",
+    "name": "mikka",
+    "url": "mikka-p6dy6kwcf-mikka-dev.vercel.app",
+    "createdAt": 1794077299192,
+    "ready": 1794077735709,
+    "state": "READY",
+    "target": "production",
+    "alias": [
+      "app.aspectlylabs.com",
+      "mikka.aspectlylabs.com",
+      "new-base-nova-project-ten.vercel.app",
+      "mikka-mikka-dev.vercel.app"
+    ],
+    "aliasError": null
+  },
+  "boundaries": [
+    "Provider metadata only. Deployment READY plus alias assignment does not independently prove the current response body from the public origin.",
+    "The separate same-source GitHub publication receipt records its actual public-production version check."
+  ],
+  "observationWindowUtc": {
+    "after": "2026-11-07T18:55:45Z",
+    "before": "2026-11-07T18:56:33Z"
+  }
+}

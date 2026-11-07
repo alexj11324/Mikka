@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "purpose": "Exact Live-kind read-coverage regression plus separate main0c12/CI/PostHog readbacks; not production acceptance",
+  "baseEvidenceCommit": "e6a3beaf89f296a0864831e545d44376f04dc010",
+  "retainedCandidateParent": "db988428a95a47637f04089ffc51aad37343c9dd",
+  "createdAt": "2026-11-07 19:16:01 UTC",
+  "files": [
+    {
+      "path": "live-kind/lib/live/channel.ts",
+      "gitBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "bytes": 24031,
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/lib/live/channel.test.ts",
+      "gitBlob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "bytes": 45859,
+      "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/red.tap",
+      "gitBlob": "d2b980ebedcf3b9f4e909e0ebb834ef11ea3f74e",
+      "bytes": 1533,
+      "sha256": "86469d55343420187c5a4272d27d21036d1e2057a8d260008b589cd302c41e43",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/red.stderr",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/red-result.json",
+      "gitBlob": "743801221f58c69a52767d0ab5ed434266a45947",
+      "bytes": 555,
+      "sha256": "3cfd5b1e612f0498f166ce575b10f528e193af565dd957d2021abf99b7377d70",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/green.tap",
+      "gitBlob": "4f03cd7ba6cc9ad0b07e8e0a4c0ecbf26f4585b0",
+      "bytes": 14323,
+      "sha256": "3a8e7b8acd7978d59c6bd6f5a7e06d37e7da1dd25f48b41303fdf9bf60ab7bea",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/green.stderr",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/green-result.json",
+      "gitBlob": "fa995757f65bbccd401d9d9f7559b83cf993cc91",
+      "bytes": 379,
+      "sha256": "a46f4c5d9e82446e0836fd06ef86770a0afa6fc738edbfdc0479d5dfa4ea888a",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/live-kind.patch",
+      "gitBlob": "44b59804bb0470b1caa75729bc9a51dd39802de5",
+      "bytes": 4610,
+      "sha256": "b4750498e28f8feb6b272f05ef5e79f3c2fb4c54d046b9481ee8a6d57f672b27",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/diffcheck-result.json",
+      "gitBlob": "ee38c80fe9cba805acaee42e73375b40f2145ec9",
+      "bytes": 220,
+      "sha256": "70e36642ab1d837baa3d7997280f13ade58979721c02a0cc97efe6b0a5b472ee",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/channel.ts.diffcheck.stdout",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/channel.ts.diffcheck.stderr",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/channel.test.ts.diffcheck.stdout",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/channel.test.ts.diffcheck.stderr",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/evidence/resolve-typescript.mjs",
+      "gitBlob": "656deccfb15e5a349ac914476e95b66ffd7d275d",
+      "bytes": 543,
+      "sha256": "badb0e535ac263b8cbf4b18ec72394cbb296f25d0bdef1b4e16e88fe3a227675",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/lib/swr/read-observer.ts",
+      "gitBlob": "cb23eb39ddc29e746c437bf259ffc1db3ad08436",
+      "bytes": 4604,
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/lib/live/events.ts",
+      "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/lib/live/presence.ts",
+      "gitBlob": "0b6ff3baba04a577b5d7f1c94a8519e77b013621",
+      "bytes": 4002,
+      "sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/lib/live/revisions.ts",
+      "gitBlob": "dbef48a71d14c0f5a4f68b16c7a0aae32ecd184f",
+      "bytes": 4070,
+      "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/lib/device-gateway-ticket.ts",
+      "gitBlob": "5a84bce13112ea010708fcd4406c19c683c62a50",
+      "bytes": 1745,
+      "sha256": "e6358b210bd3c5955be1caaf9c21369b13533345cc72f83e00af68d278ceda88",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/package.json",
+      "gitBlob": "f9ec9b62f616f5c61144ef14c6cbbb1f8454f745",
+      "bytes": 33,
+      "sha256": "89c47db7851f89caec72da4f215ebc21cf1e294aeef3b45d2583562d846ab035",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/test-support/resolve-typescript.mjs",
+      "gitBlob": "656deccfb15e5a349ac914476e95b66ffd7d275d",
+      "bytes": 543,
+      "sha256": "badb0e535ac263b8cbf4b18ec72394cbb296f25d0bdef1b4e16e88fe3a227675",
+      "kind": "frozen_live_regression_payload"
+    },
+    {
+      "path": "live-kind/receipt.json",
+      "gitBlob": "0893cbe4e326edec2b4d8e374fd1ec857b1380f6",
+      "bytes": 16216,
+      "sha256": "61566cd50b4ae54660ec64048ee76ef22db4ea972496efe79c94d6580372d100",
+      "kind": "regression_receipt"
+    },
+    {
+      "path": "main0c12/e2b-terminal-readonly.json",
+      "gitBlob": "1a6af8548987f501a8f654912456a59f3cdb55cf",
+      "bytes": 24342,
+      "sha256": "c083592d3279ee36c73eab4b6ff562fa2e10a2d3d92bc87dee3f630f837b7c17",
+      "kind": "terminal_publication_receipt"
+    },
+    {
+      "path": "main0c12/vercel-ready-metadata.json",
+      "gitBlob": "eea3659f02080c514540fa5ca74f74cef8b6450c",
+      "bytes": 943,
+      "sha256": "bf0c0481fdbdb179852854d075b1ec06588d3eb55f22db3ba182eed4c50c9ecb",
+      "kind": "read_only_provider_metadata"
+    },
+    {
+      "path": "posthog/configuration-readback.json",
+      "gitBlob": "b5b415052a8e06bb4e4b422901abef1c640714d8",
+      "bytes": 6855,
+      "sha256": "dacdb9c096cf9accef7169c340d178af4f188fc9140e668630f294e80db4256d",
+      "kind": "preproduction_configuration_only"
+    },
+    {
+      "path": "ci-batch-f753-final.json",
+      "gitBlob": "f84221997a383d56b635595123a99375bb6f2c74",
+      "bytes": 17081,
+      "sha256": "90f1610ca9eaa834ae52c58310604040a98bf934da138edce7ecd7c2dd0ce913",
+      "kind": "final_workflow_metadata"
+    },
+    {
+      "path": "live-kind/root-candidate-binding.json",
+      "gitBlob": "7bc1016f5422e179b0f32c875351d81dea21f2cb",
+      "bytes": 1989,
+      "sha256": "4c3c1f421a0a94f9a67706e36137c90d753157441cb14410a22fc83c65a38a33",
+      "kind": "root_source_binding"
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "500c2c64749ddaec32992cc0476c5ad7979c0128",
+      "bytes": 4756,
+      "sha256": "224732929a2afbe056233f5dafff0a09904474d88f38b7d6c7442bd56e0afa3c",
+      "kind": "archive_readme"
+    },
+    {
+      "path": "privacy-check.json",
+      "gitBlob": "3ecda8473bba14f00d9aa9e16d2b6a418574c6c6",
+      "bytes": 5718,
+      "sha256": "dadb41ca3ddc033fc7f3bced6f4c8cda5415c3cdee347392d5a9737386e7aef4",
+      "kind": "supplementary_privacy_scan"
+    }
+  ],
+  "payloadCount": 30,
+  "payloadBytes": 189629,
+  "indexExcludesItself": true,
+  "candidateMergedIntoMain": false,
+  "nativeQueryBudgetPassed": null,
+  "productionAcceptance": false
+}

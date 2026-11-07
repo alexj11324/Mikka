@@ -1,0 +1,538 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact_head_batch_ci_metadata_final",
+  "recordedAt": "2026-11-07T19:01:41.693Z",
+  "repository": "alexj11324/Mikka",
+  "head": "f753504932f69bc6d35fee28c88a033e679b26a5",
+  "workflowCount": 17,
+  "workflowConclusions": {
+    "success": 15,
+    "failure": 1,
+    "cancelled": 1
+  },
+  "allWorkflowTerminal": true,
+  "allWorkflowsPassed": false,
+  "cancellationCause": "unknown",
+  "workflows": [
+    {
+      "id": 42402794150,
+      "name": "Unattended sandbox acceptance",
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:46:39Z"
+    },
+    {
+      "id": 42402794067,
+      "name": "Community settings UI evidence",
+      "path": ".github/workflows/community-settings-ui.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:46:22Z"
+    },
+    {
+      "id": 42402794127,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:45:05Z"
+    },
+    {
+      "id": 42402794157,
+      "name": "Mobile OTA update",
+      "path": ".github/workflows/mobile-update.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:47:03Z"
+    },
+    {
+      "id": 42402794126,
+      "name": "Device gateway",
+      "path": ".github/workflows/device-gateway.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:47:13Z"
+    },
+    {
+      "id": 42402794201,
+      "name": "Cloud computer backend",
+      "path": ".github/workflows/cloud-computer.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:47:27Z"
+    },
+    {
+      "id": 42402794087,
+      "name": "Self-hosting UI evidence",
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:47:28Z"
+    },
+    {
+      "id": 42402794115,
+      "name": "Read cache API acceptance",
+      "path": ".github/workflows/read-cache.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:48:28Z"
+    },
+    {
+      "id": 42402794081,
+      "name": "Local device Node 22",
+      "path": ".github/workflows/local-device-node22.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:49:02Z"
+    },
+    {
+      "id": 42402794065,
+      "name": "E2B subscription custody",
+      "path": ".github/workflows/e2b-byos.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:49:24Z"
+    },
+    {
+      "id": 42402794076,
+      "name": "Analytics SSR",
+      "path": ".github/workflows/analytics-ssr.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:49:56Z"
+    },
+    {
+      "id": 42402794109,
+      "name": "SSH device backend",
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:50:39Z"
+    },
+    {
+      "id": 42402794169,
+      "name": "Site search read contract",
+      "path": ".github/workflows/site-search.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:51:51Z"
+    },
+    {
+      "id": 42402794101,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:54:01Z"
+    },
+    {
+      "id": 42402794056,
+      "name": "Self-hosted image",
+      "path": ".github/workflows/self-hosted-image.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:58:05Z"
+    },
+    {
+      "id": 42402794113,
+      "name": "Desktop shell",
+      "path": ".github/workflows/desktop.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-07T18:44:46Z",
+      "updatedAt": "2026-11-07T18:58:51Z"
+    },
+    {
+      "id": 42402794012,
+      "name": "Browser gate",
+      "path": ".github/workflows/browser-gate.yml",
+      "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:44:45Z",
+      "updatedAt": "2026-11-07T18:44:51Z"
+    }
+  ],
+  "ci": {
+    "runId": 42402794101,
+    "attempt": 1,
+    "jobCount": 12,
+    "jobConclusions": {
+      "success": 9,
+      "failure": 2,
+      "skipped": 1
+    },
+    "jobs": [
+      {
+        "id": 128494075215,
+        "name": "Changed files",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:03Z",
+        "completedAt": "2026-11-07T18:45:14Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128494130010,
+        "name": "Database checks (2/4)",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:16Z",
+        "completedAt": "2026-11-07T18:49:15Z",
+        "nonSuccessSteps": [
+          {
+            "number": 8,
+            "name": "Save native dependency packages (main only)",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 13,
+            "name": "Verify local execution identities and repository records (isolated Postgres)",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 14,
+            "name": "Verify thread sharing, membership and privacy against isolated database",
+            "conclusion": "skipped"
+          }
+        ]
+      },
+      {
+        "id": 128494130045,
+        "name": "Integration unit checks",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-07T18:45:16Z",
+        "completedAt": "2026-11-07T18:52:10Z",
+        "nonSuccessSteps": [
+          {
+            "number": 28,
+            "name": "Run pnpm test:issues",
+            "conclusion": "failure"
+          },
+          {
+            "number": 29,
+            "name": "Run pnpm test:issue-search",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 30,
+            "name": "Shared protocol unit tests",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 31,
+            "name": "E2B local API relay",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 32,
+            "name": "Audit business UI composition",
+            "conclusion": "skipped"
+          }
+        ]
+      },
+      {
+        "id": 128494130055,
+        "name": "Core unit checks",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:16Z",
+        "completedAt": "2026-11-07T18:53:55Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128494130072,
+        "name": "Database checks (4/4)",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:16Z",
+        "completedAt": "2026-11-07T18:48:58Z",
+        "nonSuccessSteps": [
+          {
+            "number": 8,
+            "name": "Save native dependency packages (main only)",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 13,
+            "name": "Verify local execution identities and repository records (isolated Postgres)",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 14,
+            "name": "Verify thread sharing, membership and privacy against isolated database",
+            "conclusion": "skipped"
+          }
+        ]
+      },
+      {
+        "id": 128494130077,
+        "name": "Source checks",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:16Z",
+        "completedAt": "2026-11-07T18:47:56Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128494130120,
+        "name": "Database checks (3/4)",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:16Z",
+        "completedAt": "2026-11-07T18:50:05Z",
+        "nonSuccessSteps": [
+          {
+            "number": 8,
+            "name": "Save native dependency packages (main only)",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 13,
+            "name": "Verify local execution identities and repository records (isolated Postgres)",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 14,
+            "name": "Verify thread sharing, membership and privacy against isolated database",
+            "conclusion": "skipped"
+          }
+        ]
+      },
+      {
+        "id": 128494130156,
+        "name": "Database checks (1/4)",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:20Z",
+        "completedAt": "2026-11-07T18:49:35Z",
+        "nonSuccessSteps": [
+          {
+            "number": 8,
+            "name": "Save native dependency packages (main only)",
+            "conclusion": "skipped"
+          }
+        ]
+      },
+      {
+        "id": 128494130189,
+        "name": "Daemon checks",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:45:20Z",
+        "completedAt": "2026-11-07T18:48:40Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128494130892,
+        "name": "Cloud credential access (OIDC)",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T18:45:14Z",
+        "completedAt": "2026-11-07T18:45:14Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128495349667,
+        "name": "Production build and browser interactions",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:50:07Z",
+        "completedAt": "2026-11-07T18:50:10Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128496289390,
+        "name": "UI policy (strict)",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-07T18:53:57Z",
+        "completedAt": "2026-11-07T18:54:00Z",
+        "nonSuccessSteps": [
+          {
+            "number": 2,
+            "name": "Require the full suite unless only documentation changed",
+            "conclusion": "failure"
+          }
+        ]
+      }
+    ],
+    "directFailure": {
+      "file": "batch-f753-task-read-fixture-diagnosis.json",
+      "bytes": 5077,
+      "sha256": "01484623de1ce000905a1f7ea9ae05d920a08269e9130d8e6a77333fcf0f9210",
+      "gitBlobSha1": "e3740072339f811d68466c7d2e9dea0230146828",
+      "remoteBytesVerified": true,
+      "sourceOrRefMutation": false
+    },
+    "sourceChecksSucceeded": true,
+    "fourPgShardsSucceeded": true,
+    "aliasFailureNotObservedInThisRun": true
+  },
+  "desktop": {
+    "runId": 42402794113,
+    "attempt": 1,
+    "jobs": [
+      {
+        "id": 128494033763,
+        "name": "checks",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:44:53Z",
+        "completedAt": "2026-11-07T18:47:20Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128494034062,
+        "name": "smoke",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:44:53Z",
+        "completedAt": "2026-11-07T18:49:50Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128494034064,
+        "name": "icon",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:44:53Z",
+        "completedAt": "2026-11-07T18:45:18Z",
+        "nonSuccessSteps": []
+      },
+      {
+        "id": 128495282877,
+        "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+        "headSha": "f753504932f69bc6d35fee28c88a033e679b26a5",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "startedAt": "2026-11-07T18:49:53Z",
+        "completedAt": "2026-11-07T18:58:50Z",
+        "nonSuccessSteps": [
+          {
+            "number": 14,
+            "name": "Package an inspector-enabled harness input",
+            "conclusion": "cancelled"
+          },
+          {
+            "number": 15,
+            "name": "Real Keychain encryption across three independent packaged processes",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 16,
+            "name": "Real packaged Apple Silicon native acceptance",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 20,
+            "name": "Audit native evidence",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 21,
+            "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "conclusion": "skipped"
+          },
+          {
+            "number": 40,
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "skipped"
+          }
+        ]
+      }
+    ],
+    "realNativeStep": "skipped",
+    "freshNativeBudget": "not_available",
+    "reason": "Apple Silicon job cancelled at packaging step 14 before real crypto and native acceptance."
+  },
+  "metadataOnlyBoundaries": {
+    "noNewModelOrDbCalls": true,
+    "noRerunsOrCancellations": true,
+    "conditionalSkipsNotProductionProof": true,
+    "pgCountsNotReconstructedHere": true,
+    "sourceOrRefMutation": false
+  }
+}

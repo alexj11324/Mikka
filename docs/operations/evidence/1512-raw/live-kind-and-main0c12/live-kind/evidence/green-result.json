@@ -1,0 +1,22 @@
+{
+  "exitCode": 0,
+  "command": [
+    "node",
+    "--experimental-transform-types",
+    "--import",
+    "./resolve-typescript.mjs",
+    "--test",
+    "--test-reporter=tap",
+    "lib/live/channel.test.ts"
+  ],
+  "stdoutBytes": 14323,
+  "stderrBytes": 0,
+  "counts": {
+    "tests": 59,
+    "pass": 59,
+    "fail": 0,
+    "skipped": 0
+  },
+  "failedTests": [],
+  "errorCodes": []
+}

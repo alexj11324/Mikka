@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "filesChecked": 29,
+  "bytesChecked": 183911,
+  "findings": [],
+  "method": "Narrow static pattern checks on full UTF-8 text plus the source-specific closed-schema projections; not universal secret detection",
+  "allowedStaticFixtures": "Existing synthetic UUIDs, presence test tokens, gateway.test and Node test error messages contain no operational credentials or user messages",
+  "rows": [
+    {
+      "path": "live-kind/lib/live/channel.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/lib/live/channel.test.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/red.tap",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/red.stderr",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/red-result.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/green.tap",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/green.stderr",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/green-result.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/live-kind.patch",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/diffcheck-result.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/channel.ts.diffcheck.stdout",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/channel.ts.diffcheck.stderr",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/channel.test.ts.diffcheck.stdout",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/channel.test.ts.diffcheck.stderr",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/evidence/resolve-typescript.mjs",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/lib/swr/read-observer.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/lib/live/events.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/lib/live/presence.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/lib/live/revisions.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/lib/device-gateway-ticket.ts",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/package.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/test-support/resolve-typescript.mjs",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/receipt.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "main0c12/e2b-terminal-readonly.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "main0c12/vercel-ready-metadata.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "posthog/configuration-readback.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "ci-batch-f753-final.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "live-kind/root-candidate-binding.json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    },
+    {
+      "path": "README.md",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "emails": 0
+    }
+  ]
+}
