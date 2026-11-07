@@ -29,7 +29,7 @@ A missing directory, or one outside the repository, fails the build.
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
 | `chat-message` | today's message rows (`Message`, `Bubble`, `ReplyWaiting`) | `ChatMessageProps`, `ChatWaitingProps` in `components/slots/chat-message-contract.ts`; also exports `CHAT_SURFACE` | `coordinator-chat.tsx`, through `@ui-slot/chat-message` |
 | `reply-activity` | a reply's thinking and tool calls as Trace rows | `ActivityThinkingProps`, `ActivityToolView`, `ActivityGroupProps` in `components/slots/reply-activity-contract.ts`; exports `ActivityList`, `ActivityThinking`, `ActivityTool`, `ActivityGroup` | `components/coordinator/reply-activity.tsx`, through `@ui-slot/reply-activity` |
-| `settings-frame` | app rail and window bar around settings (`AppFrame`) | `SettingsFrameProps` in `components/slots/settings-frame-contract.ts`; also exports `OWN_SETTINGS_FRAME` (`false` by default: settings stay in the workspace frame; `true`: `IssueWorkspace` draws settings in this frame) | `SettingsFrame` from `@/components/settings/settings-shell`; `IssueWorkspace` |
+| `settings-frame` | app rail and window bar around settings (`AppFrame`) | `SettingsFrameProps` in `components/slots/settings-frame-contract.ts`; optional `OWN_SETTINGS_FRAME` (`false` or missing: settings stay in the workspace frame; `true`: `IssueWorkspace` draws settings in this frame) | `SettingsFrame` from `@/components/settings/settings-shell`; `IssueWorkspace` |
 | `settings-sidebar` | settings section list | `SettingsSidebarProps` in `components/slots/settings-sidebar-contract.ts` | `SettingsSidebar` from `@/components/settings/settings-sidebar` |
 | `settings-content` | heading and card around a section (`AppShellContent variant="settings"`) | `SettingsContentFrameProps` in `components/slots/settings-content-contract.ts` | `SettingsView` |
 | `settings-account` | 账户 body (picture, name, email, sign-out, delete account) | `SettingsAccountProps` in `components/slots/settings-account-contract.ts` | `AccountSettings` from `@/components/settings/account-settings` |
@@ -47,12 +47,26 @@ behaviour stay in this repository and reach the slot as props. A layer slot
 exports the same named component as the default, takes the same props and is
 a client component (`'use client'`).
 
+**Required and optional exports.** Production builds this repository's main
+with the layer's main, and the two merge at different times. A slot's
+required exports are listed in `UI_SLOT_EXPORTS` (`lib/ui-overlay.mjs`); every
+layer must export them, and callers may import only those by name. Anything
+else a slot exports is optional and is read through a namespace import with a
+fallback (`import * as slot from '@ui-slot/<name>'`, then
+`slot.X ?? fallback`): a layer that predates it still builds, because a
+missing named import fails the production build while a missing namespace
+member is just `undefined`. `lib/ui-overlay.test.mjs` fails when a caller
+imports any other name by name. To make a name required, merge the layer that
+exports it first, then add it to `UI_SLOT_EXPORTS`. On its side, the layer's CI
+builds each change together with this repository's main before it merges.
+
 The settings slots are filled together: a layer's frame draws the whole settings page, and its sidebar and content slots hand it their section list and title rather than drawing their own.
 
 Adding a slot: move today's component to `components/slots/<name>.tsx`, put
 its props in a contract file next to it, keep the public import path
-re-exporting it from `@ui-slot/<name>`, add the name to `UI_SLOTS`, and add a
-row above.
+re-exporting it from `@ui-slot/<name>`, add the name to `UI_SLOTS` and its
+required exports to `UI_SLOT_EXPORTS`, and add a row above. Merge the layer's
+slot only after this repository's slot is on main.
 
 ## Rules for the layer
 
