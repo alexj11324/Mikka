@@ -13,7 +13,7 @@ import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
 import { runAgentName, runBotId, runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
-import { queryVersion } from '@/lib/db/query-version'
+import { queryVersionWithExpiry } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { withDevicePresence } from '@/lib/live/presence-read'
@@ -56,20 +56,25 @@ async function readTaskRuns() {
   const begun = await beginOwnerListRead(session.user.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
-  const rows = await db.selectDistinctOn([agentRuns.issueId], {
+  const latest = db.selectDistinctOn([agentRuns.issueId], {
     // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`, agentName: runAgentName,
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'), agentName: runAgentName.as('agentName'),
     status: agentRuns.status, outcome: agentRuns.outcome,
-    botId: runBotId,
-    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`,
-    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
+    botId: runBotId.as('botId'),
+    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`.as('expiresAt'),
+    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
-  const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
-  const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
+    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200).as('latest_task_runs')
+  // Select the same 200 issues first. Bot decoration is a one-to-one join in
+  // this database; a missing or foreign bot cannot remove or duplicate a task.
+  const rows = await db.select({
+    issueId: latest.issueId, runId: latest.runId, issueTitle: latest.issueTitle, agentName: latest.agentName,
+    status: latest.status, outcome: latest.outcome, expiresAt: latest.expiresAt, harnesses: latest.harnesses,
+    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
+  }).from(latest).leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, session.user.id))).orderBy(latest.issueId)
   const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)
-  const items: TaskRun[] = rows.map(({ botId, expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId!, bot: looks.find(look => look.id === botId) ?? null }))
+  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId! }))
   return { items, live }
 }
 
@@ -152,11 +157,10 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
       .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
-    const signature = await queryVersion(snapshot)
-    const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
+    const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+interval '30 days'`)
+    const version = createHash('sha256').update(JSON.stringify([session.user.id, signature.version])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
-    const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
-    const live = withDevicePresence(await ownerListRead(session.user.id, [expiry?.at], observedAt, begun), presenceDevices, process.env, observedAt)
+    const live = withDevicePresence(await ownerListRead(session.user.id, [signature.expiresAt], observedAt, begun), presenceDevices, process.env, observedAt)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0

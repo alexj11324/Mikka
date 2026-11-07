@@ -1,6 +1,7 @@
 import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type LiveKind } from './events'
 import { liveRevisionKey, type LiveRevisions } from './revisions'
 import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_TOKEN_BYTES, PRESENCE_MAX_WATCHES_PER_SOCKET, presenceReply, type PresenceCommand, type PresenceProof } from './presence'
+import { readBoundary } from '../swr/read-observer'
 
 export const LIVE_FALLBACK_MS = 60_000
 const HEARTBEAT_MS = 30_000
@@ -33,11 +34,11 @@ export type LiveSubscriptionOptions = {
 }
 export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
 /** Shared reads cover every known revision; only fully versioned pushes may reuse a completed result. */
-export type LiveRefresh = (key: string, requiredRevisions?: Readonly<LiveRevisions>, reuseCompleted?: boolean) => unknown
+export type LiveRefresh = (key: string, requiredRevisions?: Readonly<LiveRevisions>, reuseCompleted?: boolean, after?: number) => unknown
 type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: LiveRefresh; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number>; presence: PresenceProof | null | undefined }
 type PresenceWatch = { id: string; proof: PresenceProof; coveredUntil: number | null; unavailable: boolean }
 /** An unversioned event always reads, while retaining any known revisions merged into that read. */
-type PendingRead = { refresh: Subscription['refresh']; at: number; unconditional: boolean; waits: { subscription: Subscription; key: string; rev: number }[] }
+type PendingRead = { at: number; after: number; unconditional: boolean; waits: { subscription: Subscription; key: string; rev: number }[] }
 const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(Object.entries(value ?? {})
   .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isSafeInteger(entry[1]) && entry[1] > 0))
 
@@ -202,6 +203,7 @@ export class LiveChannel {
 
   private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number) {
     if (!this.runtime.visible()) { this.observe({ event: 'skipped', reason: 'hidden', kind, id, rev }); return }
+    const after = readBoundary()
     for (const subscription of this.subscriptions) {
       if (kind && (subscription.kind !== kind || subscription.id !== id)) continue
       if (unsupportedOnly && this.connected && this.supported(subscription)) continue
@@ -211,7 +213,7 @@ export class LiveChannel {
         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
         const previous = this.pending.get(key)
         const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
-        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity),
+        this.pending.set(key, { at: Math.min(at, previous?.at ?? Infinity), after,
           unconditional: rev === undefined || previous?.unconditional === true, waits })
       }
     }
@@ -235,18 +237,19 @@ export class LiveChannel {
 
   private flush() {
     if (!this.runtime.visible()) return
-    const activeKeys = new Set([...this.subscriptions].flatMap(value => [...value.keys]))
     for (const [key, read] of this.pending) {
-      const { refresh, at } = read
-      if (!activeKeys.has(key)) { this.pending.delete(key); this.observe({ event: 'skipped', reason: 'unsubscribed', key }); continue }
+      const { at } = read
+      // A key can outlive one of its consumers (e.g. the native badge and its
+      // Board). Never let a departed consumer's refresh discard the obligation.
+      const entity = [...this.subscriptions].find(subscription => subscription.keys.includes(key))
+      if (!entity) { this.pending.delete(key); this.observe({ event: 'skipped', reason: 'unsubscribed', key }); continue }
       if (this.covered(read)) { this.pending.delete(key); this.skippedReads++; this.observe({ event: 'skipped', reason: 'covered', key }); continue }
       if (this.inFlight.has(key) || at > this.localNow()) continue
       this.pending.delete(key)
       this.lastRead.set(key, this.localNow())
       const request = Symbol()
       this.inFlight.set(key, request)
-      const entity = [...this.subscriptions].find(subscription => subscription.keys.includes(key))
-      this.observe({ event: 'read', key, kind: entity?.kind, id: entity?.id })
+      this.observe({ event: 'read', key, kind: entity.kind, id: entity.id })
       const settled = () => {
         if (this.inFlight.get(key) !== request) return
         this.inFlight.delete(key)
@@ -258,7 +261,7 @@ export class LiveChannel {
         revisions[ref] = Math.max(revisions[ref] ?? 0, rev)
         return revisions
       }, {}) : undefined
-      try { Promise.resolve(refresh(key, required, !read.unconditional)).catch(() => {}).finally(settled) }
+      try { Promise.resolve(entity.refresh(key, required, !read.unconditional, read.after)).catch(() => {}).finally(settled) }
       catch { settled() } // SWR owns read errors.
     }
     this.scheduleFlush()

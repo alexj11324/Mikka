@@ -544,6 +544,20 @@ test('a subscriber joining an already healthy channel reconciles a read that sta
   f.channel.dispose()
 })
 
+test('a pending shared-key catch-up uses a remaining subscriber when the last reader unmounts', async () => {
+  const f = fixture()
+  let mounted = true
+  f.channel.subscribe('task_run_list', task, ['task-runs'], () => { f.reads.push('persistent badge') })
+  const stop = f.channel.subscribe('task_run_list', task, ['task-runs'], () => { if (mounted) f.reads.push('board') })
+  try {
+    await f.open(); f.reads.length = 0
+    f.sockets[0].message(JSON.stringify({ kind: 'task_run_list', id: task }))
+    mounted = false; stop()
+    await f.advance(100)
+    assert.deepEqual(f.reads, ['persistent badge'], 'a retired refresh closure must not consume the remaining subscriber\'s obligation')
+  } finally { f.channel.dispose() }
+})
+
 test('a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs', async () => {
   const f = fixture(); f.capabilities(null)
   f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) })
