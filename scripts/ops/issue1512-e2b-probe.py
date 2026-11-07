@@ -1,9 +1,10 @@
-"""Reuse one recorded private candidate for one anonymous probe; never build/release.
+"""One private diagnostic candidate and one anonymous probe; never a release.
 
-The existing OIDC key stays in runner memory. The immutable source's additive
-builder and ownership-checked finalizers retain their normal contracts.
+The existing OIDC key stays in runner memory. The immutable additive builder
+is unchanged; this wrapper owns the corrected alias guard and ID cleanup.
 """
 import argparse
+import contextlib
 import importlib.util
 import json
 import logging
@@ -21,20 +22,17 @@ SOURCE_SHA = 'b8045b5661bcbf51eeecc74ceef19eceead93a10'
 REPOSITORY = 'alexj11324/Mikka'
 BRANCH = 'refs/heads/ops/1512-git-transport'
 APPLICATION = 'mikka-issue1512-desktop-probe'
-CANDIDATE_ORIGIN = {
-    'application': APPLICATION, 'repository': REPOSITORY, 'ref': BRANCH,
-    'sourceCommit': SOURCE_SHA, 'opsCommit': '75768047a9e513ace9a6f401e2b3b66fe3aab99d',
-    'runId': '42311837349', 'runAttempt': '1',
-}
-CANDIDATE = {
-    'kind': 'desktop', 'name': 'mikka-i1512-42311837349-1-desktop',
-    'templateId': '2ioitiq578dnb6vu51lr', 'buildId': '99f0f864-ff2d-400b-a175-2878d0004320',
-}
 PREFIX = 'mikka-model-probe '
 PHASES = {'entry', 'spawn', 'spawn_throw', 'spawn_error', 'catalogue_received',
           'catalogue_scan_bounded', 'exit', 'close', 'deadline_snapshot',
-          'parent_deadline_snapshot', 'parent_deadline_child', 'parent_exit'}
+          'parent_deadline_snapshot', 'parent_deadline_child', 'parent_exit',
+          'call_begin', 'call_return', 'call_throw', 'module_load_begin', 'module_load_return',
+          'module_load_throw', 'bundle_evaluation_begin', 'probe_branch_enter', 'hosted_probe_enter',
+          'binaries_resolved', 'fingerprint_ready', 'probe_scratch_ready', 'marker_unavailable'}
 HARNESSES = {'claude_code', 'codex'}
+APIS = {'spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'execPromisified', 'execFilePromisified'}
+MODULES = {'worker_bundle', 'claude_sdk', 'pino'}
+MARKERS = {'probe_branch_enter', 'hosted_probe_enter', 'binaries_resolved', 'fingerprint_ready', 'probe_scratch_ready'}
 SIGNALS = {'SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGBUS', 'other'}
 RESOURCES = {'PipeWrap', 'ProcessWrap', 'Timeout', 'TCPSocketWrap', 'TCPServerWrap',
              'FSWatcher', 'FSEventWrap', 'TTYWrap', 'other'}
@@ -44,6 +42,7 @@ ERROR_TYPES = {'TimeoutException', 'CommandExitException', 'ConnectError', 'HTTP
 CODES = {'workflow_identity_invalid', 'source_mismatch', 'ops_checkout_mismatch', 'source_dirty', 'ledger_invalid',
          'resource_identity_invalid', 'candidate_not_private', 'candidate_missing',
          'candidate_identity_mismatch', 'candidate_build_mismatch', 'candidate_alias_invalid', 'candidate_still_exists',
+         'candidate_collision', 'candidate_identity_unresolved', 'boundary_observer_incomplete',
          'catalogue_invalid', 'catalogue_missing', 'command_failed', 'key_missing',
          'diagnostic_deadline', 'interrupted', 'cleanup_incomplete', 'operation_failed'}
 
@@ -82,6 +81,10 @@ def safe_error(error):
     return value
 
 
+def candidate_name(context):
+    return f"mikka-i1512-{context['runId']}-{context['runAttempt']}-desktop"
+
+
 def save(path, ledger):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(path.name + '.tmp')
@@ -99,11 +102,12 @@ def stage(ledger, path, phase):
 
 
 def new_ledger(context):
-    return {'version': 2, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
-            'candidateOrigin': dict(CANDIDATE_ORIGIN),
-            'budget': {'candidates': 0, 'reusedCandidates': 1, 'probeSandboxes': 1, 'sandboxSeconds': 60,
+    return {'version': 3, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
+            'candidateOrigin': dict(context),
+            'budget': {'candidates': 1, 'cpuCount': 2, 'memoryMiB': 4096, 'probeSandboxes': 1, 'sandboxSeconds': 60,
                        'commandSeconds': 45, 'internalProbeMilliseconds': 20000},
-            'candidate': dict(CANDIDATE), 'candidateChecks': [],
+            'candidate': {'kind': 'desktop', 'name': candidate_name(context), 'absenceConfirmed': False, 'buildStarted': False},
+            'candidateChecks': [],
             'sandboxes': [], 'events': [], 'ignoredDiagnosticLines': 0,
             'probe': {'status': 'not_started'}, 'cleanup': {'status': 'not_started'}, 'cleanupHistory': []}
 
@@ -111,12 +115,19 @@ def new_ledger(context):
 def validate_ledger(ledger, context):
     if not isinstance(ledger, dict):
         fail('ledger_invalid')
+    candidate = ledger.get('candidate')
     if (set(ledger) - {'version', 'diagnosticOnly', 'releaseAccepted', 'identity', 'budget', 'candidate',
                       'candidateOrigin', 'candidateChecks', 'sandboxes', 'events', 'ignoredDiagnosticLines',
                       'probe', 'cleanup', 'cleanupHistory', 'phase'}
-            or ledger.get('version') != 2 or ledger.get('diagnosticOnly') is not True
+            or ledger.get('version') != 3 or ledger.get('diagnosticOnly') is not True
             or ledger.get('releaseAccepted') is not False or ledger.get('identity') != context
-            or ledger.get('candidateOrigin') != CANDIDATE_ORIGIN or ledger.get('candidate') != CANDIDATE
+            or ledger.get('candidateOrigin') != context or not isinstance(candidate, dict)
+            or set(candidate) - {'kind', 'name', 'absenceConfirmed', 'buildStarted', 'templateId', 'buildId'}
+            or candidate.get('kind') != 'desktop' or candidate.get('name') != candidate_name(context)
+            or type(candidate.get('absenceConfirmed')) is not bool or type(candidate.get('buildStarted')) is not bool
+            or (candidate['buildStarted'] and not candidate['absenceConfirmed'])
+            or (('templateId' in candidate or 'buildId' in candidate) and not candidate['buildStarted'])
+            or any(key in candidate and not opaque(candidate[key]) for key in ['templateId', 'buildId'])
             or not isinstance(ledger.get('sandboxes'), list)
             or any(not isinstance(row, dict) or set(row) - {'sandboxId', 'status'}
                    or not opaque(row.get('sandboxId')) for row in ledger['sandboxes'])):
@@ -128,8 +139,10 @@ def closed_event(value):
         return None
     numeric = {'elapsedMs', 'stdoutBytes', 'pid', 'catalogueCount', 'exitCode', 'spawned', 'catalogues', 'exited', 'closed'}
     boolean = {'catalogueSeen', 'exited', 'closed'}
-    allowed = {'version', 'phase', 'harness', 'signal', 'resources'} | numeric | boolean
-    if set(value) - allowed or ('harness' in value and value['harness'] not in HARNESSES):
+    allowed = {'version', 'phase', 'harness', 'api', 'module', 'marker', 'signal', 'resources'} | numeric | boolean
+    if (set(value) - allowed or ('harness' in value and value['harness'] not in HARNESSES | {'other'})
+            or ('api' in value and value['api'] not in APIS) or ('module' in value and value['module'] not in MODULES)
+            or ('marker' in value and value['marker'] not in MARKERS)):
         return None
     for key, item in value.items():
         if key in boolean and type(item) is bool:
@@ -169,7 +182,7 @@ class Collector:
                     value = closed_event(json.loads(line[len(PREFIX):]))
                 except (ValueError, TypeError):
                     pass
-            if value is None or len(self.ledger['events']) >= 64:
+            if value is None or len(self.ledger['events']) >= 128:
                 self.ledger['ignoredDiagnosticLines'] += 1
                 continue
             self.ledger['events'].append(value)
@@ -191,6 +204,21 @@ def inspect_candidate(builder, api_key, ledger, output, phase, allow_absent=Fals
     ledger['candidateChecks'].append(check)
     ledger['candidateChecks'] = ledger['candidateChecks'][-4:]
     try:
+        if 'templateId' not in candidate:
+            # A build can fail after allocating the private template but before
+            # returning its ID. Only our correctly preflighted alias may recover it.
+            try:
+                recovered = builder._request('GET', '/templates/aliases/' + quote(candidate['name'], safe=''), api_key)
+            except HTTPError as error:
+                if error.code == 404:
+                    fail('candidate_identity_unresolved')
+                raise
+            if not isinstance(recovered, dict) or not opaque(recovered.get('templateID')):
+                fail('candidate_identity_mismatch')
+            if recovered.get('public') is not False:
+                fail('candidate_not_private')
+            candidate['templateId'] = recovered['templateID']
+            save(output, ledger)
         try:
             info = builder._request('GET', '/templates/' + candidate['templateId'], api_key)
             check['idHttpStatus'] = 200
@@ -216,16 +244,24 @@ def inspect_candidate(builder, api_key, ledger, output, phase, allow_absent=Fals
         check['exactNameCount'] = int(candidate['name'] in all_names)
         check['qualifiedNameCount'] = len(qualified)
         builds = info.get('builds', [])
-        check['buildIdMatches'] = (isinstance(builds, list) and len(builds) == 1
-                                  and isinstance(builds[0], dict) and builds[0].get('buildID') == candidate['buildId']
-                                  and info.get('buildID', candidate['buildId']) == candidate['buildId']
-                                  and info.get('buildCount', 1) == 1)
-        check['buildReady'] = check['buildIdMatches'] and builds[0].get('status') == 'ready'
+        if 'buildId' not in candidate and phase == 'cleanup' and isinstance(builds, list) and len(builds) == 1:
+            if isinstance(builds[0], dict) and opaque(builds[0].get('buildID')):
+                candidate['buildId'] = builds[0]['buildID']
+        check['buildIdMatches'] = (isinstance(builds, list) and len(builds) <= 1
+                                  and (not builds and 'buildId' not in candidate or len(builds) == 1
+                                       and isinstance(builds[0], dict) and builds[0].get('buildID') == candidate.get('buildId')))
+        if phase == 'probe':
+            check['buildIdMatches'] = (check['buildIdMatches'] and len(builds) == 1
+                                      and info.get('buildID', candidate['buildId']) == candidate['buildId']
+                                      and info.get('buildCount', 1) == 1)
+        elif info.get('buildID') and info['buildID'] != candidate.get('buildId'):
+            check['buildIdMatches'] = False
+        check['buildReady'] = bool(check['buildIdMatches'] and builds and builds[0].get('status') == 'ready')
         if not check['templateIdMatches']:
             fail('candidate_identity_mismatch')
         if check['public'] is not False or check['isDefault'] not in {False, 'absent'}:
             fail('candidate_not_private')
-        if not check['buildIdMatches'] or not check['buildReady']:
+        if not check['buildIdMatches'] or phase == 'probe' and not check['buildReady']:
             fail('candidate_build_mismatch')
         if check['exactNameCount'] + check['qualifiedNameCount'] == 0 or len(qualified) > 1:
             fail('candidate_alias_invalid')
@@ -258,10 +294,15 @@ def inspect_candidate(builder, api_key, ledger, output, phase, allow_absent=Fals
 def cleanup_owned(builder, cleaner, context, api_key, ledger, output):
     validate_ledger(ledger, context)
     receipt = {'status': 'complete', 'metadataScanComplete': False, 'sandboxes': [], 'templates': [], 'errors': []}
+    candidate = ledger['candidate']
+    if not candidate['absenceConfirmed']:
+        ledger['cleanup'] = receipt
+        ledger.setdefault('cleanupHistory', []).append(receipt)
+        save(output, ledger)
+        return True
     try:
-        # Original and current workflow identities remain separate. The source
-        # finalizer rechecks every metadata field after its server-side query.
-        rows = cleaner.cleanup_sandboxes([context, ledger['candidateOrigin']], api_key)
+        # The source finalizer rechecks every metadata field after its query.
+        rows = cleaner.cleanup_sandboxes([context], api_key)
         for row in rows:
             if not opaque(row.get('sandboxId')) or row.get('status') not in {'killed', 'failed'}:
                 fail('resource_identity_invalid')
@@ -271,7 +312,6 @@ def cleanup_owned(builder, cleaner, context, api_key, ledger, output):
         receipt['metadataScanComplete'] = True
     except Exception as error:
         receipt['errors'].append({'phase': 'sandboxes', **safe_error(error)})
-    candidate = ledger['candidate']
     try:
         exists = inspect_candidate(builder, api_key, ledger, output, 'cleanup', allow_absent=True)
         if exists:
@@ -296,10 +336,50 @@ def cleanup_owned(builder, cleaner, context, api_key, ledger, output):
     return receipt['status'] == 'complete'
 
 
+class Sink:
+    def write(self, value):
+        return len(value)
+
+    def flush(self):
+        pass
+
+
+def assert_new_candidate(builder, name, api_key):
+    # The immutable builder's old name-as-ID check is not an ownership guard.
+    # Use the official alias route before calling its unchanged build function.
+    try:
+        builder._request('GET', '/templates/aliases/' + quote(name, safe=''), api_key)
+    except HTTPError as error:
+        if error.code == 404:
+            return
+        raise
+    fail('candidate_collision')
+
+
 def diagnose(builder, cleaner, sandbox_factory, context, api_key, hook_source, output):
     ledger = new_ledger(context)
-    stage(ledger, output, 'verifying_existing_candidate')
+    stage(ledger, output, 'preflight')
     try:
+        candidate = ledger['candidate']
+        assert_new_candidate(builder, candidate['name'], api_key)
+        candidate['absenceConfirmed'] = True
+        candidate['buildStarted'] = True
+        stage(ledger, output, 'building_private_desktop')
+        try:
+            with contextlib.redirect_stdout(Sink()), contextlib.redirect_stderr(Sink()):
+                sha, built = builder.build(candidate['name'], ref=SOURCE_SHA, api_key=api_key, kind='desktop',
+                                           cpu_count=2, memory_mb=4096, on_build_logs=lambda _: None)
+        except ValueError as error:
+            if error.args == ('template_name_already_exists',):
+                candidate.update(absenceConfirmed=False, buildStarted=False)
+                fail('candidate_collision')
+            raise
+        if not opaque(built.template_id) or not opaque(built.build_id):
+            fail('resource_identity_invalid')
+        candidate.update(templateId=built.template_id, buildId=built.build_id)
+        stage(ledger, output, 'candidate_built')
+        if sha != SOURCE_SHA:
+            fail('source_mismatch')
         inspect_candidate(builder, api_key, ledger, output, 'probe')
         stage(ledger, output, 'creating_anonymous_probe')
         sandbox = sandbox_factory(ledger['candidate']['templateId'], api_key=api_key, timeout=60, metadata=context)
@@ -332,6 +412,9 @@ def diagnose(builder, cleaner, sandbox_factory, context, api_key, hook_source, o
             if not isinstance(catalogue, list) or not catalogue:
                 fail('catalogue_missing')
             counts[harness] = min(len(catalogue), 500)
+        phases = {event['phase'] for event in ledger['events']}
+        if 'marker_unavailable' in phases or not MARKERS <= phases:
+            fail('boundary_observer_incomplete')
         ledger['probe'].update(status='passed', catalogueCounts=counts)
         stage(ledger, output, 'diagnostic_complete')
     except Exception as error:
@@ -362,7 +445,7 @@ def verify_checkout(source, expected_sha, mismatch_code):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['probe-existing', 'cleanup'])
+    parser.add_argument('mode', choices=['diagnose', 'cleanup'])
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()

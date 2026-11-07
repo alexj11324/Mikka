@@ -30,16 +30,31 @@ class Fake:
     def __init__(self, case='success'):
         self.case, self.calls, self.deleted = case, [], False
         self.context = probe.identity(ENV)
-        # No build/publication methods exist: recovery must never rebuild.
-        self.builder = SimpleNamespace(_request=self.info)
+        self.built = case == 'already_exists'
+        self.candidate = {'kind': 'desktop', 'name': probe.candidate_name(self.context),
+                          'templateId': 'owned-template', 'buildId': 'owned-build'}
+        self.builder = SimpleNamespace(_request=self.info, build=self.build)
         self.cleaner = SimpleNamespace(cleanup_sandboxes=self.clean_sandboxes)
         self.sandbox = SimpleNamespace(sandbox_id='owned-sandbox',
                                       files=SimpleNamespace(write=self.write), commands=SimpleNamespace(run=self.command))
 
+    def build(self, name, **kwargs):
+        self.calls.append(('build', name, kwargs))
+        assert name == self.candidate['name']
+        assert kwargs['ref'] == probe.SOURCE_SHA and kwargs['kind'] == 'desktop'
+        assert kwargs['cpu_count'] == 2 and kwargs['memory_mb'] == 4096 and kwargs['api_key'] == PRIVATE
+        kwargs['on_build_logs'](PRIVATE)
+        if self.case == 'build_before_create':
+            raise RuntimeError(PRIVATE)
+        self.built = True
+        if self.case == 'build_partial':
+            raise RuntimeError(PRIVATE)
+        return probe.SOURCE_SHA, SimpleNamespace(template_id=self.candidate['templateId'], build_id=self.candidate['buildId'])
+
     def info(self, method, path, api_key):
         self.calls.append(('info', method, path))
         assert api_key == PRIVATE
-        candidate = probe.CANDIDATE
+        candidate = self.candidate
         if method == 'DELETE':
             assert path == '/templates/' + candidate['templateId']
             if self.case != 'delete_not_applied':
@@ -74,10 +89,15 @@ class Fake:
                 value['builds'].append({'buildID': 'foreign-build', 'status': 'ready'})
             if self.case == 'build_missing':
                 value['builds'] = []
+            if self.case == 'build_partial':
+                value['builds'][0]['status'] = 'error'
+                value.pop('buildID')
             return value
         if path.startswith('/templates/aliases/'):
             alias = unquote(path.removeprefix('/templates/aliases/'))
             assert alias in {candidate['name'], 'fixture-project/' + candidate['name']}
+            if not self.built:
+                raise HTTPError('fixture', 404, PRIVATE, {}, None)
             if (self.case in {'qualified_fallback', 'qualified_alias_wrong', 'qualified_missing'} and alias == candidate['name']) or self.case == 'alias_missing':
                 raise HTTPError('fixture', 404, PRIVATE, {}, None)
             if self.case == 'qualified_missing':
@@ -89,7 +109,7 @@ class Fake:
 
     def create(self, template, **kwargs):
         self.calls.append(('create', template, kwargs))
-        assert template == probe.CANDIDATE['templateId']
+        assert template == self.candidate['templateId']
         assert kwargs == {'api_key': PRIVATE, 'timeout': 60, 'metadata': self.context}
         if self.case == 'create_partial':
             raise TimeoutException(PRIVATE)
@@ -109,7 +129,11 @@ class Fake:
         assert PRIVATE not in command and 'bootstrap.json' not in command
         callback = kwargs['on_stderr']
         callback(PRIVATE + '\n')
+        for phase in sorted(probe.MARKERS):
+            callback(probe.PREFIX + json.dumps({'version': 1, 'phase': phase, 'elapsedMs': 4}) + '\n')
         callback(probe.PREFIX + json.dumps({'version': 1, 'phase': 'spawn', 'harness': 'codex', 'pid': 42, 'elapsedMs': 4}) + '\n')
+        if self.case == 'missing_marker':
+            callback(probe.PREFIX + json.dumps({'version': 1, 'phase': 'marker_unavailable', 'marker': 'hosted_probe_enter', 'elapsedMs': 4}) + '\n')
         if self.case == 'timeout':
             raise TimeoutException(PRIVATE)
         reports = [{'harness': harness, 'installed': True, 'models': [PRIVATE]} for harness in sorted(probe.HARNESSES)]
@@ -119,7 +143,7 @@ class Fake:
 
     def clean_sandboxes(self, contexts, api_key):
         self.calls.append(('clean_sandboxes', deepcopy(contexts)))
-        assert contexts == [self.context, probe.CANDIDATE_ORIGIN] and api_key == PRIVATE
+        assert contexts == [self.context] and api_key == PRIVATE
         if self.case == 'cleanup_failure':
             raise RuntimeError(PRIVATE)
         return [{'sandboxId': 'owned-sandbox', 'status': 'killed'}] if any(c[0] == 'create' for c in self.calls) else []
@@ -143,10 +167,10 @@ class Guards(unittest.TestCase):
         self.assertEqual(result['repository'], ENV['GITHUB_REPOSITORY'])
         self.assertEqual(ENV['GITHUB_REF'], probe.BRANCH)
         ledger = probe.new_ledger(result)
-        self.assertNotEqual(ledger['candidateOrigin']['runId'], result['runId'])
-        self.assertNotEqual(ledger['candidateOrigin']['opsCommit'], result['opsCommit'])
-        self.assertEqual(ledger['candidateOrigin']['runId'], '42311837349')
-        self.assertEqual(ledger['candidate']['templateId'], '2ioitiq578dnb6vu51lr')
+        self.assertEqual(ledger['candidateOrigin'], result)
+        self.assertIsNot(ledger['candidateOrigin'], result)
+        self.assertEqual(ledger['candidate']['name'], 'mikka-i1512-123456-2-desktop')
+        self.assertNotIn('templateId', ledger['candidate'])
         for key, value in [('GITHUB_REF', 'refs/heads/main'), ('GITHUB_REPOSITORY', 'other/repo'),
                            ('GITHUB_SHA', PRIVATE), ('GITHUB_RUN_ID', '0'), ('GITHUB_RUN_ATTEMPT', '0')]:
             with self.assertRaises(probe.DiagnosticFailure):
@@ -168,33 +192,34 @@ class Guards(unittest.TestCase):
         self.assertEqual(ledger['probe']['catalogueCounts'], {'claude_code': 1, 'codex': 1})
         self.assertEqual(ledger['cleanup']['status'], 'complete')
         self.assertFalse(ledger['releaseAccepted'])
-        self.assertEqual(ledger['budget']['candidates'], 0)
-        self.assertEqual(ledger['budget']['reusedCandidates'], 1)
-        self.assertFalse(any(c[0] == 'build' for c in fake.calls))
+        self.assertEqual(ledger['budget']['candidates'], 1)
+        self.assertEqual(ledger['budget']['cpuCount'], 2)
+        self.assertEqual(ledger['budget']['memoryMiB'], 4096)
+        self.assertEqual(sum(c[0] == 'build' for c in fake.calls), 1)
         self.assertEqual(sum(c[0] == 'create' for c in fake.calls), 1)
         self.assertEqual(sum(c[0] == 'command' for c in fake.calls), 1)
         self.assertEqual(ledger['budget']['internalProbeMilliseconds'], 20000)
-        self.assertEqual(ledger['candidate'], probe.CANDIDATE)
+        self.assertEqual({key: ledger['candidate'][key] for key in fake.candidate}, fake.candidate)
         self.assertEqual(ledger['sandboxes'][0]['sandboxId'], 'owned-sandbox')
-        self.assertEqual(ledger['cleanup']['templates'][0]['templateId'], probe.CANDIDATE['templateId'])
+        self.assertEqual(ledger['cleanup']['templates'][0]['templateId'], fake.candidate['templateId'])
         self.assertTrue(ledger['cleanup']['templates'][0]['absenceConfirmedById'])
-        self.assertEqual(fake.calls[-1], ('info', 'GET', '/templates/' + probe.CANDIDATE['templateId']))
+        self.assertEqual(fake.calls[-1], ('info', 'GET', '/templates/' + fake.candidate['templateId']))
         self.assertTrue(fake.deleted)
 
     def test_timeout_preserves_closed_events_and_still_cleans_both_owned_resources(self):
         fake, ledger = self.run_case('timeout')
         self.assertEqual(ledger['probe']['status'], 'failed')
         self.assertEqual(ledger['probe']['error']['type'], 'TimeoutException')
-        self.assertEqual(ledger['events'][0]['phase'], 'spawn')
+        self.assertTrue(any(event['phase'] == 'spawn' for event in ledger['events']))
         self.assertEqual(ledger['cleanup']['status'], 'complete')
-        self.assertIn(('clean_sandboxes', [fake.context, probe.CANDIDATE_ORIGIN]), fake.calls)
+        self.assertIn(('clean_sandboxes', [fake.context]), fake.calls)
         self.assertTrue(fake.deleted)
 
-    def test_partial_sandbox_creation_recovers_only_the_two_exact_workflow_identities(self):
+    def test_partial_sandbox_creation_recovers_only_the_current_exact_workflow_identity(self):
         fake, ledger = self.run_case('create_partial')
         self.assertEqual(ledger['probe']['status'], 'failed')
         self.assertEqual(ledger['cleanup']['status'], 'complete')
-        self.assertIn(('clean_sandboxes', [fake.context, probe.CANDIDATE_ORIGIN]), fake.calls)
+        self.assertIn(('clean_sandboxes', [fake.context]), fake.calls)
         self.assertEqual(ledger['sandboxes'][0]['status'], 'recovered_by_metadata')
 
     def test_repeated_finalizer_keeps_the_first_cleanup_resource_evidence(self):
@@ -204,7 +229,7 @@ class Guards(unittest.TestCase):
             self.assertTrue(probe.cleanup_owned(fake.builder, fake.cleaner, fake.context, PRIVATE,
                                                ledger, Path(directory) / 'receipt.json'))
         self.assertEqual(ledger['sandboxes'][0]['sandboxId'], 'owned-sandbox')
-        self.assertEqual(ledger['candidate']['templateId'], probe.CANDIDATE['templateId'])
+        self.assertEqual(ledger['candidate']['templateId'], fake.candidate['templateId'])
         self.assertEqual(len(ledger['cleanupHistory']), 2)
         self.assertEqual(ledger['cleanupHistory'][0]['sandboxes'][0]['status'], 'killed')
         self.assertTrue(ledger['cleanup']['metadataScanComplete'])
@@ -238,19 +263,47 @@ class Guards(unittest.TestCase):
             if case == 'qualified_fallback':
                 self.assertEqual(check['aliasAttempts'][0]['httpStatus'], 404)
                 self.assertEqual(check['aliasAttempts'][1]['form'], 'qualified')
-                self.assertIn(('info', 'GET', '/templates/aliases/fixture-project%2F' + probe.CANDIDATE['name']), fake.calls)
+                self.assertIn(('info', 'GET', '/templates/aliases/fixture-project%2F' + fake.candidate['name']), fake.calls)
 
     def test_optional_default_field_matches_the_official_schema(self):
         _, ledger = self.run_case('default_absent')
         self.assertEqual(ledger['probe']['status'], 'passed')
         self.assertEqual(ledger['candidateChecks'][0]['isDefault'], 'absent')
 
-    def test_an_absent_id_is_recorded_but_does_not_create_or_rebuild_anything(self):
+    def test_an_absent_returned_id_is_recorded_without_rebuilding_or_starting_a_vm(self):
         fake, ledger = self.run_case('absent')
         self.assertEqual(ledger['probe']['error']['code'], 'candidate_missing')
         self.assertEqual(ledger['cleanup']['status'], 'complete')
         self.assertTrue(ledger['cleanup']['templates'][0]['absenceConfirmedById'])
         self.assertFalse(any(c[0] == 'create' or c[:2] == ('info', 'DELETE') for c in fake.calls))
+        self.assertEqual(sum(c[0] == 'build' for c in fake.calls), 1)
+
+    def test_correct_alias_preflight_refuses_a_preexisting_name_without_building_or_cleanup(self):
+        fake, ledger = self.run_case('already_exists')
+        self.assertEqual(ledger['probe']['error']['code'], 'candidate_collision')
+        self.assertEqual(fake.calls, [('info', 'GET', '/templates/aliases/' + fake.candidate['name'])])
+        self.assertFalse(ledger['candidate']['absenceConfirmed'])
+
+    def test_partial_build_recovers_its_id_and_failed_build_through_the_owned_alias(self):
+        fake, ledger = self.run_case('build_partial')
+        self.assertEqual(ledger['probe']['status'], 'failed')
+        self.assertEqual(ledger['candidate']['templateId'], fake.candidate['templateId'])
+        self.assertEqual(ledger['candidate']['buildId'], fake.candidate['buildId'])
+        self.assertEqual(ledger['cleanup']['status'], 'complete')
+        self.assertTrue(fake.deleted)
+        self.assertFalse(any(c[0] == 'create' for c in fake.calls))
+
+    def test_no_returned_id_and_no_resolvable_alias_never_claims_id_absence(self):
+        fake, ledger = self.run_case('build_before_create')
+        self.assertEqual(ledger['cleanup']['status'], 'incomplete')
+        self.assertEqual(ledger['cleanup']['errors'][0]['code'], 'candidate_identity_unresolved')
+        self.assertFalse(any(c[:2] == ('info', 'DELETE') for c in fake.calls))
+        self.assertNotIn('absenceConfirmedById', ledger['cleanup']['templates'][0])
+
+    def test_missing_source_markers_are_an_observer_failure_even_if_catalogues_return(self):
+        _, ledger = self.run_case('missing_marker')
+        self.assertEqual(ledger['probe']['error']['code'], 'boundary_observer_incomplete')
+        self.assertEqual(ledger['cleanup']['status'], 'complete')
 
     def test_a_concurrent_build_change_prevents_deletion_and_is_not_a_cleanup_pass(self):
         fake, ledger = self.run_case('changed_before_cleanup')
@@ -323,8 +376,8 @@ class Guards(unittest.TestCase):
         for forbidden in ['ACME_', 'SMOKE_', 'VERCEL_TOKEN', 'GITHUB_SHA:', 'GITHUB_REF:', 'contents: write', 'workflow_dispatch']:
             self.assertNotIn(forbidden, workflow)
         self.assertIn("if: always() && steps.key.outcome == 'success'", workflow)
-        self.assertIn('probe.py probe-existing', workflow)
-        self.assertNotIn('probe.py diagnose', workflow)
+        self.assertIn('probe.py diagnose', workflow)
+        self.assertNotIn('probe.py probe-existing', workflow)
 
 
 if __name__ == '__main__':
