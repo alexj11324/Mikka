@@ -30,6 +30,11 @@ test(
       mock.module(new URL("./workspace-db.ts", import.meta.url).href, {
         namedExports: { workspaceDb: drizzle(pool), workspacePool: pool },
       });
+      // Install the existing points fixture before the first model menu read.
+      // Points admission has its own DB tests; resource authorization below remains real.
+      mock.module(new URL("./points-fallback.ts", import.meta.url).href, {
+        namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) },
+      });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
@@ -190,8 +195,6 @@ test(
         }),
       });
       stub("./db/index.ts", { pool });
-      // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
-      stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) });
       const actions = await import("../app/actions/execution-settings");
       const { freezeBotModel } = await import('./bot-model-selection');
       const { SubscriptionRepository } = await import('./subscription-repository');
