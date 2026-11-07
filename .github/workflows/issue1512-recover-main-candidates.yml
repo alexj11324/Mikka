@@ -1,0 +1,71 @@
+name: Issue 1512 recover fixed failed release candidates
+
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths:
+      - .github/workflows/issue1512-recover-main-candidates.yml
+      - scripts/ops/issue1512-recover-main-candidates.py
+      - scripts/ops/issue1512-recover-main-candidates.test.py
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: issue1512-recover-main-candidates-42328947041-1
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  recover:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-git-transport' && startsWith(github.event.head_commit.message, 'issue1512:recover-main-candidates')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out the fixed cleanup guards
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 6adc26c6eab10deb0a873272de502cbc88828f53
+          path: source
+          persist-credentials: false
+      - name: Check out this recovery revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          persist-credentials: false
+      - name: Check the bounded recovery offline before requesting the key
+        run: python3 -B ops/scripts/ops/issue1512-recover-main-candidates.test.py --source source
+      - name: Install the pinned inventory SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/issue1512-candidate-recovery"
+          "$RUNNER_TEMP/issue1512-candidate-recovery/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Read only the existing E2B key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Recover only the three fixed failed-release candidates
+        run: >-
+          "$RUNNER_TEMP/issue1512-candidate-recovery/bin/python" -B ops/scripts/ops/issue1512-recover-main-candidates.py
+          --source source --output "$RUNNER_TEMP/issue1512-candidate-recovery.json"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Preserve actual ID cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-candidate-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1512-candidate-recovery.json
+          if-no-files-found: warn
+          retention-days: 7
