@@ -231,6 +231,21 @@ async function setup() {
       try { return (await fetch(`${origin}/mikka/zh-CN`, { signal: AbortSignal.any([signal, AbortSignal.timeout(90_000)]) })).ok } catch { return false }
     })
   })
+  // Vite can serve the shell before Nitro has compiled or started its worker.
+  // Wait for our owned runtime and a real API response before the one bounded
+  // attestation/login attempt. The account helper still proves the exact SHA
+  // and database with HMAC; the development version response has an empty build.
+  runtime = await step('runtime-ready', 120_000, signal => until(signal, async () => {
+    try {
+      const review = existing && process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE ? JSON.parse(await readFile(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, 'utf8')) : null
+      const value = JSON.parse(await readFile(resolve(review?.repositoryRoot ?? root, '.cache/dev-local/runtime.json'), 'utf8'))
+      if (!existing && value.daemonDataDir !== process.env.MIKKA_DEV_DAEMON_DIR) return null
+      const response = await fetch(`${origin}/mikka/api/version`, { redirect: 'error', credentials: 'omit', cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) })
+      const version = response.ok ? await response.json() : null
+      return typeof version?.build === 'string' ? value : null
+    } catch { return null }
+  }))
+  assert.equal(new URL(runtime.server ?? runtime.appUrl).origin, origin, 'runtime origin mismatch')
   accounts = await step('account-lease', 120_000, () => acquireTestAccounts({ environment, database: pool, runId, workerId: 'local-loop', requestId: runId }))
   if (needsModels) await step('local-account-ready', 120_000, signal => until(signal, async () => {
     const refreshed = await fetch('http://127.0.0.1:3191/refresh', { method: 'POST', signal: AbortSignal.timeout(90_000) })
@@ -239,14 +254,6 @@ async function setup() {
     assert.ok(keys.length, 'No real DeepSeek key seeded; refusing scripted/default model acceptance')
     return true
   }))
-  runtime = await step('runtime-ready', 120_000, signal => until(signal, async () => {
-    try {
-      const review = existing && process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE ? JSON.parse(await readFile(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, 'utf8')) : null
-      const value = JSON.parse(await readFile(resolve(review?.repositoryRoot ?? root, '.cache/dev-local/runtime.json'), 'utf8'))
-      return (existing || value.daemonDataDir === process.env.MIKKA_DEV_DAEMON_DIR) ? value : null
-    } catch { return null }
-  }))
-  assert.equal(new URL(runtime.server ?? runtime.appUrl).origin, origin, 'runtime origin mismatch')
   if (!needsDaemon) {
     await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, items: selectedItems, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, started: new Date(started).toISOString(), externalBoundaries: [needsModels ? 'Real DeepSeek model' : 'No model calls required by selected items', 'No daemon required by selected items', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
     return null
