@@ -62,6 +62,11 @@ export function toolTarget(tool: Pick<ChatTool, 'input'>): string | null {
 }
 
 /** The task or thread a call names by id (`runId`, `issueId`), for the chat to show by its name. */
+/** The thread a dispatch started, as lib/coordinator/context.ts reads it into the reply's cards; null for any other call. */
+export function dispatchedRunId(tool: Pick<ChatTool, 'name' | 'output'>): string | null {
+  return tool.name === 'dispatch_run' || tool.name === 'dispatch_bot_computer' ? field(tool.output, ['runId']) : null
+}
+
 export function toolObjectId(tool: Pick<ChatTool, 'input'>): string | null {
   return field(tool.input, ['runId', 'issueId', 'threadId', 'taskId'])
 }
