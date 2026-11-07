@@ -4,7 +4,7 @@ import { resolveAppOrigin } from '@/lib/auth-config'
 /** The one scope an MCP access token needs: act in Mikka as the person. */
 export const MCP_SCOPE = 'mikka'
 
-/** Where the app is served, e.g. https://app.aspectlylabs.com; better-auth's base URL. */
+/** The configured application origin, without its separately configured base path. */
 export const appOrigin = resolveAppOrigin(process.env)
 
 /** The MCP server's URL. Clients name it as the OAuth `resource` (RFC 8707). */

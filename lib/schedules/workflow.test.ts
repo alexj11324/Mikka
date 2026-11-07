@@ -17,6 +17,9 @@ stub('../coordinator/model.ts',{coordinatorStep:()=>({}),turnWarning})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
 stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{record('hosted')(...args);return result}})
 stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:native?'codex':'ai_sdk'})})
+// Scheduled single-round fixtures do not reach the bounded run's durable
+// handoff; the dedicated coordinator/handoff.test exercises that implementation.
+stub('../../workflows/coordinator/finish-turn.ts',{finishCoordinatorTurn:async()=>{throw new Error('unexpected bounded turn handoff')}})
 stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:async(...args:unknown[])=>{
  record('native')(...args)
  const create=args[4] as (scope?:NativeToolScope)=>unknown

@@ -5,9 +5,10 @@ import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { createRequestDatabaseScope } from './db/request-scope'
 import { mintDeviceEnrollment, consumeDeviceEnrollment } from './device-enrollment'
-import { authenticateDevice, hashDeviceToken } from './device-link'
+import { authenticateDevice, hashDeviceToken, linkDeviceToken } from './device-link'
 import { enqueueDeviceCommand, pendingDeviceCommands } from './device-management'
 import { removeOwnedDevice } from './device-removal'
+import { checkOwnedEnrollment, enrollmentToken } from '../scripts/acceptance/self-hosted-daemon.mjs'
 
 const url = process.env.E2E_DATABASE_URL
 if (!url || !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) || !new URL(url).pathname.endsWith('_e2e')) throw new Error('An isolated loopback *_e2e database is required')
@@ -29,7 +30,7 @@ before(async () => {
   await run(async () => {
     const { pool } = await import('./db')
     await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,kind text DEFAULT 'local',"removedAt" timestamptz,enabled boolean DEFAULT true,"lastSeenAt" timestamptz,"updatedAt" timestamptz);
-    CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text NOT NULL,"tokenHash" text NOT NULL,name text,"lastUsedAt" timestamptz,"revokedAt" timestamptz,"boundDeviceId" uuid,"boundWorkspaceId" uuid,"expiresAt" timestamptz);
+    CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text NOT NULL,"tokenHash" text NOT NULL,name text,"createdAt" timestamptz NOT NULL DEFAULT now(),"lastUsedAt" timestamptz,"revokedAt" timestamptz,"boundDeviceId" uuid,"boundWorkspaceId" uuid,"expiresAt" timestamptz);
     CREATE TABLE device_token_devices ("tokenId" uuid,"deviceId" uuid,"userId" text,PRIMARY KEY("tokenId","deviceId"));
     CREATE TABLE agents (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"updatedAt" timestamptz);
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,status text,"deviceTokenId" uuid,"userId" text,"leaseExpiresAt" timestamptz);`)
@@ -71,6 +72,42 @@ test('registration grant is user-bound, expires, and has one concurrent winner',
   await pool.query(`UPDATE device_enrollments SET "expiresAt"=now()-interval '1 second' WHERE "tokenHash"=$1`, [hashDeviceToken(expired)])
   assert.equal(await consumeDeviceEnrollment(expired), null)
   assert.equal(await consumeDeviceEnrollment('invalid'), null)
+}))
+
+test('daemon acceptance follows real local enrollment and owner routes without a cloud token binding', () => run(async () => {
+  const { pool } = await import('./db')
+  const { GET: readTokens } = await import('../app/api/device-tokens/route')
+  const { GET: readEnrollment } = await import('../app/api/devices/enrollment/route')
+  const owner = `acceptance-${randomUUID()}`, deviceId = randomUUID()
+  const request = () => new Request('http://localhost/mikka/api/device-tokens')
+  const previousOwner = browserOwner
+  try {
+    browserOwner = owner
+    assert.deepEqual(await (await readTokens(request())).json(), { tokens: [] })
+    const credential = await consumeDeviceEnrollment(await mintDeviceEnrollment(owner))
+    assert.ok(credential)
+    const { tokens } = await (await readTokens(request())).json()
+    const token = enrollmentToken(tokens)
+    assert.equal(token.boundDeviceId, null)
+    assert.equal(token.revokedAt, null)
+    const caller = await authenticateDevice(new Request('http://localhost/mikka/v1/devices/register', {
+      headers: { authorization: `Bearer ${credential}` },
+    }))
+    assert.deepEqual(caller, { userId: owner, tokenId: token.id })
+    await pool.query('INSERT INTO devices(id,"ownerId") VALUES($1,$2)', [deviceId, owner])
+    assert.equal(await linkDeviceToken(caller!, deviceId), true)
+    const account = await (await readEnrollment(new Request('http://localhost/mikka/api/devices/enrollment'))).json()
+    checkOwnedEnrollment(account, owner, deviceId)
+    assert.equal(enrollmentToken((await (await readTokens(request())).json()).tokens).boundDeviceId, null,
+      'registering a local device links device_token_devices instead of assigning a cloud scope')
+    browserOwner = `foreign-${owner}`
+    assert.deepEqual(await (await readTokens(request())).json(), { tokens: [] })
+    assert.throws(() => checkOwnedEnrollment(account, browserOwner!, deviceId), /OWNER_DEVICE/)
+    browserOwner = owner
+    await consumeDeviceEnrollment(await mintDeviceEnrollment(owner))
+    const ambiguous = await (await readTokens(request())).json()
+    assert.throws(() => enrollmentToken(ambiguous.tokens), /TOKEN_IDENTITY/)
+  } finally { browserOwner = previousOwner }
 }))
 
 async function removableDevice(online: boolean) {

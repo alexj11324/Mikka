@@ -93,7 +93,7 @@ test('wrangler uses one minute trigger for all existing production cadences', ()
   assert.equal(config.preview_urls, false)
   assert.equal(config.routes, undefined)
   assert.deepEqual(config.triggers.crons, ['* * * * *'])
-  assert.deepEqual(config.vars, { MIKKA_URL: 'https://app.aspectlylabs.com/mikka' })
+  assert.deepEqual(config.vars, {}, 'deployment supplies MIKKA_URL; source has no production target')
 })
 
 test('unknown schedules and missing configuration fail without a request', async () => {

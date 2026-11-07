@@ -44,6 +44,8 @@ test('credential broker publishes only the committed session-resume event and ca
   const reader = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 2 })
   const previousSecret = process.env.BETTER_AUTH_SECRET
   const previousBroker = process.env.CREDENTIAL_BROKER_URL
+  const previousEdition = process.env.MIKKA_EDITION
+  process.env.MIKKA_EDITION = 'cloud'
   process.env.CREDENTIAL_BROKER_URL = 'https://fixture-broker.vercel.app'
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const keys = new Map<string, { key: Buffer; context: EncryptionContext }>()
@@ -260,6 +262,7 @@ test('credential broker publishes only the committed session-resume event and ca
     for (const mocked of runtimeBoundaries.reverse()) mocked.restore()
     boundary.restore()
     if (previousBroker === undefined) delete process.env.CREDENTIAL_BROKER_URL; else process.env.CREDENTIAL_BROKER_URL = previousBroker
+    if (previousEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = previousEdition
     if (previousSecret === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = previousSecret
     for (const { key } of keys.values()) key.fill(0)
     await reader.end(); await pool.end()

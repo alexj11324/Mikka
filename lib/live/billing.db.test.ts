@@ -88,7 +88,7 @@ test('the hosted billing key reaches the workspace and the card owner, after the
     const id = (prefix: string) => `${prefix}_${randomUUID().replaceAll('-', '')}`
     const purchase = { id: id('cs'), mode: 'payment', payment_status: 'paid', payment_intent: id('pi'), amount_total: 1000, currency: 'usd', metadata: { workspaceId: team, points: '1000', purpose: 'points_purchase' } }
     const stripe = (async () => Response.json({ latest_charge: { receipt_url: null, balance_transaction: { fee: 59, currency: 'usd' } } })) as typeof fetch
-    const options = { env: { STRIPE_SECRET_KEY: 'sk_test_fixture' }, fetchImpl: stripe }
+    const options = { env: { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fixture' }, fetchImpl: stripe }
 
     await t.test('purchased points reach every active member of the team, and a refund does too', async () => {
       assert.equal(await scope.run(() => applyStripeEvent({ id: id('evt'), type: 'checkout.session.completed', data: { object: purchase } }, options)), true)

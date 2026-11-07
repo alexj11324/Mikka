@@ -95,6 +95,50 @@ dbTest('event-driven Coordinator wakes need no minute sweep', async t => {
       assert.deepEqual(woken, [token])
     })
 
+    await t.test('after ten rounds a new user event needs a fresh claim when the old holder releases its lease', async () => {
+      const recovery = recoveryModule.createWakeRecovery(pool)
+      const target = { userId: owner, botId }
+      const oldHolder = 'wrun_ten-rounds-fixture', nextHolder = 'wrun_next-round-fixture'
+      try {
+        await recordCoordinatorEvent(db, userMessageEvent(owner, 'Round 1', { botId }))
+        const original = await recovery.claim(target)
+        assert.ok(original?.ticket)
+        for (let round = 1; round <= 10; round++) {
+          if (round > 1) await recordCoordinatorEvent(db, userMessageEvent(owner, `Round ${round}`, { botId }))
+          const taken = await store.takeInbox(owner, oldHolder, botId)
+          assert.deepEqual([taken.held, taken.added], [true, 1])
+          await store.appendMessages(owner, oldHolder, [{ role: 'assistant', content: `Round ${round} complete` }], null, botId)
+        }
+        const next = userMessageEvent(owner, 'Round 11', { botId })
+        await recordCoordinatorEvent(db, next)
+        const { rows: [pending] } = await pool.query<{ id: string; deliveredAt: Date | null; wakeAttempts: number }>(
+          'SELECT id,"deliveredAt","wakeAttempts" FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND "dedupeKey"=$3',
+          [owner, botId, next.dedupeKey])
+        assert.ok(pending)
+        assert.equal(pending.deliveredAt, null)
+        assert.equal(pending.wakeAttempts, 0)
+        assert.equal(await recovery.claim(target), null, 'the producer wake defers behind the still-active tenth-round lease')
+        assert.deepEqual(await recovery.resume(original.ticket), { kind: 'obsolete' }, 'the old deadline cannot acquire a later event outside its original batch')
+        assert.equal(await store.releaseLease(owner, oldHolder, botId), true, 'the exiting loop must hand off this waking inbox')
+        const claimed = await recovery.claim(target)
+        assert.ok(claimed)
+        assert.deepEqual(claimed.ids, [pending.id])
+        assert.equal(claimed.attempt, 1)
+        const taken = await store.takeInbox(owner, nextHolder, botId)
+        assert.deepEqual([taken.held, taken.added, taken.sourceEventId], [true, 1, pending.id])
+        assert.equal((await store.takeInbox(owner, oldHolder, botId)).held, false, 'the previous holder cannot take the successor lease')
+        await store.appendMessages(owner, nextHolder, [{ role: 'assistant', content: 'Round 11 complete' }], null, botId)
+        assert.equal(await store.hasPendingEvents(owner, botId), false)
+        assert.equal(await store.releaseLease(owner, nextHolder, botId), false)
+        const chat = await store.chatView(owner, 200, botId)
+        assert.equal(chat.working, false)
+        assert.ok(chat.items.some(item => item.from === 'coordinator' && item.text === 'Round 11 complete'))
+      } finally {
+        await store.releaseLease(owner, oldHolder, botId)
+        await store.releaseLease(owner, nextHolder, botId)
+      }
+    })
+
     await t.test('a failed start is claimed again exactly at its backoff, with no sweep', async () => {
       await recordCoordinatorEvent(db, userMessageEvent(owner, 'Third request', { botId }))
       let now = new Date()

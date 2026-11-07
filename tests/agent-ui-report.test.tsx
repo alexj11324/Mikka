@@ -139,7 +139,7 @@ test('a repository card: candidates answer with owner/repo, githubInstall opens 
   const card = `root = BeQuestions("Mikka_test", [{id: "repo", title: "No authorized repository named Mikka_test", options: [{value: "githubInstall", label: "x", action: "githubInstall"}]}])`
   assert.deepEqual(parser.parse(card).meta.errors, [])
   const html = render(card)
-  const link = /<a[^>]*href="https:\/\/github\.com\/apps\/mikka-github\/installations\/new"[^>]*>/.exec(html)?.[0] ?? ''
+  const link = /<a[^>]*href="\/api\/integrations\/github\/install"[^>]*>/.exec(html)?.[0] ?? ''
   assert.match(link, /target="_blank"/)
   assert.match(link, /rel="noopener noreferrer"/)
   assert.match(html, /Authorize more repositories on GitHub/)

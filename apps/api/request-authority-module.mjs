@@ -10,3 +10,10 @@ export function vercelRequestAuthority(nitro) {
   // onto rejected/legacy responses, while authority runs before the H3 router.
   if (!nitro.options.plugins.includes(plugin)) nitro.options.plugins.unshift(plugin)
 }
+
+export function nodeRequestAuthority(nitro) {
+  if (nitro.options.dev || nitro.options.preset !== 'node-server') return
+  const plugin = fileURLToPath(new URL('./plugins/node-request-authority.ts', import.meta.url))
+  nitro.options.plugins ??= []
+  if (!nitro.options.plugins.includes(plugin)) nitro.options.plugins.unshift(plugin)
+}
