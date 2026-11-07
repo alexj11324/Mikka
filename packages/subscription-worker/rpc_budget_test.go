@@ -96,7 +96,7 @@ func TestRPCFrameBudgetsCountCRBeforeLF(t *testing.T) {
 
 func TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod(t *testing.T) {
 	w := Worker{ExecutionOnly: true}
-	for _, method := range []string{"execute", "nativeStream", "nativeContext", "prepare", "quota", "models", "usage", "cleanup", "oauthStart", "oauthResume", "oauthPoll", "oauthHandoff", "oauthComplete", "nativeAuth", "status", "acquire", "refresh", "recover", "disconnect", "unknown"} {
+	for _, method := range []string{"execute", "nativeStream", "nativeContext", "prepare", "prepareStream", "quota", "models", "usage", "cleanup", "oauthStart", "oauthResume", "oauthPoll", "oauthHandoff", "oauthComplete", "nativeAuth", "status", "acquire", "refresh", "recover", "disconnect", "unknown"} {
 		t.Run(method, func(t *testing.T) {
 			for _, size := range []int{524287, 524288} {
 				var out bytes.Buffer

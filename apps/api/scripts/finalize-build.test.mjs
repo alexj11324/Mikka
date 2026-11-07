@@ -14,7 +14,7 @@ test('actual packaged bootstrap patches pg before application import and preserv
   const directory = await mkdtemp(join(cache, 'mikka-function-'))
   const config = {
     handler: 'index.mjs', runtime: 'nodejs24.x', launcherType: 'Nodejs',
-    supportsResponseStreaming: true, supportsCancellation: true, maxDuration: 120,
+    supportsResponseStreaming: true, supportsCancellation: true, maxDuration: 120, regions: ['iad1'],
     experimentalTriggers: [{ type: 'queue/v2beta', topic: '__wkf_workflow_*', consumer: 'workflow', retryAfterSeconds: 5 }],
   }
   try {

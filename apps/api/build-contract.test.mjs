@@ -85,11 +85,11 @@ test('actual Nitro router accepts multiple named parameters and preserves route 
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test('actual Nitro Vercel output opts MCP into cancellation without changing other functions', async () => {
+test('actual Nitro Vercel output preserves cancellation and places Cloud Coordinator calls with its workflow', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-mcp-cancellation-'))
   let nitro
   try {
-    const declarations = [['/api/mcp', 120], ['/api/coordinator/stream', 300], ['/api/other', 60]]
+    const declarations = [['/api/mcp', 120], ['/api/rpc', 300], ['/api/coordinator/stream', 300], ['/api/other', 60]]
     const routes = []
     for (const [template, maxDuration] of declarations) {
       const source = `app${template}/route.ts`, text = `export const maxDuration=${maxDuration}; export const POST=handler`
@@ -101,7 +101,7 @@ test('actual Nitro Vercel output opts MCP into cancellation without changing oth
     await mkdir(join(root, 'apps/api/generated'), { recursive: true })
     await writeFile(join(root, 'apps/api/generated/routes.json'), JSON.stringify({ version: 1, basePath: '/mikka', routes }))
     nitro = await createNitro({ rootDir: root, workspaceDir: root, serverDir: false, preset: 'vercel',
-      vercel: { functions: { runtime: 'nodejs24.x' }, functionRules: await routeFunctionRules(root) },
+      vercel: { functions: { runtime: 'nodejs24.x' }, functionRules: await routeFunctionRules(root, { MIKKA_EDITION: 'cloud' }) },
     }, { dotenv: false })
     await prepare(nitro)
     await writeFile(join(nitro.options.output.serverDir, 'index.mjs'), 'export default () => new Response("fixture")')
@@ -114,9 +114,24 @@ test('actual Nitro Vercel output opts MCP into cancellation without changing oth
     assert.equal(mcp.maxDuration, 120)
     assert.equal(mcp.supportsResponseStreaming, true)
     assert.equal(mcp.runtime, 'nodejs24.x')
-    assert.equal((await readConfig('mikka/api/coordinator/stream')).supportsCancellation, true)
+    const stream = await readConfig('mikka/api/coordinator/stream'), rpc = await readConfig('mikka/api/rpc')
+    assert.equal(stream.supportsCancellation, true)
+    assert.equal(stream.maxDuration, 300)
+    assert.equal(rpc.maxDuration, 300)
+    assert.equal(rpc.supportsCancellation, undefined)
+    assert.deepEqual(stream.regions, ['iad1'], 'COORDINATOR_STREAM_REGION_NOT_WITH_WORKFLOW')
+    assert.deepEqual(rpc.regions, ['iad1'], 'COORDINATOR_RPC_REGION_NOT_WITH_WORKFLOW')
+    assert.equal(mcp.regions, undefined)
     assert.equal((await readConfig('mikka/api/other')).supportsCancellation, undefined)
+    assert.equal((await readConfig('mikka/api/other')).regions, undefined)
     assert.equal((await readConfig('__server')).supportsCancellation, undefined)
+    assert.equal((await readConfig('__server')).regions, undefined)
+    for (const env of [{}, { MIKKA_EDITION: 'community' }]) {
+      const selfHosted = await routeFunctionRules(root, env)
+      assert.equal(selfHosted['/mikka/api/rpc'].regions, undefined)
+      assert.equal(selfHosted['/mikka/api/coordinator/stream'].regions, undefined)
+      assert.equal(selfHosted['/mikka/api/coordinator/stream'].supportsCancellation, true)
+    }
   } finally { await nitro?.close(); await rm(root, { recursive: true, force: true }) }
 })
 

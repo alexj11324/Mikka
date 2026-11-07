@@ -13,7 +13,7 @@ import { SubscriptionCallTiming, withSubscriptionTiming } from '../packages/daem
 type Part = { type: string; [key: string]: unknown }
 
 // A real child/line transport, with in-memory provider SSE and no network/DB.
-function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2]) {
+function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2], streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3]) {
   const dir = mkdtempSync(join(tmpdir(), 'mikka-stage-timing-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const script = join(dir, 'worker.mjs')
@@ -36,7 +36,7 @@ console.log(JSON.stringify({id,result:{done:true},...diagnostic}));lines.close()
   return new SubscriptionWorkerClient({ binary: process.execPath, args: [script] }, {
     scope: { ownerId: 'fixture-private-owner', workspaceId: 'fixture-private-workspace', connectionId: '00000000-0000-4000-8000-000000000001', provider: 'codex' },
     databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture-private-project', environment: 'test', path: '/fixture-private', workloadToken: 'fixture-private-custody', accessToken: 'fixture-private-access', accessPath: '/access',
-  }, resolveIdentity)
+  }, resolveIdentity, streamIdentity)
 }
 const streamOf = (parts: Part[]) => new ReadableStream<Part>({ start(controller) { for (const part of parts) controller.enqueue(part); controller.close() } })
 async function drain<P extends { type: string }>(stream: ReadableStream<P>) { const seen: P[] = []; for await (const part of stream as unknown as AsyncIterable<P>) seen.push(part); return seen }
@@ -232,4 +232,38 @@ test('cancel during identity preparation logs missing Go immediately and never s
   assert.equal(call.snapshot().workers[0].outcome, 'cancelled')
   assert.equal(call.snapshot().workers[0].identityMs, null)
   assert.equal(logs[0].subscriptionStages!.workers[0].outcome, 'pending', 'the emitted snapshot does not mutate')
+})
+
+
+test('a same-call warm projection produces one real worker row plus separate private-free pre-read timing', async t => {
+  const call = new SubscriptionCallTiming()
+  const scope = { ownerId: 'fixture-private-owner', workspaceId: 'fixture-private-workspace', connectionId: '00000000-0000-4000-8000-000000000001', provider: 'codex' }
+  let reads = 0
+  const client = timingWorker(t, 'valid', async () => { throw new Error('warm must not resolve identity twice') }, async () => {
+    reads++
+    return { accessSnapshot: {
+      name: 'mikka-byos-00000000-0000-4000-8000-000000000001',
+      value: JSON.stringify({ schema: 1, ...scope, payload: { type: 'codex', access_token: 'fixture-private-token', account_id: 'fixture-private-account', expired: new Date(Date.now() + 3_600_000).toISOString() } }),
+    } }
+  })
+  const model = createOpenAICompatible({ name: 'fixture', baseURL: 'https://fixture.invalid/v1', fetch: async () =>
+    new Response(client.stream(1, 'fixture-model', {}), { headers: { 'content-type': 'text/event-stream' } }),
+  })('fixture-model')
+  const result = await withSubscriptionTiming(call, () => model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'fixture-private-prompt' }] }] }))
+  const logs: ModelCallTiming[] = []
+  const seen = await drain(timedModelStream(result, { route: 'subscription', model: 'fixture-model', tools: 0, startedAt: 10, requestedAt: 20, subscriptionTiming: call }, () => 40, line => logs.push(line)).stream)
+  assert.equal(reads, 1)
+  assert.equal(seen.filter(part => part.type === 'finish').length, 1)
+  assert.equal(logs.length, 1)
+  const stages = logs[0].subscriptionStages!
+  assert.deepEqual(stages.workers.map(row => [row.ordinal, row.method, row.outcome]), [[1, 'executeStream', 'result']])
+  assert.equal(stages.streamPreRead!.outcome, 'ready')
+  assert.ok(stages.streamPreRead!.settledMs! <= stages.workers[0].startedMs!)
+  assert.equal(stages.workers[0].parentAccessAuthorityCalls, 0)
+  assert.equal(stages.workers[0].parentProjectionReadCalls, 0)
+  assert.equal(logs[0].firstTextMs, 20)
+  assert.equal(logs[0].interrupted, false)
+  const encoded = JSON.stringify(logs[0])
+  assert.doesNotMatch(encoded, /fixture-private|accessToken|accessSnapshot|workloadToken|databaseUrl|connectionId|mikka-byos/)
+  t.diagnostic('warm_model_timing_fixture_bytes=' + Buffer.byteLength(encoded))
 })

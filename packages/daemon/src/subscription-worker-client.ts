@@ -1,4 +1,5 @@
 // Private control-plane IPC. This module must never be bundled into a browser.
+import { accessSnapshotReady } from './subscription-access-ready'
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 import { randomUUID } from "node:crypto"
@@ -63,13 +64,17 @@ const REQUEST_FAILURE = new RegExp('^subscription_request_failure (claude|codex|
   `stream (stream_unavailable|chunk_too_large) ${REQUEST_BYTES} (0|65536))$`)
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
+type WorkerIdentity = { workloadToken?: string; accessToken?: string; accessSnapshot?: WorkerConfiguration['accessSnapshot'] }
+type StreamIdentity = { accessSnapshot: NonNullable<WorkerConfiguration['accessSnapshot']> }
+type StreamIdentityResolver = (signal?: AbortSignal, use?: WorkerConfiguration['use'], revision?: unknown) => Promise<StreamIdentity | null>
+
 export class SubscriptionWorkerClient {
-  constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration, private readonly resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal, use?: WorkerConfiguration['use'], revision?: unknown) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: WorkerConfiguration['accessSnapshot'] }>) {}
+  constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration, private readonly resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal, use?: WorkerConfiguration['use'], revision?: unknown) => Promise<WorkerIdentity>, private readonly resolveStreamIdentity?: StreamIdentityResolver) {}
   forUse(use: { bindingId: string; consumerId: string; runId?: string }): SubscriptionWorkerClient {
-    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId, ...(use.runId ? {runId:use.runId} : {}) } }, this.resolveIdentity)
+    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId, ...(use.runId ? {runId:use.runId} : {}) } }, this.resolveIdentity, this.resolveStreamIdentity)
   }
 
-  private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void, head?: (value: { contentType: string }) => void, binary?: (value: Uint8Array) => void) {
+  private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void, head?: (value: { contentType: string }) => void, binary?: (value: Uint8Array) => void, streamIdentity?: StreamIdentity) {
     if (signal?.aborted) throw new WorkerRefusal("subscription_cancelled")
     const id = randomUUID()
     const timing = currentSubscriptionTiming()?.startWorker(request.method)
@@ -98,7 +103,7 @@ export class SubscriptionWorkerClient {
       }
     }
     let killTimer: NodeJS.Timeout | undefined
-    const abort = () => { rejectPending(new WorkerRefusal("subscription_cancelled")) }
+    const abort = () => { rejectPending(signal?.reason instanceof WorkerRefusal && signal.reason.code === "subscription_timeout" ? signal.reason : new WorkerRefusal("subscription_cancelled")) }
     const result = new Promise<unknown>((resolve, reject) => {
       const finish = (error?: Error, value?: unknown) => {
         if (settled) return
@@ -144,10 +149,10 @@ export class SubscriptionWorkerClient {
       // OAuth stay in custody children, with no token material in their results.
       void (async () => {
         const identityDone = timing?.beginIdentity()
-        let identity: { workloadToken?: string; accessToken?: string; accessSnapshot?: WorkerConfiguration['accessSnapshot'] }
+        let identity: WorkerIdentity
         try {
-          identity = this.resolveIdentity ? await withSubscriptionWorkerTiming(timing, () => this.resolveIdentity!(executionOnly, signal, this.config.use, request.revision)) : {}
-          timing?.identityMode(!this.resolveIdentity ? 'static' : Object.hasOwn(identity, 'accessSnapshot') ? 'parent_snapshot' : Object.hasOwn(identity, 'accessToken') ? 'access_token' : Object.hasOwn(identity, 'workloadToken') ? 'custody_token' : 'unobserved')
+          identity = streamIdentity ?? (this.resolveIdentity ? await withSubscriptionWorkerTiming(timing, () => this.resolveIdentity!(executionOnly, signal, this.config.use, request.revision)) : {})
+          timing?.identityMode(!this.resolveIdentity && !streamIdentity ? 'static' : Object.hasOwn(identity, 'accessSnapshot') ? 'parent_snapshot' : Object.hasOwn(identity, 'accessToken') ? 'access_token' : Object.hasOwn(identity, 'workloadToken') ? 'custody_token' : 'unobserved')
         } finally { identityDone?.() }
         if (settled) return
         const resolved = { ...this.config, ...identity }
@@ -193,6 +198,48 @@ export class SubscriptionWorkerClient {
     try { const head = await ready; return { ...head, body } }
     catch (error) { await body.cancel().catch(() => undefined); throw error }
   }
+  private async streamIdentity(revision: number, signal: AbortSignal): Promise<StreamIdentity | undefined> {
+    if (!this.resolveStreamIdentity || this.config.use?.runId) { await this.call('prepare', { revision }, signal); return }
+    if (signal.aborted) throw new WorkerRefusal('subscription_cancelled')
+    // One original preparation budget covers both the same-call pre-read and
+    // any required custody work. Execution still gets its own 275s after spawn.
+    const budget = new AbortController()
+    const onAbort = () => budget.abort(new WorkerRefusal('subscription_cancelled'))
+    signal.addEventListener('abort', onAbort, { once: true })
+    const timer = setTimeout(() => budget.abort(new WorkerRefusal('subscription_timeout')), 35_000)
+    timer.unref()
+    let rejectWait!: (error: unknown) => void
+    const stopped = new Promise<never>((_resolve, reject) => { rejectWait = reject })
+    const stopWait = () => rejectWait(budget.signal.reason)
+    budget.signal.addEventListener('abort', stopWait, { once: true })
+    const observation = currentSubscriptionTiming()?.startStreamPreRead()
+    const identityDone = observation?.worker.beginIdentity()
+    try {
+      const identity = await Promise.race([
+        withSubscriptionWorkerTiming(observation?.worker, () => this.resolveStreamIdentity!(budget.signal, this.config.use, revision)),
+        stopped,
+      ])
+      if (budget.signal.aborted) throw budget.signal.reason
+      const ready = identity !== null && accessSnapshotReady(this.config.scope, identity.accessSnapshot)
+      identityDone?.()
+      observation?.finish(ready ? 'ready' : identity === null ? 'prepare_missing' : 'prepare_expiring')
+      if (ready) return identity
+      await Promise.race([this.start({ method: 'prepareStream', revision }, budget.signal).result, stopped])
+      if (budget.signal.aborted) throw budget.signal.reason
+      // Refresh/migration may have replaced the projection. The execution
+      // child's existing resolver must authorize and read that new version.
+      return undefined
+    } catch (error) {
+      const failure = budget.signal.aborted ? budget.signal.reason : error
+      identityDone?.()
+      observation?.finish(failure instanceof WorkerRefusal && failure.code === 'subscription_timeout' ? 'timeout' : failure instanceof WorkerRefusal && failure.code === 'subscription_cancelled' ? 'cancelled' : 'error')
+      throw failure
+    } finally {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', onAbort)
+      budget.signal.removeEventListener('abort', stopWait)
+    }
+  }
   stream(revision: number, model: string, payload: unknown, signal?: AbortSignal): ReadableStream<Uint8Array> {
     currentSubscriptionTiming()?.streamEntry()
     const encoder = new TextEncoder()
@@ -206,9 +253,10 @@ export class SubscriptionWorkerClient {
     return new ReadableStream({
       start: async controller => {
         try {
-          await this.call("prepare", { revision }, abort.signal)
-          if (closed || abort.signal.aborted) return
-          const run = this.start({ method: "executeStream", revision, model, payload }, abort.signal, value => { if (!closed) controller.enqueue(encoder.encode(value)) })
+          const identity = await this.streamIdentity(revision, abort.signal)
+          if (closed) return
+          if (abort.signal.aborted) throw new WorkerRefusal('subscription_cancelled')
+          const run = this.start({ method: "executeStream", revision, model, payload }, abort.signal, value => { if (!closed) controller.enqueue(encoder.encode(value)) }, undefined, undefined, identity)
           stop = run.stop
           void run.result.then(() => { if (!closed) { closed = true; controller.close() }; cleanup() }, error => { if (!closed) { closed = true; controller.error(error) }; cleanup() })
         } catch (error) { if (!closed) { closed = true; controller.error(error instanceof WorkerRefusal ? error : new WorkerRefusal()) }; cleanup() }

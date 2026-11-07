@@ -35,7 +35,7 @@ export function assertApiBuildConfiguration(nitro, root, { development = false }
     || !options.externals?.external?.includes('pg')) throw new Error('API_CONFIG_NOT_LOADED')
 }
 
-export async function routeFunctionRules(root) {
+export async function routeFunctionRules(root, env = process.env) {
   const manifest = JSON.parse(await readFile(join(root, 'apps/api/generated/routes.json'), 'utf8'))
   if (manifest.version !== 1 || manifest.basePath !== '/mikka' || !Array.isArray(manifest.routes)) throw new Error('API_ROUTE_MANIFEST_INVALID')
   const rules = {}, seen = new Set()
@@ -53,7 +53,13 @@ export async function routeFunctionRules(root) {
     // Named parameters retain each dynamic segment's original one-part bound.
     const pattern = route.path.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, '**').replace(/\[([^\]]+)\]/g, ':$1')
     const supportsCancellation = route.template === '/api/coordinator/stream' || route.template === '/api/mcp'
-    rules[pattern] = { maxDuration: route.maxDuration, ...(supportsCancellation ? { supportsCancellation: true } : {}) }
+    // Cloud's database is in us-east-2 and Workflow executes in iad1. Keep
+    // browser RPC admission and chat streaming beside that server-side work;
+    // self-hosted deployments retain their configured function region.
+    const coordinatorRegion = env.MIKKA_EDITION === 'cloud'
+      && (route.template === '/api/rpc' || route.template === '/api/coordinator/stream')
+    rules[pattern] = { maxDuration: route.maxDuration, ...(supportsCancellation ? { supportsCancellation: true } : {}),
+      ...(coordinatorRegion ? { regions: ['iad1'] } : {}) }
   }
   return rules
 }
