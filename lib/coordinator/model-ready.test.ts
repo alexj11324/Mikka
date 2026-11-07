@@ -30,6 +30,11 @@ mock.module(new URL('../model-api-keys.ts', import.meta.url).href, { namedExport
   botApiKeyChoice: async () => key, usableApiKeys: async () => keys,
 } })
 mock.module(new URL('../quota-fallback.ts', import.meta.url).href, { namedExports: { quotaFallbackKey: async () => fallback } })
+// The existing core hosted ledger admits an unmetered community default;
+// readiness must still reject that default when no provider is configured.
+mock.module(new URL('../points-fallback.ts', import.meta.url).href, { namedExports: {
+  hostedPointsRefusal: async () => null, pointsFallback: async () => { throw new Error('unexpected points fallback') },
+} })
 let botModelReady: typeof import('./model-ready')['botModelReady']
 before(async () => { process.env.MIKKA_EDITION = 'community'; ({ botModelReady } = await import('./model-ready')) })
 beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; fallback = null; scopes.length = 0 })

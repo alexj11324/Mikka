@@ -32,7 +32,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE mikka_workspace_members ("workspaceId" text,"userId" text,name text,status text);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
+      CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
     for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql"])
@@ -54,6 +55,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
 
     const settings = new ExecutionSettings(pool);
     const workspace = randomUUID(), elsewhere = randomUUID();
+    await pool.query('INSERT INTO mikka_workspaces VALUES ($1),($2)', [workspace, elsewhere]);
     const alice = { ownerId: "alice", workspaceId: workspace };
     const [botA, botB, bobBot] = [randomUUID(), randomUUID(), randomUUID()];
     await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [workspace]);
@@ -311,6 +313,91 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const lostKeyRun = await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies);
     assert.equal(lostKeyMenu.current.modelId, lostKeyRun.model);
     assert.equal(lostKeyMenu.current.fallback, "preference");
+
+    // Shared subscriptions are explicit model choices, not an unselectable Claude-first fallback.
+    const bob = { ownerId: "bob", workspaceId: workspace };
+    await pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]);
+    await pool.query(`UPDATE byos_connections SET state='connected', paused=false, epoch=1, "removedAt"=NULL WHERE id=ANY($1::uuid[])`, [[claude, codex]]);
+    const haiku = await binding("alice", workspace, claude, "claude-haiku-5-5", "claude_cpa");
+    const luna = await binding("alice", workspace, codex, "gpt-6-luna", "codex_cpa");
+    await pool.query(`UPDATE byos_connections SET "accountLabel"='PRIVATE-LOGIN-SENTINEL', quota=$3::jsonb,
+      "modelCatalog"=jsonb_build_object('revision','1','models',jsonb_build_array($2::text)) WHERE id=$1`, [claude, "claude-haiku-5-5", quota(0.2, FUTURE)]);
+    await pool.query(`UPDATE byos_connections SET quota=$3::jsonb,
+      "modelCatalog"=jsonb_build_object('revision','1','models',jsonb_build_array($2::text)) WHERE id=$1`, [codex, "gpt-6-luna", quota(0.2, FUTURE, "codex")]);
+    const sharedModels = await botModelMenu(pool, settings, bob, bobBot);
+    const sharedGroups = sharedModels.groups.filter(group => group.kind === "subscription" && group.owner === "Alice");
+    assert.ok(sharedGroups.some(group => group.provider === "claude" && group.options.some(option => option.modelId === "claude-haiku-5-5")));
+    assert.ok(sharedGroups.some(group => group.provider === "codex" && group.options.some(option => option.modelId === "gpt-6-luna")));
+    for (const group of sharedGroups) {
+      assert.equal(group.credentialLabel, "Alice");
+      assert.equal(group.plan, undefined);
+      for (const option of group.options) assert.deepEqual(Object.keys(option).sort(), ["id", "modelId", "provider"]);
+    }
+    assert.ok(!JSON.stringify(sharedGroups).includes("PRIVATE-LOGIN-SENTINEL"));
+    let savedShared = "";
+    for (const [id, model, connectionId, route] of [[haiku, "claude-haiku-5-5", claude, "claude_cpa"], [luna, "gpt-6-luna", codex, "codex_cpa"]]) {
+      const selected = await chooseBotModel(pool, settings, bob, bobBot, id);
+      assert.deepEqual([selected.current.kind, selected.current.modelId, selected.current.chosen, selected.current.credentialLabel], ["subscription", model, true, "Alice"]);
+      assert.equal(selected.current.quota, undefined);
+      const saved = (await pool.query(`SELECT b.* FROM bot_model_choices c JOIN byos_bindings b ON b.id=c."bindingId"
+        WHERE c."ownerId"='bob' AND c."workspaceId"=$1 AND c."botKey"=$2`, [workspace, bobBot])).rows[0];
+      savedShared = saved.id;
+      assert.deepEqual([saved.ownerId, saved.workspaceId, saved.consumerId, saved.connectionId, saved.modelId, saved.route], ["alice", workspace, bobBot, connectionId, model, route]);
+      const frozen = await freezeBotModel({ ...bob, botId: bobBot }, dependencies);
+      assert.equal(frozen.model, model);
+      assert.deepEqual(frozen.modelSelection, { type: "subscription", bindingId: saved.id, ownerId: "alice", runOwnerId: "bob",
+        consumerId: bobBot, workspaceId: workspace, connectionId, connectionRevision: 1, modelId: model, route });
+    }
+    const latestLuna = await binding("alice", workspace, codex, "gpt-6-luna", "codex_cpa");
+    await pool.query('UPDATE byos_bindings SET "createdAt"=now()+interval \'1 day\' WHERE id=$1', [latestLuna]);
+    const deduped = await botModelMenu(pool, settings, bob, bobBot);
+    assert.equal(deduped.current.id, latestLuna);
+    assert.equal(deduped.current.chosen, true);
+    const dedupedSelection = (await freezeBotModel({ ...bob, botId: bobBot }, dependencies)).modelSelection;
+    assert.equal(dedupedSelection?.type, "subscription");
+    assert.equal(dedupedSelection?.type === "subscription" ? dedupedSelection.bindingId : undefined, savedShared);
+
+    await assert.rejects(chooseBotModel(pool, settings, bob, botA, luna), { code: "botNotFound" });
+    await assert.rejects(chooseBotModel(pool, settings, { ...bob, workspaceId: elsewhere }, bobBot, luna), { code: "botNotFound" });
+    const elsewhereBot = randomUUID();
+    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId") VALUES ($1,'bob',$2)`, [elsewhereBot, elsewhere]);
+    await assert.rejects(chooseBotModel(pool, settings, { ...bob, workspaceId: elsewhere }, elsewhereBot, luna), { code: "executionModelUnknown" });
+    await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [bobBot]);
+    await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "botNotFound" });
+    await pool.query('UPDATE bots SET "archivedAt"=NULL WHERE id=$1', [bobBot]);
+
+    for (const [change, restore] of [["paused=true", "paused=false"], ["state='disconnected'", "state='connected'"],
+      ["epoch=2", "epoch=1"], ['"removedAt"=now()', '"removedAt"=NULL']]) {
+      await pool.query(`UPDATE byos_connections SET ${change} WHERE id=$1`, [codex]);
+      assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
+      await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
+      const unavailable = await botModelMenu(pool, settings, bob, bobBot);
+      assert.ok(!unavailable.groups.some(group => group.owner === "Alice" && group.options.some(option => option.modelId === "gpt-6-luna")));
+      await pool.query(`UPDATE byos_connections SET ${restore} WHERE id=$1`, [codex]);
+    }
+    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [codex, quota(1, FUTURE, "codex")]);
+    const exhaustedShared = await botModelMenu(pool, settings, bob, bobBot);
+    assert.equal(exhaustedShared.current.availability, "exhausted");
+    assert.equal(exhaustedShared.current.quota, undefined);
+    assert.ok(!JSON.stringify(exhaustedShared.current).includes(FUTURE));
+    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [codex, quota(0.2, FUTURE, "codex")]);
+
+    for (const owner of ["alice", "bob"]) {
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace, owner]);
+      await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna));
+      if (owner === "alice") assert.equal((await settings.pooledBindings(bob)).length, 0);
+      else await assert.rejects(settings.pooledBindings(bob), { code: "workspaceAccessDenied" });
+      await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace, owner]);
+    }
+    await pool.query(`INSERT INTO workspace_personal_policies("workspaceId",subscriptions) VALUES ($1,false)
+      ON CONFLICT("workspaceId") DO UPDATE SET subscriptions=false`, [workspace]);
+    await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
+    assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
+    await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [workspace]);
+    await pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]);
+    await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
+    assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
+    assert.ok(!(await botModelMenu(pool, settings, bob, bobBot)).groups.some(group => group.owner === "Alice"));
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

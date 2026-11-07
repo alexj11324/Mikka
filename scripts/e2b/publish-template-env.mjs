@@ -106,6 +106,11 @@ export function runtimeConfigurationSha(configuration, { allowLegacy = false } =
 
 export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, sourceCommit, models }) {
   if (releaseEvidence?.sourceCommit !== sourceCommit || releaseEvidence?.workerSha !== sourceSha) fail('runtime_release_source_invalid')
+  const scope = releaseEvidence.acceptanceScope
+  if (scope?.account !== 'shared_smoke' || scope.team?.teamWorkspaceConfirmed !== true || scope.team.teamAdminMembershipVerified !== true
+    || scope.workspaceRestored !== true || !/^[a-f0-9]{64}$/.test(scope.team.teamWorkspaceHash ?? '')
+    || !/^[a-f0-9]{16}$/.test(scope.requesterHash ?? '') || !/^[a-f0-9]{16}$/.test(scope.payerHash ?? '')
+    || scope.requesterHash === scope.payerHash) fail('runtime_release_shared_scope_invalid')
   for (const kind of Object.keys(TEMPLATE_ENV)) {
     const row = releaseEvidence.templates?.[kind], proof = row?.conservation
     if (row?.templateId !== templates[kind] || row?.baseTemplate !== kind || row?.preinstalled !== true
@@ -115,6 +120,12 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
   }
   for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
     const row = releaseEvidence.subscriptionAcceptance?.[kind]
+    const shared = row?.sharedScope
+    if (shared?.verified !== true || shared.access !== 'workspace_share' || shared.requesterHash !== scope.requesterHash
+      || shared.payerHash !== scope.payerHash || shared.workspaceHash !== scope.team.teamWorkspaceHash
+      || !['connectionHash', 'bindingHash'].every(key => /^[a-f0-9]{16}$/.test(shared[key] ?? ''))
+      || !/^(0|[1-9][0-9]*)$/.test(shared.connectionRevision ?? '')
+      || !Number.isInteger(shared.profileVersion) || shared.profileVersion < 1 || !/^[a-f0-9]{64}$/.test(shared.profileDigest ?? '')) fail(`runtime_release_shared_scope_invalid ${kind}`)
     const ack = row?.agentAcceptance, authorization = row?.runtimeAuthorization, tool = row?.toolEvidence
     if (row?.status !== 'passed' || row?.templateId !== templates[kind] || row?.sourceCommit !== sourceCommit || row?.workerSha !== sourceSha
       || row?.harness !== harness || row?.model !== model || row?.credentialRoute !== 'subscription' || row?.replyVerified !== true

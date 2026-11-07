@@ -7,7 +7,7 @@ import { botApiKeyChoice, usableApiKeys, type UsableApiKey } from './model-api-k
 import { subscriptionAvailability } from './subscription-quota'
 import { isCloudEdition } from './edition'
 
-type Settings = Pick<ExecutionSettings, 'chatModels' | 'chatBinding'> & Partial<Pick<ExecutionSettings, 'pooledBindings'>>
+type Settings = Pick<ExecutionSettings, 'chatModels' | 'chatBinding'> & Partial<Pick<ExecutionSettings, 'pooledBindings' | 'sharedChatBinding'>>
 export interface BotSubscriptionChoice {
   bindingId: string
   connectionId: string
@@ -53,7 +53,7 @@ export async function resolveBotModelChoice(
   scope: ExecutionSettingsScope,
   botId: string | null,
   preference: { selected?: string; key?: { keyId: string; model: string } },
-  cached: { rows?: BotSubscriptionChoice[]; keys?: UsableApiKey[]; now?: number } = {},
+  cached: { rows?: BotSubscriptionChoice[]; pooled?: BotSubscriptionChoice[]; keys?: UsableApiKey[]; now?: number } = {},
 ): Promise<BotModelChoice> {
   const now = cached.now ?? Date.now()
   const keys = cached.keys ?? await usableApiKeys(pool, scope.ownerId, scope.workspaceId)
@@ -81,15 +81,18 @@ export async function resolveBotModelChoice(
 
   const rows = cached.rows ?? await settings.chatModels(scope)
   const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined
+  const shared = !selected && botId && preference.selected && !preference.key && settings.sharedChatBinding
+    ? await settings.sharedChatBinding(scope, botId, preference.selected) : undefined
   const binding = selected ?? rows.find(row => row.provider === 'claude') ?? rows[0]
   const state: ChoiceState = {
-    chosen: Boolean(selected),
-    ...(!selected && (preference.selected || fallback) ? { fallback: 'preference' as const } : {}),
+    chosen: Boolean(selected || shared),
+    ...(!selected && !shared && (preference.selected || fallback) ? { fallback: 'preference' as const } : {}),
   }
   const withQuota = async (binding: BotSubscriptionChoice, sharedOwnerId?: string): Promise<BotModelChoice> => {
     const availability = subscriptionAvailability(binding.quota, binding.modelId, binding.provider === 'codex' ? 'codex' : 'claude', now)
     if (availability.status !== 'exhausted') return { kind: 'subscription', binding, ...state, ...(sharedOwnerId ? { sharedOwnerId } : {}) }
-    const quota: BotModelQuota = { subscription: binding.provider, plan: binding.plan ?? null, resetsAt: availability.resetsAt, fallback: null }
+    const quota: BotModelQuota = { subscription: binding.provider, plan: sharedOwnerId ? null : binding.plan ?? null,
+      resetsAt: sharedOwnerId ? null : availability.resetsAt, fallback: null }
     const { quotaFallbackKey } = await import('./quota-fallback')
     const next = await quotaFallbackKey(pool, scope.ownerId, scope.workspaceId, binding.modelId)
     if (next) {
@@ -98,10 +101,10 @@ export async function resolveBotModelChoice(
     }
     return { kind: 'subscription', binding, ...state, ...(sharedOwnerId ? { sharedOwnerId } : {}), quota }
   }
+  if (shared) return withQuota(shared, shared.ownerId)
   if (binding) return withQuota(binding)
-  // A shared subscription is resolved for bots only; it is never listed as an
-  // owner's credential or exposed with another member's private account label.
-  const pooled = botId && settings.pooledBindings ? (await settings.pooledBindings(scope))[0] : undefined
+  // The default remains own subscriptions first, then the first shared one.
+  const pooled = botId && settings.pooledBindings ? (cached.pooled ?? await settings.pooledBindings(scope))[0] : undefined
   if (pooled) return withQuota(pooled, pooled.ownerId)
   return hosted(state)
 }
