@@ -12,13 +12,6 @@ on:
         default: dry-run
         type: choice
         options: [dry-run, apply]
-  push:
-    branches: [ops/1515-1517-acceptance]
-    paths:
-      - scripts/ops/issues-1515-1517-cleanup.ts
-      - scripts/ops/issues-1515-1517-runtime-cleanup.py
-      - scripts/ops/issues-1515-1517-production-env.mjs
-      - .github/workflows/issues-1515-1517-cleanup.yml
 permissions:
   contents: read
 jobs:

@@ -9,7 +9,31 @@ on:
 permissions:
   contents: read
 jobs:
+  recovery-contract:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      - name: Bind deterministic SDK regressions to the deployed business source
+        env:
+          APPLICATION_SHA: ${{ inputs.application_sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process'
+          const sha = process.env.APPLICATION_SHA
+          if (!/^[a-f0-9]{40}$/.test(sha ?? '')) throw new Error('application_sha_required')
+          execFileSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD'], { stdio: 'ignore' })
+          execFileSync('git', ['diff', '--quiet', sha, '--', 'lib/subscription-workflow-turn.ts', 'lib/subscription-workflow-model.ts', 'lib/coordinator/invalid-tool-call.ts', 'lib/agent-kit/core-entry.ts', 'lib/agent-welcome.ts'], { stdio: 'ignore' })
+          JS
+      - name: Prove unknown/none/empty recovery budget and dedicated failure outcome with the real SDK
+        run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/subscription-workflow-turn.test.ts lib/agent-rounds.test.ts lib/agent-kit/core-entry.test.ts
   preflight:
+    needs: recovery-contract
     concurrency:
       group: production-smoke-owner-acceptance
       cancel-in-progress: false
