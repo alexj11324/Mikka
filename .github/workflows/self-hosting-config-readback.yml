@@ -1,146 +1,22 @@
-name: Self-hosting configuration readback
-
+name: Official GitHub App public metadata
 on:
   push:
-    branches: ['feat/self-hosting-config-readback-1560']
-  workflow_dispatch:
-
+    branches: [feat/self-hosting-config-readback-1560]
 permissions:
   contents: read
-
-concurrency:
-  group: self-hosting-config-readback
-  cancel-in-progress: false
-
 jobs:
-  readback:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/feat/self-hosting-config-readback-1560'
+  metadata:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      id-token: write
+    timeout-minutes: 3
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - name: Test redaction and fixed endpoint
-        run: node --test scripts/ops/self-hosting-config-readback.test.mjs
-      - name: Read the existing App ID
-        id: app-id
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: GITHUB_APP_ID
-          include-imports: false
-      - name: Read the existing App signing key
-        id: app-key
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: GITHUB_APP_PRIVATE_KEY
-          include-imports: false
-      - name: Read subscription flag
-        id: byos
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_BYOS_ENABLED
-          include-imports: false
-      - name: Read Claude OAuth flag
-        id: claude
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_BYOS_CLAUDE_OAUTH
-          include-imports: false
-      - name: Read Codex OAuth flag
-        id: codex
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_BYOS_CODEX_OAUTH
-          include-imports: false
-      - name: Read computer flag
-        id: computer
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: NEXT_PUBLIC_COMPUTER_ENABLED
-          include-imports: false
-      - name: Read edition
-        id: edition
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_EDITION
-          include-imports: false
-      - name: Read the existing Vercel deployment identity for the fixed project
-        id: vercel-read
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_DEPLOY_TOKEN
-          include-imports: false
-      - name: Read public App metadata and emit only validated projections
-        run: node scripts/ops/self-hosting-config-readback.mjs
-        env:
-          READ_GITHUB_APP_ID: ${{ steps.app-id.outcome }}
-          READ_GITHUB_APP_PRIVATE_KEY: ${{ steps.app-key.outcome }}
-          READ_MIKKA_BYOS_ENABLED: ${{ steps.byos.outcome }}
-          READ_MIKKA_BYOS_CLAUDE_OAUTH: ${{ steps.claude.outcome }}
-          READ_MIKKA_BYOS_CODEX_OAUTH: ${{ steps.codex.outcome }}
-          READ_NEXT_PUBLIC_COMPUTER_ENABLED: ${{ steps.computer.outcome }}
-          READ_MIKKA_EDITION: ${{ steps.edition.outcome }}
-          READ_VERCEL_DEPLOY_TOKEN: ${{ steps.vercel-read.outcome }}
+      - name: Read only the public app metadata
+        run: |
+          node --input-type=module <<'JS'
+          const response = await fetch('https://api.github.com/apps/mikka-github', {headers:{accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Mikka-self-hosting-review'},redirect:'error',signal:AbortSignal.timeout(15000)});
+          if (!response.ok) { console.log(JSON.stringify({status:response.status,available:false})); process.exitCode=1; }
+          else {
+            const v=await response.json();
+            if(v.slug!=='mikka-github'||!Number.isSafeInteger(v.id)||!v.permissions||!Array.isArray(v.events)) throw Error('APP_METADATA_INVALID');
+            console.log(JSON.stringify({id:v.id,slug:v.slug,owner:v.owner?.login,html_url:v.html_url,permissions:v.permissions,events:v.events,readAt:new Date().toISOString()}));
+          }
+          JS
