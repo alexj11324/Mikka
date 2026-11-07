@@ -1,5 +1,6 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { causeFields, logCodedError } from '@mikka/protocol/coded-error'
+import { CodedError, causeFields, logCodedError } from '@mikka/protocol/coded-error'
+import { serverRunFailure } from '@/lib/run-failure-details'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { runListChanged } from '@/lib/live/lists'
@@ -104,7 +105,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   if (!agent || !repo || !run.issueId) {
     const failed = await db.update(agentRuns)
-      .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
+      .set({ status: 'failed', stopReason: 'error', failureDetails: serverRunFailure(runId, new Date()), error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
       .where(eq(agentRuns.id, runId)).returning({ id: agentRuns.id })
     if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     await afterRunEnded(caller.userId, runId)
@@ -118,7 +119,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     const summary = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
     // The claim transaction has rolled back. Only its still-unclaimed row may
     // be settled; a concurrent claim/stop must never be overwritten.
-    const rejected = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: summary,
+    const rejected = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: summary, failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: error })),
       report: { summary, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }, finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
@@ -322,7 +323,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts, supportsTeamSkills)
     benchmarkAssignment = await claimBenchmarkAssignment(caller.userId, deviceId, runId, leaseExpiresAt)
   } catch (error) {
-    const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+    const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: error })), error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)))).returning({ id: agentRuns.id })
     if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     await afterRunEnded(caller.userId, runId)
@@ -436,7 +437,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       // only this claim's still-preparing lease, never a concurrent stop/retry.
       console.warn(JSON.stringify({ msg: 'run_claim_credentials_failed', runId,
         failures: failures.map(result => causeFields((result as PromiseRejectedResult).reason)) }))
-      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: (failures[0] as PromiseRejectedResult).reason })), error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
       if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId); await afterRunEnded(caller.userId, runId) }
       return NextResponse.json({ error: 'Run credentials unavailable.' }, { status: 409, headers: { 'cache-control': 'private, no-store' } })

@@ -5,6 +5,7 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, times
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { RunFailure } from '@mikka/protocol/run-failure'
 import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
@@ -380,6 +381,7 @@ export const agentRuns = pgTable('agent_runs', {
   baseBranch: text('baseBranch').default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
+  failureDetails: jsonb('failureDetails').$type<RunFailure | null>(),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
   /** The opening of the agent's last reply (240 characters), written as its text arrives; the right column's row shows it. */
   lastReply: text('lastReply'),
@@ -561,6 +563,7 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   memory: text('memory').notNull().default(''),
   /** Why the last turn failed; cleared when a turn answers. */
   lastError: text('lastError'),
+  lastFailure: jsonb('lastFailure').$type<RunFailure | null>(),
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
@@ -1101,6 +1104,7 @@ export const nativeCoordinatorTurns = pgTable('native_coordinator_turns', {
   deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
   holder: text('holder').notNull(), round: integer('round').notNull(), payload: jsonb('payload').notNull(),
   status: text('status').notNull().default('queued'), reply: text('reply'),
+  failureDetails: jsonb('failureDetails').$type<RunFailure | null>(),
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique().on(table.userId, table.holder, table.round), index('native_coordinator_pending_idx').on(table.deviceId, table.status, table.createdAt)])

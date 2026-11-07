@@ -8,6 +8,19 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  run_subscription_expired: [],
+  run_api_key_invalid: [],
+  run_quota_exceeded: [],
+  run_rate_limited: [],
+  run_invalid_request: [],
+  run_access_denied: [],
+  run_model_unavailable: [],
+  run_context_length_exceeded: [],
+  run_timeout: [],
+  run_network_error: [],
+  run_provider_error: [],
+  run_failed: [],
+
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],
   cloud_not_connected: [],

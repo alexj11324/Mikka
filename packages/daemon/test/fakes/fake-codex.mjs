@@ -77,6 +77,14 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text.startsWith('FIXTURE_STRUCTURED_FAILURE')) {
+    const diagnostic = JSON.stringify({ error: { code: 'insufficient_quota', message: text.includes("ECHO") ? `Your account has no remaining credit. Request: ${text}; credential: fixture-private-model-key` : "Your account has no remaining credit." } })
+    writeFileSync(join(process.env.CODEX_HOME, 'provider-prompts.json'), JSON.stringify({ prompts: turn }))
+    const error = { message: `unexpected status 429: ${diagnostic}`, codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 429 } } }
+    notify('turn/completed', { threadId, turn: { id: open, status: 'failed', error } })
+    open = null
+    return
+  }
   if (text.startsWith('PROVIDER_DIAGNOSTIC ')) {
     const scenario = JSON.parse(text.slice('PROVIDER_DIAGNOSTIC '.length))
     writeFileSync(join(process.env.CODEX_HOME, 'provider-prompts.json'), JSON.stringify({ prompts: turn }))

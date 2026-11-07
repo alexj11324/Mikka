@@ -440,7 +440,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) {
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
-        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
         if (failure) {
           flush()
           items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], welcome: true, failure })
@@ -478,7 +478,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         const images = typeof message.content === 'string' ? 0 : message.content.filter(part => part.type === 'file' && part.mediaType.startsWith('image/')).length
         // The turn that answered this message failed (store.failTurn): the reason stays under it.
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
-        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
         items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {

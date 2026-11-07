@@ -83,7 +83,7 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
     assert.equal(result.reads.filter(read => read.text.includes('from (select distinct on')).length, 1)
     assert.equal(result.reads.some(read => /from "bots" where/.test(read.text)), false, 'bot looks do not add a separate statement')
     t.diagnostic(JSON.stringify({ read: 'task-runs', rowCount: selected.rows, beforeResultBytes: baseline.reads[0].bytes, resultBytes: selected.bytes, actionBytes: Buffer.byteLength(JSON.stringify(result.value)), fields: selected.fields }))
-    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: botLooks.find(bot => bot.id === botId) ?? null })))
+    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: botLooks.find(bot => bot.id === botId) ?? null, failureDetails: null })))
     assert.equal(result.value.items.length, 200)
     assert.equal(result.value.items.find(row => row.issueId === issueIds[0])?.runId, newest)
     assert.deepEqual(issueIds.slice(0, 4).map(id => result.value.items.find(row => row.issueId === id)?.bot?.id ?? null), [boundBot, directBot, null, runtimeBot], 'binding wins, direct and runtime fallbacks survive, and foreign bots remain private')

@@ -31,6 +31,8 @@ import type { DaemonPreparationTiming } from '../tracing'
  * `stopReason` is `submitted` (the agent handed in its work explicitly).
  */
 export interface ExitEvent {
+  /** Host-captured failure; never accepted from a model handoff. */
+  failureDetails?: import("@mikka/protocol/run-failure").RunFailure
   type: "exit"
   outcome: "succeeded" | "failed" | "cancelled"
   /** An adapter error may end its stream without proving the native process exited. */

@@ -1,3 +1,4 @@
+import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -1600,8 +1601,9 @@ export class Daemon {
       }
       if (!matches) {
         const message = "Repository origin does not match the approved repository"
-        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
-        throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        const error = new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message), failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) })
+        throw error
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || !cloudComputerGrantMatches(assignment, runId, deviceId))) throw new Error('Cloud computer runtime unavailable')
@@ -1630,6 +1632,7 @@ export class Daemon {
         .completeRun(runId, {
           stopReason: "error",
           report: baseReport(error.message),
+          failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION }),
         })
         .catch((err: unknown) =>
           this.log.warn({ run_id: runId, err }, "could not report refused run")

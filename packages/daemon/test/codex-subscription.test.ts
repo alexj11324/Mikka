@@ -230,3 +230,12 @@ it('retains only the JSON-RPC library numeric rejection code when the wire code 
   expect(calls).toHaveLength(1);expect(calls[0][0]).toHaveProperty('rpcCode',-32001);
   expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-secret');expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-access');
 });
+
+it("keeps notification-only provider details when the failed turn omits its error", async () => {
+  const { adapter, options } = await fixture()
+  const session = await adapter.start({ ...options, prompt: "DIAGNOSTIC " + JSON.stringify({ notification: { message: 'unexpected status 401: {"error":{"type":"authentication_error","message":"Session expired"}}', codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 401 } } } }) })
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: "exit", outcome: "failed", failureDetails: { runId: options.runId, provider: "codex", category: "subscription", status: 401 } })
+  expect(JSON.stringify(events)).not.toContain("fixture-access")
+})

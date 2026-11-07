@@ -1,6 +1,7 @@
 'use server'
 
 import { singleFlight } from '@/lib/single-flight'
+import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
 import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
@@ -35,6 +36,7 @@ export interface TaskRun {
   status: RunStatus
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
+  failureDetails?: CompactRunFailure | null
   /** The Bot that owns the task's newest thread, with its own bloub look (R-25); null for the Coordinator's own work. */
   bot: { id: string; name: string; color: string; shape: string } | null
   /** The coding agents (harnesses) of the task's threads, newest first: the board card's agent marks. */
@@ -60,7 +62,7 @@ async function readTaskRuns() {
   const latest = db.selectDistinctOn([agentRuns.issueId], {
     // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
     issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'), agentName: runAgentName.as('agentName'),
-    status: agentRuns.status, outcome: agentRuns.outcome,
+    status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     botId: runBotId.as('botId'),
     expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`.as('expiresAt'),
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
@@ -71,11 +73,11 @@ async function readTaskRuns() {
   // this database; a missing or foreign bot cannot remove or duplicate a task.
   const rows = await db.select({
     issueId: latest.issueId, runId: latest.runId, issueTitle: latest.issueTitle, agentName: latest.agentName,
-    status: latest.status, outcome: latest.outcome, expiresAt: latest.expiresAt, harnesses: latest.harnesses,
+    status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails, expiresAt: latest.expiresAt, harnesses: latest.harnesses,
     bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
   }).from(latest).leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, session.user.id))).orderBy(latest.issueId)
   const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)
-  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId! }))
+  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, ...row }) => ({ ...row, failureDetails: readCompactRunFailure(row.failureDetails), issueId: row.issueId! }))
   return { items, live }
 }
 
@@ -99,6 +101,7 @@ export interface Thread {
   lastReplyAt: string | null
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
+  failureDetails?: CompactRunFailure | null
   /** The coding agent running it (claude_code, codex…); its mark is the thread's icon (R-78). */
   harness: string | null
   waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string }
@@ -154,7 +157,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       deviceType: sql<'laptop' | 'server' | null>`case when ${waitingForDevice} then ${devices.deviceType} end`.as('deviceType'),
       waitingForDevice: waitingForDevice.as('waitingForDevice'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
-      outcome: agentRuns.outcome,
+      outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
       .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
@@ -180,7 +183,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
         // A cloud run waits on its own sandbox, never on a machine the person can turn on.
         ...(waitingForDevice && deviceId && deviceName !== null && deviceType
           ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
-        ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+        ...row, failureDetails: readCompactRunFailure(row.failureDetails), harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
         lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
       }))
       return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }

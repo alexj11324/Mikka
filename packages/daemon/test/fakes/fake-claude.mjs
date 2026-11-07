@@ -88,6 +88,12 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (message.startsWith('FIXTURE_STRUCTURED_FAILURE')) {
+    const diagnostic = JSON.stringify({ error: { code: 'insufficient_quota', message: message.includes("ECHO") ? `Your account has no remaining credit. Request: ${message}; credential: fixture-private-model-key` : "Your account has no remaining credit." } })
+    writeFileSync(`${process.env.CLAUDE_CONFIG_DIR}/provider-prompts.json`, JSON.stringify({ prompts: ++providerPrompts }))
+    out({ type: 'result', subtype: 'success', is_error: true, total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0 }, api_error_status: 429, terminal_reason: 'api_error', result: `API Error: 429 ${diagnostic}` })
+    return
+  }
   if (message.startsWith('PROVIDER_DIAGNOSTIC ')) {
     const scenario = JSON.parse(message.slice('PROVIDER_DIAGNOSTIC '.length))
     writeFileSync(`${process.env.CLAUDE_CONFIG_DIR}/provider-prompts.json`, JSON.stringify({ prompts: ++providerPrompts }))

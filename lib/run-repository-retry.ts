@@ -1,4 +1,5 @@
 import 'server-only'
+import { serverRunFailure } from './run-failure-details'
 import { db, pool, withDatabaseClient } from './db'
 import type { agentRuns } from './db/schema'
 import { ActionFailureError } from './action-error'
@@ -118,8 +119,8 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       const retryId = crypto.randomUUID()
       // The active-task admission gate must see A as terminal. Token revocation
       // and B's fresh receipt commit atomically; a failed admission rolls back.
-      await tx.query(`UPDATE agent_runs SET status='failed',"stopReason"='device_lost',error=$2,"finishedAt"=$3,"updatedAt"=$3 WHERE id=$1`,
-        [run.id, `The machine went offline; handed to another device as attempt ${run.attempt + 1} of ${MAX_RUN_ATTEMPTS}.`, now])
+      await tx.query(`UPDATE agent_runs SET status='failed',"stopReason"='device_lost',error=$2,"finishedAt"=$3,"updatedAt"=$3,"failureDetails"=$4::jsonb WHERE id=$1`,
+        [run.id, `The machine went offline; handed to another device as attempt ${run.attempt + 1} of ${MAX_RUN_ATTEMPTS}.`, now, JSON.stringify(serverRunFailure(run.id, now))])
       await revokeRunTokens(run.id)
       await acceptLocalRun({ id: retryId, userId: run.userId, issueId: run.issueId, botId: run.botId, source: run.source,
         deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentId: target.agentId, prompt: recovery.prompt,

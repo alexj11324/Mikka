@@ -1,3 +1,4 @@
+import { captureRunFailure, failureFrom, type RunFailure, type RunFailureContext } from "@mikka/protocol/run-failure"
 import { codexFailureInfo, codexFailureMessage, type CodexFailureInfo, type CodexFailurePhase } from "./codex-failure"
 import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
@@ -183,6 +184,34 @@ export function codexProviderFailure(error: unknown): ProviderFailure | undefine
     code: category,
     ...(bodyStart >= 0 && bodyEnd >= bodyStart ? { responseBody: diagnostic.slice(bodyStart, bodyEnd + 1) } : {}),
   })
+}
+
+/** Turn errors are a trusted CLI boundary; arbitrary messages elsewhere are not. */
+export function captureCodexRunFailure(error: unknown, context: RunFailureContext): RunFailure {
+  if (failureFrom(error)) return captureRunFailure(error, context)
+  if (!error || typeof error !== "object") return captureRunFailure(error, context)
+  const outer = error as Record<string, unknown>
+  const data = outer.data && typeof outer.data === "object" ? outer.data as Record<string, unknown> : undefined
+  const value = data && "codexErrorInfo" in data ? { ...data, message: typeof data.message === "string" ? data.message : outer.message } : outer
+  const info = codexFailureInfo(value)
+  const codes: Partial<Record<CodexFailureInfo["category"], string>> = {
+    unauthorized: "authentication_failed", usageLimitExceeded: "usage_limit_exceeded", contextWindowExceeded: "context_window_exceeded",
+    rateLimitExceeded: "rate_limit", serverOverloaded: "overloaded", flexUnavailable: "overloaded", internalServerError: "server_error",
+    httpConnectionFailed: "connection_error", responseStreamConnectionFailed: "connection_error", responseStreamDisconnected: "connection_error", responseTooManyFailedAttempts: "connection_error",
+  }
+  const diagnostic = typeof value.message === "string" ? value.message : ""
+  const prefix = /^(?:stream disconnected before completion:\s*)?(?:unexpected status|HTTP status|API [Ee]rror:)\s*([45]\d{2})\b[ :,-]*([\s\S]*)$/i.exec(diagnostic)
+  const status = info.httpStatus ?? (prefix ? Number(prefix[1]) : undefined)
+  const body = prefix?.[2]
+  const start = body?.indexOf("{") ?? -1, end = body?.lastIndexOf("}") ?? -1
+  return captureRunFailure({
+    provider: "codex", ...(status === undefined ? {} : { status }),
+    // A concrete HTTP refusal takes precedence over generic connection labels.
+    ...(codes[info.category] && !(status !== undefined && codes[info.category] === "connection_error") ? { code: codes[info.category] } : {}),
+    ...(prefix ? { message: `API Error: ${prefix[1]} ${body}` } : {}),
+    ...(body && start >= 0 && end >= start ? { responseBody: body.slice(start, end + 1) } : {}),
+    cause: error,
+  }, context)
 }
 
 /** Codex thread items as UI message chunks, at item start and completion. */
@@ -518,6 +547,9 @@ export class CodexAdapter implements AgentAdapter {
     let pendingTurnStart: Promise<void> | null = null
     let ending = false
     let cancelling = false
+    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.credential?.key ?? "", options.apps?.token ?? ""]
+    const capture = (error: unknown) => captureCodexRunFailure(error, { runId: options.runId, appVersion: DAEMON_VERSION, provider: "codex", credential: options.credential ? "api_key" : "subscription", sensitiveText })
+    let failureDetails: RunFailure | undefined
     let lastError: string | undefined
     let lastFailure: CodexFailureInfo | undefined
     let providerFailure: ProviderFailure | undefined
@@ -568,7 +600,10 @@ export class CodexAdapter implements AgentAdapter {
         )
       rpc.dispose()
       await child.kill()
-      if (event) queue.exit(event)
+      if (event) {
+        const { failureDetails: supplied, ...terminal } = event
+        queue.exit({ ...terminal, ...(event.outcome === "failed" && (supplied ?? failureDetails) ? { failureDetails: supplied ?? failureDetails } : {}) })
+      }
     }
 
     // Native requests retain their active turn identity and live run gate;
@@ -610,10 +645,10 @@ export class CodexAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_AUTH_ERROR)
         }
         try {
-          return subscriptionTokens(
-            await externalAuth.token(true),
-            externalAuth.accountId
-          )
+          const auth = subscriptionTokens(await externalAuth.token(true), externalAuth.accountId)
+          sensitiveText.push(auth.accessToken)
+          options.onCredential?.("SUBSCRIPTION_ACCESS_TOKEN", auth.accessToken)
+          return auth
         } catch (error) {
           void finish({ outcome: "failed", error: SUBSCRIPTION_AUTH_ERROR })
           throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error })
@@ -706,6 +741,7 @@ export class CodexAdapter implements AgentAdapter {
           if (errorThread && errorThread !== sessionId) return
           if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
           if (!willRetry) {
+            failureDetails = capture(error)
             lastFailure = codexFailureInfo(error)
             providerFailure = codexProviderFailure(error)
             lastError = managedAuth
@@ -750,6 +786,7 @@ export class CodexAdapter implements AgentAdapter {
       const handoff = ctx.readHandoff(log)
       if (handoff) return finish(handoff)
       if (turn.status === "failed" || lastError) {
+        if (turn.error) failureDetails = capture(turn.error)
         providerFailure = codexProviderFailure(turn.error) ?? providerFailure
         if (providerFailure) {
           quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
@@ -794,6 +831,8 @@ export class CodexAdapter implements AgentAdapter {
     let sessionId = threadId ?? ""
     let runtimeModel: string | null = null
     const startTurn = async (message: string) => {
+      sensitiveText.push(message)
+      failureDetails = undefined
       lastError = undefined
       lastFailure = undefined
       providerFailure = undefined
@@ -810,11 +849,12 @@ export class CodexAdapter implements AgentAdapter {
         ...(options.effort ? { effort: options.effort } : {}),
       })
       const response = result.catch((error: unknown) => {
+        failureDetails = capture(error)
         providerFailure = codexProviderFailure(error)
         if (managedAuth) turnStartFailure = subscriptionFailure('turn_start', codexFailureInfo(error))
-        if (providerFailure) throw new ProviderFailureError(providerFailure)
-        if (managedAuth) throw new Error(turnStartFailure)
-        throw error
+        if (providerFailure) throw Object.assign(new ProviderFailureError(providerFailure), { failureDetails, cause: error })
+        if (managedAuth) throw Object.assign(new Error(turnStartFailure, { cause: error }), { failureDetails })
+        throw Object.assign(error instanceof Error ? error : new Error(errorMessage(error), { cause: error }), { failureDetails })
       })
       if (options.mailbox) {
         pendingTurnStart = response.then(({ turn }) => { if (!ending) activeTurn = turn.id })
@@ -832,6 +872,7 @@ export class CodexAdapter implements AgentAdapter {
       if (handoff) return queue.exit(handoff)
       queue.exit({
         outcome: "failed",
+        failureDetails: failureDetails ?? capture(new Error("codex_cli_exited_early")),
         ...(providerFailure ? { providerFailure } : {}),
         ...(quota ? { quota } : {}),
         error: managedAuth
@@ -867,6 +908,8 @@ export class CodexAdapter implements AgentAdapter {
             await daemonTracer.span("daemon.adapter.auth.token", traceAttributes, () => externalAuth.token(false)),
             externalAuth.accountId
           )
+          sensitiveText.push(auth.accessToken)
+          options.onCredential?.("SUBSCRIPTION_ACCESS_TOKEN", auth.accessToken)
           const loggedIn = await daemonTracer.span("daemon.adapter.account_check.login", traceAttributes, () => ready(
             rpc.sendRequest<{ type: string }>("account/login/start", {
               type: "chatgptAuthTokens",
@@ -948,6 +991,7 @@ export class CodexAdapter implements AgentAdapter {
       runtimeModel,
       events: () => queue.drain(),
       async send(message) {
+        sensitiveText.push(message)
         if (ending) throw new Error("The Codex session already ended")
         if (activeTurn) {
           try {
