@@ -15,21 +15,21 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 SOURCE = '6adc26c6eab10deb0a873272de502cbc88828f53'
 REPOSITORY = 'alexj11324/Mikka'
 OPS_REF = 'refs/heads/ops/1512-git-transport'
-TARGET_RUN = 42328947041
-TARGET_SHA = 'd72227c94eb25174c92d77e4c74e55abe578aa99'
-TARGET_WORKER = '60ea0edacca350a3a088836d9c96e8f09e76d1d9'
+TARGET_RUN = 42331353700
+TARGET_SHA = '080b14b4b1e098c055f1c6dea021a1c49d3f0131'
+TARGET_WORKER = '4917996093c3702b457a680a57ebcce40740ae35'
 TARGET_METADATA = {'application': 'mikka-template-release', 'sourceCommit': TARGET_SHA,
                    'runId': str(TARGET_RUN), 'runAttempt': '1'}
 TARGETS = [
-    {'kind': 'desktop', 'templateId': '0a5qaq69lrw2bn7iz7pj',
-     'buildId': '8f58fa18-b373-4aca-8b3b-813cf1bd06e0',
-     'name': 'mikka-d72227c94eb2-42328947041-1-desktop'},
-    {'kind': 'claude', 'templateId': 'g249155wp8lskmgydask',
-     'buildId': '5601b5f1-36d7-4dfd-835f-52e8b055e727',
-     'name': 'mikka-d72227c94eb2-42328947041-1-claude'},
-    {'kind': 'codex', 'templateId': 'xjvt6dck202q4jpaabby',
-     'buildId': 'b998290e-bf7a-461c-a4c4-7b3ac383c217',
-     'name': 'mikka-d72227c94eb2-42328947041-1-codex'},
+    {'kind': 'desktop', 'templateId': 'pq15889g70osb15d1kt8',
+     'buildId': '1797f035-8df9-4ccf-8943-615fce6aca01',
+     'name': 'mikka-080b14b4b1e0-42331353700-1-desktop'},
+    {'kind': 'claude', 'templateId': 'nie7b19posv18cf0ny3p',
+     'buildId': 'f5dd1b1a-3e8f-4713-ba0e-24915952df1a',
+     'name': 'mikka-080b14b4b1e0-42331353700-1-claude'},
+    {'kind': 'codex', 'templateId': 'p0dwie1ie0nes5gfmaop',
+     'buildId': 'adcba2f1-38d7-4b5a-8b84-0138405ebce4',
+     'name': 'mikka-080b14b4b1e0-42331353700-1-codex'},
 ]
 CODES = {'operator_identity_invalid', 'source_mismatch', 'ops_checkout_mismatch',
          'checkout_dirty', 'key_missing', 'target_run_changed', 'api_response_invalid',

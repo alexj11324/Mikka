@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: issue1512-recover-main-candidates-42328947041-1
+  group: issue1512-recover-main-candidates-42331353700-1
   cancel-in-progress: false
   queue: max
 
