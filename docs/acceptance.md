@@ -126,20 +126,32 @@ created no API key and is not a model-prompt result.
 
 ## Production acceptance after a merge
 
-Local acceptance comes first; it does not replace production acceptance. After
-the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
+After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 
 1. Watch the Vercel production deployment of the merge commit until it is
    READY, and confirm the production domain serves that commit.
 2. Pending migrations run through the existing flow (`pnpm build` runs
    `scripts/migrate.mjs` in Vercel production; [migration bootstrap](migration-bootstrap.md)).
    Do not apply SQL by hand.
-3. Check each acceptance criterion of the issue in production, with a real
-   account and a real task. Use leased test accounts ([test accounts](test-accounts.md));
-   leave no junk data. A simulated or scripted test is not production
-   acceptance.
+3. Decide whether the change needs production acceptance (Alex, 2026-11-07):
+   - **No**, when a local production build can show it: UI, interaction,
+     navigation, page refresh, layout and copy. CI plus the PR's screenshots
+     of a local production build accept it. Note on the issue that production
+     serves the merge commit, and close it. Do not sign in to production,
+     wait for a merge window or hold `main` for these.
+   - **Yes**, only for what cannot be tested locally: real subscriptions
+     (Claude Code, Codex), OAuth sign-in, model providers, the GitHub App,
+     payments, push notifications and other external services. Check those
+     criteria in production with the shared test account in the Acme Inc.
+     workspace (above) and a real task; leave no junk data. A simulated or
+     scripted test is not production acceptance.
 4. Write the evidence on the issue: time, run id and a log summary, with no
    secrets or personal data. Then close the issue.
+
+Every production Web deploy also runs an automatic smoke test with the shared
+test account: sign in, send a Coordinator message, dispatch a task. It reports
+only when it fails. It does not replace step 3's external-service checks, and
+a failing run is fixed forward first.
 
 If production breaks, fix forward with a new PR or revert through a revert
 PR. Never delete deployments, revoke shared tokens, change production Neon

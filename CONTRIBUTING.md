@@ -29,9 +29,10 @@ Thank you for helping improve Mikka.
 
 - Work is assigned through a GitHub issue to one agent, who owns it end to
   end. Nobody pushes to `main` directly. The assigned agent opens a pull
-  request from a branch and squash-merges it itself once CI is green on the
-  latest head and the PR is mergeable. After the merge the same agent watches
-  the production deployment and accepts the change in production
+  request from a branch and merges it itself with a merge commit (no squash,
+  no rebase) once CI is green on the latest head and the PR is mergeable.
+  After the merge the same agent watches the production deployment and, only
+  when the change needs it, accepts it in production
   ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not

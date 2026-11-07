@@ -13,6 +13,30 @@ export const GITHUB_CREDENTIAL_SCRIPT = resolve(import.meta.dirname, 'github-cre
 const helper = GITHUB_CREDENTIAL_SCRIPT
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 
+/** Use the claim's token directly for this daemon-owned HTTPS clone/fetch. */
+function preparedTokenEnvironment(token: string): Record<string, string> {
+  const entries = [
+    ['credential.helper', ''],
+    // Standard Git credential protocol, with the same github.com scope as
+    // native gh. The fixed text contains no token and needs only shell builtins.
+    ['credential.https://github.com.helper', '!f() { if [ "$1" = get ]; then printf "%s\\n" "username=x-access-token" "password=$GH_TOKEN"; fi; }; f'],
+  ] as const
+  const env: Record<string, string> = { GH_TOKEN: token, GIT_TERMINAL_PROMPT: '0' }
+  const count = Number(process.env.GIT_CONFIG_COUNT || '0')
+  // Git parses inherited -c parameters after COUNT. Append at that same
+  // precedence when present, preserving their quoting and unrelated settings.
+  if (process.env.GIT_CONFIG_PARAMETERS || !Number.isSafeInteger(count) || count < 0) {
+    env.GIT_CONFIG_PARAMETERS = `${process.env.GIT_CONFIG_PARAMETERS ?? ''} ${entries.map(([key, value]) => quote(`${key}=${value}`)).join(' ')}`
+  } else {
+    env.GIT_CONFIG_COUNT = String(count + entries.length)
+    entries.forEach(([key, value], index) => {
+      env[`GIT_CONFIG_KEY_${count + index}`] = key
+      env[`GIT_CONFIG_VALUE_${count + index}`] = value
+    })
+  }
+  return env
+}
+
 /** Host-only receipt IO keeps its configured transport, not forge credentials. */
 export function githubReceiptEnvironment(host: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { NODE_ENV: host.NODE_ENV ?? 'production' }
@@ -69,11 +93,9 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
 }
 
 /**
- * The daemon's own clone and fetch for a GitHub run: git asks the run's
- * credential helper, which exchanges the run token for the run owner's own
- * GitHub credential. A machine without a GitHub login of its own (a cloud
- * sandbox, a new computer) can then clone a private repository. Only git's
- * credential settings are returned; the run-local files are removed after.
+ * The daemon's clone/fetch consumes an already prepared claim token without
+ * starting gh. Local prepared environments and older claims keep their
+ * existing native/helper flow; temporary legacy helper files are removed.
  */
 export async function withRunGitCredentials<T>(
   assignment: { github?: { endpoint: string; repository: string; branch?: string; token?: string; expiresAt?: string | null }; mcp?: { token: string }; issueId: string },
@@ -84,11 +106,7 @@ export async function withRunGitCredentials<T>(
   const none = { defaultBranch: async () => undefined }
   if (!assignment.github || (!assignment.github.token && !assignment.mcp && !preparedEnvironment)) return work({}, none)
   if (preparedEnvironment || assignment.github.token) {
-    const env = preparedEnvironment ?? {
-      GH_TOKEN: assignment.github.token!, GIT_TERMINAL_PROMPT: '0',
-      GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
-      GIT_CONFIG_KEY_1: 'credential.https://github.com.helper', GIT_CONFIG_VALUE_1: '!gh auth git-credential',
-    }
+    const env = preparedEnvironment ?? preparedTokenEnvironment(assignment.github.token!)
     return work(env, { defaultBranch: async () => {
       const binary = findOnPath('gh', env.PATH ?? process.env.PATH)
       if (!binary) return undefined
