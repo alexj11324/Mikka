@@ -1,4 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
+import { runAssignmentSchema } from '@mikka/protocol/device'
+import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
+import { POLICY_SNAPSHOT_TTL_MS, policySnapshotMessage, type PolicySnapshotPayload } from '@mikka/protocol/policy-snapshot'
 import { Daemon } from '../src/main'
 import { createLogger } from '../src/log'
 import { MemoryServer, type RunAssignment, type ServerLink } from '../src/server-link'
@@ -6,6 +10,7 @@ import { ServerUnreachableError } from '../src/errors'
 import { DAEMON_VERSION } from '../src/paths'
 import * as service from '../src/service'
 import { mkdtempSync } from 'node:fs'
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -267,6 +272,107 @@ function claimDaemon(claimRun: ServerLink['claimRun']) {
   return { daemon, start, stop, claim }
 }
 
+function desktopAssignment(subscriptionOwnerId: string) {
+  const policy = defaultRunPolicy()
+  return runAssignmentSchema.parse({
+    runId: 'run-desktop', issueId: 'issue-1', deviceId: 'device-1', repoId: 'repo-1',
+    harness: 'codex', model: 'gpt-6-luna', prompt: 'Fixture desktop task',
+    leaseExpiresAt: new Date(Date.now() + 90_000).toISOString(),
+    factoryExecuteKind: 'deliverable', preserveQuestionWorktree: true,
+    policy: { ...policy, permissions: { ...policy.permissions, computer_use: 'allow' } },
+    subscriptionBinding: {
+      bindingId: '10000000-0000-4000-8000-000000000001', ownerId: subscriptionOwnerId,
+      workspaceId: '10000000-0000-4000-8000-000000000002',
+      consumerId: '10000000-0000-4000-8000-000000000003', route: 'codex_cli',
+    },
+    computer: { botId: '10000000-0000-4000-8000-000000000004', ownerId: 'task-owner', display: ':1', policyVersion: 0 },
+  })
+}
+
+function desktopClaimDaemon(assignment: RunAssignment, broker = true) {
+  const claimRun = vi.fn<ServerLink['claimRun']>(async () => assignment)
+  const fixture = claimDaemon(claimRun)
+  Reflect.set(fixture.daemon, 'options', { ...Reflect.get(fixture.daemon, 'options'),
+    hostedSubscriptions: true, e2bContainerRuntime: true, cloudComputer: true })
+  Reflect.set(fixture.daemon, 'device', { deviceId: 'device-1', credential: 'fixture',
+    workspaceId: '10000000-0000-4000-8000-000000000002',
+    repos: [{ repoId: assignment.repoId, name: 'fixture', path: '/home/user/.mikka/bot-workspaces/fixture' }] })
+  // Keep the actual claim acceptance path; no driver, socket or agent starts.
+  if (broker) Reflect.set(fixture.daemon, 'cloudComputerBroker', { close: async () => {} })
+  return { ...fixture, claimRun }
+}
+
+function withDesktopSnapshot(assignment: RunAssignment, changed?: 'ownerId' | 'runId' | 'deviceId') {
+  // Match the existing policy-distribution fixture: a genuine local test
+  // signature, never a provider credential or a new assignment field.
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+  const now = Date.now(), revision = 'a'.repeat(64), policy = assignment.policy!
+  const payload: PolicySnapshotPayload = {
+    version: 1, issuer: 'http://127.0.0.1:19723/mikka', ownerId: assignment.computer!.ownerId,
+    runId: assignment.runId, deviceId: assignment.deviceId, revision,
+    policyHash: policySnapshotHash(policy), scope: { workspaceIds: ['10000000-0000-4000-8000-000000000002'], hierarchy: null },
+    policy, issuedAt: now, expiresAt: now + POLICY_SNAPSHOT_TTL_MS,
+  }
+  if (changed) payload[changed] = 'another-snapshot-subject'
+  return runAssignmentSchema.parse({ ...assignment, policyRevision: revision, policySnapshot: {
+    algorithm: 'Ed25519', keyId: createHash('sha256').update(publicKey.export({ format: 'der', type: 'spki' })).digest('hex'),
+    payload, signature: sign(null, policySnapshotMessage(payload), privateKey).toString('base64url'),
+  } })
+}
+
+it.each(['task-owner', 'shared-subscription-owner'])('starts an owned desktop task using the authorized subscription of %s', async subscriptionOwnerId => {
+  const assignment = desktopAssignment(subscriptionOwnerId)
+  const { claim, claimRun, start } = desktopClaimDaemon(assignment)
+  // The server authorizes the desktop for the task owner and a separately
+  // shared subscription for billing. The payer does not own the desktop.
+  await expect(claim(assignment.runId)).resolves.toEqual({})
+  expect(claimRun).toHaveBeenCalledExactlyOnceWith(assignment.deviceId, assignment.runId, expect.any(AbortSignal))
+  expect(start).toHaveBeenCalledExactlyOnceWith(assignment)
+})
+
+it('starts a desktop API-key assignment from an older server without a policy snapshot', async () => {
+  const subscription = desktopAssignment('task-owner')
+  delete subscription.subscriptionBinding
+  const assignment = runAssignmentSchema.parse({ ...subscription, model: 'deepseek-flash',
+    modelCredential: { kind: 'provider', protocol: 'openai', baseUrl: 'https://provider.example.invalid/v1', key: 'fixture' } })
+  expect(assignment.policySnapshot).toBeUndefined()
+  const { claim, start } = desktopClaimDaemon(assignment)
+  await expect(claim(assignment.runId)).resolves.toEqual({})
+  expect(start).toHaveBeenCalledExactlyOnceWith(assignment)
+})
+
+it('starts a shared-subscription desktop task whose signed policy names the task owner', async () => {
+  const assignment = withDesktopSnapshot(desktopAssignment('shared-subscription-owner'))
+  const { claim, start } = desktopClaimDaemon(assignment)
+  await expect(claim(assignment.runId)).resolves.toEqual({})
+  expect(start).toHaveBeenCalledExactlyOnceWith(assignment)
+})
+
+it.each(['ownerId', 'runId', 'deviceId'] as const)('refuses a desktop grant whose signed policy names another %s', async changed => {
+  // Sign the other subject's payload correctly: this is a scope mismatch,
+  // not a corrupt signature standing in for the ownership check.
+  const assignment = withDesktopSnapshot(desktopAssignment('task-owner'), changed)
+  const { claim, start } = desktopClaimDaemon(assignment)
+  await expect(claim(assignment.runId)).rejects.toThrow()
+  expect(start).not.toHaveBeenCalled()
+})
+
+it('refuses a desktop assignment when this daemon has no computer broker', async () => {
+  const assignment = desktopAssignment('task-owner')
+  const { claim, start } = desktopClaimDaemon(assignment, false)
+  await expect(claim(assignment.runId)).rejects.toThrow('Cloud computer runtime unavailable')
+  expect(start).not.toHaveBeenCalled()
+})
+
+it.each(['runId', 'deviceId'] as const)('refuses a desktop claim response for another %s', async changed => {
+  const assignment = desktopAssignment('task-owner')
+  const requestedRunId = assignment.runId
+  assignment[changed] = 'another-assignment'
+  const { claim, start } = desktopClaimDaemon(assignment)
+  await expect(claim(requestedRunId)).rejects.toThrow()
+  expect(start).not.toHaveBeenCalled()
+})
+
 it('shares an in-flight heartbeat or RPC claim with the commands poll', async () => {
   let finish!: (assignment: RunAssignment) => void
   const claimRun = vi.fn<ServerLink['claimRun']>(() => new Promise(resolve => { finish = resolve }))
@@ -304,11 +410,11 @@ it('settles a late claim before shutdown without launching its run', async () =>
   expect(stop).toHaveBeenCalledOnce()
 })
 
-it('does not launch an in-flight claim after the device session changes', async () => {
+it.each(['deviceId', 'credential', 'workspaceId'] as const)('does not launch an in-flight claim after the device %s changes', async changed => {
   let finish!: (assignment: RunAssignment) => void
   const { daemon, start, claim } = claimDaemon(() => new Promise(resolve => { finish = resolve }))
   const pending = claim('run-old-session').catch(error => error)
-  Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'new-session' })
+  Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'fixture', [changed]: 'changed-session' })
   finish({ runId: 'run-old-session' } as RunAssignment)
   expect(await pending).toMatchObject({ cause: 'Device session changed while claiming run' })
   expect(start).not.toHaveBeenCalled()

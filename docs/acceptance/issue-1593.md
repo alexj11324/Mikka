@@ -176,6 +176,119 @@ registry and schemas; the new contract regression failed on the old caller.
 Closed failure phases preserve where a preallocation or setup failure occurred
 without exporting HTTP bodies or credential data.
 
+### Second Owner attempt: real provider pass and shared-subscription refusal
+
+[PR #1631](https://github.com/alexj11324/Mikka/pull/1631) passed all six
+exact-head workflows and merged as
+`e4494a3c8620d0ac8fe4cd885144a3f47be0252c`. Its
+[main CI 42363131769](https://github.com/alexj11324/Mikka/actions/runs/42363131769)
+passed all 12 jobs. [Web run 42363131663](https://github.com/alexj11324/Mikka/actions/runs/42363131663)
+succeeded; deployment `dpl_2HY7JTyRWZrJ4TKudYa85xb1D6Bq` was READY and the
+public version returned exact `e4494a3c` at 10:37:44 UTC on 2026-11-07.
+The successful E2B release check `42363131705 / 1` found the worker unchanged
+at `18d86efa6f4ed740bbc86f02db2f77eecc16cff6`; it reused the published runtime.
+It did not build candidates or run new candidate subscription cases.
+
+[Task evidence run 42363177678 / 1](https://github.com/alexj11324/Mikka/actions/runs/42363177678)
+then bound the exact main, upstream attempt and public Web build. Artifact
+`13570494196` contains all four reports; two independent downloads verified
+the 4,563-byte ZIP against SHA-256
+`e576acab17ba836b814bf56b4066b630d56fc6a413fd30497b4d2007b1de376b`.
+
+At 10:37:46–10:37:58 UTC, the real-provider layer passed all eight ordered
+cases, including `provider-request-deadline`. Its fixture run was
+`043f4bd9-22e7-4bb7-830c-168b6abbf121`, VM `isdtm9nsqr5dtpiesklj7`, on the
+official `codex` template. The deadline receipt records one `setTimeout`
+request with `requestTimeoutMs: 1`, `retries: 0`, the native `TimeoutError`,
+`earlyReplayIo: 0` and `recovered: true`. Cleanup confirmed the VM missing
+and the isolated database dropped. This proves SDK deadline-to-controller
+recovery, not natural timeout expiry or native subscription execution.
+
+The Owner driver ran from 10:38:02.127 to 10:42:35.923 UTC. Its normal
+capability read confirmed `configured: true` and `byoEnabled: true`; both
+cases proved the intended fixed model and shared subscription binding.
+Each created a real Task VM, but neither reached a native question:
+
+| Path | Origin run | VM | Origin `finishedAt` UTC |
+| --- | --- | --- | --- |
+| Claude Code / `claude-haiku-5-5` | `6d125edd-5129-47e2-8034-2b316d99df68` | `ia39xpkfn9u93ach3zfxz` | 10:40:20.363 |
+| Codex / `gpt-6-luna` | `80ea7d0a-1b94-4bb5-8082-846c704abe40` | `ip13i0ea3cg416s11egxp` | 10:42:27.560 |
+
+Both reports stopped at `waiting_for_native_question` with
+`lifecycle_unexpected_factory_attempt`. Read-only production queries, scoped
+to those exact runs and their reported retries, found `stopReason: device_lost`,
+no native session or worktree, and zero `run_chunks`. The two follow-ups have
+`retryOf` pointing to their origins and `attempt: 2`; cleanup stopped them
+before they started. Thus the driver error identifies the unexpected retry,
+not the reason the original claim failed.
+
+The initial leases expired without renewal. Server claim timing reached
+`response_fence` in 5.147 and 5.316 seconds, so a 90-second credential-preparation
+wait is not the explanation. The exact production bindings show the desktop
+owner equals the run requester, while the shared subscription owner differs.
+Both runs use the desktop template, have no repository remote, and have no
+read-only mode or policy ceiling; the workspace computer permission is `allow`.
+The response therefore carries a computer grant for the requester. The daemon's
+old `credentialOwner()` instead returns the subscription payer and rejects this
+grant before `supervisor.start()`. No journal/active entry is created, so the
+daemon reports no run to renew; the existing recovery timer eventually records
+`device_lost` and creates a retry. A regression through the real
+`claimAndStart()` reproduces this pre-start rejection. The worker's later log
+stream was not retained, so no exact worker exception line is claimed as a
+production observation.
+
+Independent review found the same payer/computer-owner comparison again in
+`createHostedBotRunner()`, after credential preparation and before the local
+computer grant and CLI spawn. Fixing only the daemon precheck would therefore
+leave both shared-subscription desktop paths blocked. The native session
+ledger and resume checks correctly bind to the subscription payer; those
+checks must stay intact.
+
+The same-source lifecycle evidence still establishes automatic failed-run
+parking and final cleanup. Matching run/VM hashes and epoch 2 bind the events:
+
+| Observation, UTC | Claude | Codex |
+| --- | --- | --- |
+| Run token revoked | 10:40:20.817 | 10:42:28.140 |
+| `pause_requested` | 10:40:21.711 | 10:42:29.100 |
+| Device token revoked | 10:40:21.718 | 10:42:29.107 |
+| First provider `pause_ack` after commit | 10:40:22.020 | 10:42:29.453 |
+| Reconcile `run_ended / pause_ack` | 10:40:22.051 | 10:42:29.486 |
+| Explicit cleanup `kill_ack` | 10:40:24.910 | 10:42:32.500 |
+| Independent provider missing confirmation | 10:40:26.711 | 10:42:34.276 |
+
+Each origin had exactly one issued device token and one issued run token;
+the scoped read-only queries found both revoked, with no unrevoked/unexpired
+run tokens. The unstarted retries had no issued run tokens. These are database
+revocation observations, not attempts to authenticate with the old secrets.
+The `finishedAt` to first `pause_ack` confirmation bounds are **1.657 seconds**
+and **1.893 seconds**. They include scheduling, provider response, database and
+logging time; they do not identify E2B's exact internal transition instant.
+The later explicit cleanup kills are not automatic idle-retirement timings.
+The 121/113 compute-second values are cumulative database estimates, not idle
+compute, provider bills or a measured before/after saving.
+
+All three test VMs were independently confirmed missing. Owner cleanup also
+restored the workspace and archived the created Profiles; task history remains.
+The strict aggregate correctly failed with `providerIntegration: passed`,
+`questionResume: incomplete` and `issueAcceptance: incomplete`. It cleared
+only `provider_timeout_fault_injection`. Neither a native model execution nor
+an original-session question continuation is claimed for these two failed runs.
+
+The correction binds the server-issued computer grant to the requested run
+and current device. An existing signed policy envelope additionally binds its
+run, device and execution owner; the existing independent signature, issuer
+and freshness verifier still runs before repository or adapter effects.
+Older authenticated claims without an envelope keep their existing contract.
+The broker reuses the same binding check for permission, desktop actions and
+capture, with the existing active lease, shutdown, registration and display
+fences. Hosted startup requires that broker and its policy-scoped grant,
+without mistaking the subscription payer for the Task's computer owner. It
+does not change credential routing, native-ledger scope, resume identity,
+protocol fields or the no-per-tool-remote-check contract. This runtime change
+requires new candidate conservation and both official subscription gates;
+the earlier unchanged-worker proof cannot stand in for those gates.
+
 ### Main-only acceptance delivery
 
 The interactive environment could not obtain E2B/shared-account credentials,

@@ -224,7 +224,7 @@ export async function createHostedBotRunner(host: {
         if (scope) mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 })
         const record = async (sessionId: string) => { assertOpen(); if (scope) writeJsonAtomic(ledger, { scope, sessionId }) }
         const computer = assignment.computer
-        if (computer && (!host.computerBroker || (selected && computer.ownerId !== selected.ownerId))) throw unavailable('computer_unavailable')
+        if (computer && !host.computerBroker) throw unavailable('computer_unavailable')
         computerGrant = computer ? host.computerBroker!.spec(assignment.runId, decide('computer_use', { policy: assignment.policy }), { display: computer.display }) : undefined
         if (computer && !computerGrant) throw unavailable('computer_unavailable')
         const computerMcp = computerGrant ? {
