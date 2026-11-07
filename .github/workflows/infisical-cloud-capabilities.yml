@@ -92,7 +92,7 @@ jobs:
           node-version: 24
       - run: node --test scripts/ops/self-hosting-release.test.mjs
       - run: node scripts/ops/self-hosting-release.mjs --preflight
-      - name: Install the fixed upstream HTTPS tunnel with SHA-256 verification
+      - name: Install the fixed upstream HTTPS receiver tunnel with SHA-256 verification
         run: |
           curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 -o "$RUNNER_TEMP/mikka-cloudflared"
           node --input-type=module <<'JS'

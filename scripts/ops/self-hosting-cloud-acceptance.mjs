@@ -74,9 +74,12 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
     tunnel = spawn(env.RUNNER_TEMP + '/mikka-cloudflared', ['tunnel', '--url', 'http://127.0.0.1:' + receiver.address().port, '--no-autoupdate'], { stdio: ['ignore', 'pipe', 'pipe'], env: { PATH: env.PATH, HOME: env.RUNNER_TEMP } })
     const origin = await new Promise((resolve, reject) => {
       let buffer = ''; const timer = setTimeout(() => reject(Error('TUNNEL_START')), 45000)
-      const observe = chunk => { buffer = (buffer + chunk.toString()).slice(-64000); const match = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(buffer); if (match) { clearTimeout(timer); resolve(match[0]) } }
+      const observe = chunk => { buffer = (buffer + chunk.toString()).slice(-64000); const match = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(buffer); if (match && buffer.includes('Registered tunnel connection')) { clearTimeout(timer); resolve(match[0]) } }
       tunnel.stdout.on('data', observe); tunnel.stderr.on('data', observe); tunnel.on('error', () => { clearTimeout(timer); reject(Error('TUNNEL_START')) }); tunnel.on('exit', () => { if (!closed) { clearTimeout(timer); reject(Error('TUNNEL_START')) } })
     })
+    const publicReceiver = await fetcher(origin, { redirect: 'error', signal: AbortSignal.timeout(20000) })
+    check(publicReceiver.ok && (await publicReceiver.text()) === 'Mikka release acceptance receiver', 'TUNNEL_HTTP')
+    report.checks.receiverReachableBeforeRegistration = true
     // The normal dynamic registration validates public HTTPS and resolves DNS.
     registration = await json('server_register', '/v1/servers/register', { method: 'POST', body: { origin, basePath: '/mikka', name: 'Mikka release acceptance ' + env.GITHUB_RUN_ID } }, 201)
     check(registration.redirectUri === origin + '/mikka/api/cloud/callback' && typeof registration.serverSecret === 'string', 'REGISTRATION')
