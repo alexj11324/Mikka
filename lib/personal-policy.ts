@@ -22,8 +22,11 @@ export async function memberSubscriptionsAllowed(query: Query, workspaceId: stri
 
 /** 分享给团队成员: the owner also lets other members' bots here use it (Alex, 「B」). */
 export async function othersMayUse(query: Query, ownerId: string, workspaceId: string): Promise<boolean> {
-  const { rows: [row] } = await query.query<{ allowOthers: boolean }>('SELECT "allowOthers" FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
-  return Boolean(row?.allowOthers) && (await memberSubscriptionsAllowed(query, workspaceId))
+  const { rows: [row] } = await query.query<{ allowOthers: boolean }>(`SELECT CASE WHEN sh."allowOthers" THEN NOT EXISTS (
+    SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions
+  ) ELSE false END AS "allowOthers" FROM workspace_subscription_shares sh
+    WHERE sh."ownerId"=$1 AND sh."workspaceId"=$2`, [ownerId, workspaceId])
+  return Boolean(row?.allowOthers)
 }
 
 /**

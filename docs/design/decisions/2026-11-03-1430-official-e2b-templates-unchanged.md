@@ -320,6 +320,15 @@ worker claim 为 3.778–4.577 秒，仓库准备为 2.151–5.633 秒。阶段�
 同一查询重读原 binding 与当前 connection，保留 owner/workspace、分享及 epoch
 检查且不回退到旧 binding。Factory claim 复用同一事务已锁定的 repo 行。
 claim 的强制 fresh quota 仍在原位置；不在正常拒绝路径提前发 usage 或写入配额。
+Factory 的两个既有 advisory lock 继续按原顺序取得，只合并为一次 PostgreSQL
+原生 simple-query 往返；BEGIN 和授权前置条件保持原位置。任务快照的两条 SELECT
+同样批量返回，保留 pg 原生值、排序和最终 JSON 表示。route 的来源 payload
+与完整 owner/Bot/issue 谓词一次 fresh 读取，null-Bot 的 FOR SHARE 保持到提交。
+所有插值使用 pg.escapeLiteral；任何批次返回形状异常都回滚，不缓存授权或锁结果。
+
+Factory 的布尔任务授权继续每次调用完整 canonical ACL，只用既有 withoutBody 投影
+避免传回任务正文。共享凭据的 share 开关与 workspace policy 在同一条 fresh SQL
+中判定；缺共享、关闭共享和关闭策略仍拒绝，缺策略仍保留默认允许，不跨调用缓存。
 
 bootstrap 的同一次文件上传仍承载私有凭据，root 命令原子发布后降为普通 user
 检查并唤醒现有 wait-bootstrap 进程。只有固定唤醒收据才省掉第二条远程启动命令；
@@ -344,3 +353,16 @@ Codex 还按官方 launcher 的安装布局读取其 native backend。每次 dae
 start command 在模板构建末尾执行，ready command 成功后保存文件系统与内存状态；
 新实例从这个已就绪状态恢复。因此只预加载无身份的 worker，实际 owner、设备与任务
 通过启动后的正常 handoff 注入，不依赖创建实例时的环境变量去更新冻结的进程。
+
+### 2026-11-07：统一发布后的后续验证边界
+
+#1658 的固定 head 6d7d993a 已纳入统一发布 #1615 的集成分支；源码集成不代表
+主线发布或 5 秒验收完成。后续查询优化以该批次为基底，保留其完整 run failure、
+continuous tracing、critical request sampling、授权与撤销行为，不用旧版本整文件
+覆盖。额外限定窗口 sampler 方案未采用，因为统一批次已提供原生 critical 采样；
+后续先验证实际部署的链路覆盖，不增加第二套 claim 授权或采样入口。
+
+全部六次完整生产失败记录仍保留。只有同一最终部署、worker/source 和三个模板
+组合的 Claude 三次及 Codex 三次完整 dispatch-to-agent 均不超过 5000 ms，且原有
+官方文件守恒、真实订阅和清理门槛均通过，才可关闭 #1505。匿名 CLI 初始化对照
+只用于判断文件预读取假设，不能替代这项生产验收。
