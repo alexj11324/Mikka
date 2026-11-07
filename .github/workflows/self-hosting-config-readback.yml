@@ -120,6 +120,19 @@ jobs:
           secret-path: /vercel
           secret-name: MIKKA_EDITION
           include-imports: false
+      - name: Read the existing Vercel deployment identity for the fixed project
+        id: vercel-read
+        continue-on-error: true
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
+          include-imports: false
       - name: Read public App metadata and emit only validated projections
         run: node scripts/ops/self-hosting-config-readback.mjs
         env:
@@ -130,3 +143,4 @@ jobs:
           READ_MIKKA_BYOS_CODEX_OAUTH: ${{ steps.codex.outcome }}
           READ_NEXT_PUBLIC_COMPUTER_ENABLED: ${{ steps.computer.outcome }}
           READ_MIKKA_EDITION: ${{ steps.edition.outcome }}
+          READ_VERCEL_DEPLOY_TOKEN: ${{ steps.vercel-read.outcome }}

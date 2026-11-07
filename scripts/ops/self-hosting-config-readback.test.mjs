@@ -1,7 +1,33 @@
 import assert from 'node:assert/strict'
 import { generateKeyPairSync } from 'node:crypto'
 import test from 'node:test'
-import { BOOLEAN_NAMES, configurationReadback, publicAppConfiguration, readbackDiagnostics, runReadback, valueShape } from './self-hosting-config-readback.mjs'
+import { BOOLEAN_NAMES, configurationReadback, publicAppConfiguration, readbackDiagnostics, readVercelFallback, runReadback, valueShape } from './self-hosting-config-readback.mjs'
+
+test('Vercel fallback decrypts only exact production entries on the fixed project and never trusts inventory values or URLs', async () => {
+  const project = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', team = 'team_C7lwxVVvnUicFli6112mvxpv'
+  const env = { READ_VERCEL_DEPLOY_TOKEN: 'success', VERCEL_DEPLOY_TOKEN: 'fixture-deploy-token' }
+  const requests = []
+  const { env: result, evidence } = await readVercelFallback(env, async (url, init) => {
+    requests.push(url)
+    assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error'); assert.equal(init.cache, 'no-store')
+    assert.equal(init.headers.authorization, `Bearer ${env.VERCEL_DEPLOY_TOKEN}`)
+    if (url === `https://api.vercel.com/v10/projects/${project}/env?teamId=${team}&decrypt=false`) return Response.json({ envs: [
+      { id: 'preview-id', key: 'GITHUB_APP_ID', target: ['preview'], value: 'never-use-preview' },
+      { id: 'prod-id', key: 'GITHUB_APP_ID', target: ['production'], value: 'never-use-encrypted', url: 'https://attacker.example' },
+      { id: 'irrelevant-id', key: 'UNRELATED_SECRET', target: ['production'], value: 'never-decrypt' },
+      { id: 'unsafe/path', key: 'MIKKA_EDITION', target: ['production'] },
+    ] })
+    assert.equal(url, `https://api.vercel.com/v1/projects/${project}/env/prod-id?teamId=${team}`)
+    return Response.json({ id: 'prod-id', key: 'GITHUB_APP_ID', target: ['production'], value: '12345', decrypted: true })
+  })
+  assert.equal(requests.length, 2)
+  assert.equal(result.GITHUB_APP_ID, '12345')
+  assert.equal(result.READ_GITHUB_APP_ID, 'success')
+  assert.equal(result.READ_GITHUB_APP_PRIVATE_KEY, 'success')
+  assert.equal(result.GITHUB_APP_PRIVATE_KEY, undefined)
+  assert.deepEqual(evidence, { GITHUB_APP_ID: 'found', GITHUB_APP_PRIVATE_KEY: 'absent', NEXT_PUBLIC_COMPUTER_ENABLED: 'absent', MIKKA_EDITION: 'ambiguous' })
+  for (const secret of ['12345', 'fixture-deploy-token', 'never-use-encrypted', 'never-use-preview', 'never-decrypt']) assert.ok(!JSON.stringify(evidence).includes(secret))
+})
 
 test('representation diagnostics disclose only closed shapes and lengths', () => {
   assert.deepEqual(valueShape(undefined), { shape: 'unset', length: 0 })

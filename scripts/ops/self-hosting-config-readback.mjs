@@ -1,5 +1,7 @@
 // One-off, read-only evidence for #1560–#1563. No credential or provider body is
-// printed. The workflow injects exactly the seven named Infisical secrets.
+// printed. The workflow injects only named existing Infisical secrets. If four
+// keys are absent there, the existing deployment identity reads those exact
+// production entries from the fixed Vercel project, keeping values in memory.
 import { createPrivateKey, createSign } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 
@@ -7,9 +9,42 @@ export const BOOLEAN_NAMES = ['MIKKA_BYOS_ENABLED', 'MIKKA_BYOS_CLAUDE_OAUTH', '
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/
 const IDENT = /^[a-z][a-z0-9_]{0,80}$/
 const APP_ISSUER = /^(?:[1-9]\d{0,30}|Iv[A-Za-z0-9_.-]{8,126})$/
+const VERCEL_PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
+const VERCEL_TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
+const VERCEL_NAMES = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'NEXT_PUBLIC_COMPUTER_ENABLED', 'MIKKA_EDITION']
 
 class ProbeFailure extends Error {
   constructor(code, cause) { super(code, cause === undefined ? undefined : { cause }); this.code = code }
+}
+
+export async function readVercelFallback(env, fetcher = fetch) {
+  const resolved = { ...env }, evidence = {}
+  if (env.READ_VERCEL_DEPLOY_TOKEN !== 'success' || !env.VERCEL_DEPLOY_TOKEN) throw new ProbeFailure('vercel_credentials_unavailable')
+  const get = async path => {
+    let response
+    try {
+      response = await fetcher(`https://api.vercel.com${path}`, { method: 'GET', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(20_000),
+        headers: { authorization: `Bearer ${env.VERCEL_DEPLOY_TOKEN}`, accept: 'application/json' } })
+    } catch (error) { throw new ProbeFailure('vercel_request_failed', error) }
+    if (!response.ok) { await response.body?.cancel(); throw new ProbeFailure('vercel_request_refused') }
+    try { return await response.json() } catch (error) { throw new ProbeFailure('vercel_response_invalid', error) }
+  }
+  const inventory = await get(`/v10/projects/${VERCEL_PROJECT}/env?teamId=${VERCEL_TEAM}&decrypt=false`)
+  if (!inventory || !Array.isArray(inventory.envs) || inventory.envs.length > 2_000 || inventory.pagination?.next) throw new ProbeFailure('vercel_response_invalid')
+  for (const name of VERCEL_NAMES) {
+    if (resolved[`READ_${name}`] === 'success') { evidence[name] = 'infisical'; continue }
+    const rows = inventory.envs.filter(row => row?.key === name && Array.isArray(row.target) && row.target.includes('production') && !row.gitBranch)
+    if (!rows.length) { delete resolved[name]; resolved[`READ_${name}`] = 'success'; evidence[name] = 'absent'; continue }
+    if (rows.length !== 1 || typeof rows[0].id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(rows[0].id)) { evidence[name] = 'ambiguous'; continue }
+    try {
+      // Only a selected, validated provider ID reaches this fixed project path.
+      const item = await get(`/v1/projects/${VERCEL_PROJECT}/env/${rows[0].id}?teamId=${VERCEL_TEAM}`)
+      if (item?.key !== name || item.id !== rows[0].id || typeof item.value !== 'string'
+        || !Array.isArray(item.target) || !item.target.includes('production') || item.gitBranch) throw new ProbeFailure('vercel_response_invalid')
+      resolved[name] = item.value; resolved[`READ_${name}`] = 'success'; evidence[name] = 'found'
+    } catch (error) { evidence[name] = error instanceof ProbeFailure ? error.code : 'unexpected_failure' }
+  }
+  return { env: resolved, evidence }
 }
 
 /** The existing booleans use exactly '1'; other strings are not silently normalized. */
@@ -93,6 +128,10 @@ export async function appReadback(env, fetcher = fetch, now = Date.now()) {
 }
 
 export async function runReadback({ env = process.env, fetcher = fetch, write = line => console.log(line) } = {}) {
+  if (env.READ_VERCEL_DEPLOY_TOKEN === 'success') {
+    try { const result = await readVercelFallback(env, fetcher); env = result.env; write(JSON.stringify({ vercel: result.evidence })) }
+    catch (error) { write(JSON.stringify({ vercel: { status: 'unavailable', reason: error instanceof ProbeFailure ? error.code : 'unexpected_failure' } })) }
+  }
   const configuration = configurationReadback(env)
   write(JSON.stringify({ configuration }))
   write(JSON.stringify({ diagnostics: readbackDiagnostics(env) }))
