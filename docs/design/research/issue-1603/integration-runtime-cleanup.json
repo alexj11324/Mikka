@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T08:00:53.667566+00:00",
+  "scope": "Isolated local integration manual runtime for issue #1603",
+  "source": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+  "sourceTree": "977111e65ae6bc8c15b88e01810f2f143512c4dd",
+  "overlay": "ac5980696802f188a81124a8a3f2513be2d14e9e",
+  "renderer": "074aadefa5f4b52e647c5e12ffe816c6b1d5cd3873c7481826295b8b529118fb",
+  "profile": "final4",
+  "environmentId": "local-7ed7e7be-7c84-4bda-a89e-9ac84244bfb7",
+  "manual": {
+    "jobId": "job-ed2b88530713",
+    "runId": "issue1603-manual-d224f1a4-075c-42bc-96fb-6960f27909c4",
+    "state": "exited",
+    "exitCode": 0,
+    "completedAt": "2026-11-07T07:44:17.636Z",
+    "closeOperationCount": 1,
+    "closeCompletedAt": "2026-11-07T07:44:17.519Z",
+    "cleanup": {
+      "browserClosed": true,
+      "fixtureCleanup": true,
+      "lease": "released",
+      "evidenceAudit": {
+        "files": 25,
+        "archives": 0,
+        "archiveEntries": 0,
+        "decodedBytes": 0,
+        "result": "passed",
+        "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+      }
+    },
+    "clientHelperTimeout": "The only close request helper timed out after 50 seconds. The actual driver continued and completed cleanup with exit 0; no repeated close request was sent."
+  },
+  "finalDatabaseCleanup": {
+    "checkedAt": "2026-11-07T07:55:05.066786+00:00",
+    "database": "mikka_issue1603_final4_e2e",
+    "applicationConnections": 0,
+    "lease": "released",
+    "businessFixtureCleanup": "passed",
+    "createdResourceDeclarations": 0,
+    "cleanedResourceDeclarations": 53,
+    "retainedResourceDeclarations": 3,
+    "retention": [
+      {
+        "type": "user",
+        "count": 2,
+        "reason": "Reusable managed test identities retained under the test account pool lifecycle. Clean lease release validates the baseline fingerprint."
+      },
+      {
+        "type": "session",
+        "count": 1,
+        "reason": "Tracked test session retained after token rotation and expiry by the fenced cleanup transaction. An independent read-only query confirmed one retained row and zero active retained sessions."
+      }
+    ],
+    "retainedSessions": {
+      "rows": 1,
+      "active": 0
+    },
+    "claim": "Clean refers to removed isolated business fixtures and a clean released lease; managed identities and invalidated session records are intentionally retained."
+  },
+  "allOwnedDatabases": [
+    {
+      "database": "mikka_issue1603_baseline_e2e",
+      "owner": "issue1603",
+      "applicationConnections": 0,
+      "leases": [
+        {
+          "state": "released",
+          "count": 1
+        }
+      ],
+      "resourceCounts": {
+        "created": 0,
+        "cleaned": 34,
+        "retained": 4
+      },
+      "retainedResourceTypes": {
+        "session": 2,
+        "user": 2
+      },
+      "retainedSessionRows": {
+        "rows": 2,
+        "active": 0
+      }
+    },
+    {
+      "database": "mikka_issue1603_final3_e2e",
+      "owner": "issue1603",
+      "applicationConnections": 0,
+      "leases": [
+        {
+          "state": "released",
+          "count": 1
+        }
+      ],
+      "resourceCounts": {
+        "created": 0,
+        "cleaned": 25,
+        "retained": 4
+      },
+      "retainedResourceTypes": {
+        "session": 2,
+        "user": 2
+      },
+      "retainedSessionRows": {
+        "rows": 2,
+        "active": 0
+      }
+    },
+    {
+      "database": "mikka_issue1603_final4_e2e",
+      "owner": "issue1603",
+      "applicationConnections": 0,
+      "leases": [
+        {
+          "state": "released",
+          "count": 1
+        }
+      ],
+      "resourceCounts": {
+        "created": 0,
+        "cleaned": 53,
+        "retained": 3
+      },
+      "retainedResourceTypes": {
+        "session": 1,
+        "user": 2
+      },
+      "retainedSessionRows": {
+        "rows": 1,
+        "active": 0
+      }
+    }
+  ],
+  "processes": {
+    "application": {
+      "jobId": "job-db390e7014cc",
+      "state": "exited",
+      "exitCode": 0,
+      "completedAt": "2026-11-07T07:44:59.440Z"
+    },
+    "controller": {
+      "bootId": "057ab42a-a323-4104-a58a-e2543218f013",
+      "state": "stopped",
+      "stoppedAt": "2026-11-07T07:46:17.825Z",
+      "pendingRemoteStops": 0
+    },
+    "orphanRelays": {
+      "cleanupMatch": [
+        "/usr/bin/python3",
+        "/tmp/issue1603-pg-relay.py"
+      ],
+      "remainingAtFinalCheck": 0,
+      "applicationConnectionsAfterCleanup": 0,
+      "scope": "Only processes matching both owned relay argv entries were eligible for termination after local consumers exited."
+    },
+    "broker": {
+      "processId": 665011,
+      "sessionId": 98297,
+      "terminationRequest": "terminal interrupt after confirmed Docker stopped",
+      "exitCode": 1,
+      "checkedAt": "2026-11-07T08:00:53.120130+00:00",
+      "aliveAfterStop": false,
+      "localControllerAliveAfterStop": false,
+      "note": "Broker is a temporary RPC loop, terminated after Docker reached its final stopped state. Process exit and absence were both observed."
+    }
+  },
+  "docker": {
+    "sandboxId": "sbx_001m6t64a9jfsj7f4qmbb3wsq2t",
+    "name": "mikka-issue1603-20261107",
+    "stopRequestAccepted": true,
+    "finalState": "stopped",
+    "finalStateObservedAt": "2026-11-07T08:00:06.945992+00:00",
+    "runningCompute": false,
+    "newDockerSandboxesCreatedDuringRecovery": false,
+    "lifecycle": "Existing owned sandbox stopped with its configured preserve-memory behavior."
+  },
+  "transportIncident": {
+    "at": "2026-11-07T07:31:12Z",
+    "observed": "Three renewal attempts received an HTTP 403 WebSocket upgrade response, followed by a brief transport outage. The existing runtime recovered without app or manual-driver restart.",
+    "underlyingHttp403Cause": "unknown; response body was not retained",
+    "evidence": "final4-transport-incident.json",
+    "productFollowup": "The workspace switcher route mapped an unknown backend error to 403. That independently confirmed classification defect is assigned to a separate fix; this cleanup does not claim it is fixed."
+  },
+  "priorFailedAttempt": {
+    "profile": "final2",
+    "cleanRelease": false,
+    "disposition": "Expired lease was quarantined and the isolated owned database retired after confirming no active leases or connections. It is not relabeled as successful."
+  },
+  "evidence": {
+    "auditResult": "passed",
+    "auditFiles": 25,
+    "rawSecretsIncluded": false,
+    "sourceFileSha256": {
+      "job-ed2b88530713.json": "55058e0c581556ec4aea812b63cfb55189b12642f3d9c57f335072b380d59624",
+      "job-db390e7014cc.json": "ae223d03f4ff7853c5d770557a50cf94e4df511a0859910baacbab09c0037eda",
+      "final-owned-databases.json": "90781ccfd3b9fad4b180116028f8ba41dbe3c662509234fa95f0e797be286e66",
+      "docker-final-status.json": "00a00a7e32a6a101a5ad430f569be9243233463e1ccf4f2924dc86d81bec76f3",
+      "broker-stopped.json": "fb589cd1f58fe998d085d2e8c57f6354ff8c32f8c354837a4ab7bc4eb29c0ab6"
+    }
+  }
+}

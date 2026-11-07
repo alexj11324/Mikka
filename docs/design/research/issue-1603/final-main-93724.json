@@ -1,0 +1,494 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-07T07:58:18.565Z",
+  "repository": "alexj11324/Mikka",
+  "readOnlyReview": true,
+  "comparison": {
+    "base": "4f0f68e971b2676a156a3cedd7bc97413afb2310",
+    "head": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+    "status": "ahead",
+    "aheadBy": 12,
+    "behindBy": 0,
+    "commitCount": 12,
+    "fileCount": 36,
+    "additions": 1886,
+    "deletions": 299,
+    "commits": [
+      {
+        "sha": "b25102777dc1d1cac2dfc7a80563d84ad41726ca",
+        "subject": "perf(mcp): wait for committed reply and scope notifications"
+      },
+      {
+        "sha": "167cc931264e9fabf48ea50ee351614177b14ee5",
+        "subject": "fix(mcp): isolate fixture notifications and record reply wait completion"
+      },
+      {
+        "sha": "df81c550d45f32916f518c473db8c56963d381ee",
+        "subject": "Merge deployed Coordinator and live fixes into MCP reply push"
+      },
+      {
+        "sha": "c301a3b7986524872de91a72a8abc264f1fc3108",
+        "subject": "Guide Coordinator choice requests and tool cards to bare OpenUI"
+      },
+      {
+        "sha": "3d469db500ff2af1cfd16ceebb23e96adc282522",
+        "subject": "fix: keep Codex subscription prefixes stable without explicit markers"
+      },
+      {
+        "sha": "77975c88fa88cdcc19eb5bdf1aae574dc46ca62a",
+        "subject": "merge: include MCP reply push in latency batch"
+      },
+      {
+        "sha": "1257f9632e2a1c5deb3e275c83880904d8aaba47",
+        "subject": "merge: include OpenUI backend guidance in latency batch"
+      },
+      {
+        "sha": "2703958f071d95a8277b5a9ea90d13c2fa9c15f1",
+        "subject": "merge: include Codex implicit prefix compatibility in latency batch"
+      },
+      {
+        "sha": "0be4d96adc3a3364a1c3ae81a65518af33164ff1",
+        "subject": "perf: combine hosted coordinator preparation safely"
+      },
+      {
+        "sha": "1ecfa838c82e5e8335cc7fd84d0d7be57c1878a3",
+        "subject": "merge: include combined hosted preparation in latency batch"
+      },
+      {
+        "sha": "1e992673a5c0c2e7124d7b30700b4b5dd1fc5388",
+        "subject": "fix(migrations): order MCP notifications after current main"
+      },
+      {
+        "sha": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+        "subject": "Merge pull request #1625 from alexj11324/batch/2026-11-07-1506-forward"
+      }
+    ],
+    "files": [
+      {
+        "path": "drizzle/20261107120001_mcp_reply_notifications.sql",
+        "status": "added",
+        "additions": 53,
+        "deletions": 0
+      },
+      {
+        "path": "drizzle/20261107120002_mcp_membership_notifications.sql",
+        "status": "added",
+        "additions": 18,
+        "deletions": 0
+      },
+      {
+        "path": "lib/agent-kit/core-entry.test.ts",
+        "status": "modified",
+        "additions": 159,
+        "deletions": 15
+      },
+      {
+        "path": "lib/agent-kit/defaults-consumers.test.ts",
+        "status": "modified",
+        "additions": 29,
+        "deletions": 1
+      },
+      {
+        "path": "lib/agent-kit/round-preparation.test.ts",
+        "status": "added",
+        "additions": 171,
+        "deletions": 0
+      },
+      {
+        "path": "lib/agent-kit/store.db.test.ts",
+        "status": "modified",
+        "additions": 81,
+        "deletions": 1
+      },
+      {
+        "path": "lib/agent-kit/store.ts",
+        "status": "modified",
+        "additions": 41,
+        "deletions": 17
+      },
+      {
+        "path": "lib/coordinator-ui-prompt.json",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "lib/coordinator/coordinator-presentation.test.ts",
+        "status": "modified",
+        "additions": 23,
+        "deletions": 2
+      },
+      {
+        "path": "lib/coordinator/presentation-options.ts",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 2
+      },
+      {
+        "path": "lib/db/listen.test.ts",
+        "status": "added",
+        "additions": 106,
+        "deletions": 0
+      },
+      {
+        "path": "lib/db/listen.ts",
+        "status": "modified",
+        "additions": 19,
+        "deletions": 4
+      },
+      {
+        "path": "lib/mcp/reply-completion.test.ts",
+        "status": "added",
+        "additions": 162,
+        "deletions": 0
+      },
+      {
+        "path": "lib/mcp/reply-completion.ts",
+        "status": "added",
+        "additions": 25,
+        "deletions": 0
+      },
+      {
+        "path": "lib/mcp/reply-live.db.test.ts",
+        "status": "modified",
+        "additions": 34,
+        "deletions": 7
+      },
+      {
+        "path": "lib/mcp/reply-live.test.ts",
+        "status": "added",
+        "additions": 82,
+        "deletions": 0
+      },
+      {
+        "path": "lib/mcp/reply-live.ts",
+        "status": "modified",
+        "additions": 19,
+        "deletions": 23
+      },
+      {
+        "path": "lib/mcp/reply-notifications.db.test.ts",
+        "status": "added",
+        "additions": 191,
+        "deletions": 0
+      },
+      {
+        "path": "lib/mcp/reply-signals.test.ts",
+        "status": "added",
+        "additions": 89,
+        "deletions": 0
+      },
+      {
+        "path": "lib/mcp/reply-signals.ts",
+        "status": "added",
+        "additions": 43,
+        "deletions": 0
+      },
+      {
+        "path": "lib/mcp/reply-wait.test.ts",
+        "status": "modified",
+        "additions": 93,
+        "deletions": 1
+      },
+      {
+        "path": "lib/mcp/reply-wait.ts",
+        "status": "modified",
+        "additions": 83,
+        "deletions": 7
+      },
+      {
+        "path": "lib/mcp/tools.ts",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 1
+      },
+      {
+        "path": "lib/prompt-cache.test.ts",
+        "status": "modified",
+        "additions": 43,
+        "deletions": 22
+      },
+      {
+        "path": "lib/prompt-cache.ts",
+        "status": "modified",
+        "additions": 22,
+        "deletions": 23
+      },
+      {
+        "path": "lib/schedules/workflow.test.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "status": "modified",
+        "additions": 62,
+        "deletions": 19
+      },
+      {
+        "path": "lib/subscription-workflow-model.ts",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 4
+      },
+      {
+        "path": "package.json",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 3
+      },
+      {
+        "path": "packages/subscription-worker/codex_cache_breakpoints_test.go",
+        "status": "modified",
+        "additions": 122,
+        "deletions": 73
+      },
+      {
+        "path": "packages/subscription-worker/plain_model.go",
+        "status": "modified",
+        "additions": 0,
+        "deletions": 49
+      },
+      {
+        "path": "workflows/coordinator/agent-kit-steps.ts",
+        "status": "modified",
+        "additions": 20,
+        "deletions": 1
+      },
+      {
+        "path": "workflows/coordinator/round-preparation.ts",
+        "status": "added",
+        "additions": 22,
+        "deletions": 0
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "workflows/coordinator/tools.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 3
+      },
+      {
+        "path": "workflows/coordinator/workflow.ts",
+        "status": "modified",
+        "additions": 49,
+        "deletions": 16
+      }
+    ]
+  },
+  "candidate": {
+    "sha": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+    "workflowCount": 7,
+    "allWorkflowsSuccessful": true,
+    "allWorkflowsOnCandidate": true,
+    "checkCount": 30,
+    "checkCounts": {
+      "success": 23,
+      "skipped": 7
+    },
+    "allChecksOnCandidate": true
+  },
+  "latestMainWorkflows": [
+    {
+      "id": 42352970593,
+      "name": "Web deploy",
+      "headSha": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+      "status": "pending",
+      "conclusion": null,
+      "updatedAt": "2026-11-07T07:50:56Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42352970593"
+    },
+    {
+      "id": 42352970554,
+      "name": "CI",
+      "headSha": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+      "status": "in_progress",
+      "conclusion": null,
+      "updatedAt": "2026-11-07T07:51:16Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42352970554"
+    }
+  ],
+  "latestMainCiJobs": [
+    {
+      "id": 128344852770,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907239,
+      "name": "Core unit checks",
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 128344907242,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907244,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907262,
+      "name": "Integration unit checks",
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 128344907266,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907296,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907300,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907321,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128344907325,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128345863076,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "latestMainWebJobs": [
+    {
+      "id": 128344852646,
+      "name": "deploy",
+      "status": "pending",
+      "conclusion": null
+    }
+  ],
+  "currentFailedMainJobs": [],
+  "semanticAssessment": {
+    "candidateSameFileOverlap": [
+      "package.json"
+    ],
+    "mainChangedScriptKeys": [
+      "test:lib-units",
+      "test:agent-kit-model",
+      "test:live-db"
+    ],
+    "candidateChangedScriptKeys": [
+      "test:artifacts",
+      "test:groups",
+      "test:view-state"
+    ],
+    "overlappingScriptKeys": [],
+    "reactUiOrPrivateOverlayChanges": false,
+    "normalUiReadRpcChanges": false,
+    "sessionCookieLoginLogoutOrSelectedWorkspaceChanges": false,
+    "frontendReadCacheKeysAndViewStateChanges": false,
+    "changedReadPath": "MCP readCoordinatorMessages(waitSeconds): waits on shared PostgreSQL COMMIT notifications rather than the previous private WebSocket callback, with abort/deadline handling and existing lost-observer reconciliation.",
+    "authorization": "The MCP read still calls coordinatorSessionScope before waiting and before every data reread, and rejects missing authority or a changed workspace. Notification keys authorize no data access. No auth/session endpoint is changed.",
+    "invalidations": "Two new migration triggers notify only the MCP channel after assistant-message, Coordinator-session, bot owner/workspace, and workspace-member changes. They wake a fresh authorized reread. The browser LiveProvider/SWR invalidation channels and scope retirement code are unchanged.",
+    "sharedListener": "subscribeShared adds an optional cancellation signal; keepalive/query timeout changes are restricted to the new MCP channel. Existing callers and channels retain their signatures and default behavior.",
+    "executionPreparation": "Hosted Coordinator execution combines frozen preparation work and adds scoped/locked terminal recovery by execution key. AgentKit authority checks and owner/bot filters remain. These are execution paths rather than ordinary UI read requests.",
+    "modelPresentation": "OpenUI selection/card prompt guidance and Codex stable-prefix request handling affect subsequent model-generated replies; the UI renderer itself and existing read-model fixtures are unchanged.",
+    "evidenceImpact": "The current 5a752a50/ad5-based integrated UI evidence remains evidence for the candidate's unchanged navigation, drafts, focus, scrolling, scope retirement and failure/recovery rendering. It does not establish the new MCP notification transport, migrations or model execution paths as production-accepted.",
+    "integrationBuildEvidenceSource": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "integrationBuildEvidenceTree": "977111e65ae6bc8c15b88e01810f2f143512c4dd",
+    "integrationBuildEvidenceBase": "ad5e5db5ed5547ea19644ce2381992d8d1583eb9",
+    "productionState": "The new main CI is still in progress and its Web deployment is pending at this snapshot; neither is represented as complete."
+  },
+  "mutations": {
+    "candidateModified": false,
+    "mainModified": false,
+    "worktreeModified": false,
+    "existingUploadedAuditModified": false,
+    "onlyGitObjectsFetchedAndMergeTreeComputed": true
+  },
+  "mainGitIdentity": {
+    "sha": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+    "tree": "f148f9688b9bfb3324db26af716192d7d5fab4b3",
+    "parents": [
+      "4f0f68e971b2676a156a3cedd7bc97413afb2310",
+      "1e992673a5c0c2e7124d7b30700b4b5dd1fc5388"
+    ]
+  },
+  "mergeProjection": {
+    "status": "clean",
+    "mergeTreeExitCode": 0,
+    "mainSha": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+    "candidateSha": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+    "expectedTreeSha": "fd7fb13f41c5a87df865f539d498b32e3a4fb83b",
+    "headUnchanged": true,
+    "branchRefsUnchanged": true,
+    "upstreamDeltaPaths": [
+      "drizzle/20261107120001_mcp_reply_notifications.sql",
+      "drizzle/20261107120002_mcp_membership_notifications.sql",
+      "lib/agent-kit/core-entry.test.ts",
+      "lib/agent-kit/defaults-consumers.test.ts",
+      "lib/agent-kit/round-preparation.test.ts",
+      "lib/agent-kit/store.db.test.ts",
+      "lib/agent-kit/store.ts",
+      "lib/coordinator-ui-prompt.json",
+      "lib/coordinator/coordinator-presentation.test.ts",
+      "lib/coordinator/presentation-options.ts",
+      "lib/db/listen.test.ts",
+      "lib/db/listen.ts",
+      "lib/mcp/reply-completion.test.ts",
+      "lib/mcp/reply-completion.ts",
+      "lib/mcp/reply-live.db.test.ts",
+      "lib/mcp/reply-live.test.ts",
+      "lib/mcp/reply-live.ts",
+      "lib/mcp/reply-notifications.db.test.ts",
+      "lib/mcp/reply-signals.test.ts",
+      "lib/mcp/reply-signals.ts",
+      "lib/mcp/reply-wait.test.ts",
+      "lib/mcp/reply-wait.ts",
+      "lib/mcp/tools.ts",
+      "lib/prompt-cache.test.ts",
+      "lib/prompt-cache.ts",
+      "lib/schedules/workflow.test.ts",
+      "lib/subscription-workflow-model.test.ts",
+      "lib/subscription-workflow-model.ts",
+      "package.json",
+      "packages/subscription-worker/codex_cache_breakpoints_test.go",
+      "packages/subscription-worker/plain_model.go",
+      "workflows/coordinator/agent-kit-steps.ts",
+      "workflows/coordinator/round-preparation.ts",
+      "workflows/coordinator/steps.ts",
+      "workflows/coordinator/tools.ts",
+      "workflows/coordinator/workflow.ts"
+    ],
+    "candidateNonPackageBlobMismatches": [],
+    "packageSemanticMergeValid": true,
+    "candidateChangedScriptKeys": [
+      "test:artifacts",
+      "test:groups",
+      "test:view-state"
+    ]
+  }
+}

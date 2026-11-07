@@ -1,0 +1,1001 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1626,
+  "url": "https://github.com/alexj11324/Mikka/pull/1626",
+  "requestedHead": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+  "observedHead": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+  "headTree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+  "baseRef": "main",
+  "baseSha": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+  "changedFiles": 2,
+  "checkedAt": "2026-11-07T08:12:56.252Z",
+  "allCiGreenAt": "2026-11-07T08:12:19.396Z",
+  "reviewMode": "read-only",
+  "conclusion": {
+    "exactHeadVerified": true,
+    "allThreeWorkflowsSucceeded": true,
+    "allRequiredChecksSucceeded": true,
+    "allObservedChecksCompleted": true,
+    "checkRunCounts": {
+      "total": 17,
+      "success": 16,
+      "skipped": 1,
+      "failure": 0,
+      "pending": 0
+    },
+    "mergeable": true,
+    "mergeableState": "clean",
+    "pullRequestState": "open",
+    "mergedAtObservation": false
+  },
+  "mergeCandidate": {
+    "reportedSha": "6e8d8828eb3fd4e50b143b3188d11b7b998e6ba6",
+    "semantics": "These pull_request workflow runs are associated with the exact requested head and observed base. Default actions/checkout uses GitHub's PR merge candidate; this report does not relabel that candidate as a branch-head checkout."
+  },
+  "branchPolicy": {
+    "source": "https://api.github.com/repos/alexj11324/Mikka/branches/main",
+    "observedAt": "2026-11-07T08:12:56.252Z",
+    "protected": true,
+    "enforcementLevel": "non_admins",
+    "requiredChecks": [
+      {
+        "name": "UI policy (strict)",
+        "appId": 15368,
+        "checkRunId": 128349295085,
+        "status": "completed",
+        "conclusion": "success",
+        "kind": "suite_aggregate",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128349295085"
+      },
+      {
+        "name": "Production build and browser interactions",
+        "appId": 15368,
+        "checkRunId": 128348547146,
+        "status": "completed",
+        "conclusion": "success",
+        "kind": "database_aggregate",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128348547146"
+      },
+      {
+        "name": "GitGuardian Security Checks",
+        "appId": 46505,
+        "checkRunId": 128347620729,
+        "status": "completed",
+        "conclusion": "success",
+        "kind": "external_security_check",
+        "url": "https://github.com/alexj11324/Mikka/runs/128347620729"
+      },
+      {
+        "name": "Browser tests (before merge)",
+        "appId": 15368,
+        "checkRunId": 128347483189,
+        "status": "completed",
+        "conclusion": "success",
+        "kind": "placeholder_success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839043/job/128347483189"
+      }
+    ],
+    "accessBoundary": {
+      "fullBranchProtectionEndpoint": "403 Resource not accessible by integration",
+      "repositoryRulesetsResponse": [],
+      "effectiveRulesEndpoint": "Connector does not expose this endpoint; not used as evidence that no rules exist."
+    }
+  },
+  "workflows": [
+    {
+      "id": 42353839043,
+      "name": "Browser gate",
+      "path": ".github/workflows/browser-gate.yml",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839043",
+      "event": "pull_request",
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "headTree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T08:03:34Z",
+      "updatedAt": "2026-11-07T08:03:40Z",
+      "jobCount": 1,
+      "jobs": [
+        {
+          "id": 128347483189,
+          "name": "Browser tests (before merge)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:37Z",
+          "completedAt": "2026-11-07T08:03:39Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839043/job/128347483189",
+          "kind": "placeholder_success",
+          "selectedSteps": [],
+          "skippedSteps": []
+        }
+      ]
+    },
+    {
+      "id": 42353839027,
+      "name": "Analytics SSR",
+      "path": ".github/workflows/analytics-ssr.yml",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027",
+      "event": "pull_request",
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "headTree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T08:03:34Z",
+      "updatedAt": "2026-11-07T08:07:11Z",
+      "jobCount": 3,
+      "jobs": [
+        {
+          "id": 128347483643,
+          "name": "Changed files",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:37Z",
+          "completedAt": "2026-11-07T08:03:48Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128347483643",
+          "kind": "change_classification",
+          "selectedSteps": [],
+          "skippedSteps": []
+        },
+        {
+          "id": 128347534563,
+          "name": "Analytics SSR (full)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:50Z",
+          "completedAt": "2026-11-07T08:07:06Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128347534563",
+          "kind": "build_and_analytics_ssr_regression",
+          "selectedSteps": [
+            {
+              "name": "Run pnpm build",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:04:45Z",
+              "completedAt": "2026-11-07T08:06:40Z"
+            },
+            {
+              "name": "Verify compiled runtime resources and browser analytics assets",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:06:40Z",
+              "completedAt": "2026-11-07T08:06:41Z"
+            },
+            {
+              "name": "Render real compiled HTTP pages with browser analytics enabled",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:06:56Z",
+              "completedAt": "2026-11-07T08:06:59Z"
+            }
+          ],
+          "skippedSteps": []
+        },
+        {
+          "id": 128348248187,
+          "name": "analytics-ssr",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:07:08Z",
+          "completedAt": "2026-11-07T08:07:10Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128348248187",
+          "kind": "analytics_aggregate",
+          "selectedSteps": [],
+          "skippedSteps": []
+        }
+      ]
+    },
+    {
+      "id": 42353839057,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057",
+      "event": "pull_request",
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "headTree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T08:03:34Z",
+      "updatedAt": "2026-11-07T08:11:59Z",
+      "jobCount": 12,
+      "jobs": [
+        {
+          "id": 128347484039,
+          "name": "Changed files",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:37Z",
+          "completedAt": "2026-11-07T08:03:55Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347484039",
+          "kind": "change_classification",
+          "selectedSteps": [],
+          "skippedSteps": []
+        },
+        {
+          "id": 128347560069,
+          "name": "Source checks",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:57Z",
+          "completedAt": "2026-11-07T08:06:31Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560069",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [
+            {
+              "name": "Run pnpm lint:code",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:04:55Z",
+              "completedAt": "2026-11-07T08:04:58Z"
+            },
+            {
+              "name": "Run pnpm typecheck",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:38Z",
+              "completedAt": "2026-11-07T08:06:20Z"
+            }
+          ],
+          "skippedSteps": []
+        },
+        {
+          "id": 128347560101,
+          "name": "Database checks (2/4)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:57Z",
+          "completedAt": "2026-11-07T08:08:28Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560101",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-11-07T08:05:07Z",
+              "completedAt": "2026-11-07T08:05:07Z"
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-11-07T08:05:07Z",
+              "completedAt": "2026-11-07T08:05:07Z"
+            },
+            {
+              "name": "Required DB suites (temporary Postgres 17, no skips)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:07Z",
+              "completedAt": "2026-11-07T08:08:26Z"
+            }
+          ],
+          "skippedSteps": [
+            {
+              "name": "Save native dependency packages (main only)",
+              "reason": "Cache save runs only on main push; this run is pull_request."
+            },
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "reason": "This verification runs only on matrix shard 1; shard 1 completed it successfully."
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "reason": "This verification runs only on matrix shard 1; shard 1 completed it successfully."
+            }
+          ]
+        },
+        {
+          "id": 128347560138,
+          "name": "Core unit checks",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:58Z",
+          "completedAt": "2026-11-07T08:11:52Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560138",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [],
+          "skippedSteps": []
+        },
+        {
+          "id": 128347560143,
+          "name": "Daemon checks",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:57Z",
+          "completedAt": "2026-11-07T08:07:07Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560143",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [],
+          "skippedSteps": []
+        },
+        {
+          "id": 128347560144,
+          "name": "Database checks (3/4)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:04:01Z",
+          "completedAt": "2026-11-07T08:08:02Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560144",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-11-07T08:05:14Z",
+              "completedAt": "2026-11-07T08:05:14Z"
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-11-07T08:05:14Z",
+              "completedAt": "2026-11-07T08:05:14Z"
+            },
+            {
+              "name": "Required DB suites (temporary Postgres 17, no skips)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:14Z",
+              "completedAt": "2026-11-07T08:07:53Z"
+            }
+          ],
+          "skippedSteps": [
+            {
+              "name": "Save native dependency packages (main only)",
+              "reason": "Cache save runs only on main push; this run is pull_request."
+            },
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "reason": "This verification runs only on matrix shard 1; shard 1 completed it successfully."
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "reason": "This verification runs only on matrix shard 1; shard 1 completed it successfully."
+            }
+          ]
+        },
+        {
+          "id": 128347560146,
+          "name": "Database checks (1/4)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:57Z",
+          "completedAt": "2026-11-07T08:08:07Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560146",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:22Z",
+              "completedAt": "2026-11-07T08:05:23Z"
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:23Z",
+              "completedAt": "2026-11-07T08:05:48Z"
+            },
+            {
+              "name": "Required DB suites (temporary Postgres 17, no skips)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:48Z",
+              "completedAt": "2026-11-07T08:08:03Z"
+            }
+          ],
+          "skippedSteps": [
+            {
+              "name": "Save native dependency packages (main only)",
+              "reason": "Cache save runs only on main push; this run is pull_request."
+            }
+          ]
+        },
+        {
+          "id": 128347560157,
+          "name": "Integration unit checks",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:57Z",
+          "completedAt": "2026-11-07T08:10:36Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560157",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [
+            {
+              "name": "Run pnpm test:settings-backend",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:09:20Z",
+              "completedAt": "2026-11-07T08:09:22Z"
+            }
+          ],
+          "skippedSteps": []
+        },
+        {
+          "id": 128347560198,
+          "name": "Database checks (4/4)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:03:57Z",
+          "completedAt": "2026-11-07T08:07:44Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560198",
+          "kind": "executed_test_or_source_checks",
+          "selectedSteps": [
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-11-07T08:05:00Z",
+              "completedAt": "2026-11-07T08:05:00Z"
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-11-07T08:05:00Z",
+              "completedAt": "2026-11-07T08:05:00Z"
+            },
+            {
+              "name": "Required DB suites (temporary Postgres 17, no skips)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-07T08:05:00Z",
+              "completedAt": "2026-11-07T08:07:41Z"
+            }
+          ],
+          "skippedSteps": [
+            {
+              "name": "Save native dependency packages (main only)",
+              "reason": "Cache save runs only on main push; this run is pull_request."
+            },
+            {
+              "name": "Verify local execution identities and repository records (isolated Postgres)",
+              "reason": "This verification runs only on matrix shard 1; shard 1 completed it successfully."
+            },
+            {
+              "name": "Verify thread sharing, membership and privacy against isolated database",
+              "reason": "This verification runs only on matrix shard 1; shard 1 completed it successfully."
+            }
+          ]
+        },
+        {
+          "id": 128347561762,
+          "name": "Cloud credential access (OIDC)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T08:03:56Z",
+          "completedAt": "2026-11-07T08:03:55Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347561762",
+          "kind": "conditional_skip",
+          "selectedSteps": [],
+          "skippedSteps": []
+        },
+        {
+          "id": 128348547146,
+          "name": "Production build and browser interactions",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:08:30Z",
+          "completedAt": "2026-11-07T08:08:32Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128348547146",
+          "kind": "database_aggregate",
+          "selectedSteps": [],
+          "skippedSteps": []
+        },
+        {
+          "id": 128349295085,
+          "name": "UI policy (strict)",
+          "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T08:11:55Z",
+          "completedAt": "2026-11-07T08:11:58Z",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128349295085",
+          "kind": "suite_aggregate",
+          "selectedSteps": [],
+          "skippedSteps": []
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": 128349295085,
+      "name": "UI policy (strict)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:11:55Z",
+      "completedAt": "2026-11-07T08:11:58Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128349295085",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128349295085",
+      "kind": "suite_aggregate",
+      "meaning": "Requires Changed files plus the actual Core unit, Integration unit, Source, and Daemon jobs for a non-documentation PR."
+    },
+    {
+      "id": 128348547146,
+      "name": "Production build and browser interactions",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:08:30Z",
+      "completedAt": "2026-11-07T08:08:32Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128348547146",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128348547146",
+      "kind": "database_aggregate",
+      "meaning": "Required historical check name. For this source PR it requires successful database shards. The CI workflow explicitly does not run a production build or browser interaction suite in this job."
+    },
+    {
+      "id": 128348248187,
+      "name": "analytics-ssr",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:07:08Z",
+      "completedAt": "2026-11-07T08:07:10Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128348248187",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128348248187",
+      "kind": "analytics_aggregate",
+      "meaning": "Requires the actual Analytics SSR (full) regression on this non-documentation PR."
+    },
+    {
+      "id": 128347620729,
+      "name": "GitGuardian Security Checks",
+      "appId": 46505,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:04:13Z",
+      "completedAt": "2026-11-07T08:04:14Z",
+      "url": "https://github.com/alexj11324/Mikka/runs/128347620729",
+      "detailsUrl": "https://dashboard.gitguardian.com",
+      "kind": "external_security_check",
+      "meaning": "GitGuardian completed successfully on this exact head."
+    },
+    {
+      "id": 128347561762,
+      "name": "Cloud credential access (OIDC)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T08:03:56Z",
+      "completedAt": "2026-11-07T08:03:55Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347561762",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347561762",
+      "kind": "conditional_skip",
+      "meaning": "Skipped for pull_request. The workflow condition restricts this credential check to qualifying push events; no credential validation was executed by this job."
+    },
+    {
+      "id": 128347560198,
+      "name": "Database checks (4/4)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:57Z",
+      "completedAt": "2026-11-07T08:07:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560198",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560198",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560157,
+      "name": "Integration unit checks",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:57Z",
+      "completedAt": "2026-11-07T08:10:36Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560157",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560157",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560146,
+      "name": "Database checks (1/4)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:57Z",
+      "completedAt": "2026-11-07T08:08:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560146",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560146",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560144,
+      "name": "Database checks (3/4)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:04:01Z",
+      "completedAt": "2026-11-07T08:08:02Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560144",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560144",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560143,
+      "name": "Daemon checks",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:57Z",
+      "completedAt": "2026-11-07T08:07:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560143",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560143",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560138,
+      "name": "Core unit checks",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:58Z",
+      "completedAt": "2026-11-07T08:11:52Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560138",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560138",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560101,
+      "name": "Database checks (2/4)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:57Z",
+      "completedAt": "2026-11-07T08:08:28Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560101",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560101",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347560069,
+      "name": "Source checks",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:57Z",
+      "completedAt": "2026-11-07T08:06:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560069",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347560069",
+      "kind": "executed_test_or_source_checks",
+      "meaning": "The named source, unit, daemon, or database job executed successfully."
+    },
+    {
+      "id": 128347534563,
+      "name": "Analytics SSR (full)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:50Z",
+      "completedAt": "2026-11-07T08:07:06Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128347534563",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128347534563",
+      "kind": "build_and_analytics_ssr_regression",
+      "meaning": "The actual build, compiled-resource check, and Chromium rendering of compiled HTTP pages with analytics enabled all ran successfully."
+    },
+    {
+      "id": 128347484039,
+      "name": "Changed files",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:37Z",
+      "completedAt": "2026-11-07T08:03:55Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347484039",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839057/job/128347484039",
+      "kind": "change_classification",
+      "meaning": "Runs the trusted change classifier; full source/database jobs ran on this PR."
+    },
+    {
+      "id": 128347483643,
+      "name": "Changed files",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:37Z",
+      "completedAt": "2026-11-07T08:03:48Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128347483643",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839027/job/128347483643",
+      "kind": "change_classification",
+      "meaning": "Runs the trusted change classifier; full source/database jobs ran on this PR."
+    },
+    {
+      "id": 128347483189,
+      "name": "Browser tests (before merge)",
+      "appId": 15368,
+      "headSha": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T08:03:37Z",
+      "completedAt": "2026-11-07T08:03:39Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42353839043/job/128347483189",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42353839043/job/128347483189",
+      "kind": "placeholder_success",
+      "meaning": "A real GitHub job succeeded, but its only custom step echoes that browser tests are not run. It preserves a required check name; it is not an executed browser acceptance test."
+    }
+  ],
+  "legacyCommitStatuses": {
+    "source": "https://api.github.com/repos/alexj11324/Mikka/commits/6ccb50d7aad25eef0275af76fd8f137e9eb3faed/status?per_page=100",
+    "state": "pending",
+    "totalCount": 0,
+    "contexts": [],
+    "interpretation": "GitHub's legacy combined-status endpoint reports pending for an empty status-context list. Required checks are Check Runs; all four required Check Runs are successful."
+  },
+  "distinctions": {
+    "placeholderSuccess": [
+      "Browser tests (before merge)"
+    ],
+    "conditionallySkippedJobs": [
+      "Cloud credential access (OIDC)"
+    ],
+    "historicalRequiredName": "Production build and browser interactions is the database aggregation gate in this revision.",
+    "actualAnalyticsBuildAndBrowserRegression": "Analytics SSR (full) performed its scoped build/resource/Chromium rendering checks successfully; this is separate from the Browser gate placeholder.",
+    "manualProductAcceptance": "This CI review did not execute or claim a new manual product browser acceptance run."
+  },
+  "monitoring": {
+    "startedAt": "2026-11-07T08:04:39.366Z",
+    "lastObservedAt": "2026-11-07T08:12:56.252Z",
+    "normalPollIntervalSeconds": 35,
+    "snapshotCount": 12,
+    "failureObserved": false,
+    "rerunsRequested": false,
+    "codeChanged": false,
+    "mergePerformed": false,
+    "snapshots": [
+      {
+        "at": "2026-11-07T08:04:39.366Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 4,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Database checks (4/4)",
+          "Integration unit checks",
+          "Database checks (1/4)",
+          "Database checks (3/4)",
+          "Daemon checks",
+          "Core unit checks",
+          "Database checks (2/4)",
+          "Source checks",
+          "Analytics SSR (full)"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:05:51.556Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 4,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Database checks (4/4)",
+          "Integration unit checks",
+          "Database checks (1/4)",
+          "Database checks (3/4)",
+          "Daemon checks",
+          "Core unit checks",
+          "Database checks (2/4)",
+          "Source checks",
+          "Analytics SSR (full)"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:06:45.040Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 5,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Database checks (4/4)",
+          "Integration unit checks",
+          "Database checks (1/4)",
+          "Database checks (3/4)",
+          "Daemon checks",
+          "Core unit checks",
+          "Database checks (2/4)",
+          "Analytics SSR (full)"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:07:20.529Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 8,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Database checks (4/4)",
+          "Integration unit checks",
+          "Database checks (1/4)",
+          "Database checks (3/4)",
+          "Core unit checks",
+          "Database checks (2/4)"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:07:56.504Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 9,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Integration unit checks",
+          "Database checks (1/4)",
+          "Database checks (3/4)",
+          "Core unit checks",
+          "Database checks (2/4)"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:08:32.034Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 12,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Production build and browser interactions",
+          "Integration unit checks",
+          "Core unit checks"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:09:07.536Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 13,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Integration unit checks",
+          "Core unit checks"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:09:43.036Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 13,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Integration unit checks",
+          "Core unit checks"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:10:18.503Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 13,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Integration unit checks",
+          "Core unit checks"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:11:08.077Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 14,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Core unit checks"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:11:43.738Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "blocked",
+        "success": 14,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": [
+          "Core unit checks"
+        ]
+      },
+      {
+        "at": "2026-11-07T08:12:19.396Z",
+        "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+        "base": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "mergeable": true,
+        "mergeableState": "clean",
+        "success": 16,
+        "skipped": [
+          "Cloud credential access (OIDC)"
+        ],
+        "pending": []
+      }
+    ]
+  },
+  "sourceWorkflows": [
+    "https://github.com/alexj11324/Mikka/blob/6ccb50d7aad25eef0275af76fd8f137e9eb3faed/.github/workflows/browser-gate.yml",
+    "https://github.com/alexj11324/Mikka/blob/6ccb50d7aad25eef0275af76fd8f137e9eb3faed/.github/workflows/ui-policy.yml",
+    "https://github.com/alexj11324/Mikka/blob/6ccb50d7aad25eef0275af76fd8f137e9eb3faed/.github/workflows/analytics-ssr.yml"
+  ]
+}

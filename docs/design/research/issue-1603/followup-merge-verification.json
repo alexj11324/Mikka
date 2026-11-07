@@ -1,0 +1,59 @@
+{
+  "recordedAt": "2026-11-07T08:14:34.962Z",
+  "repository": "alexj11324/Mikka",
+  "pr": 1626,
+  "url": "https://github.com/alexj11324/Mikka/pull/1626",
+  "merged": true,
+  "mergedAt": "2026-11-07T08:13:42Z",
+  "mergeCommit": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+  "tree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+  "parents": [
+    "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+    "6ccb50d7aad25eef0275af76fd8f137e9eb3faed"
+  ],
+  "expectedHead": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+  "expectedTree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+  "treeMatchesTestedCandidate": true,
+  "mainBeforeMerge": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+  "requiredChecks": [
+    {
+      "context": "UI policy (strict)",
+      "appId": 15368,
+      "conclusion": "success"
+    },
+    {
+      "context": "Production build and browser interactions",
+      "appId": 15368,
+      "conclusion": "success"
+    },
+    {
+      "context": "GitGuardian Security Checks",
+      "appId": 46505,
+      "conclusion": "success"
+    },
+    {
+      "context": "Browser tests (before merge)",
+      "appId": 15368,
+      "conclusion": "success"
+    }
+  ],
+  "checkSummary": {
+    "total": 17,
+    "success": 16,
+    "skipped": [
+      "Cloud credential access (OIDC)"
+    ]
+  },
+  "limitations": [
+    "Browser tests (before merge) is an existing placeholder; no browser execution is inferred.",
+    "Production build and browser interactions is the existing database-shard aggregate, not a browser test.",
+    "Existing local screenshots retain their original source/overlay binding; this server-only follow-up has no new local browser run.",
+    "Final merge deployment and shared-account production UI acceptance remain pending."
+  ],
+  "gitReadback": {
+    "mainFetched": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "candidate156IsAncestor": true,
+    "followup6ccbIsAncestor": true,
+    "mergeBaseCommandsExitCode": 0
+  }
+}

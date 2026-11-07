@@ -1,6 +1,10 @@
 # Issue #1603：交互连续性验收证据
 
-**当前结论：候选 `156b6a27` 已完成类型检查、官方 overlay 生产构建、真实 API 35-read 重跑及适用 CI 门禁；本地整合 `5a752a50`／overlay `ac598069` 已完成本页逐项列出的真实浏览器操作和清理。** 最终运行记录 296 条操作（含 close）与 23 张截图，两个 `9005` 实测失败均已在整合版本复验修复。仍有一项确认的后续缺陷：**workspace switcher 将未知服务端／数据库异常统一误报 403，独立修复 IN_PROGRESS**；部分错误图的全局 toast 遮挡局部控件亦保留为未解决的体验限制。**合并后生产验收 PENDING，不能据此宣告 issue 已完成。** 本地整合提交、CI 合成合并提交和最终 GitHub merge 是不同对象，不能互相改标。
+> **2026-11-07 11:27 UTC 更新：** 主批次 #1619 与补修 #1626 均已 merge；`26ef4de1` 的主干 CI 12/12 与 Web deploy 均成功，并独立核实历史 Vercel READY、HTTP200、source/build `26ef4de1` 和官方 overlay `53d30a3`。见 [主干CI](followup-main-ci.json)、[发布证据](followup-release-evidence.json)、[独立Vercel绑定](followup-vercel-binding.json)。生产域名随后随其它PR前移；当前 main `f7225f3e`。
+>
+> **仍未完成：** 第18项 ArtifactLibrary 在“Retry 后仍失败”时丢失错误提示及唯一就地恢复按钮，已以真实 Sonner/SWR 动态复现并隔离重复（发生4×影响5=20），正在最小修复。默认折叠通知栈本身不登记为缺陷，详见 [toast 复核](toast-source-review.json)。指定SMOKE账号、Acme Inc.真实生产流程验收仍待完成；不得据已部署关闭issue。以下历史观测保留原版本边界。
+
+**当前结论：主批次 [#1619](https://github.com/alexj11324/Mikka/pull/1619) 已合并为 `efb95d951ddbeca1af04bc80d011ccbc2a9f0188`；第 17 项 workspace switcher 错误分类修复 [#1626](https://github.com/alexj11324/Mikka/pull/1626) 已合并为 `26ef4de15129e22503e152258ee9cb2e4aeae8bd`。** 后续修复本地既有入口 34 项先 32 pass／2 fail、修复后 34/34 pass，4 项 required CI 均 success，实际合并树与 CI 候选树一致。候选 `156b6a27` 的类型检查、官方 overlay 构建、真实 API 35-read 与 CI，以及本地整合 `5a752a50`／overlay `ac598069` 的 296 条操作、23 张截图和清理，仍各自绑定原版本；两个 `9005` 实测失败已在整合版本复验修复。Artifact 错误图中的折叠 toast 栈属于既有 Sonner 行为，hover／Alt+T／模态窗口键盘可达性尚未完成交互验收，不能仅凭截图认定永久遮挡或死锁；持续失败 Retry 后通知存续另待动态核实。**最终合并部署与指定 SMOKE 账号生产验收 PENDING，不能据此宣告 issue 已完成。** 本地整合、CI 合成合并与实际 GitHub merge 保持版本区分。
 
 本目录记录本地生产模式应用的实际浏览器操作、截图和 HTTP 验收。截图来自隔离测试数据；它们不代表生产共享账号验收、原生桌面应用验收或 iOS 验收。
 
@@ -11,7 +15,9 @@
 | 修改前基线 | `f3ef8f4a5f96909e84a719ab3cd4cf2515d57602` | 本地生产模式，`localhost:3111`；2026-11-07 05:39:05–05:44:03；独立测试数据库 | `before/` 的 5 张截图。确认 Settings 冷加载替换外层框架、Artifact 后台失败替换旧列表；该次人工会话完成清理并释放租约。 |
 | 中间版本实际 UI | `9005d8eaea561d42a59768846f6abbf46d4d5f19` | 本地生产模式，`localhost:3110`；2026-11-07 06:00:10–06:16:05；隔离测试数据库 | `9005/` 的 14 张截图、[操作观测摘要](9005-observations.json)及[失败摘录](curated-failures.json)。部分通过，两个明确失败；控制器终止后租约按既有规则进入 `quarantined`，`cleanRelease=false`；其 owned 隔离数据库已退役，详情见[退役记录](9005-runtime-retirement.json)。 |
 | 候选源码检查与 API | `156b6a2779d1ee71161b99ab47b3484e2a8b5704` | 官方 overlay `2cbb930e`；精确类型检查与构建通过。API 重跑于 07:07:11.880–07:09:45.956 完成，35 次读取通过并干净释放。关联该 head 的 30 项检查为 23 success、7 skipped。 | [构建证据](156b-build-evidence.json)、[API 证据](156b-api-evidence.json)、[CI 审核](156b-ci-review.json)。首轮连接失败另行保留；这些结果不改标为最终手动 UI。 |
-| 本地整合版本与最终手动 UI | `5a752a50eb74c22681cd7dd8511ff6d2e58fc46f` | 本地合并 `ad5e5db5` 与候选 `156b6a27`，树 `977111e65ae6bc8c15b88e01810f2f143512c4dd`；官方 overlay `ac598069`；生产构建 exit 0（128.36 秒）。07:19:14.159 UTC 核实 `localhost:3110` 实际服务该 build。 | [整合构建证据](integration-build-evidence.json)、[运行版本绑定](integration-runtime-binding.json)；最终图库 `integrated/` 共 23 张；07:24:29–07:43:02 完成所列 UI 操作，07:44:17 close 确认 fixture 清理与租约释放，见[脱敏观测](integration-observations.json)。确认的 switcher 错误分类缺陷与视觉限制见下文，不能记为全部要求通过。`5a752a50` 是本地整合提交，不是最终 GitHub merge。 |
+| 本地整合版本与最终手动 UI | `5a752a50eb74c22681cd7dd8511ff6d2e58fc46f` | 本地合并 `ad5e5db5` 与候选 `156b6a27`，树 `977111e65ae6bc8c15b88e01810f2f143512c4dd`；官方 overlay `ac598069`；生产构建 exit 0（128.36 秒）。07:19:14.159 UTC 核实 `localhost:3110` 实际服务该 build。 | [整合构建证据](integration-build-evidence.json)、[运行版本绑定](integration-runtime-binding.json)；最终图库 `integrated/` 共 23 张；07:24:29–07:43:02 完成所列 UI 操作，07:44:17 close 确认 fixture 清理与租约释放，见[脱敏观测](integration-observations.json)。该次运行仍包含下文的 switcher 误分类，后续 #1626 已修复；toast 交互证据未完成，不能记为全部要求通过。`5a752a50` 是本地整合提交，不是最终 GitHub merge。 |
+| 主批次实际 GitHub merge | `efb95d951ddbeca1af04bc80d011ccbc2a9f0188` | #1619 于 07:58:31 UTC 合并；parents 为最新 main `93724cb9` 与候选 `156b6a27`，树 `fd7fb13f41c5a87df865f539d498b32e3a4fb83b` 与预测一致。 | [主批次合并回读](batch-merge-verification.json)、[合并前最新主干复核](final-main-93724.json)。不把较早 `5a752a50` 的人工 UI 改标为本 SHA 新运行。 |
+| 第 17 项服务端误分类后续修复 | `26ef4de15129e22503e152258ee9cb2e4aeae8bd` | #1626 于 08:13:42 UTC 合并；parents 为 `efb95d95` 与修复 head `6ccb50d7`；树 `9cec7cc5dee0fe71eff576e3f84136ca51ed3def` 与通过 CI 的候选树一致。 | [本地 red→green 与范围](switcher-followup-evidence.json)、[4 项 required CI](switcher-ci-review.json)、[实际合并回读](followup-merge-verification.json)。仅修改 route／路由回归 2 文件；没有新的本地浏览器运行，最终部署与生产验收 PENDING。 |
 
 基线、`9005` 和候选 `156b` 构建使用官方 overlay `2cbb930e409ccc247f7692abc9e2dd1152a571fe`；本地整合 `5a752a50` 使用更新后的官方 overlay `ac5980696802f188a81124a8a3f2513be2d14e9e`。两组源码／overlay 组合分别记录。已验证的应用路径为 Vite 前端与 Nitro 服务端；“生产模式构建”指本地构建运行方式，不表示访问生产域名。
 
@@ -21,13 +27,13 @@
 
 | 要求 | 最终整合版本实际证据 | 源码／组件证据 | 当前判断与尚待工作 |
 | --- | --- | --- | --- |
-| **A：固定基线、逐路径检查、真实问题记录** | 基线、`9005`、候选 API、整合 UI 分别绑定 SHA／overlay／时间。整合版本 296 条操作、23 张截图；#296 清理及审计通过。 | 问题登记保留具体根因、最小修复、工程风险估计；新增 switcher 误分类作为待修项目。 | 本地证据闭环已具备；**尚未完成生产验收或新增误分类修复。** |
-| **B：稳定外层框架、局部 loading/error** | #15 的 Settings chunk 延迟 8 秒命中一次；#19–20 frame/bar/rail 同节点且各 1 个；Settings 内 Ctrl+K 打开搜索。 | 稳定 AppFrame、局部 SettingsRouteContent 和真实组件回归。 | 所列冷加载与普通导航路径通过；环境误报 403 触发的安全边界退役单独记录。 |
+| **A：固定基线、逐路径检查、真实问题记录** | 基线、`9005`、候选 API、整合 UI 分别绑定 SHA／overlay／时间。整合版本 296 条操作、23 张截图；#296 清理及审计通过。 | 问题登记保留具体根因、最小修复、工程风险估计；第 17 项 switcher 误分类已在 #1626 修复并合并。 | 本地证据、主批次及后续合并回读已具备；**最终部署和指定 SMOKE 生产验收 PENDING。** |
+| **B：稳定外层框架、局部 loading/error** | #15 的 Settings chunk 延迟 8 秒命中一次；#19–20 frame/bar/rail 同节点且各 1 个；Settings 内 Ctrl+K 打开搜索。 | 稳定 AppFrame、局部 SettingsRouteContent 和真实组件回归。 | 所列冷加载与普通导航路径通过；历史误报 403 及安全边界退役单列，服务端分类已在 #1626 修复。 |
 | **B：地址、Back/Forward 与内容保持一致** | #27–36 完整重走 Back/Back/Forward/Back；Ada URL 与输入一致，草稿保留，scrollTop=340，shell 同节点，documentRequests=1。 | `b7a73ab1` 修复 no-op 地址清理提前消费历史查询；两种事件顺序组件回归。 | `9005` 的真实失败已在 `5a752a50` 复验修复。 |
-| **C：后台更新与普通失败不破坏在读内容** | 聊天两次合成后台消息到达；任务／线程／群聊／Artifact 列表、文档和 HTML 的受控普通 503 保留相应节点、已读内容和已列出的焦点／选区／位置。 | 对应真实 React／SWR 生命周期与授权拒绝回归。 | 所列操作通过；**switcher 未知异常误报 403 的另一条后台路径仍待修复**，不能泛化为所有网络故障均不重建。 |
+| **C：后台更新与普通失败不破坏在读内容** | 聊天两次合成后台消息到达；任务／线程／群聊／Artifact 列表、文档和 HTML 的受控普通 503 保留相应节点、已读内容和已列出的焦点／选区／位置。 | 对应真实 React／SWR 生命周期与授权拒绝回归。 | 所列操作通过；**switcher 未知异常现返回 500，#1626 的路由回归及 CI 已通过并合并**。本地图库仍属于修复前的 `5a752a50`，不宣称已补跑所有网络故障 UI。 |
 | **C：离开／返回时草稿、筛选与局部状态连续** | 评论与回复关闭／重开后恢复；3 次真实提交仅清相应草稿；Plugins 保留 GitHub 搜索；换工作区隔离 Medium／APP-1／草稿，返回原工作区恢复 Medium／List 和任务评论草稿。 | scoped view-state、稳定任务 ID、未授权 cached preview 不恢复 Activity，相关隔离回归。 | 本次同账号两工作区操作通过；跨账号与多标签仅有对应组件／既有 API 证据。 |
-| **C：权限、退出与显式升级边界** | 群聊 403→503 继续隐藏历史并禁用输入，成功 Retry 才恢复。removed-action 提示前 documentRequests=1、草稿在；显式 Refresh 后=2、草稿恢复、群聊 POST 未重放。真实 Sign out 后 view keys 68→0。 | 拒绝锁存、provider retirement、退出 helper 与旧 setter 不回填回归。 | 明确安全拒绝与显式刷新按本次范围通过；不能把服务端误报 403 视为理想体验。 |
-| **D：局部反馈、减少运动、适配** | reduce 下三处 skeleton animation=none、命令弹窗 scale/transform=none；暗／亮色工具详情截图；最终 390×844 线程图 input／Send 完整无遮挡。 | 既有 motion-reduce 类与提交／错误反馈组件回归。 | 仅所列范围通过；**Artifact 和部分全宽错误画面仍有全局 toast 遮挡局部 Retry／输入角落，未解决**。窄屏 Web 不代表 iOS／原生移动验收。 |
+| **C：权限、退出与显式升级边界** | 群聊 403→503 继续隐藏历史并禁用输入，成功 Retry 才恢复。removed-action 提示前 documentRequests=1、草稿在；显式 Refresh 后=2、草稿恢复、群聊 POST 未重放。真实 Sign out 后 view keys 68→0。 | 拒绝锁存、provider retirement、退出 helper 与旧 setter 不回填回归。 | 明确安全拒绝与显式刷新按本次范围通过；#1626 只修服务端未知错误分类，真实 401／403 的客户端拒绝策略保留。 |
+| **D：局部反馈、减少运动、适配** | reduce 下三处 skeleton animation=none、命令弹窗 scale/transform=none；暗／亮色工具详情截图；最终 390×844 线程图 input／Send 完整无遮挡。 | 既有 motion-reduce 类与提交／错误反馈组件回归。 | 仅所列范围通过；**Artifact 折叠 toast 栈的 hover／Alt+T／模态键盘恢复及 composer 可达性证据仍未完成**，静态截图不证明永久遮挡或死锁。另有 Retry 通知存续待动态核实，见 [toast 源码复核](toast-source-review.json)。窄屏 Web 不代表 iOS／原生移动验收。 |
 
 ## 3. 基线与中间版本的视觉对照
 
@@ -93,7 +99,7 @@
 
 **合成内容与真实操作分开。** 认证、HTTP／RPC、生产构建和 UI 操作是真实的；人物、任务、文档、8 条 stored reasoning／tool activity 消息、2 条后台到达消息及备用工作区 Coordinator 的 2 条消息是 owned fixture。stored tool 不执行工具，未调用 live model。人工 UI **确实发生 2 次评论和 1 次回复的业务写入**，所以不能套用 API 35-read 报告的 `businessRequestWrites=false`；群聊 POST 在临时受控边界返回 503，没有触达模型。
 
-**视觉与操作限制保留。** Artifact 列表／Markdown／HTML 图中的全局 “Can't reach Mikka” toast 会遮挡局部 Retry；部分全宽线程画面输入角落也受遮挡。仅最终窄屏线程图支持“输入和 Send 无遮挡”。`group-pending-and-draft` 图停在较早历史位置，失败待重试项在 DOM 底部而未入画；`group-recovered` 图实际展示 Not sent／Retry。期间错误 locator 或被 toast 拦截的 helper 操作属于未完成的操作，不能改写成产品通过；这里依据后续成功执行的精确按钮、DOM 与截图记录给出限定结论。
+**视觉与操作证据仍有限定。** Artifact 列表／Markdown／HTML 图中，全局 “Can't reach Mikka” 位于折叠 toast 栈前排，局部 Retry 属于后排 toast；部分全宽画面也确实与输入角落重叠。[真实 Sonner 1.7.4 源码复核](toast-source-review.json)确认 hover／mousemove 或 Alt+T 可展开栈，同 ID 更新不自动改变顺序。因此，未 hover 即点击后排按钮而被拦截的 helper 不能证明永久遮挡或键盘死锁；实际模态窗口内的键盘可达性与展开后的 composer 使用仍待验收。仅最终窄屏线程图支持该时刻“输入和 Send 无遮挡”。`group-pending-and-draft` 图停在较早历史位置，失败待重试项在 DOM 底部而未入画；`group-recovered` 图实际展示 Not sent／Retry。错误 locator 或被拦截的 helper 均保留为未完成操作，不改写为通过。源码另外提示“Retry 再失败后通知可能因 Sonner action 默认关闭而消失”，这是独立、尚待动态验证的分支，不用截图推断它已发生。
 
 ## 5. 两个必须保留的真实失败
 
@@ -156,9 +162,9 @@ button "Send comment" [disabled]
 
 [全局连接提示](../../../../apps/desktop/src/renderer/app.tsx)的 Retry now 调用 `SessionApplication.reload()`→[readBootstrap](../../../../apps/desktop/src/renderer/bootstrap.ts)→`desktop.bootstrap`，不做 document reload；同 owner／workspace 的普通 reload 也不无条件清空 bootstrap。
 
-**已确认但尚未修复：switcher 误分类。** [route](../../../../app/api/workspace/switcher/route.ts) 的 catch-all 把 `getApiSession`／`loadWorkspaceSwitcher` 抛出的任何错误统一返回 403，包括可能的数据库／连接异常。这一实现与基线相同，但仍是可行动缺陷。客户端 [SettingsReadError](../../../../lib/settings-data.ts)保留 403；[readAccessFailure](../../../../lib/swr/persistent-cache.ts)据此按 workspace 拒绝使 provider 失效，[AuthenticatedReadCache](../../../../components/authenticated-read-cache.tsx)增加 generation 并 refresh，从而退役子树。**正确的 403 必须继续拒绝旧私有内容；问题在服务器把未知失败误标成 403，不应放宽客户端安全策略。** 当次服务端 403 与该既有路径相符，普通 500 本身不触发这条失效规则。
+**历史根因已确认，服务端分类已在 #1626 合并修复。** 本地 `5a752a50` 当时的 [route](../../../../app/api/workspace/switcher/route.ts) catch-all 将 `getApiSession`／`loadWorkspaceSwitcher` 的任意异常统一返回 403，包括未知数据库／连接异常。客户端 [SettingsReadError](../../../../lib/settings-data.ts)保留 403；[readAccessFailure](../../../../lib/swr/persistent-cache.ts)据此按 workspace 拒绝使 provider 失效，[AuthenticatedReadCache](../../../../components/authenticated-read-cache.tsx)增加 generation 并 refresh，退役子树。后续修复保留无会话 401 与真实 `WorkspaceError` 403，将其他异常返回 500／`workspaceReadFailed`，所有分支 `private, no-store`，日志仅错误类。**真实 403 继续拒绝旧私有内容，客户端安全策略没有放宽。** 当次服务端 403 与旧路径相符，普通 500 本身不触发这条失效规则；该次具体 throw 及精确重建时刻仍未被补写为已知。
 
-最小后续修复应保留无会话 401、明确权限／成员拒绝 403，将数据库／未知异常返回普通 500，并在既有 settings backend 路由入口检验分类。**状态：confirmed follow-up IN_PROGRESS；独立工作区正进行既有 settings-backend 入口的 red→green 最小修复，本批 candidate／整合 UI 没有修复此项。** 因此，本地普通受控 503 的结果可以成立，但不能宣称所有后台网络失败体验已经解决。
+**第 17 项状态：FIXED AND MERGED。** [本地证据](switcher-followup-evidence.json)记录既有 `pnpm test:settings-backend` 的 34 项先 32 pass／2 fail（未知错误实际返回 403，而预期 500），修复后 34/34 pass；完整类型检查、lint、error-cause policy 与 diff check 通过。两个修改文件在本地基底 `156b` 与实际主批次 merge `efb95d95` 的原始 blob 相同，仅将该两文件补丁接到真实 merge 之上。[后续 CI](switcher-ci-review.json)的 4 项 required check 全部 success，共 17 项为 16 success／1 conditional skip；[#1626 合并回读](followup-merge-verification.json)确认实际 merge `26ef4de1` 的树与 CI head `6ccb50d7` 一致。该服务端后续修复没有新本地 UI 运行，最终部署／指定 SMOKE 生产验收仍 PENDING。
 
 环境恢复后重新登记 `frameAfterTransport/barAfterTransport/railAfterTransport`，后续 Plugins／Artifact／群聊普通失败按新基线比较；明确群聊 403 后再登记 `AfterSecurity`。旧 detached 输入对象保留 value 不能单独证明新 live input 已恢复；本页只用后续实际 live input 观测证明 Ada 和任务评论草稿恢复，不把旧对象值冒充新输入验证。
 
@@ -179,7 +185,9 @@ button "Send comment" [disabled]
 | `9005` 人工 UI | 215 条原始记录没有 close 操作；租约已过期并进入 `quarantined`，`cleanRelease=false`；全部旧 fixture 数据随该 owned 隔离数据库退役移除，见[退役记录](9005-runtime-retirement.json) | **隔离与数据库退役已完成；不是干净释放** |
 | `156b` 本地 API 首轮 | [失败记录](156b-local-api-attempt-1.json)：exit 1，PG 连接意外终止，没有生成该次 HTTP 验收摘要 | **失败记录保留；后续成功运行不补写这次的成功或干净释放** |
 | `156b` 本地 API 重跑 | [新运行记录](156b-api-evidence.json)：35 reads pass、exit 0；`cleanup.fixtures=succeeded`，`cleanup.lease=released-clean` | **已通过并干净释放** |
-| 本地整合 `5a752a50` 人工 UI | [脱敏观测](integration-observations.json) #296：07:44:17.519，browserClosed=true、fixtureCleanup=true、lease=released，证据审计 passed（25 个原始文件） | **实际 close、fixture 清理与租约释放已完成** |
+| 本地整合 `5a752a50` 人工 UI | [脱敏观测](integration-observations.json) #296：07:44:17.519，browserClosed=true、fixtureCleanup=true、lease=released，证据审计 passed（25 个原始文件）；[最终运行回收](integration-runtime-cleanup.json)独立确认业务 fixture 已清、53 项资源标记 cleaned、created=0，应用连接=0，应用／控制器／relay／Docker 已停止 | **实际 close、业务 fixture 清理、租约释放和临时计算停止已完成** |
+
+[最终回收报告](integration-runtime-cleanup.json)中的 clean 指业务 fixture 已移除及租约干净释放；托管测试池保留 2 个身份与 1 个已失效 session 记录，active retained session=0，不宣称数据库所有行归零。
 
 API 会话的 clean release 不能代替之后人工 UI 会话的清理。旧人工会话的数据库退役结束了该隔离环境的数据生命周期，但没有补成一次成功 close 或 clean release。控制器终止后尚未执行的请求不能记为已完成操作，也不能补写成功截图或关闭结果。
 
@@ -205,14 +213,15 @@ API 会话的 clean release 不能代替之后人工 UI 会话的清理。旧人
 - [x] **整合版本评论与回复。** #87–114 关闭重开恢复，真实提交分别清草稿；#278／#287 同账号跨工作区隔离与返回恢复。未宣称手动跨账号验收。
 - [x] **整合版本所列普通路径。** 冷 Settings、聊天到达、群聊在途返回和 503、任务／线程 503、Artifact 列表／文档／HTML 连续性、Plugins 和 Board 返回均已有本版本操作证据。
 - [x] **整合版本安全与显式升级。** 群聊 403→503 保持拒绝，成功授权 Retry 才恢复；removed-action 只在点击 Refresh 后重载、草稿恢复、没有群聊发送重放；实际 Sign out 清理 view keys。旧 callback 回填仍使用独立组件证据。
-- [x] **整合版本界面观察。** 所列减少运动、暗／亮色和最终窄屏输入观察已完成；不据此掩盖全局 toast 遮挡局部控件的未解决限制。
+- [x] **整合版本界面观察。** 所列减少运动、暗／亮色和最终窄屏输入观察已完成；折叠 toast 栈的交互可达性仍另列待验收，不把截图重叠直接判为永久死锁。
 - [x] **整合会话清理。** #296 实际 close，fixtureCleanup=true、lease=released、证据审计 passed。旧 `9005` 仍保持隔离／退役结论，未补成正常 close。
-- [ ] **CONFIRMED FOLLOW-UP IN_PROGRESS：switcher 错误分类。** 未知 DB／连接异常被 catch-all 误报 403，可能使普通后台失败触发整棵授权缓存子树退役；只修服务端分类，真实授权拒绝策略保持。
-- [ ] **未解决的视觉限制。** 部分全宽错误画面全局连接 toast 遮挡局部 Retry 或输入一角；需要针对实际遮挡处理或后续明确验收，不能标为全错误 UX 通过。
-- [ ] **PENDING：GitHub 最终合并门禁。** 合并前复查真实 head、最新 main、适用检查和实际 merge SHA；本地整合提交不代替 GitHub 合并。
-- [ ] **PENDING：生产验收。** 合并并确认生产实际服务目标版本后，以已有授权的共享测试账号、正确工作区和真实任务按 issue 验收。本地 fixture 不替代该步骤。
+- [x] **第 17 项 switcher 错误分类已修复并合并。** #1626 仅修服务端分类及既有路由回归；本地 34 项 red→green、4 项 required CI 成功、实际 merge `26ef4de1` 与测试树一致，真实授权拒绝策略保持。
+- [ ] **PENDING：toast 交互证据。** 默认折叠栈不是确认缺陷；仍需实际 hover／Alt+T／Artifact 模态键盘与 composer 可达性验收。持续失败 Retry 的通知存续另待动态核实，见 [源码复核](toast-source-review.json)。
+- [x] **GitHub 合并与回读。** [#1619](batch-merge-verification.json) 实际 merge `efb95d95`；[#1626](followup-merge-verification.json) 实际 merge `26ef4de1`。最新 main 的独立变化已在 [93724 复核](final-main-93724.json)中评估，合并 parent／tree 与候选关系已核实。
+- [ ] **PENDING：最终合并部署。** 确认生产实际服务含 `26ef4de1` 的目标版本；合并回执和 CI 不替代部署版本回读。
+- [ ] **PENDING：指定 SMOKE 账号生产验收。** 部署版本确认后，以 issue 指定且已有授权的 SMOKE 账号、正确工作区和真实任务验收；本地 fixture、较早主干部署及 API 报告不替代该步骤。
 
-最终手动 UI 图库命名为 `integrated/`，绑定本地整合 `5a752a50` 与 overlay `ac598069`。若源码或 overlay 继续变化，应另记精确版本或明确源码树对应关系，不移动旧图片造成已验收的假象。最终 GitHub merge SHA 与线上实际版本在合并后单独记录。
+最终手动 UI 图库命名为 `integrated/`，绑定本地整合 `5a752a50` 与 overlay `ac598069`。若源码或 overlay 继续变化，应另记精确版本或明确源码树对应关系，不移动旧图片造成已验收的假象。最终 GitHub merge 已在主批次／后续回执中分别记录；线上实际版本仍待独立验收。
 
 ## 9. 图片索引
 
@@ -265,9 +274,9 @@ API 会话的 clean release 不能代替之后人工 UI 会话的清理。旧人
 | [integrated-thread-background-error](integrated/integrated-thread-background-error.webp) | 线程后台 503 保留内容；不据此宣称全部错误 toast 无遮挡（#137） |
 | [integrated-thread-narrow-web](integrated/integrated-thread-narrow-web.webp) | 390×844 Web：输入／选区／Send 完整，无 toast 遮挡（#140） |
 | [integrated-plugins-return](integrated/integrated-plugins-return.webp) | GitHub 详情返回后搜索词保留（#163） |
-| [integrated-artifact-library-error](integrated/integrated-artifact-library-error.webp) | 旧列表保留；全局 toast 遮挡局部 Retry 的限制仍在（#173） |
-| [integrated-markdown-background-error](integrated/integrated-markdown-background-error.webp) | 正文／选区／scrollTop=650 保留；toast 有遮挡（#190） |
-| [integrated-html-background-error](integrated/integrated-html-background-error.webp) | 同一 iframe 保留；toast 有遮挡（#205） |
+| [integrated-artifact-library-error](integrated/integrated-artifact-library-error.webp) | 旧列表保留；局部 Retry 位于折叠 toast 栈后排，展开交互未验收（#173） |
+| [integrated-markdown-background-error](integrated/integrated-markdown-background-error.webp) | 正文／选区／scrollTop=650 保留；toast 栈与 composer 局部重叠，交互待验收（#190） |
+| [integrated-html-background-error](integrated/integrated-html-background-error.webp) | 同一 iframe 保留；折叠 toast 栈交互待验收（#205） |
 | [integrated-group-pending-and-draft](integrated/integrated-group-pending-and-draft.webp) | 较早历史与未发草稿选区；失败 pending 在 DOM 底部、未入画（#228） |
 | [integrated-group-access-refused](integrated/integrated-group-access-refused.webp) | 403 后历史隐藏、输入禁用（#241） |
 | [integrated-group-recovered](integrated/integrated-group-recovered.webp) | 成功授权读取恢复；实际可见 Not sent／Retry 与保留草稿（#250） |
@@ -298,7 +307,7 @@ API 会话的 clean release 不能代替之后人工 UI 会话的清理。旧人
 
 CI 中名为 `Production build and browser interactions` 的 job 是数据库分片汇总门禁，与 Browser gate 一样，均不作为本次实际 UI 证明。Desktop 原生打包验收的成功也不能改写为执行者在本地手动检查了原生桌面或 iOS。
 
-这些检查关联候选 head；已核实 CI 实际检出的 PR 合成合并版本为 `873aaf4b3d1da4a1f78f1d29ba6828c4f143084f`，基于 main `c31ac8cd8824ea4d44d23ba548ef67bd139771bb` 与候选 `156b6a27`。审核时 main 已前移到 `ad5e5db5ed5547ea19644ce2381992d8d1583eb9`（[#1620](https://github.com/alexj11324/Mikka/pull/1620)）；新增提交没有与候选重叠的文件，静态审查未发现 UI、scope、导航或 read-cache 语义交互。随后已在本地整合该 main 与候选、完成下述构建与运行绑定；**不将旧 CI 的结论改标到本地整合提交，也不将本地整合提交称为最终 GitHub merge**。合并前仍须复查最新 main 与实际合并结果。
+这些检查关联候选 head；已核实 CI 实际检出的 PR 合成合并版本为 `873aaf4b3d1da4a1f78f1d29ba6828c4f143084f`，基于 main `c31ac8cd8824ea4d44d23ba548ef67bd139771bb` 与候选 `156b6a27`。审核时 main 已前移到 `ad5e5db5ed5547ea19644ce2381992d8d1583eb9`（[#1620](https://github.com/alexj11324/Mikka/pull/1620)）；新增提交没有与候选重叠的文件，静态审查未发现 UI、scope、导航或 read-cache 语义交互。随后已在本地整合该 main 与候选、完成下述构建与运行绑定；**不将旧 CI 的结论改标到本地整合提交，也不将本地整合提交称为最终 GitHub merge**。后续已完成 [main `93724cb9` 复核](final-main-93724.json)、[主批次实际 merge 回读](batch-merge-verification.json)和[#1626 后续 merge 回读](followup-merge-verification.json)，没有将旧 CI 或手动运行改标为新 SHA。
 
 ### 本地整合构建与运行绑定
 
@@ -314,19 +323,30 @@ CI 中名为 `Production build and browser interactions` 的 job 是数据库分
 | 生产模式构建 | `pnpm build:app`，exit 0，128.36 秒；Node v24.22.1，Nitro `node-server` |
 | 实际服务绑定 | 07:19:14.159 UTC，`http://localhost:3110`；source、compiledBuild、servedBuild 均为上述 `5a752a50`，renderer／overlay 均一致 |
 | 隔离数据库 | `mikka_issue1603_final4_e2e`，与 `156b` API 重跑的 `final3` 分开 |
-| 手动 UI 总结与清理 | [观测摘要](integration-observations.json)：296 条记录、23 张截图；所列路径复验完成，#296 实际 close／fixture 清理／租约释放；误分类后续缺陷及视觉限制仍未解决 |
+| 手动 UI 总结与清理 | [观测摘要](integration-observations.json)：296 条记录、23 张截图；所列路径复验完成，#296 实际 close／fixture 清理／租约释放；当次误分类已在后续 #1626 修复；toast 交互验收待完成 |
 
-新 overlay 的 170 个构建相关官方 tracked blob 均匹配，缺失构建输入为 0、blob 不匹配为 0；10 张文档 PNG 排除在构建输入外。依赖目录沿用已安装副本，未对安装后的依赖字节另行证明。上述事实确认本地实际运行的组合，不表示生产已部署或 GitHub 已合并。
+新 overlay 的 170 个构建相关官方 tracked blob 均匹配，缺失构建输入为 0、blob 不匹配为 0；10 张文档 PNG 排除在构建输入外。依赖目录沿用已安装副本，未对安装后的依赖字节另行证明。上述事实只确认本地实际运行的组合；GitHub 已合并的结论来自独立 merge 回执，生产部署仍待验证。
 
-### 本地运行与生产验收仍待完成
+### 历史本地运行边界与待完成生产验收
 
 [本地 API 首轮失败](156b-local-api-attempt-1.json)与[后续 `156b` API 成功重跑](156b-api-evidence.json)分别保留。临时传输中已确认的官方 WSS 五分钟会话续接缺口已处理，成功重跑保持同一进程、同一 PostgreSQL 连接且不重放 stdin；旧失败日志没有保留 `1008` close code，因此仍不能断言这就是首轮 PG 连接中断的已证实根因。
 
-**最终本地手动 UI：所列操作与清理已完成；switcher 错误分类后续修复 IN_PROGRESS，toast 遮挡限制未解决；合并后生产共享账号验收 PENDING。** 已复现问题、具体根因与修复见[问题登记](defect-register.md)；在全部要求完成前不宣告 issue #1603 关闭。
+**最终本地手动 UI 的所列操作与清理已完成；主批次及第 17 项 switcher 后续修复均已合并。Toast 默认折叠栈保留为未完成的交互证据，独立 Retry 通知存续待动态核实；最终部署及指定 SMOKE 账号生产验收 PENDING。** 已复现问题、具体根因与修复见[问题登记](defect-register.md)；在全部要求完成前不宣告 issue #1603 关闭。
 
 
 ## 附加机器可读审计
 
-[合并前 GitHub 门禁快照](final-github-gate.json)记录 2026-11-07 07:43 UTC 复核的候选 CI、main `4f0f68e9` 的 CI／部署／迁移步骤，以及该 main 与候选的无冲突预测树；后续主干变化与最终 merge 在 PR／Issue 的合并回执中继续记录，不将此快照改标为未来主干。
+[合并前 GitHub 门禁快照](final-github-gate.json)记录 2026-11-07 07:43 UTC 复核的候选 CI、main `4f0f68e9` 的 CI／部署／迁移步骤，以及该 main 与候选的无冲突预测树；此后主干变化见 [final-main-93724.json](final-main-93724.json)，主批次实际合并见 [batch-merge-verification.json](batch-merge-verification.json)，第 17 项本地修复／CI／最终合并分别见 [switcher-followup-evidence.json](switcher-followup-evidence.json)、[switcher-ci-review.json](switcher-ci-review.json) 与 [followup-merge-verification.json](followup-merge-verification.json)。[integration-runtime-cleanup.json](integration-runtime-cleanup.json)独立记录最终环境回收，[toast-source-review.json](toast-source-review.json)记录尚未完成的 toast 交互证据及 Retry 存续风险。每份快照保持自己的版本与观察时间。
 
 [最终截图校验清单](integration-screenshots.json)列出 23 张 PNG 与无损 WebP 的哈希、尺寸、Git blob SHA 和逐像素一致性；原始截图没有经生成式修改。
+
+
+## 主批次 merge 与后续修复回执（2026-11-07）
+
+主批次 [#1619](https://github.com/alexj11324/Mikka/pull/1619) 已由owner以merge commit合并：`efb95d951ddbeca1af04bc80d011ccbc2a9f0188`；实际tree `fd7fb13f41c5a87df865f539d498b32e3a4fb83b` 与预先预测一致。原#1607/#1611均已merged，原head仍是实际merge祖先，见[读回回执](batch-merge-verification.json)。[最新主干增量审计](final-main-93724.json)明确区分新MCP通知/后台执行路径和本批UI证据，不把截图改标为新后端路径已验收。
+
+[最终运行清理与停机](integration-runtime-cleanup.json)记录实际driver exit0、lease released、53条业务/受管声明cleaned；保留2个可复用测试身份和1个已轮换/过期session，其active计数0。应用连接与孤儿relay均0。Docker于08:00:06 UTC实测stopped；controller/broker均已退出。旧失败尝试保持真实quarantine记录。
+
+第17项switcher错误分类已实现为独立 [#1626](https://github.com/alexj11324/Mikka/pull/1626)，head `6ccb50d7aad25eef0275af76fd8f137e9eb3faed`，parent为实际efb merge；仅2文件。既有settings-backend入口32/34红→34/34绿，完整typecheck、lint和独立review通过，见[后续修复证据](switcher-followup-evidence.json)。**此追加时该PR CI仍进行，尚未merge／部署；本地原图仍绑定5a/ac598。**
+
+合并后共享账号生产验收仍PENDING。错误toast栈的默认折叠/hover/键盘交互正在按实际组件实现复核，截图遮挡不能独自证明交互死锁。

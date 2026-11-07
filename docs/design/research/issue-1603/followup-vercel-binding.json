@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-11-07T11:27:33.901Z",
+  "deployment": "dpl_AxVmLD3SpwxxH4nVYyhzE7vLJXRB",
+  "deploymentUrl": "https://mikka-mjvznc2nm-mikka-dev.vercel.app",
+  "vercelState": "READY",
+  "source": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+  "httpStatus": 200,
+  "version": {
+    "build": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "overlaySha": "53d30a3282cefde79e692d10ba6ed1eabe126f9d",
+    "minMobileBuild": 0,
+    "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+    "minDesktopVersion": null
+  },
+  "currentProductionAlias": false,
+  "currentAliasSourceAtObservation": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "notes": [
+    "Queried the immutable deployment version endpoint via the existing Vercel connector.",
+    "Production alias advanced while the secure authentication input was pending; this record is a historical deployment verification, not final production UI acceptance.",
+    "No temporary share token or response headers are retained."
+  ]
+}

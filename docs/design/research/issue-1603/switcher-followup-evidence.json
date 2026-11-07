@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "pr": 1626,
+  "source": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+  "tree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+  "parent": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+  "localVerificationBase": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+  "patchedFiles": [
+    {
+      "path": "app/api/workspace/switcher/route.ts",
+      "oldBlob": "a4ffda3886e6e7edfc01305285188328f583ce6c",
+      "mergedBaseBlob": "a4ffda3886e6e7edfc01305285188328f583ce6c",
+      "unchangedFromTestBase": true,
+      "newBlob": "91b864094d0f6527ddedef2c3a8da6ac6cb3e4ba",
+      "bytes": 1234
+    },
+    {
+      "path": "tests/settings-backend-routes.test.ts",
+      "oldBlob": "c4ddd3e5f9f005caa29c1db2f10ffa5028d2323c",
+      "mergedBaseBlob": "c4ddd3e5f9f005caa29c1db2f10ffa5028d2323c",
+      "unchangedFromTestBase": true,
+      "newBlob": "fdddb081dd53bca48d44444bcd9a2c27cecb30f5",
+      "bytes": 17005
+    }
+  ],
+  "patchSha256": "d92c99033260fbdb39c71665445237d1fb0c3196d3a678e27747b5ed4dc0f2f5",
+  "change": "Preserve null-session401 and typed WorkspaceError403; classify unexpected workspace/session read errors500/workspaceReadFailed with private,no-store. Log only the error class. No cache/authorization scope policy changes.",
+  "localVerification": {
+    "red": {
+      "command": "PATH=/tmp/issue1603-tools:$PATH pnpm test:settings-backend",
+      "exitCode": 1,
+      "sha256": "046f78d2b3c77360eddd31a60598863fed90de949086ed3db0ee13443677b69d",
+      "tests": 34,
+      "pass": 32,
+      "fail": 2,
+      "skipped": 0,
+      "cancelled": 0,
+      "firstRequestLogAt": "2026-11-07T07:56:48.636Z",
+      "lastRequestLogAt": "2026-11-07T07:56:48.665Z",
+      "expectedFailures": [
+        "workspace DB/unknown error returned403 instead of500",
+        "session store unknown error returned403 instead of500"
+      ]
+    },
+    "green": {
+      "command": "PATH=/tmp/issue1603-tools:$PATH pnpm test:settings-backend",
+      "exitCode": 0,
+      "sha256": "eb4ef259533d3432cff2520b71fde9cf942b9b22520e508fd88c7dd5307a286b",
+      "tests": 34,
+      "pass": 34,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "firstRequestLogAt": "2026-11-07T07:57:30.925Z",
+      "lastRequestLogAt": "2026-11-07T07:57:30.980Z"
+    },
+    "lint": {
+      "command": "pnpm exec oxlint app/api/workspace/switcher/route.ts tests/settings-backend-routes.test.ts",
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "typecheck": {
+      "command": "NODE_OPTIONS=--max-old-space-size=4096 PATH=/tmp/issue1603-tools:$PATH pnpm typecheck",
+      "exitCode": 0,
+      "sha256": "c326d2174ea820b9d1f2137ad9152d94e599102b644e85f918c1eb55c0060624",
+      "scope": "Full existing command: root tsrs, API tsrs and frontend tsc."
+    },
+    "errorCausePolicy": {
+      "command": "node scripts/error-cause-policy.mjs",
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    "independentReview": {
+      "agent": "final_ci",
+      "mode": "read-only actual two-file diff",
+      "result": "No blocking findings, authorization relaxation or test-state contamination found."
+    }
+  },
+  "environmentAttempts": [
+    {
+      "result": "Initial root typecheck lacked existing package-local dependency links; reused installed package/app node_modules, no package manifest or dependency installation change."
+    },
+    {
+      "result": "Default ~2GB frontend tsc heap exhausted; root/API stages had completed. Full command subsequently passed with4GB.",
+      "exitCode": 134
+    }
+  ],
+  "authRequiredHandling": "No new ActionFailureError branch: switcher passes the already authenticated user into loadWorkspaceContext; the inspected active read path did not throw ActionFailureError(authRequired). Missing/invalid session remains the existing explicit null-session401 path; unknown errors are not matched by message.",
+  "runtimeAcceptance": "No new app/browser/DB/model acceptance run for this patch. Existing route adapter tests exercise classification; root owns follow-up PR CI, integration and production acceptance.",
+  "preciseHeadCi": {
+    "status": "success",
+    "head": "6ccb50d7aad25eef0275af76fd8f137e9eb3faed",
+    "requiredChecks": 4,
+    "checkRuns": 17,
+    "success": 16,
+    "skipped": 1,
+    "report": "switcher-ci-review.json",
+    "mainCiRun": 42353839057,
+    "backendStep": "Run pnpm test:settings-backend completed/success"
+  },
+  "localProofMapping": "Both changed files in local base156 and actual merged parentefb had identical base Git blobs. Only the two-file patch was applied on efb; the full source tree was not replaced.",
+  "merge": {
+    "commit": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "tree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+    "mergedAt": "2026-11-07T08:13:42Z",
+    "receipt": "followup-merge-verification.json"
+  }
+}

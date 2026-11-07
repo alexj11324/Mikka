@@ -1,0 +1,575 @@
+{
+  "schemaVersion": 1,
+  "reviewedAtUtc": "2026-11-07T08:17:07.262312+00:00",
+  "issue": 1603,
+  "reviewMode": "Read-only product source review plus isolated Node/Happy DOM diagnostic regression; no product implementation change",
+  "reviewedSource": {
+    "checkout": "/tmp/issue1603-integration",
+    "gitHead": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "versionMeaning": "Local integration checkout, not a claim about the final GitHub merge SHA or current production deployment.",
+    "sonner": "1.7.4",
+    "swr": "2.5.1"
+  },
+  "activity": {
+    "productFilesChanged": false,
+    "dependenciesChanged": false,
+    "existingEvidenceDocumentsChanged": false,
+    "newBrowserSessionStarted": false,
+    "databaseOrDockerStarted": false,
+    "newDynamicTestsRun": true,
+    "externalWritesPerformed": false,
+    "onlyChangedUploadArtifactInThisStep": "toast-source-review.json",
+    "diagnosticWorktree": "/tmp/issue1603-toast-repro",
+    "temporaryFilesCreatedInDiagnosticWorktree": [
+      "components/artifacts/issue1603-toast-repro.test.tsx",
+      "toast-repro-red.log",
+      "toast-repro-isolated-red.log",
+      "toast-repro-observations.json"
+    ]
+  },
+  "conclusion": {
+    "collapsedStack": "Expected installed-library behavior. Do not classify the collapsed stack itself as a confirmed defect.",
+    "screenshotInterpretation": "The Artifact library and Markdown error screenshots are consistent with a collapsed toast stack. The local background Retry is another Sonner toast behind the global connection toast. The Markdown screenshot also shows real partial overlap with the composer area.",
+    "notEstablished": [
+      "A connection toast that perpetually takes the front position",
+      "An unrecoverable pointer or keyboard deadlock",
+      "Successful modal keyboard recovery in the inspected production build",
+      "All error-state controls being unobscured"
+    ],
+    "designStatus": "Keep the visual interaction limitation open for actual hover/keyboard/composer verification. Default library behavior does not establish task usability.",
+    "separateRecoveryRisk": "Dynamically confirmed for the real ArtifactLibrary with real React, SWR and Sonner in Node/Happy DOM on final merge 26ef4de1: Retry performs another read, the failure remains, the existing row remains mounted, but the toast and the only explicit in-place Retry disappear. This is independent of collapsed stacking; no production browser deadlock is claimed."
+  },
+  "stackFacts": [
+    {
+      "fact": "The application mounts one shared Toaster and its wrapper does not override position, expand, visibleToasts, hotkey, closeButton, or offset.",
+      "sources": [
+        {
+          "path": "apps/desktop/src/renderer/app.tsx",
+          "lines": [
+            42
+          ]
+        },
+        {
+          "path": "components/ui/sonner.tsx",
+          "lines": [
+            7,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "fact": "Installed Sonner defaults to bottom-right, three visible toasts, a collapsed stack, Alt+T, and no enabled close button. Non-front collapsed contents are visually hidden by opacity and stacking.",
+      "sources": [
+        {
+          "path": "node_modules/sonner/dist/index.mjs.map",
+          "lines": [
+            22,
+            37
+          ],
+          "sourceMapOriginal": "../src/index.tsx"
+        },
+        {
+          "path": "node_modules/sonner/dist/index.mjs.map",
+          "lines": [
+            593,
+            623
+          ],
+          "sourceMapOriginal": "../src/index.tsx"
+        },
+        {
+          "path": "node_modules/sonner/dist/styles.css",
+          "lines": [
+            298,
+            320
+          ]
+        }
+      ]
+    },
+    {
+      "fact": "Mouse enter or mouse move expands the stack. Alt+T expands and focuses the toast list. Ordinary focus only records the previous focus; it does not itself expand the stack.",
+      "sources": [
+        {
+          "path": "node_modules/sonner/dist/index.mjs.map",
+          "lines": [
+            731,
+            750
+          ],
+          "sourceMapOriginal": "../src/index.tsx"
+        },
+        {
+          "path": "node_modules/sonner/dist/index.mjs.map",
+          "lines": [
+            801,
+            827
+          ],
+          "sourceMapOriginal": "../src/index.tsx"
+        }
+      ]
+    },
+    {
+      "fact": "Updating an existing toast ID keeps its position. A genuinely newly inserted toast is prepended. ConnectionStatus uses the fixed desktop-offline ID and depends on offline plus the translator.",
+      "sources": [
+        {
+          "path": "node_modules/sonner/dist/index.mjs.map",
+          "lines": [
+            660,
+            672
+          ],
+          "sourceMapOriginal": "../src/index.tsx"
+        },
+        {
+          "path": "apps/desktop/src/renderer/app.tsx",
+          "lines": [
+            185,
+            193
+          ]
+        }
+      ]
+    },
+    {
+      "fact": "Mixed successful and failed RPCs can toggle ready/offline: fetch rejection or HTTP 502-504 sets offline, a successful RPC sets ready. A real dismiss/reinsert can create a new front toast. Existing evidence does not measure a perpetual stack-order loop, so this possibility is not a confirmed cause.",
+      "sources": [
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "lines": [
+            38,
+            61
+          ]
+        },
+        {
+          "path": "apps/desktop/src/renderer/transport-state.ts",
+          "lines": [
+            6,
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "fact": "ArtifactViewer is a Base UI modal, while the shared toast is mounted outside it. Sonner has its own hotkey and focus handling. Escape collapses Sonner when it has focus but does not stop propagation; actual interaction with modal Escape/focus must be observed, not assumed.",
+      "sources": [
+        {
+          "path": "components/ui/dialog.tsx",
+          "lines": [
+            4,
+            12
+          ]
+        },
+        {
+          "path": "components/ui/dialog.tsx",
+          "lines": [
+            60,
+            77
+          ]
+        },
+        {
+          "path": "components/artifacts/artifact-viewer.tsx",
+          "lines": [
+            135,
+            138
+          ]
+        },
+        {
+          "path": "node_modules/sonner/dist/index.mjs.map",
+          "lines": [
+            731,
+            749
+          ],
+          "sourceMapOriginal": "../src/index.tsx"
+        }
+      ]
+    }
+  ],
+  "retryAfterContinuedFailure": {
+    "status": "CONFIRMED_ARTIFACT_LIBRARY_NODE_COMPONENT_REGRESSION_PRODUCT_FIX_NOT_APPLIED",
+    "notAScreenshotAttribution": true,
+    "mechanism": [
+      "Sonner calls action.onClick(event), then deleteToast() unless the handler called event.preventDefault(). It does not await an asynchronous request result.",
+      "ArtifactLibrary, ArtifactViewer and ConnectionStatus pass Retry handlers that do not prevent this default dismissal.",
+      "Artifact effects depend on backgroundFailed and stable key/message/mutate dependencies, not each error instance. SWR revalidation preserves the old error while pending; another failure changes the error instance but leaves backgroundFailed true.",
+      "With the same mounted view, same key, same locale and continuing failure, the effect need not rerun after the toast is removed. A later successful read can still recover the content normally."
+    ],
+    "sources": [
+      {
+        "path": "node_modules/sonner/dist/index.mjs.map",
+        "lines": [
+          484,
+          495
+        ],
+        "sourceMapOriginal": "../src/index.tsx"
+      },
+      {
+        "path": "components/artifacts/artifact-library.tsx",
+        "lines": [
+          54,
+          61
+        ]
+      },
+      {
+        "path": "components/artifacts/artifact-viewer.tsx",
+        "lines": [
+          126,
+          134
+        ]
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "lines": [
+          185,
+          193
+        ]
+      },
+      {
+        "path": "node_modules/swr/dist/use-swr-emll9s78.mjs",
+        "lines": [
+          324,
+          350
+        ]
+      },
+      {
+        "path": "node_modules/swr/dist/use-swr-emll9s78.mjs",
+        "lines": [
+          397,
+          442
+        ]
+      },
+      {
+        "path": "node_modules/swr/dist/use-swr-emll9s78.mjs",
+        "lines": [
+          488,
+          492
+        ]
+      },
+      {
+        "path": "node_modules/swr/dist/config-context-ext53wcz.mjs",
+        "lines": [
+          276,
+          294
+        ]
+      }
+    ],
+    "userVisibleConsequence": "After a failed background read, the person clicks Retry while the service still fails. The error notice and its explicit local Retry can disappear although the displayed content remains stale. This removes the immediate in-place recovery affordance and can conceal that the refresh still failed; it does not establish data loss, authorization bypass, or a permanently unrecoverable application.",
+    "independentPermanentRecoveryEntry": {
+      "artifactLibrary": {
+        "presentInRetainedDataBranch": false,
+        "explanation": "InlineLoadError and its Retry render only when error exists and no visible data remains. The retained list branch has category and artifact navigation controls, but no separate refresh/retry button.",
+        "sources": [
+          {
+            "path": "components/artifacts/artifact-library.tsx",
+            "lines": [
+              82,
+              104
+            ]
+          }
+        ]
+      },
+      "artifactViewer": {
+        "presentInRetainedDataBranch": false,
+        "explanation": "The inline Retry belongs to the failed/no-content branch. When content is retained, header actions and Close remain, but no second current-read Retry is rendered. Closing/reopening or changing navigation may cause a fresh read; that is an indirect workaround, not an always-visible in-place retry.",
+        "sources": [
+          {
+            "path": "components/artifacts/artifact-viewer.tsx",
+            "lines": [
+              140,
+              193
+            ]
+          },
+          {
+            "path": "components/artifacts/artifact-window.tsx",
+            "lines": [
+              41,
+              72
+            ]
+          }
+        ]
+      },
+      "connectionStatus": {
+        "presentInRetainedBootstrapBranch": false,
+        "explanation": "ConnectionStatus itself returns null and its only control is the toast. The full Offline screen belongs to the no-bootstrap branch. Browser refresh or the online event can initiate later recovery, but there is no second persistent ConnectionStatus button in the retained shell.",
+        "sources": [
+          {
+            "path": "apps/desktop/src/renderer/app.tsx",
+            "lines": [
+              88,
+              131
+            ]
+          },
+          {
+            "path": "apps/desktop/src/renderer/app.tsx",
+            "lines": [
+              185,
+              194
+            ]
+          }
+        ]
+      },
+      "automaticRecoveryIsDifferent": {
+        "explanation": "SWR retry/focus/reconnect and relevant live invalidation may recover later. Automatic error retries are bounded at five with each wait capped at thirty seconds. These mechanisms are not an always-available manual recovery control; no claim of permanent failure is made.",
+        "sources": [
+          {
+            "path": "components/swr-defaults.tsx",
+            "lines": [
+              21,
+              93
+            ]
+          },
+          {
+            "path": "lib/swr/retry.ts",
+            "lines": [
+              3,
+              4
+            ]
+          },
+          {
+            "path": "lib/swr/retry.ts",
+            "lines": [
+              31,
+              40
+            ]
+          }
+        ]
+      }
+    },
+    "dynamicallyConfirmedScope": "ArtifactLibrary only; ArtifactViewer, ConnectionStatus and the two thread notices share the inspected pattern but were not dynamically tested here.",
+    "minimumSuggestedFix": "Keep these existing persistent error toasts when their Retry action is invoked: have the toast action handler call event.preventDefault(), then invoke the existing retry. Let the existing success/effect cleanup dismiss the toast. Do not change the global stack layout, install another toast system, relax authorization, or add polling to address this branch.",
+    "riskEstimate": {
+      "occurrence": 4,
+      "impact": 5,
+      "product": 20,
+      "scale": "Each factor is an engineering estimate from 1 to 10, not measured production frequency.",
+      "basis": "Requires an already loaded artifact list, a failed background refresh, and a person retrying while failure continues. The loss of the visible error and immediate manual recovery is material, while existing data remains present and later automatic recovery/navigation/reload remain possible. No data-loss or authorization-bypass claim."
+    }
+  },
+  "existingTests": {
+    "entrypoint": "pnpm test:artifacts",
+    "targetedNodeCommand": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/artifacts/artifact-library.test.tsx components/artifacts/artifact-viewer-continuity.test.tsx",
+    "availableHarness": "Existing Node test runner, Happy DOM, React act/createRoot, real SWR, deterministic mocked artifact actions, counters, and isolated cache. No browser, database, live model or new test framework is needed to verify notice lifetime and a second retry.",
+    "coverageGap": "Both current component test files mock Sonner as a Map of options. Calling the saved action directly skips Sonner action-button auto-dismiss semantics. Their background Retry cases clear the injected failure before clicking, so they cover successful recovery rather than a failed Retry followed by another Retry.",
+    "sources": [
+      {
+        "path": "package.json",
+        "lines": [
+          76
+        ]
+      },
+      {
+        "path": "components/artifacts/artifact-library.test.tsx",
+        "lines": [
+          13,
+          19
+        ]
+      },
+      {
+        "path": "components/artifacts/artifact-library.test.tsx",
+        "lines": [
+          66,
+          87
+        ]
+      },
+      {
+        "path": "components/artifacts/artifact-viewer-continuity.test.tsx",
+        "lines": [
+          34,
+          38
+        ]
+      },
+      {
+        "path": "components/artifacts/artifact-viewer-continuity.test.tsx",
+        "lines": [
+          124,
+          171
+        ]
+      }
+    ],
+    "lowCostDynamicVerification": [
+      "Use the existing component harness with the real installed Sonner Toaster/action button instead of the Map-only toast mock for this case; keep server actions mocked and auto retries disabled for deterministic reads.",
+      "Load content successfully, then fail a background read. Click the actual local toast Retry while the same failure remains active.",
+      "After the request and Sonner removal transition settle, assert the stale content is still mounted and an explicit local Retry remains available. Click it again and assert a second read occurs.",
+      "Allow the second attempt to succeed and assert the error toast dismisses while retained row/document/draft nodes remain. This is a behavior test, not a source regex or a direct action callback call."
+    ],
+    "limits": "Happy DOM can verify action/default-dismiss and re-render behavior. It cannot establish actual toast overlap, pointer hit-testing, or production modal keyboard usability; those remain browser/manual checks.",
+    "executionStatus": "TEMPORARY_REAL_SONNER_COMPONENT_REPRO_RUN; existing repository test files and scripts unchanged",
+    "diagnosticNote": "The new temporary diagnosis reused the existing ArtifactLibrary Happy DOM/React/SWR setup, omitted the Map-only Sonner mock, mounted the actual installed Toaster and clicked its actual DOM action button. The existing pnpm test:artifacts suite was not rerun in this diagnostic step."
+  },
+  "manualFollowup": {
+    "executionStatus": "PENDING",
+    "labels": {
+      "connectionTitle": "Can't reach Mikka",
+      "connectionRetry": "Retry now",
+      "libraryTitle": "Artifacts failed to load.",
+      "libraryRetry": "Retry",
+      "artifactTitle": "Artifact could not open",
+      "artifactRetry": "Retry"
+    },
+    "steps": [
+      {
+        "name": "Pointer access to the stacked local Retry",
+        "action": "On an already loaded artifact with both connection and local background-error notices, hover the visible [data-sonner-toaster] area. Wait for the expansion transition, then target [data-sonner-toast] by its local load-error text and its exact Retry button label.",
+        "observe": "Both cards expose their contents; data-expanded becomes true; an ordinary click reaches the local action and triggers the expected read. A forced DOM click or an unexpanded hidden-button locator is not pointer-access evidence."
+      },
+      {
+        "name": "Keyboard access with the Artifact modal open",
+        "action": "Press Alt+T (Option+T where applicable), inspect which element receives focus, then Tab to the local Retry and activate with Enter.",
+        "observe": "The stack expands, focus remains usable, and the local read runs. Record actual browser/OS shortcut handling and modal focus behavior. Do not presume ordinary focus expands the stack or Escape dismisses the notice/returns to the composer."
+      },
+      {
+        "name": "A failed Retry remains retryable",
+        "action": "Keep the read failure active for the first Retry; inspect the notice after the attempt completes, then attempt another Retry before permitting success.",
+        "observe": "The error state remains visible and a second local retry is reachable. Disappearance without success confirms the independent auto-dismiss branch; it is not evidence of perpetual front stacking."
+      },
+      {
+        "name": "Composer remains usable",
+        "action": "Return focus to the adjacent composer and check existing draft, selection, scroll, and reachability of input/send at the target desktop and narrow-web sizes.",
+        "observe": "Record actual visible bounds and focus behavior. The previously accepted narrow screenshot establishes that one captured state only; it does not certify all persistent-error overlays. No model-triggering send is necessary for this check."
+      }
+    ]
+  },
+  "designReferences": [
+    {
+      "source": {
+        "path": "docs/design/rules.md",
+        "lines": [
+          705,
+          719
+        ]
+      },
+      "meaning": "R-89 requires the primary next action to be apparent; R-90 requires reuse of the actual shared component. Neither proves a particular stacked error flow usable without interaction acceptance."
+    },
+    {
+      "source": {
+        "path": "docs/review-checklist.md",
+        "lines": [
+          27,
+          35
+        ]
+      },
+      "meaning": "Error recovery, keyboard, touch and narrow width must be walked; recovery controls must remain reachable."
+    },
+    {
+      "source": {
+        "path": "docs/design/components.md",
+        "lines": [
+          77,
+          96
+        ]
+      },
+      "meaning": "Native mobile read errors use ReadNotice and native toasts are off. These Web Sonner findings do not certify or condemn the native iOS flow."
+    }
+  ],
+  "evidenceBoundaries": [
+    "Reviewed existing integrated Artifact library and Markdown background-error screenshots; did not generate new screenshots.",
+    "Existing screenshots establish content retention and partial visual overlap, not hover expansion, final modal keyboard behavior, or failed-Retry notice lifetime.",
+    "No real fixture identifiers, user email addresses, credentials, database contents, or raw application logs are included.",
+    "The default collapsed stack is not added as a confirmed defect. The separate ArtifactLibrary failed-Retry notice lifetime defect now has two actual red component runs, including an isolated repeat, and a passing successful-Retry control. Other similar paths retain their static-only boundary."
+  ],
+  "sourceSha256": {
+    "apps/desktop/src/renderer/app.tsx": "c3ca52856ed4bea3216f82a53f705b7f8681b66a98909f2bca273553c152ba22",
+    "apps/desktop/src/renderer/rpc.ts": "99be517821915848237463d7c7bbc9061097f9fddca723996356006c93e9389e",
+    "apps/desktop/src/renderer/transport-state.ts": "34a55a9a5ae921b8f55a1963722ef97a1dd76d34b05b8862ff8a5c52bb3c7583",
+    "components/ui/sonner.tsx": "2dd975ad2170ba2570b00e58713dcbda90f26a7fffdaceb1ef7255f450c2d2a6",
+    "components/ui/dialog.tsx": "a9798a421bbd7ca761817cd9b259167943e4f8f99281a224271278849c081e67",
+    "components/artifacts/artifact-library.tsx": "c240bf7130a1b5fce6ff8d2128fb5a6ae18d289bd73a1e6cd7256c9232fb0b6f",
+    "components/artifacts/artifact-viewer.tsx": "07f63b93aac74a121bffa2bc60d29a6fa0485fdde7d2d74de4decba55023aaa3",
+    "components/artifacts/artifact-library.test.tsx": "2949b7003704a3b94ad3436a4fb70da03261ef19ff125c818dd8fea6b38aed06",
+    "components/artifacts/artifact-viewer-continuity.test.tsx": "3701a1d902d7fb578cb4809345544435a17da54f22592bfd73df86fb5defd478",
+    "node_modules/sonner/dist/index.mjs.map": "9b2c20ce8adaeeec92e111effa3f03b84de51529e0510da2531957019ae0065b",
+    "node_modules/sonner/dist/styles.css": "20e5c3dd637ba4b8b87d46cf9732632f669f42d5ac9c0e399ecebeac272a1f74",
+    "node_modules/swr/dist/use-swr-emll9s78.mjs": "cbc8a46f33ba5f3963e3d43e8cd247fc198a33df0e52c13306ce530ebec8dc70"
+  },
+  "updatedAtUtc": "2026-11-07T08:24:23.679597+00:00",
+  "dynamicVerification": {
+    "source": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+    "tree": "9cec7cc5dee0fe71eff576e3f84136ca51ed3def",
+    "worktree": "/tmp/issue1603-toast-repro",
+    "productGitDiff": "Empty; only a temporary diagnostic test and its evidence files are untracked.",
+    "actualLibraries": {
+      "node": "24.22.1",
+      "sonner": "1.7.4",
+      "swr": "2.5.1",
+      "happyDom": "15.11.7"
+    },
+    "mockedBoundary": "The artifact read server action returns a small in-memory fixture or throws a TypeError. All other network requests are blocked and counted. No database, browser app, model or tool execution is involved.",
+    "firstRun": {
+      "command": "PATH=/tmp/issue1603-tools:$PATH node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/artifacts/issue1603-toast-repro.test.tsx",
+      "exitCode": 1,
+      "tests": 2,
+      "pass": 1,
+      "fail": 1,
+      "observations": [
+        {
+          "case": "retry-success-control",
+          "readsBefore": 2,
+          "readsAfter": 3,
+          "toastPresent": false,
+          "retryPresent": false,
+          "sameRow": true,
+          "cacheHasError": false,
+          "unexpectedNetwork": 0
+        },
+        {
+          "case": "retry-continues-to-fail",
+          "readsBefore": 2,
+          "readsAfter": 3,
+          "toastPresent": false,
+          "retryPresent": false,
+          "sameRow": true,
+          "cacheHasError": true,
+          "inlineAlertCount": 0,
+          "otherLocalRetryButtons": 0,
+          "unexpectedNetwork": 0
+        }
+      ],
+      "result": "The successful Retry control passes. The continuing-failure regression fails because the expected explicit Retry control is absent after Sonner action dismissal.",
+      "logPath": "/tmp/issue1603-toast-repro/toast-repro-red.log",
+      "logSha256": "7bcbf1b47cd735d36a796766054acb45f1558e4e2701f2545a2a2fe40f91760d"
+    },
+    "isolatedRepeat": {
+      "command": "PATH=/tmp/issue1603-tools:$PATH node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern='regression: a still-failing Retry' components/artifacts/issue1603-toast-repro.test.tsx",
+      "exitCode": 1,
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "observations": [
+        {
+          "case": "retry-continues-to-fail",
+          "readsBefore": 2,
+          "readsAfter": 3,
+          "toastPresent": false,
+          "retryPresent": false,
+          "sameRow": true,
+          "cacheHasError": true,
+          "inlineAlertCount": 0,
+          "otherLocalRetryButtons": 0,
+          "unexpectedNetwork": 0
+        }
+      ],
+      "result": "Same missing-recovery result when the failing case runs alone, excluding dependence on the successful control case.",
+      "logPath": "/tmp/issue1603-toast-repro/toast-repro-isolated-red.log",
+      "logSha256": "1d4ee6b4ae846f89d4ec992c17c90a1ccecff08106367fea455f96be25081ad8"
+    },
+    "diagnosticTest": {
+      "path": "/tmp/issue1603-toast-repro/components/artifacts/issue1603-toast-repro.test.tsx",
+      "sha256": "e7c8e0e959c1a818283769993a441a0eacfb59e92186935777b147dd41d2cd1b"
+    },
+    "otherEntryCheck": {
+      "afterFailedRetry": {
+        "inlineAlertCount": 0,
+        "otherLocalRetryButtons": 0
+      },
+      "scope": "Rendered ArtifactLibrary retained-data branch. Parent shell and browser chrome were not mounted. Its source has no second direct Retry in this branch; navigation/reopening/browser refresh and automatic revalidation are indirect recovery paths."
+    },
+    "limits": [
+      "No layout/pointer hit-testing claim from Happy DOM.",
+      "No production browser, modal keyboard, native desktop or iOS acceptance claim.",
+      "No product fix or green regression run has been performed.",
+      "Only ArtifactLibrary is dynamically confirmed in this report."
+    ],
+    "reviewedSourceFileMatchesStaticCheckout": {
+      "components/artifacts/artifact-library.tsx": true,
+      "components/artifacts/artifact-viewer.tsx": true,
+      "apps/desktop/src/renderer/app.tsx": true,
+      "components/ui/sonner.tsx": true
+    }
+  }
+}

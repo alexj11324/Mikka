@@ -1,0 +1,48 @@
+{
+  "checkedAt": "2026-11-07 07:58:58 UTC",
+  "merge": {
+    "sha": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+    "tree": "fd7fb13f41c5a87df865f539d498b32e3a4fb83b",
+    "parents": [
+      "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+      "156b6a2779d1ee71161b99ab47b3484e2a8b5704"
+    ],
+    "matchesPredictedTree": true
+  },
+  "prs": [
+    {
+      "number": 1607,
+      "state": "closed",
+      "merged": true,
+      "mergedAt": "2026-11-07T07:58:33Z",
+      "mergeCommit": "40ebd1aadd0b4a19f8336a153afbedee1687a88d",
+      "url": "https://github.com/alexj11324/Mikka/pull/1607"
+    },
+    {
+      "number": 1611,
+      "state": "closed",
+      "merged": true,
+      "mergedAt": "2026-11-07T07:58:33Z",
+      "mergeCommit": "40ebd1aadd0b4a19f8336a153afbedee1687a88d",
+      "url": "https://github.com/alexj11324/Mikka/pull/1611"
+    },
+    {
+      "number": 1619,
+      "state": "closed",
+      "merged": true,
+      "mergedAt": "2026-11-07T07:58:31Z",
+      "mergeCommit": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+      "url": "https://github.com/alexj11324/Mikka/pull/1619"
+    }
+  ],
+  "originalHeadAncestry": {
+    "1607": {
+      "head": "35c1d50b56cc44e983f04b3673fcd7719dd30bd0",
+      "ancestorOfBatchMerge": true
+    },
+    "1611": {
+      "head": "b09a1125d197972ac1b799f648595525c2e3f406",
+      "ancestorOfBatchMerge": true
+    }
+  }
+}
