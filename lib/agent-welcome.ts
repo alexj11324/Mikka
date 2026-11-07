@@ -1,5 +1,17 @@
+import type { ModelMessage } from 'ai'
+
 /** Marks a bot's welcome request in its conversation, which the chat never shows. */
 export const COORDINATOR_WELCOME_MARK = '[Welcome]'
+
+/** Only the initial welcome asks for presentation alone. A later user request
+ * (including one queued beside the welcome) keeps the normal tool registry. */
+export function isWelcomeOnlyTurn(messages: readonly ModelMessage[] | undefined): boolean {
+  const users = messages?.filter(message => message.role === 'user') ?? []
+  if (users.length !== 1) return false
+  const content = users[0].content
+  const text = typeof content === 'string' ? content : content.filter(part => part.type === 'text').map(part => part.text).join('\n')
+  return text.startsWith(COORDINATOR_WELCOME_MARK)
+}
 
 /**
  * A bot speaks first (Grok style), the Coordinator included: an empty chat

@@ -3,7 +3,7 @@
 // decoding with the packages/protocol schemas.
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, emptyRunReport } from "@mikka/protocol"
+import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
@@ -92,11 +92,22 @@ describe("HttpServerLink", () => {
     const fetcher = (async (_url, init) => {
       expect(new Headers(init?.headers).get(RECOVERY_WORKTREE_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(RUN_CREDENTIALS_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
       return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
     }) as typeof fetch
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
     expect(result.requireWorktreeContinuation).toBe(true)
+  })
+  it('preserves negotiated catalogue evidence in the natural-expiry lease response', async () => {
+    const lease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', accountId: 'fixture-account', revision: 1,
+      expiresAt: SOON(), accessToken: 'fixture-access', modelCatalogueVerified: true }
+    const fetcher = vi.fn(async (_url: URL | string, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
+      return json(lease)
+    }) as unknown as typeof fetch
+    expect(await new HttpServerLink('http://server.test', fetcher).nativeLease('dev-1', 'run-1')).toEqual(lease)
+    expect(fetcher).toHaveBeenCalledOnce()
   })
   it('uses only the claimed local lease for every provider/tool check', async () => {
     const fetcher = vi.fn(async () => { throw new Error('operation-time HTTP is forbidden') })

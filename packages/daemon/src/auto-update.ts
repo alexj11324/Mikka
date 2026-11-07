@@ -16,12 +16,20 @@ export function newerStableVersion(candidate: unknown, current: string): candida
   return false
 }
 
+/** A desktop-managed install must keep updating its own prefix and private cache. */
+export function serviceNpmEnvironment(entry: string, home: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const prefix = join(home, '.mikka/npm')
+  return resolve(entry) === join(prefix, 'lib/node_modules/@aspectlylabs/mikka/mikka.js')
+    ? { ...env, npm_config_prefix: prefix, npm_config_cache: join(home, '.mikka/npm-cache') }
+    : env
+}
+
 /** Run npm with the service's Node and configuration, even when PATH selects another Node. */
 export async function runServiceNpm(args: string[]): Promise<string> {
   const npm = realpathSync(join(dirname(process.execPath), 'npm'))
   const { stdout } = await exec(process.execPath, [npm, ...args], {
     cwd: homedir(), timeout: 300_000, maxBuffer: 1024 * 1024,
-    env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}` },
+    env: { ...serviceNpmEnvironment(realpathSync(process.argv[1]!), homedir(), process.env), PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}` },
   })
   return stdout.trim()
 }

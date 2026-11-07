@@ -11,10 +11,11 @@ signs in and reads.
 
 | | |
 | --- | --- |
-| Email | `alexjiang20232024+mikka-smoke-owner@gmail.com` |
+| Email | Infisical `prod:/` → `SMOKE_OWNER_EMAIL` |
 | Made | 2026-10-30, through `/api/auth/sign-up/email`; verified from the Gmail inbox |
-| Workspace | Mikka Smoke的工作区 (made by the app on first sign-in) |
-| Bot | `Smoke Bot`, made once in the UI. The Coordinator has no computer, so the 电脑 tab is checked on this bot |
+| Acceptance workspace | Alex's **Acme Inc.** team, selected through normal workspace membership and administrator verification |
+| Browser conversation | The selected team's existing Coordinator; its Computer tab needs no separate bot fixture |
+| Historical API-only fixture | `Smoke Bot` in the original personal workspace; used only by the legacy API-only driver described below |
 | Credentials | Infisical `prod:/` (the root, which holds nothing else and syncs nowhere): `SMOKE_OWNER_EMAIL`, `SMOKE_OWNER_PASSWORD` |
 
 The `+mikka-smoke` tag ([`lib/smoke-account.ts`](../lib/smoke-account.ts)) grants
@@ -26,11 +27,32 @@ it sees what real users see.
 
 A new smoke account is made the same way: sign up with a `+mikka-smoke-<role>`
 address on an inbox you can read, open the verification link, sign in once so
-the workspace is created, create `Smoke Bot`, and store the email and password
-in `prod:/`. Keep app secrets out of the root: the smoke job reads everything
-there. Do not write to the database to make or repair an account.
+the personal workspace is created, and store the email and password in
+`prod:/`. Normal acceptance then uses the account's membership in Alex's team
+and the subscriptions shared there, as `AGENTS.md` requires. The browser
+smoke does not create a bot. Keep app secrets out of the root: the legacy smoke
+job reads everything there. Do not write to the database to make or repair an
+account.
 
 ## What it checks
+
+### Browser smoke
+
+[`tests/smoke/production.spec.ts`](../tests/smoke/production.spec.ts) signs in,
+verifies and selects the shared team with the same cookie jar, opens its
+Coordinator, and requires the chat composer. It reads the Coordinator,
+credential-vault and approved-writes feature APIs, then checks the current
+Coordinator's **Computer** tab without clicking it or starting a computer.
+The Coordinator feature and every `SMOKE_EXPECT_ON` feature must still be on.
+The explicit deployed-target entry requires `credentialVault,cloudComputer`.
+
+That entry retains the before/after deployment checks and this session's normal
+logout. Its closed report records `browserStage` and `failedStage` from fixed
+operation names; it contains no Playwright exception, locator value, page text,
+screenshot or trace. A failed run is not evidence that any particular earlier
+UI assertion passed unless the recorded stage establishes it.
+
+### Legacy API-only smoke
 
 [`scripts/ops/production-smoke.mjs`](../scripts/ops/production-smoke.mjs) signs in
 through the HTTP API, checks the session, loads the shell HTML and reads. It
@@ -42,7 +64,9 @@ calls no model or E2B provider.
 - Reports, without failing: whether the credential vault, approved writes and
   the cloud computer are on. The table lands in the job summary.
 
-The cloud computer probe reads the existing Smoke Bot's runtime list; it
+This API-only driver still finds the historical `Smoke Bot` by name and reads
+its runtime list; it does not select or establish the browser's shared-team
+scope. It is not a substitute for team-bound acceptance. Its computer probe
 checks the authenticated API and server kill switch. It does not assert that a
 machine can boot, that the computer tab renders or that a model can run. Those
 require separate active acceptance. Reports contain only capability names and

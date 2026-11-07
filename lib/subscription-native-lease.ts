@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER } from '@mikka/protocol/subscription'
 import { isDeviceAuthorityError } from './db/device-scope'
 import type { SubscriptionService } from './subscription-service'
 
@@ -19,7 +20,8 @@ export function subscriptionNativeLease(deps: {
       if (!owner) return new Response(null, { status: 401, headers })
       const service = deps.service()
       const use = await service.nativeRun(owner, deviceId, runId)
-      return Response.json(await service.nativeLease(use, request.signal), { headers })
+      return Response.json(await service.nativeLease(use, request.signal,
+        request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1'), { headers })
     } catch (error) {
       // A revoked device token is an authentication failure: withDeviceRoute answers 401.
       if (isDeviceAuthorityError(error)) throw error

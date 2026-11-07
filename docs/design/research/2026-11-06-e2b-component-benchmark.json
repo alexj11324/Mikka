@@ -542,7 +542,16 @@
   "cleanup": {
     "remainingSandboxes": [],
     "errors": [],
-    "privateCandidatesDeleted": true
+    "privateCandidatesDeleted": false,
+    "templateCleanupEvidenceValid": false,
+    "correction": "The original cleanup queried aliases as template IDs. Its 404s did not prove deletion; all exact images were later found private and recovered.",
+    "correctiveRecovery": {
+      "runId": "42307145307",
+      "artifactId": 13545414751,
+      "artifactSha256": "5d1027e8e63ac47f1ee86586ef7b8eb1bbf9793bf58fe8f519707ecb2be242bf",
+      "status": "deleted_and_verified_absent_by_id",
+      "evidence": "2026-11-06-e2b-runtime-gate-recovery.json"
+    }
   },
   "productionAcceptance": {
     "passed": false,
