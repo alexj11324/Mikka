@@ -67,7 +67,7 @@ test('actual Nitro router accepts multiple named parameters and preserves route 
     }
     await mkdir(join(root, 'apps/api/generated'), { recursive: true })
     await writeFile(join(root, 'apps/api/generated/routes.json'), JSON.stringify({ version: 1, basePath: '/mikka', routes }))
-    const rules = await routeFunctionRules(root), router = createRouter()
+    const rules = await routeFunctionRules(root, { MIKKA_EDITION: 'community' }), router = createRouter()
     for (const [path, data] of Object.entries(rules)) addRoute(router, '', path, data)
     const credentials = '/mikka/api/bots/:botId/subagents/:id/credentials'
     assert.deepEqual(rules[credentials], { maxDuration: 60 })

@@ -6,6 +6,12 @@ import { SubscriptionCallTiming, withSubscriptionTiming } from '../src/subscript
 import { cleanupTempDirs, tempDir } from './helpers'
 
 afterEach(cleanupTempDirs)
+
+function deferred<T>() {
+  let resolve!: (value: T) => void, reject!: (reason: unknown) => void
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
 function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: {name: string; value: string} }>, accessProject?: string, snapshotMode = false, prepareFailure?: string, streamFailure?: unknown, streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3]) {
   const directory = tempDir('mikka-worker-boundary-')
   const journal = join(directory, 'calls')
@@ -225,8 +231,8 @@ it('a denied or malformed pre-read cannot turn into custody preparation', async 
 })
 
 it('Stop while a pre-read is pending ends the read; a late snapshot cannot start a child', async () => {
-  const pending = Promise.withResolvers<{ accessSnapshot: { name: string; value: string } }>()
-  const entered = Promise.withResolvers<void>()
+  const pending = deferred<{ accessSnapshot: { name: string; value: string } }>()
+  const entered = deferred<void>()
   const { client, journal } = fixture(false, undefined, undefined, true, undefined, undefined, async () => { entered.resolve(); return pending.promise })
   const abort = new AbortController()
   const read = new Response(client.stream(2, 'fixture-model', {}, abort.signal)).text()
@@ -242,7 +248,7 @@ it('Stop while a pre-read is pending ends the read; a late snapshot cannot start
 it('a pre-read that ignores cancellation is bounded by the original 35s preparation deadline', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   try {
-    const pending = Promise.withResolvers<{ accessSnapshot: { name: string; value: string } }>()
+    const pending = deferred<{ accessSnapshot: { name: string; value: string } }>()
     const { client, journal } = fixture(false, undefined, undefined, true, undefined, undefined, () => pending.promise)
     const read = new Response(client.stream(2, 'fixture-model', {})).text()
     const failure = expect(read).rejects.toMatchObject({ code: 'subscription_timeout' })
@@ -257,9 +263,9 @@ it('a pre-read that ignores cancellation is bounded by the original 35s preparat
 it('cold custody receives only the time left in the original preparation budget', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   try {
-    const pending = Promise.withResolvers<null>()
-    const custodyStarted = Promise.withResolvers<void>()
-    const custody = Promise.withResolvers<{ workloadToken: string }>()
+    const pending = deferred<null>()
+    const custodyStarted = deferred<void>()
+    const custody = deferred<{ workloadToken: string }>()
     const ordinary = vi.fn(async (_execution: boolean) => { custodyStarted.resolve(); return custody.promise })
     const { client, journal } = fixture(false, ordinary, undefined, true, undefined, undefined, () => pending.promise)
     const timing = new SubscriptionCallTiming()

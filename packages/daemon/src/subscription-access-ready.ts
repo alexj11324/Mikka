@@ -53,6 +53,7 @@ function jwtExpiry(token: string): number | undefined {
 export function accessSnapshotReady(scope: CredentialScope, snapshot: NonNullable<WorkerConfiguration['accessSnapshot']>, now = Date.now()): boolean {
   if (!/^mikka-byos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(snapshot.name) || !snapshot.value || Buffer.byteLength(snapshot.value) > 32768) throw invalid()
   let bundle: unknown
+  // error-cause: a JSON parse error quotes the projection, which may hold an access token.
   try { bundle = JSON.parse(snapshot.value) } catch { throw invalid() }
   if (!object(bundle) || bundle.schema !== 1 || bundle.ownerId !== scope.ownerId || bundle.workspaceId !== scope.workspaceId || bundle.connectionId !== scope.connectionId || bundle.provider !== scope.provider || !object(bundle.payload)) throw invalid()
   const payload = bundle.payload
