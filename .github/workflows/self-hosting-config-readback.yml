@@ -59,6 +59,18 @@ jobs:
               const hook=await fetch('https://api.github.com/app/hook/config',{headers:{authorization:'Bearer '+jwt,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Mikka-self-hosting-review'},redirect:'error',signal:AbortSignal.timeout(15000)});
               if(!hook.ok){console.log(JSON.stringify({operation:'official_webhook_config',status:hook.status}));process.exitCode=1;}
               else {const h=await hook.json();console.log(JSON.stringify({operation:'official_webhook_config',status:hook.status,urlMatches:h.url==='https://app.aspectlylabs.com/mikka/api/webhooks/github',contentTypeJson:h.content_type==='json',tlsVerificationEnabled:h.insecure_ssl==='0'||h.insecure_ssl===0,setupUrlInAppResponse:typeof v.setup_url==='string',setupUrlMatches:v.setup_url==null?null:v.setup_url==='https://app.aspectlylabs.com/mikka',secretValuesLogged:false}));}
+              const headers={authorization:'Bearer '+jwt,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Mikka-self-hosting-review'};
+              const ir=await fetch('https://api.github.com/repos/alexj11324/Mikka/installation',{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
+              if(!ir.ok){console.log(JSON.stringify({operation:'native_token_installation',status:ir.status}));process.exitCode=1;}
+              else {
+                const i=await ir.json();if(!Number.isSafeInteger(i.id)||String(i.app_id)!==appId)throw Error('INSTALLATION_SCOPE');
+                const minted=await fetch('https://api.github.com/app/installations/'+i.id+'/access_tokens',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({repositories:['Mikka'],permissions:{contents:'read',metadata:'read'}}),redirect:'error',signal:AbortSignal.timeout(15000)});
+                const value=await minted.json();
+                console.log(JSON.stringify({operation:'native_token_shape',status:minted.status,tokenPresent:typeof value.token==='string',legacyShape:typeof value.token==='string'&&/^[A-Za-z0-9_]{20,512}$/.test(value.token),urlSafeShape:typeof value.token==='string'&&/^[A-Za-z0-9_-]{20,512}$/.test(value.token),expiryMinutes:typeof value.expires_at==='string'?Math.round((Date.parse(value.expires_at)-Date.now())/60000):null,permissionRefused:/permission/i.test(String(value.message??'')),repositoryRefused:/repositor/i.test(String(value.message??'')),secretValuesLogged:false}));
+                if(typeof value.token==='string'){
+                  const removed=await fetch('https://api.github.com/installation/token',{method:'DELETE',headers:{...headers,authorization:'Bearer '+value.token},redirect:'error',signal:AbortSignal.timeout(15000)});await removed.body?.cancel();console.log(JSON.stringify({operation:'own_native_token_disposal',status:removed.status}));if(![204,401].includes(removed.status))process.exitCode=1;
+                }else process.exitCode=1;
+              }
 
             }
           } catch { console.log(JSON.stringify({available:false,code:'OFFICIAL_APP_METADATA_UNAVAILABLE'})); process.exitCode=1; }
