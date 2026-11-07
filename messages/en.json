@@ -243,6 +243,7 @@
       "hint": "You'll be sent to your organization's identity provider.",
       "invalid": "Enter a work email or a domain, such as acme.com.",
       "notFound": "No company sign-in was found for that email or domain. Check that your organization has verified its domain, or use another way to sign in.",
+      "tooMany": "Too many attempts. Try again in a moment.",
       "failed": "Couldn't start company SSO. Try again.",
       "returnedFailed": "Company SSO sign-in didn't finish. Try again, or contact your organization's admin.",
       "cancel": "Back",
@@ -5531,7 +5532,7 @@
     },
     "bound": {
       "notAdmin": "This workspace belongs to an Organization",
-      "notAdminNote": "Only the Organization's owners and admins can see its settings. If the Organization requires SSO, sign in again with its SSO and reopen this page."
+      "notAdminNote": "Only the Organization's owners and admins can see its settings. Your access to this workspace still follows Members."
     },
     "tabs": {
       "label": "Organization settings",
