@@ -162,7 +162,6 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		body["system"] = claudeSubscriptionSystem(body["system"])
 	} else {
 		body["store"] = false
-		codexStableSystemCacheBreakpoints(request.Model, original, body)
 	}
 	converted, err = json.Marshal(body)
 	if err != nil {
@@ -289,54 +288,6 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		emit(ex.StreamChunk{Payload: []byte("data: [DONE]\n\n")})
 	}()
 	return &ex.StreamResult{Chunks: chunks}, nil
-}
-
-// The compatible SDK carries preparation's stable-system hints as a private
-// marker. CPA rebuilds system messages as developer input_text blocks; verify
-// that exact initial sequence before marking it. No top-level caching option is
-// set, so the provider's implicit history caching remains enabled.
-func codexStableSystemCacheBreakpoints(model string, original, body map[string]any) {
-	// Keep the capability gate in lib/prompt-cache.ts in sync. Unknown aliases
-	// and older generations must retain their existing request format.
-	switch model {
-	case "gpt-5.6", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra",
-		"gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra":
-	default:
-		return
-	}
-	messages, _ := original["messages"].([]any)
-	input, _ := body["input"].([]any)
-	var marked []map[string]any
-	for index, value := range messages {
-		message, _ := value.(map[string]any)
-		if message["role"] != "system" {
-			break
-		}
-		text, ok := message["content"].(string)
-		if !ok || text == "" || index >= len(input) {
-			return
-		}
-		converted, _ := input[index].(map[string]any)
-		parts, _ := converted["content"].([]any)
-		if converted["type"] != "message" || converted["role"] != "developer" || len(parts) != 1 {
-			return
-		}
-		part, _ := parts[0].(map[string]any)
-		if part["type"] != "input_text" || part["text"] != text {
-			return
-		}
-		if message["mikka_cache_breakpoint"] == "stable_system_v1" {
-			if len(marked) == 2 {
-				return
-			}
-			marked = append(marked, part)
-		}
-	}
-	// Validate the whole initial sequence first: a later mismatch cannot leave
-	// an earlier partial marker behind. At most two explicit write slots are used.
-	for _, part := range marked {
-		part["prompt_cache_breakpoint"] = map[string]any{"mode": "explicit"}
-	}
 }
 
 // Keep the OAuth subscription's required protocol prefix separate from the
