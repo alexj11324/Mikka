@@ -27,6 +27,14 @@ test('task groups cover every R-52 branch, including PR metadata and closed-task
   assert.equal(mobileTaskGroup(task('review'), run('succeeded', 'blocked')), 'pending')
 })
 
+test('a task without a thread is pending when the board blocks it; closed tasks still win', () => {
+  assert.equal(mobileTaskGroup(task(), undefined, true), 'pending')
+  assert.equal(mobileTaskGroup(task(), undefined, false), 'todo')
+  assert.equal(mobileTaskGroup(task(), run('running'), true), 'pending')
+  assert.equal(mobileTaskGroup(task(), run('succeeded', 'idle'), true), 'pending')
+  for (const status of ['done', 'canceled', 'duplicate']) assert.equal(mobileTaskGroup(task(status), undefined, true), 'done')
+})
+
 test('activity numbers chronologically, sorts newest first, and keeps same-time replacements stable', () => {
   const attempt = (id: string, at: number, extra: Partial<MobileTaskAttempt> = {}): MobileTaskAttempt => ({ ...run('succeeded', 'idle'), runId: id, harness: 'codex', createdAt: new Date(at), threadReplacedBy: null, ...extra })
   const first = attempt('a', 1000, { threadReplacedBy: 'b', status: 'failed' })

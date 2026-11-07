@@ -32,7 +32,7 @@ async function identity(pool: Pool, userId: string, runId: string) {
     WHERE q."continuationRunId"=$1 AND q."userId"=$2 AND q.stage='execute'`, [runId, userId])).rows[0]
 }
 
-async function scope(tx: PoolClient, task: FactoryTask, runId: string, unclaimed = true) {
+async function scope(tx: PoolClient, task: FactoryTask, runId: string, unclaimed = true, lockRows = true) {
   const { rows: [row] } = await tx.query(`SELECT q.id AS "questionId",q."answerId",q."originSessionId",b."workspaceId",
       r.status,r."questionContinuation"->>'requiredSandboxId' AS "sandboxId",r."agentDefinition"->>'definitionDigest' AS digest,
       (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=clock_timestamp()) AS idle
@@ -53,7 +53,7 @@ async function scope(tx: PoolClient, task: FactoryTask, runId: string, unclaimed
       AND (($6::boolean AND r.status='queued' AND r."startedAt" IS NULL AND r."sessionId" IS NULL
         AND (r."leaseExpiresAt" IS NULL OR r."leaseExpiresAt"<=clock_timestamp()))
         OR (NOT $6::boolean AND r.status IN ('queued','preparing','running','waiting_input')))
-    FOR UPDATE OF q,r`, [task.id, task.userId, task.sourceEventId, task.attemptId, runId, unclaimed])
+    ${lockRows ? 'FOR UPDATE OF q,r' : ''}`, [task.id, task.userId, task.sourceEventId, task.attemptId, runId, unclaimed])
   if (!row || !await questionExecutionContinuation(tx, task, task.attemptId)) return null
   return row as { questionId: string; answerId: string; originSessionId: string; workspaceId: string; sandboxId: string; digest: string; idle: boolean; status: string }
 }
@@ -212,7 +212,8 @@ export async function questionWakeFailure(pool: Pool, userId: string, runId: str
   if (!found) return null
   const store = await questionWakeRuntime.store(found.botId)
   return transaction(pool, async tx => {
-    const task = await store.readTask(tx, userId, found.taskId), row = await scope(tx, task, runId)
+    // This projection reads committed state; mutation paths retain their row locks.
+    const task = await store.readTask(tx, userId, found.taskId), row = await scope(tx, task, runId, true, false)
     if (!row || !row.idle) return null
     const saved = await receipt(tx, task, runId)
     return saved?.result.state === 'blocked' && requestMatches(saved.request, task, runId, row) ? { generation: saved.result.generation, error: FAILURE } : null

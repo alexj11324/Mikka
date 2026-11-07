@@ -18,7 +18,9 @@ const failure = rpcFailure
  * must still pass Better Auth's signature, bearer-binding and expiry checks. */
 export function desktopBearerHeaders(request: Request): Headers | null {
   const authorization = request.headers.get('authorization')
-  if (!authorization || !/^Bearer [A-Za-z0-9_.%~+/-]{32,512}$/.test(authorization) || /^Bearer (?:mkp_|mka_|mkr_)/.test(authorization)) return null
+  // Better Auth's set-auth-token is a signed value with base64 padding.
+  // Only trailing padding is allowed; the complete token stays within 512 bytes.
+  if (!authorization || !/^Bearer (?=.{32,512}$)[A-Za-z0-9_.%~+/-]+={0,2}$/.test(authorization) || /^Bearer (?:mkp_|mka_|mkr_)/.test(authorization)) return null
   const headers = new Headers(request.headers)
   headers.delete('cookie')
   return headers

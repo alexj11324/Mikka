@@ -5,9 +5,10 @@ export type MobileTaskGroup = 'pending' | 'running' | 'todo' | 'done'
 export type MobileTaskBot = { id: string; name: string; color: string; shape: string }
 export type MobileTaskSchedule = { label: string; nextAt: string | null }
 
-/** Collapse the web's R-52 groups; all decisions about a thread stay in threadGroup. */
-export function mobileTaskGroup(issue: GroupIssue, run?: BlockRun | null): MobileTaskGroup {
+/** Closed tasks win, then board blocks; remaining thread decisions stay in the web's R-52 threadGroup. */
+export function mobileTaskGroup(issue: GroupIssue, run?: BlockRun | null, blocked = false): MobileTaskGroup {
   if (['done', 'canceled', 'duplicate'].includes(issue.status)) return 'done'
+  if (blocked) return 'pending'
   if (!run) return 'todo'
   const group = threadGroup({ id: run.runId, status: run.status, outcome: run.outcome, issueId: null, createdAt: '' }, issue)
   return ({ waiting: 'pending', blocked: 'pending', running: 'running', idle: 'todo', resolved: 'done' } as const)[group]
