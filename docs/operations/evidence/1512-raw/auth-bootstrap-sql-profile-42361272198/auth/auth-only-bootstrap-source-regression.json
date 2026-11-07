@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T09:30:37.021337+00:00",
+  "kind": "source-only-regression",
+  "baseHead": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+  "productChangesCommitted": false,
+  "scope": "Validated system-browser Web PKCE sign-in uses desktop.session and public login configuration; native and full application routes retain full bootstrap.",
+  "sourceFiles": [
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "bytes": 13839,
+      "sha256": "8e80fbb4f255d9ea4f3963179355bfdcf541f682b2c40c9ac3be7e8a3a942dd1"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "bytes": 3596,
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333"
+    },
+    {
+      "path": "apps/desktop/src/renderer/environment.d.ts",
+      "bytes": 1064,
+      "sha256": "7abb587729dbe005d268c2b41919f0a7f0330aada40ab6ae9b7d1f5ec24b6b52"
+    },
+    {
+      "path": "apps/desktop/src/renderer/platform.tsx",
+      "bytes": 2269,
+      "sha256": "8626f234b46457610b085503f2443061cd3addc1f7712193cbc9751504591dbc"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "bytes": 3375,
+      "sha256": "89bb095db896cf6c515feb550ab11fa9f7753cccbf2799ff5dfb833bf4d257e8"
+    },
+    {
+      "path": "apps/frontend/src/web/auth-routing.ts",
+      "bytes": 3143,
+      "sha256": "c4761f47e106d865058dc6e0fe0df72ff6a6b904fea74d2cdbe73918abe53f02"
+    },
+    {
+      "path": "apps/frontend/src/web/platform.tsx",
+      "bytes": 4376,
+      "sha256": "34d4108fae7b136c63932959031ff20426af3e2ad1a5c62e2d1f9d1db4fdd68f"
+    },
+    {
+      "path": "apps/frontend/src/web/rpc.ts",
+      "bytes": 726,
+      "sha256": "d3bff50a90d31b0762807556d555704cffe1df1c5ee968ace7f2cb53da9e7448"
+    },
+    {
+      "path": "apps/frontend/scripts/runtime.test.mjs",
+      "bytes": 11772,
+      "sha256": "4a416366a73128df402aaa746a3aae82af17a5c8d7ad5814d0488565320ea084"
+    },
+    {
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "bytes": 17164,
+      "sha256": "c9330bc2af4a375352eb3b9cf60e8889bb0dc7e0ac647aaab4887a911295126b"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "auth-only-bootstrap-red.tap",
+      "bytes": 1996,
+      "sha256": "97d7e9b1a0deebdf2f04f00a933b9022836dd57be3773dd55b5d18f032986add",
+      "exitCode": 1,
+      "tests": {
+        "pass": 0,
+        "fail": 2
+      },
+      "interpretation": "Old source: unnecessary full bootstrap and missing identity-to-workspace authorization refresh."
+    },
+    {
+      "path": "auth-only-bootstrap-green-initial.tap",
+      "bytes": 647,
+      "sha256": "ac373d770a5c08a21b4a442d7459fbd9122121285c570c3bca4b74fe186f602a",
+      "exitCode": 0,
+      "tests": {
+        "pass": 2,
+        "fail": 0
+      },
+      "interpretation": "Same initial two behavioral regressions after scope implementation."
+    },
+    {
+      "path": "auth-only-bootstrap-phase-red.tap",
+      "bytes": 7204,
+      "sha256": "54dff4f6bce25eb709842cd468400c1bd0fa39e5f1f3aab7c1204d806a8936eb",
+      "exitCode": 1,
+      "tests": {
+        "pass": 21,
+        "fail": 3
+      },
+      "interpretation": "Intermediate patch: late full-bootstrap HTTP 401/503 changed current identity-page transport; includes parent test counted failed."
+    },
+    {
+      "path": "auth-only-bootstrap-green-final.tap",
+      "bytes": 5360,
+      "sha256": "8c10bab5e2d18e37f61053a362454f23eb3802eef3e17e4abd98eb842d307cd5",
+      "exitCode": 0,
+      "tests": {
+        "pass": 25,
+        "fail": 0
+      },
+      "interpretation": "Final App/Web RPC/auth-routing regression suite."
+    },
+    {
+      "path": "auth-only-bootstrap-existing-renderer.tap",
+      "bytes": 3451,
+      "sha256": "61901699746eed4bc925c49e874fb1a9cbc14033c6e6e44c4771bac189f77861",
+      "exitCode": 0,
+      "tests": {
+        "pass": 13,
+        "fail": 0
+      },
+      "interpretation": "Existing native renderer source contracts."
+    },
+    {
+      "path": "auth-only-bootstrap-existing-handoff.tap",
+      "bytes": 1345,
+      "sha256": "5c366561b74411c72d8b20490451530379625884c1e326784a39cba871574bf0",
+      "exitCode": 0,
+      "tests": {
+        "pass": 4,
+        "fail": 0
+      },
+      "interpretation": "Existing real AuthForm PKCE UI behavior in Happy DOM."
+    },
+    {
+      "path": "auth-only-bootstrap-session-cache-check.tap",
+      "bytes": 333,
+      "sha256": "4744ba28f51905ec4bf3fef15a20434c45f62b64a5e379f42457f0b3897cc78d",
+      "exitCode": 0,
+      "tests": {
+        "pass": 1,
+        "fail": 0
+      },
+      "interpretation": "Additional actual SWR cache check already passed; no cache implementation change was needed."
+    },
+    {
+      "path": "auth-only-bootstrap-lint-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "interpretation": "Direct oxlint --no-ignore --deny-warnings on all ten files."
+    },
+    {
+      "path": "auth-only-bootstrap-diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "interpretation": "git diff --check."
+    }
+  ],
+  "behavioralBoundaries": [
+    "Existing duplicate-aware PKCE parsing and OAuth/Composio precedence unchanged.",
+    "Authentication and workspace phases cannot share an in-flight bootstrap or use identity-only data as workspace authorization, including identical null workspace selectors.",
+    "Retired phase responses are fenced before transport mutation; existing Web owner/session generation is also required.",
+    "Actual account changes and same-account new sessions clear prior persistent and in-memory cache state.",
+    "Only confirmed HTTP 401 becomes signed-out; other transport failures remain unavailable.",
+    "No UI copy, main process enrollment, Live catch-up, task-runs polling, measurement-window or protocol envelope change."
+  ],
+  "validationLimits": [
+    "No browser/Electron/macOS acceptance, database, provider, cloud resource or live CI was executed.",
+    "Source tests use actual shared App, Web platform/RPC, routing, SWR and React with explicitly mocked UI leaves, SDK session atom, and fetch boundary.",
+    "No full project typecheck was run; no claim that all twenty observed additional SQL reads are removed.",
+    "Real native login/startup query counts remain pending a new exact-source acceptance run."
+  ],
+  "excludedFixtureAttempt": {
+    "path": "auth-only-bootstrap-fixture-build-error.tap",
+    "bytes": 328701,
+    "sha256": "2dfc1d566dfd2ca10dd2d70139f4c02ef2a61dfd2cdb4c6006b1e3ac2715cfd5",
+    "interpretation": "Test harness initial build imported unused lazy UI/server graph; test seam fixed before behavioral red run. Not a product failure or passing verification."
+  }
+}

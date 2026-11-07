@@ -1,0 +1,28 @@
+{
+  "kind": "thread-lifecycle-ci-attestation",
+  "sourceCommit": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+  "upstream": {
+    "runId": 42356253078,
+    "runAttempt": 1,
+    "workflowId": 405833668
+  },
+  "selected": true,
+  "reason": "validated_runtime",
+  "runtime": "validated_and_published",
+  "jobs": {
+    "test": 128354955254,
+    "check": 128355041665,
+    "validate": 128355092753,
+    "awaitWeb": 128356771648,
+    "subscriptions": 128362749137,
+    "publish": 128363467013,
+    "cleanup": 128368266303
+  },
+  "web": {
+    "sourceCommit": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+    "webRunId": 42356253062,
+    "webAttempt": 1,
+    "publicBuild": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+    "verifiedAt": "2026-11-07T09:42:14.823Z"
+  }
+}

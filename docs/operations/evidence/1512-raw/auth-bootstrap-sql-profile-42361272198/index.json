@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-auth-bootstrap-and-query-diagnostics",
+  "recordedAt": "2026-11-07T09:56:06.133079+00:00",
+  "issue": 1512,
+  "pr": 1518,
+  "productionAcceptance": false,
+  "archive": {
+    "previousEvidenceHead": "110437724daa690167b3dd4163cd3ba094f925b1",
+    "preservedOperationParent": "61ccefd9cf2c150d6911f7cfa83559c47ad5f41c",
+    "ref": "evidence/1512-observability",
+    "originalFileCount": 23,
+    "originalBytes": 123388,
+    "bytePolicy": "All listed original files retain exact bytes; this index alone is a new synthesis."
+  },
+  "currentAcceptance": {
+    "remoteFeatureHead": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "publishedAuthOnlyChange": false,
+    "nativeLoginQueries": 213,
+    "webLoginQueries": 193,
+    "nativeMinusWeb": 20,
+    "nativeNotMoreThanWeb": "unmet",
+    "source": "Previous archived real macOS paired lifecycle at 0d33; these counts are not recomputed by the sequential profiler.",
+    "previousIndex": "../0d33-native-and-query-preparation/index.json"
+  },
+  "authOnly": {
+    "localCommit": "deca620efec43c3f870ec368cef0b600579a79d6",
+    "localTree": "b6b740983cf6d6a0342dd9b1e51fb91e4dab9bb0",
+    "localParent": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "localOnly": true,
+    "remoteAccessibilityVerified": false,
+    "ciForLocalCommit": "not_run",
+    "productionPublished": false,
+    "sourceFilesMatchRegressionReceipt": true,
+    "scope": "Validated system-browser Web PKCE confirmation uses identity-only bootstrap; native/full workspace still refreshes full authorization.",
+    "confirmedQueryScope": "Old compiled-source sequential comparison indicates only a possible two-query reduction on the confirmation page. This does not prove the complete native login difference is resolved.",
+    "fullNativeQueryDifferenceResolved": false,
+    "sourceTestResults": {
+      "initialRed": {
+        "pass": 0,
+        "fail": 2
+      },
+      "retiredPhaseRed": {
+        "pass": 21,
+        "fail": 3
+      },
+      "final": {
+        "pass": 25,
+        "fail": 0
+      },
+      "existingRenderer": {
+        "pass": 13,
+        "fail": 0
+      },
+      "existingHandoff": {
+        "pass": 4,
+        "fail": 0
+      }
+    },
+    "canonicalTypechecks": {
+      "frontendExitCode": 0,
+      "desktopMainExitCode": 0,
+      "desktopRendererExitCode": 0
+    },
+    "receiptChronology": "The original regression receipt was created before the local commit and typechecks. Its productChangesCommitted=false and no-full-typecheck statements remain preserved as historical facts; later three typecheck receipts and local commit identity provide the subsequent state."
+  },
+  "sqlProfile": {
+    "runId": 42361272198,
+    "attempt": 1,
+    "operationRevision": "61ccefd9cf2c150d6911f7cfa83559c47ad5f41c",
+    "status": "passed",
+    "compiledSource": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+    "candidate": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "productTree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+    "sourceBuildVerified": true,
+    "platform": "linux",
+    "arch": "x64",
+    "primaryApiPid": 3326,
+    "completedRequests": 14,
+    "comparisonRequests": 2,
+    "allRequestsPassed": true,
+    "sameApiPid": true,
+    "gapQueries": 0,
+    "requestQueryCounts": {
+      "web_sign_in": 17,
+      "web_get_session": 2,
+      "web_bootstrap": 2,
+      "web_session": 0,
+      "native_sign_in": 17,
+      "native_get_session": 2,
+      "pkce_begin": 1,
+      "system_browser_bootstrap": 2,
+      "pkce_return": 2,
+      "pkce_exchange": 9,
+      "native_bootstrap": 2,
+      "native_session": 0,
+      "native_task_runs_first": 4,
+      "native_task_runs_second": 4
+    },
+    "protocol": "Sequential real email/session/PKCE HTTP reads against the prebuilt old source and job-local PostgreSQL; no actual browser or Electron renderer.",
+    "isOriginalMacLoginDeltaAllocation": false,
+    "newAuthSourceMeasured": false,
+    "productionAcceptance": false,
+    "externalModelCalls": 0,
+    "externalVirtualMachines": 0,
+    "cleanup": {
+      "apiNormalExit": true,
+      "leaseReleased": true,
+      "temporaryDownloadsRemoved": true,
+      "ownedResourcesReportedPassed": true,
+      "workflowStopContainers": "success",
+      "workflowStopContainersCompletedAt": "2026-11-07T09:50:23Z",
+      "workflowConclusion": "success",
+      "workflowConclusionObservedViaGitHubMetadata": true
+    },
+    "limits": {
+      "source": "existing desktop db-metrics.cjs and createLifecycleQueryCounter, one compiled primary API PID",
+      "scope": "all pg.Client.query calls and connection protocol bytes between each pair of snapshots",
+      "exclusions": [
+        "separate harness lease/fixture SQL",
+        "PG connection handshake and TCP/TLS overhead"
+      ],
+      "cache": "ordinary Better Auth signed browser/native session cache; no clearing or invented proof",
+      "workspace": "args:[], default selection, no workspace switch request or fabricated selector",
+      "interpretation": "sequential decomposition only; not an exact allocation of the earlier concurrent Native minus Web query difference",
+      "background": "all primary API background traffic is included; gaps are reported, never subtracted",
+      "protocol": "ordinary leased email auth and real PKCE endpoints/owned loopback; no browser, provider challenge, daemon or VM",
+      "taskReads": "two separate single requests; this does not replay or remove the Live channel catch-up",
+      "comparisons": "desktop.session rows are additional action comparisons, not part of an observed login total"
+    }
+  },
+  "taskVm": {
+    "runId": 42360728689,
+    "source": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+    "workflowStatus": "failure",
+    "failedStep": 13,
+    "providerControllerIntegration": "passed",
+    "providerModelCalls": 0,
+    "providerMissingConfirmed": true,
+    "providerDisposableDatabaseDropped": true,
+    "ownerCases": {
+      "claude-haiku-5-5": "blocked",
+      "gpt-6-luna": "blocked"
+    },
+    "ownerError": "startup_http_404",
+    "ownerCasesDispatched": false,
+    "ownerQuestionResumeEvidence": "missing",
+    "ownerCleanup": "passed",
+    "workspaceRestored": true,
+    "causeBasis": "Unregistered workspace-secrets.getE2BKey in immutable f811 Owner driver; only getE2BKeyCapability exists in the shared RPC registry. Artifact has completed team selection but no cloud-status or case dispatch. Direct HTTP response body was not retained.",
+    "issue1512DriverUsesMissingAction": false,
+    "modelPathFailureProved": false
+  },
+  "privacy": {
+    "allOriginalFilesScanned": true,
+    "emailJwtBearerPrivateKeySignedUrlMatches": 0,
+    "nonemptyCredentialJsonFields": 0,
+    "rawPrivateLogsIncluded": false,
+    "imagesIncluded": false,
+    "signedDownloadUrlsIncluded": false,
+    "secretValuesIncluded": false,
+    "sourcesContainOnlyCodeReferencesToCredentialNames": true
+  },
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/sql-profile/artifact-receipt.json",
+      "bytes": 889,
+      "sha256": "5223a4ae739ce2c98090b0a441c285c9e55cae47b6ec1e487e01cc37e572631b",
+      "gitBlobSha": "880d1234b6a7d07c7b3e70b871f251cd72ac6df2"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/sql-profile/desktop-query-decomposition.json",
+      "bytes": 29404,
+      "sha256": "f8f15cdcaceb1bd10977b47f4edd05d24ab1503ce3c90f7250a6fa79a0a0ebc2",
+      "gitBlobSha": "0e1f7d6fb397f2aeaca4a745b4da7ca89c499078"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/sql-profile/download-receipt.json",
+      "bytes": 724,
+      "sha256": "d39ca5b792818d1d0ab9b1d15ef91e0176c7de8b7a4597cd897cf7aebcddea52",
+      "gitBlobSha": "224b4747c2cf9c0a5caf4f367e75e80b3d09f789"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/sql-profile/runner-receipt.json",
+      "bytes": 738,
+      "sha256": "50b132974d72ecd9463f153315426362ee06023240f5eba472bd07ce320fd6a4",
+      "gitBlobSha": "b4efb3832883f021d0adce2609f6c4c20994d85e"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/sql-profile/workflow-final.json",
+      "bytes": 5767,
+      "sha256": "d8f7b61ed2df21c0eb5c642f0214f9c6ba837f60cf72253c5ca10b266ae9118f",
+      "gitBlobSha": "700327bb294f260afade3ba2bbbc17ffcf6642f2"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/ops/desktop-query-decomposition.mjs",
+      "bytes": 30351,
+      "sha256": "5ce05f24dffc80888f248dbf28ff8a5761b42e5142a670b2e51124f2362a4aa0",
+      "gitBlobSha": "fdceaf953d9c3e05bcd43e19bcbcc8b1b4dc7a67"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/ops/desktop-query-decomposition.md",
+      "bytes": 8619,
+      "sha256": "7722e5b42678d9640e11b8a8118b15312cdbca74e32615ad1ee98660300a51cc",
+      "gitBlobSha": "12f1cb733ca59312eb008674dbb2d535a7a14562"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/ops/issue1512-sql-profile.yml",
+      "bytes": 6072,
+      "sha256": "ca941a82619bd521a7ce37b82ca48b60aef787336a5ef3bab7b06ab4b8fe0359",
+      "gitBlobSha": "61aa7023854872802ded898324a18c124d0e8c1d"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/ops/issue1512-sql-profile-artifact.mjs",
+      "bytes": 5755,
+      "sha256": "a7cf7f79f14a224467de61f67be2d3415720faead7b2ecd8137535709f1acf63",
+      "gitBlobSha": "63d6f73c7c3878629d5fd40d8593d0eaaee286c9"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-bootstrap-source-regression.json",
+      "bytes": 6783,
+      "sha256": "40d3b2dd50fb20631fdb7b3f94e0153e32a310a6225ddb27cb2ad66178d7baf7",
+      "gitBlobSha": "7f7b4a18041a53ce7e4b59792a2666b957838e66"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-frontend-typecheck.json",
+      "bytes": 324,
+      "sha256": "74c280285e0dd29ed19d90a95457160c0ef4f568669a0de4297bcc92e6e3c14e",
+      "gitBlobSha": "93452b8c478f8459d15c4faecc86b7d53b5333b3"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-desktop-typecheck.json",
+      "bytes": 343,
+      "sha256": "7811bae3cf4d2fa313813d3f81d10e2e1e9fd19c82d0860056467efde1228f47",
+      "gitBlobSha": "06802a122f578c3603c0923d7c726c02b3bfaea9"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-desktop-renderer-typecheck.json",
+      "bytes": 362,
+      "sha256": "4a04a49eafd08a053ffc930f9a63f1155eb8b1ba8935e21c0f5d3e69bda3fcfa",
+      "gitBlobSha": "d015fce67a19ea66b26067755b232b0ad4829e12"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-bootstrap-red.tap",
+      "bytes": 1996,
+      "sha256": "97d7e9b1a0deebdf2f04f00a933b9022836dd57be3773dd55b5d18f032986add",
+      "gitBlobSha": "84050d12137692c73242daffba091fba0a1aa5fc"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-bootstrap-phase-red.tap",
+      "bytes": 7204,
+      "sha256": "54dff4f6bce25eb709842cd468400c1bd0fa39e5f1f3aab7c1204d806a8936eb",
+      "gitBlobSha": "85a01836e8d501b67f527b2b3199e503ff595fad"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-bootstrap-green-final.tap",
+      "bytes": 5360,
+      "sha256": "8c10bab5e2d18e37f61053a362454f23eb3802eef3e17e4abd98eb842d307cd5",
+      "gitBlobSha": "91f6a1234cb3706c1d84cb0ea7407c6159d3d683"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-bootstrap-existing-renderer.tap",
+      "bytes": 3451,
+      "sha256": "61901699746eed4bc925c49e874fb1a9cbc14033c6e6e44c4771bac189f77861",
+      "gitBlobSha": "f4e13118a4dda720ea81a2ae2d744fe4298d69a7"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/auth/auth-only-bootstrap-existing-handoff.tap",
+      "bytes": 1345,
+      "sha256": "5c366561b74411c72d8b20490451530379625884c1e326784a39cba871574bf0",
+      "gitBlobSha": "c1bc5ff7d4473ff700cfb0a2109116dfb8c9df7b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/task-vm/attestation.json",
+      "bytes": 759,
+      "sha256": "fc8fe3376d4bc72587a6c3ca9b4db64e7ddc24513af5edfb4f22f224ff5902c7",
+      "gitBlobSha": "55e62c24d0448a8c7f55146c425ba8ea0a70bd41"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/task-vm/diagnostic-summary.json",
+      "bytes": 3345,
+      "sha256": "5a64025537cd004dda16b73da96db1b4d24f01745311d9b970fcfc2a207c9a3b",
+      "gitBlobSha": "c13bf6ba9091501c547d13fce637c5d0b657bd90"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/task-vm/provider-report.json",
+      "bytes": 1006,
+      "sha256": "7938b247ab21b0ed6c70398d968ec4e53fd7308eb771f574ee9f60d47ea68829",
+      "gitBlobSha": "aa1edf61e9014799f60fbde94f67c023d082458e"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/task-vm/report.json",
+      "bytes": 1989,
+      "sha256": "aaa163a1ac821a2d870e7b085af3b90382a85343cadf9498415c5920f2391fe3",
+      "gitBlobSha": "607c70e3ef164ec80c7dde02c2058a87d74e13a0"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/task-vm/summary.json",
+      "bytes": 802,
+      "sha256": "999931c77d07e1ba9fc4142195128686800fc1cb1c94c68c97e602f79e7493b0",
+      "gitBlobSha": "b9cfbba014a8ea16ad197ea14f9b36526138ce23"
+    }
+  ]
+}

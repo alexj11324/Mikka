@@ -1,0 +1,200 @@
+TAP version 13
+# Subtest: a valid system-browser PKCE page reads only the existing session and public login methods
+ok 1 - a valid system-browser PKCE page reads only the existing session and public login methods
+  ---
+  duration_ms: 52.405673
+  type: 'test'
+  ...
+# Subtest: leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts
+ok 2 - leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts
+  ---
+  duration_ms: 21.023019
+  type: 'test'
+  ...
+# Subtest: malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+    # Subtest: duplicate state
+    ok 1 - duplicate state
+      ---
+      duration_ms: 12.055256
+      type: 'test'
+      ...
+    # Subtest: Electron host
+    ok 2 - Electron host
+      ---
+      duration_ms: 10.351562
+      type: 'test'
+      ...
+    1..2
+ok 3 - malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+  ---
+  duration_ms: 23.104411
+  type: 'test'
+  ...
+# Subtest: pending identity and workspace reads never join across phases or mount from a late identity result
+ok 4 - pending identity and workspace reads never join across phases or mount from a late identity result
+  ---
+  duration_ms: 13.21054
+  type: 'test'
+  ...
+# Subtest: a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration
+ok 5 - a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration
+  ---
+  duration_ms: 11.354397
+  type: 'test'
+  ...
+# Subtest: a retired workspace request cannot expire or disconnect the current PKCE identity page
+    # Subtest: 401
+    not ok 1 - 401
+      ---
+      duration_ms: 14.825369
+      type: 'test'
+      location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:184:44'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        + actual - expected
+        
+        + 'unauthenticated'
+        - 'ready'
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 'ready'
+      actual: 'unauthenticated'
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:190:12)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:184:36)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    # Subtest: 503
+    not ok 2 - 503
+      ---
+      duration_ms: 14.001986
+      type: 'test'
+      location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:184:44'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        'offline' !== 'ready'
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 'ready'
+      actual: 'offline'
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:190:12)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:184:36)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    1..2
+not ok 6 - a retired workspace request cannot expire or disconnect the current PKCE identity page
+  ---
+  duration_ms: 29.693342
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:183:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: account and same-account session changes invalidate a pending identity response and clear prior caches
+    # Subtest: different owner
+    ok 1 - different owner
+      ---
+      duration_ms: 12.344703
+      type: 'test'
+      ...
+    # Subtest: same owner, new session
+    ok 2 - same owner, new session
+      ---
+      duration_ms: 14.585697
+      type: 'test'
+      ...
+    1..2
+ok 7 - account and same-account session changes invalidate a pending identity response and clear prior caches
+  ---
+  duration_ms: 27.417065
+  type: 'test'
+  ...
+# Subtest: only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+    # Subtest: 401
+    ok 1 - 401
+      ---
+      duration_ms: 11.205793
+      type: 'test'
+      ...
+    # Subtest: 503
+    ok 2 - 503
+      ---
+      duration_ms: 8.010848
+      type: 'test'
+      ...
+    1..2
+ok 8 - only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+  ---
+  duration_ms: 19.597997
+  type: 'test'
+  ...
+# Subtest: web RPC keeps the shared codec but uses only normal same-origin cookie transport
+ok 9 - web RPC keeps the shared codec but uses only normal same-origin cookie transport
+  ---
+  duration_ms: 29.044963
+  type: 'test'
+  ...
+# Subtest: an old web owner delayed 401 cannot clear the newly authenticated owner
+ok 10 - an old web owner delayed 401 cannot clear the newly authenticated owner
+  ---
+  duration_ms: 15.43479
+  type: 'test'
+  ...
+# Subtest: an old web owner network rejection does not overwrite the new owner transport
+ok 11 - an old web owner network rejection does not overwrite the new owner transport
+  ---
+  duration_ms: 12.969476
+  type: 'test'
+  ...
+# Subtest: web owner changes fence both asynchronous response bodies and pre-request encoding
+ok 12 - web owner changes fence both asynchronous response bodies and pre-request encoding
+  ---
+  duration_ms: 11.889645
+  type: 'test'
+  ...
+# Subtest: web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+ok 13 - web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+  ---
+  duration_ms: 14.896406
+  type: 'test'
+  ...
+# Subtest: identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+ok 14 - identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+  ---
+  duration_ms: 11.87281
+  type: 'test'
+  ...
+# Subtest: web session owner watches the actual SDK atom without mutating it or treating an error as logout
+ok 15 - web session owner watches the actual SDK atom without mutating it or treating an error as logout
+  ---
+  duration_ms: 5.563452
+  type: 'test'
+  ...
+# Subtest: deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+ok 16 - deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+  ---
+  duration_ms: 7.307937
+  type: 'test'
+  ...
+1..16
+# tests 24
+# suites 0
+# pass 21
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 583.044776

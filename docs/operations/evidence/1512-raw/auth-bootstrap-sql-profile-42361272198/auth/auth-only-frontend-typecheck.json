@@ -1,0 +1,9 @@
+{
+  "command": "canonical tsc --noEmit -p apps/frontend/tsconfig.json",
+  "heap_mib": 4096,
+  "exit_code": 0,
+  "elapsed_seconds": 36.0,
+  "stdout_bytes": 0,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "scope": "current frozen auth-only working tree; no database or external service"
+}

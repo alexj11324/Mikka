@@ -1,0 +1,26 @@
+{
+  "artifactId": 13570156485,
+  "runId": 42361272198,
+  "attempt": 1,
+  "zipBytes": 4792,
+  "zipSha256": "94284f99986b43b9546d7a42add3eb8b3d5d7fb8e6d9e9b99c24fdf34fc38223",
+  "members": [
+    {
+      "name": "artifact-receipt.json",
+      "bytes": 889,
+      "sha256": "5223a4ae739ce2c98090b0a441c285c9e55cae47b6ec1e487e01cc37e572631b"
+    },
+    {
+      "name": "desktop-query-decomposition.json",
+      "bytes": 29404,
+      "sha256": "f8f15cdcaceb1bd10977b47f4edd05d24ab1503ce3c90f7250a6fa79a0a0ebc2"
+    },
+    {
+      "name": "runner-receipt.json",
+      "bytes": 738,
+      "sha256": "50b132974d72ecd9463f153315426362ee06023240f5eba472bd07ce320fd6a4"
+    }
+  ],
+  "privacyPatternMatches": 0,
+  "zipRetained": false
+}

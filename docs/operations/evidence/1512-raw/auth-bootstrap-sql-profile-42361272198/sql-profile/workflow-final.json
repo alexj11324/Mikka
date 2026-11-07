@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "runId": 42361272198,
+  "runAttempt": 1,
+  "operationRevision": "61ccefd9cf2c150d6911f7cfa83559c47ad5f41c",
+  "sourceRevision": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+  "productionAcceptance": false,
+  "jobs": [
+    {
+      "id": 128369991409,
+      "name": "profile",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T09:48:28Z",
+      "completedAt": "2026-11-07T09:50:26Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:48:29Z",
+          "completedAt": "2026-11-07T09:48:31Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:48:31Z",
+          "completedAt": "2026-11-07T09:48:47Z"
+        },
+        {
+          "number": 3,
+          "name": "Read the exact reviewed diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:48:47Z",
+          "completedAt": "2026-11-07T09:48:50Z"
+        },
+        {
+          "number": 4,
+          "name": "Read the source used by the successful Linux API artifact",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:48:50Z",
+          "completedAt": "2026-11-07T09:48:54Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:48:54Z",
+          "completedAt": "2026-11-07T09:48:55Z"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:48:55Z",
+          "completedAt": "2026-11-07T09:49:00Z"
+        },
+        {
+          "number": 7,
+          "name": "Verify and reuse the immutable successful compiled API",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:49:00Z",
+          "completedAt": "2026-11-07T09:49:05Z"
+        },
+        {
+          "number": 8,
+          "name": "Install pinned dependencies without any browser runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:49:05Z",
+          "completedAt": "2026-11-07T09:49:49Z"
+        },
+        {
+          "number": 9,
+          "name": "Decompose normal authentication and read requests on disposable PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:49:49Z",
+          "completedAt": "2026-11-07T09:49:58Z"
+        },
+        {
+          "number": 10,
+          "name": "Remove the exact diagnostic download and retain safe runner provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:49:58Z",
+          "completedAt": "2026-11-07T09:49:58Z"
+        },
+        {
+          "number": 11,
+          "name": "Check only the explicitly safe reports before upload",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:49:58Z",
+          "completedAt": "2026-11-07T09:49:58Z"
+        },
+        {
+          "number": 12,
+          "name": "Preserve only safe diagnostic JSON",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:49:58Z",
+          "completedAt": "2026-11-07T09:50:00Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:50:00Z",
+          "completedAt": "2026-11-07T09:50:21Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:50:21Z",
+          "completedAt": "2026-11-07T09:50:21Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Read the source used by the successful Linux API artifact",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:50:21Z",
+          "completedAt": "2026-11-07T09:50:22Z"
+        },
+        {
+          "number": 23,
+          "name": "Post Read the exact reviewed diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:50:22Z",
+          "completedAt": "2026-11-07T09:50:22Z"
+        },
+        {
+          "number": 24,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:50:22Z",
+          "completedAt": "2026-11-07T09:50:23Z"
+        },
+        {
+          "number": 25,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T09:50:23Z",
+          "completedAt": "2026-11-07T09:50:23Z"
+        }
+      ]
+    }
+  ],
+  "resourceResult": "API exited normally and leased fixtures/session cleanup released, exact temporary downloads removed; workflow Stop containers completed successfully",
+  "queryInterpretation": "Sequential decomposition; not a replay or arithmetic allocation of the earlier concurrent macOS login window"
+}

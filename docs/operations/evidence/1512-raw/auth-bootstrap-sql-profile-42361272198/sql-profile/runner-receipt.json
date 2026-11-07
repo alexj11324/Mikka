@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "runId": "42361272198",
+  "runAttempt": "1",
+  "operationRevision": "61ccefd9cf2c150d6911f7cfa83559c47ad5f41c",
+  "sourceRevision": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+  "temporaryDownloadsRemoved": true,
+  "scripts": {
+    "issue1512-sql-profile.mjs": "5ce05f24dffc80888f248dbf28ff8a5761b42e5142a670b2e51124f2362a4aa0",
+    "issue1512-sql-profile-artifact.mjs": "a7cf7f79f14a224467de61f67be2d3415720faead7b2ecd8137535709f1acf63"
+  },
+  "externalModelCalls": 0,
+  "externalVirtualMachines": 0,
+  "postgres": {
+    "scope": "fresh job-local GitHub Actions service",
+    "teardown": "pending workflow-owned Stop containers step"
+  },
+  "recordedAt": "2026-11-07T09:49:58.596Z",
+  "productionAcceptance": false
+}

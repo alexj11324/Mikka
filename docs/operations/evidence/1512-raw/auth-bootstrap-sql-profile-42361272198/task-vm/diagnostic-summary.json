@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "kind": "task-vm-readonly-failure-diagnosis",
+  "observedAt": "2026-11-07T09:46:23.159551+00:00",
+  "sourceCommit": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+  "runId": 42360728689,
+  "attempt": 1,
+  "jobId": 128368399521,
+  "failedStep": {
+    "number": 13,
+    "name": "Require both question-resume cases and provider cleanup evidence"
+  },
+  "artifact": {
+    "id": 13569761286,
+    "name": "thread-lifecycle-question-resume-42360728689-1",
+    "bytes": 2740,
+    "sha256": "2189e85f9fb89409ebf0699500f4b8f6678cee8a77017e3f46e95d1c9a23cec4",
+    "apiHeadMatched": true,
+    "bytesDigestMatched": true,
+    "members": [
+      {
+        "path": "attestation.json",
+        "bytes": 759,
+        "sha256": "fc8fe3376d4bc72587a6c3ca9b4db64e7ddc24513af5edfb4f22f224ff5902c7"
+      },
+      {
+        "path": "provider-report.json",
+        "bytes": 1006,
+        "sha256": "7938b247ab21b0ed6c70398d968ec4e53fd7308eb771f574ee9f60d47ea68829"
+      },
+      {
+        "path": "report.json",
+        "bytes": 1989,
+        "sha256": "aaa163a1ac821a2d870e7b085af3b90382a85343cadf9498415c5920f2391fe3"
+      },
+      {
+        "path": "summary.json",
+        "bytes": 802,
+        "sha256": "999931c77d07e1ba9fc4142195128686800fc1cb1c94c68c97e602f79e7493b0"
+      }
+    ]
+  },
+  "provider": {
+    "status": "passed",
+    "realProviderRpc": true,
+    "modelCalls": 0,
+    "subscriptionAcceptance": false,
+    "cleanupStatus": "passed",
+    "providerMissingConfirmed": true,
+    "disposableDatabaseDropped": true
+  },
+  "owner": {
+    "status": "blocked",
+    "error": "startup_http_404",
+    "teamSelectionRecorded": true,
+    "cloudKeyStatusRecorded": false,
+    "cases": [
+      {
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "status": "blocked",
+        "cleanupStatus": "passed"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "status": "blocked",
+        "cleanupStatus": "passed"
+      }
+    ],
+    "caseRunDispatched": false,
+    "caseBotOrProfileCreated": false,
+    "cleanupStatus": "passed",
+    "cleanupErrors": 0,
+    "workspaceRestored": true,
+    "signOutReportedSuccessful": true
+  },
+  "cause": {
+    "basis": "immutable-source-contract-plus-artifact-stage",
+    "action": "workspace-secrets.getE2BKey",
+    "registered": false,
+    "registeredEquivalent": "workspace-secrets.getE2BKeyCapability",
+    "httpUnknownActionStatus": 404,
+    "directResponseBodyRecorded": false,
+    "missingEvidence": "Owner cases never reached task creation, generation, question/pause/resume or completion; not a model failure receipt."
+  },
+  "issue1512": {
+    "deploymentAlreadySucceeded": true,
+    "sameMissingActionUsedByDriver": false,
+    "provenModelPathBlocker": false,
+    "productionAcceptanceStillRequired": true
+  },
+  "privacy": {
+    "onlyKnownJsonMembersRead": true,
+    "noRawLogsRead": true,
+    "noPngRead": true,
+    "noSignedDownloadUrlSaved": true,
+    "emailJwtBearerPrivateKeySignedUrlMatches": 0
+  },
+  "limits": [
+    "Owner command step conclusion success is affected by continue-on-error and does not prove business acceptance.",
+    "No live account, provider or model request was performed for this diagnosis.",
+    "No inference that model-order catalogue reads are zero-provider-network; no Owner case was dispatched."
+  ]
+}

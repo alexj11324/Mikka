@@ -1,0 +1,37 @@
+TAP version 13
+# (node:11) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:11) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: the provider the app asked for starts without another click, and Back does not start it again
+ok 1 - the provider the app asked for starts without another click, and Back does not start it again
+  ---
+  duration_ms: 464.222709
+  type: 'test'
+  ...
+# Subtest: a failed attempt shows the card instead of starting again
+ok 2 - a failed attempt shows the card instead of starting again
+  ---
+  duration_ms: 4.546004
+  type: 'test'
+  ...
+# Subtest: a web session is shown before the app gets it; another account opens the provider picker
+ok 3 - a web session is shown before the app gets it; another account opens the provider picker
+  ---
+  duration_ms: 27.101335
+  type: 'test'
+  ...
+# Subtest: without a provider, another account opens the ordinary sign-in card with the picker on
+ok 4 - without a provider, another account opens the ordinary sign-in card with the picker on
+  ---
+  duration_ms: 9.088214
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1076.634869

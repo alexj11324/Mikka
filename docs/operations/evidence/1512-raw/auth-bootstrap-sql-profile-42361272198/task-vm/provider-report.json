@@ -1,0 +1,39 @@
+{
+  "kind": "thread-lifecycle-provider-acceptance",
+  "sourceCommit": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+  "scope": {
+    "realProviderRpc": true,
+    "injectedTransportFaults": true,
+    "naturalTimeoutExpiry": false,
+    "daemonAcceptance": false,
+    "subscriptionAcceptance": false,
+    "modelCalls": 0,
+    "resumeScope": "provider-resume-to-controller-monitor"
+  },
+  "status": "passed",
+  "acceptance": "eb7d8a40-e60b-4e6f-b8a6-4666d2a8dd46",
+  "workerHash": "18d86efa6f4ed740bbc86f02db2f77eecc16cff6",
+  "template": "codex",
+  "sandboxId": "ipktoromeirrmaexw85e0",
+  "runId": "6eadc09c-37e4-46b0-9c39-51dcc197a6d5",
+  "cases": [
+    "active-monitor",
+    "provider-refusal",
+    "lost-pause-response",
+    "resume-monitor",
+    "stale-epoch",
+    "stop-idempotence",
+    "end-idempotence"
+  ],
+  "counters": {
+    "info": 13,
+    "keepAlive": 2,
+    "pause": 2,
+    "kill": 1
+  },
+  "cleanup": {
+    "status": "passed",
+    "provider": "confirmed_missing",
+    "database": "dropped"
+  }
+}

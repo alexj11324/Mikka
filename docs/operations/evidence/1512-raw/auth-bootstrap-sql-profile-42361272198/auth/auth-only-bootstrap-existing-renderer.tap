@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: local routing preserves workspace history state, locale, query and fragment without treating opaque origins as equal
+ok 1 - local routing preserves workspace history state, locale, query and fragment without treating opaque origins as equal
+  ---
+  duration_ms: 32.235358
+  type: 'test'
+  ...
+# Subtest: generated action stubs preserve declaration arity, including SWR zero-argument fetchers
+ok 2 - generated action stubs preserve declaration arity, including SWR zero-argument fetchers
+  ---
+  duration_ms: 66.821065
+  type: 'test'
+  ...
+# Subtest: action inventory includes the actual billing re-export chain and excludes type-only aliases
+ok 3 - action inventory includes the actual billing re-export chain and excludes type-only aliases
+  ---
+  duration_ms: 4.020971
+  type: 'test'
+  ...
+# Subtest: real billing client re-exports reach the native RPC with only their declared parameters
+ok 4 - real billing client re-exports reach the native RPC with only their declared parameters
+  ---
+  duration_ms: 37.870848
+  type: 'test'
+  ...
+# Subtest: public configuration keeps only existing flags and discards the previous owner snapshot on reset
+ok 5 - public configuration keeps only existing flags and discards the previous owner snapshot on reset
+  ---
+  duration_ms: 5.839658
+  type: 'test'
+  ...
+# Subtest: RPC sends only the versioned local envelope and preserves shared cache access-denial semantics
+ok 6 - RPC sends only the versioned local envelope and preserves shared cache access-denial semantics
+  ---
+  duration_ms: 16.339714
+  type: 'test'
+  ...
+# Subtest: bootstrap only transports a workspace selector and uses server-proved cache authority
+ok 7 - bootstrap only transports a workspace selector and uses server-proved cache authority
+  ---
+  duration_ms: 18.918358
+  type: 'test'
+  ...
+# Subtest: an old safe-session IPC completion cannot restore the previous account after an owner change
+ok 8 - an old safe-session IPC completion cannot restore the previous account after an owner change
+  ---
+  duration_ms: 15.915389
+  type: 'test'
+  ...
+# Subtest: native logout waits for queued shared-cache writes and clears them before returning
+ok 9 - native logout waits for queued shared-cache writes and clears them before returning
+  ---
+  duration_ms: 16.407987
+  type: 'test'
+  ...
+# Subtest: unsupported renderer state cannot be cleared by an older in-flight success
+ok 10 - unsupported renderer state cannot be cleared by an older in-flight success
+  ---
+  duration_ms: 12.965118
+  type: 'test'
+  ...
+# Subtest: live transport uses a local handle, subscribes before connecting, and closes an aborted preparation
+ok 11 - live transport uses a local handle, subscribes before connecting, and closes an aborted preparation
+  ---
+  duration_ms: 9.37658
+  type: 'test'
+  ...
+# Subtest: noVNC raw channel forwards exact binary slices and rejects malformed local handles
+ok 12 - noVNC raw channel forwards exact binary slices and rejects malformed local handles
+  ---
+  duration_ms: 7.118259
+  type: 'test'
+  ...
+# Subtest: viewer HTTP seam retains shared response errors and routes ordinary requests through the unchanged web transport
+ok 13 - viewer HTTP seam retains shared response errors and routes ordinary requests through the unchanged web transport
+  ---
+  duration_ms: 8.90074
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 867.923957

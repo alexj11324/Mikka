@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "issue": 1593,
+  "sourceCommit": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+  "origin": "https://app.aspectlylabs.com",
+  "fixtureId": "37a63a95-8355-4814-ad7b-fc524539f5b6",
+  "startedAt": "2026-11-07T09:42:17.417Z",
+  "status": "blocked",
+  "issueAcceptance": "incomplete",
+  "cases": [
+    {
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "status": "blocked",
+      "error": "startup_http_404",
+      "cleanup": {
+        "status": "passed",
+        "errors": []
+      }
+    },
+    {
+      "harness": "codex",
+      "model": "gpt-6-luna",
+      "status": "blocked",
+      "error": "startup_http_404",
+      "cleanup": {
+        "status": "passed",
+        "errors": []
+      }
+    }
+  ],
+  "cleanup": {
+    "status": "passed",
+    "errors": [],
+    "workspaceRestored": true
+  },
+  "scope": "real_owner_factory_question_pause_resume_with_native_report",
+  "pending": [
+    "external_wait_and_adjacent_stage_continuity",
+    "terminal_revoke_and_close_grace_retention",
+    "provider_timeout_fault_injection",
+    "latency_and_cost_measurement"
+  ],
+  "excluded": [
+    "provider_fault_injection_separate_driver",
+    "natural_timeout_expiry",
+    "markdown_download",
+    "automatic_final_stage_model_selection",
+    "final_factory_submission",
+    "independent_coding_stage_completion"
+  ],
+  "source": {
+    "path": "lib/cloud-computer/thread-lifecycle.ts",
+    "sha256": "9aecc7f7e0f83379df2deca66794e62a2d1d278f9704d3ce148d06cd690fc2e5"
+  },
+  "build": "f811448d805e7baa7b032fd6ae62d991f59966c8",
+  "ownerHash": "c4d6b5727534",
+  "team": {
+    "teamWorkspaceConfirmed": true,
+    "teamWorkspaceHash": "fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade",
+    "teamSelectionBasis": "unique-active-admin-identity-match",
+    "teamOwnerAttribution": "AGENTS.md-and-owner-comment-1504-6691409495",
+    "teamAdminMembershipVerified": true
+  },
+  "error": "startup_http_404",
+  "finishedAt": "2026-11-07T09:42:27.585Z"
+}
