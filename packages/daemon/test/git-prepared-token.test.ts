@@ -153,7 +153,7 @@ it('keeps the existing GitHub host credential scope and excludes other hosts', a
   try {
     await withRunGitCredentials(assignment, join(f.root, 'private'), async env => {
       for (const url of ['https://github.com/Other/Repo.git', 'https://github.com/Owner/Repo.git-more', 'https://elsewhere.invalid/Owner/Repo.git']) {
-        await execa('git', ['ls-remote', url], { env: { ...process.env, ...env }, reject: false })
+        await execa('git', ['ls-remote', url], { cwd: f.root, env: { ...process.env, ...env }, reject: false })
       }
     })
     expect(f.requests.length).toBeGreaterThanOrEqual(3)
