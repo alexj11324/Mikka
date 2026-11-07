@@ -130,6 +130,13 @@ Mikka 请求。`mikka-mcp` 的唯一远程发送路径只允许工具目录发�
 不是零。观测不得增加远程鉴权请求、数据库请求或轮询，也不为等待统计而延迟原有
 取消与进程终止。官方 provider 的 OTLP 事件同样是尽力收集，不冒充完整调用总数。
 
+MCP 计时区分响应头和正文。v1 的 `endedAt/durationMs` 仅到 fetch 返回响应头
+或连接异常；v2 保持该语义，额外以 `body.endedAt/durationMs/outcome` 记录同一次
+发送到 `response.text()` 完成或读取异常。它不包含 JSON-RPC 解析、stdio 交付或
+官方任务 ACK，不增加远程发送。正文事件缺失保留 `null`，历史 v1 不推算正文时间；
+已观测请求配平仍只指发送与响应头配对，不代表正文或全部第一方 HTTP 完整。
+该扩展沿用下面的诊断 opt-in，普通任务仍不创建接收器或持久化详细收据。
+
 2026-11-07 曾让可信云 worker 无条件开启本机观测。随后确认：虽然没有增加 SQL
 轮次，finish 中的 `mikkaRuntimeTiming`、`agent_start.startupTiming` 以及其中的
 official CLI/MCP 收据会增加写入与读取的 JSONB 字节，不能称为数据库流量不变。

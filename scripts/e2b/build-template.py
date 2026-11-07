@@ -670,7 +670,7 @@ def observed_mcp_business_evidence(value, run_hash, harness):
     def duration(number):
         return type(number) in (int, float) and math.isfinite(number) and 0 <= number <= 86_400_000
 
-    if (not isinstance(value, dict) or type(value.get('version')) is not int or value['version'] != 1
+    if (not isinstance(value, dict) or type(value.get('version')) is not int or value['version'] not in (1, 2)
             or value.get('source') != 'mikka_mcp_physical_fetch' or value.get('scope') != 'observed_mikka_mcp_children'
             or value.get('generationCoverage') != 'unverified' or value.get('allFirstPartyHttpComplete') is not False
             or type(value.get('remoteMcpServerCount')) is not int or value['remoteMcpServerCount'] != 0
@@ -715,10 +715,21 @@ def observed_mcp_business_evidence(value, run_hash, harness):
               or not duration(request.get('durationMs'))
               or request['outcome'] != ('ok' if type(request['status']) is int and 200 <= request['status'] < 300 else 'error')):
             return False
+        if value['version'] == 2:
+            if 'body' not in request:
+                return False
+            body = request['body']
+            if body is not None and (not isinstance(body, dict) or set(body) != {'endedAt', 'durationMs', 'outcome'}
+                    or request['endedAt'] is None or request['status'] is None
+                    or not epoch(body.get('endedAt')) or not request['endedAt'] <= body['endedAt'] <= (child['closedAt'] or value['endedAt'])
+                    or not duration(body.get('durationMs')) or body['durationMs'] < request['durationMs']
+                    or body.get('outcome') not in ('read', 'error')):
+                return False
     for child in children:
         observed = sorted((request for request in requests if request['child'] == child['child']), key=lambda row: row['sequence'])
         if (len(observed) != child['sent'] or sum(row['outcome'] != 'pending' for row in observed) != child['completed']
                 or child['lastSequence'] != 1 + child['sent'] + child['completed'] + int(child['closedAt'] is not None)
+                    + (sum(row.get('body') is not None for row in observed) if value['version'] == 2 else 0)
                 or any(row['sequence'] != index + 1 for index, row in enumerate(observed))):
             return False
     observed_complete = all(row['outcome'] != 'pending' for row in requests)

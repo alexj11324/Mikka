@@ -216,6 +216,7 @@ test('a real receipt rejection persists its run hash and reason without provider
     assert.deepEqual(failed, { kind: 'claude', stage: 'receipt', code: 'template_gate_official_agent_acceptance_missing',
       runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16),
       sampleStatus: 'execution_proved_awaiting_server_timing', sampleError: 'startup_failed', cleanupErrors: [],
+      failure: { phase: 'unknown', code: 'startup_failed' },
       observation: { lastStatus: 'unavailable', agentStart: false, providerChunk: false,
         agentStartStage: null, cliInit: null,
         replyVerified: true, replyVerifiedAfterTool: true, successfulTool: true, runtimeTimingStatus: 'unavailable', expectedAgentAck: false,
@@ -228,6 +229,99 @@ test('a real receipt rejection persists its run hash and reason without provider
     await assert.rejects(stat(output), { code: 'ENOENT' })
     assert.equal((await stat(diagnostics)).mode & 0o777, 0o600)
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('preflight failures preserve their phase and closed error details without producing an accepted file', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'template-gate-preflight-')), secret = 'private_response_and_model_text'
+  const failures = [
+    { phase: 'profile_create', code: 'startup_http_error', httpStatus: 403 },
+    { phase: 'profile_validation', code: 'startup_http_error', httpStatus: 400 },
+    { phase: 'coordinator_stream', code: 'startup_http_error', httpStatus: 599 },
+    { phase: 'profile_selection', code: 'startup_api_refused' },
+    { phase: 'coordinator_submit', code: 'startup_rpc_refused' },
+    { phase: 'issue_create', code: 'startup_action_refused' },
+    { phase: 'coordinator_stream', code: 'startup_coordinator_stream_invalid' },
+    { phase: 'coordinator_stream', code: 'startup_dispatch_refused' },
+    { phase: 'coordinator_stream', code: 'startup_aborted' },
+    { phase: 'coordinator_stream', code: 'startup_timeout' },
+    { phase: 'thread_lookup', code: 'startup_dispatch_run_missing' },
+  ]
+  try {
+    const input = join(root, 'candidate.json')
+    await writeFile(input, JSON.stringify(report))
+    for (const [index, failure] of failures.entries()) {
+      const fixture = candidateFixture(async options => options.harness === 'claude_code' ? accepted(options.harness) : {
+        mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [{
+          harness: options.harness, status: 'failed', error: failure.code,
+          failure: { ...failure, message: secret, body: secret, cause: { token: secret } },
+          providerText: secret, cleanup: { status: 'passed', errors: [] },
+        }],
+      })
+      const output = join(root, `accepted-${index}.json`), diagnostics = join(root, `diagnostics-${index}.json`)
+      await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+      const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
+      const failed = value.candidates.find(row => row.kind === 'codex')
+      assert.equal(value.status, 'failed')
+      assert.equal(value.code, 'template_gate_subscription_or_cleanup_failed')
+      assert.equal(failed.stage, 'receipt')
+      assert.equal(failed.code, 'template_gate_execution_failed')
+      assert.deepEqual(failed.failure, failure)
+      assert.equal(failed.sampleError, failure.code)
+      assert.equal(failed.runIdHash, null)
+      assert.equal(failed.candidateProof.harness, 'codex')
+      assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+      assert.equal(value.candidates.find(row => row.kind === 'claude').passedReceipt.status, 'passed')
+      for (const forbidden of [secret, 'providerText', 'cause', 'message', 'body']) assert.ok(!raw.includes(forbidden))
+      assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+      await assert.rejects(stat(output), { code: 'ENOENT' })
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('a failure before a sample exists preserves the startup phase without inventing sample evidence', async () => {
+  const diagnostics = [], failure = { phase: 'build_pin', code: 'startup_build_mismatch' }
+  const fixture = candidateFixture(async options => options.harness === 'claude_code' ? accepted(options.harness) : {
+    mode: 'candidate', status: 'failed', error: failure.code, failure, samples: [], cleanup: { errors: [] },
+  })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+    /template_gate_subscription_or_cleanup_failed/)
+  const failed = diagnostics.find(row => row.kind === 'codex')
+  assert.deepEqual(failed.failure, failure)
+  assert.equal(failed.sampleStatus, 'unavailable')
+  assert.equal(failed.sampleError, null)
+  assert.equal(failed.runIdHash, null)
+  assert.ok(!Object.hasOwn(failed, 'observation'))
+  assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+})
+
+test('startup failure projection drops unknown content and only admits numeric HTTP error statuses', async () => {
+  const secret = 'private_unknown_code_phase_or_http_body'
+  const cases = [
+    [{ phase: secret, code: `startup_${secret}`, httpStatus: 500 }, { phase: 'unknown', code: 'startup_failed' }],
+    [{ phase: secret, code: 'startup_api_refused', httpStatus: 500 }, { phase: 'unknown', code: 'startup_api_refused' }],
+    ...['403', secret, 399, 600, 500.5, null].map(httpStatus => [
+      { phase: 'profile_create', code: 'startup_http_error', httpStatus }, { phase: 'profile_create', code: 'startup_http_error' },
+    ]),
+    [undefined, { phase: 'unknown', code: 'startup_http_error', httpStatus: 503 }],
+  ]
+  for (const [failure, expected] of cases) {
+    const diagnostics = []
+    const fixture = candidateFixture(async options => options.harness === 'claude_code' ? accepted(options.harness) : {
+      mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [{
+        harness: options.harness, status: 'failed', error: failure?.code ?? 'startup_http_503',
+        failure: failure && { ...failure, message: secret, response: { body: secret }, cause: { token: secret } },
+        cleanup: { status: 'passed', errors: [] },
+      }],
+    })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+      /template_gate_subscription_or_cleanup_failed/)
+    const failed = diagnostics.find(row => row.kind === 'codex')
+    assert.deepEqual(failed.failure, expected)
+    assert.equal(failed.sampleError, expected.code)
+    assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+    const raw = JSON.stringify(diagnostics)
+    for (const forbidden of [secret, 'response', 'message', 'cause', 'token']) assert.ok(!raw.includes(forbidden))
+  }
 })
 
 test('failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code', async () => {

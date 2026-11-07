@@ -4,12 +4,25 @@ import { RunRuntimeTimings } from './run-runtime-timing'
 import { runIdHash } from './tracing'
 
 const child = 'a'.repeat(32)
-const event = (type: string, sequence: number, fields: Record<string, unknown> = {}) => ({ version: 1, child, type,
+const event = (type: string, sequence: number, fields: Record<string, unknown> = {}) => ({ version: 2, child, type,
   sequence, at: 1000, lost: 0, ...fields })
 const start = () => event('child_start', 1)
 const begin = (sequence = 2, request = 1) => event('request_start', sequence, { request, operation: 'decision_catalogue' })
 const end = (sequence = 3, request = 1) => event('request_end', sequence, { request, status: 200, outcome: 'ok', durationMs: 3.25 })
 const collector = (remote = 0) => new McpHttpTimingCollector('private-run', 'codex', remote, () => 1000)
+
+it('keeps response headers separate from the later body completion without counting a second send', () => {
+  const value = new McpHttpTimingCollector('private-run', 'codex', 0, () => 1010)
+  expect(value.accept({ ...start(), at: 1010 })).toBe(true)
+  expect(value.accept({ ...begin(), at: 1010 })).toBe(true)
+  expect(value.accept({ ...end(), at: 1010 })).toBe(true)
+  expect(value.accept(event('request_body_end', 4, { request: 1, at: 1010, durationMs: 8.25, outcome: 'read' }))).toBe(true)
+  expect(value.accept(event('child_close', 5, { at: 1010, sent: 1, completed: 1 }))).toBe(true)
+  expect(value.finish()).toMatchObject({ version: 2, observedComplete: true, childLifecycleComplete: true,
+    children: [{ sent: 1, completed: 1, lastSequence: 5 }],
+    requests: [{ endedAt: 1010, durationMs: 3.25, status: 200, outcome: 'ok',
+      body: { endedAt: 1010, durationMs: 8.25, outcome: 'read' } }] })
+})
 
 it('pairs concurrent physical sends by request id, without using receiver arrival as their start time', () => {
   let now = 1000
@@ -28,6 +41,29 @@ it('pairs concurrent physical sends by request id, without using receiver arriva
       { child: 1, sequence: 2, startedAt: 1001, endedAt: 1003, outcome: 'error' }],
     children: [{ child: 1, lastSequence: 6, sent: 2, completed: 2, lost: 0 }] })
   expect(JSON.stringify(receipt)).not.toMatch(/private-run|aaaaaaaa|Bearer|https?:/)
+})
+
+it.each([
+  { outcome: ['read'] }, { outcome: 'ok' }, { durationMs: 1 }, { at: 999 },
+  { content: 'PRIVATE_BODY' }, { request: 2 },
+])('rejects malformed body completion without altering the observed physical send', fields => {
+  const value = collector()
+  value.accept(start()); value.accept(begin()); value.accept(end())
+  expect(value.accept(event('request_body_end', 4, { request: 1, durationMs: 8, outcome: 'read', ...fields }))).toBe(false)
+  const receipt = value.finish()
+  expect(receipt).toMatchObject({ rejectedEvents: 1, observedComplete: false,
+    children: [{ sent: 1, completed: 1, lastSequence: 3 }], requests: [{ body: null, durationMs: 3.25 }] })
+  expect(JSON.stringify(receipt)).not.toContain('PRIVATE_BODY')
+})
+
+it('requires a response before body completion and never accepts it twice', () => {
+  const value = collector()
+  value.accept(start()); value.accept(begin())
+  expect(value.accept(event('request_body_end', 3, { request: 1, durationMs: 8, outcome: 'read' }))).toBe(false)
+  expect(value.accept(end())).toBe(true)
+  expect(value.accept(event('request_body_end', 4, { request: 1, durationMs: 8, outcome: 'error' }))).toBe(true)
+  expect(value.accept(event('request_body_end', 5, { request: 1, durationMs: 9, outcome: 'read' }))).toBe(false)
+  expect(value.finish().requests[0]?.body).toEqual({ endedAt: 1000, durationMs: 8, outcome: 'error' })
 })
 
 it('does not infer lifecycle closure or unseen generations from paired requests, CLI exit, or no observed child', () => {

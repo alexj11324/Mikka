@@ -123,6 +123,38 @@ it('observes the real MCP child catalogue and decision fetches, preserving cache
   } finally { await mcp.close(); await receiver.close(); run.close(); await api.close() }
 })
 
+it('records headers before a held response body and measures the real body completion without another business send', async () => {
+  const releaseBody = deferred<void>()
+  const api = await backend((rpc, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' }); response.flushHeaders()
+    void releaseBody.promise.then(() => response.end(JSON.stringify({ jsonrpc: '2.0', id: rpc.id,
+      result: { tools: [{ name: 'record_decision', inputSchema: { type: 'object' } }] } })))
+  })
+  const observed = receivedEvents(), runId = randomUUID(), run = runRuntimeTimings.begin(runId, 'device', 'codex')
+  const receiver = await startCliTimingCollector({ runId, harness: 'codex', remoteMcpServerCount: 0 })
+  const mcp = client(api.url, receiver.mcpHttpObservationUrl)
+  let replied = false
+  const response = mcp.request('tools/list').then(value => { replied = true; return value })
+  // Attach a rejection observer before assertions so cleanup cannot leave a
+  // rejected child promise behind when the real socket fixture fails.
+  void response.catch(() => {})
+  try {
+    await observed.until(events => events.some(event => event.type === 'request_end'))
+    expect(replied).toBe(false)
+    expect(observed.events.some(event => event.type === 'request_body_end')).toBe(false)
+    releaseBody.resolve()
+    expect(await response).toMatchObject({ result: { tools: expect.arrayContaining([expect.objectContaining({ name: 'record_decision' })]) } })
+    await observed.until(events => events.some(event => event.type === 'request_body_end'))
+    await mcp.close(); await receiver.close()
+    const receipt = run.finish()!.mcpHttpTiming!, request = receipt.requests[0]!
+    expect(api.calls).toHaveLength(1)
+    expect(receipt).toMatchObject({ version: 2, observedComplete: true,
+      children: [{ sent: 1, completed: 1 }], requests: [{ outcome: 'ok', status: 200, body: { outcome: 'read' } }] })
+    expect(request.body!.durationMs).toBeGreaterThan(request.durationMs!)
+    expect(request.body!.endedAt).toBeGreaterThanOrEqual(request.endedAt!)
+  } finally { releaseBody.resolve(); await mcp.close(); await receiver.close(); run.close(); await api.close() }
+})
+
 it.each(['http_error', 'connection_error'] as const)('records a real %s at the physical send without changing the fixed business error', async failure => {
   const api = await backend((_rpc, response) => failure === 'http_error' ? response.writeHead(503).end('PRIVATE_ERROR') : response.destroy())
   const observed = receivedEvents(), runId = randomUUID(), run = runRuntimeTimings.begin(runId, 'device', 'codex')
@@ -135,7 +167,7 @@ it.each(['http_error', 'connection_error'] as const)('records a real %s at the p
     await observed.until(events => events.some(event => event.type === 'request_end'))
     await mcp.close(); await receiver.close()
     expect(run.finish()!.mcpHttpTiming).toMatchObject({ observedComplete: true, childLifecycleComplete: false,
-      requests: [{ operation: 'decision_record', outcome: 'error', status: failure === 'http_error' ? 503 : null }] })
+      requests: [{ operation: 'decision_record', outcome: 'error', status: failure === 'http_error' ? 503 : null, body: null }] })
     expect(api.calls).toHaveLength(1)
   } finally { await mcp.close(); await receiver.close(); run.close(); await api.close() }
 })

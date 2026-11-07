@@ -16,7 +16,7 @@ const MCP_OPERATIONS = new Set(['decision_catalogue', 'decision_record'])
  * generations can be complete; the official CLI's whole generation inventory
  * is not observable here and must never be inferred from an empty receipt. */
 export function readMcpHttpTiming(value, record) {
-  if (value?.version !== 1 || value.source !== 'mikka_mcp_physical_fetch' || value.scope !== 'observed_mikka_mcp_children'
+  if (![1, 2].includes(value?.version) || value.source !== 'mikka_mcp_physical_fetch' || value.scope !== 'observed_mikka_mcp_children'
     || value.generationCoverage !== 'unverified' || value.allFirstPartyHttpComplete !== false
     || !Number.isInteger(value.remoteMcpServerCount) || value.remoteMcpServerCount < 0 || value.remoteMcpServerCount > 64
     || value.childPathAuditVersion !== 1 || value.runIdHash !== record.runIdHash || value.harness !== record.harness
@@ -48,21 +48,37 @@ export function readMcpHttpTiming(value, record) {
       || (request.outcome === 'pending' ? request.endedAt !== null || request.durationMs !== null || request.status !== null
         : !epoch(request.endedAt) || request.endedAt < request.startedAt || request.endedAt > (child.closedAt ?? value.endedAt)
           || !ms(request.durationMs) || request.outcome !== (request.status >= 200 && request.status < 300 ? 'ok' : 'error'))) return null
+    let body
+    if (value.version === 2) {
+      if (!Object.hasOwn(request, 'body')) return null
+      body = request.body
+      if (body !== null) {
+        if (!body || typeof body !== 'object' || Array.isArray(body)
+          || Object.keys(body).length !== 3 || Object.keys(body).some(key => !['endedAt', 'durationMs', 'outcome'].includes(key))
+          || request.endedAt === null || request.status === null
+          || !epoch(body.endedAt) || body.endedAt < request.endedAt || body.endedAt > (child.closedAt ?? value.endedAt)
+          || !ms(body.durationMs) || body.durationMs < request.durationMs
+          || !['read', 'error'].includes(body.outcome)) return null
+        body = { endedAt: body.endedAt, durationMs: body.durationMs, outcome: body.outcome }
+      }
+    }
     seen.add(key)
     requests.push({ child: request.child, sequence: request.sequence, operation: request.operation,
-      startedAt: request.startedAt, endedAt: request.endedAt, durationMs: request.durationMs, status: request.status, outcome: request.outcome })
+      startedAt: request.startedAt, endedAt: request.endedAt, durationMs: request.durationMs, status: request.status, outcome: request.outcome,
+      ...(value.version === 2 ? { body } : {}) })
   }
   const matched = children.every(child => {
       const sent = requests.filter(request => request.child === child.child).sort((a, b) => a.sequence - b.sequence)
       return sent.length === child.sent && child.completed === sent.filter(request => request.outcome !== 'pending').length
         && child.lastSequence === 1 + child.sent + child.completed + (child.closedAt === null ? 0 : 1)
+          + sent.filter(request => request.body != null).length
         && sent.every((request, index) => request.sequence === index + 1)
   })
   const complete = value.observedChildren >= value.expectedChildren && value.rejectedEvents === 0 && !value.truncated
     && children.every(child => child.lost === 0 && child.sent === child.completed) && matched
   const lifecycleComplete = complete && value.closedChildren === value.observedChildren
   if (value.observedComplete && !complete || value.childLifecycleComplete && !lifecycleComplete) return null
-  return { version: 1, source: value.source, scope: value.scope, generationCoverage: 'unverified',
+  return { version: value.version, source: value.source, scope: value.scope, generationCoverage: 'unverified',
     allFirstPartyHttpComplete: false, remoteMcpServerCount: value.remoteMcpServerCount, childPathAuditVersion: 1,
     runIdHash: value.runIdHash, harness: value.harness, startedAt: value.startedAt, endedAt: value.endedAt,
     expectedChildren: 1, observedChildren: value.observedChildren, closedChildren: value.closedChildren,
@@ -91,6 +107,7 @@ export function mcpBusinessEvidence(value, record) {
     const requests = timing.requests.filter(request => request.child === child.child).sort((a, b) => a.sequence - b.sequence)
     if (requests.length !== child.sent || requests.filter(request => request.outcome !== 'pending').length !== child.completed
       || child.lastSequence !== 1 + child.sent + child.completed + (child.closedAt === null ? 0 : 1)
+        + requests.filter(request => request.body != null).length
       || requests.some((request, index) => request.sequence !== index + 1))
       return { ...base, status: 'unavailable', reason: 'mcp_http_sequence_invalid' }
   }

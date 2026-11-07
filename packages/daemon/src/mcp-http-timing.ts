@@ -4,13 +4,14 @@ type Harness = 'claude_code' | 'codex'
 type Operation = 'decision_catalogue' | 'decision_record'
 type Child = { child: number; startedAt: number; closedAt: number | null; lastSequence: number; sent: number; completed: number; lost: number }
 type Request = { child: number; sequence: number; operation: Operation; startedAt: number; endedAt: number | null
-  durationMs: number | null; status: number | null; outcome: 'ok' | 'error' | 'pending' }
+  durationMs: number | null; status: number | null; outcome: 'ok' | 'error' | 'pending'
+  body: { endedAt: number; durationMs: number; outcome: 'read' | 'error' } | null }
 
 /** Only received child generations are observable. A CLI may kill or restart
  * a child before it reports anything; neither a paired request nor CLI exit
  * proves an inventory of every first-party HTTP send. */
 export type McpHttpTiming = {
-  version: 1; source: 'mikka_mcp_physical_fetch'; scope: 'observed_mikka_mcp_children'
+  version: 2; source: 'mikka_mcp_physical_fetch'; scope: 'observed_mikka_mcp_children'
   generationCoverage: 'unverified'; allFirstPartyHttpComplete: false
   runIdHash: string; harness: Harness; startedAt: number; endedAt: number
   expectedChildren: 1; observedChildren: number; closedChildren: number
@@ -28,6 +29,7 @@ const BASE_KEYS = ['version', 'child', 'type', 'sequence', 'at', 'lost']
 const EXTRA_KEYS: Record<string, string[]> = {
   child_start: [], request_start: ['request', 'operation'],
   request_end: ['request', 'durationMs', 'status', 'outcome'], child_close: ['sent', 'completed'],
+  request_body_end: ['request', 'durationMs', 'outcome'],
 }
 const object = (value: unknown): Record<string, unknown> | undefined => value !== null && typeof value === 'object' && !Array.isArray(value)
   ? value as Record<string, unknown> : undefined
@@ -61,7 +63,7 @@ export class McpHttpTimingCollector {
     const extra = typeof event?.type === 'string' && Object.hasOwn(EXTRA_KEYS, event.type) ? EXTRA_KEYS[event.type] : undefined
     const keys = extra && [...BASE_KEYS, ...extra]
     if (!event || !keys || Object.keys(event).length !== keys.length || Object.keys(event).some(key => !keys.includes(key))
-      || event.version !== 1 || typeof event.child !== 'string' || !/^[a-f0-9]{32}$/.test(event.child)
+      || event.version !== 2 || typeof event.child !== 'string' || !/^[a-f0-9]{32}$/.test(event.child)
       || !count(event.sequence) || event.sequence < 1 || !count(event.lost) || !epoch(event.at)
       || event.at < this.startedAt || event.at > this.now()) return this.invalid()
 
@@ -81,7 +83,7 @@ export class McpHttpTimingCollector {
         || !['decision_catalogue', 'decision_record'].includes(event.operation)) return this.invalid()
       if (this.requests.length >= MCP_HTTP_REQUEST_LIMIT) { this.truncate(); return this.invalid() }
       const request: Request = { child: child.child, sequence: event.request, operation: event.operation as Operation,
-        startedAt: event.at, endedAt: null, durationMs: null, status: null, outcome: 'pending' }
+        startedAt: event.at, endedAt: null, durationMs: null, status: null, outcome: 'pending', body: null }
       this.requests.push(request); this.pending.set(`${child.child}:${event.request}`, request); child.sent++
     } else if (event.type === 'request_end') {
       const request = count(event.request) ? this.pending.get(`${child.child}:${event.request}`) : undefined
@@ -91,10 +93,18 @@ export class McpHttpTimingCollector {
         || event.outcome !== (event.status !== null && Number(event.status) >= 200 && Number(event.status) < 300 ? 'ok' : 'error')) return this.invalid()
       Object.assign(request, { endedAt: event.at, durationMs: event.durationMs, status: event.status, outcome: event.outcome })
       this.pending.delete(`${child.child}:${event.request}`); child.completed++
+    } else if (event.type === 'request_body_end') {
+      const request = count(event.request) ? this.requests.find(row => row.child === child.child && row.sequence === event.request) : undefined
+      if (!request || request.endedAt === null || request.status === null || request.body !== null
+        || event.at < request.endedAt || typeof event.durationMs !== 'number' || !Number.isFinite(event.durationMs)
+        || event.durationMs < request.durationMs! || event.durationMs > 86_400_000
+        || (event.outcome !== 'read' && event.outcome !== 'error')) return this.invalid()
+      request.body = { endedAt: event.at, durationMs: event.durationMs, outcome: event.outcome as 'read' | 'error' }
     } else if (event.type === 'child_close') {
       const at = event.at
       if (event.sent !== child.sent || event.completed !== child.completed || child.sent !== child.completed
-        || this.requests.some(request => request.child === child.child && (request.endedAt === null || request.endedAt > at))) return this.invalid()
+        || this.requests.some(request => request.child === child.child && (request.endedAt === null || request.endedAt > at
+          || request.body !== null && request.body.endedAt > at))) return this.invalid()
       child.closedAt = event.at
     } else return this.invalid()
     child.lastSequence = event.sequence; child.lost = event.lost
@@ -109,11 +119,12 @@ export class McpHttpTimingCollector {
     const closedChildren = children.filter(child => child.closedAt !== null).length
     const observedComplete = children.length > 0 && this.pending.size === 0 && this.rejectedEvents === 0 && !this.truncated
       && children.every(child => child.lost === 0 && child.sent === child.completed)
-    return { version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
+    return { version: 2, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
       generationCoverage: 'unverified', allFirstPartyHttpComplete: false, runIdHash: runIdHash(this.runId), harness: this.harness,
       startedAt: this.startedAt, endedAt: this.now(), expectedChildren: 1, observedChildren: children.length, closedChildren,
       observedComplete, childLifecycleComplete: observedComplete && closedChildren === children.length,
       rejectedEvents: this.rejectedEvents, truncated: this.truncated, remoteMcpServerCount: this.remoteMcpServerCount,
-      childPathAuditVersion: 1, children, requests: this.requests.map(request => ({ ...request })) }
+      childPathAuditVersion: 1, children, requests: this.requests.map(request => ({ ...request,
+        body: request.body === null ? null : { ...request.body } })) }
   }
 }

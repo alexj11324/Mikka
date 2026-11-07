@@ -178,6 +178,10 @@ export function markdown(report) {
     const ack = sample.runtimeTiming?.agentAccepted?.at
     lines.push(`| ${sample.sampleId} / ${request.child}.${request.sequence} | ${request.operation} | ${new Date(request.startedAt).toISOString()} | ${request.endedAt === null ? 'unavailable' : new Date(request.endedAt).toISOString()} | ${seconds(request.durationMs)} | ${seconds(Number.isFinite(ack) ? request.startedAt - ack : null)} | ${request.outcome} |`)
   }
+  lines.push('', 'v2 收据另外记录正文读取完成或读取异常；下面的耗时从同一次 fetch 开始累计，不是第二次 HTTP 请求。正文读完不代表 JSON-RPC 解析或官方 CLI 已接收任务；v1 历史收据或缺失的正文事件均显示 unavailable，不能补成零。',
+    '', '| Sample / child.request | UTC body end | 发送到正文结束秒 | Body outcome |', '|---|---|---:|---|')
+  for (const sample of report.samples) for (const request of sample.runtimeTiming?.mcpHttpTiming?.requests ?? [])
+    lines.push(`| ${sample.sampleId} / ${request.child}.${request.sequence} | ${request.body ? new Date(request.body.endedAt).toISOString() : 'unavailable'} | ${seconds(request.body?.durationMs)} | ${request.body?.outcome ?? 'unavailable'} |`)
   lines.push('', '### 官方 CLI provider / tool 耗时观察', '', '仅保留官方 OTLP 数字事件，delivery=best_effort，flush=not_confirmed；CLI 正常退出也不能证明每个事件都已送达。以下是已观察到的逐次事件，不是完整 provider 调用总数。',
     '', '| Sample / event | 事件 | 耗时秒 | Outcome | 官方 sequence |', '|---|---|---:|---|---:|')
   for (const sample of report.samples) for (const [index, event] of (sample.runtimeTiming?.officialCliTiming?.events ?? []).entries())
