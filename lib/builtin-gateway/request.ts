@@ -1,5 +1,6 @@
 import { bearerMatches, deviceGatewayTicketValid } from '../device-gateway-ticket'
 import { LIVE_CHANNEL, LIVE_ID, LIVE_REVISION_PARAM, liveInvalidations } from '../live/events'
+import { LIVE_PRESENCE_PARAM } from '../live/presence'
 import { builtinGatewayConfig } from './config'
 import type { GatewayHub, GatewaySocket } from './hub'
 
@@ -30,7 +31,8 @@ export function gatewayUpgrade(request: Request, env: Environment = process.env,
   if (!deviceGatewayTicketValid(name, offered, found.config.secret, now)) return new Response(null, { status: 401 })
   const protocol = offered.split(',').map(item => item.trim()).find(item => item.startsWith('mikka-ticket-'))!
   const expiresAt = Number(protocol.split('-')[2]) * 1000
-  return { protocol, socket: { kind: found.kind, key: found.key, expiresAt, revisions: found.url.searchParams.get(LIVE_REVISION_PARAM) === '1' } }
+  return { protocol, socket: { kind: found.kind, key: found.key, expiresAt, revisions: found.url.searchParams.get(LIVE_REVISION_PARAM) === '1',
+    ...(found.kind === 'live' && found.url.searchParams.get(LIVE_PRESENCE_PARAM) === '1' ? { presence: true } : {}) } }
 }
 
 export async function gatewayRequest(request: Request, hub: GatewayHub, env: Environment = process.env): Promise<Response> {

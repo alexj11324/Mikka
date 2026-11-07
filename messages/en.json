@@ -3476,6 +3476,7 @@
       "separator": " · ",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all",
+      "card": {"thinkingDone": "Done thinking", "finished": "{tool} finished", "failed": "Failed", "args": "Arguments", "result": "Result", "waiting": "Waiting for result…", "empty": "No arguments or result", "usedTools": "Used {count, plural, one {# tool} other {# tools}}", "usingTools": "Using tools…", "showAll": "Show all", "showLess": "Show less"},
       "detail": {
         "handedTo": "Handed to",
         "query": "Query",
