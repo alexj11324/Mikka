@@ -1,6 +1,7 @@
 import { bearerMatches, deviceGatewayTicketValid } from '../device-gateway-ticket'
 import { LIVE_CHANNEL, LIVE_ID, LIVE_REVISION_PARAM, liveInvalidations } from '../live/events'
 import { LIVE_PRESENCE_PARAM } from '../live/presence'
+import { readSessionLiveTicket } from '../live/session-ticket'
 import { builtinGatewayConfig } from './config'
 import type { GatewayHub, GatewaySocket } from './hub'
 
@@ -27,12 +28,19 @@ export function gatewayUpgrade(request: Request, env: Environment = process.env,
   if (!found || found.operation !== 'socket') return new Response(null, { status: 404 })
   if (request.method !== 'GET' || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return new Response(null, { status: 426 })
   const offered = request.headers.get('sec-websocket-protocol') ?? ''
-  const name = found.kind === 'live' ? `live:${found.key}` : found.key
-  if (!deviceGatewayTicketValid(name, offered, found.config.secret, now)) return new Response(null, { status: 401 })
+  if (found.kind === 'live') {
+    // Built-in live never accepts an unbound legacy ticket. Worker and device
+    // protocols are unchanged; all browser/native clients pass this opaque value through.
+    const ticket = readSessionLiveTicket(found.key, offered, found.config.secret, now)
+    if (!ticket) return new Response(null, { status: 401 })
+    return { protocol: ticket.protocol, socket: { kind: 'live', key: found.key, sessionId: ticket.sessionId,
+      expiresAt: ticket.expiresAt, revisions: found.url.searchParams.get(LIVE_REVISION_PARAM) === '1',
+      ...(found.url.searchParams.get(LIVE_PRESENCE_PARAM) === '1' ? { presence: true } : {}) } }
+  }
+  if (!deviceGatewayTicketValid(found.key, offered, found.config.secret, now)) return new Response(null, { status: 401 })
   const protocol = offered.split(',').map(item => item.trim()).find(item => item.startsWith('mikka-ticket-'))!
   const expiresAt = Number(protocol.split('-')[2]) * 1000
-  return { protocol, socket: { kind: found.kind, key: found.key, expiresAt, revisions: found.url.searchParams.get(LIVE_REVISION_PARAM) === '1',
-    ...(found.kind === 'live' && found.url.searchParams.get(LIVE_PRESENCE_PARAM) === '1' ? { presence: true } : {}) } }
+  return { protocol, socket: { kind: found.kind, key: found.key, expiresAt, revisions: found.url.searchParams.get(LIVE_REVISION_PARAM) === '1' } }
 }
 
 export async function gatewayRequest(request: Request, hub: GatewayHub, env: Environment = process.env): Promise<Response> {
