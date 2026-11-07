@@ -1,0 +1,55 @@
+{
+  "source": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+  "tree": "977111e65ae6bc8c15b88e01810f2f143512c4dd",
+  "overlay": "ac5980696802f188a81124a8a3f2513be2d14e9e",
+  "command": "pnpm build:app",
+  "exitCode": 0,
+  "durationSeconds": 128.36,
+  "buildMetadata": {
+    "version": 1,
+    "revision": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "preset": "node-server",
+    "node": "v24.22.1",
+    "basePath": "/mikka",
+    "appBuild": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "testDeploymentSha": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "lockSha256": "485665d544f5f2175933eb7a4d45ffcb5167bb60d676ad157d7dbea1ab080367",
+    "routesSha256": "371a4f218bed74546211a4d3b7fa3532c9759d8fbfffe66734962f93fdf153f6",
+    "tracingSha256": "3f81ebfa9f675ec75993d1303a81540b21ac07f276bfac93bafedb45608d696a"
+  },
+  "rendererBuild": "074aadefa5f4b52e647c5e12ffe816c6b1d5cd3873c7481826295b8b529118fb",
+  "overlayVerification": {
+    "status": "verified",
+    "checkedAt": "2026-11-07T07:15:39.648517+00:00",
+    "integrationSourceSha": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "integrationTreeSha": "977111e65ae6bc8c15b88e01810f2f143512c4dd",
+    "integrationParents": [
+      "ad5e5db5ed5547ea19644ce2381992d8d1583eb9",
+      "156b6a2779d1ee71161b99ab47b3484e2a8b5704"
+    ],
+    "previousOverlaySha": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+    "overlaySha": "ac5980696802f188a81124a8a3f2513be2d14e9e",
+    "officialTrackedBlobs": 180,
+    "officialTrackedBlobsMatched": 170,
+    "missingBuildInputs": 0,
+    "mismatchedGitBlobs": 0,
+    "excludedDocumentationScreenshotBlobs": 10,
+    "extraTrackedSourceFiles": 0,
+    "changedFilesUpdatedFromOfficialCommit": 6,
+    "sourceSnapshotStillMatchesPreviousOfficialRevision": true,
+    "sourceSnapshotVerifiedBlobs": 166,
+    "sourceSnapshotExcludedDocumentationScreenshots": 10,
+    "integrationWorktreeClean": true,
+    "privateDependencyDirectoryCopied": true,
+    "publicDependencyDirectoryAvailable": true,
+    "verificationScope": "All official tracked source, asset, configuration and lockfile blobs; documentation PNG screenshots are excluded and are not build inputs. Installed dependency bytes are copied, not separately re-attested.",
+    "privateSourcePrinted": false,
+    "privateSourceUploaded": false
+  },
+  "parents": [
+    "ad5e5db5ed5547ea19644ce2381992d8d1583eb9",
+    "156b6a2779d1ee71161b99ab47b3484e2a8b5704"
+  ],
+  "buildMetadataSha256": "a3ba51ef7dfdb11cd3b71d3cdf63fd30f210bc95ac71501dabeeee3574c35575",
+  "buildMetadataResourceCount": 43
+}

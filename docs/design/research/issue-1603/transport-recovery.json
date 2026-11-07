@@ -1,0 +1,80 @@
+{
+  "observedAt": "2026-11-07T07:04:44.032Z",
+  "scope": "temporary test transport, no product source changes",
+  "originalFailure": {
+    "job": "job-4c407e9accb6",
+    "at": "2026-11-07T06:42:03.339Z",
+    "pgError": "Connection terminated unexpectedly",
+    "databaseServerObservation": "client reset and unexpected EOF with open transaction",
+    "originalWebSocketCloseCode": null
+  },
+  "expiryReproduction": {
+    "startedAt": "2026-11-07T07:04:23.821Z",
+    "requestedTtlSeconds": 20,
+    "elapsedMs": 20211,
+    "protocolCode": "unauthenticated",
+    "closeCode": 1008,
+    "outputChunks": 25
+  },
+  "repair": "Proactive WebSocket attachment renewal; pause local input, complete old close handshake, resume same remote process from last received output sequence; never replay stdin",
+  "canary": {
+    "startedAt": "2026-11-07T07:04:48.999Z",
+    "source": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+    "rounds": [
+      {
+        "round": 1,
+        "rows": 1,
+        "payloadBytes": 174764,
+        "payloadSha256": "344a4270166ae79b1bd3aa37ac51fb7c39b719d79ec148b502dcde5a9bec11df",
+        "sameBackend": true,
+        "renewalCompleted": true
+      },
+      {
+        "round": 2,
+        "rows": 2,
+        "payloadBytes": 174764,
+        "payloadSha256": "5bbdc954d5d59e2742465c88225a92a95344e80890f4a751fc0216e3521a8843",
+        "sameBackend": true,
+        "renewalCompleted": true
+      },
+      {
+        "round": 3,
+        "rows": 3,
+        "payloadBytes": 174764,
+        "payloadSha256": "51283b62f45f899c2f7c660ff76702172afc08c428bcd8eebb8afb575b8ef549",
+        "sameBackend": true,
+        "renewalCompleted": true
+      }
+    ],
+    "businessWrites": false,
+    "tlsAuthorized": true,
+    "completedAt": "2026-11-07T07:05:09.036Z",
+    "status": "passed"
+  },
+  "renewals": [
+    {
+      "at": "2026-11-07T07:04:53.624Z",
+      "ageMs": 86781,
+      "previousSequence": "9",
+      "resumeFrom": "9",
+      "stdinReplayed": false,
+      "processRecreated": false
+    },
+    {
+      "at": "2026-11-07T07:05:02.397Z",
+      "ageMs": 95554,
+      "previousSequence": "17",
+      "resumeFrom": "17",
+      "stdinReplayed": false,
+      "processRecreated": false
+    },
+    {
+      "at": "2026-11-07T07:05:07.834Z",
+      "ageMs": 100991,
+      "previousSequence": "30",
+      "resumeFrom": "30",
+      "stdinReplayed": false,
+      "processRecreated": false
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-11-07T07:19:14.159Z",
+  "status": "ready",
+  "origin": "http://localhost:3110",
+  "environmentId": "local-7ed7e7be-7c84-4bda-a89e-9ac84244bfb7",
+  "database": "mikka_issue1603_final4_e2e",
+  "source": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+  "compiledBuild": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+  "servedBuild": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+  "rendererBuild": "074aadefa5f4b52e647c5e12ffe816c6b1d5cd3873c7481826295b8b529118fb",
+  "overlaySha": "ac5980696802f188a81124a8a3f2513be2d14e9e"
+}

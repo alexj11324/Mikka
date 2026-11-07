@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "issue": 1372,
+  "status": "pass",
+  "environment": {
+    "id": "local-b6449483-709d-4ea9-986f-40a47afd83e0",
+    "origin": "http://localhost:3110",
+    "deploymentSha": "156b6a2779d1ee71161b99ab47b3484e2a8b5704"
+  },
+  "runId": "read-cache-0c0ee339-5be0-497f-9a9f-b1e7675c516e",
+  "startedAt": "2026-11-07T07:07:11.880Z",
+  "finishedAt": "2026-11-07T07:09:45.956Z",
+  "boundaries": {
+    "businessRequestWrites": false,
+    "modelExecution": false,
+    "browserExecution": false
+  },
+  "cleanup": {
+    "fixtures": "succeeded",
+    "lease": "released-clean"
+  },
+  "serverMode": "production",
+  "readCount": 35,
+  "job": "job-dac4e5acc290",
+  "jobStartedAt": "2026-11-07T07:07:08.830Z",
+  "jobCompletedAt": "2026-11-07T07:10:16.406Z",
+  "exitCode": 0,
+  "database": "mikka_issue1603_final3_e2e",
+  "transportRenewal": "same process and same PostgreSQL connection; no stdin replay"
+}

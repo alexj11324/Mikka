@@ -1,0 +1,34 @@
+{
+  "at": "2026-11-07T07:06:06.076Z",
+  "source": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+  "database": "mikka_issue1603_final2_e2e",
+  "failedJob": "job-4c407e9accb6",
+  "cleanRelease": false,
+  "before": [
+    {
+      "runId": "read-cache-6ca0c41d-ca6e-4396-b4db-a09c8aa10d82",
+      "state": "active",
+      "expiresAt": "2026-11-07T06:43:10.327Z"
+    }
+  ],
+  "after": [
+    {
+      "runId": "read-cache-6ca0c41d-ca6e-4396-b4db-a09c8aa10d82",
+      "state": "quarantined",
+      "expiresAt": "2026-11-07T06:43:10.327Z"
+    }
+  ],
+  "resourceCounts": {
+    "cleaned": 9,
+    "created": 18,
+    "retained": 2
+  },
+  "databaseRetirement": "retired",
+  "databaseRetiredAt": "2026-11-07T07:06:57.632525+00:00",
+  "retirementVerified": {
+    "owner": "issue1603",
+    "connectionsBefore": 0,
+    "activeLeasesBefore": 0,
+    "forced": false
+  }
+}
