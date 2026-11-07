@@ -70,7 +70,7 @@ export function FactoryArtifactAcceptance({ taskId, issueId, review, ...view }: 
   // The report lead is read-only and drawn in every state of the PR, also while a fix run or failed checks
   // unbind the decision below (P3, P7b); the decision's actions stay bound to the current candidate.
   return <>
-    {review?.slots.lead && view.version === view.latestVersion && createPortal(<ArtifactReportLead task={task} artifactId={view.artifactId} onBannerSlot={setBanner} />, review.slots.lead)}
+    {review?.slots.lead && view.version === view.latestVersion && createPortal(<ArtifactReportLead task={task} artifactId={view.artifactId} onBannerSlot={setBanner} actions={review.slots.actions} />, review.slots.lead)}
     <ArtifactDecision task={task} {...view} review={review && { ...review, slots: { ...review.slots, banner } }} />
   </>
 }

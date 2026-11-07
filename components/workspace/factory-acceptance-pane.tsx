@@ -400,8 +400,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     const failedChecks = results.filter(row => row.status === 'failed')
     const actions = <>
       {(kind === 'review' || kind === 'refused' || kind === 'merging') && canRequest && <Button size="sm" variant="secondary" disabled={busy || kind === 'merging'} onClick={ask}>{tReview('changeRequestLabel')}</Button>}
-      {kind === 'fixing' && <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground"><Spinner />{tReview('state.fixing')}</span>}
-      {(kind === 'review' || kind === 'refused' || kind === 'fixing') && <Button size="sm" disabled={busy || kind !== 'review' || !ledger} onClick={() => setConfirming(true)}>{tReview('approveAndMerge')}</Button>}
+      {(kind === 'review' || kind === 'refused') && <Button size="sm" disabled={busy || kind !== 'review' || !ledger} onClick={() => setConfirming(true)}>{tReview('approveAndMerge')}</Button>}
       {kind === 'merging' && <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground"><Spinner />{tReview('state.merging')}</span>}
       {kind === 'merged' && <>
         <span className="flex items-center gap-1.5 text-sm"><span className="flex size-4 [&_svg]:size-4"><PullRequestIcon state="merged" /></span>{merged?.finishedAt ? tReview('mergedAt', { time: time(merged.finishedAt) }) : tReview('state.merged')}</span>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowRight, ChevronRight, CircleCheck, CircleX, ExternalLink, Play } from 'lucide-react'
@@ -153,7 +154,7 @@ export function ReportBanner({ tone, icon, title, detail, children }: { tone: 'm
  * the task's state from the shared detail, flow and ledger reads, so it stays while a fix run or failed checks
  * unbind the decision; a bound decision puts its own buttons into the banner through `onBannerSlot`.
  */
-export function ArtifactReportLead({ task, artifactId, onBannerSlot }: { task: FactoryTask; artifactId: string; onBannerSlot: (node: HTMLElement | null) => void }) {
+export function ArtifactReportLead({ task, artifactId, onBannerSlot, actions: header }: { task: FactoryTask; artifactId: string; onBannerSlot: (node: HTMLElement | null) => void; /** The window header's action area: a fix run names itself there (P3), with nothing to decide. */ actions?: HTMLElement | null }) {
   const t = useTranslations('ArtifactReview')
   const tAcceptance = useTranslations('FactoryAcceptance')
   const format = useFormatter()
@@ -173,5 +174,8 @@ export function ArtifactReportLead({ task, artifactId, onBannerSlot }: { task: F
       {github}{actions}
     </ReportBanner> : undefined
   // The changes are the candidate's work tree; during a fix run that is still the PR's last candidate.
-  return <AcceptanceReport artifactId={artifactId} issueId={task.issueId} runId={task.candidateRunId ?? flow?.acceptance?.runId ?? null} detail={detail} flow={flow} results={results} banner={banner} />
+  return <>
+    {header && kind === 'fixing' && createPortal(<span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground"><Spinner />{t('state.fixing')}</span>, header)}
+    <AcceptanceReport artifactId={artifactId} issueId={task.issueId} runId={task.candidateRunId ?? flow?.acceptance?.runId ?? null} detail={detail} flow={flow} results={results} banner={banner} />
+  </>
 }
