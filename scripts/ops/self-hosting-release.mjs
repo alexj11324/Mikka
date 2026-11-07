@@ -3,7 +3,7 @@ import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: '4ba1630111ea92ebed7a399f84e8a2332d8a2967', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: 'c0839251df609a03531abd11ad940e5befb073dd', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -32,7 +32,7 @@ export async function prepare({env=process.env,fetcher=fetch,report}) {
   const auth=origin.includes('infisical')?token:env.VERCEL_TEAM_TOKEN;demand(auth,'AUTH_MISSING')
   let r;try{r=await fetcher(origin+path,{method,redirect:'error',signal:AbortSignal.timeout(20000),headers:{authorization:'Bearer '+auth,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})})}catch{throw Error('API_TRANSPORT')}
   report.requests.push({host:origin.includes('infisical')?'infisical':'vercel',method,path:path.split('?')[0].replace(/\/secrets\/[^/]+$/,'/secrets/[name]'),status:r.status})
-  demand(r.ok,'API_HTTP_'+r.status);return r.status===204?{}:r.json()
+  if(!r.ok){let e={};try{e=await r.json()}catch{};const text=String(e.message??'');report.apiFailure={status:r.status,code:typeof e.error==='string'&&/^[A-Za-z _-]{1,60}$/.test(e.error)?e.error:'OTHER',planLimit:/plan|limit|upgrade/i.test(text),permission:/permission|forbidden|access|privilege/i.test(text),notFound:/not found|could not find/i.test(text),validation:/validation|invalid|schema|expected|recogniz/i.test(text),detailsKeys:e.details&&typeof e.details==='object'?Object.keys(e.details).filter(x=>/^[A-Za-z0-9_-]{1,60}$/.test(x)):[]};throw Error('API_HTTP_'+r.status)}return r.status===204?{}:r.json()
  }
  const inf=(p,m,b)=>request('https://app.infisical.com',p,m,b)
  const ver=(p,m,b)=>request('https://api.vercel.com',p,m,b)

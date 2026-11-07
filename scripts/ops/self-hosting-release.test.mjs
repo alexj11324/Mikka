@@ -7,3 +7,5 @@ test('existing data key is retained or referenced and ambiguous keys block befor
 test('untrusted execution cannot start a release',()=>{assert.throws(()=>assertExecution({}, {},'a'.repeat(40),TARGET.base,[]),/SCOPE/)})
 
 // Prepare dispatch uses a YAML block scalar for the colon-bearing commit prefix.
+
+// API refusals are classified without printing raw errors or request bodies.
