@@ -1,0 +1,38 @@
+name: Existing Infisical cloud capabilities
+
+on:
+  push:
+    branches: [ops/infisical-cloud-capabilities]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infisical-cloud-capabilities
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Test fixed scope, metadata-only routes and closed output
+        run: node --test scripts/ops/infisical-cloud-capabilities.test.mjs
+      - name: Verify the reviewed branch and three-file change before authentication
+        run: node scripts/ops/infisical-cloud-capabilities.mjs --preflight
+      - name: Reuse existing OIDC identity and inspect only management metadata
+        run: node scripts/ops/infisical-cloud-capabilities.mjs --inspect
