@@ -1,44 +1,50 @@
 # Self-hosted GitHub App registration
 
-## Staging checkpoint — #1563 is not ready for acceptance
+## Verified official App snapshot
 
-The encrypted configuration, administrator boundary, Manifest registration
-flow, existing GitHub readers and settings UI are implemented. The static
-permissions/events snapshot still needs the official App's authenticated
-metadata. `lib/github/manifest-template.ts` deliberately contains `null` at
-this checkpoint: registration returns the `template` error before storing
-an intent or opening GitHub. Do not treat this checkpoint as completed
-one-click registration or merge it as the final #1563 result.
+One-click registration uses the bundled permissions/events in
+`lib/github/manifest-template.ts`. The existing OIDC/Infisical Actions
+[run 42369222955](https://github.com/alexj11324/Mikka/actions/runs/42369222955/job/128393675936)
+read the official `mikka-github` App at `2026-11-07T11:43:44.314Z` with authenticated
+`GET https://api.github.com/app`. Workflow source: `ec4a331a`, using the existing
+identity and named App credentials in `prod:/github`. Only public metadata was
+recorded; credentials and the signed JWT remain in the runner. Anonymous lookup
+404 and personal GitHub token 401 do not replace this authenticated snapshot.
 
-Anonymous `GET /apps/mikka-github` returned 404. That does not establish
-whether the App exists; a private App is not available through that lookup.
-The read-only CI probe found no `GITHUB_APP_ID` or `GITHUB_APP_PRIVATE_KEY`
-named secrets at Infisical `prod:/vercel`. The existing Vercel deployment
-identity can select their production environment entries, but those reads
-have not returned usable credential values. Neither result is permission
-to change identity, reveal credentials, or guess the App's permissions.
+The exact permission snapshot is:
 
-## Obtain the public metadata once
+| Permission | Access |
+| --- | --- |
+| `actions` | write |
+| `administration` | read |
+| `checks` | read |
+| `contents` | write |
+| `deployments` | read |
+| `discussions` | write |
+| `emails` | read |
+| `gists` | write |
+| `issues` | write |
+| `members` | read |
+| `merge_queues` | read |
+| `metadata` | read |
+| `organization_projects` | write |
+| `pull_requests` | write |
+| `repository_advisories` | read |
+| `repository_custom_properties` | read |
+| `repository_projects` | write |
+| `secret_scanning_alerts` | read |
+| `security_events` | read |
+| `starring` | write |
+| `statuses` | read |
+| `vulnerability_alerts` | read |
+| `workflows` | write |
 
-An explicitly appointed server administrator with a fresh session can read:
+Events: `deployment_protection_rule`, `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`.
 
-```text
-GET /mikka/api/github/manifest?metadata=1
-```
-
-This signs a short-lived App JWT in server memory and only calls the fixed
-`https://api.github.com/app` endpoint. It returns the validated App slug,
-permission names/access levels and event names. It never returns the JWT,
-private key, webhook secret, client secret, raw provider response, or an
-arbitrary URL. Other users receive only their non-admin status and no
-provider request is made. This is an explicit administrator operation, not
-part of application startup or ordinary GitHub calls.
-
-Record the revision, deployment origin and read time, copy that public
-projection into `GITHUB_APP_MANIFEST_TEMPLATE`, cite its source here, and
-remove this staging notice and the temporary `template` error. A new
-self-hosted server must create its App entirely from that bundled snapshot
-without reading Mikka or the official App at runtime.
+A new self-hosted server creates its private App entirely from this bundled
+snapshot, without reading Mikka or the official App at runtime. The server-admin
+metadata endpoint remains an explicit read-only operation; it is not a runtime
+registration dependency. Existing cloud App configuration remains unchanged.
 
 ## Behavior and validation
 
@@ -74,7 +80,7 @@ hands setup to the system browser, as the existing GitHub linking flow does.
 | Use the newly saved App | Environment-only readers | Connection, installation, repository checks, webhook and redelivery use the encrypted database App immediately |
 | Reuse the App for sign-in | Separate OAuth environment client | Explicit opt-in, activated on restart; existing cloud sign-in remains the default |
 
-Remaining acceptance after the verified snapshot lands: real App creation
+Remaining real acceptance: real App creation
 on a public HTTPS self-hosted instance without `GITHUB_APP_*` environment
 variables; installation on a test repository; clone/push/PR and signed
 webhook/merge behavior; existing cloud App behavior; production-build UI
