@@ -3476,6 +3476,7 @@
       "separator": " · ",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all",
+      "card": {"thinkingDone": "Done thinking", "finished": "{tool} finished", "failed": "Failed", "args": "Arguments", "result": "Result", "waiting": "Waiting for result…", "empty": "No arguments or result", "usedTools": "Used {count, plural, one {# tool} other {# tools}}", "usingTools": "Using tools…", "showAll": "Show all", "showLess": "Show less"},
       "detail": {
         "handedTo": "Handed to",
         "query": "Query",
@@ -5274,5 +5275,81 @@
     "checkUpdate": "Check for update",
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
+  },
+  "HostedSettings": {
+    "general": {
+      "iconHint": "PNG, JPEG, WebP or GIF, up to 200 KB"
+    },
+    "memory": {
+      "title": "Memory",
+      "count": "{count, plural, one {# memory} other {# memories}}",
+      "off": "Learning is off",
+      "offNote": "Nothing new is learnt from your connected apps. What is here stays.",
+      "category": "Kind",
+      "all": "All",
+      "search": "Search memories",
+      "closeSearch": "Close search",
+      "noMatch": "No memory mentions “{query}”",
+      "noneHere": "No memories here",
+      "editing": "Enter to save · Esc to cancel",
+      "deleted": "Deleted “{text}”",
+      "learned": "Learnt from your connected apps",
+      "edited": "You corrected it"
+    },
+    "security": {
+      "othersDone": "Other devices are signed out",
+      "othersTitle": "Sign out other devices",
+      "othersHint": "Every device but this one is signed out and has to sign in again.",
+      "othersConfirm": "Sign out now"
+    },
+    "account": {
+      "note": "Your account details apply to every workspace you are in.",
+      "pictureHint": "PNG, JPEG or WebP"
+    },
+    "models": {
+      "defaults": "Defaults",
+      "filterLabel": "Filter models",
+      "filterAll": "All",
+      "filterSubscription": "Subscriptions",
+      "filterApiKey": "API keys",
+      "filterCustom": "Custom",
+      "search": "Search models",
+      "clearSearch": "Clear search",
+      "noMatch": "No models match “{query}”",
+      "noCustom": "No custom providers yet",
+      "defaultBadge": "Default",
+      "readOnly": "Models can’t be turned off one by one yet",
+      "providerOn": "{on}/{total} on",
+      "firstModel": "Tasks start with",
+      "keyProvider": "Provider"
+    }
+  },
+  "DesktopServer": {
+    "title": "Choose a server",
+    "server": "Server",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "Self-hosted server",
+    "address": "Server address",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "change": "Change",
+    "switch": "Switch",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect {name} and sign out of its accounts?",
+    "version": "Version {version}",
+    "errors": {
+      "invalidAddress": "This address isn't valid",
+      "httpsRequired": "The address must start with https://",
+      "unreachable": "Can't reach this server",
+      "notMikka": "This address isn't a Mikka server",
+      "serverUpdate": "This server runs {version}, which is too old. Update the server to the latest version",
+      "serverUpdateUnknown": "This server is too old. Update the server to the latest version",
+      "appUpdate": "Update Mikka to {version} or later",
+      "appUpdateUnknown": "Update Mikka to the latest version",
+      "failed": "That didn't work"
+    }
   }
 }

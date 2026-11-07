@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
-import { APP_BUILD, STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild, readAppVersion, markPageNeedsRefresh } from '@/lib/app-build'
+import { APP_BUILD, desktopBelowMinimum, isStaleBuild, readAppVersion, markPageNeedsRefresh, subscribePageRefresh } from '@/lib/app-build'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { bridgeFromWindow } from '@/lib/platform/detect'
@@ -43,11 +43,8 @@ function VersionGuardContent() {
     return () => { disposed = true; clearInterval(timer) }
   }, [pathname, search, offer])
 
-  // lib/app-build.ts watchRemovedActions raises this when it could not reload.
-  useEffect(() => {
-    window.addEventListener(STALE_BUILD_EVENT, offer)
-    return () => { window.removeEventListener(STALE_BUILD_EVENT, offer) }
-  }, [offer])
+  // Retain the page and offer an explicit refresh, including an early missing action.
+  useEffect(() => subscribePageRefresh(window, offer), [offer])
   return <AlertDialog open={required} onOpenChange={() => {}}>
     <AlertDialogContent size="sm">
       <AlertDialogHeader><AlertDialogTitle>{t('appUpdated')}</AlertDialogTitle></AlertDialogHeader>

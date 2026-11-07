@@ -12,10 +12,11 @@ import { createLogger } from '../src/log'
 import { ComputerBroker } from '../src/computer/broker.mjs'
 import { ToolApprovalGate } from '../src/agents/tool-approval'
 import { Daemon } from '../src/main'
+import { runRuntimeTimings } from '../src/run-runtime-timing'
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(cleanupTempDirs)
-async function fixture(harness: 'codex' | 'claude_code' = 'claude_code') {
+async function fixture(harness: 'codex' | 'claude_code' = 'claude_code', collectCliTiming?: boolean) {
   const root = tempDir('machine-direct-'), stateDir = join(root, 'adapters'), home = join(root, 'home')
   mkdirSync(stateDir); mkdirSync(home)
   const runId = randomUUID(), deviceId = randomUUID(), cwd = await makeRepo()
@@ -37,12 +38,49 @@ async function fixture(harness: 'codex' | 'claude_code' = 'claude_code') {
   const options = { runId, toolApproval: gate, cwd, prompt: 'hello', model: 'fixture-model',
     env: { PATH: process.env.PATH!, HOME: home, XDG_CONFIG_HOME: join(home, '.config'), GH_CONFIG_DIR: join(home, '.config', 'gh') }, log: createLogger({ level: 'silent' }) }
   const config = join(home, harness === 'codex' ? '.codex' : '.claude')
-  const runner = await createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary } })
+  const runner = await createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary }, collectCliTiming })
   return { root, stateDir, home, cwd, config, link, never, binary, assignment, options, gate, runner }
 }
 const collect = async (session: Awaited<ReturnType<Awaited<ReturnType<typeof createHostedBotRunner>>['start']>>) => {
   const events = []; for await (const event of session.events()) events.push(event); return events
 }
+
+for (const harness of ['codex', 'claude_code'] as const) {
+  it.each(['default', 'acceptance_host', 'repository'] as const)(`${harness} collects CLI timing only for an explicit diagnostic opt-in (%s)`, async source => {
+    const f = await fixture(harness, source === 'acceptance_host' ? true : undefined)
+    // Normal personal-device claims have no cloud-only task environment.
+    delete f.assignment.taskEnv
+    if (source === 'repository') f.assignment.taskEnv = { CLOUD_STARTUP_TIMING: '1' }
+    const before = structuredClone(f.assignment)
+    const observation = runRuntimeTimings.begin(f.assignment.runId, f.assignment.deviceId, harness)
+    try {
+      const session = await f.runner.start(f.assignment, { ...f.options,
+        env: { ...f.options.env, FIXTURE_MACHINE_AUTH: '1' } })
+      expect((await collect(session)).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+      const receipt = observation.finish()!
+      if (source === 'default') expect(receipt.officialCliTiming).toBeUndefined()
+      else expect(receipt.officialCliTiming).toMatchObject({ harness, source: 'official_cli_otlp',
+        collection: 'best_effort', flush: 'not_confirmed', cliExitObserved: true, events: [] })
+      expect(f.assignment).toEqual(before)
+      expect(f.never).not.toHaveBeenCalled()
+    } finally { observation.close() }
+  })
+}
+
+it.each([true, false])('Codex clears inherited compression only with timing enabled (%s)', async enabled => {
+  const f = await fixture('codex', enabled)
+  const options = { ...f.options, env: { ...f.options.env, FIXTURE_TIMING_ENV: '1',
+    OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: 'none' } }
+  f.assignment.taskEnv = { ...f.assignment.taskEnv, OTEL_EXPORTER_OTLP_COMPRESSION: 'gzip' }
+  const assignmentBefore = structuredClone(f.assignment), envBefore = { ...options.env }
+  expect((await collect(await f.runner.start(f.assignment, options))).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(JSON.parse(readFileSync(join(f.config, 'fixture-timing-env.json'), 'utf8'))).toEqual({
+    logsCompression: enabled ? null : 'none', genericCompression: enabled ? null : 'gzip', exporterConfigured: enabled,
+  })
+  expect(f.assignment).toEqual(assignmentBefore)
+  expect(options.env).toEqual(envBefore)
+  expect(f.never).not.toHaveBeenCalled()
+})
 
 it.each(['codex', 'claude_code'] as const)('%s consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request', async harness => {
   const f = await fixture(harness)
@@ -108,7 +146,8 @@ it.each(['codex', 'claude_code'] as const)('%s stops its actual CLI immediately 
 })
 
 it.each(['route', 'model', 'expired', 'stopped'] as const)('refuses %s before any CLI receives the prompt', async reason => {
-  const f = await fixture()
+  // The trusted diagnostic switch must not weaken the ordinary run gates.
+  const f = await fixture('claude_code', true)
   if (reason === 'route') f.assignment.subscriptionLease!.route = 'codex_cli'
   if (reason === 'model') f.assignment.model = 'wrong-model'
   if (reason === 'expired') f.assignment.subscriptionLease!.expiresAt = new Date(0).toISOString()

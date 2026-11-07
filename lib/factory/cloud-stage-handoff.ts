@@ -35,7 +35,7 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
   // A lost step response can replay after the worker claimed. Continue this
   // durable workflow's lifecycle without parking or bootstrapping active work.
   if (handoff.status !== 'queued') return true
-  try { if (previousRunId) await factoryAutomaticRuntime.park(pool, actor, previousRunId) }
+  try { if (previousRunId) await factoryAutomaticRuntime.park(pool, actor, previousRunId, runId) }
   catch {
     await failFactoryCloudStage(pool, actor, runId, 'Previous stage artifacts could not be retained')
     return false

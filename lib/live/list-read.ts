@@ -1,5 +1,6 @@
 import { LIVE_ID } from './events'
 import { botKeys, issueKeys } from '@/lib/swr/keys'
+import type { PresenceProof } from './presence'
 
 export type ListLiveRead = {
   ownerId: string
@@ -8,8 +9,17 @@ export type ListLiveRead = {
   deadline?: { at: string; afterMs: number }
   /** Live keys' revisions, read before this list (lib/live/revisions.ts). */
   revisions?: Record<string, number>
+  /** A device-dependent read needs an acknowledged watch before its presence
+   * fallback can stop. Null explicitly retains it; absent means no dependency. */
+  presence?: PresenceProof | null
 }
 export type ObservedList = { live?: ListLiveRead; requestedAt?: number }
+
+/** Old servers keep their existing fallback flag. A new proof is only a
+ * prerequisite: LiveChannel still requires the matching Worker acknowledgement. */
+export function listReadPresence(read: (ObservedList & { presenceFallback?: boolean }) | undefined) {
+  return read?.live?.presence !== undefined ? read.live.presence : read?.presenceFallback ? null : undefined
+}
 
 export class ListReadScopeError extends Error {
   constructor(readonly kind: 'owner' | 'workspace') { super('List read scope changed'); this.name = 'ListReadScopeError' }

@@ -1,11 +1,12 @@
 // Real adapter/CLI transports, synthetic provider protocol events; no network.
 import { chmodSync, readFileSync } from "node:fs"
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join, resolve } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { ClaudeAdapter } from "../src/adapters/claude"
 import { CodexAdapter } from "../src/adapters/codex"
-import type { AgentEvent, ExitEvent } from "../src/adapters/types"
+import type { AgentEvent, AgentSession, ExitEvent } from "../src/adapters/types"
 import { NoSandbox } from "../src/agents/sandbox"
 import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { buildChildEnv } from "../src/env"
@@ -13,6 +14,31 @@ import { createLogger } from "../src/log"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
+
+it('waits for the real Claude process exit before emitting terminal safety evidence', async () => {
+  const binary = resolve(import.meta.dirname, 'fakes/fake-claude.mjs'), runId = 'native-terminal'
+  chmodSync(binary, 0o755)
+  let child: ChildProcessWithoutNullStreams | undefined, processEnded = false
+  let exited: Promise<void> | undefined, session: AgentSession | undefined
+  const adapter = new ClaudeAdapter({ stateDir: tempDir(), binary, spawnHosted(options) {
+    child = spawn(binary, options.args, { cwd: options.cwd, env: options.env, signal: options.signal, stdio: ['pipe', 'pipe', 'pipe'] })
+    exited = new Promise<void>(resolve => child!.once('exit', () => { processEnded = true; resolve() }))
+    return child
+  } })
+  try {
+    session = await adapter.start({ runId, cwd: await makeRepo(), prompt: 'ordinary turn',
+      toolApproval: new ToolApprovalGate(runId, { isLive: () => true }), env: buildChildEnv(), log: createLogger({ level: 'silent' }) })
+    let terminal = false
+    for await (const event of session.events()) {
+      if (event.type === 'exit') { terminal = true; expect(processEnded).toBe(true) }
+    }
+    expect(terminal).toBe(true)
+  } finally {
+    if (!processEnded) child?.kill('SIGKILL')
+    await exited
+    await session?.detach?.()
+  }
+})
 
 async function run(harness: "claude_code" | "codex", scenario: Record<string, unknown>) {
   const stateDir = tempDir(), runId = "provider-failure"

@@ -15,13 +15,18 @@ import { sweepFactoryWatchdog, type WatchdogDependencies } from './watchdog'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 process.env.MIKKA_BYOS_ENABLED = '1'
 
-test('handoff batches its bounded history without changing the existing Date and digest receipt', async () => {
+function handoffFixture() {
   const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
   const task: FactoryTask = {
     id: id(1), userId: 'handoff-owner', botId: null, issueId: id(2), scopeVersion: null,
     sourceEventId: id(3), stage: 'execute', status: 'pending', revision: 3, attemptId: id(4), candidateId: id(5), reason: 'Continue',
     route: { issueId: id(2), eventId: id(6), sourceEventId: id(3), rationale: 'Owner request', missingInformation: [], missingPermissions: [], needsSpec: false },
   }
+  return { id, task }
+}
+
+test('handoff batches its bounded history without changing the existing Date and digest receipt', async () => {
+  const { id, task } = handoffFixture()
   // These are the pg results before batching. PostgreSQL text retains both the
   // offset and sub-millisecond fraction; the existing pg Date does not.
   const timestamp = '2026-11-06 23:59:59.123456+05:30'
@@ -39,15 +44,14 @@ test('handoff batches its bounded history without changing the existing Date and
     operations: [{ operationId: id(12), status: 'uncertain', runId: id(8), action: 'fixture_observation', target: null, receipt: null, updatedAt: date }],
     dependencies: [{ id: id(13), status: 'open', originRunId: id(8), kind: 'context' }],
   }
-  const asWire = (rows: Record<string, unknown>[]) => rows.map(row => Object.values(row).map(value => value instanceof Date ? timestamp : value))
-  const batch = { source: asWire(history.source)[0], attempts: asWire(history.attempts), effects: asWire(history.effects),
-    publications: asWire(history.publications), operations: asWire(history.operations), dependencies: asWire(history.dependencies) }
   let reads = 0
   const writes: unknown[][] = []
-  const query = async (sql: string, values: unknown[]) => {
+  const query = async (sql: string, ...parameters: unknown[][]) => {
+    const [values] = parameters
     if (sql.startsWith('INSERT INTO factory_events')) { writes.push(values); return { rows: [] } }
+    assert.equal(parameters.length, 0, 'native multi-result queries must use the simple protocol')
     reads++
-    return { rows: structuredClone(sql.includes('AS source') ? [batch] : Object.values(history)[reads - 1]) }
+    return structuredClone(Object.values(history).map(rows => ({ command: 'SELECT', rows, rowCount: rows.length, fields: [] })))
   }
   const handoff = await persistFactoryHandoff({ query: query as PoolClient['query'] }, task)
   // Captured from the six-read implementation: field order, nulls, masking,
@@ -61,7 +65,48 @@ test('handoff batches its bounded history without changing the existing Date and
   assert.equal(handoff.externalEffects.effects[0].receipt.note.length, 10000)
   assert.equal(writes.length, 1)
   assert.equal(JSON.parse(writes[0][2] as string).digest, handoff.digest)
-  assert.equal(reads, 1, 'one database read replaces the six serial history reads')
+  assert.equal(reads, 1, 'one database round trip returns the six original result sets')
+})
+
+test('handoff simple-query literals contain quotes, backslashes and SQL-like identifier text', async () => {
+  const { task } = handoffFixture()
+  Object.assign(task, {
+    id: String.raw`task'\; SELECT 'injected' --`, userId: String.raw`owner'\tail`,
+    issueId: String.raw`issue'\tail`, sourceEventId: String.raw`source'\tail`,
+  })
+  let reads = 0, writes = 0
+  const query = async (sql: string, ...parameters: unknown[][]) => {
+    if (sql.startsWith('INSERT INTO factory_events')) { writes++; return { rows: [] } }
+    reads++
+    assert.equal(parameters.length, 0)
+    assert.ok(sql.includes(String.raw`WHERE a."taskId"= E'task''\\; SELECT ''injected'' --' ORDER BY`))
+    assert.ok(sql.includes(String.raw`e."userId"= E'owner''\\tail'`))
+    assert.ok(sql.includes(String.raw`i.id= E'issue''\\tail'`))
+    assert.ok(sql.includes(String.raw`WHERE e.id= E'source''\\tail'`))
+    return Array.from({ length: 6 }, () => ({ command: 'SELECT', rows: [], rowCount: 0, fields: [] }))
+  }
+  await persistFactoryHandoff({ query: query as PoolClient['query'] }, task)
+  assert.equal(reads, 1)
+  assert.equal(writes, 1)
+})
+
+test('handoff rejects malformed native result sets before recording evidence', async () => {
+  const empty = { command: 'SELECT', rows: [], rowCount: 0, fields: [] }
+  const valid = Array.from({ length: 6 }, () => empty)
+  for (const response of [
+    { rows: [] }, valid.slice(1), [...valid, empty],
+    [{ ...empty, command: 'UPDATE' }, ...valid.slice(1)],
+    [{ ...empty, rows: null }, ...valid.slice(1)],
+    [{ ...empty, rows: [null] }, ...valid.slice(1)],
+  ]) {
+    let writes = 0
+    const query = async (sql: string) => {
+      if (sql.startsWith('INSERT INTO factory_events')) writes++
+      return response
+    }
+    await assert.rejects(persistFactoryHandoff({ query: query as PoolClient['query'] }, handoffFixture().task), /Invalid Factory handoff history/)
+    assert.equal(writes, 0)
+  }
 })
 
 test('PG: request epochs, stale completion fences and unattended handoff are durable', { skip: !dbUrl, timeout: 120000 }, async t => {
@@ -223,7 +268,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     let reads = 0
     const query = async (sql: string, values: unknown[]) => { if (sql.startsWith('SELECT')) reads++; return pool.query(sql, values) }
     const handoff = await persistFactoryHandoff({ query: query as PoolClient['query'] }, pending)
-    assert.equal(reads, 1, 'real PostgreSQL executes one bounded history read')
+    assert.equal(reads, 1, 'real PostgreSQL returns the six bounded histories in one round trip')
     assert.equal(handoff.externalEffects.operations.length, 20, 'handoff remains bounded without hiding unresolved effects')
     assert.equal(handoff.externalEffects.operations[0].operationId, operationId)
     assert.equal(handoff.externalEffects.operations[0].status, 'uncertain')

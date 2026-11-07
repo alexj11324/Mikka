@@ -20,6 +20,7 @@ export const DESKTOP_CAPABILITIES = [
   "quota.snapshot",
   "preview.scheme",
   "settings.local",
+  "server.select",
 ] as const
 export type DesktopCapability = (typeof DESKTOP_CAPABILITIES)[number]
 export type PlatformCapabilities = Readonly<Record<DesktopCapability, boolean>>
@@ -40,6 +41,7 @@ const NO_CAPABILITIES: PlatformCapabilities = Object.freeze({
   "quota.snapshot": false,
   "preview.scheme": false,
   "settings.local": false,
+  "server.select": false,
 })
 
 /** The web client. Always safe: it grants no native ability. */
@@ -71,6 +73,7 @@ export function desktopPlatform(bridge: MikkaBridge): PlatformSnapshot {
       "quota.snapshot": isFunction(bridge.quota?.get),
       "preview.scheme": isFunction(bridge.preview?.html),
       "settings.local": isFunction(bridge.settings?.getAll),
+      "server.select": isFunction(bridge.bundled?.server?.probe),
     }),
   })
 }

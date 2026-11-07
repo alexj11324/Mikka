@@ -79,6 +79,24 @@ async function startDueTimer(kind: DueKind) {
   return start(dueTimer, [kind])
 }
 
+/** A bounded machine Workflow may exit only after another durable owner has
+ * accepted responsibility. Unlike a request's best-effort wake, a failed
+ * handoff propagates so the Workflow step remains retryable. */
+export async function handoffRunRecoveryTimer(): Promise<void> {
+  if (!workflowWakesEnabled()) return
+  if (process.env.VERCEL_ENV === 'production') {
+    await (await import('./due-timer-owner')).armCurrentRecoveryTimer()
+    return
+  }
+  if (await replaceStaleDueTimer('run-recovery')) return
+  try {
+    const resume = wakeTransport.resume ?? (await import('workflow/api')).resumeHook
+    await resume(wakeTokens.dueTimer('run-recovery'), {})
+  } catch {
+    await startDueTimer('run-recovery')
+  }
+}
+
 /** Production run recovery elects and hands over its own owner (lib/due-timer-owner.ts, #1403); it is never cancelled here. */
 const ownsItsDeployment = (kind: DueKind) => kind === 'run-recovery' && process.env.VERCEL_ENV === 'production'
 
