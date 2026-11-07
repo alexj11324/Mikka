@@ -1,6 +1,8 @@
 # Self-hosting Mikka
 
-The community edition runs on your own server and database. It does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
+Deploy the community server, then connect the official app to that server. It runs on your own database and does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
+
+The image is a backend by default: API, realtime, the daemon gateway, scheduling, migrations and BYOK remain enabled. The full community workspace UI is frozen and opt-in. Official app layouts and connection-flow screenshots are maintained in the official UI work; they are not copied into this public image.
 
 ## Start the server
 
@@ -21,7 +23,7 @@ Generate the database password with `openssl rand -hex 32`. Do not use a sample 
 docker compose up -d --wait
 ```
 
-Open `http://localhost:3000/mikka`. Compose starts only the app and PostgreSQL. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
+Open `http://localhost:3000/mikka` for server information. Compose starts only the app and PostgreSQL. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
 
 The app port binds to `127.0.0.1` by default. For remote access, put a TLS reverse proxy on the host and set `BETTER_AUTH_URL=https://mikka.example.com`. The value is an **origin**, without `/mikka`, credentials, a query, or a fragment. Forward `Host` unchanged, support WebSocket upgrades, and forward the original HTTPS scheme. The server rejects conflicting forwarded hosts or schemes. HTTP is accepted only for a configured loopback origin; use HTTPS for a network deployment.
 
@@ -32,6 +34,24 @@ If you publish a different host port, set both `MIKKA_PORT` and the port in `BET
 ```sh
 docker compose up -d --force-recreate app
 ```
+
+## Server entry and initial account
+
+`GET /mikka/api/server` is the public server-info contract. In this backend delivery, the default root entry returns the same JSON viewmodel; the minimal HTML layout is supplied by the UI owner using this contract. It includes the configured name/address, running version, client entry links, initial-account state and login-method configuration. A healthy response means the configured origin is valid and the auth-user existence query succeeded; it does not claim to have checked external providers, workers or every subsystem. A failed query returns HTTP 503 and `setup.state: unavailable`, never an empty-installation state.
+
+On an empty database, `setup.state` is `required`. Configure SMTP/Resend or your own OAuth client, then use `setup.signUpUrl` to create the initial account. Registration uses the existing authentication flow and creates that person's workspace with the `admin` membership. There is no installation-wide administrator role and no special access to other people's workspaces. Existing installations report `ready`; upgrading does not assign a new administrator or alter existing accounts. Email/password being enabled is separate from the `emailDeliveryConfigured` flag, which reports configuration presence rather than a successful delivery test.
+
+The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry, so authentication does not accidentally open the frozen workspace UI.
+
+### Optional frozen community UI
+
+For compatibility, add `MIKKA_COMMUNITY_UI=1` to your private Compose configuration and recreate the app:
+
+```sh
+MIKKA_COMMUNITY_UI=1 docker compose up -d --force-recreate app
+```
+
+Unset the variable or set it to `0`, then recreate the app to restore server mode. Only the exact value `1` enables the old community UI; cloud deployments keep the official app regardless of this setting. This is a presentation switch, not an API authorization rule. It does not change your data, credentials, migrations, scheduler or gateway. The public UI source and its compilation stay in the repository; BoardUI/affectUI source and bundles do not enter the public image.
 
 ## Installation secrets and backups
 
@@ -59,7 +79,21 @@ Use your own Google or GitHub OAuth clients. Register callbacks on your exact or
 
 `AUTH_TRUSTED_ORIGINS` can add explicitly trusted origins when needed. It does not change the application's canonical origin. Your deployment uses its own OAuth credentials; it does not borrow Mikka's login proxy.
 
-## Connect the official desktop app
+## Connect an official app
+
+Use a release with server selection and enter your server address from `GET /mikka/api/server`. The backend and shared connection contract are delivered independently from the official connection UI.
+
+| Client | Entry and address requirement |
+| --- | --- |
+| Web | [Official app](https://app.aspectlylabs.com/mikka); the server address must use HTTPS, including local addresses. |
+| Desktop | [Official releases](https://github.com/alexj11324/Mikka/releases/latest); HTTPS for network servers, HTTP loopback for a local server. |
+| iOS | Use your existing official installation/invitation. No verified public download link is supplied in this release's server metadata; `clients.ios.url` is `null`. Configure the mobile trust scheme below. |
+
+### Official web transport
+
+The official browser discovers the exact server, then uses its own one-time PKCE handoff and bearer session. Server credentials stay in that browser; the official backend does not relay requests or store the self-hosted session. Discovery exposes `web.enabled` and protocol range 1. Set `MIKKA_OFFICIAL_WEB_ENABLED=0` to disable official-browser handoffs and existing cross-origin bearer access. The default exact allowed app URL is `https://app.aspectlylabs.com/mikka`; `MIKKA_OFFICIAL_WEB_URL` can select an explicit HTTPS deployment URL without wildcards. This does not widen cookie trusted origins.
+
+### Official desktop transport
 
 Use a desktop release with self-hosted server selection. Enter
 `https://mikka.example.com/mikka`; a bare `https://mikka.example.com` is also
