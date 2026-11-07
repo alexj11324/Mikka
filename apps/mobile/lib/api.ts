@@ -57,7 +57,7 @@ export const REQUEST_TIMEOUT_MS = 30_000
 export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}, connection: ApiConnection = apiConnection()): Promise<T> {
   const context = apiCache.context()
   const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders(connection) }
-  if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET') {
+  if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET' && currentAccount().id === connection.account.id) {
     const proof = presenceScope.token(context)
     if (proof) headers['x-mikka-presence-scope'] = proof
   }

@@ -22,7 +22,7 @@ export const minuteRef = (kind: LiveRef['kind']): LiveRef => ({ kind, id: UNRESO
  * actual device watch before its minute fallback stops. Old servers retain that
  * fallback while any device is online. Keep the refs stable as metadata arrives.
  */
-export function threadsLive(data: Threads | null, home: string | null | undefined, ownerId = apiCache.account()): Spec {
+export function threadsLive(data: Threads | null, home: string | null | undefined, ownerId = apiCache.owner()): Spec {
   if (data?.live?.presence !== undefined) {
     const presence = data.live.ownerId === ownerId && data.live.workspaceId === home ? data.live.presence : null
     return { minIntervalMs: LIST_MERGE_MS, refs: [listRef('thread_list', home), listRef('device_list', home)], presence }

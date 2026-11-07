@@ -17,6 +17,7 @@ mock.module(new URL('../lib/session.ts', import.meta.url).href, { namedExports: 
 mock.module(new URL('../lib/tracing.ts', import.meta.url).href, { namedExports: { mobileTraceHeaders: () => ({ 'x-mikka-client': 'mobile' }) } })
 const { api, apiConnection } = await import('../lib/api.ts')
 const { apiCache } = await import('../lib/api-cache.ts')
+const { presenceScope } = await import('../lib/presence-scope.ts')
 
 test('a server switch while keychain reads cannot send the old cookie to the new server or sign it out', async t => {
   const requests: { url: string; cookie: string | null; redirect?: string }[] = []
@@ -38,4 +39,24 @@ test('a server switch while keychain reads cannot send the old cookie to the new
   await assert.rejects(api('/api/mobile/follow-up', {}, connection))
   assert.equal(requests[1].url, `${first.server.url}/api/mobile/follow-up`)
   assert.equal(ended, 0)
+})
+
+test('an old explicit server connection cannot acquire the current server home proof', async t => {
+  const requests: { url: string; scope: string | null }[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), scope: new Headers(init?.headers).get('x-mikka-presence-scope') })
+    return Response.json({})
+  }
+  t.after(() => { globalThis.fetch = original; presenceScope.clear() })
+  current = second
+  apiCache.setIdentity('1:same-id', 'same-id')
+  const home = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72', token = `home.${'a'.repeat(64)}`, expiresAt = Date.now() + 60_000
+  presenceScope.remember(home, { expiresAt, homeScope: { ownerId: 'same-id', workspaceId: home, expiresAt, token } }, presenceScope.begin())
+  await api('/api/mobile/threads', {}, { account: first, client: apiConnection().client })
+  await api('/api/mobile/threads')
+  assert.deepEqual(requests, [
+    { url: `${first.server.url}/api/mobile/threads`, scope: null },
+    { url: `${second.server.url}/api/mobile/threads`, scope: token },
+  ])
 })
