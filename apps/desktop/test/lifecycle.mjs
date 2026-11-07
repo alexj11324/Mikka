@@ -25,7 +25,7 @@ import { readNativeStartup } from './native-startup.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
 import { continueInSystemBrowser } from './browser-handoff.mjs'
-import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledRootDocument } from './native-document.mjs'
+import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
@@ -162,7 +162,7 @@ async function selectFixture(page) {
 
 async function nativeSignIn(app, page, account = scope.owner) {
   mark('auth-initial-document')
-  await waitForBundledRootDocument(page)
+  await waitForBundledDocument(page)
   mark('auth-open-browser')
   await app.evaluate(({ shell }) => {
     globalThis.__mikkaLifecycleExternal = null
@@ -344,7 +344,7 @@ try {
 
   let run = await launch('bundled')
   application = run.app
-  await waitForBundledRootDocument(run.page)
+  await waitForBundledDocument(run.page)
   const nativeLogin = await beginQueryWindow('nativeLogin', { client: 'bundled-electron', phase: 'ordinary-login-to-usable-workspace' })
   await scope.owner.reauthenticate()
   await checkpointQueryWindow(nativeLogin, 'common-email-authentication')
