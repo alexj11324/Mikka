@@ -6,10 +6,11 @@ import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api'
 import type { DBFieldAttribute } from 'better-auth/db'
 import { openSecret, sealSecret, type Sealed } from '../secrets/crypto'
 import { identityTokenHash } from './scim-store'
+import { enterpriseOidcLogoutEndpoints } from './oidc-logout'
 
 export type EnterpriseLoginProof = { organizationId: string; providerId: string; directoryUserId: string | null; identityId: string; userId: string }
 type Proof = EnterpriseLoginProof
-type LogoutProof = { organizationId: string; providerId: string; userId: string; sessionId: string }
+type LogoutProof = { organizationId: string; providerId: string; userId: string; sessionId: string; reason?: string; failed?: boolean }
 const context = new AsyncLocalStorage<{ linkTicket?: string; proof?: Proof; logout?: LogoutProof; correlationId: string; auditUnavailable?: boolean }>()
 export function withEnterpriseAuthRequest(handler: (request: Request) => Promise<Response>) {
   return (request: Request) => {
@@ -167,10 +168,10 @@ async function finishEnterpriseAuthentication(ctx: EnterpriseAuthenticationConte
   const previous = request.logout
   if (previous) {
     const [{ workspaceDb }, { enqueueOrganizationAudit }] = await Promise.all([import('../workspace-db'), import('../governance/audit')])
-    const denied = ctx.context.returned instanceof APIError && ctx.context.returned.statusCode >= 400
+    const denied = previous.failed || (ctx.context.returned instanceof APIError && ctx.context.returned.statusCode >= 400)
     await workspaceDb.transaction(tx => enqueueOrganizationAudit(tx, { organizationId: previous.organizationId, actorId: previous.userId,
-      action: denied ? 'sso.logout_failed' : 'sso.signed_out', targetId: previous.sessionId, result: denied ? 'denied' : 'success', correlationId: request.correlationId,
-      metadata: { providerId: previous.providerId } }))
+      action: denied ? 'sso.logout_failed' : 'sso.signed_out', targetId: previous.sessionId, result: previous.failed ? 'failure' : denied ? 'denied' : 'success', correlationId: request.correlationId,
+      metadata: { providerId: previous.providerId, ...(previous.reason ? { reason: previous.reason } : {}) } }))
   }
   const logoutProvider = ctx.path === '/sso/saml2/sp/slo/:providerId' ? ctx.params?.providerId : undefined
   if (logoutProvider) {
@@ -220,7 +221,10 @@ export function enterpriseSso(options: Pick<SSOOptions, 'defaultSSO'> = {}) {
       request.logout = proof
     }),
   }
-  return { ...plugin, hooks: { ...nativeHooks, before: [logoutHook, ...(nativeHooks?.before ?? [])] } }
+  const oidcLogout = enterpriseOidcLogoutEndpoints({ decryptConfig: value => decryptSsoConfig(value, 'oidcConfig'),
+    record: (proof, reason, failed) => { const request = context.getStore(); if (request) request.logout = { ...proof, reason, failed } },
+  })
+  return { ...plugin, endpoints: { ...plugin.endpoints, ...oidcLogout }, hooks: { ...nativeHooks, before: [logoutHook, ...(nativeHooks?.before ?? [])] } }
 }
 
 const string = { type: 'string', required: true } as const

@@ -4,7 +4,7 @@ import { resolveTxt } from 'node:dns/promises'
 import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
 import type { PoolClient } from 'pg'
-import { discoverOIDCConfig, deriveSAMLIdentityProviderEntityID, type SAMLConfig } from '@better-auth/sso'
+import { deriveSAMLIdentityProviderEntityID, type SAMLConfig } from '@better-auth/sso'
 import { isPublicRoutableHost } from '@better-auth/core/utils/host'
 import { pool } from '@/lib/db'
 import { organizationEntitlements } from '@/lib/db/governance-schema'
@@ -22,6 +22,7 @@ import { identityTokenHash, ScimStore } from './scim-store'
 import { retryEnterpriseRevocations, synchronizeDirectoryUser, auditDirectoryGroup } from './lifecycle'
 import { commitIdentityChange, enqueueIdentityAudit, deliverIdentityAudits } from './audit-outbox'
 import { samlSpMetadata, samlSpSigningInput } from './saml-signing'
+import { discoverEnterpriseOidcConfig } from './oidc-config'
 
 const publicHttps = z.url().max(2048).refine(value => {
   const url = new URL(value)
@@ -118,10 +119,8 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     let oidc: string | null = null
     let saml: string | null = null
     if (value.protocol === 'oidc') {
-      const issuerOrigin = new URL(value.issuer).origin
-      const hydrated = await discoverOIDCConfig({ issuer: value.issuer, isTrustedOrigin: url => new URL(url).origin === issuerOrigin,
-        existingConfig: { tokenEndpointAuthentication: value.tokenEndpointAuthentication } })
-      for (const endpoint of [hydrated.authorizationEndpoint, hydrated.tokenEndpoint, hydrated.jwksEndpoint, hydrated.discoveryEndpoint, hydrated.userInfoEndpoint].filter(Boolean)) publicHttps.parse(endpoint)
+      const hydrated = await discoverEnterpriseOidcConfig(value.issuer, value.tokenEndpointAuthentication)
+      for (const endpoint of [hydrated.authorizationEndpoint, hydrated.tokenEndpoint, hydrated.jwksEndpoint, hydrated.discoveryEndpoint, hydrated.userInfoEndpoint, hydrated.endSessionEndpoint].filter(Boolean)) publicHttps.parse(endpoint)
       oidc = encryptSsoConfig({ ...hydrated, pkce: true, clientId: value.clientId, clientSecret: value.clientSecret,
         scopes: ['openid', 'email', 'profile'], allowIdpInitiated: false }, 'oidcConfig')
     } else {
@@ -152,7 +151,8 @@ export async function manageIdentity(organizationId: string, session: { user: { 
       await tx.query('update session set "enterpriseOrganizationId"=null,"enterpriseProviderId"=null,"enterpriseDirectoryUserId"=null,"enterpriseIdentityId"=null where "enterpriseProviderId"=$1', [value.providerId])
     })
     return { providerId: value.providerId, dns: { type: 'TXT', name: `_mikka-sso.${value.domain}`, value: `mikka-sso=${token}`, token },
-      callbackURL: `${origin}${withBasePath(`/api/auth/${value.protocol === 'oidc' ? 'sso/callback' : 'sso/saml2/sp/acs'}/${value.providerId}`)}` }
+      callbackURL: `${origin}${withBasePath(`/api/auth/${value.protocol === 'oidc' ? 'sso/callback' : 'sso/saml2/sp/acs'}/${value.providerId}`)}`,
+      ...(value.protocol === 'oidc' ? { postLogoutRedirectURI: `${origin}${withBasePath(`/api/auth/sso/oidc/logout/callback/${value.providerId}`)}` } : {}) }
   }
   const value = actionInput.parse(input)
   if (value.action === 'verify-domain') {

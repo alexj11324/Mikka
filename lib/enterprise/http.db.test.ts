@@ -17,6 +17,7 @@ import { ScimStore, identityTokenHash } from './scim-store'
 import { SCIM_GROUP, SCIM_PATCH, SCIM_USER } from './scim-protocol'
 import { completeEnterpriseSignIn, enterpriseIdentityModels, enterpriseSessionFields, enterpriseSso, encryptSsoConfig, ssoSessionData, withEnterpriseAuthRequest } from './sso-plugin'
 import { samlSpMetadata, samlSpSigningInput } from './saml-signing'
+import { discoverEnterpriseOidcConfig } from './oidc-config'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) { assertE2eTarget(target); assert.equal(process.env.MIKKA_DATABASE_URL, target); assert.equal(process.env.DATABASE_URL, target) }
@@ -66,6 +67,10 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   const wrongKeys = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const jwk = { ...keys.publicKey.export({ format: 'jwk' }), kid: 'fixture', use: 'sig', alg: 'RS256' }
   const codes = new Map<string, { redirect: string; challenge: string; mode: string; subject: string; email: string }>()
+  const upstreamSessions = new Set<string>()
+  let discoveryMode: 'valid' | 'issuer' | 'private' | 'missing-logout' = 'valid'
+  let upstreamLogoutUnavailable = false
+  let upstreamLogoutRequests = 0
   let oidcIdentity = { subject, email }
   let mode = 'valid'
   let idpOrigin = '', appOrigin = ''
@@ -81,7 +86,46 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   const idpServer = createServer(async (incoming, outgoing) => {
     try {
       const url = new URL(incoming.url!, idpOrigin)
+      const upstreamSession = /(?:^|;\s*)fixture_idp=([A-Za-z0-9_-]+)(?:;|$)/.exec(incoming.headers.cookie ?? '')?.[1]
+      if (url.pathname === '/.well-known/openid-configuration') {
+        outgoing.setHeader('content-type', 'application/json')
+        outgoing.end(JSON.stringify({ issuer: discoveryMode === 'issuer' ? 'https://wrong.example.invalid' : idpOrigin,
+          authorization_endpoint: `${idpOrigin}/authorize`, token_endpoint: `${idpOrigin}/token`, jwks_uri: `${idpOrigin}/jwks`,
+          token_endpoint_auth_methods_supported: ['client_secret_post'], scopes_supported: ['openid', 'email', 'profile'],
+          response_types_supported: ['code'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'], code_challenge_methods_supported: ['S256'],
+          ...(discoveryMode === 'missing-logout' ? {} : { end_session_endpoint: discoveryMode === 'private' ? 'http://169.254.169.254/logout' : `${idpOrigin}/oidc-logout` }) }))
+        return
+      }
+      if (url.pathname === '/upstream-session') {
+        outgoing.setHeader('content-type', 'application/json'); outgoing.end(JSON.stringify({ active: Boolean(upstreamSession && upstreamSessions.has(upstreamSession)) })); return
+      }
+      if (url.pathname === '/oidc-logout') {
+        upstreamLogoutRequests++
+        if (upstreamLogoutUnavailable) { outgoing.writeHead(503); outgoing.end(); return }
+        const chunks: Buffer[] = []; for await (const chunk of incoming) chunks.push(Buffer.from(chunk))
+        const params = incoming.method === 'POST' ? new URLSearchParams(Buffer.concat(chunks).toString()) : url.searchParams
+        assert.equal(params.get('client_id'), 'mikka-fixture')
+        assert.equal(params.get('post_logout_redirect_uri'), `${appOrigin}/api/auth/sso/oidc/logout/callback/${providerId}`)
+        assert.match(params.get('state') ?? '', /^[A-Za-z0-9_-]{43}$/)
+        for (const forbidden of ['id_token_hint', 'logout_hint', 'client_secret']) assert.equal(params.has(forbidden), false)
+        // RP-Initiated Logout requires the OP to confirm a request without an ID
+        // token hint. This fixture confirms via an actual second HTTP request.
+        if (incoming.method === 'GET') {
+          outgoing.setHeader('content-type', 'application/json'); outgoing.end(JSON.stringify({ confirmationRequired: true })); return
+        }
+        const returned = new URL(params.get('post_logout_redirect_uri')!)
+        returned.searchParams.set('state', params.get('state')!)
+        if (params.get('confirm') === 'yes') {
+          if (upstreamSession) upstreamSessions.delete(upstreamSession)
+          outgoing.setHeader('set-cookie', 'fixture_idp=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')
+        } else returned.searchParams.set('error', 'access_denied')
+        outgoing.writeHead(302, { location: returned.href }); outgoing.end(); return
+      }
       if (url.pathname === '/authorize') {
+        if (!upstreamSession || !upstreamSessions.has(upstreamSession)) {
+          const next = randomBytes(24).toString('base64url'); upstreamSessions.add(next)
+          outgoing.setHeader('set-cookie', `fixture_idp=${next}; Path=/; HttpOnly; SameSite=Lax`)
+        }
         const code = randomUUID()
         codes.set(code, { redirect: url.searchParams.get('redirect_uri')!, challenge: url.searchParams.get('code_challenge')!, mode, ...oidcIdentity })
         const callback = new URL(url.searchParams.get('redirect_uri')!)
@@ -142,9 +186,12 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   appOrigin = await listen(appServer)
   const auth = betterAuth({ database: pool, baseURL: appOrigin, basePath: '/api/auth', secret: randomBytes(32).toString('hex'),
     trustedOrigins: [appOrigin, idpOrigin], plugins: [enterpriseIdentityModels, enterpriseSso()],
-    account: { accountLinking: { trustedProviders: [] } }, rateLimit: { enabled: false },
+    account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } }, rateLimit: { enabled: false },
     session: { storeSessionInDatabase: true, additionalFields: enterpriseSessionFields },
-    databaseHooks: { session: { create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) } } },
+    databaseHooks: {
+      session: { create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) } },
+      account: { create: { before: async account => ({ data: { ...account, idToken: null } }) }, update: { before: async account => ({ data: { ...account, idToken: null } }) } },
+    },
     hooks: { after: createAuthMiddleware(completeEnterpriseSignIn) },
     advanced: { database: { validateSchema: false }, useSecureCookies: false }, logger: { disabled: true },
   })
@@ -178,9 +225,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     await pool.query('insert into mikka_organizations (id,name,"createdBy") values ($1,\'Enterprise fixture\',$2)', [id, adminId])
     await pool.query('insert into mikka_organization_members ("organizationId","userId",role,name,email) values ($1,$2,\'owner\',\'Fixture owner\',$3)', [id, adminId, `${adminId}@fixture.example.invalid`])
   }
-  const oidcConfig = { issuer: idpOrigin, pkce: true, clientId: 'mikka-fixture', clientSecret: 'fixture-secret',
-    authorizationEndpoint: `${idpOrigin}/authorize`, tokenEndpoint: `${idpOrigin}/token`, jwksEndpoint: `${idpOrigin}/jwks`, discoveryEndpoint: `${idpOrigin}/.well-known/openid-configuration`,
-    tokenEndpointAuthentication: 'client_secret_post', scopes: ['openid', 'email', 'profile'] }
+  const oidcConfig = { ...await discoverEnterpriseOidcConfig(idpOrigin, 'client_secret_post'), pkce: true,
+    clientId: 'mikka-fixture', clientSecret: 'fixture-secret', scopes: ['openid', 'email', 'profile'] }
   for (const [pid, org, config, protocol, host] of [
     [providerId, organizationId, oidcConfig, 'oidc', oidcDomain],
     [otherProviderId, otherOrganizationId, oidcConfig, 'oidc', otherDomain],
@@ -206,12 +252,12 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const { url } = await response.json() as { url: string }
     return { url, jar }
   }
-  async function oidcLogin(jar = new Cookies()) {
+  async function oidcLogin(jar = new Cookies(), upstream = new Cookies()) {
     const { url } = await startSso(providerId, jar)
-    const consent = await fetch(url, { redirect: 'manual' })
+    const consent = await fetch(url, { headers: { cookie: upstream.header() }, redirect: 'manual' }); upstream.take(consent)
     const callback = await fetch(consent.headers.get('location')!, { headers: { cookie: jar.header() }, redirect: 'manual' })
     jar.take(callback)
-    return { callback, jar }
+    return { callback, jar, upstream }
   }
   async function samlLogin() {
     const { url, jar } = await startSso(samlProviderId)
@@ -227,6 +273,24 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const response = await fetch(`${appOrigin}/api/auth/get-session`, { headers: { cookie: jar.header() } })
     return response.json() as Promise<{ user: { id: string }; session: { id: string } } | null>
   }
+  async function startOidcLogout(jar: Cookies, pid = providerId, body: Record<string, unknown> = {}, origin = appOrigin) {
+    const response = await fetch(`${appOrigin}/api/auth/sso/oidc/logout/${pid}`, { method: 'POST',
+      headers: { origin, cookie: jar.header(), 'content-type': 'application/json' }, body: JSON.stringify(body), redirect: 'manual' })
+    jar.take(response); return response
+  }
+  async function pendingLogout() {
+    const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
+    const started = await startOidcLogout(login.jar)
+    assert.equal(started.status, 200, await started.clone().text())
+    const result = await started.json() as { url: string; localSessionRevoked: boolean; upstream: string }
+    assert.equal(result.localSessionRevoked, true); assert.equal(result.upstream, 'requested')
+    const endpoint = new URL(result.url), state = endpoint.searchParams.get('state')!
+    const callback = new URL(endpoint.searchParams.get('post_logout_redirect_uri')!); callback.searchParams.set('state', state)
+    const identifier = `enterprise-oidc-logout:${providerId}:${identityTokenHash(state)}`
+    return { ...login, originalSessionId: active.session.id, endpoint, callback, identifier }
+  }
+  const oidcReturn = (url: URL, jar: Cookies) => fetch(url, { headers: { cookie: jar.header() }, redirect: 'manual' })
+  const nonceCount = async (identifier: string) => (await pool.query('select count(*) from verification where identifier=$1', [identifier])).rows[0].count as string
   await t.test('SCIM creates one user on concurrent replay and supports filtered paginated HTTP reads', async () => {
     const user = { schemas: [SCIM_USER], externalId: subject, userName: email, displayName: 'Directory fixture', active: true }
     const deliveries = await Promise.all([requestScim('Users', 'POST', user), requestScim('Users', 'POST', user)])
@@ -260,6 +324,165 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const unknown = await fetch(`${appOrigin}/api/auth/sso/callback/${providerId}?code=untrusted&state=untrusted`, { redirect: 'manual' })
     assert.equal(unknown.headers.getSetCookie().some(value => value.startsWith('better-auth.session_token=')), false)
     assert.ok(Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'sso.sign_in_failed\' and result=\'denied\'', [organizationId])).rows[0].count) >= 3)
+  })
+  await t.test('OIDC discovery retains logout capability from one validated metadata snapshot', async () => {
+    try {
+      assert.equal(oidcConfig.endSessionEndpoint, `${idpOrigin}/oidc-logout`)
+      discoveryMode = 'issuer'; await assert.rejects(discoverEnterpriseOidcConfig(idpOrigin, 'client_secret_post'))
+      discoveryMode = 'private'; await assert.rejects(discoverEnterpriseOidcConfig(idpOrigin, 'client_secret_post'))
+      discoveryMode = 'missing-logout'; assert.equal((await discoverEnterpriseOidcConfig(idpOrigin, 'client_secret_post')).endSessionEndpoint, undefined)
+    } finally { discoveryMode = 'valid' }
+  })
+  await t.test('OIDC RP-initiated logout revokes locally before confirmed upstream logout without persisting or sending an ID token', async () => {
+    const pending = await pendingLogout()
+    assert.equal(await session(pending.jar), null)
+    assert.equal((await pool.query('select count(*) from session where id=$1', [pending.originalSessionId])).rows[0].count, '0')
+    assert.equal(pending.endpoint.searchParams.get('client_id'), 'mikka-fixture')
+    for (const forbidden of ['id_token_hint', 'logout_hint', 'client_secret']) assert.equal(pending.endpoint.searchParams.has(forbidden), false)
+    const upstreamStatus = () => fetch(`${idpOrigin}/upstream-session`, { headers: { cookie: pending.upstream.header() } }).then(response => response.json())
+    assert.deepEqual(await upstreamStatus(), { active: true })
+    const confirmation = await fetch(pending.endpoint, { headers: { cookie: pending.upstream.header() } })
+    assert.deepEqual(await confirmation.json(), { confirmationRequired: true })
+    assert.deepEqual(await upstreamStatus(), { active: true }, 'a client_id-only request requires the OP confirmation step')
+    const form = new URLSearchParams(pending.endpoint.search); form.set('confirm', 'yes')
+    const finished = await fetch(`${idpOrigin}/oidc-logout`, { method: 'POST', headers: { cookie: pending.upstream.header(), 'content-type': 'application/x-www-form-urlencoded' }, body: form, redirect: 'manual' })
+    pending.upstream.take(finished)
+    assert.equal(finished.status, 302); assert.equal(finished.headers.get('location'), pending.callback.href)
+    assert.deepEqual(await upstreamStatus(), { active: false })
+    const returned = await oidcReturn(pending.callback, pending.jar)
+    assert.equal(returned.status, 302); assert.equal(returned.headers.get('location'), `${appOrigin}/sign-in`)
+    assert.equal(returned.headers.get('referrer-policy'), 'no-referrer')
+    assert.match(returned.headers.get('cache-control') ?? '', /no-store/)
+    assert.equal(await nonceCount(pending.identifier), '0')
+    assert.equal((await pool.query('select count(*) from account where "providerId"=$1 and "idToken" is not null', [providerId])).rows[0].count, '0')
+    const reasons = (await pool.query('select metadata->>\'reason\' as reason from mikka_organization_audit_events where "organizationId"=$1 and "targetId"=$2 and action=\'sso.signed_out\' order by "createdAt"', [organizationId, pending.originalSessionId])).rows.map(row => row.reason)
+    assert.deepEqual(reasons, ['oidc_upstream_requested', 'oidc_upstream_returned'])
+    assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session remains active')
+  })
+  await t.test('OIDC logout rejects wrong principals, cross-origin starts and client-selected redirects before revoking a session', async () => {
+    const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
+    const before = upstreamLogoutRequests
+    assert.equal((await startOidcLogout(login.jar, otherProviderId)).status, 403)
+    assert.equal((await startOidcLogout(login.jar, providerId, {}, 'https://foreign.example.invalid')).status, 403)
+    for (const input of [{ post_logout_redirect_uri: 'https://foreign.example.invalid' }, { callbackURL: '//foreign.example.invalid' }, { redirectTo: `${appOrigin}/sign-in?next=external` }, { client_id: 'other-client' }, { id_token_hint: 'untrusted' }]) {
+      assert.equal((await startOidcLogout(login.jar, providerId, input)).status, 400)
+    }
+    assert.equal((await session(login.jar))?.session.id, active.session.id)
+    await pool.query('update session set "enterpriseOrganizationId"=null,"enterpriseProviderId"=null,"enterpriseDirectoryUserId"=null,"enterpriseIdentityId"=null where id=$1', [active.session.id])
+    assert.equal((await startOidcLogout(login.jar)).status, 403, 'an ordinary local session has no provider logout authority')
+    assert.equal((await session(login.jar))?.session.id, active.session.id)
+    assert.equal(upstreamLogoutRequests, before)
+  })
+  await t.test('OIDC logout callback binds the browser and provider before atomic consumption, preserving a later login', async () => {
+    const pending = await pendingLogout()
+    assert.equal((await oidcReturn(pending.callback, new Cookies())).status, 400)
+    const altered = new Cookies(); altered.values = new Map(pending.jar.values)
+    const verifierName = [...altered.values.keys()].find(name => name.includes('enterprise_oidc_logout_'))!
+    assert.ok(verifierName); altered.values.set(verifierName, `${altered.values.get(verifierName)!}x`)
+    assert.equal((await oidcReturn(pending.callback, altered)).status, 400)
+    const another = await pendingLogout()
+    assert.equal((await oidcReturn(pending.callback, another.jar)).status, 400, 'another valid browser verifier cannot consume this request')
+    const wrongProvider = new URL(pending.callback); wrongProvider.pathname = wrongProvider.pathname.replace(providerId, otherProviderId)
+    assert.equal((await oidcReturn(wrongProvider, pending.jar)).status, 400)
+    const badState = new URL(pending.callback); badState.searchParams.set('state', randomBytes(32).toString('base64url'))
+    assert.equal((await oidcReturn(badState, pending.jar)).status, 400)
+    const duplicate = new URL(pending.callback); duplicate.searchParams.append('state', badState.searchParams.get('state')!)
+    assert.equal((await oidcReturn(duplicate, pending.jar)).status, 400)
+    const missing = new URL(pending.callback); missing.search = ''
+    assert.equal((await oidcReturn(missing, pending.jar)).status, 400)
+    assert.equal(await nonceCount(pending.identifier), '1', 'invalid returns must not burn the original request')
+    const newer = await oidcLogin(), newest = await session(newer.jar); assert.ok(newest)
+    newer.jar.values.set(verifierName, pending.jar.values.get(verifierName)!)
+    const concurrent = await Promise.all([oidcReturn(pending.callback, newer.jar), oidcReturn(pending.callback, newer.jar)])
+    assert.deepEqual(concurrent.map(response => response.status).sort(), [302, 400])
+    assert.equal(await nonceCount(pending.identifier), '0')
+    for (const response of concurrent) {
+      assert.equal(response.headers.getSetCookie().some(cookie => cookie.includes('session_token=') || cookie.includes('session_data=')), false)
+      newer.jar.take(response)
+    }
+    assert.equal((await session(newer.jar))?.session.id, newest.session.id)
+    assert.equal((await oidcReturn(pending.callback, newer.jar)).status, 400)
+    assert.equal((await session(newer.jar))?.session.id, newest.session.id, 'a successful or replayed old logout must not clear a later session')
+  })
+  await t.test('OIDC logout expires state and invalidates the prior provider configuration binding', async () => {
+    const expired = await pendingLogout()
+    await pool.query('update verification set "expiresAt"=now()-interval \'1 second\' where identifier=$1', [expired.identifier])
+    assert.equal((await oidcReturn(expired.callback, expired.jar)).status, 400)
+    const changed = await pendingLogout()
+    const previous = (await pool.query('select "oidcConfig" from enterprise_sso_provider where "providerId"=$1', [providerId])).rows[0].oidcConfig
+    try {
+      await pool.query('update enterprise_sso_provider set "oidcConfig"=$2 where "providerId"=$1', [providerId, encryptSsoConfig({ ...oidcConfig, clientId: 'replaced-client' }, 'oidcConfig')])
+      assert.equal((await oidcReturn(changed.callback, changed.jar)).status, 400)
+      assert.equal(await nonceCount(changed.identifier), '1')
+    } finally { await pool.query('update enterprise_sso_provider set "oidcConfig"=$2 where "providerId"=$1', [providerId, previous]) }
+  })
+  await t.test('OIDC local logout survives missing capability, OP outage or cancellation and durable nonce failure', async () => {
+    const previous = (await pool.query('select "oidcConfig" from enterprise_sso_provider where "providerId"=$1', [providerId])).rows[0].oidcConfig
+    const unsupported = await oidcLogin()
+    try {
+      const { endSessionEndpoint: _logout, ...withoutLogout } = oidcConfig
+      await pool.query('update enterprise_sso_provider set "oidcConfig"=$2 where "providerId"=$1', [providerId, encryptSsoConfig(withoutLogout, 'oidcConfig')])
+      const result = await startOidcLogout(unsupported.jar)
+      assert.equal(result.status, 200)
+      assert.deepEqual(await result.json(), { localSessionRevoked: true, upstream: 'not_supported', url: `${appOrigin}/sign-in` })
+      assert.equal(await session(unsupported.jar), null)
+    } finally { await pool.query('update enterprise_sso_provider set "oidcConfig"=$2 where "providerId"=$1', [providerId, previous]) }
+    const failed = await pendingLogout()
+    try {
+      upstreamLogoutUnavailable = true
+      assert.equal((await fetch(failed.endpoint, { headers: { cookie: failed.upstream.header() } })).status, 503)
+      assert.equal(await session(failed.jar), null, 'the provider outage cannot roll back local revocation')
+    } finally { upstreamLogoutUnavailable = false }
+    const form = new URLSearchParams(failed.endpoint.search); form.set('confirm', 'no')
+    const declined = await fetch(`${idpOrigin}/oidc-logout`, { method: 'POST', headers: { cookie: failed.upstream.header(), 'content-type': 'application/x-www-form-urlencoded' }, body: form, redirect: 'manual' })
+    const returned = await oidcReturn(new URL(declined.headers.get('location')!), failed.jar)
+    assert.equal(returned.status, 302); assert.equal(returned.headers.get('location'), `${appOrigin}/sign-in`)
+    assert.equal(await session(failed.jar), null)
+    assert.equal((await pool.query('select count(*) from mikka_organization_audit_events where "targetId"=$1 and action=\'sso.logout_failed\' and metadata->>\'reason\'=\'oidc_upstream_failed\' and result=\'failure\'', [failed.originalSessionId])).rows[0].count, '1')
+    const unavailable = await oidcLogin(), constraint = `oidc_logout_nonce_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`alter table verification add constraint "${constraint}" check (identifier not like 'enterprise-oidc-logout:${providerId}:%') not valid`)
+    try {
+      const result = await startOidcLogout(unavailable.jar)
+      assert.equal(result.status, 200)
+      assert.deepEqual(await result.json(), { localSessionRevoked: true, upstream: 'unavailable', url: `${appOrigin}/sign-in` })
+      assert.equal(await session(unavailable.jar), null)
+    } finally { await pool.query(`alter table verification drop constraint "${constraint}"`) }
+  })
+  await t.test('OIDC logout audit failure withholds the redirect without restoring the revoked local session', async t => {
+    const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
+    const constraint = `oidc_logout_audit_${randomUUID().replaceAll('-', '')}`
+    const report = t.mock.method(console, 'error', () => {})
+    await pool.query(`alter table mikka_organization_audit_events add constraint "${constraint}" check ("organizationId"<>'${organizationId}'::uuid or action<>'sso.signed_out') not valid`)
+    try {
+      const refused = await startOidcLogout(login.jar)
+      assert.equal(refused.status, 503)
+      assert.equal(refused.headers.has('location'), false)
+      assert.deepEqual(await refused.json(), { code: 'ENTERPRISE_AUDIT_UNAVAILABLE', message: 'Authentication unavailable' })
+      assert.equal((await pool.query('select count(*) from session where id=$1', [active.session.id])).rows[0].count, '0')
+      assert.equal(await session(login.jar), null)
+      assert.equal(JSON.stringify(report.mock.calls.map(call => call.arguments)).includes('fixture-secret'), false)
+    } finally { await pool.query(`alter table mikka_organization_audit_events drop constraint "${constraint}"`) }
+  })
+  await t.test('OIDC logout cannot claim local revocation or request the OP when native session deletion fails', async () => {
+    const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
+    const name = `oidc_logout_delete_${randomUUID().replaceAll('-', '')}`
+    const before = (await pool.query('select count(*) from verification where identifier like $1', [`enterprise-oidc-logout:${providerId}:%`])).rows[0].count
+    await pool.query(`create function "${name}"() returns trigger language plpgsql as $$ begin
+      if old.id='${active.session.id}' then raise exception 'fixture_logout_delete_refused' using errcode='23514'; end if; return old; end; $$`)
+    try {
+      await pool.query(`create trigger "${name}" before delete on session for each row execute function "${name}"()`)
+      const refused = await startOidcLogout(login.jar)
+      assert.equal(refused.status, 500)
+      assert.equal(refused.headers.has('location'), false)
+      const body = await refused.text()
+      assert.equal(body.includes('"localSessionRevoked":true'), false)
+      assert.equal(body.includes('"upstream":"requested"'), false)
+      assert.equal((await pool.query('select count(*) from session where id=$1', [active.session.id])).rows[0].count, '1')
+      assert.equal((await pool.query('select count(*) from verification where identifier like $1', [`enterprise-oidc-logout:${providerId}:%`])).rows[0].count, before)
+    } finally {
+      await pool.query(`drop trigger if exists "${name}" on session`)
+      await pool.query(`drop function "${name}"()`)
+    }
   })
   await t.test('a signed OIDC login cannot publish a session cookie when its Organization audit transaction fails', async t => {
     mode = 'valid'
