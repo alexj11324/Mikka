@@ -27,7 +27,7 @@ export const navigationAllowlist = {
   'components/billing/free-allowance-section.tsx': { 'navigation/history': { count: 1, reason: 'drops the Stripe return key after showing its result' } },
   'components/plugins/connected-apps.tsx': { 'navigation/history': { count: 1, reason: 'drops the Composio OAuth return keys after showing the result' } },
   'components/plugins/github-settings.tsx': { 'navigation/history': { count: 1, reason: 'drops the GitHub App return keys after showing the result' }, 'navigation/address': { count: 1, reason: 'sign-in return to the GitHub app page with the one-time link token, after switching the browser account' } },
-  'components/settings/google-sign-in-settings.tsx': { 'navigation/history': { count: 1, reason: 'drops the Google link return key after showing the result' } },
+  'hooks/settings/use-google-sign-in.ts': { 'navigation/history': { count: 1, reason: 'drops the Google link return key after showing the result' } },
   'lib/subscription-enrollment-binding-proof.ts': { 'navigation/history': { count: 1, reason: 'script in the subscription enrollment page drops its one-time proof from the address' } },
   'lib/subscription-enrollment-handoff.ts': { 'navigation/history': { count: 1, reason: 'script in the subscription hand-off page drops its one-time key from the address' } },
   'components/workspace/issue-workspace.tsx': { 'navigation/router': { count: 5, reason: 'sign-out leaves for /sign-in; Settings opened on its own route goes back to the app when pushSettingsHistory cannot' } },

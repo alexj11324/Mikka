@@ -5259,6 +5259,11 @@
     "renderHint": "请重试打开页面。"
   },
   "HostedSettings": {
+    "security": {
+      "othersTitle": "退出其他设备",
+      "othersHint": "除这台设备外，所有已登录的设备都会退出，需要重新登录。",
+      "othersConfirm": "立即退出"
+    },
     "account": {
       "note": "账户信息对你所在的所有团队都生效。",
       "pictureHint": "PNG、JPEG 或 WebP"

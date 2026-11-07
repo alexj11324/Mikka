@@ -5259,6 +5259,11 @@
     "renderHint": "Retry to reopen the view."
   },
   "HostedSettings": {
+    "security": {
+      "othersTitle": "Sign out other devices",
+      "othersHint": "Every device but this one is signed out and has to sign in again.",
+      "othersConfirm": "Sign out now"
+    },
     "account": {
       "note": "Your account details apply to every workspace you are in.",
       "pictureHint": "PNG, JPEG or WebP"

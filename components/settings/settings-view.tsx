@@ -8,6 +8,7 @@ import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SettingsContentFrame } from '@ui-slot/settings-content'
 import { ApiAndSubscriptions } from '@ui-slot/settings-models'
+import { SecurityAndSignIn } from '@ui-slot/settings-security'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -17,9 +18,7 @@ import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
-import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
-import { SecuritySettings } from '@/components/settings/security-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
@@ -115,7 +114,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     : null
   switch (section) {
     case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
-    case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
+    case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} workspace={workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} /> : waiting} />
