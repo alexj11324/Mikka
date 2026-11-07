@@ -1,5 +1,5 @@
 name: Issue 1503 read-only runtime snapshot
-# Capture the released 0c12 tuple and its preserved previous a65 configuration.
+# Capture the current 0c12 runtime pair before the next e8d0 runtime publication.
 on:
   push:
     branches: [ops/issue-1503-runtime-snapshot]
