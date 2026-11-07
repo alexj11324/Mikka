@@ -1,0 +1,55 @@
+name: Export pinned audit source once
+on:
+  push:
+    branches: [chore/audit-recovery-20261107]
+    paths: ['.github/workflows/audit-source-export-once.yml']
+permissions:
+  contents: read
+jobs:
+  export:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 6bd4287e180a529c36ad78339ff26a270f79d8b0
+          persist-credentials: false
+      - name: Export tracked source with an explicit non-review inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 6bd4287e180a529c36ad78339ff26a270f79d8b0
+          mkdir -p "$RUNNER_TEMP/audit-source"
+          git archive --format=tar HEAD | gzip -n > "$RUNNER_TEMP/audit-source/source.tar.gz"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          files = []
+          for row in subprocess.check_output(['git','ls-tree','-rz','HEAD']).split(b'\0'):
+              if not row:
+                  continue
+              meta, name = row.split(b'\t', 1)
+              mode, kind, sha = meta.decode().split()
+              path = name.decode()
+              item = {'path': path, 'mode': mode, 'kind': kind, 'git_blob': sha, 'manual_review': 'not_attested_by_inventory'}
+              if kind == 'blob':
+                  raw = subprocess.check_output(['git','cat-file','blob',sha])
+                  item.update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+                  try:
+                      content = raw.decode('utf-8')
+                      item.update(encoding='utf-8', lines=len(content.splitlines()))
+                  except UnicodeDecodeError:
+                      item['encoding'] = 'binary'
+              files.append(item)
+          target = Path(os.environ['RUNNER_TEMP']) / 'audit-source'
+          (target/'inventory.json').write_text(json.dumps({'commit':'6bd4287e180a529c36ad78339ff26a270f79d8b0','files':files},ensure_ascii=False))
+          (target/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in sorted(target.iterdir()) if p.is_file()))
+          print('Exported tracked file count:',len(files))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mikka-pinned-audit-source
+          path: ${{ runner.temp }}/audit-source/
+          retention-days: 7
+          if-no-files-found: error
