@@ -31,11 +31,12 @@ export class SubscriptionWorkflowModel implements V4Model {
     if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
     const { promptPrefix, stepIdentity, timedModelStream } = await import('./model-call-timing')
     const requestedAt = Date.now()
-    // Claude caches only at explicit breakpoints (lib/prompt-cache.ts): the broker passes the subscription's on; a person's
-    // own Anthropic key reads the SDK's option, which other providers ignore. Codex and OpenAI cache prefixes themselves.
-    const { withCacheBreakpoints } = await import('./prompt-cache')
+    // Claude gets its provider breakpoints. Supported Codex models also retain
+    // preparation's stable-system boundaries without disabling implicit history caching.
+    const { withCacheBreakpoints, withCodexSystemCacheBreakpoints } = await import('./prompt-cache')
     const key = this.selection.type === 'api_key' ? 'anthropic' : this.selection.route === 'claude_cpa' ? 'openaiCompatible' : null
-    const request = key ? { ...options, prompt: withCacheBreakpoints(options.prompt, key) } : options
+    const prompt = key ? withCacheBreakpoints(options.prompt, key) : this.selection.type === 'subscription' && this.selection.route === 'codex_cpa' ? withCodexSystemCacheBreakpoints(options.prompt, this.modelId) : options.prompt
+    const request = prompt === options.prompt ? options : { ...options, prompt }
     const prefix = await promptPrefix(options.prompt, options.tools)
     return timedModelStream(await model.doStream(request), { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, prefix, ...await stepIdentity() })
   }
