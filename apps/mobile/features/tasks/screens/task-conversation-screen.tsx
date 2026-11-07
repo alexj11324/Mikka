@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useCallback, useRef, useState } from 'react'
+import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -19,6 +19,7 @@ import { useHome } from '@/lib/home'
 import { tasksLive, threadLive } from '@/lib/live-keys'
 import { composerStops } from '@/lib/stop'
 import { threadSendErrorLine } from '@/lib/thread-send-error'
+import { runErrorLine } from '@/lib/run-error'
 import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
@@ -42,7 +43,7 @@ async function readConversation(id: string): Promise<Conversation> {
  * attempt's live keys.
  */
 export function TaskConversationScreen() {
-  const { id } = useLocalSearchParams<{ id: string; attempt?: string }>()
+  const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const home = useHome().data
@@ -81,6 +82,18 @@ export function TaskConversationScreen() {
 
   const task = data?.detail.task
   const agent = currentAgent(segments)
+  // Opened on an attempt from 活动: scrolled to its part, once. Opened plainly: at the newest, at the bottom, as a chat.
+  const scroller = useRef<{ scrollTo: (to: { y: number; animated: boolean }) => void; scrollToEnd: (options: { animated: boolean }) => void } | null>(null)
+  const offsets = useRef(new Map<string, number>())
+  const placed = useRef(false)
+  const place = () => {
+    if (placed.current || !segments.length) return
+    const y = attempt ? offsets.current.get(attempt) : undefined
+    if (attempt && y === undefined && segments.some(segment => segment.attempt.runId === attempt)) return
+    placed.current = true
+    if (y !== undefined) scroller.current?.scrollTo({ y: Math.max(0, y - 8), animated: false })
+    else scroller.current?.scrollToEnd({ animated: false })
+  }
   return (
     <View style={styles.screen}>
       <NavBar
@@ -92,17 +105,18 @@ export function TaskConversationScreen() {
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
         {data && !segments.length ? <Text style={styles.empty}>还没有尝试</Text> : null}
         {segments.map((segment, index) => (
-          <Fragment key={segment.attempt.runId}>
+          <View key={segment.attempt.runId} style={styles.segment}
+            onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
             {index > 0 ? <Divider text={dividerText(segments[index - 1]!.attempt, segment.attempt)} /> : null}
             {segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
-            {/* A failed attempt's raw error stays inside it (2026-11-05-0330). */}
-            {segment.error && !(index === segments.length - 1 && live?.active) && !segment.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{segment.error}</Text> : null}
-          </Fragment>
+            {/* A failed attempt's cause stays inside it, in words, with the raw code under 详情 (2026-11-05-0330). */}
+            {segment.error && !(index === segments.length - 1 && live?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
+          </View>
         ))}
         {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
         {live?.paused ? <ThreadQuotaPaused key={live.paused.runId} paused={live.paused} onContinued={() => reload()} /> : null}
@@ -126,9 +140,24 @@ function Item({ item, live }: { item: ThreadItem; live: boolean }) {
         </View>
       )
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
-    case 'error': return <Text style={styles.error}>{item.text}</Text>
+    case 'error': return <AttemptError raw={item.text} />
     case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
   }
+}
+
+/** Why an attempt stopped: its code's words in secondary text, the raw error folded under 详情. Never raw red text. */
+function AttemptError({ raw }: { raw: string }) {
+  const [open, setOpen] = useState(false)
+  const { line } = runErrorLine(raw)
+  return (
+    <View style={styles.cause}>
+      <Text style={styles.causeLine}>{line}</Text>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(value => !value)} hitSlop={8}>
+        <Text style={styles.detailsToggle}>详情</Text>
+      </Pressable>
+      {open ? <Text selectable style={styles.details}>{raw}</Text> : null}
+    </View>
+  )
 }
 
 /** The line between two attempts, as the chat's event lines are drawn: centred grey words between hairlines. */
@@ -154,6 +183,11 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
   stepText: { fontSize: 14, color: colors.secondary },
   error: { fontSize: 14, color: colors.danger, marginVertical: 4 },
+  segment: { gap: 4 },
+  cause: { gap: 4, marginVertical: 4 },
+  causeLine: { fontSize: 14, color: colors.secondary },
+  detailsToggle: { fontSize: 12, color: colors.secondary, textDecorationLine: 'underline' },
+  details: { fontSize: 12, color: colors.secondary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 },
   rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   dividerText: { flexShrink: 1, fontSize: 13, color: colors.secondary },

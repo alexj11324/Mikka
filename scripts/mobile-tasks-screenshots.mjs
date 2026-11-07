@@ -49,7 +49,7 @@ const detail = {
     place: { kind: 'laptop', name: 'MacBook' },
   },
   activity: [
-    { kind: 'attempt', runId: RUN2, n: 2, group: 'waiting', state: 'waiting', harness: 'claude_code', createdAt: ago(0, 3), failed: false },
+    { kind: 'attempt', runId: RUN2, n: 2, group: 'waiting', state: 'done', harness: 'claude_code', createdAt: ago(0, 3), failed: false },
     { kind: 'attempt', runId: RUN1, n: 1, group: 'blocked', state: 'failed', harness: 'codex', createdAt: ago(1), failed: true },
     { kind: 'created', by: 'Coordinator', createdAt: ago(1, 1) },
   ],
@@ -65,7 +65,7 @@ const threads = {
   [RUN1]: threadOf(RUN1, 'codex', 'failed', [
     { kind: 'person', id: 'p1', text: 'iOS 上 Google 登录回来以后停在空白页，修一下', mine: true, at: Date.now() - 90_000_000 },
     { kind: 'steps', id: 's1', count: 4, at: Date.now() - 89_000_000 },
-  ], 'agent_exited: codex exited with code 1 (E_SANDBOX_NETWORK)'),
+  ], 'run_network_error'),
   [RUN2]: threadOf(RUN2, 'claude_code', 'waiting', [
     { kind: 'steps', id: 's2', count: 9, at: Date.now() - 9_000_000 },
     { kind: 'agent', id: 'a2', text: '回调地址少了 `mikka://` 的信任来源，加上以后在模拟器里登录能回到聊天列表。PR #1471 已开，等你审阅。', at: Date.now() - 8_000_000 },

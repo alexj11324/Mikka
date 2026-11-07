@@ -24,8 +24,8 @@ const day = (iso: string) => {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
 }
 
-/** Where an attempt opens: the task's one conversation, which holds every attempt in order (2026-11-07). */
-export const conversationHref = (taskId: string): Href => ({ pathname: '/task/[id]/conversation', params: { id: taskId } })
+/** Where an attempt opens: the task's one conversation, scrolled to that attempt (2026-11-07). */
+export const conversationHref = (taskId: string, attempt?: string): Href => ({ pathname: '/task/[id]/conversation', params: attempt ? { id: taskId, attempt } : { id: taskId } })
 
 /**
  * A task's detail (decisions/2026-11-07-2045-tasks-only-threads-inside.md, Figma 1085:2 M2): its number and title,
@@ -44,8 +44,6 @@ export function TaskScreen() {
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
   const activity = data ? [...data.activity].reverse() : []
-  // The newest attempt is the task's current one: a pause there says the task's reason (待审阅 · Claude Code · date).
-  const currentAttempt = data?.activity.find(item => item.kind === 'attempt')?.runId
 
   // A push opens the task, then the attempt it was about, once.
   const opened = useRef(false)
@@ -53,7 +51,7 @@ export function TaskScreen() {
     if (opened.current || !attempt || !data) return
     opened.current = true
     const found = data.activity.some(item => item.kind === 'attempt' && item.runId === attempt)
-    router.push(found ? conversationHref(data.task.id) : `/thread/${attempt}`)
+    router.push(found ? conversationHref(data.task.id, attempt) : `/thread/${attempt}`)
   }, [attempt, data, router])
 
   return (
@@ -78,8 +76,8 @@ export function TaskScreen() {
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}
             {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} last={index === activity.length - 1}
-              reason={item.kind === 'attempt' && item.runId === currentAttempt ? shown?.reason ?? null : null}
-              onOpen={item.kind === 'attempt' ? () => router.push(conversationHref(task.id)) : undefined} />)}
+
+              onOpen={item.kind === 'attempt' ? () => router.push(conversationHref(task.id, item.runId)) : undefined} />)}
           </>
         ) : null}
       </ScrollView>
@@ -106,7 +104,8 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
  * One entry of 活动 on the timeline: an attempt carries its own result's icon and word (2026-11-07-2230) and opens
  * its thread; a replaced thread and the creation are lines.
  */
-function ActivityRow({ item, last, reason, onOpen }: { item: TaskActivity; last: boolean; reason: string | null; onOpen?: () => void }) {
+function ActivityRow({ item, last, onOpen }: { item: TaskActivity; last: boolean; onOpen?: () => void }) {
+  // Its own run's result, never the task's reason: an attempt that finished and opened a PR is 完成; only the task waits.
   const result = item.kind === 'attempt' ? attemptState(item) : null
   const body = (
     <>
@@ -121,7 +120,7 @@ function ActivityRow({ item, last, reason, onOpen }: { item: TaskActivity; last:
           {item.kind === 'attempt' ? `第 ${item.n} 次尝试` : item.kind === 'replaced' ? '换了新线程' : item.by ? `${item.by} 创建了任务` : '创建了任务'}
         </Text>
         <Text style={styles.activityMeta} numberOfLines={1}>
-          {result && item.kind === 'attempt' ? [result === 'paused' ? reason ?? ATTEMPT_WORD.paused : ATTEMPT_WORD[result], HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
+          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}
