@@ -158,3 +158,5 @@ test('frozen-source failure matching projects locations only and never runtime t
  const out = safeSourceFailures('Run credentials unavailable. SYNTHETIC_PRIVATE_VALUE', [{source:'lib/static.ts',line:12,literal:'Run credentials unavailable.'},{source:'lib/static.ts',line:15,literal:'another fixed failure'}]);
  assert.deepEqual(out, [{source:'lib/static.ts',line:12}]); assert.ok(!JSON.stringify(out).includes('PRIVATE'));
 })
+
+// Lease diagnosis uses the frozen authority function read-only and unchanged heartbeat responses.

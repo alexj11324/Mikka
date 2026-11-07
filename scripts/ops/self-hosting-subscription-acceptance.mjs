@@ -2,7 +2,7 @@
 // PostgreSQL, normal HTTP enrollment/dispatch and unchanged official CLIs.
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import { promisify, isDeepStrictEqual } from 'node:util'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
@@ -212,7 +212,8 @@ export async function runCommunity(env = process.env) {
   const requireSource = createRequire(source + '/package.json')
   const { Pool } = requireSource('pg')
   const { Sandbox } = await import(pathToFileURL(requireSource.resolve('e2b')))
-  const { createSessionClient, readProductionWorkerRelease, watchRun } = await import(pathToFileURL(source + '/scripts/acceptance/cloud-startup.mjs'))
+  const { createSessionClient, readProductionWorkerRelease, watchRun, observeChunks, cleanupCase } = await import(pathToFileURL(source + '/scripts/acceptance/cloud-startup.mjs'))
+  const { executionIdentitySchema, freezeExecutionIdentity, revalidateExecutionIdentity } = await import(pathToFileURL(source + '/lib/execution-identity.ts'))
   const revision = (await execute('git', ['rev-parse', 'HEAD'], { cwd: source })).stdout.trim()
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
   const report = { kind: 'real-community-subscriptions', revision, cases: [], cleanup: {}, stage: 'source', status: 'failed',
@@ -220,7 +221,7 @@ export async function runCommunity(env = process.env) {
   const publicErrors = (await execute('git', ['grep', '-n', '-E', '(Error|Refusal)\\(|error:|summary:|msg:', '--', 'lib', 'app', 'packages/daemon/src', 'packages/protocol/src'], { cwd: source, maxBuffer: 8 * 1024 * 1024 })).stdout
   const signatures = publicErrors.split('\n').flatMap(line => {
     const location = /^([^:]+):(\d+):/.exec(line)
-    return location ? [...line.matchAll(/(?:(?:Error|CodedError|ActionFailureError|Refusal)\(|\b(?:error|summary|msg):)\s*(['"])([^'"\n\\]{8,180})\1/g)]
+    return location && !/\.(test|spec)\./.test(location[1]) ? [...line.matchAll(/(?:(?:Error|CodedError|ActionFailureError|Refusal)\(|\b(?:error|summary|msg):)\s*(['"])([^'"\n\\]{8,180})\1/g)]
       .map(match => ({ source: location[1], line: Number(location[2]), literal: match[2] })) : []
   })
   const name = 'mikka-community-' + env.GITHUB_RUN_ID
@@ -473,8 +474,20 @@ export async function runCommunity(env = process.env) {
         // The existing strict helper conserves the official binary and uses
         // normal enrollment. Only its fixed acceptance origin is adapted to
         // this run's attested community server; no runtime source is changed.
-        const helper = (await readFile(source + '/scripts/e2b/acceptance-daemon.mts', 'utf8')).replace("origin !== 'https://app.aspectlylabs.com'", 'origin !== ' + JSON.stringify(origin))
+        let helper = (await readFile(source + '/scripts/e2b/acceptance-daemon.mts', 'utf8')).replace("origin !== 'https://app.aspectlylabs.com'", 'origin !== ' + JSON.stringify(origin))
         check(helper.includes('origin !== ' + JSON.stringify(origin)), 'HELPER_ORIGIN')
+        const heartbeatObserver = `const heartbeatProof: unknown[] = []
+  const originalHeartbeat = link.heartbeat.bind(link)
+  link.heartbeat = async (...args) => {
+    const result = await originalHeartbeat(...args)
+    heartbeatProof.push({ reported: args[1].runs.length, renewed: Object.keys(result.leases).length,
+      revoked: result.revoked?.length ?? 0, reportedRevoked: args[1].runs.filter(run => result.revoked?.includes(run.runId)).length })
+    await writeFile(dataDir + '/heartbeat-proof.json', JSON.stringify(heartbeatProof.slice(-12)), { mode: 0o600 })
+    return result
+  }
+  const register = link.registerDevice.bind(link)`
+        check(helper.includes('const register = link.registerDevice.bind(link)'), 'HELPER_HEARTBEAT_OBSERVER')
+        helper = helper.replace('const register = link.registerDevice.bind(link)', heartbeatObserver)
         await sandbox.files.write('/opt/mikka/worker/scripts/e2b/community-acceptance-daemon.mts', helper, { user: 'root' })
         row.stage = 'enrollment'
         const grant = await community.json('/api/devices/enrollment', post({}))
@@ -497,15 +510,52 @@ export async function runCommunity(env = process.env) {
         await configureBoundSubscription(community, workspace.id, s, row)
         const sampleId = randomUUID(), marker = 'STARTUP_OK_' + sampleId
         row.stage = 'create-issue'
-        const issue = await mcp('tools/call', { name: 'create_issue', arguments: { title: 'Self-hosted ' + kind + ' release validation', body: 'Read README.md using the normal file/shell tool. Do not change any file, commit, branch or push. After the successful tool call, reply exactly ' + marker + '. This is a read-only release verification task.', priority: 'low' } })
+        const title = 'Self-hosted ' + kind + ' release validation'
+        const issue = await mcp('tools/call', { name: 'create_issue', arguments: { title, body: 'Read README.md using the normal file/shell tool. Do not change any file, commit, branch or push. After the successful tool call, reply exactly ' + marker + '. This is a read-only release verification task.', priority: 'low' } })
         issueId = issue.issue?.id ?? issue.id; check(UUID.test(issueId), 'ISSUE')
         row.stage = 'dispatch'
         const queued = await mcp('tools/call', { name: 'dispatch_run', arguments: { issueId, agentId: agent.id, repo: 'alexj11324/Mikka', requestKey: 'selfhost:' + sampleId, note: 'Use exactly ' + s.model + ' on this subscription. Read-only; finish with ' + marker } })
         runId = queued.runId ?? queued.thread?.runId; check(UUID.test(runId), 'RUN')
-        const record = executionRecord = { runId, issueId, sampleId, harness: s.harness, requireReply: true, requireReplyAfterTool: true, requireTerminal: true, minToolCalls: 1 }
+        const record = executionRecord = { runId, issueId, title, sampleId, harness: s.harness, requireReply: true, requireReplyAfterTool: true, requireTerminal: true, minToolCalls: 1 }
         row.runId = runId; row.issueId = issueId
         row.stage = 'full-thread'
-        await watchRun(community, record, 240000, WebSocket, Date.now)
+        row.authorityReads = []
+        const readAuthority = async () => {
+          const tx = await localPool.connect(), reads = []
+          try {
+            await tx.query('BEGIN READ ONLY')
+            const query = { query: async (text, values) => {
+              const result = await tx.query(text, values)
+              reads.push({ kind: text.includes('byos_bindings') ? 'subscription' : text.includes('FROM devices') ? 'device' : text.includes('mikka_workspace_members') ? 'membership' : text.includes('FROM bots') ? 'bot' : 'other', rows: result.rowCount })
+              return result
+            } }
+            const run = (await tx.query('SELECT "userId","botId","deviceId","agentDefinition",status,"stopRequestedAt","leaseExpiresAt" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3', [runId, own.id, deviceId])).rows[0]
+            check(run, 'OWN_AUTHORITY_DIAGNOSIS')
+            const item = { status: run.status, stopRequested: Boolean(run.stopRequestedAt), leaseExpired: new Date(run.leaseExpiresAt).getTime() <= Date.now(), reads }
+            row.authorityReads.push(item)
+            const subscription = run.agentDefinition?.subscription
+            if (subscription) {
+              const binding = (await tx.query(`SELECT b."ownerId",b."modelId",b.route,b."connectionRevision"::text AS revision,c.epoch::text AS epoch,c.state,c.paused
+                FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" WHERE b.id=$1`, [subscription.bindingId])).rows[0]
+              item.subscription = { present: Boolean(binding), connected: binding?.state === 'connected', paused: binding?.paused === true,
+                revisionMatches: Boolean(binding && binding.revision === binding.epoch), modelMatches: binding?.modelId === subscription.modelId,
+                routeMatches: binding?.route === subscription.route, ownerMatches: binding?.ownerId === run.userId }
+            }
+            try {
+              const frozen = executionIdentitySchema.parse(run.agentDefinition.executionIdentity)
+              const current = await freezeExecutionIdentity(query, run, query, frozen.workspaceId)
+              item.changedFields = Object.keys(frozen).filter(key => !isDeepStrictEqual(frozen[key], current[key]))
+              await revalidateExecutionIdentity(query, run, query)
+              item.valid = true
+            } catch (error) { item.valid = false; item.errorClass = ['ExecutionIdentityError','ZodError','TypeError'].includes(error?.name) ? error.name : 'OTHER' }
+          } finally { await tx.query('ROLLBACK'); tx.release() }
+        }
+        const diagnosed = new Set()
+        await watchRun(community, record, 240000, WebSocket, Date.now, undefined, { observe: async detail => {
+          const key = detail.thread?.status
+          if (!diagnosed.has(key) && diagnosed.size < 4) { diagnosed.add(key); await readAuthority() }
+          return observeChunks(record, detail, Date.now())
+        } })
         check(['succeeded', 'completed'].includes(record.lastStatus) && record.replyVerifiedAfterTool && record.toolCalls.some(t => t.outcome === 'ok'), 'THREAD_COMPLETE')
         row.stage = 'provenance'
         const evidence = (await community.json('/api/runs/' + runId + '/evidence')).run
@@ -516,6 +566,10 @@ export async function runCommunity(env = process.env) {
       } catch (error) {
         row.code = /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_THREAD_FAILED'; row.errorClass = error?.constructor?.name === 'CommandExitError' ? 'CommandExitError' : 'Error'
         if (runId && issueId) {
+          try {
+            const heartbeat = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/heartbeat-proof.json', { user: 'root' }))
+            row.heartbeatProof = heartbeat.map(value => ({ reported: value.reported, renewed: value.renewed, revoked: value.revoked, reportedRevoked: value.reportedRevoked }))
+          } catch { row.heartbeatProofUnavailable = true }
           try {
             const journal = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/runs.json', { user: 'root' }))
             const local = journal.runs?.[runId]
@@ -551,12 +605,9 @@ export async function runCommunity(env = process.env) {
       finally {
         if (!deviceId && sandbox) { try { const proof = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/device-proof.json', { user: 'root' })); if (UUID.test(proof.deviceId) && proof.harness === s.harness) deviceId = proof.deviceId } catch { /* registration may not have completed */ } }
         if (runId) { try {
-          const ended = detail => detail.thread?.attempts?.length && detail.thread.attempts.every(attempt => ['succeeded','completed','failed','stopped','cancelled'].includes(attempt.status))
-          if (!ended(await community.rpc('agents.getIssueThread', [issueId, runId]))) {
-            await community.rpc('agents.stopRun', [runId])
-            await watchRun(community, { runId, issueId }, 45000, WebSocket, Date.now, new Set([runId]))
-          }
-          row.cleanup.runStopped = true
+          await cleanupCase(community, executionRecord, 'device', { timeoutMs: 45000 })
+          row.cleanup.runStopped = executionRecord.cleanup?.status === 'passed'
+          row.cleanup.factoryCancelled = executionRecord.cleanup?.factoryCancelled === true
         } catch { row.cleanup.runStopped = false } }
         if (deviceId) { try { await community.rpc('agents.removeDevice', [deviceId]); row.cleanup.deviceRemoved = true } catch { row.cleanup.deviceRemoved = false } }
         if (sandbox) { try { await sandbox.kill(); row.cleanup.vmStopped = true; journal.vms = journal.vms.filter(id => id !== sandbox.sandboxId); await saveJournal() } catch { row.cleanup.vmStopped = false } }
