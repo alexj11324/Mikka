@@ -4,6 +4,7 @@ import { CodedError } from '@mikka/protocol/coded-error'
 import { directPoolOptions } from '../../scripts/postgres-connection.mjs'
 import { LIVE_CHANNEL, LIVE_ID, liveInvalidations } from '../live/events'
 import { PRESENCE_MAX_DEVICES } from '../live/presence'
+import { liveSessionIdValid } from '../live/session-ticket'
 import type { GatewayBus, GatewayMessage } from './hub'
 import { cancelGatewayQuery, type BackendKey } from './postgres-cancel'
 
@@ -28,6 +29,7 @@ function watchedQuery<R extends QueryResultRow>(watch: SourceWatch, query: Query
 export function gatewayMessage(value: unknown): GatewayMessage | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const item = value as Record<string, unknown>
+  if (item.type === 'session_revoked' && liveSessionIdValid(item.sessionId)) return { type: 'session_revoked', sessionId: item.sessionId }
   if (item.type === 'live' && typeof item.key === 'string' && LIVE_CHANNEL.test(item.key)) {
     const events = liveInvalidations(item.events, true)
     return events ? { type: 'live', key: item.key, events } : null
@@ -130,6 +132,17 @@ export class PostgresGatewayBus implements GatewayBus {
     const client = this.client!
     try { await client.query('SELECT pg_notify($1, $2)', [CHANNEL, JSON.stringify({ node: this.node, message })]) }
     catch (error) { this.lost(client); throw error }
+  }
+
+  /** Two reads per connection, at upgrade/open. No session polling or per-frame SQL. */
+  async authorizeSession(sessionId: string): Promise<boolean> {
+    if (!liveSessionIdValid(sessionId)) return false
+    await this.ready()
+    const client = this.client!
+    try {
+      const { rows } = await client.query<{ active: boolean }>('SELECT EXISTS (SELECT 1 FROM "session" WHERE id = $1 AND "expiresAt" > now()) AS active', [sessionId])
+      return this.client === client && rows[0]?.active === true
+    } catch (error) { this.lost(client); throw error }
   }
 
   private lost(client: Client) {

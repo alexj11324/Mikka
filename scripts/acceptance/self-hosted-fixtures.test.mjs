@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import test from 'node:test'
-import { assertFixtureEnvironment, chatObservation, fixtureHttp } from './self-hosted-services.mjs'
+import { assertFixtureEnvironment, assertOfficialWebCors, chatObservation, fixtureHttp, handoffCode, officialWebFixture } from './self-hosted-services.mjs'
 import { createModelFixture } from './self-hosted-model.mjs'
 
 const fixture = {
@@ -92,4 +92,48 @@ test('the isolated model supports ordinary and streaming OpenAI requests with ex
   const refused = await call({ model: 'selfhost-ci', messages: [] }, 'Bearer other')
   assert.equal(refused.status, 400); await refused.body.cancel()
   assert.deepEqual(await (await fetch(`${base}/evidence`)).json(), { synthetic: true, calls: 2, turns: ['01', '02'] })
+})
+
+
+test('official web fixture provides exact callback metadata without changing disposable network targets', () => {
+  assert.deepEqual(officialWebFixture(fixture), {
+    origin: 'https://app.aspectlylabs.com', callback: 'https://app.aspectlylabs.com/mikka/api/web/complete',
+  })
+  assert.deepEqual(officialWebFixture({ ...fixture, MIKKA_OFFICIAL_WEB_URL: 'https://isolated.example.test/custom/' }), {
+    origin: 'https://isolated.example.test', callback: 'https://isolated.example.test/custom/api/web/complete',
+  })
+  for (const patch of [{ MIKKA_OFFICIAL_WEB_ENABLED: '0' }, { MIKKA_OFFICIAL_WEB_ENABLED: 'false' },
+    { MIKKA_OFFICIAL_WEB_URL: 'http://isolated.example.test/custom' },
+    { MIKKA_OFFICIAL_WEB_URL: 'https://credential@isolated.example.test/custom' },
+    { MIKKA_OFFICIAL_WEB_URL: 'https://isolated.example.test/custom?redirect=elsewhere' },
+    { MIKKA_OFFICIAL_WEB_URL: 'https://isolated.example.test/custom#fragment' }]) {
+    assert.throws(() => officialWebFixture({ ...fixture, ...patch }))
+  }
+})
+
+test('HTTP handoff driver refuses wrong callback/state, duplicate proof, token leakage and query credentials', () => {
+  const { callback } = officialWebFixture(fixture)
+  const state = 'fixture_state_123456789', code = 'a'.repeat(43)
+  const target = `${callback}#${new URLSearchParams({ state, code })}`
+  assert.equal(handoffCode(target, { callback, state }), code)
+  for (const location of [
+    target.replace('app.aspectlylabs.com', 'malicious.example.test'),
+    `${callback}/#state=${state}&code=${code}`,
+    `${callback}?code=${code}#state=${state}&code=${code}`,
+    `${callback}#state=wrong_state&code=${code}`,
+    `${target}&state=${state}`, `${target}&code=${code}`, `${target}&token=must-not-be-accepted`,
+    `${callback}#state=${state}&code=short`,
+  ]) assert.throws(() => handoffCode(location, { callback, state }), /SELF_HOSTED_WEB_HANDOFF_RETURN/)
+})
+
+test('HTTP acceptance requires exact CORS without cookie or native cache authority on every remote response', () => {
+  const official = officialWebFixture(fixture).origin
+  const headers = { 'access-control-allow-origin': official, vary: 'Origin, Authorization', 'cache-control': 'private, no-store' }
+  assert.doesNotThrow(() => assertOfficialWebCors(new Response('{}', { headers }), official))
+  for (const patch of [
+    { 'access-control-allow-origin': '*' }, { 'access-control-allow-origin': 'https://malicious.example.test' },
+    { 'access-control-allow-credentials': 'true' }, { 'access-control-allow-credentials': 'false' },
+    { 'set-cookie': 'private=must-not-escape' }, { 'x-mikka-session-cache': 'must-not-escape' },
+    { vary: 'Authorization' }, { 'cache-control': 'public, max-age=60' },
+  ]) assert.throws(() => assertOfficialWebCors(new Response('{}', { headers: { ...headers, ...patch } }), official), /SELF_HOSTED_WEB_CORS_BOUNDARY/)
 })

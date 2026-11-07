@@ -11,7 +11,7 @@ export function builtinGateway(): Runtime | null {
   if (!config) return null
   if (!runtime) {
     const bus = new PostgresGatewayBus({ connectionString: process.env.MIKKA_DATABASE_URL_UNPOOLED || process.env.MIKKA_DATABASE_URL })
-    const hub = new GatewayHub(bus, Date.now, config.secret)
+    const hub = new GatewayHub(bus, Date.now, config.secret, sessionId => bus.authorizeSession(sessionId))
     runtime = { hub, bus, async stop() { hub.stop(); await bus.stop(); runtime = undefined } }
   }
   return runtime

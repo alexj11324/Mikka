@@ -5,9 +5,10 @@ import { PRESENCE_ONLINE_MS, presenceCommand } from '../live/presence'
 import { PresenceWatches, type DeviceSnapshot } from './presence'
 
 export type GatewayPeer = { id: string; send(data: string): unknown; close(code: number, reason: string): unknown }
-export type GatewaySocket = { kind: 'live' | 'device'; key: string; expiresAt: number; revisions: boolean; presence?: boolean }
+export type GatewaySocket = { kind: 'live' | 'device'; key: string; expiresAt: number; revisions: boolean; presence?: boolean; sessionId?: string }
 export type GatewayPresence = { online: boolean; lastSeenAt: string | null }
 export type GatewayMessage =
+  | { type: 'session_revoked'; sessionId: string }
   | { type: 'live'; key: string; events: LiveInvalidation[] }
   | { type: 'work'; key: string }
   | { type: 'claim'; key: string; connection: string; seen?: number }
@@ -25,7 +26,7 @@ export interface GatewayBus {
   /** Observe the lifetime of a publishing LISTEN session, without polling. */
   observe?(source: string, lost: () => void, signal?: AbortSignal): Promise<() => void>
 }
-type Connection = { peer: GatewayPeer; socket: GatewaySocket; claimed: boolean; seen: number; online: boolean;
+type Connection = { peer: GatewayPeer; socket: GatewaySocket; claimed: boolean; seen: number; online: boolean; authorized: boolean;
   source?: string; expiry?: ReturnType<typeof setTimeout>; stale?: ReturnType<typeof setTimeout> }
 type PendingSnapshot = { keys: Set<string>; states: Map<string, DeviceSnapshot>; sent: boolean;
   timer?: ReturnType<typeof setTimeout>; finish(error?: Error): void }
@@ -41,7 +42,7 @@ export class GatewayHub {
   private presence: PresenceWatches
   private unsubscribe: () => void
 
-  constructor(private bus: GatewayBus, private now = Date.now, secret = '') {
+  constructor(private bus: GatewayBus, private now = Date.now, secret = '', private authorizeSession?: (sessionId: string) => Promise<boolean>) {
     this.presence = new PresenceWatches(secret, bus, now, (keys, signal) => this.snapshots(keys, signal),
       (peer, reply) => this.send(peer, JSON.stringify(reply)), (channel, home) => {
         this.receive({ type: 'live', key: channel, events: [{ kind: 'device_list', id: home }, { kind: 'thread_list', id: home }] })
@@ -49,10 +50,25 @@ export class GatewayHub {
     this.unsubscribe = bus.subscribe((message, source) => this.receive(message, source), () => this.disconnect())
   }
 
+  async authorize(socket: GatewaySocket): Promise<boolean> {
+    if (socket.kind !== 'live' || !socket.sessionId) return true
+    if (!this.authorizeSession || socket.expiresAt <= this.now()) return false
+    try { return await this.authorizeSession(socket.sessionId) }
+    catch { return false } // An unavailable fresh authority never keeps a live capability open.
+  }
+
   async open(peer: GatewayPeer, socket: GatewaySocket) {
-    const connection: Connection = { peer, socket, claimed: false, seen: this.now(), online: false }
+    const connection: Connection = { peer, socket, claimed: false, seen: this.now(), online: false, authorized: !socket.sessionId }
     this.connections.set(peer.id, connection)
     if (socket.kind === 'live') {
+      if (socket.sessionId) {
+        // Register before checking: a committed revoke during the await removes
+        // this exact connection, and a late successful read cannot resurrect it.
+        const allowed = await this.authorize(socket)
+        if (this.connections.get(peer.id) !== connection) return
+        if (!allowed) { this.remove(peer.id, 4001, 'session revoked'); return }
+        connection.authorized = true
+      }
       if (socket.expiresAt <= this.now()) { this.remove(peer.id, 4001, 'ticket expired'); return }
       connection.expiry = setTimeout(() => this.remove(peer.id, 4001, 'ticket expired'), socket.expiresAt - this.now())
       connection.expiry.unref?.()
@@ -68,7 +84,7 @@ export class GatewayHub {
 
   message(peer: GatewayPeer, data: string) {
     const connection = this.connections.get(peer.id)
-    if (!connection) return
+    if (!connection || !connection.authorized) return
     if (connection.socket.kind === 'live' && connection.socket.expiresAt <= this.now()) {
       this.remove(peer.id, 4001, 'ticket expired'); return
     }
@@ -198,6 +214,12 @@ export class GatewayHub {
   }
 
   private receive(message: GatewayMessage, source?: string) {
+    if (message.type === 'session_revoked') {
+      for (const [id, connection] of this.connections) {
+        if (connection.socket.kind === 'live' && connection.socket.sessionId === message.sessionId) this.remove(id, 4001, 'session revoked')
+      }
+      return
+    }
     if (message.type === 'inspect') {
       const devices = message.keys.flatMap(key => {
         const state = this.localSnapshot(key)
@@ -247,6 +269,7 @@ export class GatewayHub {
     }
     for (const connection of this.connections.values()) {
       const { peer, socket } = connection
+      if (!connection.authorized) continue
       if (socket.key !== message.key) continue
       if (message.type === 'claim') {
         if (socket.kind !== 'device') continue

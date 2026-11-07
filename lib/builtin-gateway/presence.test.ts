@@ -75,7 +75,7 @@ test('presence is explicitly negotiated without changing either legacy ready sha
   await hub.message(old.socket, command('legacy', false))
   assert.equal(old.messages.length, 1)
   const env = { BETTER_AUTH_URL: 'https://self.example', BETTER_AUTH_SECRET: 'isolated-local-auth-secret' }
-  const config = builtinGatewayConfig(env)!, ticket = liveTicket(scope, config)
+  const config = builtinGatewayConfig(env)!, ticket = liveTicket(scope, config, Date.now(), 'presence-test-session')
   const accepted = gatewayUpgrade(new Request(`${ticket.url.replace('wss:', 'https:')}?presence=1`, {
     headers: { upgrade: 'websocket', 'sec-websocket-protocol': ticket.protocol },
   }), env)

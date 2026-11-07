@@ -50,11 +50,43 @@ export function assertFixtureEnvironment(env) {
   }
 }
 
+/** The official URL supplies only a browser Origin and exact callback value.
+ * Every network request remains on the guarded disposable Compose targets. */
+export function officialWebFixture(env) {
+  check(!['0', 'false'].includes(env.MIKKA_OFFICIAL_WEB_ENABLED), 'WEB_DISABLED')
+  const value = (env.MIKKA_OFFICIAL_WEB_URL ?? 'https://app.aspectlylabs.com/mikka').replace(/\/+$/, '')
+  const url = new URL(value)
+  check(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash, 'WEB_CALLBACK_CONFIGURATION')
+  return { origin: url.origin, callback: `${value}/api/web/complete` }
+}
+
+/** Validate the redirect before using its proof. This never follows the official
+ * callback URL, so the isolated fixture does not call the official deployment. */
+export function handoffCode(location, { callback, state }) {
+  const target = new URL(location ?? 'invalid:')
+  const fragment = new URLSearchParams(target.hash.slice(1))
+  check(`${target.origin}${target.pathname}` === callback && !target.search
+    && !target.username && !target.password && fragment.getAll('state').length === 1
+    && fragment.get('state') === state && fragment.getAll('code').length === 1
+    && [...fragment.keys()].every(key => ['state', 'code'].includes(key))
+    && /^[A-Za-z0-9_-]{32,128}$/.test(fragment.get('code') ?? ''), 'WEB_HANDOFF_RETURN')
+  return fragment.get('code')
+}
+
+export function assertOfficialWebCors(response, officialOrigin) {
+  check(response.headers.get('access-control-allow-origin') === officialOrigin
+    && !response.headers.has('access-control-allow-credentials')
+    && !response.headers.has('set-cookie') && !response.headers.has('x-mikka-session-cache')
+    && /(?:^|,)\s*Origin\s*(?:,|$)/i.test(response.headers.get('vary') ?? '')
+    && /no-store/.test(response.headers.get('cache-control') ?? ''), 'WEB_CORS_BOUNDARY')
+}
+
 /** Event queues retain a notification arriving before its HTTP request returns.
  * Waiting is event-driven and has a deadline; there is no refresh/poll loop. */
 export function socketEvents(url, protocol) {
   const socket = new WebSocket(url, protocol)
   const queue = [], listeners = new Set()
+  const closed = new Promise(resolve => socket.addEventListener('close', event => resolve({ code: event.code }), { once: true }))
   const ready = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('SELF_HOSTED_SOCKET_OPEN_TIMEOUT')), 15_000)
     socket.addEventListener('open', () => { clearTimeout(timer); resolve() }, { once: true })
@@ -68,7 +100,8 @@ export function socketEvents(url, protocol) {
     else queue.push(value)
   })
   return {
-    ready,
+    ready, closed,
+    get isOpen() { return socket.readyState === WebSocket.OPEN },
     next(matches, timeout = 30_000) {
       const found = queue.findIndex(matches)
       if (found >= 0) return Promise.resolve(queue.splice(found, 1)[0])
@@ -124,15 +157,16 @@ export function chatObservation(chat, expectedReply) {
 export async function runAcceptance(env = process.env) {
   assertFixtureEnvironment(env)
   const report = { kind: 'isolated-self-hosted-services', revision: env.MIKKA_EXPECTED_REVISION, origin,
-    provider: 'synthetic-openai-compatible', productionAcceptance: false, checks: {}, status: 'running', stage: 'startup' }
+    provider: 'synthetic-openai-compatible', synthetic: true, productionAcceptance: false, checks: {}, status: 'running', stage: 'startup' }
   const cookies = new Map(), sockets = []
-  const request = async (path, { target = origin, method = 'GET', body, binary = false, expected = [200] } = {}) => {
+  const official = officialWebFixture(env)
+  const request = async (path, { target = origin, method = 'GET', body, binary = false, expected = [200], useCookies = true, browserOrigin = origin, token, headers = {} } = {}) => {
     check([origin, second].includes(target) && path.startsWith('/mikka/'), 'REQUEST_TARGET')
     const response = await fixtureHttp(`${target}${path}`, { method, signal: AbortSignal.timeout(30_000),
-      headers: { host: 'localhost:3000', origin, ...(cookies.size ? { cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') } : {}),
+      headers: { ...headers, host: 'localhost:3000', origin: browserOrigin, ...(token ? { authorization: `Bearer ${token}` } : {}), ...(useCookies && cookies.size ? { cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') } : {}),
         ...(body !== undefined ? { 'content-type': binary ? 'application/octet-stream' : 'application/json' } : {}) },
       ...(body !== undefined ? { body: binary ? body : JSON.stringify(body) } : {}) })
-    for (const cookie of response.headers.getSetCookie()) {
+    for (const cookie of useCookies ? response.headers.getSetCookie() : []) {
       const pair = cookie.split(';', 1)[0], index = pair.indexOf('=')
       if (index > 0) cookies.set(pair.slice(0, index), pair.slice(index + 1))
     }
@@ -181,10 +215,67 @@ export async function runAcceptance(env = process.env) {
     check(session.user?.emailVerified === true && session.user?.email === email, 'VERIFIED_SIGN_IN')
     report.checks.mailpit = { verificationReceived: true, passwordResetReceived: true, configuredSender: true, verifiedSignIn: true }
 
+    report.stage = 'official-web-handoff'
+    // These are actual HTTP requests. The official Origin is explicit, and no
+    // cookie or native session-cache proof accompanies public/bearer requests.
+    const officialRequest = async (path, options = {}) => {
+      const response = await request(path, { ...options, useCookies: false, browserOrigin: official.origin })
+      assertOfficialWebCors(response, official.origin)
+      return response
+    }
+    const discovery = await (await officialRequest('/mikka/api/desktop/discovery')).json()
+    check(discovery.web?.enabled === true && discovery.web.protocol?.min <= 1 && discovery.web.protocol?.max >= 1
+      && discovery.basePath === '/mikka' && discovery.version === version.build, 'WEB_DISCOVERY')
+    const preflight = await officialRequest('/mikka/api/desktop/rpc', { method: 'OPTIONS', expected: [204], headers: {
+      'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type',
+    } })
+    check(preflight.headers.get('access-control-allow-methods')?.split(/,\s*/).includes('POST')
+      && preflight.headers.get('access-control-allow-headers')?.split(/,\s*/).includes('authorization'), 'WEB_PREFLIGHT')
+    const state = randomBytes(24).toString('base64url'), verifier = randomBytes(32).toString('base64url')
+    const challenge = createHash('sha256').update(verifier).digest('base64url')
+    const begin = await (await officialRequest('/mikka/api/web/begin', { method: 'POST', body: { state, challenge, callback: official.callback } })).json()
+    const signIn = new URL(begin.signInUrl)
+    check(signIn.origin === origin && signIn.pathname === '/mikka/sign-in' && !signIn.hash
+      && signIn.searchParams.get('web') === '1' && signIn.searchParams.get('web_state') === state
+      && signIn.searchParams.get('web_callback') === official.callback, 'WEB_SIGN_IN_TARGET')
+    // Account confirmation is represented explicitly as the same-origin link
+    // navigation; this HTTP driver does not claim a browser visual acceptance.
+    const returnedWeb = await request(`/mikka/api/web/return?${new URLSearchParams({ state, callback: official.callback })}`, {
+      expected: [303], headers: { 'sec-fetch-site': 'same-origin', referer: signIn.href },
+    })
+    const code = handoffCode(returnedWeb.headers.get('location'), { callback: official.callback, state })
+    const proof = { state, code, verifier, callback: official.callback }
+    const webSession = await (await officialRequest('/mikka/api/web/exchange', { method: 'POST', body: proof })).json()
+    check(typeof webSession.token === 'string' && webSession.token.length >= 32
+      && webSession.user?.id === session.user.id && typeof webSession.session?.id === 'string'
+      && webSession.session.id !== session.session?.id && webSession.token !== session.session?.token, 'WEB_INDEPENDENT_SESSION')
+    await officialRequest('/mikka/api/web/exchange', { method: 'POST', body: proof, expected: [400] })
+    const webRequest = (path, options = {}) => officialRequest(path, { ...options, token: webSession.token })
+    const sessionRpc = { version: 1, action: 'desktop.session', args: [] }
+    const webRead = await (await webRequest('/mikka/api/desktop/rpc', { method: 'POST', body: sessionRpc })).json()
+    check(webRead.ok === true && webRead.result?.user?.id === session.user.id
+      && webRead.result?.session?.id === webSession.session.id, 'WEB_BEARER_RPC')
+    await officialRequest('/mikka/api/desktop/rpc', { method: 'POST', body: sessionRpc, expected: [401] })
+    for (const [path, body, bearer] of [
+      ['/mikka/api/web/begin', { state, challenge, callback: official.callback }, undefined],
+      ['/mikka/api/desktop/rpc', sessionRpc, webSession.token],
+    ]) {
+      const denied = await request(path, { method: 'POST', body, token: bearer, useCookies: false,
+        browserOrigin: 'https://malicious.example.test', expected: [403] })
+      check(!denied.headers.has('access-control-allow-origin'), 'WEB_MALICIOUS_ORIGIN_CORS')
+      await denied.body?.cancel()
+    }
+    report.checks.officialWeb = { transport: 'actual-http', protocol: 'v1', discovery: true, corsPreflight: true,
+      bearerOnly: true, explicitSameOriginReturn: true, independentSession: true, fragmentCodeOnly: true,
+      replayRejected: true, sessionRpc: true, maliciousOriginRejected: true, visualAcceptance: false }
+
     report.stage = 'cross-replica-live'
     const workspace = await (await request('/mikka/api/workspace')).json()
     check(typeof workspace.workspace?.id === 'string', 'WORKSPACE_CREATED')
-    const ticket = await (await request(`/mikka/api/live/ticket?workspace=${workspace.workspace.id}`)).json()
+    const webWorkspace = await (await webRequest('/mikka/api/workspace')).json()
+    check(webWorkspace.workspace?.id === workspace.workspace.id, 'WEB_WORKSPACE_READ')
+    report.checks.officialWeb.workspaceRead = true
+    const ticket = await (await webRequest(`/mikka/api/live/ticket?workspace=${workspace.workspace.id}`)).json()
     const liveURL = new URL(ticket.url)
     check(liveURL.origin === origin.replace('http:', 'ws:') && liveURL.pathname.startsWith('/mikka/v1/live/'), 'BUILTIN_TICKET')
     liveURL.searchParams.set('revisions', '1')
@@ -198,12 +289,12 @@ export async function runAcceptance(env = process.env) {
 
     report.stage = 'minio-upload-download'
     const bytes = Buffer.from('Self-hosted S3 interoperability fixture.\nUTF-8: 中文。\n')
-    const upload = await (await request('/mikka/api/chat/attachments', { method: 'POST', body: {
+    const upload = await (await webRequest('/mikka/api/chat/attachments', { method: 'POST', body: {
       operation: 'init', scope: { kind: 'bot', id: bot.id }, name: 'selfhost.txt', size: bytes.length, mediaType: 'text/plain',
     } })).json()
     check(typeof upload.id === 'string', 'UPLOAD_CREATED')
-    await request(`/mikka/api/chat/attachments?id=${upload.id}`, { target: second, method: 'POST', binary: true, body: bytes })
-    const file = await (await request(`/mikka/api/chat/attachments/${upload.id}?download-url`)).json()
+    await webRequest(`/mikka/api/chat/attachments?id=${upload.id}`, { target: second, method: 'POST', binary: true, body: bytes })
+    const file = await (await webRequest(`/mikka/api/chat/attachments/${upload.id}?download-url`)).json()
     const signed = new URL(file.downloadUrl)
     check(signed.origin === storage && signed.pathname.startsWith(`/${bucket}/chat-files/`) && signed.searchParams.get('X-Amz-Algorithm') === 'AWS4-HMAC-SHA256', 'S3_PRESIGNED_DOWNLOAD')
     const downloaded = await fetch(signed, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
@@ -211,21 +302,24 @@ export async function runAcceptance(env = process.env) {
     const anonymous = await fetch(`${signed.origin}${signed.pathname}`, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
     check(anonymous.status === 403, 'S3_PRIVATE_OBJECT'); await anonymous.body?.cancel()
     report.checks.minio = { applicationUpload: true, privateObject: true, presignedDownload: true, bytesVerified: true }
+    report.checks.officialWeb.attachmentUploadAndDownload = true
 
     report.stage = 'community-chat-31'
     report.chatProgress = { confirmedReplies: 0 }
     for (let turn = 1; turn <= 31; turn++) {
       const number = String(turn).padStart(2, '0'), reply = `SELF_HOSTED_REPLY_${number}`
-      await request('/mikka/api/mobile/chat', { method: 'POST', expected: [202], body: { botId: bot.id, text: `selfhost_turn_${number}`, submissionId: randomUUID() } })
+      const chatRequest = turn === 1 ? webRequest : request
+      await chatRequest('/mikka/api/mobile/chat', { method: 'POST', expected: [202], body: { botId: bot.id, text: `selfhost_turn_${number}`, submissionId: randomUUID() } })
       const deadline = Date.now() + 45_000
       for (;;) {
-        const chat = await (await request(`/mikka/api/mobile/chat?bot=${bot.id}`)).json()
+        const chat = await (await chatRequest(`/mikka/api/mobile/chat?bot=${bot.id}`)).json()
         if (!(chat.enabled === true && !chat.error && !chat.failure)) {
           report.chatObservation = { turn, ...chatObservation(chat, reply) }
         }
         check(chat.enabled === true && !chat.error && !chat.failure, 'CHAT_UNAVAILABLE')
         if (!chat.working && chat.items?.some(item => item.from === 'coordinator' && item.text?.includes(reply))) {
           report.chatProgress.confirmedReplies = turn
+          if (turn === 1) Object.assign(report.checks.officialWeb, { messageSubmitted: true, messageReplyRead: true, replyProvider: 'synthetic-openai-compatible' })
           break
         }
         check(Date.now() < deadline, 'CHAT_REPLY_TIMEOUT')
@@ -240,8 +334,31 @@ export async function runAcceptance(env = process.env) {
       const ledger = await pool.query('SELECT count(*)::integer AS n FROM hosted_usage WHERE "workspaceId"=$1', [workspace.workspace.id])
       check(ledger.rows[0].n === 0, 'COMMUNITY_METERING')
     } finally { await pool.end() }
-    report.checks.chat = { messages: 31, replies: 31, provider: 'synthetic-openai-compatible', hostedUsageRows: 0, subscriptionAcceptance: false }
-    await request(`/mikka/api/chat/attachments/${upload.id}`, { method: 'DELETE' })
+    report.checks.chat = { messages: 31, replies: 31, provider: 'synthetic-openai-compatible', synthetic: true, hostedUsageRows: 0, subscriptionAcceptance: false }
+    await webRequest(`/mikka/api/chat/attachments/${upload.id}`, { method: 'DELETE' })
+    report.stage = 'official-web-revoke'
+    // Use a fresh bearer-bound ticket so a long fixture run cannot confuse the
+    // old ticket's natural expiry with an immediate revocation notification.
+    const revokeTicket = await (await webRequest(`/mikka/api/live/ticket?workspace=${workspace.workspace.id}`)).json()
+    const revokeURL = new URL(revokeTicket.url)
+    check(revokeURL.origin === origin.replace('http:', 'ws:') && revokeURL.pathname.startsWith('/mikka/v1/live/'), 'WEB_REVOKE_TICKET')
+    revokeURL.searchParams.set('revisions', '1')
+    const revokeLive = socketEvents(revokeURL.href, revokeTicket.protocol)
+    sockets.push(revokeLive); await revokeLive.ready
+    await revokeLive.next(value => value.type === 'live_ready' && value.version === 2)
+    check(revokeLive.isOpen, 'WEB_REVOKE_SOCKET_NOT_OPEN')
+    await webRequest('/mikka/api/web/revoke', { method: 'POST', expected: [204] })
+    let closeDeadline
+    try {
+      const closed = await Promise.race([revokeLive.closed, new Promise((_, reject) => {
+        closeDeadline = setTimeout(() => reject(new Error('SELF_HOSTED_WEB_REVOKE_SOCKET_TIMEOUT')), 15_000)
+      })])
+      check(closed.code === 4001, 'WEB_REVOKE_SOCKET_CODE')
+    } finally { clearTimeout(closeDeadline) }
+    await webRequest('/mikka/api/desktop/rpc', { method: 'POST', body: sessionRpc, expected: [401] })
+    const sourceAfterRevoke = await (await request('/mikka/api/auth/get-session?disableCookieCache=true')).json()
+    check(sourceAfterRevoke.user?.id === session.user.id && sourceAfterRevoke.session?.id === session.session.id, 'WEB_SOURCE_COOKIE_SURVIVES')
+    Object.assign(report.checks.officialWeb, { revokeImmediate: true, sourceCookieSurvives: true, bearerBoundLive: true, liveClosedOnRevoke: true })
     // Private one-run handoff to the same-revision source daemon on the CI
     // runner. Never include this file in reports or retained artifacts.
     await writeFile('/data/self-hosted-daemon-session.private.json', JSON.stringify({ revision: version.build, origin,
