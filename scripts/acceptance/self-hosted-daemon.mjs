@@ -6,6 +6,8 @@ import { chmod, lstat, mkdir, open, readFile, realpath, rm, writeFile } from 'no
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { encode, decode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
+import { liveChannelId } from '../../lib/live/scope.ts'
+import { presenceReply, PRESENCE_MAX_TOKEN_BYTES } from '../../lib/live/presence.ts'
 
 const ORIGIN = 'http://localhost:3000'
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -47,6 +49,58 @@ export function createOwnerRequest(session, fetchImpl = fetch) {
     check(response.status === 200, 'OWNER_HTTP')
     return response.json()
   }
+}
+
+/** Only the signed-in owner's fresh read can supply a presence grant. Keep its
+ * socket ticket and grant on this disposable installation's exact channel. */
+export function presenceTarget(ticket, live, ownerId, now = Date.now()) {
+  check(live?.ownerId === ownerId && UUID.test(live?.workspaceId ?? ''), 'PRESENCE_SCOPE')
+  const proof = live.presence
+  check(typeof proof?.token === 'string' && proof.token.length <= PRESENCE_MAX_TOKEN_BYTES
+    && /^[A-Za-z0-9_-]+\.[a-f0-9]{64}$/.test(proof.token)
+    && Number.isSafeInteger(proof.expiresAt) && proof.expiresAt > now && proof.expiresAt <= now + 305_000, 'PRESENCE_PROOF')
+  let url
+  try { url = new URL(ticket?.url) } catch { check(false, 'PRESENCE_TARGET') }
+  const channel = liveChannelId({ ownerId, workspaceId: live.workspaceId })
+  check(url.origin === ORIGIN.replace('http:', 'ws:') && url.pathname === `/mikka/v1/live/${channel}/socket`
+    && !url.username && !url.password && !url.search && !url.hash, 'PRESENCE_TARGET')
+  check(typeof ticket.protocol === 'string' && /^mikka-ticket-[0-9]+-[a-f0-9]{64}$/.test(ticket.protocol)
+    && Number.isSafeInteger(ticket.expiresAt) && ticket.expiresAt === Number(ticket.protocol.split('-')[2]) * 1000
+    && ticket.expiresAt > now && ticket.expiresAt <= now + 305_000, 'PRESENCE_TICKET')
+  url.searchParams.set('revisions', '1'); url.searchParams.set('presence', '1')
+  return { url: url.href, protocol: ticket.protocol, proof }
+}
+
+async function verifyPresence(ticket, live, ownerId) {
+  const target = presenceTarget(ticket, live, ownerId)
+  const socket = new WebSocket(target.url, target.protocol), id = 'daemon-acceptance'
+  await new Promise((resolveAck, reject) => {
+    let ready = false, finished = false
+    const finish = code => {
+      if (finished) return
+      finished = true; clearTimeout(timer)
+      socket.onmessage = null; socket.onerror = null; socket.onclose = null
+      socket.close()
+      if (code) reject(new Error(`SELF_HOSTED_DAEMON_${code}`)); else resolveAck()
+    }
+    const timer = setTimeout(() => finish('PRESENCE_TIMEOUT'), 15_000)
+    socket.onerror = () => finish('PRESENCE_SOCKET')
+    socket.onclose = () => finish('PRESENCE_CLOSED')
+    socket.onmessage = message => {
+      if (typeof message.data !== 'string' || message.data.length > 2_048) return
+      let reply
+      try { reply = presenceReply(JSON.parse(message.data)) } catch { return }
+      if (reply?.type === 'presence_ready' && !ready) {
+        ready = true
+        socket.send(JSON.stringify({ type: 'presence_watch', id, token: target.proof.token }))
+      } else if (reply?.id === id && reply.type === 'presence_unavailable') finish('PRESENCE_UNAVAILABLE')
+      else if (reply?.id === id && reply.type === 'presence_ack') {
+        if (!ready || reply.expiresAt !== Math.min(target.proof.expiresAt, ticket.expiresAt)
+          || reply.expiresAt <= Date.now()) finish('PRESENCE_ACK')
+        else finish()
+      }
+    }
+  })
 }
 
 export async function runDaemonAcceptance(env = process.env) {
@@ -121,9 +175,13 @@ export async function runDaemonAcceptance(env = process.env) {
     check(token.revokedAt === null, 'TOKEN_IDENTITY')
     tokenId = token.id
     check((await event('heartbeat')).deviceId === deviceId && (await event('gateway-pong')).deviceId === deviceId, 'TRANSPORT_IDENTITY')
-    const devices = (await rpc('agents.pollDevices')).devices
+    const deviceRead = await rpc('agents.pollDevices'), devices = deviceRead.devices
     check(devices?.length === 1 && devices[0].id === deviceId && devices[0].online === true, 'DEVICE_ONLINE')
     Object.assign(report.checks, { enrollment: true, realProcess: true, heartbeat: true, builtinGatewayPong: true, ownerDeviceOnline: true })
+    check(deviceRead.live?.ownerId === session.ownerId && UUID.test(deviceRead.live?.workspaceId ?? ''), 'PRESENCE_SCOPE')
+    const ticket = await owner(`/api/live/ticket?workspace=${deviceRead.live.workspaceId}`)
+    await verifyPresence(ticket, deviceRead.live, session.ownerId)
+    Object.assign(report.checks, { builtinPresenceReady: true, builtinPresenceAck: true })
     report.process = { pid: ready.pid, daemonVersion: ready.daemonVersion, protocolVersion: ready.protocolVersion }
     report.status = 'passed'
   } catch (error) {

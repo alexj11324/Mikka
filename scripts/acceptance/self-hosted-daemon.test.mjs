@@ -3,7 +3,9 @@ import test from 'node:test'
 import { z } from 'zod'
 import { createBrowserRpc } from '../../lib/browser-rpc/handler.ts'
 import { decode, encode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
-import { checkSessionTarget, checkOwnedEnrollment, enrollmentToken, createOwnerRequest } from './self-hosted-daemon.mjs'
+import { liveTicket } from '../../lib/live/scope.ts'
+import { devicePresenceGrant } from '../../lib/device-presence-grant.ts'
+import { checkSessionTarget, checkOwnedEnrollment, enrollmentToken, createOwnerRequest, presenceTarget } from './self-hosted-daemon.mjs'
 
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_SHA: 'a'.repeat(40),
   RUNNER_TEMP: '/tmp/runner', GITHUB_WORKSPACE: '/tmp/checkout' }
@@ -63,4 +65,26 @@ test('daemon owner polling and removal satisfy the real browser RPC transport', 
   assert.equal(removed.ok, true)
   assert.deepEqual(decode(removed.result), { id: deviceId })
   assert.deepEqual(invoked, ['poll', 'remove'])
+})
+
+test('presence acceptance keeps the actual owner grant and ticket on the fixed loopback channel', () => {
+  const now = 1_800_000_000_000, scope = { ownerId: session.ownerId, workspaceId: session.workspaceId }
+  const secret = 'isolated-presence-unit-fixture'
+  const ticket = liveTicket(scope, { url: session.origin + '/mikka', secret }, now)
+  const live = { ...scope, presence: devicePresenceGrant(scope, [['b0000000-0000-4000-8000-000000000002', true, now + 90_000]], secret, now) }
+  const target = presenceTarget(ticket, live, session.ownerId, now)
+  assert.equal(target.protocol, ticket.protocol)
+  assert.equal(target.proof.token, live.presence.token)
+  assert.equal(new URL(target.url).searchParams.get('presence'), '1')
+  assert.equal(new URL(target.url).searchParams.get('revisions'), '1')
+  for (const url of [ticket.url.replace('localhost:3000', 'app.aspectlylabs.com'),
+    ticket.url.replace('localhost:3000', 'localhost:3001'), ticket.url.replace('ws:', 'wss:'),
+    ticket.url.replace('/live/', '/devices/'), ticket.url + '?redirect=1', ticket.url + '#fragment']) {
+    assert.throws(() => presenceTarget({ ...ticket, url }, live, session.ownerId, now), /PRESENCE_TARGET/)
+  }
+  assert.throws(() => presenceTarget(ticket, { ...live, ownerId: 'another-owner' }, session.ownerId, now), /PRESENCE_SCOPE/)
+  assert.throws(() => presenceTarget(ticket, { ...live, workspaceId: 'b0000000-0000-4000-8000-000000000002' }, session.ownerId, now), /PRESENCE_TARGET/)
+  assert.throws(() => presenceTarget(ticket, { ...live, presence: null }, session.ownerId, now), /PRESENCE_PROOF/)
+  assert.throws(() => presenceTarget(ticket, { ...live, presence: { ...live.presence, expiresAt: now } }, session.ownerId, now), /PRESENCE_PROOF/)
+  assert.throws(() => presenceTarget({ ...ticket, expiresAt: ticket.expiresAt + 1000 }, live, session.ownerId, now), /PRESENCE_TICKET/)
 })

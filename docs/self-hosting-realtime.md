@@ -37,13 +37,38 @@ PostgreSQL uses `MIKKA_DATABASE_URL`; known Neon pooler URLs are converted to th
 direct endpoint by the existing connection helper.
 
 Device ping/pong and presence timestamps remain in memory. Presence on another
-replica is requested only when an authorized device read needs it, with a bounded
-one-second reply window. Device connection claims follow PostgreSQL notification
+replica is requested by an authorized device read or its signed live watch, with
+a bounded one-second reply window. Device connection claims follow PostgreSQL notification
 commit order, so a replacement connection closes the previous one across
 replicas without relying on their clocks. A lost database listener closes its
 sockets: normal client reconnection obtains a fresh snapshot and resumes push.
 The next connection, event or scheduled job reconnects the database session;
 there is no database reconnect poll.
+
+Device-dependent live reads negotiate `presence=1`, then register the short-lived
+grant issued by the ordinary authenticated read. The gateway acknowledges only
+that grant's device ids and home channel, until the earlier of its expiry and the
+socket ticket's expiry. Online/offline transitions push the existing device-list
+and thread-list keys; pings perform no SQL. A known legacy heartbeat has one
+in-memory deadline. Closing, replacing or expiring a watch releases its observers.
+
+Cross-replica observers also watch the publishing PostgreSQL session's advisory
+lock. In addition to its one `LISTEN` session, each app replica uses at most 32
+direct waiter sessions, shared by remote source and counting both active and
+closing waiters. Local devices add no waiter. The waits issue no periodic SQL or
+heartbeat writes. Only these dedicated sessions set PostgreSQL's
+`client_connection_check_interval=1000`: an internal check of the kernel socket
+while a query is blocked, so a dead observer does not leave its backend waiting
+indefinitely after the kernel detects the disconnect.
+
+The last subscriber cancels its exact waiter query, waits for the server's
+response and closes the session. Cancellation may briefly open one extra
+protocol connection per closing waiter, using the same TLS settings; it starts
+no SQL session. Unconfirmed cleanup retains its capacity reservation for that
+app process. Producer-session loss or a failed wait revokes presence coverage
+and the client catches up. Network blackholes still depend on PostgreSQL/TCP
+detecting the broken connection. At the connection limit, the gateway explicitly
+refuses coverage and the client's existing fallback remains active.
 
 This transport does not make the local Workflow world distributed. Deploy one
 Workflow execution node with persistent storage until a distributed Workflow
@@ -76,4 +101,6 @@ explicitly; the checked-in Worker configuration has no hard-coded destination.
 - `pnpm test:idle-budget`: existing idle-screen request budget.
 - `pnpm test:live-db` with the required isolated PostgreSQL 17 test database:
   two independent app gateway instances sharing live events, daemon wakes,
-  presence and scheduler leadership, including leader handoff.
+  presence and scheduler leadership, including leader handoff, producer-session
+  termination, the try-to-wait race, last-observer/stop connection release and
+  the physical backend disappearing after an observer socket is lost.
