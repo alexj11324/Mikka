@@ -2395,7 +2395,8 @@
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
           "deleted": "删除了工作区",
-          "ownership_transferred": "把工作区转让给 {target}"
+          "ownership_transferred": "把工作区转让给 {target}",
+          "entitlements_changed": "将工作区权益从 {fromPlan} 调整为 {toPlan}"
         },
         "billing": {
           "checkout_started": "打开了结账",
@@ -5068,6 +5069,19 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "governance_denied": {
+      "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
+      "default": "治理操作未完成，请重试。",
+      "access_denied": "你没有管理此组织或工作区的权限。",
+      "seat_limit": "活跃成员已达到当前套餐上限。请移除或停用成员，或升级套餐。",
+      "feature_unavailable": "此功能需要 Team Pro 或 Enterprise。",
+      "last_owner": "组织至少需要保留一位活跃所有者。",
+      "workspace_attached": "此工作区已属于另一个组织。",
+      "personal_workspace": "个人工作区不能使用共享工作区权益或加入组织。",
+      "invalid_request": "请检查填写的信息后重试。",
+      "template_limit": "审批模板数量已达到当前套餐上限。",
+      "not_found": "此组织、工作区或模板不可用。"
+    },
     "installer_failed": {
       "default": "Mikka 未能安装，请查看本机安装日志。",
       "node_required": "请安装 Node.js 22 或更新版本，然后重试。",
