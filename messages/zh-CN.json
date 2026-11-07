@@ -4265,6 +4265,7 @@
         "created": "创建了任务",
         "replaced": "换了新线程",
         "openPage": "打开任务页",
+        "more": "更多",
         "comment": "评论",
         "commentOnPage": "在任务页评论",
         "loadFailed": "任务加载失败",
@@ -4272,6 +4273,7 @@
         "notFound": "这个任务不在你的列表里",
         "reason": {
           "needsReply": "等你回复",
+          "running": "运行中",
           "confirm": "等你确认",
           "review": "待审阅",
           "failed": "失败",

@@ -47,6 +47,7 @@ A missing directory, or one outside the repository, fails the build.
 | `settings-security` | 安全 body (password, signed-in devices, Google sign-in) | `SettingsSecurityProps` in `components/slots/settings-security-contract.ts` | `SettingsView` |
 | `task-column` | a task open in the right column beside the centre (`?task=`, decision 2026-11-07-2045): its title and threads; the default layer never opens one | `TaskColumnProps` in `components/slots/task-column-contract.ts`; threads from `useIssueThreads`; `openThread`, `closeTask` move between it and its threads | `TaskColumn` from `@/components/workspace/task-column` |
 | `thread-card` | a thread a reply dispatched, as a card under that reply | `ThreadCardProps` in `components/slots/thread-card-contract.ts` (`onOpenTask` opens its task for a layer whose card is the task's) | `ThreadCard` from `@/components/coordinator/thread-card` |
+| `thread-header` | a thread panel's header row (←, title, where it runs, Artifact, stop, open task, ✕) and the status line above its transcript | `ThreadHeaderProps`, `ThreadStatusLineProps` in `components/slots/thread-header-contract.ts`; the panel passes its widgets and actions, the slot lays them out | `ThreadHeader`, `ThreadStatusLine` from `@/components/workspace/thread-header` |
 
 A slot changes how something looks, never what it does. Data, state and
 behaviour stay in this repository and reach the slot as props. A layer slot

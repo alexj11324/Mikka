@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { ArrowLeft, MessageSquareDiff, Square, SquareKanban, X } from 'lucide-react'
+import { MessageSquareDiff } from 'lucide-react'
 import { getIssueThread, getThreadChanges, getThreadInstructions, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
@@ -27,12 +27,11 @@ import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel, type IssueThreadsRead } from './issue-threads'
-import { ThreadStatus } from './thread-status-icon'
+import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
@@ -265,25 +264,15 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const title = (!readRejected && listedName) || (detail?.name ?? t('title'))
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
-    {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
-      {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
-      <h2 ref={headingRef} tabIndex={-1} className="min-w-0 truncate text-sm font-semibold outline-none">{title}</h2>
-      {/* Icons only after the title: where it runs and its Agent; names on hover (Alex, 2026-11-06). */}
-      {detail && <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} />}
-      {acceptance && <AcceptanceStateBadge task={acceptance} />}
-      <span className="flex-1" />
-      {data?.thread.ownedByCurrentUser && <ThreadExecutionIdentity runId={liveRunId} />}
-      {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}
-      {!readRejected && <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} />}
-      {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
-      {canStop && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('stop')} data-slot="thread-stop" onClick={() => { void stop() }} />}><Square data-icon="inline-start" className="fill-current" /></TooltipTrigger><TooltipContent side="bottom">{t('stop')}</TooltipContent></Tooltip>}
-      {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
-      {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
-      {acceptance && !hasChanges && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
+    {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
+      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance}
+      place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
+      acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
+      identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
+      artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
+      tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
-      </Tabs>}
-      {onClose && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
-    </header>}
+      </Tabs> : null} />}
     {/* With 改动 the tabs get their own row: the side panel has no room for them beside the title. */}
     {!bare && hasChanges && <div className="flex shrink-0 items-center px-3 pt-2">
       <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)}>
@@ -298,12 +287,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} />
-            <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
-            {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
-            {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
-          </div>
+          <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null} />
           {data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">

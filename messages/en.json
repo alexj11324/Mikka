@@ -4265,6 +4265,7 @@
         "created": "Created the task",
         "replaced": "Started a new thread",
         "openPage": "Open task page",
+        "more": "More",
         "comment": "Comment",
         "commentOnPage": "Comment on the task page",
         "loadFailed": "Couldn't load the task",
@@ -4272,6 +4273,7 @@
         "notFound": "This task isn't in your list",
         "reason": {
           "needsReply": "Needs your reply",
+          "running": "Running",
           "confirm": "Needs your confirmation",
           "review": "Needs review",
           "failed": "Failed",
