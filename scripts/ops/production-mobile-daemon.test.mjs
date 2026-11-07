@@ -159,7 +159,7 @@ function fixture(options = {}) {
         if (body.action === 'desktop.bootstrap') {
           assert.equal(options.core, true); assert.deepEqual(args, [TEAM_WORKSPACE])
           result = { user: { id: OWNER }, cacheWorkspace: { workspaceId: TEAM_WORKSPACE, role: 'member' }, edition: 'cloud',
-            emailEnabled: true, features: { cloudComputer: true, flags: { 'mikka-computer-billing': false, 'mikka-computer-tab-off': false } } }
+            emailEnabled: true, features: { cloudComputer: options.cloudComputer ?? true, flags: { 'mikka-computer-billing': false, 'mikka-computer-tab-off': false } } }
         } else if (body.action === 'agents.pollDevices') result = { devices: devices(), live: { ownerId: OWNER, workspaceId: WORKSPACE } }
         else if (body.action === 'agents.setDeviceEnabled') {
           assert.deepEqual(args, [{ deviceId: NEW_DEVICE, enabled: false }])
@@ -548,23 +548,26 @@ function coreFixture(business, { changed = () => false } = {}) {
 }
 
 test('core workflow_run composes real source daemon HTTP, current target guards, both sockets and exact cleanup', async () => {
-  const f = fixture({ core: true }), target = coreFixture(f)
-  const report = await f.run({ ...target, attestation: await target.proof() })
-  assert.equal(report.status, 'pass', JSON.stringify(report))
-  assert.equal(report.scope, 'mikka-cloud-core-compatibility'); assert.equal(report.targetMode, CORE_MODE)
-  assert.ok(Object.values(report.checks).every(Boolean)); assert.ok(Object.values(report.cleanup).every(Boolean))
-  assert.equal(report.core.billing.status, 'not_authorized')
-  assert.equal(report.boundaries.quotaEnforcementExercised, false)
-  assert.equal(report.boundaries.modelRequestsByDriver, 0)
-  assert.equal(f.sockets.length, 2); assert.ok(f.sockets.every(socket => socket.readyState === 3))
-  assert.equal(f.requests.filter(row => row.path.endsWith('/register')).length, 1)
-  assert.equal(f.requests.some(row => row.action?.startsWith('billing.')), false)
-  assert.equal(f.removed, true); noSensitiveReport(report)
+  for (const cloudComputer of [false, true]) {
+    const f = fixture({ core: true, cloudComputer }), target = coreFixture(f)
+    const report = await f.run({ ...target, attestation: await target.proof() })
+    assert.equal(report.status, 'pass', JSON.stringify(report))
+    assert.equal(report.core.flags.cloudComputer, cloudComputer)
+    assert.equal(report.scope, 'mikka-cloud-core-compatibility'); assert.equal(report.targetMode, CORE_MODE)
+    assert.ok(Object.values(report.checks).every(Boolean)); assert.ok(Object.values(report.cleanup).every(Boolean))
+    assert.equal(report.core.billing.status, 'not_authorized')
+    assert.equal(report.boundaries.quotaEnforcementExercised, false)
+    assert.equal(report.boundaries.modelRequestsByDriver, 0)
+    assert.equal(f.sockets.length, 2); assert.ok(f.sockets.every(socket => socket.readyState === 3))
+    assert.equal(f.requests.filter(row => row.path.endsWith('/register')).length, 1)
+    assert.equal(f.requests.some(row => row.action?.startsWith('billing.')), false)
+    assert.equal(f.removed, true); noSensitiveReport(report)
+  }
 })
 
 test('core gateway refusal and later deployment drift still close sockets and clean only this attempt', async () => {
   for (const gatewayCloses of [true, false]) {
-    const f = fixture({ core: true, gatewayCloses }), target = coreFixture(f, { changed: () => !gatewayCloses && f.removed })
+    const f = fixture({ core: true, cloudComputer: false, gatewayCloses }), target = coreFixture(f, { changed: () => !gatewayCloses && f.removed })
     const report = await f.run({ ...target, attestation: await target.proof() })
     assert.equal(report.status, 'fail'); assert.ok(Object.values(report.cleanup).every(Boolean), JSON.stringify(report))
     assert.ok(f.sockets.every(socket => socket.readyState === 3)); assert.equal(f.removed, true)

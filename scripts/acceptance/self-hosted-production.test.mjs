@@ -151,9 +151,9 @@ test('real Node WebSockets observe the owner live key and source-device ping/pon
   await device.close(); await live.close()
 })
 
-test('ordinary flags and billing reads do not call metering/card mutation adapters or elevate a team member', async () => {
+test('ordinary flags preserve cloud UI rollout values without billing mutations or team elevation', async () => {
   const actions = []
-  const fixture = role => ({ ownerId, workspaceId, role, applicationSha: SHA,
+  const fixture = (role, cloudComputer) => ({ ownerId, workspaceId, role, applicationSha: SHA,
     owner: async path => {
       assert.equal(path, '/api/desktop/discovery')
       return { status: 200, body: { version: SHA, edition: 'cloud', basePath: '/mikka', desktopProtocol: { min: 0, max: 1 },
@@ -162,17 +162,31 @@ test('ordinary flags and billing reads do not call metering/card mutation adapte
     rpc: async (action, args) => {
       actions.push(action); assert.deepEqual(args, [workspaceId])
       if (action === 'desktop.bootstrap') return { user: { id: ownerId }, cacheWorkspace: { workspaceId, role },
-        edition: 'cloud', emailEnabled: true, features: { cloudComputer: true,
+        edition: 'cloud', emailEnabled: true, features: { ...(cloudComputer === undefined ? {} : { cloudComputer }),
           flags: { 'mikka-computer-billing': false, 'mikka-computer-tab-off': false } } }
       assert.equal(action, 'billing.getBilling')
       return { configured: true, live: false, hasCustomer: false, seats: 0, members: 2, purchasedPoints: 0 }
     } })
-  const member = await readCoreCapabilities(fixture('member'))
+  const member = await readCoreCapabilities(fixture('member', true))
   assert.equal(member.billing.status, 'not_authorized'); assert.deepEqual(actions, ['desktop.bootstrap'])
   actions.length = 0
-  const admin = await readCoreCapabilities(fixture('admin'))
+  const admin = await readCoreCapabilities(fixture('admin', true))
   assert.equal(admin.billing.status, 'read'); assert.equal(admin.billing.quotaEnforcementExercised, false)
   assert.deepEqual(actions, ['desktop.bootstrap', 'billing.getBilling'])
+  assert.equal(admin.flags.cloudComputer, true)
+
+  actions.length = 0
+  const hidden = await readCoreCapabilities(fixture('member', false))
+  assert.equal(hidden.flags.cloudComputer, false)
+  assert.equal(hidden.billing.status, 'not_authorized')
+  assert.deepEqual(actions, ['desktop.bootstrap'])
+
+  for (const cloudComputer of [undefined, null, 'false', 0]) {
+    actions.length = 0
+    await assert.rejects(readCoreCapabilities(fixture('member', cloudComputer)),
+      error => error.code === 'core_features' && error.detail === 'flags')
+    assert.deepEqual(actions, ['desktop.bootstrap'])
+  }
 })
 
 test('the dedicated workflow has only the existing narrow OIDC delivery and API/CLI production entry', async () => {
