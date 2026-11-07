@@ -45,7 +45,7 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 | `MIKKA_DEFAULT_MODEL_API_KEY` | 自己的提供方 API Key。 |
 | `MIKKA_DEFAULT_MODEL_ID` | 提供方实际 model ID，例如 `local-model`。 |
 
-三项完整配置后，社区版的「Mikka 默认」、Coordinator、短标题、行动标题和资料提取使用该提供方。请求直接发送到该地址，不增加 Mikka 云代理，不扣 Mikka 额度，也不会在失败时自动将内容发送给另一个提供方。禁止跟随 HTTP 重定向。
+三项完整配置后，社区版的「Mikka 默认」、Coordinator、短标题、行动标题和资料提取使用该提供方。请求直接发送到该地址，不增加 Mikka 云服务代理，不扣 Mikka 额度，也不会在失败时自动将内容发送给另一个提供方。禁止跟随 HTTP 重定向。
 
 组织配置了模型准入规则时，需允许 `provider: "openai-compatible"`、规范化后的 endpoint、提供方实际 model ID、`servingProviders: ["openai-compatible"]` 和当前用户。每次 SDK 工具步骤前重新检查，修改或撤销规则不会被「Mikka 默认」这个 UI 别名绕过。
 

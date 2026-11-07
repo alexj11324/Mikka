@@ -12,7 +12,7 @@ test('official rollout requires both the source and actual production runtime ed
   await verifyCloudEdition(env, reader('cloud'))
   assert.equal(seen.length, 2)
   seen.length = 0
-  await assert.rejects(verifyCloudEdition({ ...env, MIKKA_EDITION: undefined }, reader('cloud')), /infisicalCloudEditionRequired/)
+  await assert.rejects(verifyCloudEdition({ ...env, MIKKA_EDITION: undefined }, reader('cloud')), /buildCloudEditionRequired/)
   assert.equal(seen.length, 0)
   await assert.rejects(verifyCloudEdition(env, reader('community')), /vercelCloudEditionRequired/)
   await assert.rejects(verifyCloudEdition(env, reader('cloud', [])), /vercelCloudEditionRequired/)
