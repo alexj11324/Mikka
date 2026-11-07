@@ -1,0 +1,87 @@
+(node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (34.770402ms)
+✔ empty task rows do not add a read or leak another owner into the bot join (0.692636ms)
+✖ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (2.899839ms)
+✖ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (3.891347ms)
+✖ an empty thread snapshot keeps null expiry and no changed-row query (1.76808ms)
+✔ authentication failures still precede every revision or main-database read (0.541457ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 2
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 770.930225
+
+✖ failing tests:
+
+test at tests/task-run-read-query.test.ts:1:3510
+✖ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (34.770402ms)
+  AssertionError [ERR_ASSERTION]: bot looks must not need another main-database read
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:69:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/task-run-read-query.test.ts:1:5570
+✖ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (2.899839ms)
+  AssertionError [ERR_ASSERTION]: expiry must share the fingerprint snapshot and statement
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:98:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/task-run-read-query.test.ts:1:6578
+✖ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (3.891347ms)
+  AssertionError [ERR_ASSERTION]: one aggregate, one manifest, one changed-row query
+  
+  4 !== 3
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:111:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/task-run-read-query.test.ts:1:7559
+✖ an empty thread snapshot keeps null expiry and no changed-row query (1.76808ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  3 !== 2
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:128:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

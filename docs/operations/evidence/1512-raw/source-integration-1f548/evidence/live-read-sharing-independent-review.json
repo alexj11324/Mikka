@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-07T11:29:16.503Z",
+  "reviewer": "daemon_impl",
+  "mode": "independent_read_only_source_review",
+  "baseHead": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "reviewedState": "uncommitted_frozen_files_identified_by_sha256",
+  "conclusion": "no_remaining_source_review_blockers",
+  "files": [
+    {
+      "path": "components/swr-defaults.tsx",
+      "bytes": 4433,
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "bytes": 9682,
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 22849,
+      "sha256": "8b67917b2b657e05594c93ef9d1437e9476520ea1d718aaabcc26dbd9429f111"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 4139,
+      "sha256": "1da6a8e8fb672e7ad81bf304bf5e65944b01593f6ca66e2f756eff43dd8cdf16"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 47482,
+      "sha256": "188442d33f444511c92e45e4747531e60be951dbc6155472ab502f7ac0c0ab24"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "bytes": 40673,
+      "sha256": "393a0f41c63e417d6719226158ce3c59972e3b43c90d0af1fe0cd38dc07dd830"
+    }
+  ],
+  "installedSWR": {
+    "version": "2.5.1",
+    "resolvedPackagePath": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/swr@2.5.1_react@19.3.1/node_modules/swr",
+    "files": [
+      {
+        "path": "node_modules/swr/package.json",
+        "bytes": 5025,
+        "sha256": "1f31317b02f186432e540864e84f1bf21134e67fdb5ded09a984844dbe4d1b04"
+      },
+      {
+        "path": "node_modules/swr/dist/use-swr-emll9s78.mjs",
+        "bytes": 33374,
+        "sha256": "cbc8a46f33ba5f3963e3d43e8cd247fc198a33df0e52c13306ce530ebec8dc70"
+      },
+      {
+        "path": "node_modules/swr/dist/config-context-ext53wcz.mjs",
+        "bytes": 26415,
+        "sha256": "e21d8dd9fd9660bda211a63c9d79474eabdb9417f28e98bf89a2bdab5feeb879"
+      },
+      {
+        "path": "node_modules/swr/dist/_internal/index.mjs",
+        "bytes": 4735,
+        "sha256": "64263fb99dbbababe6335f29caf6e6d4bdd67f38e97f0baf443b6d58344afaab"
+      }
+    ],
+    "evidence": [
+      {
+        "path": "node_modules/swr/dist/use-swr-emll9s78.mjs",
+        "areas": [
+          "fetcher promise awaited",
+          "FETCH and MUTATION checks discard obsolete results without onSuccess",
+          "onSuccess runs before synchronous final cache commit"
+        ],
+        "implication": "The observer can confirm callback acceptance and actual committed value after the SWR continuation; a fulfilled fetcher alone is insufficient."
+      },
+      {
+        "path": "node_modules/swr/dist/config-context-ext53wcz.mjs",
+        "areas": [
+          "mutate without new data clears FETCH then revalidates",
+          "defaultConfig contains a real cache",
+          "mutation records protect overlapping reads"
+        ],
+        "implication": "The existing mutate path remains the fresh-read fallback. Default deduplication alone does not satisfy this optimization."
+      },
+      {
+        "path": "node_modules/swr/dist/_internal/index.mjs",
+        "areas": [
+          "useSWRConfig merges defaults and provider configuration",
+          "withArgs merges hook configuration before applying middleware"
+        ],
+        "implication": "Normal middleware receives a real cache. Removing the artificial fetchedAt object as an absent-cache fallback does not change a supported configured path."
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "custom_compare_is_not_commit_proof",
+      "origin": "root_and_implementation_review",
+      "status": "closed",
+      "resolution": "Acceptance requires the matching onSuccess observation, no superseding read, no cache error, and Object.is between the actual cache value and the received value; custom compare is not used as proof."
+    },
+    {
+      "id": "unresolved_owner_home_fallback",
+      "origin": "independent_review",
+      "status": "closed",
+      "resolution": "The separate owner-home subscription retains UNRESOLVED_LIST_SCOPE with a null transport while the selected-workspace subscription remains stable."
+    },
+    {
+      "id": "departed_shared_key_consumer",
+      "origin": "independent_review",
+      "status": "closed",
+      "resolution": "LiveChannel.flush selects a currently active subscriber for the key. A departed Board refresh cannot discard a catch-up still required by the persistent Desktop badge."
+    },
+    {
+      "id": "entry_revision_baseline",
+      "origin": "root_question_and_independent_review",
+      "status": "closed",
+      "resolution": "The acceptance predicate checks required revisions, a copied entry-time baseline, and current cache revisions. A lower committed revision cannot satisfy the obligation through self-comparison."
+    },
+    {
+      "id": "hidden_wait_continuation",
+      "origin": "independent_review",
+      "status": "closed",
+      "resolution": "The continuation requires the same mounted lifetime, visible document, and enabled owner cache. Existing visibility recovery retains its normal catch-up."
+    },
+    {
+      "id": "callback_error_belongs_to_current_read",
+      "origin": "implementation_review_and_independent_review",
+      "status": "closed",
+      "resolution": "The original onSuccess catch records the error only on the matching cache/key/received-value entry and rethrows it. A retained old cache.error is not treated as the current fulfilled read failure."
+    }
+  ],
+  "reviewedInvariants": [
+    "Sharing is scoped to the exact cache object and key; completed local results are not retained.",
+    "An ordinary read must begin after the latest relevant invalidation boundary.",
+    "Newer or unversioned pushes during an active read retain their trailing obligation.",
+    "Permission errors remain on the existing SWR path without an observer-triggered retry.",
+    "Owner/cache retirement prevents adoption and new continuation reads in the departed scope.",
+    "Cross-tab adoption retains namespace authorization, previous-cache identity, and revision checks.",
+    "Persistent cache hydration, focus freshness, required presence acknowledgement, and revision-before-data contracts are not replaced."
+  ],
+  "verification": {
+    "reviewerReadActualInstalledSWR": true,
+    "reviewerReadFinalImplementationAndRegressionAssertions": true,
+    "reviewerVerifiedAllFrozenFileHashes": true,
+    "testsRerunByReviewer": false,
+    "typecheckRunByReviewer": false,
+    "productFilesModifiedByReviewer": false,
+    "executionEvidence": {
+      "sourceReceipt": {
+        "path": "evidence/live-read-sharing-source-191fcce.json",
+        "bytes": 14096,
+        "sha256": "428040e7f61d8ca39df8c196adea3834e4aec74ba42501331c39c12a192dc686"
+      },
+      "reportedBy": "llm_impl",
+      "finalReactSWRGuards": {
+        "passed": 17,
+        "failed": 0
+      },
+      "channelTests": {
+        "passed": 47,
+        "failed": 0
+      },
+      "attribution": "Counts are implementer execution results indexed by its source receipt; the independent reviewer did not rerun them."
+    }
+  },
+  "limits": {
+    "sourceOnly": true,
+    "newHeadCI": "pending_at_review",
+    "actualNativeLoginQueryCount": "unknown_until_new_exact_source_native_acceptance",
+    "nativeAtMostWebProven": false,
+    "productionAcceptance": false,
+    "externalServiceCalls": false,
+    "providerCalls": false,
+    "newResources": false,
+    "remoteMutations": false
+  }
+}

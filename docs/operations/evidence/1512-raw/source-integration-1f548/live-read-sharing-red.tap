@@ -1,0 +1,48 @@
+TAP version 13
+# (node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# An update to ObservedReader inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: live catch-ups share an ordinary SWR read that starts after both scoped connections open
+not ok 1 - live catch-ups share an ordinary SWR read that starts after both scoped connections open
+  ---
+  duration_ms: 316.169665
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:1:8321'
+  failureType: 'testCodeFailure'
+  error: |-
+    both catch-up obligations are covered by the same later in-flight read
+    
+    3 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 3
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:158:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: a SWR read that starts before the live connection opens cannot consume its catch-up
+ok 2 - a SWR read that starts before the live connection opens cannot consume its catch-up
+  ---
+  duration_ms: 326.755861
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4028.714769

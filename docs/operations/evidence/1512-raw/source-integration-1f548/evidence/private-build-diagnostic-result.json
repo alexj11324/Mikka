@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "kind": "isolated-hosted-build-closed-diagnosis",
+  "createdAt": "2026-11-07T11:15:25.253Z",
+  "repository": "alexj11324/mikka-hosted-ui",
+  "workflowRun": {
+    "id": 42366810044,
+    "attempt": 1,
+    "head": "5937815e8d748921a055a0ed41d2269674e1c10d",
+    "status": "completed",
+    "conclusion": "failure",
+    "startedAt": "2026-11-07T11:07:08Z",
+    "updatedAt": "2026-11-07T11:09:23Z"
+  },
+  "source": {
+    "public": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "private": "53d30a3282cefde79e692d10ba6ed1eabe126f9d",
+    "workflowSha256": "19374ef7f561948ee425c0a4cb7a90ea2c3b0d09a4809ca19a893e79f8d4f1ff",
+    "scope": "Two renderer compilation graphs only; exact previously failing source pair."
+  },
+  "graphs": [
+    {
+      "graph": "frontend",
+      "status": "failed",
+      "category": "missing_export",
+      "publicSymbol": "OWN_SETTINGS_FRAME",
+      "publicImport": "components/workspace/issue-workspace.tsx:21",
+      "resolvedModuleWithinPrivateOverlayVerified": true
+    },
+    {
+      "graph": "desktop",
+      "status": "failed",
+      "category": "missing_export",
+      "publicSymbol": "OWN_SETTINGS_FRAME",
+      "publicImport": "components/workspace/issue-workspace.tsx:21",
+      "resolvedModuleWithinPrivateOverlayVerified": true
+    }
+  ],
+  "publicContractSources": [
+    "components/slots/settings-frame-contract.ts:5",
+    "components/slots/settings-frame.tsx:10",
+    "docs/ui-overlay.md:32"
+  ],
+  "buildJob": {
+    "id": 128386479283,
+    "compileStep": 9,
+    "status": "failure",
+    "artifactUploadStep": 10,
+    "artifactUploadStatus": "failure",
+    "artifactUploadCategory": "storage_quota",
+    "artifactCount": 0,
+    "fixedExitReceiptAvailable": false
+  },
+  "cleanup": {
+    "jobId": 128386930708,
+    "status": "success",
+    "branch": "ops/1512-hosted-build-diagnostic",
+    "scope": "The cleanup job first required this exact repository, branch, and unchanged run SHA, then deleted only that reference.",
+    "exactPrefixReadbackMatchedRefs": 0,
+    "ownedBranchAbsent": true
+  },
+  "boundaries": {
+    "deploymentsTriggeredByDiagnostic": 0,
+    "modelCalls": 0,
+    "databases": 0,
+    "productionCredentialsLoaded": false,
+    "licenseCredentialsLoaded": false,
+    "compilerLogsAnalyzedInMemory": true,
+    "privateCompilerTextPersisted": false,
+    "paidSourcePersisted": false,
+    "rawLogsRetained": false,
+    "fullProductionBuildValidated": false,
+    "newPrivateMainE290Validated": false
+  },
+  "laterOwnerAction": {
+    "privatePr": 16,
+    "mergedAt": "2026-11-07T11:11:48Z",
+    "privateMain": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "diagnosisDoesNotApplyAsAnObservationOfThisNewPair": true
+  }
+}

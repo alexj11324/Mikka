@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-07T11:07:54.864Z",
+  "baseHead": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "state": "uncommitted_frozen",
+  "sourceFiles": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "bytes": 13225,
+      "sha256": "d881db08b12bd018dda2e9e04cb1424cc0bd8fe0bdfac645c45a852593eab08e"
+    },
+    {
+      "path": "lib/db/query-version.ts",
+      "bytes": 1213,
+      "sha256": "24ce6a24e61467638cfb4cd91b8e8ec06ffebd546c4abdb3c5d7f40d94e9cfad"
+    },
+    {
+      "path": "tests/task-run-read-query.test.ts",
+      "bytes": 9164,
+      "sha256": "8d9edb07b88e6773c569d7296af336f6520e0b890c4ee31a08493f05cb2f942a"
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "bytes": 34323,
+      "sha256": "e31fbed3f5fd15a4241bf44a5540bcf84402f144f49c840e0a1f7c5b419d9594"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "task-read-sql-harness-initial.tap",
+      "bytes": 5594,
+      "sha256": "e0c2de5fe3c7fe0fbd74636feceb05588db6fe956f379fe5589b2c185b7cc5a8"
+    },
+    {
+      "path": "task-read-sql-red.tap",
+      "bytes": 3604,
+      "sha256": "23244a4b29de4e3186257b31371ee7729746fac382153f78ceb0a76bf8df4ce3"
+    },
+    {
+      "path": "task-read-sql-green.tap",
+      "bytes": 980,
+      "sha256": "cbacc65757c91ea2791f24e8d816e834f10159492af60fba5d0cfaa93bc24c46"
+    },
+    {
+      "path": "task-read-sql-regression.tap",
+      "bytes": 1640,
+      "sha256": "87bef62258ed2d80cb0d8b036e102229c06acf2bc82d7a088bbedc14ea41ac93"
+    },
+    {
+      "path": "task-read-sql-db-guard.tap",
+      "bytes": 812,
+      "sha256": "d52934013fd273da55ab0f7e6807f8d43d13c6077888ff148a7c1080eef5f105"
+    },
+    {
+      "path": "task-read-sql-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "task-read-sql-diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "changes": {
+    "taskRuns": "The original owner/30-day/DISTINCT/200 issue subquery precedes a same-main-database one-to-one owner bot LEFT JOIN; original runBotId expression remains.",
+    "threads": "The exact existing row fingerprint and minimum createdAt plus 30 days are computed by one aggregate over the same bounded snapshot."
+  },
+  "preserved": [
+    "authentication before reads",
+    "Live revision before data",
+    "first 200 issues and winner ordering",
+    "binding/direct/runtime bot fallback",
+    "foreign or absent bot null",
+    "separate main and workspace databases",
+    "owner-bound version and manifest hashes",
+    "changed-row filtering and single-flight semantics",
+    "expiry and empty snapshot null",
+    "public result shapes"
+  ],
+  "validation": {
+    "initialHarness": {
+      "exitCode": 1,
+      "passed": 0,
+      "failed": 6,
+      "reason": "The fixture initially omitted the request-scope transport mock. Missing sampleClient export was a harness setup failure, not product red evidence."
+    },
+    "red": {
+      "exitCode": 1,
+      "passed": 2,
+      "failed": 4,
+      "queries": {
+        "taskBotLooks": {
+          "actual": 2,
+          "expected": 1
+        },
+        "threadUnchanged": {
+          "actual": 2,
+          "expected": 1
+        },
+        "threadChanged": {
+          "actual": 4,
+          "expected": 3
+        },
+        "threadEmpty": {
+          "actual": 3,
+          "expected": 2
+        }
+      }
+    },
+    "green": {
+      "exitCode": 0,
+      "passed": 6,
+      "failed": 0
+    },
+    "regression": {
+      "exitCode": 0,
+      "passed": 13,
+      "failed": 0,
+      "files": [
+        "tests/task-run-read-query.test.ts",
+        "lib/list-poll.test.ts",
+        "lib/single-flight.test.ts"
+      ],
+      "boundary": "Real actions and Drizzle query/result mapping, mocked PostgreSQL transport and session/Live boundaries; no database semantics claim."
+    },
+    "databaseGuard": {
+      "exitCode": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 6,
+      "disposableDatabase": false,
+      "files": [
+        "tests/action-read-egress.db.test.ts",
+        "tests/thread-list-egress.db.test.ts"
+      ],
+      "boundary": "No eligible disposable loopback database. Existing real PostgreSQL fixtures were extended for normal CI; they have not been executed here."
+    },
+    "lint": {
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    },
+    "node": "v24.22.1"
+  },
+  "ciIntegration": {
+    "sourceTest": "Add tests/task-run-read-query.test.ts to the existing mock-enabled test:issues Node command; package.json was not changed by this worker.",
+    "databaseTests": "Existing test:activity-actor-db already includes both relevant DB files."
+  },
+  "acceptance": {
+    "realNativeLoginQueryCount": "unknown_until_new_exact_source_native_acceptance",
+    "productionAcceptance": false
+  },
+  "actions": {
+    "newServices": false,
+    "newDatabase": false,
+    "providerCalls": false,
+    "gitStage": false,
+    "gitCommit": false,
+    "remoteMutations": false
+  }
+}

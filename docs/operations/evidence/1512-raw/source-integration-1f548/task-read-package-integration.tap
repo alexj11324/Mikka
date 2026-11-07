@@ -1,0 +1,24 @@
+2026-11-07T11:15:17.821Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ every column is a fixed 300px that never shrinks (sidebar closed) (356.652945ms)
+✔ every column is a fixed 300px that never shrinks (sidebar open) (13.075873ms)
+✔ beside the sidebar the hidden lane is left out; without it the lane shows (20.406883ms)
+(node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (34.191467ms)
+✔ empty task rows do not add a read or leak another owner into the bot join (0.925808ms)
+✔ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (1.928863ms)
+✔ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (3.341395ms)
+✔ an empty thread snapshot keeps null expiry and no changed-row query (1.425743ms)
+✔ authentication failures still precede every revision or main-database read (0.520687ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3068.293406

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-07T11:22:00.687603+00:00",
+  "source": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "state": "working_tree_integration",
+  "backendReview": {
+    "sqlBoundary": "Owner-filtered one-to-one decoration after original distinct/order/200 limit; original Bot fallback and null mapping retained. Same bounded fingerprint and expiry aggregate; auth and Live revision ordering preserved.",
+    "packageCommandIntegration": {
+      "tests": 9,
+      "passed": 9,
+      "failed": 0,
+      "databaseExecuted": false
+    }
+  },
+  "reconcilerReview": {
+    "entireImplementationRead": true,
+    "tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "scope": "Offline metadata reconciliation only; never production acceptance; raw payloads not echoed."
+  },
+  "files": [
+    {
+      "path": "ops1512/task-read-package-integration.tap",
+      "bytes": 1831,
+      "sha256": "8478d767c0781538f74d716a861f434201e616bec3833427bc91e96adffaf214"
+    },
+    {
+      "path": "ops1512/reconciler-root-review.tap",
+      "bytes": 932,
+      "sha256": "7f89f7c4b0cd6941f5cfdbfd6e2b030d6ae4405434e23231dadbfb7cf4a3c406"
+    },
+    {
+      "path": "ops1512/reconcile-production-evidence.mjs",
+      "bytes": 26641,
+      "sha256": "22ec0669a234d03bdbf991aa0bebd209031c6c42815d4d04ba22fbc2cb6fd0e2"
+    }
+  ],
+  "productionAcceptance": false
+}

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T11:43:44.480Z",
+  "scope": "CI failure diagnosis and one-line fixture correction; no production changes",
+  "candidate": {
+    "head": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "syntheticCheckout": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+    "parents": [
+      "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+      "1f548a73304923da466ebe702c99b6a8f6096f15"
+    ]
+  },
+  "failure": {
+    "runId": 42368835440,
+    "attempt": 1,
+    "jobId": 128392576113,
+    "job": "Database checks (4/4)",
+    "stepNumber": 15,
+    "step": "Required DB suites (temporary Postgres 17, no skips)",
+    "file": "tests/action-read-egress.db.test.ts",
+    "line": 57,
+    "test": "task run rows keep the newest owner run and the 200-row limit without unused fields",
+    "errorName": "error",
+    "code": "23505",
+    "constraint": "agents_user_name_key",
+    "table": "agents",
+    "schema": "public",
+    "cause": "The fixture inserted agent and runtimeAgent for one owner with the same case-insensitive name.",
+    "productQueryReached": false,
+    "sourceEvidence": "The failed INSERT is before the pollTaskRuns invocation; the database constraint is defined on userId and lower(name).",
+    "rawLogPersisted": false
+  },
+  "adjacentObservedPass": {
+    "test": "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows",
+    "status": "passed",
+    "source": "Same exact failed shard job log"
+  },
+  "correction": {
+    "file": "tests/action-read-egress.db.test.ts",
+    "before": {
+      "bytes": 34323,
+      "sha256": "e31fbed3f5fd15a4241bf44a5540bcf84402f144f49c840e0a1f7c5b419d9594"
+    },
+    "after": {
+      "bytes": 34351,
+      "sha256": "d11f05926277f886206cb0d51e0d7493f6241d352b55b7490c8bed3b2edd0a5a"
+    },
+    "addedLines": 1,
+    "deletedLines": 1,
+    "behavior": "Use the two fixture array indexes in distinct agent names. Preserve all 200-row, ordering, fallback and privacy assertions."
+  },
+  "checks": [
+    {
+      "path": "task-read-db-fixture-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "path": "task-read-db-fixture-diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    }
+  ],
+  "limits": {
+    "postgresRerun": false,
+    "newTestAdded": false,
+    "productCodeChanged": false,
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "ciRerun": false,
+    "oldCandidateResultRemains": "failure",
+    "nativeAcceptance": "Still in progress; no conclusion about revised product query counts."
+  }
+}

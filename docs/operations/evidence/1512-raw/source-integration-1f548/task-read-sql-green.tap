@@ -1,0 +1,17 @@
+(node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (34.60588ms)
+✔ empty task rows do not add a read or leak another owner into the bot join (0.967691ms)
+✔ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (2.07286ms)
+✔ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (3.743313ms)
+✔ an empty thread snapshot keeps null expiry and no changed-row query (1.270719ms)
+✔ authentication failures still precede every revision or main-database read (0.590341ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 786.076256

@@ -1,0 +1,24 @@
+✔ an unchanged poll preserves current optimistic data; a changed snapshot replaces it (1.837295ms)
+✔ a row delta follows the authorized order and drops deleted or revoked rows (0.472343ms)
+✔ invalid proofs fall back to full reads, and a local cache only claims rows it holds (0.705716ms)
+✔ flight proof keys distinguish full, empty and different held subsets without depending on their order (0.473124ms)
+✔ identical concurrent keys share one read; any differing part, or a settled read, reads again (1.523861ms)
+✔ a failed read fails its joiners and is not kept (0.438812ms)
+✔ a read inside a write transaction is never shared (1.142215ms)
+(node:17) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:17) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (33.027208ms)
+✔ empty task rows do not add a read or leak another owner into the bot join (0.866328ms)
+✔ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (1.988663ms)
+✔ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (3.636131ms)
+✔ an empty thread snapshot keeps null expiry and no changed-row query (1.240163ms)
+✔ authentication failures still precede every revision or main-database read (0.655871ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1212.021872

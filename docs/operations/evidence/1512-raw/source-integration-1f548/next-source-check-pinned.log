@@ -1,0 +1,429 @@
+
+> next-app@0.0.1 check /workspace/scratch/812e3b7d6d45/Mikka
+> pnpm test:settings-backend && pnpm test:signup-turnstile && pnpm test:hosted-usage && pnpm test:execution-rules && pnpm test:abuse && pnpm test:unattended && pnpm check:agent-definitions && pnpm test:agent-kit && pnpm test:agent-kit-compat && pnpm check:agent-ui && pnpm test:credentials && pnpm test:preview && pnpm test:lib-units && pnpm test:project-decisions && pnpm test:unread && pnpm test:issue-readonly-dom && pnpm test:idle-budget && pnpm test:dev-local && pnpm test:mvp-fixtures && pnpm test:agent && pnpm test:acceptance && pnpm test:test-accounts && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:platform && pnpm test:motion && pnpm test:view-state && pnpm test:i18n && pnpm i18n:check && node scripts/check-copy.mjs && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:schedules && pnpm test:run-recovery && pnpm test:run-publication && pnpm test:coordinator-native-relay && pnpm test:coordinator-native-scope && pnpm test:coordinator-issue-tools && pnpm test:coordinator-native && pnpm test:groups && pnpm test:group-turns && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:account && pnpm test:issues && pnpm test:issue-search && pnpm test:slack && pnpm test:telegram && pnpm test:suggestions && pnpm test:artifacts && pnpm test:captures && pnpm test:cloud-limits && pnpm test:factory-config && pnpm lint && pnpm typecheck && pnpm test:db-runner && pnpm test:active-agents && pnpm test:conversation-reads && pnpm test:request-log && pnpm test:legacy-reads && pnpm test:mailbox-verification && pnpm test:personal-mailbox-core && pnpm test:preview-driver && pnpm test:mobile && pnpm test:github && pnpm test:factory-monitor && pnpm test:factory-approval && pnpm test:factory-check-independence && pnpm test:factory-check-recovery && pnpm test:factory && pnpm test:self-improvement-unit && pnpm test:workspace-settings && pnpm test:model-admission && pnpm test:release-security && pnpm test:audit && pnpm test:user-message-text && pnpm test:chat-actions && pnpm test:run-info && pnpm test:thread-changes
+
+
+> next-app@0.0.1 test:settings-backend /workspace/scratch/812e3b7d6d45/Mikka
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/audit/cursor.test.ts lib/audit/delivery-arm.test.ts lib/secrets/audit-map.test.ts lib/secrets/dotenv.test.ts lib/usage/month.test.ts lib/billing/stripe.test.ts lib/billing/points-purchase.test.ts tests/settings-backend-routes.test.ts tests/workspace-secret-actions.test.ts
+
+✔ audit cursors round-trip and reject anything else (15.506987ms)
+✔ CSV fields are quoted and never start a formula (0.329898ms)
+(node:39) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:39) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ enqueueing an audit receipt arms the audit-retention timer on the same transaction (72.437935ms)
+(node:40) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ each fixed USD amount creates a payment session with server-owned pricing and matching payment metadata (18.797898ms)
+✔ English returns to the localized billing section and Preview keeps its isolated origin (0.960941ms)
+✔ non-admins and client-supplied values outside the fixed list cannot create customers or sessions (2.07248ms)
+✔ unconfigured payment fulfillment is unavailable before any Stripe request (0.561538ms)
+✔ first purchase creates one workspace customer and persists it for the next session (1.691995ms)
+✔ provider failures and unsafe Checkout URLs fail without leaking provider response details (3.472344ms)
+✔ from a chat: a dialog session with a publishable key, else a hosted page; both come back to that chat (5.306044ms)
+✔ config is null without a key; form encoding nests the way Stripe expects (1.964387ms)
+✔ requests carry the key as a bearer header; failures keep only the status (7.693739ms)
+✔ webhook signatures: valid, tampered, stale and missing (1.100382ms)
+✔ secret and env events map onto the audit catalogue with allowlisted metadata only (6.037076ms)
+✔ denied and skipped events stay out of the log (0.224659ms)
+✔ one KEY=value per line, with an optional # note after the value (2.298241ms)
+✔ quotes keep # and spaces in the value; export, blank and comment lines; CRLF (0.411301ms)
+✔ each bad line is reported by number; good lines still parse (0.324149ms)
+✔ a file over 2 MB is refused whole (5.631194ms)
+✔ usage months are UTC calendar months (3.552264ms)
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.356Z","requestId":"f94dd71f-0dc5-4a37-80bb-0fd18a5f1da6","invocationId":"15821908-0a22-4415-bbdb-fb8e612124ef","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-07T11:28:10.361Z","requestId":"f94dd71f-0dc5-4a37-80bb-0fd18a5f1da6","invocationId":"15821908-0a22-4415-bbdb-fb8e612124ef","route":"/api/workspace/switcher","method":"GET","status":200,"durationMs":6,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.365Z","requestId":"18517bc5-cf34-477a-8038-25217932dd4a","invocationId":"dbb010c9-8d0b-4c6b-9a4e-6da1cd073fa0","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.365Z","requestId":"18517bc5-cf34-477a-8038-25217932dd4a","invocationId":"dbb010c9-8d0b-4c6b-9a4e-6da1cd073fa0","route":"/api/workspace/switcher","method":"GET","status":401,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.366Z","requestId":"06699a64-25b7-4bd6-8a7b-4052f45b818d","invocationId":"79ee0bc7-6691-4140-aeda-8478777e81ae","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.366Z","requestId":"06699a64-25b7-4bd6-8a7b-4052f45b818d","invocationId":"79ee0bc7-6691-4140-aeda-8478777e81ae","route":"/api/workspace/switcher","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.367Z","requestId":"af720754-5652-45e3-8176-3d9b5fc4d599","invocationId":"852a473c-3248-4fdd-9ca9-686ae202b288","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.367Z","requestId":"af720754-5652-45e3-8176-3d9b5fc4d599","invocationId":"852a473c-3248-4fdd-9ca9-686ae202b288","route":"/api/workspace/switcher","method":"GET","status":403,"durationMs":0,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.368Z","requestId":"87e38015-1d40-4ee3-be33-68c4dedcc8b8","invocationId":"f1ec87a1-0918-4533-806a-d7a610de8018","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.369Z","requestId":"57e3cf05-6f75-499b-a1b9-e1838179b7a1","invocationId":"8b9fc2f8-1409-4be4-b044-9f5967e276dd","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.370Z","requestId":"3398b20e-67e0-418b-9a12-cf96f397c9e7","invocationId":"6976955f-9dae-4898-9481-e6ef250682d6","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.370Z","requestId":"b11d7c64-5b95-41c0-94e8-b9b05a4d0093","invocationId":"8a12414b-b149-4236-86f4-0ba798c63f3e","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.371Z","requestId":"6e4f5172-1252-416a-b320-88f64fdf04f7","invocationId":"6e2214ee-7820-4572-9717-cbd2124df16b","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-07T11:28:10.375Z","requestId":"6e4f5172-1252-416a-b320-88f64fdf04f7","invocationId":"6e2214ee-7820-4572-9717-cbd2124df16b","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":4,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.375Z","requestId":"77d456fc-ecb8-4155-b77a-a7ae48ef142e","invocationId":"4fe26bf8-2518-4bfc-aec1-4d8839043970","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.377Z","requestId":"6fe4c950-fab8-4890-9506-1009079ede09","invocationId":"534c6673-021b-4254-bdc0-12eeeb448388","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.378Z","requestId":"a753b378-2fcd-4844-8633-360f73e79c2f","invocationId":"f4e1f791-eda7-445b-b794-e29fd71bdac5","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.379Z","requestId":"59210673-4501-4eca-9d76-965042ce9c0a","invocationId":"e19c0972-540c-471f-bd36-f93cac975651","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.381Z","requestId":"dd9b358b-002c-48a0-8978-6b5c5c56b45c","invocationId":"163694ef-3f82-4226-9c3d-cfe6cc723820","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.381Z","requestId":"34c4d1a9-1d70-4e4c-811d-9b6e48afc89b","invocationId":"e50bc857-b1b4-4d7b-9167-54c110fbe75e","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-07T11:28:10.381Z","requestId":"c0e137cb-1eb2-4fdb-9eb5-698274332419","invocationId":"5fbe7e2a-0f7a-4434-ac4f-4b0b2d115605","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.377Z","requestId":"77d456fc-ecb8-4155-b77a-a7ae48ef142e","invocationId":"4fe26bf8-2518-4bfc-aec1-4d8839043970","route":"/api/settings/[read]","method":"GET","status":401,"durationMs":2,"userIdHash":null}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.378Z","requestId":"6fe4c950-fab8-4890-9506-1009079ede09","invocationId":"534c6673-021b-4254-bdc0-12eeeb448388","route":"/api/settings/[read]","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.379Z","requestId":"a753b378-2fcd-4844-8633-360f73e79c2f","invocationId":"f4e1f791-eda7-445b-b794-e29fd71bdac5","route":"/api/settings/[read]","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"error","msg":"api_request","timestamp":"2026-11-07T11:28:10.380Z","requestId":"59210673-4501-4eca-9d76-965042ce9c0a","invocationId":"e19c0972-540c-471f-bd36-f93cac975651","route":"/api/settings/[read]","method":"GET","status":500,"durationMs":1,"userIdHash":null,"error":"Error"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-07T11:28:10.381Z","requestId":"dd9b358b-002c-48a0-8978-6b5c5c56b45c","invocationId":"163694ef-3f82-4226-9c3d-cfe6cc723820","route":"/api/settings/[read]","method":"GET","status":404,"durationMs":0,"userIdHash":null}
+(node:175) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:175) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ workspace switcher uses the authenticated session and keeps its successful response private (167.481688ms)
+✔ workspace switcher refuses a missing session before reading workspace data (1.084678ms)
+✔ workspace switcher keeps explicit workspace and membership refusals as 403 (1.477371ms)
+✔ workspace switcher does not turn database or unknown read failures into authority refusals (2.864957ms)
+✔ workspace switcher keeps an unknown session lookup failure retryable without reading workspace data (0.670873ms)
+✔ workspace-bots GET preserves the full workspace activity result and delegates scope to the existing action (4.043406ms)
+✔ workspace-bots GET preserves auth and membership refusals and never substitutes an empty activity list (5.821933ms)
+{"level":"info","msg":"api_request","timestamp":"2026-11-07T11:28:10.394Z","requestId":"34c4d1a9-1d70-4e4c-811d-9b6e48afc89b","invocationId":"e50bc857-b1b4-4d7b-9167-54c110fbe75e","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":13,"userIdHash":null}
+{"level":"info","msg":"api_request","timestamp":"2026-11-07T11:28:10.394Z","requestId":"c0e137cb-1eb2-4fdb-9eb5-698274332419","invocationId":"5fbe7e2a-0f7a-4434-ac4f-4b0b2d115605","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":13,"userIdHash":null}
+[billing] webhook event rejected { name: 'SyntaxError' }
+✔ concurrent devices of one owner retain their own current-session marker (13.612626ms)
+✔ audit JSON resumes the same snapshot and preserves explicit export failures (6.799338ms)
+✔ audit CSV requires a session and service authorization, preserves the workspace/filter, and escapes formulas (2.656471ms)
+✔ Stripe webhook verifies raw-body signatures before applying an event and leaves DB failures retryable (2.772727ms)
+✔ signed setup Checkout events and legacy SetupIntents reach verification; invalid signatures do not (5.394606ms)
+(node:183) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:183) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ saving and deleting an E2B key pass the authenticated actor’s transaction audit hook to storage (16.27607ms)
+✔ E2B actions authorize the page workspace and reject a foreign workspace before storage (0.539125ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1333.324933
+
+> next-app@0.0.1 test:signup-turnstile /workspace/scratch/812e3b7d6d45/Mikka
+> node --import tsx --test lib/signup-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/auth/turnstile.test.tsx
+
+✔ maps the #527 sign-up codes to their messages (0.879038ms)
+✔ leaves other failures to the generic message (0.115615ms)
+✔ sends the Turnstile token only when the widget produced one (0.743834ms)
+✔ a wrong password and an unknown email read the same; only an unverified email offers verification (N4) (0.115364ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 205.164686
+(node:254) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:254) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:254) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ renders the Cloudflare widget when a site key is set (6.445203ms)
+✔ renders nothing without a site key (local, previews) (0.329939ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 284.543708
+
+> next-app@0.0.1 test:hosted-usage /workspace/scratch/812e3b7d6d45/Mikka
+> node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts lib/subscription-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-wait.test.tsx
+
+✔ finds the hosted refusal code in a failed turn (0.959979ms)
+✔ shows the allowance and purchased points as one balance, 100 points per dollar, rounded down (0.136606ms)
+✔ the refusal line offers only what the person's state allows (0.811235ms)
+✔ a refused turn moves to the person's own subscription: the first in the menu's order (1.508728ms)
+(node:295) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:295) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ forwards each real action with the selected workspace and purchase amount (2.159511ms)
+✔ keeps the whole-point display and every transaction from the billing action (3.258751ms)
+✔ preserves billing authorization failures without a fallback read (0.692135ms)
+✔ a failed billing read rejects instead of showing an empty balance (0.796924ms)
+✔ a subscription refusal maps to its notice, never the raw step error (1.278331ms)
+✔ recovery follows the cause rather than retrying a disconnected account (0.285561ms)
+✔ other failures keep their own message (0.117688ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 268.708508
+(node:360) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:360) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ idle, it registers no key and reads nothing (27.811571ms)
+✔ waiting, it listens on the workspace key and ends with the pushed read, with no read of its own (5.881392ms)
+✔ with no push, one backstop read at the timeout, and the last data either way (4.179392ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 631.982397
+
+> next-app@0.0.1 test:execution-rules /workspace/scratch/812e3b7d6d45/Mikka
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/bot-quota-stop.test.ts lib/execution-worker.test.ts lib/execution-identity.test.ts lib/execution-settings-view.test.ts lib/model-options-source.test.ts lib/model-order-plan.test.ts lib/device-scheduling.test.ts lib/model-routing.test.ts lib/model-provider-health.test.ts lib/run-model-fallback-view.test.ts lib/model-api-key-providers.test.ts lib/device-ssh-view.test.ts && pnpm --filter @mikka/daemon exec vitest run src/harness-models.test.ts test/commands.test.ts && pnpm --filter @mikka/protocol exec vitest run src/execution.test.ts
+
+(node:402) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:402) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a frozen subscription that runs out stops the turn; it never switches account or model mid-turn (47.144497ms)
+✔ dispatch ranks match cloud-first and local-first planner selection, load and exclusions (3.242307ms)
+✔ future, offline, uninstalled and unavailable models have backend reasons and no dispatch rank (0.479364ms)
+✔ per-harness supported models come from the same account-aware device support as dispatch (0.238581ms)
+✔ dispatch nodes carry the same catalogue and limited CLI evidence as model admission (0.270669ms)
+✔ an earlier credential check keeps the node checking instead of inventing an install/update failure (0.174323ms)
+✔ the installer's five steps fold into the four Figma shows (2.189667ms)
+✔ a failure marks only its own step and keeps the rest waiting (0.363679ms)
+✔ online completes every step (0.174583ms)
+✔ an ssh alias counts as added by device name or host name (0.280073ms)
+✔ 添加这台电脑 shows 安装 → 启动 → 已上线, with the node check counted as installing (0.170838ms)
+✔ 重新连接 this computer shows 启动 → 已上线; SSH keeps all four steps (0.201885ms)
+✔ borrowing a Bot uses the requester, their own device/account, and their private output (3.627368ms)
+✔ a Bot owner cannot lend their personal device implicitly (0.863885ms)
+✔ resource ownership is distinct from the Bot owner and explicit sharing is mandatory (5.704955ms)
+✔ revoking requester's membership ends a previously valid grant (2.11892ms)
+✔ revoking bot-owner's membership ends a previously valid grant (0.978778ms)
+✔ revoking resource-owner's membership ends a previously valid grant (2.749783ms)
+✔ Bot takeover and workspace migration cannot silently reassign an accepted run (1.902132ms)
+✔ subscription disconnect and revision changes revoke frozen subscription authority (1.027071ms)
+✔ retries retain immutable attribution and refuse an injected payment account (1.017446ms)
+✔ handoff reauthorizes a same-owner destination without refreshing withdrawn shares (1.016545ms)
+✔ E2B billing remains the requester's own external account and deletion denies execution (0.705375ms)
+✔ historical runs remain unattributed instead of fabricating current owners as past payers (0.370439ms)
+✔ the final provider boundary rejects stopped, completed and expired executions (4.024818ms)
+✔ usage attributes the frozen payer and leaves external amounts unknown (15.863577ms)
+✔ the provider mark follows the model id, then the account or harness (1.003065ms)
+✔ bot models group by account and list a copied binding once (5.29096ms)
+✔ a Bot with no saved model shows the Claude account first, then ChatGPT (0.267133ms)
+✔ subscription workers retain CLI auto unless a provider model is explicitly selected (3.719046ms)
+✔ explicit model and device stay frozen through retries (0.551593ms)
+✔ a preset serves every protocol its official API speaks; DeepSeek and Kimi both, so their keys run on both Agents (3.212682ms)
+✔ each Agent talks to its own protocol's endpoint; a key that does not speak it has none (0.479615ms)
+✔ a custom provider serves only the protocol the person picked, at its own base URL (0.20581ms)
+✔ Codex runs on the Responses API: an OpenAI-protocol provider without it serves no Agent, but still speaks its protocol (0.222416ms)
+✔ no model name is written into lib/ or components/: model options come only from what was reported (1610.411932ms)
+✔ the guard catches a written model name and ignores comments (0.422338ms)
+✔ routing metadata exemption cannot hide model options, defaults or another file (1.101684ms)
+(node:549) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:549) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ untouched defaults keep the newest release per account and family while retaining the full catalogue (3.41735ms)
+✔ Claude full IDs use the exact broker account catalogue, not another account or the shortcut menu (1.166351ms)
+✔ an allowance check that failed keeps the subscription preference and does not silently charge a key (0.540737ms)
+✔ the first allowed model that can run takes the run; the full provider model is what runs despite a CLI slot (0.279472ms)
+✔ ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped (0.46354ms)
+✔ 本地 picks only among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run (0.471792ms)
+✔ a subscription model runs only where the daemon reported it; a daemon that reported no models needs an update (0.343148ms)
+✔ no computer can run it: the reason comes from the computer closest to running it (0.339723ms)
+✔ failed subscription preflight is actionable and overrides a stale broker flag without blocking API-key runs (0.37041ms)
+✔ 本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device (0.501197ms)
+✔ a model the person picked for the thread goes first, before the list (0.28529ms)
+✔ 云端 runs the first usable model on the person's E2B machine (0.242106ms)
+✔ nothing can run: the card names why (0.267614ms)
+✔ an untouched list: opus first, then the first Codex model reported, else the first model anything reported (0.966109ms)
+✔ 云端: the cloud, then a server, then a computer; a place is tried only when the one before it can run nothing (0.288095ms)
+✔ 本地: a server, then a computer, never the cloud (0.186682ms)
+✔ a run the person put in the cloud goes nowhere else (0.1128ms)
+✔ a model whose allowance check failed stops the search in every place, unless one before it can run (0.200283ms)
+✔ a configured cloud without measured template models cannot take a subscription run (0.13884ms)
+✔ dispatch order: the 优先使用的 Agent's list first, then the other's, each keeping its own order (decision 2026-11-05-0400) (0.280784ms)
+✔ a place in the 运行位置 chain says why it cannot take a run: 参与调度 off before offline before a missing Agent (0.229917ms)
+✔ order view serializes supplied heartbeat times without changing its display snapshot (257.527263ms)
+✔ runtime balance and authentication failures remain blocked until the credential is handled (3.931637ms)
+✔ provider unavailability expires after two minutes, including its exact boundary (1.012069ms)
+✔ health accepts only the structured provider contract and never returns raw errors (0.416108ms)
+✔ no authorized candidates means no credential or runtime history is read (0.270058ms)
+✔ exact model tiers leave unknown versions and aliases at standard (1.410951ms)
+✔ offered efforts exist in the retained native capability reports and run protocol (2.007282ms)
+✔ Decision asks two independent ordered scores and never sends candidates (0.491632ms)
+✔ the transport validates score answers against the question levels (0.647127ms)
+✔ the rounded tier picks the first listed model of that tier, regardless of the list head (0.740969ms)
+✔ scores round to the nearest level within bounds (0.246953ms)
+✔ the judge reads what must change, not process, acceptance or reporting sections (0.635639ms)
+✔ a missing tier goes up, never down, and only falls lower when nothing higher can run (0.296307ms)
+✔ effort maps to the nearest level the selected model supports (0.428006ms)
+✔ only an uncertain, missing or malformed tier keeps list order (0.55601ms)
+✔ tier and effort use separate confidence floors (0.229927ms)
+✔ confidence combinations: effort never abandons the tier judgement (0.507716ms)
+✔ diagnostics carry scores, confidence and the outcome, never candidate IDs (0.345352ms)
+✔ toggle off ignores the Decision and follows the person's list position without mutation (0.177528ms)
+✔ a light failure goes to the nearest higher available tier, before an earlier strongest entry (0.210728ms)
+✔ escalation preserves list order inside a tier and never returns a lower or failed tier (0.571614ms)
+✔ escalation keeps an accepted effort only when the new model supports it (0.108563ms)
+✔ a version-1 snapshot from before the tier judgement still escalates, with an unknown required tier (0.153062ms)
+✔ the labeled routing set is well formed and each label is reachable through the host mapping (7.753735ms)
+✔ only a committed continuation within the same authorized chain is shown as switched (6.489621ms)
+✔ the composer follows only a confirmed switch to its current live run (0.250949ms)
+✔ multiple switch notices cannot replace the current run with an unrelated historical target (0.231089ms)
+✔ blocked and explicitly picked models keep the safe per-model reasons and setup actions (2.046251ms)
+✔ host receipt parsing rejects raw fields and malformed digests without exposing private receipt fields (0.35719ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 88
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2923.696338
+
+ RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/Mikka/packages/daemon
+
+ ❯ test/commands.test.ts (8 tests | 8 failed) 173ms
+   × uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits 44ms
+   × redetect refreshes harnesses through the shared device command channel 23ms
+   ❯ run commands (6)
+     × cancels active work when the application rejects the device credential 19ms
+     × hands a person's message to the running agent and acks it once 22ms
+     × cancels the run when a person stops it, and closes its message 24ms
+     × keeps taking messages for other runs while one is being stopped 19ms
+     × runs overlapping server passes one after another, so it registers once 4ms
+     × ignores commands for runs it does not have, and keeps polling after a network cut 17ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/commands.test.ts > uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits
+Error: listen EPERM: operation not permitted /tmp/orvd-Z70re8/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:80:30
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  test/commands.test.ts > redetect refreshes harnesses through the shared device command channel
+Error: listen EPERM: operation not permitted /tmp/orvd-UsWSZd/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:116:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > cancels active work when the application rejects the device credential
+Error: listen EPERM: operation not permitted /tmp/orvd-Vv9bp2/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:133:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > hands a person's message to the running agent and acks it once
+Error: listen EPERM: operation not permitted /tmp/orvd-9aodW0/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:144:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > cancels the run when a person stops it, and closes its message
+Error: listen EPERM: operation not permitted /tmp/orvd-Ycbr4N/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:161:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > keeps taking messages for other runs while one is being stopped
+Error: listen EPERM: operation not permitted /tmp/orvd-DpbI13/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:191:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > runs overlapping server passes one after another, so it registers once
+Error: listen EPERM: operation not permitted /tmp/orvd-QJ3llL/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ test/commands.test.ts:223:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > ignores commands for runs it does not have, and keeps polling after a network cut
+Error: listen EPERM: operation not permitted /tmp/orvd-MM0Urp/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:624:20
+ ❯ Daemon.start src/main.ts:315:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:245:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed (8)
+   Start at  06:28:17
+   Duration  1.25s (import 54%, transform 30%, tests 16%)
+
+undefined
+/workspace/scratch/812e3b7d6d45/Mikka/packages/daemon:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/harness-models.test.ts test/commands.test.ts
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

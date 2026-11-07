@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "repository": "alexj11324/mikka-hosted-ui",
+  "temporaryBranch": "ops/1512-hosted-build-diagnostic",
+  "commit": "5937815e8d748921a055a0ed41d2269674e1c10d",
+  "tree": "e69001bf4a1aca4229b8d193859583c16141074a",
+  "parent": "53d30a3282cefde79e692d10ba6ed1eabe126f9d",
+  "publicSource": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+  "privateSource": "53d30a3282cefde79e692d10ba6ed1eabe126f9d",
+  "workflowSha256": "19374ef7f561948ee425c0a4cb7a90ea2c3b0d09a4809ca19a893e79f8d4f1ff",
+  "status": "dispatched_by_branch_creation",
+  "mode": "isolated_renderer_build_only",
+  "deployments": 0,
+  "modelCalls": 0,
+  "databases": 0,
+  "productionCredentialsLoaded": false,
+  "cleanup": "always job deletes only unchanged owned temporary branch; verify actual result before declaring closed",
+  "limits": [
+    "Private compiler output stays inside the private repository.",
+    "This checks renderer graphs only, not the complete production API/typecheck/migration graph."
+  ]
+}

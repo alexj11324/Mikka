@@ -1,0 +1,57 @@
+TAP version 13
+# (node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a shared read cannot replace the revision held when the live obligation began with a lower revision
+not ok 1 - a shared read cannot replace the revision held when the live obligation began with a lower revision
+  ---
+  duration_ms: 759.405417
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:1:13645'
+  failureType: 'testCodeFailure'
+  error: |-
+    post-commit revision 5 cannot erase the earlier revision 9 requirement
+    
+    1 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:265:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: an original onSuccess exception remains a SWR error without a shared-read retry
+not ok 2 - an original onSuccess exception remains a SWR error without a shared-read retry
+  ---
+  duration_ms: 491.096675
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:1:14324'
+  failureType: 'testCodeFailure'
+  error: |-
+    the observer must not retry an original SWR callback failure
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:279:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4883.86666

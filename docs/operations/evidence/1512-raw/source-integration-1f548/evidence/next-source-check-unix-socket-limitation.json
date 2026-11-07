@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-07T11:31:36.261Z",
+  "reviewer": "daemon_impl",
+  "mode": "read_only_existing_stdout_and_source_review",
+  "baseHead": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "rawStdout": {
+    "path": "next-source-check-pinned.log",
+    "bytes": 35499,
+    "sha256": "f7f32b6787e91357d28ebebeaf8a93f855ed4e5b3deee5c72e960637d9bc52d2"
+  },
+  "execution": {
+    "ownerReportedSession": 80903,
+    "ownerReportedProcessTerminated": true,
+    "ownerReportedExitCode": 1,
+    "exitIndependentlyPolled": false,
+    "declaredPinnedPnpm": "10.34.3",
+    "phase": "test:execution-rules / daemon Vitest",
+    "workflowScope": "partial pnpm check; later chained gates did not complete"
+  },
+  "observed": {
+    "testFilesFailed": 1,
+    "testFilesTotal": 1,
+    "testsFailed": 8,
+    "testsTotal": 8,
+    "cases": [
+      {
+        "case": "uninstall_active_threads",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "redetect_harnesses",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "reject_device_credential",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "deliver_message_once",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "stop_run_and_message",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "concurrent_runs_during_stop",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "serialize_server_passes",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      },
+      {
+        "case": "unknown_run_and_network_recovery",
+        "errorName": "Error",
+        "code": "EPERM",
+        "operation": "listen",
+        "socketKind": "unix",
+        "pathShape": "/tmp/orvd-*/daemon.sock",
+        "sameListenerEntry": true,
+        "permissionDenied": true,
+        "expectedPathShape": true
+      }
+    ],
+    "harnessModelsResult": "not_observed_in_stdout",
+    "harnessModelsPassCount": null
+  },
+  "attribution": {
+    "classification": "environment_unix_socket_listen_permission_denied",
+    "allEightShareEntry": "packages/daemon/src/rpc/server.ts:80:14",
+    "businessAssertionsReached": false,
+    "daemonSourceUnchanged": true,
+    "productRegressionProven": false,
+    "acceptedAsTestPass": false
+  },
+  "sourceFiles": [
+    {
+      "path": "packages/daemon/src/rpc/server.ts",
+      "bytes": 5205,
+      "sha256": "1e2602b62fa96f46b0fe1a955d9e69b9026e12c4733f39819e8a44dcca8c143c",
+      "equalsHead": true
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "bytes": 92786,
+      "sha256": "c4d9783be0305efcc1ef8342d814089104c317db6f535ee0e26c79f3ad657431",
+      "equalsHead": true
+    },
+    {
+      "path": "packages/daemon/test/commands.test.ts",
+      "bytes": 10253,
+      "sha256": "ba8696b87338b3f1375f47f82949ca3a5627979c61285585e76997509f53da78",
+      "equalsHead": true
+    },
+    {
+      "path": "packages/daemon/test/helpers.ts",
+      "bytes": 2074,
+      "sha256": "02d16e122fa0463f0ece04bbb2a19f83988e0a4d52c7c8ba849f080664f53aa6",
+      "equalsHead": true
+    },
+    {
+      "path": "packages/daemon/vitest.config.ts",
+      "bytes": 316,
+      "sha256": "52372f2592654c670fe5829ac835112846c95fb46e27cfadc5d22b2c4716efb1",
+      "equalsHead": true
+    }
+  ],
+  "cleanup": {
+    "startupFailurePath": {
+      "source": "packages/daemon/src/main.ts",
+      "facts": [
+        "start catches startInternal rejection",
+        "start awaits stop before rethrow",
+        "stop closes RPC and supervisor/brokers, aborts command work, closes outbox/tracing/logger and releases the owned data-dir lock"
+      ]
+    },
+    "fixturePath": {
+      "source": "packages/daemon/test/commands.test.ts",
+      "facts": [
+        "afterEach stops successfully registered daemon instances",
+        "afterEach restores spies and calls cleanupTempDirs",
+        "a daemon rejected during start is not pushed to the fixture array, so the start catch cleanup is material"
+      ]
+    },
+    "tempDirectories": {
+      "source": "packages/daemon/test/helpers.ts",
+      "facts": [
+        "tempDir registers every fixture path",
+        "cleanupTempDirs removes every tracked directory recursively"
+      ],
+      "independentlyCheckedLoggedDaemonDirectories": 8,
+      "loggedDaemonDirectoriesRemaining": 0,
+      "scope": "Only exact daemon data directories present in the saved stdout were checked; repository temp paths were not separately enumerated."
+    },
+    "stdoutWarnings": {
+      "startupCleanupFailureMentioned": false,
+      "lockReleaseFailureMentioned": false,
+      "afterEachFailureMentioned": false
+    }
+  },
+  "actions": {
+    "rerun": false,
+    "typecheck": false,
+    "changedProduct": false,
+    "relaxedAssertions": false,
+    "escalation": false,
+    "newServices": false,
+    "newDatabase": false,
+    "remoteMutations": false
+  },
+  "remaining": {
+    "normalCIUnixSocketGate": "required_on_new_exact_head",
+    "postgresGate": "required_on_new_exact_head",
+    "nativeQueryAcceptance": "not_proven",
+    "fullCheck": "not_passed_in_this_environment"
+  }
+}

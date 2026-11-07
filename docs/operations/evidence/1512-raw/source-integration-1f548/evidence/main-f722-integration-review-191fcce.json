@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "status": "read_only_source_review",
+  "reviewedAt": "2026-11-07T10:48:44.011169+00:00",
+  "candidate": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "main": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+  "mainBase": "e4494a3c8620d0ac8fe4cd885144a3f47be0252c",
+  "integrationTree": "8e01d600fc5146444997ddb00783102048528abf",
+  "mainChangedFiles": 75,
+  "mainPatchPreservedInIntegrationTree": true,
+  "unchanged1512Paths": [
+    "apps/desktop/src/renderer/app.tsx",
+    "apps/desktop/src/renderer/bootstrap.ts",
+    "apps/desktop/src/renderer/rpc.ts",
+    "apps/desktop/src/renderer/read-batch.ts",
+    "apps/frontend/src/web/auth-routing.ts",
+    "apps/frontend/src/web/platform.tsx",
+    "apps/frontend/src/web/rpc.ts",
+    "lib/desktop-rpc/read-batch-contract.ts",
+    "lib/desktop-rpc/read-batch.ts",
+    "lib/desktop-rpc/handler.ts",
+    "hooks/use-live-key.tsx",
+    "hooks/use-live-lists.ts",
+    "components/desktop/desktop-integration.tsx",
+    "lib/local-device-setup.ts",
+    "apps/desktop/test/lifecycle.mjs",
+    "apps/desktop/test/parity.mjs",
+    "apps/desktop/test/parity-page-ready.mjs"
+  ],
+  "workspaceSwitcher": "Same SWR key/fetcher, fresh account check, switch action, persistent-cache clear and hard navigation. No additional startup read established.",
+  "conditionalFinding": {
+    "condition": "OWN_SETTINGS_FRAME=true",
+    "source": "components/workspace/issue-workspace.tsx:555",
+    "effect": "Settings branch unmounts BrowserNotesProvider and ComputerAgentsProvider. BrowserNotesProvider holds pending annotations only in local useState; returning creates an empty provider.",
+    "evidence": "components/browser/browser-notes.tsx:29-40; components/workspace/issue-workspace-settings.test.tsx existing default-slot continuity test",
+    "defaultSlotAffected": false,
+    "actualHostedFlagVerified": false,
+    "productionFailureAttribution": false,
+    "action": "No product edit; outside current read-batch/login-count fix scope."
+  },
+  "ciBoundary": "Loose-check allows reuse for unchanged 1512 paths; old candidate does not validate new hosted-frame branch. File count alone does not require new CI.",
+  "buildFailureBoundary": {
+    "runId": 42364868968,
+    "reportedBy": "acceptance_review",
+    "publicCode": "webDeploy:buildFailed",
+    "compilerRootCause": "unknown; private build output not available in artifacts",
+    "attributedToSettingsSlot": false
+  },
+  "validation": {
+    "sourceDiffOnly": true,
+    "testsRun": false,
+    "sharedWorktreeChanged": false,
+    "refsChanged": false,
+    "resourcesStarted": false
+  },
+  "acceptanceEvidence": false
+}

@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "status": "frozen_source_regression_validated_not_native_acceptance",
+  "baseCommit": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "productFiles": [
+    {
+      "path": "components/swr-defaults.tsx",
+      "bytes": 4433,
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+      "gitBlobSha1": "f6be8710182ad68ce0a87f6cac910184bf1d52f3"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "gitBlobSha1": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "bytes": 9682,
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+      "gitBlobSha1": "ac60a59be511ec45cc372b8c91c0535861a30931"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 22849,
+      "sha256": "8b67917b2b657e05594c93ef9d1437e9476520ea1d718aaabcc26dbd9429f111",
+      "gitBlobSha1": "5932584eccbda70f803646c0c835556b2db3c3bf"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "bytes": 40673,
+      "sha256": "393a0f41c63e417d6719226158ce3c59972e3b43c90d0af1fe0cd38dc07dd830",
+      "gitBlobSha1": "b93ba9cf9b9a5429172c71bced238937e90b4049"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 4139,
+      "sha256": "1da6a8e8fb672e7ad81bf304bf5e65944b01593f6ca66e2f756eff43dd8cdf16",
+      "gitBlobSha1": "c910b50f56603163fe84feb11e040e510b5aa18c"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 47482,
+      "sha256": "188442d33f444511c92e45e4747531e60be951dbc6155472ab502f7ac0c0ab24",
+      "gitBlobSha1": "086f2ce96c0260c639b13cfa6c8506a0bf56fd77"
+    }
+  ],
+  "sourceScope": {
+    "nativeReadBatchChanged": false,
+    "measurementWindowsChanged": false,
+    "backendChangedByThisTask": false,
+    "providerDatabaseBrowserOrVmCalls": false,
+    "gitStageCommitPushPerformed": false,
+    "newTimers": 0,
+    "newCompletedHttpResultCache": false,
+    "observer": "WeakMap of actual SWR cache and serialized key; pending entry only, removed on settlement",
+    "boundary": "same-realm monotonically increasing ordering sequence recorded at Live invalidation and fetcher entry; conservative pre-HTTP boundary, including hydration/native queue delay",
+    "commitProof": "SWR onSuccess for the matching read plus non-superseded identity and Object.is(actual cache data, fetcher result), no current cache error, current effect/cache/visible lifetime",
+    "revisionProof": "required revisions plus a copied revision floor at refresh entry plus current cache revisions",
+    "originalCallbackError": "matching key/value callback failure is explicitly registered and rethrown unchanged; old cache errors are not attributed to a different read",
+    "scopeLiveness": "retired owner/cache/effect/hidden interval cannot initiate a deferred revalidation; existing visibility reconnect and initial catch-up remain",
+    "selectedIssueScope": "stable selected subscription; independently add/remove the home subscription; dedupe equal home/selected; preserve unresolved null-transport fallback",
+    "remainingSubscriber": "pending shared-key reads select a currently subscribed refresh instead of an unmounted consumer closure"
+  },
+  "validation": {
+    "finalReactSWRGuards": {
+      "tests": 17,
+      "passed": 17,
+      "exitCode": 0,
+      "stdout": "live-read-sharing-final-guards.tap"
+    },
+    "channelSuite": {
+      "tests": 47,
+      "passed": 47,
+      "exitCode": 0,
+      "stdout": "live-read-channel-green.tap"
+    },
+    "lint": {
+      "files": 7,
+      "exitCode": 0,
+      "stdout": "live-read-sharing-lint.log"
+    },
+    "diffCheck": {
+      "exitCode": 0,
+      "stdout": "live-read-sharing-diff-check.log"
+    },
+    "intermediateSixFileSuite": {
+      "tests": 134,
+      "passed": 134,
+      "exitCode": 0,
+      "stdout": "live-read-sharing-regressions.tap",
+      "binding": "before the final unresolved-home, revision-floor, retired-subscriber, visibility, and callback-error attribution tightening; must not be represented as a final full-suite result"
+    },
+    "finalFullSuiteAndCanonicalTypes": "owned by root after this freeze; not run by this task",
+    "fullRegressionCommand": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx scripts/task-detail-live.test.tsx scripts/focus-refetch.test.tsx lib/live/channel.test.ts lib/live/tab-share.test.ts",
+    "redGreenInterpretation": "The selected-subscription and ordinary-read join red cases reproduce existing behavior. Other red receipts are negative tests of intermediate proposed implementations, caught before freeze; they do not assert those mechanisms already existed in base 191fcce."
+  },
+  "readCountProofs": [
+    {
+      "fixture": "ordinary read starts after both scope connections opened",
+      "before": 3,
+      "after": 1,
+      "unit": "fake authenticated read calls"
+    },
+    {
+      "fixture": "ordinary read starts before its live connection opened",
+      "before": 2,
+      "after": 2,
+      "unit": "fake authenticated read calls",
+      "reason": "the connection gap requires its catch-up"
+    }
+  ],
+  "productionAcceptance": {
+    "status": "not_retested_unknown_after_source_change",
+    "lastMeasuredCandidate": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+    "lastMeasuredSyntheticSource": "a5be42ddee7690de2c2ce11574a47cac0f482a79",
+    "nativeLoginQueries": 208,
+    "webLoginQueries": 161,
+    "difference": 47,
+    "nativeNotMoreThanWeb": false,
+    "evidence": "evidence/desktop-191fcce/lifecycle.json",
+    "evidenceSha256": "95fed0edb9815cd97534c39b51be4791f2d335bc25973f1552fd63d559742eb0",
+    "note": "Source-only fake transport counts cannot allocate the prior real concurrent SQL delta or establish the next native result."
+  },
+  "knownConservativeLimits": [
+    "Reads begun before an obligation never qualify merely because they finish later.",
+    "Already completed reads are not retained for this same-realm join, even if they could theoretically cover a later flush.",
+    "A custom comparator retaining an older object makes the observer revalidate conservatively rather than certify that cache value.",
+    "Existing cross-tab transport/result-sharing protocol is unchanged; the new proof applies only to an actual same-realm SWR cache/key pending read."
+  ],
+  "rawLogs": [
+    {
+      "path": "live-issue-subscription-red.tap",
+      "bytes": 2120,
+      "sha256": "7ab2bb996f7020ed719150777e5fd1334d8ac7f4501ecb7fd5fb4b2bb79c9515",
+      "gitBlobSha1": "41da382d8610334a0cb3889dfd690486bb63d09f",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "baseline_selected_subscription_red",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-issue-subscription-green.tap",
+      "bytes": 920,
+      "sha256": "2829e57bc25125a0fcea96d1f27ab2d0a592398841d13e26339af1b451ad1740",
+      "gitBlobSha1": "44e82c495814fa407cb160aa91d932f60389a881",
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "initial_selected_subscription_green",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-sharing-red.tap",
+      "bytes": 1891,
+      "sha256": "7516796375614c0e6f6083e08ca9dfb5826d3f7ffec06b4739e18b801b591e8f",
+      "gitBlobSha1": "bca3356ebb91bbeed36d689e49e77448d5db9da0",
+      "tests": 2,
+      "pass": 1,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "baseline_ordinary_read_join_red",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-read-sharing-green.tap",
+      "bytes": 898,
+      "sha256": "1db8aa9015e2db3afb23deae7adbe44763d244df892b913a6f2674dfb0901acc",
+      "gitBlobSha1": "374c3dfeb2dda2f166a7e3a574619f183d748d4d",
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "initial_ordinary_read_join_green",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-commit-proof-red.tap",
+      "bytes": 1294,
+      "sha256": "9ac39badd6f54b05df468d2c15e031fb937d2c963976e6e134087aaf820e2e8e",
+      "gitBlobSha1": "507e0795f020fa8fa996d7185f9685abd0a73a75",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_custom_compare_negative",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-read-commit-proof-green.tap",
+      "bytes": 671,
+      "sha256": "130e9b4e151f7b7f4ad0519ffe50c5c92e12b5a19ea9cc3da75c327f8452ae31",
+      "gitBlobSha1": "720731ba8ed606c703b40610922100e74e91c587",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "strict_commit_proof_green",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-issue-unresolved-home-red.tap",
+      "bytes": 1329,
+      "sha256": "63eaaf8a0ae4383b6ab68ce9fc5a2496a6a2898950c120e8abe4887bdd67a336",
+      "gitBlobSha1": "7bc5bf21e192675a9dfcd4ae1bababcdc2b03f25",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_unresolved_home_negative",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-issue-unresolved-home-green.tap",
+      "bytes": 694,
+      "sha256": "874f7ba9c1c12a44066b3c82495a8415bd026c3f9650665502fcc94e282420a6",
+      "gitBlobSha1": "998470f4a295e13d71c48c70d455f0c6948e1225",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "restored_unresolved_home_green",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-baseline-error-red.tap",
+      "bytes": 2111,
+      "sha256": "0b84907575f71efe7bf7bac1f9afada0692dda2172b876cd2966ba58b04a72f5",
+      "gitBlobSha1": "d30650ca1a85967458c481ca6d1060f0f5ad6d47",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_revision_and_callback_negative",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-read-retired-subscriber-red.tap",
+      "bytes": 1047,
+      "sha256": "1b43c259d859a506d0ffac383bd1bd4240ddc7133294c0e5595ab1cbd4e5535f",
+      "gitBlobSha1": "445470e2e61f5d4a01e4679979cbdc1259f6ce45",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_retired_subscriber_negative",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-read-hidden-red.tap",
+      "bytes": 1328,
+      "sha256": "8b8dcb75abe905cee07ed8982969a67d4c7d1a0bcfc6f45bcb364429041a3b2b",
+      "gitBlobSha1": "60518fa04cd91c729802667e26d0d4c4fab5712d",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_hidden_continuation_negative",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-read-baseline-error-hidden-green.tap",
+      "bytes": 1232,
+      "sha256": "4a86c6b7c17d00f7ca21766abf66fededd94265600e548d08fa7d4e284a9eb12",
+      "gitBlobSha1": "826289784cde7038e382186cde8147f390ba08f0",
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "revision_callback_visibility_green",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-old-error-red.tap",
+      "bytes": 1321,
+      "sha256": "86e6760cde851fb8b1669f122a205195ea9371ee392630c65c5bd41dcf21c639",
+      "gitBlobSha1": "ff9be3dc44010d3a563a3eff2500d4fe676593b8",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_error_attribution_negative",
+      "observedExitCode": 1
+    },
+    {
+      "path": "live-read-old-error-green.tap",
+      "bytes": 929,
+      "sha256": "49859552091c3fcaddcf4c5a41e479cbf3aa2bac19725f50dfa556da90a12716",
+      "gitBlobSha1": "12f657b99e4fa545619b3da8b838ea05052d3361",
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "explicit_callback_error_attribution_green",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-channel-green.tap",
+      "bytes": 11587,
+      "sha256": "7a4c41ed320828a8ed923ab0994005b408fc772ec2951a52fcaff8c592389a45",
+      "gitBlobSha1": "8bc3c34cc3cdefdc0a8eaad5067ed3b2bf2be312",
+      "tests": 47,
+      "pass": 47,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "final_channel_suite",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-sharing-final-guards.tap",
+      "bytes": 4828,
+      "sha256": "d70d4e6593577f6b2f44118cd069912afd5e058c2aa52fc651365c2b77adb371",
+      "gitBlobSha1": "6670cb503d33e329a8e8a819c983d20ff1922206",
+      "tests": 17,
+      "pass": 17,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "final_react_swr_guards",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-sharing-regressions.tap",
+      "bytes": 34371,
+      "sha256": "490decde59dbcab1c71565c6a84faea291e127d2892e42310ccae3a53f565988",
+      "gitBlobSha1": "52d665d9ebb04c4b99f17392e343d4699410460c",
+      "tests": 134,
+      "pass": 134,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "phase": "intermediate_six_file_regressions_not_final_source",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-sharing-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "phase": "final_static_check",
+      "observedExitCode": 0
+    },
+    {
+      "path": "live-read-sharing-diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "phase": "final_static_check",
+      "observedExitCode": 0
+    }
+  ]
+}

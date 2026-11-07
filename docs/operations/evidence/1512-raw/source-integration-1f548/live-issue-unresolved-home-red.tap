@@ -1,0 +1,35 @@
+TAP version 13
+# (node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy
+not ok 1 - an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy
+  ---
+  duration_ms: 461.154808
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:1:17092'
+  failureType: 'testCodeFailure'
+  error: |-
+    selected-workspace coverage alone cannot suppress the unresolved owner-wide fallback
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:331:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3719.542418

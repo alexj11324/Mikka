@@ -1,0 +1,35 @@
+TAP version 13
+# (node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+not ok 1 - a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+  ---
+  duration_ms: 624.060321
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:1:12767'
+  failureType: 'testCodeFailure'
+  error: |-
+    onSuccess and custom compare alone do not prove that the fresh result entered the cache
+    
+    1 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/scripts/use-live-lists.live.test.tsx:251:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1198.813875

@@ -1,0 +1,465 @@
+TAP version 13
+# (node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a decision that returns after the integration unmounts cannot raise an OS notification
+ok 1 - a decision that returns after the integration unmounts cannot raise an OS notification
+  ---
+  duration_ms: 278.439508
+  type: 'test'
+  ...
+# Subtest: a prior account decision cannot notify after the Vite account subtree is replaced
+ok 2 - a prior account decision cannot notify after the Vite account subtree is replaced
+  ---
+  duration_ms: 231.771127
+  type: 'test'
+  ...
+# Subtest: an ordinary list refresh does not discard a valid pending decision from the same session
+ok 3 - an ordinary list refresh does not discard a valid pending decision from the same session
+  ---
+  duration_ms: 197.069994
+  type: 'test'
+  ...
+# Subtest: changing from the desktop runtime invalidates an outstanding notification decision
+ok 4 - changing from the desktop runtime invalidates an outstanding notification decision
+  ---
+  duration_ms: 198.040974
+  type: 'test'
+  ...
+# Subtest: a pending notification click cannot navigate after the integration unmounts
+ok 5 - a pending notification click cannot navigate after the integration unmounts
+  ---
+  duration_ms: 34.549615
+  type: 'test'
+  ...
+# Subtest: replacing the router discards the old pending click and keeps the current click handler
+ok 6 - replacing the router discards the old pending click and keeps the current click handler
+  ---
+  duration_ms: 41.898507
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when connecting
+ok 7 - native setup does not read the device list when connecting
+  ---
+  duration_ms: 4.093331
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when offline
+ok 8 - native setup does not read the device list when offline
+  ---
+  duration_ms: 3.170848
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when unsigned
+ok 9 - native setup does not read the device list when unsigned
+  ---
+  duration_ms: 3.081283
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when unregistered
+ok 10 - native setup does not read the device list when unregistered
+  ---
+  duration_ms: 2.848912
+  type: 'test'
+  ...
+# Subtest: native setup still reads ownership before retaining or replacing an online signed-in device
+ok 11 - native setup still reads ownership before retaining or replacing an online signed-in device
+  ---
+  duration_ms: 3.339973
+  type: 'test'
+  ...
+# Subtest: native setup does not start an ownership read after its account has unmounted
+ok 12 - native setup does not start an ownership read after its account has unmounted
+  ---
+  duration_ms: 2.995163
+  type: 'test'
+  ...
+# Subtest: an old ownership response cannot install a device after the account changes
+ok 13 - an old ownership response cannot install a device after the account changes
+  ---
+  duration_ms: 4.515038
+  type: 'test'
+  ...
+# Subtest: failed ownership verification never becomes an install decision
+ok 14 - failed ownership verification never becomes an install decision
+  ---
+  duration_ms: 2.945338
+  type: 'test'
+  ...
+# (node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a recovered task appears before its conditional read, without creating a writable document until access is revalidated
+ok 15 - a recovered task appears before its conditional read, without creating a writable document until access is revalidated
+  ---
+  duration_ms: 2170.391328
+  type: 'test'
+  ...
+# Subtest: a failed cached-task authorization removes its preview without exchanging the stored document
+ok 16 - a failed cached-task authorization removes its preview without exchanging the stored document
+  ---
+  duration_ms: 12.643262
+  type: 'test'
+  ...
+# Subtest: a shared-task response after an account cookie change cannot validate the old viewer's document
+ok 17 - a shared-task response after an account cookie change cannot validate the old viewer's document
+  ---
+  duration_ms: 7.613857
+  type: 'test'
+  ...
+# Subtest: a quick reopen revalidates a completed SWR read before unlocking the cached task
+ok 18 - a quick reopen revalidates a completed SWR read before unlocking the cached task
+  ---
+  duration_ms: 138.602767
+  type: 'test'
+  ...
+# Subtest: closing and reopening during the first conditional read unlocks the new form only after authorization
+ok 19 - closing and reopening during the first conditional read unlocks the new form only after authorization
+  ---
+  duration_ms: 30.070392
+  type: 'test'
+  ...
+# Subtest: a task reopened before persistent hydration starts its authorized read after the SWR pause ends
+ok 20 - a task reopened before persistent hydration starts its authorized read after the SWR pause ends
+  ---
+  duration_ms: 31.103246
+  type: 'test'
+  ...
+# Subtest: a quick reopen stays read-only when current authorization returns workspaceAccessDenied
+ok 21 - a quick reopen stays read-only when current authorization returns workspaceAccessDenied
+  ---
+  duration_ms: 123.773319
+  type: 'test'
+  ...
+# Subtest: a quick reopen stays read-only when current authorization returns foreign-viewer
+ok 22 - a quick reopen stays read-only when current authorization returns foreign-viewer
+  ---
+  duration_ms: 121.26347
+  type: 'test'
+  ...
+# Subtest: a committed acceptance event refreshes the mounted task status and activity without reload
+ok 23 - a committed acceptance event refreshes the mounted task status and activity without reload
+  ---
+  duration_ms: 1631.203034
+  type: 'test'
+  ...
+# Subtest: a background transport failure keeps the authorized editor, unsaved text and selection through retry
+ok 24 - a background transport failure keeps the authorized editor, unsaved text and selection through retry
+  ---
+  duration_ms: 1745.603091
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after authRequired and a later network failure cannot restore it
+ok 25 - an authorized task discards its editor after authRequired and a later network failure cannot restore it
+  ---
+  duration_ms: 1744.291399
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after workspaceAccessDenied and a later network failure cannot restore it
+ok 26 - an authorized task discards its editor after workspaceAccessDenied and a later network failure cannot restore it
+  ---
+  duration_ms: 1743.191087
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after issueNotFound and a later network failure cannot restore it
+ok 27 - an authorized task discards its editor after issueNotFound and a later network failure cannot restore it
+  ---
+  duration_ms: 1745.118806
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after foreign-viewer and a later network failure cannot restore it
+ok 28 - an authorized task discards its editor after foreign-viewer and a later network failure cannot restore it
+  ---
+  duration_ms: 1746.521174
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after 401 and a later network failure cannot restore it
+ok 29 - an authorized task discards its editor after 401 and a later network failure cannot restore it
+  ---
+  duration_ms: 1757.161563
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after 403 and a later network failure cannot restore it
+ok 30 - an authorized task discards its editor after 403 and a later network failure cannot restore it
+  ---
+  duration_ms: 1763.092206
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after 404 and a later network failure cannot restore it
+ok 31 - an authorized task discards its editor after 404 and a later network failure cannot restore it
+  ---
+  duration_ms: 1747.441982
+  type: 'test'
+  ...
+# Subtest: a live acceptance keeps unsaved title and description, then saves them against the new revision without reopening the task
+ok 32 - a live acceptance keeps unsaved title and description, then saves them against the new revision without reopening the task
+  ---
+  duration_ms: 3321.289121
+  type: 'test'
+  ...
+# Subtest: acceptance during a pending document flush cannot pair the newer revision with an older Review snapshot
+ok 33 - acceptance during a pending document flush cannot pair the newer revision with an older Review snapshot
+  ---
+  duration_ms: 1731.325898
+  type: 'test'
+  ...
+# (node:14) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:14) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: live catch-ups share an ordinary SWR read that starts after both scoped connections open
+ok 34 - live catch-ups share an ordinary SWR read that starts after both scoped connections open
+  ---
+  duration_ms: 779.399275
+  type: 'test'
+  ...
+# Subtest: a SWR read that starts before the live connection opens cannot consume its catch-up
+ok 35 - a SWR read that starts before the live connection opens cannot consume its catch-up
+  ---
+  duration_ms: 325.605348
+  type: 'test'
+  ...
+# Subtest: a new unversioned push during a shared SWR read still gets its trailing read
+ok 36 - a new unversioned push during a shared SWR read still gets its trailing read
+  ---
+  duration_ms: 649.116754
+  type: 'test'
+  ...
+# Subtest: a higher-revision push during a shared SWR read still gets its trailing read
+ok 37 - a higher-revision push during a shared SWR read still gets its trailing read
+  ---
+  duration_ms: 645.949341
+  type: 'test'
+  ...
+# Subtest: a later-started SWR read must still prove every required revision before covering a live push
+ok 38 - a later-started SWR read must still prove every required revision before covering a live push
+  ---
+  duration_ms: 488.350965
+  type: 'test'
+  ...
+# Subtest: a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+ok 39 - a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+  ---
+  duration_ms: 488.376013
+  type: 'test'
+  ...
+# Subtest: a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+ok 40 - a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+  ---
+  duration_ms: 487.228149
+  type: 'test'
+  ...
+# Subtest: a shared read cannot replace the revision held when the live obligation began with a lower revision
+ok 41 - a shared read cannot replace the revision held when the live obligation began with a lower revision
+  ---
+  duration_ms: 486.469033
+  type: 'test'
+  ...
+# Subtest: an original onSuccess exception remains a SWR error without a shared-read retry
+ok 42 - an original onSuccess exception remains a SWR error without a shared-read retry
+  ---
+  duration_ms: 486.297676
+  type: 'test'
+  ...
+# (node:14) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# Subtest: a discarded shared read cannot start another request after the page becomes hidden
+ok 43 - a discarded shared read cannot start another request after the page becomes hidden
+  ---
+  duration_ms: 809.384273
+  type: 'test'
+  ...
+# Subtest: a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+ok 44 - a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+  ---
+  duration_ms: 486.375043
+  type: 'test'
+  ...
+# Subtest: an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement
+ok 45 - an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement
+  ---
+  duration_ms: 648.085103
+  type: 'test'
+  ...
+# Subtest: a shared permission failure keeps SWR error handling and does not start another request
+ok 46 - a shared permission failure keeps SWR error handling and does not start another request
+  ---
+  duration_ms: 489.718652
+  type: 'test'
+  ...
+# Subtest: retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+ok 47 - retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+  ---
+  duration_ms: 808.53895
+  type: 'test'
+  ...
+# Subtest: resolving the issue home different from the selected workspace preserves its live subscription
+ok 48 - resolving the issue home different from the selected workspace preserves its live subscription
+  ---
+  duration_ms: 647.261098
+  type: 'test'
+  ...
+# Subtest: resolving the issue home equal to the selected workspace preserves its live subscription
+ok 49 - resolving the issue home equal to the selected workspace preserves its live subscription
+  ---
+  duration_ms: 645.77463
+  type: 'test'
+  ...
+# Subtest: an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy
+ok 50 - an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy
+  ---
+  duration_ms: 325.40445
+  type: 'test'
+  ...
+# Subtest: real thread hooks require a current presence acknowledgement, update its proof and unregister on exit
+ok 51 - real thread hooks require a current presence acknowledgement, update its proof and unregister on exit
+  ---
+  duration_ms: 488.595317
+  type: 'test'
+  ...
+# Subtest: an older server presence fallback flag remains uncovered on a healthy new live transport
+ok 52 - an older server presence fallback flag remains uncovered on a healthy new live transport
+  ---
+  duration_ms: 323.779176
+  type: 'test'
+  ...
+# Subtest: three acknowledged presence tabs still share one authorized read for the same device-state push
+ok 53 - three acknowledged presence tabs still share one authorized read for the same device-state push
+  ---
+  duration_ms: 2752.329011
+  type: 'test'
+  ...
+# Subtest: a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta
+ok 54 - a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta
+  ---
+  duration_ms: 324.334263
+  type: 'test'
+  ...
+# Subtest: a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta
+ok 55 - a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta
+  ---
+  duration_ms: 323.660026
+  type: 'test'
+  ...
+# Subtest: a restored list with partial proofs cannot receive unchanged while rows are missing
+ok 56 - a restored list with partial proofs cannot receive unchanged while rows are missing
+  ---
+  duration_ms: 324.519718
+  type: 'test'
+  ...
+# Subtest: a restored list with missing proofs cannot receive unchanged while rows are missing
+ok 57 - a restored list with missing proofs cannot receive unchanged while rows are missing
+  ---
+  duration_ms: 324.267553
+  type: 'test'
+  ...
+# Subtest: an explicit revoked access response hides a previously visible cached issue list
+ok 58 - an explicit revoked access response hides a previously visible cached issue list
+  ---
+  duration_ms: 675.983652
+  type: 'test'
+  ...
+# Subtest: real list hooks update held revisions after an asynchronous read without losing scoped focus coverage
+ok 59 - real list hooks update held revisions after an asynchronous read without losing scoped focus coverage
+  ---
+  duration_ms: 5048.064823
+  type: 'test'
+  ...
+# Subtest: real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes
+ok 60 - real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes
+  ---
+  duration_ms: 7596.950267
+  type: 'test'
+  ...
+# Subtest: healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list
+ok 61 - healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list
+  ---
+  duration_ms: 61939.908281
+  type: 'test'
+  ...
+# Subtest: a late tasks response after the cookie changes cannot populate the old owner's real SWR cache
+ok 62 - a late tasks response after the cookie changes cannot populate the old owner's real SWR cache
+  ---
+  duration_ms: 327.387273
+  type: 'test'
+  ...
+# Subtest: a late bots response after the cookie changes cannot populate the old owner's real SWR cache
+ok 63 - a late bots response after the cookie changes cannot populate the old owner's real SWR cache
+  ---
+  duration_ms: 324.237938
+  type: 'test'
+  ...
+# Subtest: a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows
+ok 64 - a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows
+  ---
+  duration_ms: 809.812074
+  type: 'test'
+  ...
+# Subtest: a server-selected replacement workspace is refused under the former issue-list key
+ok 65 - a server-selected replacement workspace is refused under the former issue-list key
+  ---
+  duration_ms: 324.148042
+  type: 'test'
+  ...
+# Subtest: group list GET results are bound to both the authenticated owner and the requested workspace before caching
+ok 66 - group list GET results are bound to both the authenticated owner and the requested workspace before caching
+  ---
+  duration_ms: 327.21319
+  type: 'test'
+  ...
+# Subtest: a delayed Bot roster cannot populate another owner's list key
+ok 67 - a delayed Bot roster cannot populate another owner's list key
+  ---
+  duration_ms: 325.978135
+  type: 'test'
+  ...
+# Subtest: a delayed Bot roster cannot populate another workspace's list key
+ok 68 - a delayed Bot roster cannot populate another workspace's list key
+  ---
+  duration_ms: 324.434105
+  type: 'test'
+  ...
+# Subtest: leaving Settings catches up a roster event that arrived while its read was paused
+ok 69 - leaving Settings catches up a roster event that arrived while its read was paused
+  ---
+  duration_ms: 2751.168042
+  type: 'test'
+  ...
+# Subtest: hidden list views retain a dirty event and catch up once when visible
+ok 70 - hidden list views retain a dirty event and catch up once when visible
+  ---
+  duration_ms: 3077.509518
+  type: 'test'
+  ...
+# Subtest: without an active owned home, the owner-wide list never guesses the Provider workspace
+ok 71 - without an active owned home, the owner-wide list never guesses the Provider workspace
+  ---
+  duration_ms: 323.828767
+  type: 'test'
+  ...
+# Subtest: a server-derived chat lease expiry performs one read without recreating the transport
+ok 72 - a server-derived chat lease expiry performs one read without recreating the transport
+  ---
+  duration_ms: 2277.981059
+  type: 'test'
+  ...
+# Subtest: a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility
+ok 73 - a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility
+  ---
+  duration_ms: 1357.395141
+  type: 'test'
+  ...
+# Subtest: a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat
+ok 74 - a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat
+  ---
+  duration_ms: 2624.607771
+  type: 'test'
+  ...
+1..74
+# tests 74
+# suites 0
+# pass 74
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 105926.715714

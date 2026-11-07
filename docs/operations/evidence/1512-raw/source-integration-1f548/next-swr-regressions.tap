@@ -1,0 +1,387 @@
+TAP version 13
+# Subtest: three tabs woken by one push: one reads, the others take its result
+ok 1 - three tabs woken by one push: one reads, the others take its result
+  ---
+  duration_ms: 12.024062
+  type: 'test'
+  ...
+# Subtest: a newer push cannot be satisfied by a shared read started before that revision
+ok 2 - a newer push cannot be satisfied by a shared read started before that revision
+  ---
+  duration_ms: 2.480726
+  type: 'test'
+  ...
+# Subtest: shared snapshots prove every required revision, including missing or malformed proofs
+ok 3 - shared snapshots prove every required revision, including missing or malformed proofs
+  ---
+  duration_ms: 0.794049
+  type: 'test'
+  ...
+# Subtest: three tabs with the same revision requirement share one current read on every push
+ok 4 - three tabs with the same revision requirement share one current read on every push
+  ---
+  duration_ms: 9.100569
+  type: 'test'
+  ...
+# Subtest: 2 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+ok 5 - 2 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+  ---
+  duration_ms: 7.800927
+  type: 'test'
+  ...
+# Subtest: 3 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+ok 6 - 3 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+  ---
+  duration_ms: 4.178898
+  type: 'test'
+  ...
+# Subtest: completed results retain their observation age and require live coverage, an allowed reuse and an active channel
+ok 7 - completed results retain their observation age and require live coverage, an allowed reuse and an active channel
+  ---
+  duration_ms: 4.532212
+  type: 'test'
+  ...
+# Subtest: another user, workspace or key never shares; a closed channel or a silent leader reads itself
+ok 8 - another user, workspace or key never shares; a closed channel or a silent leader reads itself
+  ---
+  duration_ms: 2.644122
+  type: 'test'
+  ...
+# Subtest: a failed leader read sends no data: the followers read themselves
+ok 9 - a failed leader read sends no data: the followers read themselves
+  ---
+  duration_ms: 1.44425
+  type: 'test'
+  ...
+# Subtest: the default chat alias cannot share across authenticated workspace, build or role namespaces
+ok 10 - the default chat alias cannot share across authenticated workspace, build or role namespaces
+  ---
+  duration_ms: 3.837553
+  type: 'test'
+  ...
+# Subtest: only known read keys with plain scope arguments are durable
+ok 11 - only known read keys with plain scope arguments are durable
+  ---
+  duration_ms: 1.145309
+  type: 'test'
+  ...
+# Subtest: ordinary task documents and history summaries retain their exact hash-covered shape
+ok 12 - ordinary task documents and history summaries retain their exact hash-covered shape
+  ---
+  duration_ms: 1.860289
+  type: 'test'
+  ...
+# Subtest: issue prefix persists its actual read model with public team identifiers
+ok 13 - issue prefix persists its actual read model with public team identifiers
+  ---
+  duration_ms: 0.189917
+  type: 'test'
+  ...
+# Subtest: public team identifiers are allowed only in the exact issue prefix root field
+ok 14 - public team identifiers are allowed only in the exact issue prefix root field
+  ---
+  duration_ms: 0.354315
+  type: 'test'
+  ...
+# Subtest: issue prefix team identifiers still reject credential text and URLs
+ok 15 - issue prefix team identifiers still reject credential text and URLs
+  ---
+  duration_ms: 0.146421
+  type: 'test'
+  ...
+# Subtest: a modified task body or metadata is not persisted under its original version proof
+ok 16 - a modified task body or metadata is not persisted under its original version proof
+  ---
+  duration_ms: 0.200903
+  type: 'test'
+  ...
+# Subtest: credential-looking text rejects the whole record rather than removing required text
+ok 17 - credential-looking text rejects the whole record rather than removing required text
+  ---
+  duration_ms: 0.605514
+  type: 'test'
+  ...
+# Subtest: no credential, key, approval parameters or monotonic request clock reach disk
+ok 18 - no credential, key, approval parameters or monotonic request clock reach disk
+  ---
+  duration_ms: 1.042614
+  type: 'test'
+  ...
+# Subtest: chat stores only the proven tail and safe activity labels; first read replays its previews
+ok 19 - chat stores only the proven tail and safe activity labels; first read replays its previews
+  ---
+  duration_ms: 0.541627
+  type: 'test'
+  ...
+# Subtest: stripped visible tool metadata retains the body continuation and requests a one-time repair
+ok 20 - stripped visible tool metadata retains the body continuation and requests a one-time repair
+  ---
+  duration_ms: 0.670772
+  type: 'test'
+  ...
+# Subtest: a response-only metadata overlay cannot bypass the nested disk allowlist
+ok 21 - a response-only metadata overlay cannot bypass the nested disk allowlist
+  ---
+  duration_ms: 0.177598
+  type: 'test'
+  ...
+# Subtest: real IndexedDB transactions fence late writes from the previously active account
+ok 22 - real IndexedDB transactions fence late writes from the previously active account
+  ---
+  duration_ms: 31.264679
+  type: 'test'
+  ...
+# Subtest: retiring an old tab clears only its namespace and preserves the current active gate
+ok 23 - retiring an old tab clears only its namespace and preserves the current active gate
+  ---
+  duration_ms: 8.502676
+  type: 'test'
+  ...
+# Subtest: logout clears the active gate so an in-flight response cannot recreate disk data
+ok 24 - logout clears the active gate so an in-flight response cannot recreate disk data
+  ---
+  duration_ms: 2.717933
+  type: 'test'
+  ...
+# Subtest: an activation invalidated while IndexedDB opens cannot replace the new account
+ok 25 - an activation invalidated while IndexedDB opens cannot replace the new account
+  ---
+  duration_ms: 5.750061
+  type: 'test'
+  ...
+# (node:15) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:15) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: disk namespaces distinguish owner, viewed workspace, build and authorized role
+ok 26 - disk namespaces distinguish owner, viewed workspace, build and authorized role
+  ---
+  duration_ms: 17.82489
+  type: 'test'
+  ...
+# Subtest: installed UI may supply its build identity while retaining server workspace authority
+ok 27 - installed UI may supply its build identity while retaining server workspace authority
+  ---
+  duration_ms: 25.698807
+  type: 'test'
+  ...
+# Subtest: fresh server seed and an optimistic write both win over a late disk hydration
+ok 28 - fresh server seed and an optimistic write both win over a late disk hydration
+  ---
+  duration_ms: 1.269015
+  type: 'test'
+  ...
+# Subtest: deleting a key while disk opens prevents its resurrection
+ok 29 - deleting a key while disk opens prevents its resurrection
+  ---
+  duration_ms: 0.308937
+  type: 'test'
+  ...
+# Subtest: revocation during hydration retires the cache and clears after queued disk work
+ok 30 - revocation during hydration retires the cache and clears after queued disk work
+  ---
+  duration_ms: 0.741299
+  type: 'test'
+  ...
+# Subtest: an old tab retiring its namespace does not erase the newly activated account
+ok 31 - an old tab retiring its namespace does not erase the newly activated account
+  ---
+  duration_ms: 4.22571
+  type: 'test'
+  ...
+# Subtest: unavailable storage still releases authorized network reads
+ok 32 - unavailable storage still releases authorized network reads
+  ---
+  duration_ms: 0.248155
+  type: 'test'
+  ...
+# Subtest: task not found removes its detail and activity history, including a delayed disk restore
+ok 33 - task not found removes its detail and activity history, including a delayed disk restore
+  ---
+  duration_ms: 0.505193
+  type: 'test'
+  ...
+# Subtest: global clear waits for a provider that unregisters synchronously on invalidation
+ok 34 - global clear waits for a provider that unregisters synchronously on invalidation
+  ---
+  duration_ms: 0.448087
+  type: 'test'
+  ...
+# Subtest: unmounted providers retire before late activation, while a StrictMode reconnect stays enabled
+ok 35 - unmounted providers retire before late activation, while a StrictMode reconnect stays enabled
+  ---
+  duration_ms: 0.263658
+  type: 'test'
+  ...
+# Subtest: real SWR waits for disk and accepts exactly one fresh first response
+ok 36 - real SWR waits for disk and accepts exactly one fresh first response
+  ---
+  duration_ms: 10.176974
+  type: 'test'
+  ...
+# Subtest: real SWR in StrictMode waits for disk and accepts exactly one fresh first response
+ok 37 - real SWR in StrictMode waits for disk and accepts exactly one fresh first response
+  ---
+  duration_ms: 5.446672
+  type: 'test'
+  ...
+# Subtest: real SWR starts a cold read after an empty or failed disk hydrate
+ok 38 - real SWR starts a cold read after an empty or failed disk hydrate
+  ---
+  duration_ms: 4.966639
+  type: 'test'
+  ...
+# Subtest: a cold paginated settings read resumes after hydration with its real aggregate key
+ok 39 - a cold paginated settings read resumes after hydration with its real aggregate key
+  ---
+  duration_ms: 9.920065
+  type: 'test'
+  ...
+# Subtest: the authenticated boundary seeds real SWR before an inner fallback can be replaced by disk
+ok 40 - the authenticated boundary seeds real SWR before an inner fallback can be replaced by disk
+  ---
+  duration_ms: 4.156785
+  type: 'test'
+  ...
+# Subtest: hydration respects a read explicitly disabled on mount
+ok 41 - hydration respects a read explicitly disabled on mount
+  ---
+  duration_ms: 1.756732
+  type: 'test'
+  ...
+# (node:15) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# Subtest: real SWR keeps a connected key fresh for five minutes, then validates in the background and catches a disconnect
+ok 42 - real SWR keeps a connected key fresh for five minutes, then validates in the background and catches a disconnect
+  ---
+  duration_ms: 55.795732
+  type: 'test'
+  ...
+# Subtest: a server-denied workspace clears durable data without hydrating or refreshing in a loop
+ok 43 - a server-denied workspace clears durable data without hydrating or refreshing in a loop
+  ---
+  duration_ms: 2.249576
+  type: 'test'
+  ...
+# Subtest: intent prefetch deduplicates per provider without sharing one account result with another
+ok 44 - intent prefetch deduplicates per provider without sharing one account result with another
+  ---
+  duration_ms: 2.412412
+  type: 'test'
+  ...
+# Subtest: mounted reads and optimistic writes win over late speculative results
+ok 45 - mounted reads and optimistic writes win over late speculative results
+  ---
+  duration_ms: 0.285041
+  type: 'test'
+  ...
+# Subtest: failed intent reads can be attempted by later user intent and do not loop on their own
+ok 46 - failed intent reads can be attempted by later user intent and do not loop on their own
+  ---
+  duration_ms: 0.521066
+  type: 'test'
+  ...
+# Subtest: access, rate limit and explicit terminal errors never retry, including wrapped causes
+ok 47 - access, rate limit and explicit terminal errors never retry, including wrapped causes
+  ---
+  duration_ms: 1.683502
+  type: 'test'
+  ...
+# Subtest: read retries have exponential equal jitter, a 30-second cap and at most five attempts
+ok 48 - read retries have exponential equal jitter, a 30-second cap and at most five attempts
+  ---
+  duration_ms: 2.13986
+  type: 'test'
+  ...
+# Subtest: group GET failures retain HTTP status and the original network cause
+ok 49 - group GET failures retain HTTP status and the original network cause
+  ---
+  duration_ms: 4.468446
+  type: 'test'
+  ...
+# Subtest: a queued transient retry cannot repeat a newer rate-limit failure or successful read
+ok 50 - a queued transient retry cannot repeat a newer rate-limit failure or successful read
+  ---
+  duration_ms: 0.405863
+  type: 'test'
+  ...
+# (node:33) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:33) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: successful logout waits for persistent data to be erased before navigation can proceed
+ok 51 - successful logout waits for persistent data to be erased before navigation can proceed
+  ---
+  duration_ms: 3.942703
+  type: 'test'
+  ...
+# Subtest: failed logout does not claim that the still-authenticated session was cleared
+ok 52 - failed logout does not claim that the still-authenticated session was cleared
+  ---
+  duration_ms: 0.290348
+  type: 'test'
+  ...
+# (node:73) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: plain SWR re-reads on every focus, which is why the site gates it
+ok 53 - plain SWR re-reads on every focus, which is why the site gates it
+  ---
+  duration_ms: 183.554048
+  type: 'test'
+  ...
+# Subtest: site defaults: focus within the freshness threshold sends no request
+ok 54 - site defaults: focus within the freshness threshold sends no request
+  ---
+  duration_ms: 126.626482
+  type: 'test'
+  ...
+# Subtest: site defaults: past the threshold one focus revalidates once, silently
+ok 55 - site defaults: past the threshold one focus revalidates once, silently
+  ---
+  duration_ms: 347.889934
+  type: 'test'
+  ...
+# Subtest: site defaults: a fresh answer from a poll or mutate counts, not just the mount
+ok 56 - site defaults: a fresh answer from a poll or mutate counts, not just the mount
+  ---
+  duration_ms: 316.188946
+  type: 'test'
+  ...
+# Subtest: site defaults: a hook that turns focus off is never revalidated on focus
+ok 57 - site defaults: a hook that turns focus off is never revalidated on focus
+  ---
+  duration_ms: 315.610853
+  type: 'test'
+  ...
+# Subtest: a return check runs once after a hand-off and never on plain focus
+ok 58 - a return check runs once after a hand-off and never on plain focus
+  ---
+  duration_ms: 95.572793
+  type: 'test'
+  ...
+# Subtest: a return check armed twice still runs once and unmounting cancels it
+ok 59 - a return check armed twice still runs once and unmounting cancels it
+  ---
+  duration_ms: 64.357247
+  type: 'test'
+  ...
+# Subtest: a link hand-off checks on every return until it is done or its time is up, and never before
+ok 60 - a link hand-off checks on every return until it is done or its time is up, and never before
+  ---
+  duration_ms: 186.28745
+  type: 'test'
+  ...
+# Subtest: a required update pauses reads even when a hook supplies its own settings pause
+ok 61 - a required update pauses reads even when a hook supplies its own settings pause
+  ---
+  duration_ms: 64.413291
+  type: 'test'
+  ...
+1..61
+# tests 61
+# suites 0
+# pass 61
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5611.959543

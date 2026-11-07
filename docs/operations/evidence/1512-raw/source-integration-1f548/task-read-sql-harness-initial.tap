@@ -1,0 +1,91 @@
+(node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (3.365954ms)
+✖ empty task rows do not add a read or leak another owner into the bot join (0.054883ms)
+✖ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (0.036165ms)
+✖ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (0.053551ms)
+✖ an empty thread snapshot keeps null expiry and no changed-row query (0.05312ms)
+✖ authentication failures still precede every revision or main-database read (0.030126ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 0
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 855.91457
+
+✖ failing tests:
+
+test at tests/task-run-read-query.test.ts:1:3437
+✖ task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement (3.365954ms)
+  /workspace/scratch/812e3b7d6d45/Mikka/lib/db/request-scope.ts:7
+  import { sampleClient } from './egress-sample'
+           ^
+  SyntaxError: The requested module './egress-sample' does not provide an export named 'sampleClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:57:13)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at tests/task-run-read-query.test.ts:1:5170
+✖ empty task rows do not add a read or leak another owner into the bot join (0.054883ms)
+  /workspace/scratch/812e3b7d6d45/Mikka/lib/db/request-scope.ts:7
+  import { sampleClient } from './egress-sample'
+           ^
+  SyntaxError: The requested module './egress-sample' does not provide an export named 'sampleClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:57:13)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at tests/task-run-read-query.test.ts:1:5497
+✖ an unchanged thread list reads its exact fingerprint and expiry in one aggregate (0.036165ms)
+  /workspace/scratch/812e3b7d6d45/Mikka/lib/db/request-scope.ts:7
+  import { sampleClient } from './egress-sample'
+           ^
+  SyntaxError: The requested module './egress-sample' does not provide an export named 'sampleClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:57:13)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at tests/task-run-read-query.test.ts:1:6505
+✖ changed thread rows keep their manifest, owner hash and ordered data read after the aggregate (0.053551ms)
+  /workspace/scratch/812e3b7d6d45/Mikka/lib/db/request-scope.ts:7
+  import { sampleClient } from './egress-sample'
+           ^
+  SyntaxError: The requested module './egress-sample' does not provide an export named 'sampleClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:57:13)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at tests/task-run-read-query.test.ts:1:7486
+✖ an empty thread snapshot keeps null expiry and no changed-row query (0.05312ms)
+  /workspace/scratch/812e3b7d6d45/Mikka/lib/db/request-scope.ts:7
+  import { sampleClient } from './egress-sample'
+           ^
+  SyntaxError: The requested module './egress-sample' does not provide an export named 'sampleClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:57:13)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at tests/task-run-read-query.test.ts:1:7841
+✖ authentication failures still precede every revision or main-database read (0.030126ms)
+  /workspace/scratch/812e3b7d6d45/Mikka/lib/db/request-scope.ts:7
+  import { sampleClient } from './egress-sample'
+           ^
+  SyntaxError: The requested module './egress-sample' does not provide an export named 'sampleClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/task-run-read-query.test.ts:57:13)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)

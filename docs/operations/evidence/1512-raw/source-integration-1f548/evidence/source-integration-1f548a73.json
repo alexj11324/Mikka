@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T11:34:05.747812+00:00",
+  "source": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "tree": "3635e075173ffb83c1e157a7f5a93296d2697603",
+  "parent": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+  "mainFetched": "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+  "automaticIntegrationTree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+  "sourceFiles": [
+    {
+      "path": "Mikka/app/actions/task-runs.ts",
+      "bytes": 13225,
+      "sha256": "d881db08b12bd018dda2e9e04cb1424cc0bd8fe0bdfac645c45a852593eab08e"
+    },
+    {
+      "path": "Mikka/components/swr-defaults.tsx",
+      "bytes": 4433,
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33"
+    },
+    {
+      "path": "Mikka/hooks/use-live-key.tsx",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+    },
+    {
+      "path": "Mikka/hooks/use-live-lists.ts",
+      "bytes": 9682,
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a"
+    },
+    {
+      "path": "Mikka/lib/db/query-version.ts",
+      "bytes": 1213,
+      "sha256": "24ce6a24e61467638cfb4cd91b8e8ec06ffebd546c4abdb3c5d7f40d94e9cfad"
+    },
+    {
+      "path": "Mikka/lib/live/channel.test.ts",
+      "bytes": 40673,
+      "sha256": "393a0f41c63e417d6719226158ce3c59972e3b43c90d0af1fe0cd38dc07dd830"
+    },
+    {
+      "path": "Mikka/lib/live/channel.ts",
+      "bytes": 22849,
+      "sha256": "8b67917b2b657e05594c93ef9d1437e9476520ea1d718aaabcc26dbd9429f111"
+    },
+    {
+      "path": "Mikka/lib/swr/read-observer.ts",
+      "bytes": 4139,
+      "sha256": "1da6a8e8fb672e7ad81bf304bf5e65944b01593f6ca66e2f756eff43dd8cdf16"
+    },
+    {
+      "path": "Mikka/package.json",
+      "bytes": 73913,
+      "sha256": "af134238ca785b181cddfb0f8020027b5cf10de20d34de44ef82c1aa4e220a1f"
+    },
+    {
+      "path": "Mikka/scripts/use-live-lists.live.test.tsx",
+      "bytes": 47482,
+      "sha256": "188442d33f444511c92e45e4747531e60be951dbc6155472ab502f7ac0c0ab24"
+    },
+    {
+      "path": "Mikka/tests/action-read-egress.db.test.ts",
+      "bytes": 34323,
+      "sha256": "e31fbed3f5fd15a4241bf44a5540bcf84402f144f49c840e0a1f7c5b419d9594"
+    },
+    {
+      "path": "Mikka/tests/task-run-read-query.test.ts",
+      "bytes": 9164,
+      "sha256": "8d9edb07b88e6773c569d7296af336f6520e0b890c4ee31a08493f05cb2f942a"
+    }
+  ],
+  "runtime": {
+    "node": "24.22.1",
+    "pnpm": "10.34.3",
+    "pnpmOrigin": "existing cached exact project version"
+  },
+  "validation": {
+    "liveIntegration": {
+      "passed": 74,
+      "failed": 0,
+      "skipped": 0
+    },
+    "swrFocusTabShare": {
+      "passed": 61,
+      "failed": 0,
+      "skipped": 0
+    },
+    "channel": {
+      "passed": 47,
+      "failed": 0,
+      "skipped": 0
+    },
+    "backendPackageCommand": {
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    "canonicalTypes": {
+      "schemaVersion": 1,
+      "startedAt": "2026-11-07T11:30:33.894200+00:00",
+      "checks": [
+        {
+          "name": "root",
+          "command": [
+            "node",
+            "node_modules/tsrs/bin/tsrs",
+            "--noEmit"
+          ],
+          "exitCode": 0,
+          "elapsedSeconds": 3.878
+        },
+        {
+          "name": "api",
+          "command": [
+            "node",
+            "node_modules/tsrs/bin/tsrs",
+            "--noEmit",
+            "-p",
+            "apps/api/tsconfig.json"
+          ],
+          "exitCode": 0,
+          "elapsedSeconds": 1.761
+        },
+        {
+          "name": "frontend",
+          "command": [
+            "node",
+            "node_modules/typescript/bin/tsc",
+            "--noEmit",
+            "-p",
+            "apps/frontend/tsconfig.json"
+          ],
+          "exitCode": 0,
+          "elapsedSeconds": 36.081
+        },
+        {
+          "name": "renderer",
+          "command": [
+            "node",
+            "node_modules/typescript/bin/tsc",
+            "--noEmit",
+            "-p",
+            "apps/desktop/tsconfig.renderer.json"
+          ],
+          "exitCode": 0,
+          "elapsedSeconds": 34.393
+        }
+      ],
+      "completedAt": "2026-11-07T11:31:50.006884+00:00"
+    },
+    "candidateSourceOxlint": {
+      "exitCode": 0,
+      "scope": "Repository lint rules with only the unrelated untracked generated .cache tree excluded from traversal; no file removed or changed."
+    },
+    "migrationFactoryUiPolicies": {
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    },
+    "fullCheck": {
+      "exitCode": 1,
+      "cause": "Eight unchanged daemon test cases cannot listen on Unix sockets in this execution container (EPERM). No passing full-check claim; actual CI remains required."
+    },
+    "setupAttempts": [
+      {
+        "log": "next-source-check.log",
+        "exitCode": 1,
+        "cause": "Runtime fallback pnpm11.25 attempted install and refused module purge without TTY; modules preserved. Exact cached project pnpm10.34.3 used thereafter."
+      },
+      {
+        "log": "next-lint.log",
+        "exitCode": 1,
+        "cause": "Global lint traversed unrelated untracked generated cache; candidate source lint separately passed without changing unrelated files."
+      },
+      {
+        "log": "next-types-root.log",
+        "exitCode": 1,
+        "cause": "Launcher mistake: invoked shell .bin/tsrs through node. Correct node_modules/tsrs/bin/tsrs passed subsequently."
+      }
+    ]
+  },
+  "stdout": [
+    {
+      "path": "ops1512/next-live-final.tap",
+      "bytes": 19787,
+      "sha256": "dc17dba744712ac26d3d72848d7368328cdd58fe7d91715610016881201ddf09"
+    },
+    {
+      "path": "ops1512/next-swr-regressions.tap",
+      "bytes": 15070,
+      "sha256": "6a87067d20529330727e0ea4c0778fe1c8204f2aeb09c53fd97e4312a283c931"
+    },
+    {
+      "path": "ops1512/next-channel-root.tap",
+      "bytes": 5006,
+      "sha256": "3cb2e3ac032c11554dbde3c08c60dc9408596551e6bad87120d6169cfb7d1a9a"
+    },
+    {
+      "path": "ops1512/task-read-package-integration.tap",
+      "bytes": 1831,
+      "sha256": "8478d767c0781538f74d716a861f434201e616bec3833427bc91e96adffaf214"
+    },
+    {
+      "path": "ops1512/next-lint-source.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ops1512/next-lint-policies.log",
+      "bytes": 5859,
+      "sha256": "1fac324bd1cf6600a0bf61424db088ac13a2a85f6550f0f8bb99d695bdb7f3b6"
+    },
+    {
+      "path": "ops1512/next-source-check.log",
+      "bytes": 1965,
+      "sha256": "472c74ea8acbd763746785d4e2780447e49505aa2c60c7dd5a1f55b587050304"
+    },
+    {
+      "path": "ops1512/next-source-check-pinned.log",
+      "bytes": 35499,
+      "sha256": "f7f32b6787e91357d28ebebeaf8a93f855ed4e5b3deee5c72e960637d9bc52d2"
+    },
+    {
+      "path": "ops1512/next-lint.log",
+      "bytes": 34371,
+      "sha256": "87696a10cfb995b6d54f88b630d0bd2f4821268325ed3051207bf0278f37cf63"
+    },
+    {
+      "path": "ops1512/next-types-root.log",
+      "bytes": 708,
+      "sha256": "9bb8e7d4a7219b8c3e048340d58df86bad3c6cd7709b1dff7d9d3890f4a61d32"
+    },
+    {
+      "path": "ops1512/next-types-root-canonical.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ops1512/next-types-api-canonical.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ops1512/next-types-frontend-canonical.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ops1512/next-types-renderer-canonical.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "boundaries": {
+    "realPostgresExecutedLocally": false,
+    "newNativeExecuted": false,
+    "latestObservedNativeLoginSql": 208,
+    "latestObservedWebLoginSql": 161,
+    "nativeSqlGatePassed": false,
+    "productionAcceptance": false,
+    "productionDeployments": 0,
+    "modelCalls": 0,
+    "noWorkflowFileChanges": true
+  }
+}

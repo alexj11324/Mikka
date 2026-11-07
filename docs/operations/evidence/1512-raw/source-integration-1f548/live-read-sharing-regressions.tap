@@ -1,0 +1,828 @@
+TAP version 13
+# Subtest: presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop
+ok 1 - presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop
+  ---
+  duration_ms: 5.093891
+  type: 'test'
+  ...
+# Subtest: old Workers, missing and oversized proofs preserve the existing minute fallback
+ok 2 - old Workers, missing and oversized proofs preserve the existing minute fallback
+  ---
+  duration_ms: 7.284188
+  type: 'test'
+  ...
+# Subtest: unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage
+ok 3 - unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage
+  ---
+  duration_ms: 1.042804
+  type: 'test'
+  ...
+# Subtest: watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback
+ok 4 - watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback
+  ---
+  duration_ms: 1.175445
+  type: 'test'
+  ...
+# Subtest: duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open
+ok 5 - duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open
+  ---
+  duration_ms: 5.082243
+  type: 'test'
+  ...
+# Subtest: changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read
+ok 6 - changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read
+  ---
+  duration_ms: 1.285421
+  type: 'test'
+  ...
+# Subtest: hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement
+ok 7 - hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement
+  ---
+  duration_ms: 3.929292
+  type: 'test'
+  ...
+# Subtest: watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription
+ok 8 - watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription
+  ---
+  duration_ms: 1.307494
+  type: 'test'
+  ...
+# Subtest: duplicate badges share a connection and one revalidation per SWR key
+ok 9 - duplicate badges share a connection and one revalidation per SWR key
+  ---
+  duration_ms: 1.711063
+  type: 'test'
+  ...
+# Subtest: live observations describe received, skipped and read keys without changing reads
+ok 10 - live observations describe received, skipped and read keys without changing reads
+  ---
+  duration_ms: 3.521377
+  type: 'test'
+  ...
+# Subtest: online idle channels send pings and perform no polling reads
+ok 11 - online idle channels send pings and perform no polling reads
+  ---
+  duration_ms: 0.678184
+  type: 'test'
+  ...
+# Subtest: focus coverage follows this key, live capabilities and disconnects
+ok 12 - focus coverage follows this key, live capabilities and disconnects
+  ---
+  duration_ms: 0.76479
+  type: 'test'
+  ...
+# Subtest: duplicate visible events skip healthy live reads while a real hidden interval still catches up
+ok 13 - duplicate visible events skip healthy live reads while a real hidden interval still catches up
+  ---
+  duration_ms: 7.142753
+  type: 'test'
+  ...
+# Subtest: unsupported live kinds keep visibility catch-up even while their socket is connected
+ok 14 - unsupported live kinds keep visibility catch-up even while their socket is connected
+  ---
+  duration_ms: 0.302506
+  type: 'test'
+  ...
+# Subtest: offline fallback waits at least 60 seconds; hidden tabs make no requests
+ok 15 - offline fallback waits at least 60 seconds; hidden tabs make no requests
+  ---
+  duration_ms: 0.37092
+  type: 'test'
+  ...
+# Subtest: a reconnect reconciles missed changes immediately and resets the offline fallback
+ok 16 - a reconnect reconciles missed changes immediately and resets the offline fallback
+  ---
+  duration_ms: 0.326533
+  type: 'test'
+  ...
+# Subtest: unknown ids, kinds and payload fields cannot trigger revalidation
+ok 17 - unknown ids, kinds and payload fields cannot trigger revalidation
+  ---
+  duration_ms: 0.335005
+  type: 'test'
+  ...
+# Subtest: workspace teardown aborts a pending ticket and discards late events
+ok 18 - workspace teardown aborts a pending ticket and discards late events
+  ---
+  duration_ms: 0.216878
+  type: 'test'
+  ...
+# Subtest: ticket renewal reauthenticates and catches up without keeping an expired subscription
+ok 19 - ticket renewal reauthenticates and catches up without keeping an expired subscription
+  ---
+  duration_ms: 0.420355
+  type: 'test'
+  ...
+# Subtest: a late ticket cannot open a socket after the tab becomes hidden
+ok 20 - a late ticket cannot open a socket after the tab becomes hidden
+  ---
+  duration_ms: 0.364621
+  type: 'test'
+  ...
+# Subtest: a half-open socket becomes offline when pongs stop
+ok 21 - a half-open socket becomes offline when pongs stop
+  ---
+  duration_ms: 0.251019
+  type: 'test'
+  ...
+# Subtest: a healthy socket catches a lost invalidation at the full ticket lifetime
+ok 22 - a healthy socket catches a lost invalidation at the full ticket lifetime
+  ---
+  duration_ms: 0.564432
+  type: 'test'
+  ...
+# Subtest: a hung renewal still reconciles a lost invalidation after one offline fallback interval
+ok 23 - a hung renewal still reconciles a lost invalidation after one offline fallback interval
+  ---
+  duration_ms: 0.41718
+  type: 'test'
+  ...
+# Subtest: stream bursts retain the last change without reading more often than the old two-second cadence
+ok 24 - stream bursts retain the last change without reading more often than the old two-second cadence
+  ---
+  duration_ms: 0.686537
+  type: 'test'
+  ...
+# Subtest: semantic changes bypass a pending stream delay and deduplicate the same SWR key
+ok 25 - semantic changes bypass a pending stream delay and deduplicate the same SWR key
+  ---
+  duration_ms: 0.283257
+  type: 'test'
+  ...
+# Subtest: a change during an in-flight read gets one trailing read after it settles
+ok 26 - a change during an in-flight read gets one trailing read after it settles
+  ---
+  duration_ms: 0.541899
+  type: 'test'
+  ...
+# Subtest: hidden documents discard delayed reads and reconcile the current document on visibility return
+ok 27 - hidden documents discard delayed reads and reconcile the current document on visibility return
+  ---
+  duration_ms: 0.376078
+  type: 'test'
+  ...
+# Subtest: teardown during a read cannot schedule an old owner or workspace trailing read
+ok 28 - teardown during a read cannot schedule an old owner or workspace trailing read
+  ---
+  duration_ms: 0.24491
+  type: 'test'
+  ...
+# Subtest: a server question deadline performs one catch-up read and never becomes a poll
+ok 29 - a server question deadline performs one catch-up read and never becomes a poll
+  ---
+  duration_ms: 0.507717
+  type: 'test'
+  ...
+# Subtest: hidden question deadlines make no reads; visibility and teardown reconcile or discard them
+ok 30 - hidden question deadlines make no reads; visibility and teardown reconcile or discard them
+  ---
+  duration_ms: 0.604122
+  type: 'test'
+  ...
+# Subtest: a subscriber joining an already healthy channel reconciles a read that started before its subscription
+ok 31 - a subscriber joining an already healthy channel reconciles a read that started before its subscription
+  ---
+  duration_ms: 0.345902
+  type: 'test'
+  ...
+# Subtest: a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs
+ok 32 - a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs
+  ---
+  duration_ms: 0.29146
+  type: 'test'
+  ...
+# Subtest: capabilities are per-kind, including subscriptions added after the channel is ready
+ok 33 - capabilities are per-kind, including subscriptions added after the channel is ready
+  ---
+  duration_ms: 0.465793
+  type: 'test'
+  ...
+# Subtest: malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback
+ok 34 - malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback
+  ---
+  duration_ms: 0.452774
+  type: 'test'
+  ...
+# Subtest: approval expiry still triggers one authoritative read when the old Worker has no capability announcement
+ok 35 - approval expiry still triggers one authoritative read when the old Worker has no capability announcement
+  ---
+  duration_ms: 1.689431
+  type: 'test'
+  ...
+# Subtest: moving the browser wall clock backwards cannot postpone a server-derived approval expiry
+ok 36 - moving the browser wall clock backwards cannot postpone a server-derived approval expiry
+  ---
+  duration_ms: 0.333463
+  type: 'test'
+  ...
+# Subtest: a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval
+ok 37 - a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval
+  ---
+  duration_ms: 2.162805
+  type: 'test'
+  ...
+# Subtest: updating or clearing a deadline retains the same subscription and cannot restart the same expiry
+ok 38 - updating or clearing a deadline retains the same subscription and cannot restart the same expiry
+  ---
+  duration_ms: 0.775251
+  type: 'test'
+  ...
+# Subtest: timing updates while hidden do not read, and updates after teardown cannot revive a subscription
+ok 39 - timing updates while hidden do not read, and updates after teardown cannot revive a subscription
+  ---
+  duration_ms: 0.390289
+  type: 'test'
+  ...
+# Subtest: updating read pacing retains the connection and applies the new spacing to subsequent pushes
+ok 40 - updating read pacing retains the connection and applies the new spacing to subsequent pushes
+  ---
+  duration_ms: 0.343569
+  type: 'test'
+  ...
+# Subtest: only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed
+ok 41 - only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed
+  ---
+  duration_ms: 1.265921
+  type: 'test'
+  ...
+# Subtest: a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck
+ok 42 - a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck
+  ---
+  duration_ms: 2.330068
+  type: 'test'
+  ...
+# Subtest: one coalesced read requires the highest pushed revision of every entity behind its key
+ok 43 - one coalesced read requires the highest pushed revision of every entity behind its key
+  ---
+  duration_ms: 0.726587
+  type: 'test'
+  ...
+# Subtest: a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one
+ok 44 - a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one
+  ---
+  duration_ms: 0.601789
+  type: 'test'
+  ...
+# Subtest: a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list
+ok 45 - a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list
+  ---
+  duration_ms: 0.690012
+  type: 'test'
+  ...
+# Subtest: an unconditional push merged with a covered one still reads
+ok 46 - an unconditional push merged with a covered one still reads
+  ---
+  duration_ms: 0.349057
+  type: 'test'
+  ...
+# Subtest: three tabs woken by one push: one reads, the others take its result
+ok 47 - three tabs woken by one push: one reads, the others take its result
+  ---
+  duration_ms: 17.478659
+  type: 'test'
+  ...
+# Subtest: a newer push cannot be satisfied by a shared read started before that revision
+ok 48 - a newer push cannot be satisfied by a shared read started before that revision
+  ---
+  duration_ms: 3.177648
+  type: 'test'
+  ...
+# Subtest: shared snapshots prove every required revision, including missing or malformed proofs
+ok 49 - shared snapshots prove every required revision, including missing or malformed proofs
+  ---
+  duration_ms: 0.449449
+  type: 'test'
+  ...
+# Subtest: three tabs with the same revision requirement share one current read on every push
+ok 50 - three tabs with the same revision requirement share one current read on every push
+  ---
+  duration_ms: 4.370659
+  type: 'test'
+  ...
+# Subtest: 2 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+ok 51 - 2 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+  ---
+  duration_ms: 17.294861
+  type: 'test'
+  ...
+# Subtest: 3 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+ok 52 - 3 tabs reject an old in-flight result and share exactly one fresh read, including the leader's later refresh
+  ---
+  duration_ms: 11.473643
+  type: 'test'
+  ...
+# Subtest: completed results retain their observation age and require live coverage, an allowed reuse and an active channel
+ok 53 - completed results retain their observation age and require live coverage, an allowed reuse and an active channel
+  ---
+  duration_ms: 2.880149
+  type: 'test'
+  ...
+# Subtest: another user, workspace or key never shares; a closed channel or a silent leader reads itself
+ok 54 - another user, workspace or key never shares; a closed channel or a silent leader reads itself
+  ---
+  duration_ms: 7.568276
+  type: 'test'
+  ...
+# Subtest: a failed leader read sends no data: the followers read themselves
+ok 55 - a failed leader read sends no data: the followers read themselves
+  ---
+  duration_ms: 1.783192
+  type: 'test'
+  ...
+# Subtest: the default chat alias cannot share across authenticated workspace, build or role namespaces
+ok 56 - the default chat alias cannot share across authenticated workspace, build or role namespaces
+  ---
+  duration_ms: 6.544631
+  type: 'test'
+  ...
+# (node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a decision that returns after the integration unmounts cannot raise an OS notification
+ok 57 - a decision that returns after the integration unmounts cannot raise an OS notification
+  ---
+  duration_ms: 263.073507
+  type: 'test'
+  ...
+# Subtest: a prior account decision cannot notify after the Vite account subtree is replaced
+ok 58 - a prior account decision cannot notify after the Vite account subtree is replaced
+  ---
+  duration_ms: 234.842804
+  type: 'test'
+  ...
+# Subtest: an ordinary list refresh does not discard a valid pending decision from the same session
+ok 59 - an ordinary list refresh does not discard a valid pending decision from the same session
+  ---
+  duration_ms: 201.892757
+  type: 'test'
+  ...
+# Subtest: changing from the desktop runtime invalidates an outstanding notification decision
+ok 60 - changing from the desktop runtime invalidates an outstanding notification decision
+  ---
+  duration_ms: 204.384995
+  type: 'test'
+  ...
+# Subtest: a pending notification click cannot navigate after the integration unmounts
+ok 61 - a pending notification click cannot navigate after the integration unmounts
+  ---
+  duration_ms: 35.341327
+  type: 'test'
+  ...
+# Subtest: replacing the router discards the old pending click and keeps the current click handler
+ok 62 - replacing the router discards the old pending click and keeps the current click handler
+  ---
+  duration_ms: 46.931848
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when connecting
+ok 63 - native setup does not read the device list when connecting
+  ---
+  duration_ms: 4.167972
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when offline
+ok 64 - native setup does not read the device list when offline
+  ---
+  duration_ms: 3.501867
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when unsigned
+ok 65 - native setup does not read the device list when unsigned
+  ---
+  duration_ms: 3.579134
+  type: 'test'
+  ...
+# Subtest: native setup does not read the device list when unregistered
+ok 66 - native setup does not read the device list when unregistered
+  ---
+  duration_ms: 4.340824
+  type: 'test'
+  ...
+# Subtest: native setup still reads ownership before retaining or replacing an online signed-in device
+ok 67 - native setup still reads ownership before retaining or replacing an online signed-in device
+  ---
+  duration_ms: 3.653996
+  type: 'test'
+  ...
+# Subtest: native setup does not start an ownership read after its account has unmounted
+ok 68 - native setup does not start an ownership read after its account has unmounted
+  ---
+  duration_ms: 2.379382
+  type: 'test'
+  ...
+# Subtest: an old ownership response cannot install a device after the account changes
+ok 69 - an old ownership response cannot install a device after the account changes
+  ---
+  duration_ms: 4.60337
+  type: 'test'
+  ...
+# Subtest: failed ownership verification never becomes an install decision
+ok 70 - failed ownership verification never becomes an install decision
+  ---
+  duration_ms: 2.791655
+  type: 'test'
+  ...
+# (node:18) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: plain SWR re-reads on every focus, which is why the site gates it
+ok 71 - plain SWR re-reads on every focus, which is why the site gates it
+  ---
+  duration_ms: 261.361722
+  type: 'test'
+  ...
+# Subtest: site defaults: focus within the freshness threshold sends no request
+ok 72 - site defaults: focus within the freshness threshold sends no request
+  ---
+  duration_ms: 128.038773
+  type: 'test'
+  ...
+# Subtest: site defaults: past the threshold one focus revalidates once, silently
+ok 73 - site defaults: past the threshold one focus revalidates once, silently
+  ---
+  duration_ms: 347.741363
+  type: 'test'
+  ...
+# Subtest: site defaults: a fresh answer from a poll or mutate counts, not just the mount
+ok 74 - site defaults: a fresh answer from a poll or mutate counts, not just the mount
+  ---
+  duration_ms: 319.257614
+  type: 'test'
+  ...
+# Subtest: site defaults: a hook that turns focus off is never revalidated on focus
+ok 75 - site defaults: a hook that turns focus off is never revalidated on focus
+  ---
+  duration_ms: 321.535207
+  type: 'test'
+  ...
+# Subtest: a return check runs once after a hand-off and never on plain focus
+ok 76 - a return check runs once after a hand-off and never on plain focus
+  ---
+  duration_ms: 93.4829
+  type: 'test'
+  ...
+# Subtest: a return check armed twice still runs once and unmounting cancels it
+ok 77 - a return check armed twice still runs once and unmounting cancels it
+  ---
+  duration_ms: 64.274531
+  type: 'test'
+  ...
+# Subtest: a link hand-off checks on every return until it is done or its time is up, and never before
+ok 78 - a link hand-off checks on every return until it is done or its time is up, and never before
+  ---
+  duration_ms: 216.922458
+  type: 'test'
+  ...
+# Subtest: a required update pauses reads even when a hook supplies its own settings pause
+ok 79 - a required update pauses reads even when a hook supplies its own settings pause
+  ---
+  duration_ms: 63.901158
+  type: 'test'
+  ...
+# (node:21) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:21) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a recovered task appears before its conditional read, without creating a writable document until access is revalidated
+ok 80 - a recovered task appears before its conditional read, without creating a writable document until access is revalidated
+  ---
+  duration_ms: 2328.055177
+  type: 'test'
+  ...
+# Subtest: a failed cached-task authorization removes its preview without exchanging the stored document
+ok 81 - a failed cached-task authorization removes its preview without exchanging the stored document
+  ---
+  duration_ms: 13.133368
+  type: 'test'
+  ...
+# Subtest: a shared-task response after an account cookie change cannot validate the old viewer's document
+ok 82 - a shared-task response after an account cookie change cannot validate the old viewer's document
+  ---
+  duration_ms: 8.90866
+  type: 'test'
+  ...
+# Subtest: a quick reopen revalidates a completed SWR read before unlocking the cached task
+ok 83 - a quick reopen revalidates a completed SWR read before unlocking the cached task
+  ---
+  duration_ms: 142.847293
+  type: 'test'
+  ...
+# Subtest: closing and reopening during the first conditional read unlocks the new form only after authorization
+ok 84 - closing and reopening during the first conditional read unlocks the new form only after authorization
+  ---
+  duration_ms: 27.622994
+  type: 'test'
+  ...
+# Subtest: a task reopened before persistent hydration starts its authorized read after the SWR pause ends
+ok 85 - a task reopened before persistent hydration starts its authorized read after the SWR pause ends
+  ---
+  duration_ms: 27.899541
+  type: 'test'
+  ...
+# Subtest: a quick reopen stays read-only when current authorization returns workspaceAccessDenied
+ok 86 - a quick reopen stays read-only when current authorization returns workspaceAccessDenied
+  ---
+  duration_ms: 124.386783
+  type: 'test'
+  ...
+# Subtest: a quick reopen stays read-only when current authorization returns foreign-viewer
+ok 87 - a quick reopen stays read-only when current authorization returns foreign-viewer
+  ---
+  duration_ms: 122.963613
+  type: 'test'
+  ...
+# Subtest: a committed acceptance event refreshes the mounted task status and activity without reload
+ok 88 - a committed acceptance event refreshes the mounted task status and activity without reload
+  ---
+  duration_ms: 1728.367332
+  type: 'test'
+  ...
+# Subtest: a background transport failure keeps the authorized editor, unsaved text and selection through retry
+ok 89 - a background transport failure keeps the authorized editor, unsaved text and selection through retry
+  ---
+  duration_ms: 1752.15711
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after authRequired and a later network failure cannot restore it
+ok 90 - an authorized task discards its editor after authRequired and a later network failure cannot restore it
+  ---
+  duration_ms: 1762.33273
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after workspaceAccessDenied and a later network failure cannot restore it
+ok 91 - an authorized task discards its editor after workspaceAccessDenied and a later network failure cannot restore it
+  ---
+  duration_ms: 1747.982457
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after issueNotFound and a later network failure cannot restore it
+ok 92 - an authorized task discards its editor after issueNotFound and a later network failure cannot restore it
+  ---
+  duration_ms: 1649.332182
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after foreign-viewer and a later network failure cannot restore it
+ok 93 - an authorized task discards its editor after foreign-viewer and a later network failure cannot restore it
+  ---
+  duration_ms: 1752.066505
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after 401 and a later network failure cannot restore it
+ok 94 - an authorized task discards its editor after 401 and a later network failure cannot restore it
+  ---
+  duration_ms: 1753.548408
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after 403 and a later network failure cannot restore it
+ok 95 - an authorized task discards its editor after 403 and a later network failure cannot restore it
+  ---
+  duration_ms: 1746.798677
+  type: 'test'
+  ...
+# Subtest: an authorized task discards its editor after 404 and a later network failure cannot restore it
+ok 96 - an authorized task discards its editor after 404 and a later network failure cannot restore it
+  ---
+  duration_ms: 1745.100365
+  type: 'test'
+  ...
+# Subtest: a live acceptance keeps unsaved title and description, then saves them against the new revision without reopening the task
+ok 97 - a live acceptance keeps unsaved title and description, then saves them against the new revision without reopening the task
+  ---
+  duration_ms: 3420.490006
+  type: 'test'
+  ...
+# Subtest: acceptance during a pending document flush cannot pair the newer revision with an older Review snapshot
+ok 98 - acceptance during a pending document flush cannot pair the newer revision with an older Review snapshot
+  ---
+  duration_ms: 1725.493729
+  type: 'test'
+  ...
+# (node:30) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:30) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: live catch-ups share an ordinary SWR read that starts after both scoped connections open
+ok 99 - live catch-ups share an ordinary SWR read that starts after both scoped connections open
+  ---
+  duration_ms: 859.65291
+  type: 'test'
+  ...
+# Subtest: a SWR read that starts before the live connection opens cannot consume its catch-up
+ok 100 - a SWR read that starts before the live connection opens cannot consume its catch-up
+  ---
+  duration_ms: 326.273446
+  type: 'test'
+  ...
+# Subtest: a new unversioned push during a shared SWR read still gets its trailing read
+ok 101 - a new unversioned push during a shared SWR read still gets its trailing read
+  ---
+  duration_ms: 647.546804
+  type: 'test'
+  ...
+# Subtest: a higher-revision push during a shared SWR read still gets its trailing read
+ok 102 - a higher-revision push during a shared SWR read still gets its trailing read
+  ---
+  duration_ms: 648.743398
+  type: 'test'
+  ...
+# Subtest: a later-started SWR read must still prove every required revision before covering a live push
+ok 103 - a later-started SWR read must still prove every required revision before covering a live push
+  ---
+  duration_ms: 490.775475
+  type: 'test'
+  ...
+# Subtest: a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+ok 104 - a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+  ---
+  duration_ms: 486.763519
+  type: 'test'
+  ...
+# Subtest: a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+ok 105 - a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+  ---
+  duration_ms: 487.623196
+  type: 'test'
+  ...
+# Subtest: a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+ok 106 - a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+  ---
+  duration_ms: 486.44378
+  type: 'test'
+  ...
+# Subtest: a shared permission failure keeps SWR error handling and does not start another request
+ok 107 - a shared permission failure keeps SWR error handling and does not start another request
+  ---
+  duration_ms: 487.667128
+  type: 'test'
+  ...
+# Subtest: retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+ok 108 - retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+  ---
+  duration_ms: 808.610515
+  type: 'test'
+  ...
+# Subtest: resolving the issue home different from the selected workspace preserves its live subscription
+ok 109 - resolving the issue home different from the selected workspace preserves its live subscription
+  ---
+  duration_ms: 648.436786
+  type: 'test'
+  ...
+# Subtest: resolving the issue home equal to the selected workspace preserves its live subscription
+ok 110 - resolving the issue home equal to the selected workspace preserves its live subscription
+  ---
+  duration_ms: 645.246867
+  type: 'test'
+  ...
+# Subtest: real thread hooks require a current presence acknowledgement, update its proof and unregister on exit
+ok 111 - real thread hooks require a current presence acknowledgement, update its proof and unregister on exit
+  ---
+  duration_ms: 488.810236
+  type: 'test'
+  ...
+# Subtest: an older server presence fallback flag remains uncovered on a healthy new live transport
+ok 112 - an older server presence fallback flag remains uncovered on a healthy new live transport
+  ---
+  duration_ms: 329.676487
+  type: 'test'
+  ...
+# Subtest: three acknowledged presence tabs still share one authorized read for the same device-state push
+ok 113 - three acknowledged presence tabs still share one authorized read for the same device-state push
+  ---
+  duration_ms: 2753.91474
+  type: 'test'
+  ...
+# Subtest: a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta
+ok 114 - a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta
+  ---
+  duration_ms: 324.218495
+  type: 'test'
+  ...
+# Subtest: a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta
+ok 115 - a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta
+  ---
+  duration_ms: 324.049677
+  type: 'test'
+  ...
+# Subtest: a restored list with partial proofs cannot receive unchanged while rows are missing
+ok 116 - a restored list with partial proofs cannot receive unchanged while rows are missing
+  ---
+  duration_ms: 324.470295
+  type: 'test'
+  ...
+# Subtest: a restored list with missing proofs cannot receive unchanged while rows are missing
+ok 117 - a restored list with missing proofs cannot receive unchanged while rows are missing
+  ---
+  duration_ms: 324.728289
+  type: 'test'
+  ...
+# Subtest: an explicit revoked access response hides a previously visible cached issue list
+ok 118 - an explicit revoked access response hides a previously visible cached issue list
+  ---
+  duration_ms: 676.174489
+  type: 'test'
+  ...
+# Subtest: real list hooks update held revisions after an asynchronous read without losing scoped focus coverage
+ok 119 - real list hooks update held revisions after an asynchronous read without losing scoped focus coverage
+  ---
+  duration_ms: 5048.059676
+  type: 'test'
+  ...
+# Subtest: real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes
+ok 120 - real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes
+  ---
+  duration_ms: 7596.546889
+  type: 'test'
+  ...
+# Subtest: healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list
+ok 121 - healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list
+  ---
+  duration_ms: 61940.973876
+  type: 'test'
+  ...
+# Subtest: a late tasks response after the cookie changes cannot populate the old owner's real SWR cache
+ok 122 - a late tasks response after the cookie changes cannot populate the old owner's real SWR cache
+  ---
+  duration_ms: 327.638046
+  type: 'test'
+  ...
+# Subtest: a late bots response after the cookie changes cannot populate the old owner's real SWR cache
+ok 123 - a late bots response after the cookie changes cannot populate the old owner's real SWR cache
+  ---
+  duration_ms: 324.967154
+  type: 'test'
+  ...
+# Subtest: a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows
+ok 124 - a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows
+  ---
+  duration_ms: 808.900048
+  type: 'test'
+  ...
+# Subtest: a server-selected replacement workspace is refused under the former issue-list key
+ok 125 - a server-selected replacement workspace is refused under the former issue-list key
+  ---
+  duration_ms: 324.301954
+  type: 'test'
+  ...
+# Subtest: group list GET results are bound to both the authenticated owner and the requested workspace before caching
+ok 126 - group list GET results are bound to both the authenticated owner and the requested workspace before caching
+  ---
+  duration_ms: 325.853123
+  type: 'test'
+  ...
+# Subtest: a delayed Bot roster cannot populate another owner's list key
+ok 127 - a delayed Bot roster cannot populate another owner's list key
+  ---
+  duration_ms: 326.214739
+  type: 'test'
+  ...
+# Subtest: a delayed Bot roster cannot populate another workspace's list key
+ok 128 - a delayed Bot roster cannot populate another workspace's list key
+  ---
+  duration_ms: 323.396755
+  type: 'test'
+  ...
+# Subtest: leaving Settings catches up a roster event that arrived while its read was paused
+ok 129 - leaving Settings catches up a roster event that arrived while its read was paused
+  ---
+  duration_ms: 2748.980395
+  type: 'test'
+  ...
+# (node:30) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# Subtest: hidden list views retain a dirty event and catch up once when visible
+ok 130 - hidden list views retain a dirty event and catch up once when visible
+  ---
+  duration_ms: 3080.924465
+  type: 'test'
+  ...
+# Subtest: without an active owned home, the owner-wide list never guesses the Provider workspace
+ok 131 - without an active owned home, the owner-wide list never guesses the Provider workspace
+  ---
+  duration_ms: 323.801822
+  type: 'test'
+  ...
+# Subtest: a server-derived chat lease expiry performs one read without recreating the transport
+ok 132 - a server-derived chat lease expiry performs one read without recreating the transport
+  ---
+  duration_ms: 2274.659972
+  type: 'test'
+  ...
+# Subtest: a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility
+ok 133 - a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility
+  ---
+  duration_ms: 1355.963368
+  type: 'test'
+  ...
+# Subtest: a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat
+ok 134 - a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat
+  ---
+  duration_ms: 2625.343347
+  type: 'test'
+  ...
+1..134
+# tests 134
+# suites 0
+# pass 134
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 103347.951369

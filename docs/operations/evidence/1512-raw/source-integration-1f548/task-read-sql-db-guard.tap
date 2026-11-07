@@ -1,0 +1,14 @@
+﹣ task run rows keep the newest owner run and the 200-row limit without unused fields (1.118419ms) # SKIP
+﹣ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (0.114934ms) # SKIP
+﹣ task thread lists retain exact titles, summaries and privacy while details retain full errors (0.065709ms) # SKIP
+﹣ team link reads page through all authorized pairs and retain explicit-id scope checks (0.0525ms) # SKIP
+﹣ thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields (0.101564ms) # SKIP
+﹣ quiet thread polls return only a version; visible changes and online state still invalidate (0.784826ms) # SKIP
+ℹ tests 6
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 553.941115
