@@ -18,6 +18,7 @@ stub('../lib/auth.ts', { auth: { api: {
 type Routes = { begin: (r: Request) => Promise<Response>; ret: (r: Request) => Promise<Response>; exchange: (r: Request) => Promise<Response> }
 let routes: Routes
 let users: string[] = []
+const states: string[] = []
 let pool: import('pg').Pool
 const origin = 'https://app.example'
 const callback = 'http://127.0.0.1:49152/auth/callback'
@@ -40,6 +41,7 @@ before(async () => {
 })
 after(async () => {
   if (!pool) return
+  await pool.query('delete from desktop_auth_requests where "stateHash" = any($1)', [states])
   await pool.query('delete from "user" where id = any($1)', [users])
   await pool.end()
   const { pool: appPool } = await import('../lib/db')
@@ -48,7 +50,9 @@ after(async () => {
 
 function pair() {
   const verifier = b64(randomBytes(32))
-  return { state: b64(randomBytes(24)), verifier, challenge: createHash('sha256').update(verifier).digest('base64url') }
+  const state = b64(randomBytes(24))
+  states.push(createHash('sha256').update(state).digest('hex'))
+  return { state, verifier, challenge: createHash('sha256').update(verifier).digest('base64url') }
 }
 const json = (path: string, body: unknown) => new Request(`${origin}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: JSON.stringify(body) })
 const returnURL = (state: string, cb = callback) => new Request(`${origin}/api/desktop/return?${new URLSearchParams({ state, next: '/', callback: cb })}`)
@@ -83,7 +87,76 @@ test('a wrong verifier burns the request', { skip: !dbUrl }, async () => {
   await routes.begin(json('/api/desktop/begin', { state, callback, challenge }))
   const code = (await bind(state, users[0])).searchParams.get('code')!
   assert.equal((await routes.exchange(json('/api/desktop/exchange', { state, code, verifier: b64(randomBytes(32)) }))).status, 400)
+  const row = await pool.query('select "usedAt", token from desktop_auth_requests where "stateHash" = $1', [createHash('sha256').update(state).digest('hex')])
+  assert.ok(row.rows[0].usedAt)
+  assert.equal(row.rows[0].token, null, 'a failed attempt clears the token in the same consumption')
   assert.equal((await routes.exchange(json('/api/desktop/exchange', { state, code, verifier }))).status, 400)
+})
+
+test('two simultaneous exchanges on separate connections consume the row only once', { skip: !dbUrl, timeout: 20_000 }, async () => {
+  const { state, verifier, challenge } = pair()
+  await routes.begin(json('/api/desktop/begin', { state, callback, challenge }))
+  const code = (await bind(state, users[0])).searchParams.get('code')!
+  const { withDatabaseClient } = await import('../lib/db')
+  const clients: import('pg').PoolClient[] = []
+  let exchanges: Promise<Response>[] = []
+  try {
+    clients.push(await pool.connect())
+    clients.push(await pool.connect())
+    const pids = await Promise.all(clients.map(client => client.query('select pg_backend_pid() as pid')))
+    assert.notEqual(pids[0].rows[0].pid, pids[1].rows[0].pid, 'the race uses two real PostgreSQL connections')
+    await Promise.all(clients.map(client => client.query('begin')))
+    await Promise.all(clients.map(client => client.query("set local statement_timeout = '10s'")))
+    // A winner keeps its row lock until COMMIT. The other statement must then
+    // recheck the updated row and reject, even if it began with an older snapshot.
+    exchanges = clients.map(client => withDatabaseClient(client, () => routes.exchange(json('/api/desktop/exchange', { state, code, verifier }))))
+    const winner = await Promise.race(exchanges.map(async (response, index) => ({ response: await response, index })))
+    assert.equal(winner.response.status, 200)
+    await clients[winner.index].query('commit')
+    const responses = await Promise.all(exchanges)
+    await clients[1 - winner.index].query('commit')
+    assert.deepEqual(responses.map(response => response.status).sort(), [200, 400])
+    assert.match((await winner.response.json() as { token: string }).token, /^ott-/)
+    const row = await clients[0].query('select "usedAt", token from desktop_auth_requests where "stateHash" = $1', [createHash('sha256').update(state).digest('hex')])
+    assert.ok(row.rows[0].usedAt)
+    assert.equal(row.rows[0].token, null)
+  } finally {
+    await Promise.allSettled(clients.map(client => client.query('rollback')))
+    await Promise.allSettled(exchanges)
+    for (const client of clients) client.release()
+  }
+})
+
+test('exchange cannot consume an unbound or expired row', { skip: !dbUrl }, async () => {
+  const unbound = pair()
+  await routes.begin(json('/api/desktop/begin', { state: unbound.state, callback, challenge: unbound.challenge }))
+  assert.equal((await routes.exchange(json('/api/desktop/exchange', { state: unbound.state, verifier: unbound.verifier, code: b64(randomBytes(32)) }))).status, 400)
+  const unboundRow = await pool.query('select "usedAt", "boundAt", token from desktop_auth_requests where "stateHash" = $1', [createHash('sha256').update(unbound.state).digest('hex')])
+  assert.deepEqual(unboundRow.rows[0], { usedAt: null, boundAt: null, token: null })
+
+  const expired = pair()
+  await routes.begin(json('/api/desktop/begin', { state: expired.state, callback, challenge: expired.challenge }))
+  const code = (await bind(expired.state, users[0])).searchParams.get('code')!
+  await pool.query('update desktop_auth_requests set "expiresAt" = now() - interval \'1 second\' where "stateHash" = $1', [createHash('sha256').update(expired.state).digest('hex')])
+  assert.equal((await routes.exchange(json('/api/desktop/exchange', { state: expired.state, verifier: expired.verifier, code }))).status, 400)
+  const expiredRow = await pool.query('select "usedAt" from desktop_auth_requests where "stateHash" = $1', [createHash('sha256').update(expired.state).digest('hex')])
+  assert.equal(expiredRow.rows[0].usedAt, null)
+})
+
+test('used rows and token-less rows cannot redeem a handoff', { skip: !dbUrl }, async () => {
+  for (const used of [true, false]) {
+    const { state, verifier, challenge } = pair()
+    await routes.begin(json('/api/desktop/begin', { state, callback, challenge }))
+    const code = (await bind(state, users[0])).searchParams.get('code')!
+    const stateHash = createHash('sha256').update(state).digest('hex')
+    await pool.query(used
+      ? 'update desktop_auth_requests set "usedAt" = now() where "stateHash" = $1'
+      : 'update desktop_auth_requests set token = null where "stateHash" = $1', [stateHash])
+    assert.equal((await routes.exchange(json('/api/desktop/exchange', { state, code, verifier }))).status, 400)
+    const row = await pool.query('select "usedAt", token from desktop_auth_requests where "stateHash" = $1', [stateHash])
+    assert.ok(row.rows[0].usedAt, 'a bound token-less request still burns its first attempt')
+    if (!used) assert.equal(row.rows[0].token, null)
+  }
 })
 
 test('a second browser cannot rebind, and a different callback is refused', { skip: !dbUrl }, async () => {
