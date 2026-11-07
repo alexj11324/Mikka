@@ -20,6 +20,7 @@ import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import type { MailboxToolRequest } from '@/lib/mailbox-tools'
 import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import { agentKitEnabled } from '@/lib/agent-kit/config'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import type { WorkerDefinitionSnapshot, WorkerModelDispatch } from '@/lib/agent-kit/worker'
@@ -182,7 +183,7 @@ export async function turnSettings(userId: string, botId: string) {
     (await import('@/lib/coordinator/coordinator-bot')).isCoordinatorBot(pool, userId, botId),
     runtime(userId),
   ])
-  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
+  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
 }
 
 /**
@@ -219,7 +220,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings: number; inbox: number; begin: number; prepare: number; execution: number; personal: number; github: number } }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -865,7 +866,9 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
         runModel = { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? (request.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
           ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(source.kind === 'api_key' ? { apiKeyId: source.keyId } : {}) }
       }
-      return dispatchComputerTask(userId, { ...request, harness, factoryBotId: chatBotId ?? request.botId, sourceEventId, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)
+      // A repository thread stays on its admitted repository even when its
+      // next turn arrives through the computer tool instead of dispatch_run.
+      return dispatchComputerTask(userId, { ...request, harness, factoryBotId: chatBotId ?? request.botId, sourceEventId, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(previous?.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)
     },
   }))
 }

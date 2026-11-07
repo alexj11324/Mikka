@@ -9,6 +9,7 @@ const calls: {name:string;args:unknown[]}[]=[]
 let execution:AgentExecution|null=null
 let inboxTaken=false
 let mailboxEnabled=false
+let kitSetting:boolean|undefined=true
 let taskEventId:string|undefined
 const record=(name:string)=>(...args:unknown[])=>{calls.push({name,args})}
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
@@ -18,8 +19,9 @@ let stopNow=()=>{}
 let stopDuringTurn=false
 // 停止 while a tool call runs: the agent never returns (the tool step is still running) after one finished model call.
 let stopDuringTool=false
-let stopAt:'settings'|'inbox'|'prepare'|null=null
+let stopAt:'settings'|'inbox'|'begin'|'prepare'|null=null
 let extraInbox=false
+let inboxHeld=true,inboxHasEvents=true
 const deliverEarlyStop=async(stage:typeof stopAt)=>{
   if(stopAt!==stage)return
   stopAt=null;stopNow()
@@ -30,6 +32,15 @@ let pendingAudit:'slow'|'fail'|null=null
 let hostedError:Error|null=null
 let hostedCompleted:unknown[]=[]
 let receiptPersistenceError:Error|null=null
+let preparationError:Error|null=null
+let streamStartError:Error|null=null
+let beginGate:Promise<void>|null=null
+let startGate:Promise<void>|null=null
+let onBeginCommitted=()=>{}
+let onStartRejected=()=>{}
+let onPreparationRejected=()=>{}
+let onStartWritten=()=>{}
+const persistedExecutions=new Map<string,{id:string;status:'running'|'completed'|'failed'}>()
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable,
   createHook:()=>({[Symbol.asyncIterator]:()=>({next:()=>new Promise(resolve=>{stopNow=()=>resolve({value:{},done:false})})})})}})
 stub('../coordinator/model.ts',{COORDINATOR_MODEL:'current-default',coordinatorStep:()=>({}),turnWarning:(_reason:string,text:string)=>text})
@@ -62,10 +73,31 @@ stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unk
 stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:'ai_sdk'})})
 stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:()=>{throw new Error('unexpected native dispatch')}})
 stub('../../workflows/coordinator/tools.ts',{coordinatorTools:(...args:unknown[])=>{record('tools')(...args);return {}}})
+const begin=async(...args:unknown[])=>{
+  record('begin')(...args)
+  await deliverEarlyStop('begin')
+  if(beginGate)await beginGate
+  await new Promise(resolve=>setTimeout(resolve,2))
+  if(execution)persistedExecutions.set(`${args[2]}:${args[3]}`,{id:execution.id,status:'running'})
+  record('begun')();onBeginCommitted();return execution
+}
 stub('../../workflows/coordinator/agent-kit-steps.ts',{
-  botRuntime:async()=>({harness:'ai_sdk',model:'connected-account-default'}),
-  beginAgentExecution:async(...args:unknown[])=>{record('begin')(...args);await new Promise(resolve=>setTimeout(resolve,2));record('begun')();return execution},
-  finishAgentExecution:async(...args:unknown[])=>{record('finish')(...args)},
+  botRuntime:async()=>{record('runtime')();return {harness:'ai_sdk',model:'connected-account-default'}},
+  beginAgentExecution:begin,
+  beginPreparedAgentExecution:async(...args:unknown[])=>{
+    record('frozenBegin')(...args)
+    return args[5]?begin(...args.slice(0,5)):null
+  },
+  finishAgentExecution:async(...args:unknown[])=>{
+    record('finish')(...args)
+    const row=[...persistedExecutions.values()].find(value=>value.id===args[2])
+    if(row)row.status=args[3]?'failed':'completed'
+  },
+  failAgentPreparation:async(...args:unknown[])=>{
+    record('finishPreparation')(...args)
+    const row=persistedExecutions.get(`${args[2]}:${args[3]}`)
+    if(row)row.status='failed'
+  },
 })
 const switches={issueTools:true,factoryRouting:false,factoryLifecycle:false}
 // The real turnSettings and prepareTurn compose these same reads in one step each (workflows/coordinator/steps.ts).
@@ -75,8 +107,9 @@ let preparedPrompt:Record<string,unknown>|null=null
 let contextMs:{execution:number;personal:number;github:number}|undefined
 const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return preparedPrompt ?? {prompt:'synthetic request'}}
 stub('../../workflows/coordinator/steps.ts',{
-  turnSettings:async()=>{await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
+  turnSettings:async()=>{await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,agentKitEnabled:kitSetting,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
   prepareTurn:async(userId:string,botId:string,holder:string,input:{snapshot?:unknown;executionId?:string;mailboxEnabled:boolean;runtime:unknown}) => {
+    if(preparationError){onPreparationRejected();throw preparationError}
     const mailboxTools=input.mailboxEnabled ? await mailboxCatalogue(userId,botId,input.executionId) : []
     if (input.runtime) await noteQuotaSwitch(userId,holder,input.runtime,botId)
     const prompt=await preparePrompt(userId,botId,input.snapshot,mailboxTools)
@@ -89,12 +122,19 @@ stub('../../workflows/coordinator/steps.ts',{
   isCoordinatorChat:async()=>false,
   mailboxToolsEnabled:async()=>mailboxEnabled,
   mailboxCatalogue,
-  takeInbox:async()=>{await deliverEarlyStop('inbox');const added=!inboxTaken || extraInbox;if(inboxTaken)extraInbox=false;inboxTaken=true;return {held:true,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
-  releaseLease:async()=>false,
+  takeInbox:async()=>{await deliverEarlyStop('inbox');const added=inboxHasEvents&&(!inboxTaken || extraInbox);if(inboxTaken)extraInbox=false;inboxTaken=true;return {held:inboxHeld,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
+  releaseLease:async()=>{record('release')();return false},
   preparePrompt,
   appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
   noteQuotaSwitch,
-  writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
+  writeStreamPart:async(...args:unknown[])=>{
+    record('stream')(...args)
+    if((args[1] as {type:string}).type==='coordinator-turn-start'){
+      if(startGate)await startGate
+      if(streamStartError){onStartRejected();throw streamStartError}
+      record('startWritten')();onStartWritten()
+    }
+  },
   logTurnTiming:async(...args:unknown[])=>{record('timing')(...args)},
   markStopped:async(...args:unknown[])=>{record('stream')(args[0],{type:'coordinator-turn-stopped',id:args[2]});record('stoppedText')(...args.slice(1));return !calls.some(c=>c.name==='hosted') ? '' : stopDuringTool ? 'Creating it.' : 'The task is'},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
@@ -107,12 +147,16 @@ before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/wo
 function reset(harness?:string){
   calls.length=0;stopDuringTurn=false;stopDuringTool=false;stopAt=null;extraInbox=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined;hostedError=null;hostedCompleted=[];receiptPersistenceError=null
   contextMs=undefined
+  preparationError=null;streamStartError=null;beginGate=null;startGate=null;onBeginCommitted=()=>{};onStartRejected=()=>{};onPreparationRejected=()=>{};onStartWritten=()=>{};persistedExecutions.clear()
+  inboxHeld=true;inboxHasEvents=true
+  kitSetting=Boolean(harness)
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
 }
 test('real workflow entry uses the returned execution snapshot for model, prompt and tool registry',async()=>{
   reset('ai_sdk')
   await coordinatorTurn(owner,bot)
   assert.deepEqual(calls.find(c=>c.name==='begin')?.args,[owner,bot,'synthetic-workflow',0,{harness:'ai_sdk'}])
+  assert.deepEqual(calls.find(c=>c.name==='frozenBegin')?.args,[owner,bot,'synthetic-workflow',0,{harness:'ai_sdk'},true])
   assert.deepEqual(calls.find(c=>c.name==='hosted')?.args[0],execution!.snapshot.runtime)
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],execution!.snapshot)
   assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[]}])
@@ -131,15 +175,19 @@ test('normal completion reports fixed preparation timings only in the existing p
   await coordinatorTurn(owner,bot)
   const timings=calls.filter(call=>call.name==='timing')
   assert.equal(timings.length,1)
-  const line=timings[0].args[0] as {phaseMs:Record<string,number>}
-  assert.deepEqual(Object.keys(line.phaseMs).sort(),['begin','execution','github','inbox','personal','prepare','settings'])
+  const line=timings[0].args[0] as {phaseMs:Record<string,number>;preparationBodyMs:Record<string,number>}
+  assert.deepEqual(Object.keys(line.phaseMs).sort(),['agentPreparation','execution','github','inbox','personal','settings'])
   assert.ok(Object.values(line.phaseMs).every(value=>Number.isFinite(value)&&value>=0))
+  assert.equal('begin' in line.phaseMs,false,'the old separate durable span is absent, never a fabricated zero')
+  assert.equal('prepare' in line.phaseMs,false,'combined elapsed has its own Workflow event-clock name')
   assert.deepEqual([line.phaseMs.execution,line.phaseMs.personal,line.phaseMs.github],[13,5,21])
+  assert.deepEqual(Object.keys(line.preparationBodyMs).sort(),['begin','prepare'])
+  assert.ok(Object.values(line.preparationBodyMs).every(value=>Number.isFinite(value)&&value>=0))
   const committed=calls.findIndex(call=>call.name==='stream'&&(call.args[1] as {type:string}).type==='coordinator-turn-committed')
   assert.ok(committed<calls.findIndex(call=>call.name==='timing'))
   const options=calls.find(call=>call.name==='hosted')!.args[2] as Record<string,unknown>
-  assert.ok(!('contextMs' in options)&&!('phaseMs' in options))
-  assert.doesNotMatch(JSON.stringify(line.phaseMs),/synthetic|grounded|reply/)
+  assert.ok(!('contextMs' in options)&&!('phaseMs' in options)&&!('preparationBodyMs' in options))
+  assert.doesNotMatch(JSON.stringify([line.phaseMs,line.preparationBodyMs]),/synthetic|grounded|reply/)
 
   reset('ai_sdk')
   await coordinatorTurn(owner,bot)
@@ -151,13 +199,109 @@ test('disabled Agent Kit still resolves the connected account model without inve
   await coordinatorTurn(owner,bot)
   assert.deepEqual(calls.find(c=>c.name==='hosted')?.args[0],{harness:'ai_sdk',model:'connected-account-default'})
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],undefined)
+  assert.equal(calls.filter(c=>c.name==='runtime').length,1)
+  assert.equal('preparationBodyMs' in (calls.find(call=>call.name==='timing')!.args[0] as object),false)
+})
+test('older recorded settings keep separate reservation and preparation checkpoints',async()=>{
+  reset('ai_sdk');kitSetting=undefined
+  await coordinatorTurn(owner,bot)
+  assert.equal(calls.filter(call=>call.name==='begin').length,1)
+  assert.equal(calls.filter(call=>call.name==='frozenBegin').length,0)
+  assert.equal(calls.filter(call=>call.name==='hosted').length,1)
+  const timing=calls.find(call=>call.name==='timing')!.args[0] as {phaseMs:Record<string,number>}
+  assert.equal(typeof timing.phaseMs.begin,'number');assert.equal(typeof timing.phaseMs.prepare,'number')
+  assert.equal('agentPreparation' in timing.phaseMs,false)
+  assert.equal('preparationBodyMs' in timing,false)
 })
 test('a replayed harness mismatch fails before hosted or native dispatch',async()=>{
   reset('codex')
   await assert.rejects(coordinatorTurn(owner,bot),/agent_runtime_changed/)
   assert.equal(calls.filter(c=>c.name==='hosted').length,0)
-  assert.deepEqual(calls.find(c=>c.name==='finish')?.args,[owner,bot,execution!.id,'turn_failed'])
+  assert.deepEqual(calls.find(c=>c.name==='finishPreparation')?.args,[owner,bot,'synthetic-workflow',0])
+  assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed')
   assert.equal(calls.filter(c=>c.name==='failed').length,1)
+})
+
+test('a failed combined preparation closes the committed execution even before its result returned',async()=>{
+  reset('ai_sdk');preparationError=new Error('synthetic_prepare_failed')
+  const error=preparationError
+  try{
+    await assert.rejects(coordinatorTurn(owner,bot),value=>value===error)
+    assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed','the committed execution must not remain running when preparation loses its return value')
+    assert.deepEqual(calls.find(call=>call.name==='finishPreparation')?.args,[owner,bot,'synthetic-workflow',0])
+    assert.equal(calls.filter(call=>call.name==='failed').length,1)
+    assert.equal(calls.some(call=>call.name==='hosted'||call.name==='tools'||call.name==='append'),false)
+    assert.equal(calls.some(call=>call.name==='stream'&&(call.args[1] as {type:string}).type==='coordinator-turn-committed'),false)
+  }finally{preparationError=null}
+})
+
+test('a stream-start failure waits for a late preparation commit before closing its execution',async()=>{
+  reset('ai_sdk');streamStartError=new Error('synthetic_stream_start_failed')
+  const error=streamStartError
+  let releaseBegin=()=>{}
+  beginGate=new Promise<void>(resolve=>{releaseBegin=resolve})
+  const committed=new Promise<void>(resolve=>{onBeginCommitted=resolve})
+  const rejectedStart=new Promise<void>(resolve=>{onStartRejected=resolve})
+  let settled=false
+  const result=coordinatorTurn(owner,bot).then(()=>{settled=true;return undefined},caught=>{settled=true;return caught})
+  try{
+    await rejectedStart
+    // Drain the already-rejected writer's promise chain while begin is explicitly held.
+    await new Promise<void>(resolve=>setImmediate(resolve))
+    const settledBeforeCommit=settled
+    releaseBegin()
+    await committed
+    assert.equal(await result,error,'the writer failure remains the original cause')
+    assert.equal(settledBeforeCommit,false,'failure cleanup must wait for the in-flight preparation to settle')
+    assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed')
+    const finished=calls.findIndex(call=>call.name==='finish'||call.name==='finishPreparation')
+    assert.ok(finished>calls.findIndex(call=>call.name==='begun'))
+    assert.equal(calls.filter(call=>call.name==='failed').length,1)
+    assert.equal(calls.some(call=>call.name==='hosted'||call.name==='tools'||call.name==='append'),false)
+  }finally{
+    releaseBegin();await result;await committed
+    beginGate=null;streamStartError=null
+  }
+})
+
+test('a preparation failure waits for the started writer before publishing terminal failure',async()=>{
+  reset('ai_sdk');preparationError=new Error('synthetic_prepare_failed_before_writer')
+  const error=preparationError
+  let releaseWriter=()=>{}
+  startGate=new Promise<void>(resolve=>{releaseWriter=resolve})
+  const rejectedPreparation=new Promise<void>(resolve=>{onPreparationRejected=resolve})
+  const written=new Promise<void>(resolve=>{onStartWritten=resolve})
+  const result=coordinatorTurn(owner,bot).then(()=>undefined,caught=>caught)
+  try{
+    await rejectedPreparation
+    await new Promise<void>(resolve=>setImmediate(resolve))
+    const failedBeforeStart=calls.some(call=>call.name==='failed')
+    releaseWriter();await written
+    assert.equal(await result,error,'the preparation failure remains the original cause')
+    assert.equal(failedBeforeStart,false,'the in-flight start write must not land after terminal failure')
+    assert.ok(calls.findIndex(call=>call.name==='startWritten')<calls.findIndex(call=>call.name==='failed'))
+    assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed')
+    assert.equal(calls.some(call=>call.name==='hosted'||call.name==='tools'||call.name==='append'),false)
+  }finally{releaseWriter();await written;await result;startGate=null}
+})
+
+test('an empty or unheld inbox starts no execution, preparation, model or notice',async()=>{
+  for(const held of [false,true]){
+    reset('ai_sdk');inboxHeld=held;inboxHasEvents=false
+    await coordinatorTurn(owner,bot)
+    assert.equal(persistedExecutions.size,0)
+    assert.equal(calls.some(call=>['begin','prompt','quotaSwitch','hosted','tools','stream','finishPreparation'].includes(call.name)),false)
+    assert.equal(calls.filter(call=>call.name==='release').length,held?1:0)
+  }
+})
+
+test('a disabled preparation whose stream start fails does not invent an execution to clean up',async()=>{
+  reset();streamStartError=new Error('synthetic_disabled_start_failed')
+  try{
+    await assert.rejects(coordinatorTurn(owner,bot),value=>value===streamStartError)
+    assert.equal(persistedExecutions.size,0)
+    assert.equal(calls.some(call=>call.name==='finishPreparation'||call.name==='runtime'||call.name==='prompt'||call.name==='hosted'),false)
+  }finally{streamStartError=null}
 })
 
 test('real workflow carries the host catalogue into named options and prompt without changing its frozen execution',async()=>{
@@ -197,7 +341,7 @@ test('停止 while a tool call runs ends the turn at once: the finished call is 
   assert.equal(calls.filter(c=>c.name==='failed').length,0)
 })
 
-for(const stage of ['settings','inbox','prepare'] as const)test(`停止 during ${stage} keeps the stop and never starts the model or tools`,async()=>{
+for(const stage of ['settings','inbox','begin','prepare'] as const)test(`停止 during ${stage} keeps the stop and never starts the model or tools`,async()=>{
   reset('ai_sdk');stopAt=stage
   await coordinatorTurn(owner,bot)
   assert.equal(calls.filter(c=>c.name==='hosted').length,0)
@@ -230,7 +374,7 @@ test('a tool finish record does not hold up the model; the round stores its repl
   }finally{pendingAudit=null}
 })
 
-test('the run reads its settings in one step and starts the execution beside the stream, then prepares the round in one step',async()=>{
+test('the hosted round prepares its execution and prompt beside the independent stream start',async()=>{
   reset('ai_sdk')
   await coordinatorTurn(owner,bot)
   const names=calls.map(c=>c.name)

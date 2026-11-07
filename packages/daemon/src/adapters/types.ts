@@ -32,6 +32,8 @@ import type { QuotaSignal } from '../runs/quota-exhausted'
 export interface ExitEvent {
   type: "exit"
   outcome: "succeeded" | "failed" | "cancelled"
+  /** An adapter error may end its stream without proving the native process exited. */
+  sessionExited?: false
   /** Defaults: `turn_ended` for succeeded, `error` for failed. */
   stopReason?: StopReason
   error?: string

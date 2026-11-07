@@ -15,8 +15,8 @@ import (
 )
 
 // These tests exercise the existing public entry, the real pinned CPA
-// converter, and the final HTTP body. The baseline can compile this file
-// unchanged; its failure is a missing wire breakpoint, not a new helper import.
+// converter, and the final HTTP body. Synthetic transport responses prove
+// serialization only, not that the live OAuth endpoint accepts the request.
 func captureCodexCacheRequest(t *testing.T, modelID string, messages []any) map[string]any {
 	t.Helper()
 	payload, err := json.Marshal(map[string]any{
@@ -37,7 +37,7 @@ func captureCodexCacheRequest(t *testing.T, modelID string, messages []any) map[
 			t.Fatal("Codex subscription destination or application headers changed")
 		}
 		if r.Header.Get("Session-Id") != "" || r.Header.Get("X-Codex-Turn-State") != "" {
-			t.Fatal("cache breakpoints must not introduce session affinity")
+			t.Fatal("the layout must not introduce session affinity")
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
@@ -60,22 +60,31 @@ func captureCodexCacheRequest(t *testing.T, modelID string, messages []any) map[
 	return body
 }
 
-func codexCacheMarkerCount(value any) int {
+func codexCacheFieldCount(value any, key string) int {
 	count := 0
 	switch node := value.(type) {
 	case map[string]any:
-		if _, exists := node["prompt_cache_breakpoint"]; exists {
+		if _, exists := node[key]; exists {
 			count++
 		}
 		for _, child := range node {
-			count += codexCacheMarkerCount(child)
+			count += codexCacheFieldCount(child, key)
 		}
 	case []any:
 		for _, child := range node {
-			count += codexCacheMarkerCount(child)
+			count += codexCacheFieldCount(child, key)
 		}
 	}
 	return count
+}
+
+func assertCodexImplicitOnly(t *testing.T, body map[string]any) {
+	t.Helper()
+	for _, key := range []string{"prompt_cache_breakpoint", "mikka_cache_breakpoint", "prompt_cache_options", "prompt_cache_key", "prompt_cache_retention", "session_id", "cache_control"} {
+		if count := codexCacheFieldCount(body, key); count != 0 {
+			t.Fatalf("codex_implicit_cache_fields_unexpected: %s count=%d", key, count)
+		}
+	}
 }
 
 func codexCacheMessages(tail string, hinted bool) []any {
@@ -93,79 +102,111 @@ func codexCacheMessages(tail string, hinted bool) []any {
 	return messages
 }
 
-func TestCodexSubscriptionStableSystemCacheBreakpoints(t *testing.T) {
+func codexExpectedMessage(role, text string) map[string]any {
+	partType := "input_text"
+	if role == "assistant" {
+		partType = "output_text"
+	}
+	return map[string]any{"type": "message", "role": role, "content": []any{map[string]any{"type": partType, "text": text}}}
+}
+
+// This same test compiles against the old public entry. Its RED is the actual
+// injected wire fields, not a fabricated provider 400 or a missing helper.
+func TestCodexSubscriptionLegacyMarkersAreNotSent(t *testing.T) {
+	marked := captureCodexCacheRequest(t, "gpt-6-luna", codexCacheMessages("tail", true))
+	assertCodexImplicitOnly(t, marked)
+	unmarked := captureCodexCacheRequest(t, "gpt-6-luna", codexCacheMessages("tail", false))
+	if !reflect.DeepEqual(marked, unmarked) {
+		t.Fatal("legacy private hints changed other converted fields, tools or reasoning")
+	}
+}
+
+func TestCodexSubscriptionImplicitStablePrefix(t *testing.T) {
 	var stablePrefix []byte
 	for _, tail := range []string{"fixture-live-A", "fixture-live-B", "fixture-live-B"} {
-		body := captureCodexCacheRequest(t, "gpt-6-luna", codexCacheMessages(tail, true))
-		if count := codexCacheMarkerCount(body); count != 2 {
-			t.Fatalf("codex_stable_cache_breakpoints_missing: want 2 explicit stable-system markers, got %d", count)
-		}
+		messages := codexCacheMessages(tail, false)
+		body := captureCodexCacheRequest(t, "gpt-6-luna", []any{messages[0], messages[1], messages[3], messages[2]})
+		assertCodexImplicitOnly(t, body)
 		input, _ := body["input"].([]any)
-		if len(input) != 4 || body["instructions"] != "" {
-			t.Fatal("CPA's separate developer messages or empty instructions changed")
+		want := []any{
+			codexExpectedMessage("developer", "规则\nfixture-rules 🦊"),
+			codexExpectedMessage("developer", "\nfixture-repositories-and-models\n"),
+			codexExpectedMessage("user", "fixture-request"),
+			codexExpectedMessage("developer", tail),
 		}
-		wantText := []string{"规则\nfixture-rules 🦊", "\nfixture-repositories-and-models\n", tail, "fixture-request"}
-		for index, value := range input {
-			message := objectMap(value)
-			wantRole := "developer"
-			if index == 3 {
-				wantRole = "user"
-			}
-			parts, _ := message["content"].([]any)
-			if message["type"] != "message" || message["role"] != wantRole || len(parts) != 1 {
-				t.Fatal("converted message order or shape changed")
-			}
-			part := objectMap(parts[0])
-			if part["type"] != "input_text" || part["text"] != wantText[index] {
-				t.Fatal("converted prompt text changed bytes")
-			}
-			if index < 2 {
-				if !reflect.DeepEqual(part["prompt_cache_breakpoint"], map[string]any{"mode": "explicit"}) {
-					t.Fatal("stable layer lacks its content-block explicit breakpoint")
-				}
-			} else if part["prompt_cache_breakpoint"] != nil {
-				t.Fatal("live tail or history received an explicit breakpoint")
-			}
+		if !reflect.DeepEqual(input, want) || body["instructions"] != "" {
+			t.Fatal("CPA changed prompt roles, text bytes or the system tail position")
 		}
 		prefix, _ := json.Marshal(input[:2])
 		if stablePrefix != nil && !bytes.Equal(prefix, stablePrefix) {
-			t.Fatal("changing the live tail changed the explicit stable prefix")
+			t.Fatal("changing the live tail changed the initial developer prefix")
 		}
 		stablePrefix = prefix
-		for _, key := range []string{"prompt_cache_options", "prompt_cache_key", "prompt_cache_retention", "metadata", "session_id", "mikka_cache_breakpoint"} {
-			if _, exists := body[key]; exists {
-				t.Fatalf("unexpected top-level cache/identity option %s", key)
-			}
-		}
-		raw, _ := json.Marshal(body)
-		if strings.Contains(string(raw), "mikka_cache_breakpoint") {
-			t.Fatal("private marker leaked to the provider")
-		}
-		for _, value := range input[:2] {
-			parts := objectMap(value)["content"].([]any)
-			delete(objectMap(parts[0]), "prompt_cache_breakpoint")
-		}
-		unhinted := captureCodexCacheRequest(t, "gpt-6-luna", codexCacheMessages(tail, false))
-		if !reflect.DeepEqual(body, unhinted) {
-			t.Fatal("explicit breakpoints changed other converted fields, tools or reasoning")
+		before := captureCodexCacheRequest(t, "gpt-6-luna", messages)
+		before["input"] = want
+		if !reflect.DeepEqual(body, before) {
+			t.Fatal("moving the tail changed model, tools, reasoning or other request fields")
 		}
 	}
 }
 
-func TestCodexSubscriptionCacheBreakpointCompatibility(t *testing.T) {
-	for _, model := range []string{"gpt-5.6", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra"} {
-		t.Run(model, func(t *testing.T) {
-			if codexCacheMarkerCount(captureCodexCacheRequest(t, model, codexCacheMessages("tail", true))) != 2 {
-				t.Fatal("a supported canonical model lost stable-system boundaries")
+func TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs(t *testing.T) {
+	user := map[string]any{"role": "user", "content": "fixture-request"}
+	assistant := map[string]any{"role": "assistant", "content": "fixture-reply 🦊"}
+	calls := map[string]any{"role": "assistant", "content": nil, "tool_calls": []any{
+		map[string]any{"id": "fixture-call-1", "type": "function", "function": map[string]any{"name": "fixture_lookup", "arguments": `{"key":"one"}`}},
+		map[string]any{"id": "fixture-call-2", "type": "function", "function": map[string]any{"name": "fixture_lookup", "arguments": `{"key":"two"}`}},
+	}}
+	outputs := []any{
+		map[string]any{"role": "tool", "tool_call_id": "fixture-call-1", "content": `{"value":"one"}`},
+		map[string]any{"role": "tool", "tool_call_id": "fixture-call-2", "content": "two"},
+	}
+	wantTools := []any{
+		map[string]any{"type": "function_call", "call_id": "fixture-call-1", "name": "fixture_lookup", "arguments": `{"key":"one"}`},
+		map[string]any{"type": "function_call", "call_id": "fixture-call-2", "name": "fixture_lookup", "arguments": `{"key":"two"}`},
+		map[string]any{"type": "function_call_output", "call_id": "fixture-call-1", "output": `{"value":"one"}`},
+		map[string]any{"type": "function_call_output", "call_id": "fixture-call-2", "output": "two"},
+	}
+	for _, test := range []struct {
+		name     string
+		history  []any
+		expected []any
+	}{
+		{"first user", []any{user}, []any{codexExpectedMessage("user", "fixture-request")}},
+		{"multiple turns", []any{user, assistant, user}, []any{codexExpectedMessage("user", "fixture-request"), codexExpectedMessage("assistant", "fixture-reply 🦊"), codexExpectedMessage("user", "fixture-request")}},
+		{"assistant last", []any{user, assistant}, []any{codexExpectedMessage("user", "fixture-request"), codexExpectedMessage("assistant", "fixture-reply 🦊")}},
+		{"parallel tool outputs last", []any{user, calls, outputs[0], outputs[1]}, append([]any{codexExpectedMessage("user", "fixture-request")}, wantTools...)},
+		{"assistant after tools", []any{user, calls, outputs[0], outputs[1], assistant}, append(append([]any{codexExpectedMessage("user", "fixture-request")}, wantTools...), codexExpectedMessage("assistant", "fixture-reply 🦊"))},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			messages := codexCacheMessages("Factory rules\nSchedule rules\nmemory/live fixture", false)
+			ordered := append(append([]any{}, messages[:2]...), test.history...)
+			ordered = append(ordered, messages[2])
+			body := captureCodexCacheRequest(t, "gpt-6-luna", ordered)
+			assertCodexImplicitOnly(t, body)
+			want := []any{codexExpectedMessage("developer", "规则\nfixture-rules 🦊"), codexExpectedMessage("developer", "\nfixture-repositories-and-models\n")}
+			want = append(want, test.expected...)
+			want = append(want, codexExpectedMessage("developer", "Factory rules\nSchedule rules\nmemory/live fixture"))
+			if !reflect.DeepEqual(body["input"], want) {
+				t.Fatal("history role/text/order, tool call IDs/results or trusted tail changed")
 			}
 		})
 	}
-	for _, model := range []string{"gpt-5.5", "gpt-5.4", "gpt-5.6-unknown", "gpt-6", "gpt-6-unknown", "gpt-6.2-sol", "gpt-7-luna", "openai/gpt-6-luna", "claude-haiku-5-5", "fixture-model"} {
+	messages := codexCacheMessages("tail", false)
+	body := captureCodexCacheRequest(t, "gpt-6-luna", messages[:3])
+	if !reflect.DeepEqual(body["input"], []any{codexExpectedMessage("developer", "规则\nfixture-rules 🦊"), codexExpectedMessage("developer", "\nfixture-repositories-and-models\n"), codexExpectedMessage("developer", "tail")}) {
+		t.Fatal("a prompt without history must retain its original order")
+	}
+}
+
+func TestCodexSubscriptionCacheBreakpointCompatibility(t *testing.T) {
+	for _, model := range []string{"gpt-5.6", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-5.5", "gpt-5.4", "gpt-5.6-unknown", "gpt-6", "gpt-6-unknown", "gpt-6.2-sol", "gpt-7-luna", "openai/gpt-6-luna", "fixture-model"} {
 		t.Run(model, func(t *testing.T) {
 			marked := captureCodexCacheRequest(t, model, codexCacheMessages("tail", true))
 			unmarked := captureCodexCacheRequest(t, model, codexCacheMessages("tail", false))
-			if !reflect.DeepEqual(marked, unmarked) || codexCacheMarkerCount(marked) != 0 {
-				t.Fatal("an old or unknown model's request changed")
+			assertCodexImplicitOnly(t, marked)
+			if !reflect.DeepEqual(marked, unmarked) {
+				t.Fatal("a legacy private hint changed the request")
 			}
 		})
 	}
@@ -175,21 +216,29 @@ func TestCodexSubscriptionCacheBreakpointAlignment(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		mutate func([]any) []any
-		want   int
 	}{
-		{"unhinted legacy", func(messages []any) []any { return codexCacheMessages("tail", false) }, 0},
-		{"coincident boundaries", func(messages []any) []any { return append(messages[:1], messages[2:]...) }, 1},
-		{"absent live tail", func(messages []any) []any { return append(messages[:2], messages[3:]...) }, 2},
-		{"three private markers", func(messages []any) []any { objectMap(messages[2])["mikka_cache_breakpoint"] = "stable_system_v1"; return messages }, 0},
-		{"non-string later system", func(messages []any) []any { objectMap(messages[2])["content"] = []any{map[string]any{"type": "text", "text": "tail"}}; return messages }, 0},
-		{"empty later system", func(messages []any) []any { objectMap(messages[2])["content"] = ""; return messages }, 0},
-		{"history first", func(messages []any) []any { return append(messages[3:], messages[:3]...) }, 0},
-		{"public part marker is not a private hint", func(messages []any) []any { return []any{map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": "rules", "prompt_cache_breakpoint": map[string]any{"mode": "explicit"}}}}, messages[3]} }, 0},
+		{"unhinted legacy", func(messages []any) []any { return codexCacheMessages("tail", false) }},
+		{"coincident boundaries", func(messages []any) []any { return append(messages[:1], messages[2:]...) }},
+		{"absent live tail", func(messages []any) []any { return append(messages[:2], messages[3:]...) }},
+		{"three private markers", func(messages []any) []any {
+			objectMap(messages[2])["mikka_cache_breakpoint"] = "stable_system_v1"
+			return messages
+		}},
+		{"non-string later system", func(messages []any) []any {
+			objectMap(messages[2])["content"] = []any{map[string]any{"type": "text", "text": "tail"}}
+			return messages
+		}},
+		{"empty later system", func(messages []any) []any {
+			objectMap(messages[2])["content"] = ""
+			return messages
+		}},
+		{"history first", func(messages []any) []any { return append(messages[3:], messages[:3]...) }},
+		{"public part marker", func(messages []any) []any {
+			return []any{map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": "rules", "prompt_cache_breakpoint": map[string]any{"mode": "explicit"}, "mikka_cache_breakpoint": "stable_system_v1"}}}, messages[3]}
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if count := codexCacheMarkerCount(captureCodexCacheRequest(t, "gpt-6-luna", test.mutate(codexCacheMessages("tail", true)))); count != test.want {
-				t.Fatalf("want %d explicit markers, got %d", test.want, count)
-			}
+			assertCodexImplicitOnly(t, captureCodexCacheRequest(t, "gpt-6-luna", test.mutate(codexCacheMessages("tail", true))))
 		})
 	}
 }

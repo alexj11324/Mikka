@@ -4,7 +4,7 @@ import { redactReplayRequest, sanitizeAnalyticsEvent } from '@/lib/analytics-pol
 import { watchRemovedActions } from '@/lib/app-build'
 import { setLiveTelemetrySink } from '@/lib/live/telemetry'
 
-// A page older than the deployment reloads when it hits a removed server action.
+// Obsolete actions stop old traffic and offer a refresh without discarding the page.
 watchRemovedActions(window)
 
 if (posthogConfig.token) {

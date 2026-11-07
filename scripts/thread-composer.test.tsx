@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { before, beforeEach, mock, test } from 'node:test'
+import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
+import { act } from 'react'
+import type { Root } from 'react-dom/client'
+import type { State } from 'swr'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { Window } from 'happy-dom'
 import { IntlProvider } from 'next-intl'
 import * as actualViewState from '../lib/hooks/view-state'
 import * as actualAppBuild from '../lib/app-build'
@@ -17,13 +21,30 @@ let thread: Record<string, unknown> | null
 let draftText = ''
 let pageChecks = 0
 let acceptance: FactoryTask | null = null
+const browser = new Window({ url: 'https://mikka.example/en' })
+for (const key of ['window', 'document', 'navigator', 'location', 'customElements', 'HTMLElement', 'Element', 'Node', 'CSS', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0), cancelAnimationFrame: (id: number) => clearTimeout(id) })
+const actualSWR = await import('swr')
+let liveRead = false
+let readFailure: unknown = null
+let readHold: Promise<void> | null = null
+let changesRead: { state: string; changes?: object } | null = null
+let issueReads = 0
+const notices = new Map<string, { action?: { onClick: () => void } }>()
+mock.module('sonner', { namedExports: { toast: {
+  error: (_message: string, options: { id: string; action?: { onClick: () => void } }) => { notices.set(options.id, options) },
+  dismiss: (id: string) => { notices.delete(id) }, success: () => {},
+} } })
 mock.module('swr', {
-  defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
+  defaultExport: (key: unknown, fetcher: never, options: never) => liveRead && Array.isArray(key) && key[0] === 'issue-thread'
+    ? actualSWR.default(key, fetcher, options)
+    : Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
     // Where the thread runs is its own read (thread-run-place.tsx); none here.
     : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
+    : Array.isArray(key) && key[0] === 'thread-changes' ? { data: changesRead, mutate: () => {} }
     : { data: [], mutate: () => {} },
-  namedExports: { useSWRConfig: () => ({ mutate: () => {}, cache: new Map() }), unstable_serialize: (key: unknown) => JSON.stringify(key) },
+  namedExports: { useSWRConfig: () => liveRead ? actualSWR.useSWRConfig() : ({ mutate: () => {}, cache: new Map() }), unstable_serialize: actualSWR.unstable_serialize },
 })
 mock.module('next/dynamic', { defaultExport: () => () => null })
 mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
@@ -31,7 +52,12 @@ mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
 } })
 mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return true } } })
-mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
+mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
+  issueReads++
+  if (readHold) await readHold
+  if (readFailure) throw readFailure
+  return { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [], chunksAppend: false }
+}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
@@ -39,24 +65,149 @@ mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useAcceptanceTasks: () => ({ tasks: acceptance ? [acceptance] : [], allTasks: acceptance ? [acceptance] : [] }),
   AcceptanceStateBadge: () => null,
 } })
-mock.module(at('components/workspace/factory-acceptance-pane.tsx'), { namedExports: { FactoryAcceptancePane: () => null } })
+mock.module(at('components/workspace/factory-acceptance-pane.tsx'), { namedExports: { FactoryAcceptancePane: () => <p data-private-pane="">Private acceptance notes</p> } })
+mock.module(at('components/workspace/thread-changes.tsx'), { namedExports: { ThreadChangesPane: () => <p data-private-pane="">Private changes</p>, ChangesTabLabel: () => <>Changes</> } })
 mock.module(at('components/workspace/self-improvement.tsx'), { namedExports: { ThreadFeedback: () => null } })
-let composer: { label: string; value: string; submitDisabled?: boolean; onSubmit: () => void } | null = null
+type ComposerProps = { label: string; value: string; submitDisabled?: boolean; onSubmit: () => void; onChange: (value: string) => void }
+let composer: ComposerProps | null = null
 let replyCalls = 0
-mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { ChatComposer: (props: { label: string; value: string; submitDisabled?: boolean; onSubmit: () => void }) => {
+mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { ChatComposer: (props: ComposerProps) => {
   composer = props
-  return <><textarea data-composer="" aria-label={props.label} defaultValue={props.value} /><button data-composer-send="" disabled={props.submitDisabled}>Send</button></>
+  return <><textarea data-composer="" aria-label={props.label} value={props.value} onChange={event => props.onChange(event.currentTarget.value)} /><button data-composer-send="" disabled={props.submitDisabled}>Send</button></>
 } } })
 
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
-before(async () => { ({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel')) })
+let createRoot: typeof import('react-dom/client')['createRoot']
+let root: Root | null = null
+let container: HTMLDivElement
+let refreshRead: () => Promise<unknown>
+before(async () => { ({ createRoot } = await import('react-dom/client')); ({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel')) })
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0 })
+beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
+after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
   <IssueThreadPanel issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
+
+function ReadControl() {
+  const { mutate } = actualSWR.useSWRConfig()
+  refreshRead = () => mutate(['issue-thread', 'issue-1', 'run-1'])
+  return null
+}
+const readCaches = new Map<string, Map<string, State>>()
+async function renderLive(scope = 'owner:workspace', props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}, shown = true) {
+  liveRead = true
+  if (!root) {
+    container = browser.document.createElement('div') as unknown as HTMLDivElement
+    document.body.append(container)
+    root = createRoot(container)
+    readCaches.clear()
+  }
+  if (!readCaches.has(scope)) readCaches.set(scope, new Map())
+  const { SWRConfig } = actualSWR
+  await act(async () => root!.render(<SWRConfig key={scope} value={{ provider: () => readCaches.get(scope)!, dedupingInterval: 0, shouldRetryOnError: false }}>
+    <actualViewState.ViewStateProvider scope={scope}><IntlProvider locale="en" timeZone="UTC" messages={messages}>
+      <ReadControl />{shown && <IssueThreadPanel issueId="issue-1" runId="run-1" bare {...props} />}
+    </IntlProvider></actualViewState.ViewStateProvider>
+  </SWRConfig>))
+}
+async function failRead(error: unknown) {
+  readFailure = error
+  await act(async () => { await refreshRead().catch(() => {}) })
+}
+
+test('a background thread read failure preserves transcript, scroll, composer focus and unsent draft', async () => {
+  await renderLive()
+  assert.equal(issueReads, 1)
+  const history = container.querySelector('ol')!
+  const scroll = history.parentElement!
+  const input = container.querySelector('textarea')!
+  assert.ok(history)
+  await act(async () => composer!.onChange('Keep this unsent follow-up'))
+  input.focus(); input.setSelectionRange(3, 9)
+  scroll.scrollTop = 148
+  scroll.dispatchEvent(new browser.Event('scroll') as unknown as Event)
+  await failRead(new Error('network unavailable'))
+  assert.ok(container.querySelector('ol') === history, 'a background failure must keep the conversation mounted')
+  assert.ok(container.querySelector('textarea') === input, 'a background failure must not replace the composer')
+  assert.equal(scroll.scrollTop, 148)
+  assert.ok(document.activeElement === input)
+  assert.equal(input.value, 'Keep this unsent follow-up')
+  assert.deepEqual([input.selectionStart, input.selectionEnd], [3, 9])
+  assert.ok(container.querySelector('[role="alert"]') === null)
+  assert.equal(replyCalls, 0)
+  const retry = notices.get('issue-thread-read-run-1')?.action
+  assert.ok(retry, 'retry belongs to the existing background error notice')
+  readFailure = null
+  await act(async () => { retry.onClick(); await new Promise(resolve => setTimeout(resolve, 0)) })
+  assert.equal(issueReads, 3)
+  assert.equal(notices.size, 0)
+  assert.ok(container.querySelector('ol') === history)
+  assert.equal(input.value, 'Keep this unsent follow-up')
+})
+
+for (const [label, refusal] of [
+  ['401', { status: 401 }], ['403', { status: 403 }], ['404', { status: 404 }],
+  ['runNotFound over browser RPC', { status: 400, code: 'runNotFound' }],
+  ['owner scope', { kind: 'owner' }], ['workspace scope', { kind: 'workspace' }],
+  ['changed transport session', { status: 409, code: 'desktop_session_changed' }],
+] as const) test(`a ${label} thread refusal hides private content until a new successful read`, async () => {
+  await renderLive()
+  assert.ok(container.querySelector('ol'))
+  await act(async () => composer!.onChange('Private unsent follow-up'))
+  await failRead(refusal)
+  assert.ok(container.querySelector('ol') === null)
+  assert.ok(container.querySelector('textarea') === null, 'the rejected thread must not keep its editable composer')
+  assert.doesNotMatch(container.textContent ?? '', /Done\.|Fix it|Private unsent follow-up/)
+  await failRead(new Error('network remains unavailable'))
+  assert.ok(container.querySelector('ol') === null, 'a later ordinary failure cannot revive a denied read')
+  assert.ok(container.querySelector('textarea') === null)
+  readFailure = null
+  await act(async () => { await refreshRead() })
+  assert.ok(container.querySelector('ol'), 'a new authorized success can show the thread again')
+  assert.equal(replyCalls, 0)
+})
+
+test('a new thread scope cannot show the previous scope conversation or draft while its read fails', async () => {
+  await renderLive()
+  await act(async () => composer!.onChange('Previous workspace draft'))
+  readFailure = new Error('network unavailable in new scope')
+  await renderLive('other-owner:other-workspace')
+  assert.ok(container.querySelector('ol') === null)
+  assert.ok(container.querySelector('textarea') === null)
+  assert.doesNotMatch(container.textContent ?? '', /Done\.|Fix it|Previous workspace draft/)
+  assert.ok(container.querySelector('[role="alert"]'))
+})
+
+for (const initialTab of ['changes', 'acceptance'] as const) test(`a thread refusal hides the cached ${initialTab} pane and its private header`, async () => {
+  if (initialTab === 'changes') changesRead = { state: 'ready', changes: {} }
+  else acceptance = acceptedTask()
+  await renderLive('owner:workspace', { bare: false, initialTab, name: 'Private task name' })
+  assert.ok(container.querySelector('[data-private-pane]'))
+  await failRead({ status: 403 })
+  assert.ok(container.querySelector('[data-private-pane]') === null, 'cached secondary panes must follow the thread refusal')
+  assert.doesNotMatch(container.textContent ?? '', /Private task name|Private acceptance notes|Private changes/)
+  assert.ok(container.querySelector('[data-slot="thread-artifact"]') === null, 'a refused thread cannot open its cached Artifact menu')
+})
+
+test('a retry started before the thread remounts restores the new panel from its shared successful read', async () => {
+  await renderLive()
+  await failRead({ status: 403 })
+  readFailure = null
+  let release!: () => void
+  readHold = new Promise<void>(resolve => { release = resolve })
+  let retry!: Promise<unknown>
+  await act(async () => { retry = refreshRead() })
+  await renderLive('owner:workspace', {}, false)
+  await renderLive()
+  assert.ok(container.querySelector('ol') === null)
+  await act(async () => { release(); await retry })
+  assert.ok(container.querySelector('ol'), 'the shared success must restore the remounted panel')
+  assert.ok(container.querySelector('textarea'))
+})
 
 test('an open thread ends in the composer whether it runs or has ended', () => {
   for (const status of ['running', 'waiting_input', 'succeeded', 'failed', 'stopped', 'cancelled']) {
