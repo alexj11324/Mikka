@@ -87,7 +87,10 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
         live = await openLive(session, initial)
         if ((await readJson(session, '/api/version')).build !== expectedSha) fail('acceptance_version_changed')
         started = performance.now(); report.sentAt = new Date().toISOString(); live.begin(started)
-        const prompt = '测试验收：请只调用一次 web_search，查询 Node.js 官网当前推荐的 LTS 大版本，搜索 limit=1。只读公开网页，不用其他工具，不创建任务、不写文件、不联系任何人。搜索返回后只用一句话和官方链接回答。'
+        const searchQuery = requestedCase === 'during_tool'
+          ? 'PostgreSQL 官网最新一次小版本发布公告的标题和发布日期'
+          : 'Node.js 官网最新一篇安全发布公告的标题和发布日期'
+        const prompt = `请在本轮实际调用一次 web_search，查询“${searchQuery}”，搜索 limit=1。必须根据这次搜索结果回答，不复用之前的搜索结果或聊天答案。只读公开网页，不用其他工具，不创建任务、不写文件、不联系任何人。搜索返回后只用一句话和官方链接回答。`
         sent = true; report.messageSendAttempts++; save()
         const queued = await rpc(session, 'coordinator.sendCoordinatorMessage', [prompt, null, botId, randomUUID()])
         report.metrics.sendAcknowledgedMs = since()
