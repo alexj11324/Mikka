@@ -3,6 +3,7 @@ import { subscriptionRefusal, type SubscriptionRefusalNotice } from '@/lib/subsc
 import { chatBalanceRefusal } from '@/lib/chat-balance'
 import { cloudErrorCode, type CloudErrorCode } from '@/lib/cloud-services/errors'
 import { parseCodedErrorText } from '@mikka/protocol/coded-error'
+import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 
 /**
  * Why a chat's last reply did not come, as the web's chat reads it
@@ -22,10 +23,12 @@ export type ChatFailure = (
   | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
   // The stored code(s) as recorded, for 详情 only (decision 2026-11-05-0330): the
   // line's own code, then the turn failure behind a wake code. Never the words.
-) & { raw?: string }
+) & { raw?: string; failureDetails?: RunFailure }
 
-export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
-  const failure = failureOf(chat)
+export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; failureDetails?: unknown; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+  const details = chat.working || !chat.error ? null : readRunFailure(chat.failureDetails)
+  const legacy = failureOf(chat) ?? (details ? { kind: 'failed' as const } : null)
+  const failure = legacy && details ? { ...legacy, failureDetails: details } : legacy
   if (!failure || !chat.error) return failure
   // A stored code (with its detail) always goes; other text only when nothing else names the failure,
   // so a recognised provider refusal does not carry its request ids along (the phone contract).

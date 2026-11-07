@@ -75,7 +75,7 @@ async function handleGET(request: Request) {
       // The app shows a failed welcome through `failure`; the empty Bot item is no message (nor unread, nor reactable).
       const chat = { ...view, items: view.items.filter(item => !item.welcome) }
       const working = enabled && chat.working
-      return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, cause: chat.cause, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
+      return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, cause: chat.cause, failureDetails: chat.failureDetails, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
     }
     if (read.kind === 'history') return history(user.id, await coordinatorHistory(bot.data, read.through, CHAT_FIRST_PAGE))
     const polled = await pollCoordinatorChat(bot.data, undefined, read.kind === 'update' ? read.continuation : undefined)

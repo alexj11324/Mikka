@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { ImprovementError } from '../lib/self-improvement/contract'
+import { APP_BUILD } from '../lib/app-build'
+import { createSecretMasker } from '../lib/secrets/mask'
+import type { RunFailure } from '@mikka/protocol/run-failure'
 
-let caller: { userId: string; scopeDeviceId?: string } | null = { userId: 'owner', scopeDeviceId: 'device' }
+let caller: { userId: string; scopeDeviceId?: string; scopeWorkspaceId?: string } | null = { userId: 'owner', scopeDeviceId: 'device' }
 let persisted: { userId: string; issueId: string | null; publicationPending: boolean; review: { id: string; scopeVersion: number } | null } | null = { userId: 'owner', issueId: 'issue', publicationPending: true, review: null }
 let enqueueFails = false
 let replayStatus: string | null = null
 let dispatchAllowed = true
 let persistError: Error | null = null
 const effects: string[] = []
-const persist = mock.fn(async () => { if (persistError) throw persistError; return persisted })
+const persist = mock.fn(async (..._arguments: unknown[]) => { if (persistError) throw persistError; return persisted })
 const enqueue = mock.fn(async () => { if (enqueueFails) throw new Error('synthetic queue failure'); effects.push('enqueued') })
 const dispatch = mock.fn(async (result: NonNullable<typeof persisted>, schedule: (id: string) => void) => {
   if (!dispatchAllowed || !result.review) return false
@@ -19,6 +22,8 @@ const dispatch = mock.fn(async (result: NonNullable<typeof persisted>, schedule:
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 // Completion scheduling is tested here with a substituted caller; the real
 // credential/transaction boundary is exercised by device-revocation.db.test.ts.
+const maskScope = mock.fn(async (_scope: { ownerId: string; workspaceId?: string }) => createSecretMasker([{ name: 'OWNER', value: 'owner-secret-value' }, { name: 'WORKSPACE', value: 'workspace-secret-value' }]))
+stub('../lib/secrets/runtime.ts', { secretMaskerFor: maskScope })
 stub('../lib/device-route.ts', { withDeviceRoute: <T>(handler: T) => handler })
 stub('../lib/device-link.ts', { authenticateDevice: async () => caller })
 stub('../lib/run-publications.ts', { persistRunCompletion: persist })
@@ -104,4 +109,29 @@ test('invalid skill evidence returns a conflict before capture, publication or d
   assert.deepEqual(effects, [])
   assert.equal(enqueue.mock.callCount(), 0)
   assert.equal(dispatch.mock.callCount(), 0)
+})
+
+
+test('completion diagnostics are rebound and masked with the authenticated owner and workspace', async () => {
+  caller = { userId: 'owner', scopeDeviceId: 'device', scopeWorkspaceId: 'workspace' }
+  const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+    providerMessage: 'Provider rejected owner-secret-value and workspace-secret-value', causes: [{ name: 'APIError' }],
+    runId: 'injected-run', appVersion: 'injected-version', occurredAt: '2026-11-07T12:00:00.000Z' }
+  assert.equal((await post({ stopReason: 'error', failureDetails })).status, 204)
+  const stored = persist.mock.calls[0].arguments[2] as { failureDetails: RunFailure }
+  assert.equal(stored.failureDetails.runId, runId)
+  assert.equal(stored.failureDetails.appVersion, APP_BUILD || 'unknown')
+  assert.match(stored.failureDetails.providerMessage!, /\[secret:OWNER\]/)
+  assert.match(stored.failureDetails.providerMessage!, /\[secret:WORKSPACE\]/)
+  assert.doesNotMatch(JSON.stringify(stored), /owner-secret-value|workspace-secret-value|injected-run|injected-version/)
+  assert.deepEqual(maskScope.mock.calls.at(-1)?.arguments, [{ workspaceId: 'workspace', ownerId: 'owner' }])
+})
+
+test('successful and cancelled requests cannot store injected provider diagnostics', async () => {
+  const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_quota_exceeded', category: 'quota', causes: [],
+    providerMessage: 'Conflicting failure', runId, appVersion: 'worker', occurredAt: '2026-11-07T12:00:00.000Z' }
+  for (const stopReason of ['cancelled', 'submitted'] as const) {
+    assert.equal((await post({ ...completion, stopReason, failureDetails })).status, 204)
+    assert.equal(Object.hasOwn(persist.mock.calls.at(-1)!.arguments[2] as object, 'failureDetails'), false)
+  }
 })

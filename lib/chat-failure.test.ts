@@ -1,3 +1,5 @@
+import { captureRunFailure } from '@mikka/protocol/run-failure'
+import { CloudServiceError } from './cloud-services/errors'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { chatFailure, failureMessageKey } from './chat-failure'
@@ -82,4 +84,25 @@ test('详情 carries the stored codes as recorded: the line code, then the turn 
   // The same text twice is listed once; nothing while working.
   assert.equal(chatFailure({ working: false, error: 'wake_failed', cause: 'wake_failed' })?.raw, 'wake_failed')
   assert.equal(chatFailure({ working: true, error: 'wake_exhausted', cause: 'x' }), null)
+})
+
+test('structured details accompany existing failure discriminators and malformed legacy payloads stay absent', () => {
+  const failureDetails = captureRunFailure({ statusCode: 400, error: { type: 'invalid_request_error', message: 'Unsupported request format.' } }, { runId: 'wrun_details', provider: 'codex' })
+  const failure = chatFailure({ working: false, error: 'wake_exhausted', cause: 'subscription_generation_failed', failureDetails })
+  assert.equal(failure?.kind, 'wake')
+  assert.deepEqual(failure?.failureDetails, failureDetails)
+  assert.equal(chatFailure({ working: true, error: 'wake_exhausted', failureDetails }), null)
+  assert.equal(chatFailure({ working: false, error: null, failureDetails }), null, 'cached details cannot revive a cleared failure')
+  assert.deepEqual(chatFailure({ working: false, error: 'some_new_failure_code', failureDetails: { providerMessage: 'untrusted' } }), { kind: 'failed', raw: 'some_new_failure_code' })
+})
+
+test('optional cloud recovery and main structured failure details survive the combined chat contract', () => {
+  const failureDetails = captureRunFailure(new CloudServiceError('cloud_quota_exhausted'), { runId: 'wrun_cloud_quota' })
+  const failure = chatFailure({ working: false, error: 'cloud_quota_exhausted', failureDetails })
+  assert.equal(failure?.kind, 'failed')
+  assert.equal(failure?.kind === 'failed' && failure.cloudCode, 'cloud_quota_exhausted')
+  assert.deepEqual(failure?.failureDetails, failureDetails)
+  assert.deepEqual(failureMessageKey(failure!), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
+  assert.equal(failureLine(failure!).recovery, 'cloudBilling')
+  assert.equal(chatFailure({ working: true, error: 'cloud_quota_exhausted', failureDetails }), null)
 })

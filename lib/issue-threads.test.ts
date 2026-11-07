@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
 import type { RunChain } from './run-chain'
+import type { RunFailure } from '@mikka/protocol/run-failure'
 
 const make = (id: string, userId = 'teammate', issueId = 'issue') => ({
   id, issueId, userId, status: 'running', prompt: 'Route group replies\nthen run e2e', report: { summary: 'Done' }, error: null,
@@ -173,4 +174,26 @@ test('a thread with no task projects as itself, and never into a task\'s list', 
   const members = new Set(['owner'])
   assert.deepEqual(projectIssueThreads([row], null, 'owner', members).map(thread => thread.id), ['run-free'])
   assert.deepEqual(projectIssueThreads([row], 'task-1', 'owner', members), [])
+})
+
+
+test('thread lists expose only compact diagnostics, including the latest continuation', () => {
+  const failure: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+    providerMessage: 'private provider response', causes: [{ name: 'APIError' }], runId: 'root', appVersion: 'test', occurredAt: '2026-11-07T12:00:00.000Z' }
+  const members = new Set(['viewer', 'teammate'])
+  const [foreign] = projectIssueThreads([{ ...make('root'), failureDetails: failure }], 'issue', 'viewer', members)
+  assert.equal(foreign.failureDetails?.code, 'run_api_key_invalid')
+  assert.equal(foreign.detail, null)
+  assert.doesNotMatch(JSON.stringify(foreign), /private provider response|APIError/)
+  const [own] = projectIssueThreads([{ ...make('root', 'viewer'), failureDetails: failure }], 'issue', 'viewer', members)
+  const chain: RunChain = { rootRunId: 'root', latestRunId: 'next', attempts: [
+    { runId: 'root', attempt: 1, status: 'failed', failureDetails: failure, stopRequestedAt: null, createdAt: new Date(), finishedAt: new Date() },
+    { runId: 'next', attempt: 2, status: 'failed', failureDetails: { ...failure, runId: 'next', code: 'run_quota_exceeded', category: 'quota' }, stopRequestedAt: null, createdAt: new Date(), finishedAt: new Date() },
+  ] }
+  const resumed = withRunChain(own, chain)
+  assert.equal(resumed.failureDetails?.code, 'run_quota_exceeded')
+  assert.equal(resumed.failureDetails?.runId, 'next')
+  assert.doesNotMatch(JSON.stringify(resumed), /private provider response|APIError/)
+  const succeeding = withRunChain(own, { ...chain, attempts: [chain.attempts[0], { ...chain.attempts[1], status: 'succeeded', failureDetails: null }] })
+  assert.equal(succeeding.failureDetails, null, 'a successful continuation does not retain the root failure')
 })

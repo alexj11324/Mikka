@@ -1265,7 +1265,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "4c390c2fd8f93aa5d8ece5b7568ed69b9d27fb060765615b93767ba403ca8142"
+      "sourceHash": "479f666a4bbd214de0012e8b19e4ab64fb7a65dbe9fc27eac15e9b4208d509e0"
     },
     {
       "path": "/mikka/api/mobile/chat-order",
@@ -2083,7 +2083,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "819fdf27942b7cb1c14a78a172fe4d1ccbf2a6df490f8e697ecfd3b92e4c7f50"
+      "sourceHash": "f2fbc397cb11706019446fc4943dec069602bd6c27de89d31dc5532457100ed4"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -2185,7 +2185,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "035bdf4e999001492b9da592102a954f93e53590202847efc4ff2ec06c7b7f90"
+      "sourceHash": "0174eb18a3003b554a4cfd996dc516ce36cef29dd868bfe5e72656b035967991"
     },
     {
       "path": "/mikka/v1/runs/[runId]/decision",
