@@ -737,7 +737,7 @@ export class ClaudeAdapter implements AgentAdapter {
           // can silently create a replacement session.
           if (!(error instanceof ClaudeProjectSettingsNotClaimable)) throw error
           control.signal.throwIfAborted()
-          if (!await approval.checkLive()) throw Error('Run tool approval unavailable')
+          if (!await approval.checkLive()) throw Error('Run tool approval unavailable', { cause: error })
           session = query({ prompt: prompts as PromptQueue, options: sdkOptions(ctx, ctx.instructions()) })
         }
       } catch (error) { await prepared.cancel(); throw error }
