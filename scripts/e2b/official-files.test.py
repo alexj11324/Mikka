@@ -196,28 +196,62 @@ class OfficialFiles(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
                     files.validate_receipt(proof, 'claude')
 
-    def test_claude_root_variation_keeps_other_metadata_paths_and_templates_protected(self):
+    def test_measured_root_variation_keeps_other_metadata_and_paths_protected(self):
         original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
                     'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
-        for field, value in (('uid', 1000), ('gid', 1000), ('mode', 0o666),
-                             ('mode', 0o700), ('kind', 'directory'), ('sha256', 'not-a-digest')):
-            updated = {**original, 'sha256': 'b' * 64, field: value}
-            with self.subTest(field=field, value=value), patch.object(files, 'entry', return_value=updated):
+        for kind in ('claude', 'desktop'):
+            for field, value in (('uid', 1000), ('gid', 1000), ('mode', 0o666),
+                                 ('mode', 0o700), ('kind', 'directory'), ('sha256', 'not-a-digest')):
+                updated = {**original, 'sha256': 'b' * 64, field: value}
+                with self.subTest(kind=kind, field=field, value=value), patch.object(files, 'entry', return_value=updated):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [original]}, kind)
+            link = {key: value for key, value in original.items() if key != 'sha256'}
+            link.update(kind='link', mode=0o777, target='/opt/mikka/replacement.crt')
+            with self.subTest(kind=kind, target=link['target']), patch.object(files, 'entry', return_value=link):
                 with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify({'version': 1, 'entries': [original]}, 'claude')
-        link = {key: value for key, value in original.items() if key != 'sha256'}
-        link.update(kind='link', mode=0o777, target='/opt/mikka/replacement.crt')
-        with patch.object(files, 'entry', return_value=link):
-            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                files.verify({'version': 1, 'entries': [original]}, 'claude')
-        for path in ('/usr/local/share/ca-certificates/other.crt', '/usr/local/bin/claude'):
-            before = {**original, 'path': path}
-            with self.subTest(path=path), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
+                    files.verify({'version': 1, 'entries': [original]}, kind)
+            for path in ('/usr/local/share/ca-certificates/other.crt', '/usr/local/bin/claude'):
+                before = {**original, 'path': path}
+                with self.subTest(kind=kind, path=path), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [before]}, kind)
+
+    def test_desktop_observed_root_rotation_is_only_permitted_during_finalization(self):
+        # Exact fresh-scan failure from run 42334937454, job 128289718639.
+        # Official-only run 42336374269 independently measured different CA
+        # bytes on the same template/envd with mode 0644; it did not reproduce
+        # the failed derived image's combined mode-plus-content transition.
+        observations = [
+            ('4e067e215d0664f4cfeb733d74824a4ba52eb57635a6e365fd27bac0b19e5a9e',
+             '98d3ae906242016c071b5d1902c7b5c6fd5fe56b277c51b407d80d14cf6dde2d', 0o777),
+            ('767be311dc40f53638de0a6d09c76dae3e15785b122eae89b55d5873d70c7fed',
+             '492c78708de3514ad7bf8cafd5290fb044c450ce66759e2047ebed310e6bd92a', 0o644),
+        ]
+        for before_sha, after_sha, mode in observations:
+            original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
+                        'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': before_sha}
+            updated = {**original, 'mode': mode, 'sha256': after_sha}
+            baseline = {'version': 1, 'entries': [original]}
+            with patch.object(files, 'entry', return_value=original):
+                installation = files.verify(baseline)
+            with self.subTest(mode=mode), patch.object(files, 'entry', return_value=updated):
                 with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify({'version': 1, 'entries': [before]}, 'claude')
-        with patch.object(files, 'entry', return_value={**original, 'sha256': 'b' * 64}):
-            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                files.verify({'version': 1, 'entries': [original]}, 'desktop')
+                    files.verify(baseline)
+                final = files.verify(baseline, 'desktop')
+                self.assertEqual(final['before'], final['after'])
+                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                expected_before, expected_after = {'sha256': before_sha}, {'sha256': after_sha}
+                if mode != original['mode']:
+                    expected_before['mode'] = original['mode']
+                    expected_after['mode'] = mode
+                self.assertEqual(final['providerChanges'], [{'path': original['path'], 'kind': 'file',
+                                 'before': expected_before, 'after': expected_after}])
+                proof = {**installation, 'finalization': final}
+                self.assertIs(files.validate_receipt(proof, 'desktop'), proof)
+                proof['after'] = final['originalAfter']
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(proof, 'desktop')
 
     def test_an_unreadable_original_directory_cannot_be_silently_skipped(self):
         with tempfile.TemporaryDirectory() as name:
