@@ -5279,6 +5279,14 @@
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
   },
+  "TaskWorkspace": {
+    "label": "Workspace",
+    "createIn": "Create in {name}",
+    "fixed": "Fixed when the task was created. A task can't move to another workspace.",
+    "personal": "Personal",
+    "shared": "Shared",
+    "otherWorkspace": "Another workspace"
+  },
   "HostedSettings": {
     "general": {
       "iconHint": "PNG, JPEG, WebP or GIF, up to 200 KB"
