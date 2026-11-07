@@ -51,6 +51,13 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
   receives only the safe user summary and public session id. Saved tabs and
   general local settings remain deferred. Updates use `electron-updater`
   against published GitHub Releases; draft releases are not offered.
+- The bundled desktop connects to Mikka Cloud or a self-hosted server (#1557,
+  [decision](decisions/2026-11-06-2300-desktop-connects-to-self-hosted-servers.md)).
+  Each stored account names its server; main sends an account's bearer only to
+  that exact probed origin and base path, and the page's `app.serverUrl`,
+  `openExternal` origin, sign-in handoff, live ticket request and the daemon
+  installed on this computer follow the current account's server. The renderer
+  never chooses an unprobed server.
 - `MIKKA_DESKTOP_RENDERER=hosted` retains the previous web-session renderer for
   explicit rollback during #1415. `Mikka Dev` uses a separate profile and never
   checks or installs production desktop updates.
