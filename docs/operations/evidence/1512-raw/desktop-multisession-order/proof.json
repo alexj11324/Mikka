@@ -1,0 +1,21 @@
+{
+  "source": "real_installed_better_auth_with_memory_adapter",
+  "version": "1.7.12",
+  "productionRequests": 0,
+  "externalRequests": 0,
+  "databaseConnections": 0,
+  "oldOrder": {
+    "nativeHandoffSharesBrowserSession": true,
+    "subsequentWebLoginRevokesNative": true,
+    "nativeFreshReadRejected": true
+  },
+  "proposedOrder": {
+    "webContextClosesBeforeFinalNativeLogin": true,
+    "finalNativeHandoffSharesLatestSession": true,
+    "finalNativeFreshReadAccepted": true
+  },
+  "limits": [
+    "This proves the installed authentication semantics and the harness ordering defect; it is not a new macOS lifecycle acceptance.",
+    "No credential, cookie, token, email or session identifier is included in this receipt."
+  ]
+}

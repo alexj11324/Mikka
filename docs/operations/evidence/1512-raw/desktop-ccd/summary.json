@@ -1,0 +1,389 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "observedAt": "2026-11-07T07:36:46.349Z",
+    "repository": "alexj11324/Mikka",
+    "run": {
+      "id": 42350008419,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42350008419",
+      "headSha": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149",
+      "attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T07:08:33Z",
+      "updatedAt": "2026-11-07T07:26:56Z"
+    },
+    "job": {
+      "id": 128336773585,
+      "conclusion": "failure",
+      "failedStep": {
+        "number": 16,
+        "name": "Real packaged Apple Silicon native acceptance",
+        "startedAt": "2026-11-07T07:18:42Z",
+        "completedAt": "2026-11-07T07:26:45Z"
+      },
+      "completedAt": "2026-11-07T07:26:55Z"
+    },
+    "source": {
+      "revision": "6330cb07a6423b5b99c90ab6b8019cfafc9d5e6f",
+      "tree": "f64c339ce3bd6a3bff96e15f1736e6be3abaaabf",
+      "parents": [
+        "ad5e5db5ed5547ea19644ce2381992d8d1583eb9",
+        "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149"
+      ],
+      "kind": "github_pull_request_synthetic_merge"
+    },
+    "artifacts": [
+      {
+        "id": 13565677705,
+        "name": "desktop-package-evidence-6330cb07a6423b5b99c90ab6b8019cfafc9d5e6f",
+        "sizeBytes": 1595,
+        "digest": "sha256:5dc978ab910a6ce97651500d30a16eb7713ce7cf2920658b759440dbee1f072b",
+        "expired": false,
+        "createdAt": "2026-11-07T07:26:47Z",
+        "runId": 42350008419,
+        "headSha": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149"
+      },
+      {
+        "id": 13565453404,
+        "name": "desktop-native-evidence-6330cb07a6423b5b99c90ab6b8019cfafc9d5e6f",
+        "sizeBytes": 14800337,
+        "digest": "sha256:f3ba98e95b93794790e83a39a997e1a07661c45d36ae1934a9355facd862936f",
+        "expired": false,
+        "createdAt": "2026-11-07T07:26:51Z",
+        "runId": 42350008419,
+        "headSha": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149"
+      }
+    ],
+    "downloadUrlsPersisted": false
+  },
+  "result": "failed",
+  "failure": {
+    "phase": "cold-bundled",
+    "kind": "TimeoutError",
+    "code": "other",
+    "locations": [
+      {
+        "file": "lifecycle.mjs",
+        "line": 142,
+        "column": 59
+      },
+      {
+        "file": "lifecycle.mjs",
+        "line": 380,
+        "column": 13
+      }
+    ]
+  },
+  "failureBoundary": "The first cold bundled launch timed out waiting for the fixed seeded message to be visible in usable(), before the composer/readiness sample completed. This receipt does not establish an authentication or product root cause.",
+  "login": {
+    "comparable": true,
+    "native": {
+      "startedAt": "2026-11-07T07:25:24.839Z",
+      "finishedAt": "2026-11-07T07:25:27.545Z",
+      "durationMs": 2706,
+      "queryCalls": 220,
+      "pgProtocolReceiveBytes": 49985,
+      "pgProtocolSendBytes": 137095,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    "web": {
+      "startedAt": "2026-11-07T07:25:32.423Z",
+      "finishedAt": "2026-11-07T07:25:34.321Z",
+      "durationMs": 1898,
+      "queryCalls": 190,
+      "pgProtocolReceiveBytes": 44104,
+      "pgProtocolSendBytes": 126068,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    "nativeLessThanOrEqualToWeb": false,
+    "queryDifference": 30,
+    "queryDifferencePercent": 15.789473684210526,
+    "segments": {
+      "native": [
+        {
+          "phase": "common-email-authentication",
+          "startedAt": "2026-11-07T07:25:24.839Z",
+          "finishedAt": "2026-11-07T07:25:25.027Z",
+          "durationMs": 188,
+          "queryCalls": 19,
+          "pgProtocolReceiveBytes": 5828,
+          "pgProtocolSendBytes": 5255,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "startedAt": "2026-11-07T07:25:25.027Z",
+          "finishedAt": "2026-11-07T07:25:26.078Z",
+          "durationMs": 1051,
+          "queryCalls": 21,
+          "pgProtocolReceiveBytes": 4303,
+          "pgProtocolSendBytes": 6073,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "startedAt": "2026-11-07T07:25:26.078Z",
+          "finishedAt": "2026-11-07T07:25:27.545Z",
+          "durationMs": 1467,
+          "queryCalls": 180,
+          "pgProtocolReceiveBytes": 39854,
+          "pgProtocolSendBytes": 125767,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        }
+      ],
+      "web": [
+        {
+          "phase": "common-email-authentication",
+          "startedAt": "2026-11-07T07:25:32.423Z",
+          "finishedAt": "2026-11-07T07:25:32.613Z",
+          "durationMs": 190,
+          "queryCalls": 19,
+          "pgProtocolReceiveBytes": 5831,
+          "pgProtocolSendBytes": 5255,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "startedAt": "2026-11-07T07:25:32.613Z",
+          "finishedAt": "2026-11-07T07:25:32.828Z",
+          "durationMs": 215,
+          "queryCalls": 0,
+          "pgProtocolReceiveBytes": 0,
+          "pgProtocolSendBytes": 0,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "startedAt": "2026-11-07T07:25:32.828Z",
+          "finishedAt": "2026-11-07T07:25:34.321Z",
+          "durationMs": 1493,
+          "queryCalls": 171,
+          "pgProtocolReceiveBytes": 38273,
+          "pgProtocolSendBytes": 120813,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "scope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+    "background": "all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution",
+    "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint",
+    "exclusions": [
+      "test-account lease/session tracking and fixture SQL in the separate harness process",
+      "PostgreSQL connection handshake and TCP/TLS overhead"
+    ]
+  },
+  "startup": {
+    "bundled": {
+      "status": "incomplete",
+      "total": null
+    },
+    "hosted": {
+      "status": "not-recorded",
+      "total": null
+    },
+    "comparison": "unknown",
+    "completedSamples": 0,
+    "scope": {
+      "samples": "first pair only from the unchanged five-pair lifecycle sequence",
+      "clients": "bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell",
+      "sessionCache": "same retained authenticated app profile/workspace; normal profile and OS caches, no purge",
+      "backend": "same primary API and fixed source; server is already warm",
+      "performanceThreshold": "none"
+    }
+  },
+  "rpcActions": {
+    "status": "incomplete",
+    "reasons": [
+      "query_window_incomplete"
+    ],
+    "duplicateRecords": 0,
+    "conflictingInvocations": 0,
+    "loginPairing": {
+      "nativeLogin": {
+        "started": 24,
+        "completed": 24,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "started": 18,
+        "completed": 18,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "observedLoginDifferences": [
+      {
+        "rpcAction": null,
+        "nativeStarted": 1,
+        "webStarted": 0,
+        "difference": 1
+      },
+      {
+        "rpcAction": "agents.listDevices",
+        "nativeStarted": 1,
+        "webStarted": 0,
+        "difference": 1
+      },
+      {
+        "rpcAction": "desktop.bootstrap",
+        "nativeStarted": 3,
+        "webStarted": 1,
+        "difference": 2
+      },
+      {
+        "rpcAction": "task-runs.pollTaskRuns",
+        "nativeStarted": 2,
+        "webStarted": 0,
+        "difference": 2
+      }
+    ],
+    "boundary": {
+      "assignment": "requests belong to the half-open window [startedAt, finishedAt) containing their api_request_started timestamp",
+      "counts": "RPC invocations, not SQL calls; all primary API requests are included, without user attribution",
+      "overlap": "completedInWindow includes carried-in requests; crossesStart/crossesEnd are confirmed by paired receipts and are not additive",
+      "statusCounts": "observed completions of requests intersecting the window, including completions after its end",
+      "unknown": "completionNotObserved means no completion in this one log snapshot, not proof the request is still running; without a start its window remains unknown"
+    },
+    "interpretation": "RPC invocation counts are not SQL counts. Preserve the original incomplete status; query_window_incomplete is the only recorded reason. Do not assign the 30-query difference to individual actions from aggregate windows."
+  },
+  "parity": {
+    "result": "passed",
+    "cleanup": "passed",
+    "screens": 100,
+    "passedScreens": 100,
+    "requiredScreens": 50,
+    "pageErrors": 0,
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    }
+  },
+  "lifecycleCleanup": {
+    "stages": [
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    },
+    "accountState": "quarantined",
+    "accountBlockedReason": "RUN_DIRTY",
+    "ownerMatchesSealedBaselineAfter": true,
+    "peerMatchesSealedBaselineAfter": true
+  },
+  "additionalReportStatus": {
+    "smokeResult": "passed",
+    "smokeChecks": 10,
+    "cryptoPassed": true,
+    "packagePassed": true,
+    "packageArchitecture": "arm64",
+    "packageSignatureVerifiedStrictDeep": true
+  },
+  "rawReports": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-ccd/reports/lifecycle.json",
+      "entry": "lifecycle.json",
+      "bytes": 40688,
+      "sha256": "4429021b549c3485d3b6e5d414d405d920b770de0a80134aaf44a0f5bb823f47"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-ccd/reports/parity/parity.json",
+      "entry": "parity/parity.json",
+      "bytes": 107275,
+      "sha256": "5b588c957b1cd51f241425acd055ac850e804b69421f8257493aff1c53324c53"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-ccd/reports/smoke.json",
+      "entry": "smoke.json",
+      "bytes": 3125,
+      "sha256": "eaf23e8ad2f070977886e91214fe4a9c234002690dbae3983b0f2f7359eb7473"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-ccd/reports/mac-acceptance-package.json",
+      "entry": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "9ab0e45ada154ac7f2968c8d92f29c2fda1e39cdacb8963fb67c1b23e16609db"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-ccd/reports/native-crypto.json",
+      "entry": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "21d606a63b7e92bd8b55c779876580e0629c3e4b4c464fe33caae176065c88c8"
+    }
+  ],
+  "artifactDigestVerification": "Both downloaded ZIP SHA256 digests exactly match GitHub artifact metadata. Five JSON entries were extracted without modification. API-build, icons and application bundles were not downloaded.",
+  "privacy": {
+    "emailPatternFindings": 0,
+    "credentialPatternFindings": 0,
+    "jwtPatternFindings": 0,
+    "rawLogsRead": false,
+    "downloadUrlsPersisted": false
+  },
+  "actions": {
+    "ciReruns": 0,
+    "modelCalls": 0,
+    "databaseQueries": 0,
+    "sourceEdits": 0,
+    "remoteWrites": 0
+  }
+}

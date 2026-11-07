@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "head": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149",
+  "sourceRevision": "6330cb07a6423b5b99c90ab6b8019cfafc9d5e6f",
+  "runId": 42350008419,
+  "nativeJobId": 128336773585,
+  "files": [
+    {
+      "path": "github-metadata.json",
+      "bytes": 1898,
+      "sha256": "af167ef63f9248d5256620225071329d7b6d8758359db424375d01a44cc0423a"
+    },
+    {
+      "path": "download-manifest.json",
+      "bytes": 1545,
+      "sha256": "02e5b8b3fd7f7eb501d953bab7f5ccb95aba9f0041c367892668fb3e372f37bc"
+    },
+    {
+      "path": "extracted-files.json",
+      "bytes": 1311,
+      "sha256": "99e6ed2ddc6935666b701e22bd162f350739605c57e7c9509c77204bcd58ac1b"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 12774,
+      "sha256": "4003edad552fd49d46b0441fe4d9b8a6cb534af64a1234481deff1afdc048ba5"
+    },
+    {
+      "path": "reports/lifecycle.json",
+      "bytes": 40688,
+      "sha256": "4429021b549c3485d3b6e5d414d405d920b770de0a80134aaf44a0f5bb823f47"
+    },
+    {
+      "path": "reports/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "9ab0e45ada154ac7f2968c8d92f29c2fda1e39cdacb8963fb67c1b23e16609db"
+    },
+    {
+      "path": "reports/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "21d606a63b7e92bd8b55c779876580e0629c3e4b4c464fe33caae176065c88c8"
+    },
+    {
+      "path": "reports/parity/parity.json",
+      "bytes": 107275,
+      "sha256": "5b588c957b1cd51f241425acd055ac850e804b69421f8257493aff1c53324c53"
+    },
+    {
+      "path": "reports/smoke.json",
+      "bytes": 3125,
+      "sha256": "eaf23e8ad2f070977886e91214fe4a9c234002690dbae3983b0f2f7359eb7473"
+    }
+  ]
+}

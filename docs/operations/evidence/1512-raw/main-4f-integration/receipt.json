@@ -1,0 +1,50 @@
+{
+  "status": "targeted_automatic_merge_tree_regression_passed",
+  "feature_head": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149",
+  "main_head": "4f0f68e971b2676a156a3cedd7bc97413afb2310",
+  "integrated_tree": "4f8662a3d257637299b7a3f342103fdfb47ee4b7",
+  "merge_conflicts": false,
+  "tests": [
+    {
+      "path": "main-4f-integration-tests.tap",
+      "bytes": 38827,
+      "sha256": "fdda8006a4b104e116aec6e7a47f0144833ce2bb559b81bfe49e11778afc20c8",
+      "tests_passed": 82,
+      "tests_failed": 0,
+      "exit_code": 0
+    },
+    {
+      "path": "main-4f-daemon-integration-tests.log",
+      "bytes": 205,
+      "sha256": "789ca88f20015ec0dcfe579753eb158a5d94078aa2a9f0cd1a79ddf596da63f9",
+      "tests_passed": 24,
+      "tests_failed": 0,
+      "exit_code": 0
+    }
+  ],
+  "production_calls": 0,
+  "database_calls": 0,
+  "limits": [
+    "Targeted existing unit regressions, not a new full CI result.",
+    "Does not assert production runtime or PostHog acceptance.",
+    "Temporary uncommitted merge will be aborted after independent semantic review; no rebase or force push."
+  ],
+  "independent_semantic_review": {
+    "reviewer": "llm_impl",
+    "result": "No integration regression found in generation, completion, native safePoint, Factory handoff or trace context.",
+    "reviewed_paths": [
+      "packages/daemon/src/adapters/claude.ts",
+      "packages/daemon/src/adapters/types.ts",
+      "packages/daemon/src/runs/supervisor.ts",
+      "packages/protocol/src/run.ts",
+      "lib/factory/automatic-dispatch.ts",
+      "lib/factory/cloud-stage-handoff.ts",
+      "workflows/coordinator/steps.ts",
+      "lib/cloud-computer/thread-machines.ts"
+    ],
+    "limits": [
+      "Native safePoint is VM lifecycle evidence, not telemetry flush confirmation.",
+      "No product source edit or new CI run was made by this review."
+    ]
+  }
+}

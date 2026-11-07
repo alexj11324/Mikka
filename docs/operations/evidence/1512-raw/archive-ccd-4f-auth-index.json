@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T07:46:06.641663Z",
+  "repository": "alexj11324/Mikka",
+  "branch": "evidence/1512-observability",
+  "primaryParent": "743248483adbea6bcaa1c13f10261cfcd2502417",
+  "baseTree": "b4c640ebdd1c8eb0fc5471b9619c1395fb6afcc1",
+  "additionalParents": [
+    "9c0a21f00822728d8d36fcdd41ef5a2f5f0a10ff"
+  ],
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/ci/ci-ccd-final.json",
+      "bytes": 140712,
+      "sha256": "e61ef7ff28c8e197a618f688b0544289a393ccc7df06e7c364bed236577f47ad",
+      "gitBlobSha1": "21c0facf19e61d6864f85a581f63a63ac118eca6",
+      "kind": "original_ci_metadata"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/reports/lifecycle.json",
+      "bytes": 40688,
+      "sha256": "4429021b549c3485d3b6e5d414d405d920b770de0a80134aaf44a0f5bb823f47",
+      "gitBlobSha1": "561b35ec2939f16cdcc160b401d3cc9a29e4dbc0",
+      "kind": "original_desktop_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/reports/parity/parity.json",
+      "bytes": 107275,
+      "sha256": "5b588c957b1cd51f241425acd055ac850e804b69421f8257493aff1c53324c53",
+      "gitBlobSha1": "470bf18b9837667bea31dfb0ba03e78c78b2dca2",
+      "kind": "original_desktop_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/reports/smoke.json",
+      "bytes": 3125,
+      "sha256": "eaf23e8ad2f070977886e91214fe4a9c234002690dbae3983b0f2f7359eb7473",
+      "gitBlobSha1": "e3b808837cf9b3c006a3f5bcd0e9d331fb394566",
+      "kind": "original_desktop_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/reports/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "9ab0e45ada154ac7f2968c8d92f29c2fda1e39cdacb8963fb67c1b23e16609db",
+      "gitBlobSha1": "f624bf8969f3037646cfe272d4b02c6f4480a92f",
+      "kind": "original_desktop_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/reports/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "21d606a63b7e92bd8b55c779876580e0629c3e4b4c464fe33caae176065c88c8",
+      "gitBlobSha1": "41dfe7b747a61f5ab64b9cdd434b2239e8f305a6",
+      "kind": "original_desktop_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/summary.json",
+      "bytes": 12774,
+      "sha256": "4003edad552fd49d46b0441fe4d9b8a6cb534af64a1234481deff1afdc048ba5",
+      "gitBlobSha1": "59e77534d38f6b0169fe00f68e9882d18bacea96",
+      "kind": "prior_safe_desktop_projection"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/index.json",
+      "bytes": 1634,
+      "sha256": "706c80940a865308c25373edfd5bd95cb180b69674727ac1b66954f5b042e2e0",
+      "gitBlobSha1": "8cc67222d41faaf9c3cf97d79e6c0f1575ba59f3",
+      "kind": "prior_safe_desktop_projection"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-ccd/extracted-files.json",
+      "bytes": 1311,
+      "sha256": "99e6ed2ddc6935666b701e22bd162f350739605c57e7c9509c77204bcd58ac1b",
+      "gitBlobSha1": "bc64332f351cacefdb0f32ef3deebbd53a04b867",
+      "kind": "prior_safe_desktop_projection"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-4f-integration/receipt.json",
+      "bytes": 1848,
+      "sha256": "c4df45f8bcb4d8d4ec1af1d59f2f3d1f2af7701fd5c3938c6482a0b20c3c5a0a",
+      "gitBlobSha1": "98a2320af590d167b7d96708fe98af892b4c12d6",
+      "kind": "original_local_integration_receipt"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-multisession-order/proof.mjs",
+      "bytes": 4753,
+      "sha256": "253758c989bf74ed1055ed3fe23771419738157719b4897cae1c5552eb1b4b7d",
+      "gitBlobSha1": "74768f4eaaf8e31396a7eca675a1de3b92c4728c",
+      "kind": "synthetic_only_reproduction_source"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-multisession-order/proof.json",
+      "bytes": 734,
+      "sha256": "9b7f821cd69fc52a13b24c06b2a7ac373331b59c82c02579126a8c1a798c5177",
+      "gitBlobSha1": "a368cd8e97bb76191769ca558e64072bb86114eb",
+      "kind": "original_local_authentication_proof_receipt"
+    }
+  ],
+  "provenance": {
+    "ccd": {
+      "head": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149",
+      "ciSummary": {
+        "workflowCount": 14,
+        "workflowConclusions": {
+          "success": 13,
+          "failure": 1
+        },
+        "checkCount": 43,
+        "checkConclusions": {
+          "success": 34,
+          "failure": 1,
+          "skipped": 8
+        },
+        "jobCount": 42,
+        "jobConclusions": {
+          "success": 33,
+          "skipped": 8,
+          "failure": 1
+        },
+        "stepCount": 523,
+        "allWorkflowsTerminal": true,
+        "allChecksTerminal": true,
+        "allJobsTerminal": true,
+        "passed": false
+      },
+      "desktopRunId": 42350008419,
+      "nativeJobId": 128336773585,
+      "actualSourceRevision": "6330cb07a6423b5b99c90ab6b8019cfafc9d5e6f",
+      "actualSourceParents": [
+        "ad5e5db5ed5547ea19644ce2381992d8d1583eb9",
+        "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149"
+      ],
+      "desktopResult": "failed",
+      "failure": {
+        "phase": "cold-bundled",
+        "kind": "TimeoutError",
+        "code": "other",
+        "locations": [
+          {
+            "file": "lifecycle.mjs",
+            "line": 142,
+            "column": 59
+          },
+          {
+            "file": "lifecycle.mjs",
+            "line": 380,
+            "column": 13
+          }
+        ]
+      },
+      "measuredLoginQueries": {
+        "native": 220,
+        "web": 190,
+        "nativeLessThanOrEqualToWeb": false
+      },
+      "startupComparison": "unknown: first bundled window incomplete and hosted startup not reached",
+      "rawReportsRetainedUnchanged": true,
+      "sourceSummaryChronology": "The earlier Desktop summary predates the authentication-order proof and correctly records that the failure receipt alone did not establish a root cause. It is preserved unchanged."
+    },
+    "desktopSelection": {
+      "included": [
+        "five original JSON reports",
+        "summary.json",
+        "index.json",
+        "extracted-files.json"
+      ],
+      "notIncluded": [
+        "artifact ZIP files",
+        "download script",
+        "download URLs",
+        "github-metadata.json",
+        "download-manifest.json"
+      ],
+      "priorIndexBoundary": "The original Desktop index is preserved byte-for-byte. It also names two prior local metadata files omitted from this requested archive selection; this outer index is the authoritative list of archived payloads. Artifact identity, digest and revision evidence remain embedded in the archived Desktop summary."
+    },
+    "main4fIntegration": {
+      "status": "targeted_automatic_merge_tree_regression_passed",
+      "featureHead": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149",
+      "mainHead": "4f0f68e971b2676a156a3cedd7bc97413afb2310",
+      "integratedTree": "4f8662a3d257637299b7a3f342103fdfb47ee4b7",
+      "tests": [
+        {
+          "passed": 82,
+          "failed": 0,
+          "exitCode": 0
+        },
+        {
+          "passed": 24,
+          "failed": 0,
+          "exitCode": 0
+        }
+      ],
+      "scope": "Targeted local automatic merge-tree regression and independent semantic review, not a new full CI result or production acceptance. No referenced raw TAP/log file is included in this archive.",
+      "productionCalls": 0,
+      "databaseCalls": 0
+    },
+    "authenticationOrderProof": {
+      "receiptSource": "real_installed_better_auth_with_memory_adapter",
+      "libraryVersion": "1.7.12",
+      "firstAttempt": {
+        "status": "failed",
+        "phase": "receipt_package_metadata",
+        "reportedCause": "The package does not export package.json.",
+        "countedAsPassed": false,
+        "provenance": "Task-owner handoff; no first-attempt raw output was supplied for this archive."
+      },
+      "successfulRerun": {
+        "status": "passed",
+        "packageMetadataRead": "Local package metadata file; the full proof was rerun after that receipt-stage correction.",
+        "provenance": "Original final receipt plus the matching preserved reproduction script; the archiving agent did not rerun it.",
+        "oldOrder": {
+          "nativeHandoffSharesBrowserSession": true,
+          "subsequentWebLoginRevokesNative": true,
+          "nativeFreshReadRejected": true
+        },
+        "proposedOrder": {
+          "webContextClosesBeforeFinalNativeLogin": true,
+          "finalNativeHandoffSharesLatestSession": true,
+          "finalNativeFreshReadAccepted": true
+        }
+      },
+      "whatItEstablishes": "The installed Better Auth 1.7.12 bearer/multiSession/oneTimeToken implementation, backed by the real memoryAdapter, shares the ordinary browser session during OTT handoff. A later sign-in using the same cookie jar deletes the earlier native session and its fresh bearer read is rejected. Making the native ordinary login the last sign-in preserves the final native fresh bearer read.",
+      "limits": [
+        "This is a controlled in-memory authentication API sequence, not a new macOS or browser lifecycle acceptance.",
+        "The proposed-order context-closure statement describes the intended harness ordering; this script does not launch a Chromium context.",
+        "The script uses only explicit non-production synthetic credential literals and retains no session/cookie/token/email values in the receipt.",
+        "This proof does not rewrite the CCD workflow failure, improve its measured 220-vs-190 login counts, or fill its missing startup totals."
+      ],
+      "productionRequests": 0,
+      "externalRequests": 0,
+      "databaseConnections": 0
+    }
+  },
+  "privacyAudit": {
+    "jsonFiles": 11,
+    "emailFindings": 0,
+    "credentialPrefixFindings": 0,
+    "jwtFindings": 0,
+    "signedUrlFindings": 0,
+    "sensitiveNamedStringFindings": 0,
+    "proofScriptContainsOnlyExplicitSyntheticCredentialLiterals": true
+  },
+  "archiveBoundary": {
+    "onlyEvidenceTreeAdditions": true,
+    "productSourceChanged": false,
+    "opsSourceFeatureRefsChanged": false,
+    "additionalParentPurpose": "Retain the most recent authorized operations transport history without importing its working tree.",
+    "indexSelfDigest": "Excluded from this recursive index; bytes, SHA256 and Git blob SHA1 are recorded in the final archive verification receipt."
+  }
+}
