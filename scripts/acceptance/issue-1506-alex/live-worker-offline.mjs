@@ -23,8 +23,14 @@ globalThis.WebSocket = class extends EventTarget {
   send(value) { if (value !== 'ping') throw new Error('offline_socket_write') }
   close() { if (this.readyState === 3) return; this.readyState = 3; sockets.delete(this); this.dispatchEvent(new Event('close')); this.onclose?.(new Event('close')) }
 }
+const workerModule = import('./live-worker.mjs')
 parentPort.on('message', message => {
+  if (message?.type === 'fixture-read') {
+    void workerModule.then(module => module.readSnapshot(message.requiredRevision ?? 0)).then(
+      () => parentPort.postMessage({ type: 'fixture-read-result', ok: true }),
+      () => parentPort.postMessage({ type: 'fixture-read-result', ok: false }))
+  }
   if (message?.type === 'fixture-push') for (const socket of sockets) socket.packet({ kind: 'bot_chat', id: message.botId, rev: message.revision })
   if (message?.type === 'fixture-disconnect') for (const socket of sockets) socket.close()
 })
-await import('./live-worker.mjs')
+await workerModule

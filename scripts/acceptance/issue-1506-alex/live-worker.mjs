@@ -6,9 +6,10 @@ import { pathToFileURL } from 'node:url'
 const { sourceDirectory, tabId, ownerId, workspaceId, transportScope, build, botId, initialChat } = workerData
 const source = path => import(pathToFileURL(sourceDirectory + '/' + path).href)
 const [{ LiveChannel }, { TabShare, tabShareChannelName }, { coversLiveRevisions, heldRevision },
-  { liveInvalidation, liveReadiness }, { PersistentReadCache, readCacheShareNamespace }] = await Promise.all([
+  { liveInvalidation, liveReadiness }, { PersistentReadCache, readCacheShareNamespace },
+  { readBoundary, readFresh, observeSWRRead, acceptSWRRead, failSWRRead }] = await Promise.all([
   source('lib/live/channel.mjs'), source('lib/live/tab-share.mjs'), source('lib/live/revisions.mjs'),
-  source('lib/live/events.mjs'), source('lib/swr/persistent-cache.mjs'),
+  source('lib/live/events.mjs'), source('lib/swr/persistent-cache.mjs'), source('lib/swr/read-observer.mjs'),
 ])
 const entity = 'bot_chat:' + botId.toLowerCase()
 // A deterministic serialized cache key for the core harness; no React/SWR render is claimed.
@@ -74,39 +75,60 @@ function storeSnapshot(data) {
   emitState(); return data
 }
 
-// Same authorization, required-revision, local-revision and local-write identity
-// checks as the exact reviewed hooks/use-live-key.tsx refresh closure.
-async function refresh(requestedKey, requiredRevisions, reuseCompleted) {
-  if (closing || requestedKey !== key) return
-  metadata.refreshCalls++; activeRefreshes++
-  const requiredRevision = requiredRevisions?.[entity] ?? 0
-  post({ type: 'refresh', requiredRevision, reuseCompleted: reuseCompleted === true }); emitState()
-  const mutate = async (data, revalidate = true) => {
-    if (!revalidate) return storeSnapshot(data)
+// This adapter preserves the production observeSWRRead -> onSuccess -> cache
+// commit order. It is a normalized RPC consumer, not a React/SWR render.
+const current = () => !closing && cache.isEnabled
+
+// Used by the real refresh path; the offline platform fixture can independently
+// start this same actual read to exercise an in-flight same-realm obligation.
+export function readSnapshot(requiredRevision = 0, reuseCompleted = false) {
+  const promise = observeSWRRead(cache, key, async () => {
     metadata.networkReads++
     const requestedAt = performance.now()
     const next = await request('chat', { requiredRevision, reuseCompleted: reuseCompleted === true })
-    if (closing) return
-    return storeSnapshot({ ...next, requestedAt })
-  }
+    return { ...next, requestedAt }
+  })
+  return promise.then(data => {
+    if (!current()) return
+    try {
+      acceptSWRRead(cache, key, data)
+      return storeSnapshot(data)
+    } catch (error) {
+      failSWRRead(cache, key, data, error)
+      throw error
+    }
+  })
+}
+
+// Same current-lifetime, authorization, required/held/local revision and
+// local-write identity guards as the pinned use-live-key refresh closure.
+async function refresh(requestedKey, requiredRevisions, reuseCompleted, after = readBoundary()) {
+  if (!current() || requestedKey !== key) return
+  metadata.refreshCalls++; activeRefreshes++
+  const requiredRevision = requiredRevisions?.[entity] ?? 0
+  post({ type: 'refresh', requiredRevision, reuseCompleted: reuseCompleted === true }); emitState()
   try {
     const authorized = () => ownerId && namespace && readCacheShareNamespace(cache, ownerId) === namespace
-    if (!authorized()) return mutate()
-    const previous = cache.get(key)?.data
+    const heldAtStart = { ...cache.get(key)?.data?.live?.revisions }
     const accepts = data => {
-      const accepted = coversLiveRevisions(data, requiredRevisions) && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
+      const accepted = coversLiveRevisions(data, requiredRevisions)
+        && coversLiveRevisions(data, heldAtStart)
+        && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
       if (!accepted) metadata.rejectedOlderResults++
       post({ type: 'acceptance', requiredRevision, localRevision: revision(cache.get(key)?.data), resultRevision: revision(data), accepted })
       return accepted
     }
-    return await tabs.run(key, () => mutate(), data => {
-      if (!authorized()) return
+    const read = () => readFresh(cache, key, after, () => readSnapshot(requiredRevision, reuseCompleted), accepts, current)
+    if (!authorized()) return await read()
+    const previous = cache.get(key)?.data
+    return await readFresh(cache, key, after, () => tabs.run(key, read, data => {
+      if (!current() || !authorized()) return
       if (cache.get(key)?.data === previous) {
         metadata.adopted++; post({ type: 'adopt', requiredRevision, resultRevision: revision(data) })
-        return mutate(data, false)
+        return storeSnapshot(data)
       }
-      return mutate()
-    }, accepts, reuseCompleted)
+      return read()
+    }, accepts, reuseCompleted), accepts, current)
   } catch { fatal() }
   finally { activeRefreshes--; firstReadSettled = true; emitState(); tryReady() }
 }

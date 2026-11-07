@@ -24,7 +24,7 @@ jobs:
     # deadline and must have time to finish after a transport failure.
     timeout-minutes: 12
     env:
-      MIKKA_ACCEPTANCE_SHA: '26ef4de15129e22503e152258ee9cb2e4aeae8bd' # Only the verified final production application SHA.
+      MIKKA_ACCEPTANCE_SHA: '' # Only the verified final production application SHA.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

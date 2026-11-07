@@ -69,7 +69,7 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
       report.initialCursor = initial.cursor
       report.botRef = fixture.botRef
       report.menu = fixture.menu
-      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, completed = null, started = null
+      let live, controller, stopPromise = null, sent = false, streamId = null, failure = null, completed = null, lastObservedChat = null, naturalIdleConfirmed = false, started = null
       let delayedStop = null, delayTimer = null, settleDelayedStop = null
       const since = () => started === null ? null : ms(performance.now() - started)
       const stop = trigger => {
@@ -107,7 +107,8 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
             initialChat: initial, live, signal: controller.signal,
             readChat: async signal => {
               report.completionChatReads++; report.postStopChatReads++
-              return validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal }))
+              lastObservedChat = validateChat(await rpc(session, 'coordinator.syncCoordinatorChat', [botId], { signal }))
+              return lastObservedChat
             },
             onEvent: (event, _rounds, sequence) => {
               if (event.type === 'start') { streamId = event.id; report.streamId = event.id; report.metrics.streamStartedMs = since() }
@@ -157,6 +158,33 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
           if (!report.triggerCallRef) fail('tool_boundary_not_observed')
           if (!await (stopPromise ?? delayedStop)) fail('stop_not_acknowledged')
         } catch (error) {
+          // A natural reply has no stopped marker. Reclassify only after this
+          // same new committed round is durably present and its lease is idle.
+          // The strict shared helper and all actual Stop predicates stay intact.
+          const chat = lastObservedChat, commit = report.committed
+          const own = chat?.items.filter(item => item.streamId === streamId) ?? []
+          if (error?.message === 'reply_not_persisted' && report.tools.length === 0 &&
+            !report.triggerCallRef && !report.stop.requested && commit?.id === streamId &&
+            commit?.quiet === false && Number.isSafeInteger(commit?.through) && commit.through > initial.cursor &&
+            !initial.persistedStreamIds.includes(commit.id) &&
+            chat?.botId === botId && chat.enabled && chat.error === null && !chat.working && !chat.streamRunId &&
+            chat.cursor >= commit.through && chat.persistedStreamIds.includes(commit.id) &&
+            chat.live?.ownerId === initial.live?.ownerId && chat.live?.workspaceId === initial.live?.workspaceId &&
+            Number.isSafeInteger(chat.live?.revisions?.['bot_chat:' + botId.toLowerCase()]) &&
+            chat.live.revisions['bot_chat:' + botId.toLowerCase()] >= live.revision &&
+            !own.some(item => item.stopped || item.failure) &&
+            own.some(item => item.from === 'coordinator' && !item.pending && typeof item.text === 'string' &&
+              item.text.length > 0 && Number.isSafeInteger(item.position) &&
+              item.position > initial.cursor && item.position <= commit.through)) {
+            naturalIdleConfirmed = true
+            completed = { chat, committed: commit }
+            report.termination = report.streamEof ? 'eof' : 'client_cancel_after_natural_committed_idle'
+            report.afterStop = { cursor: chat.cursor, committedPersisted: true, working: false, activeStream: false,
+              ownPersistedItems: own.length, stoppedMarker: false, stoppedPosition: null }
+            report.sample.classification = 'tool_boundary_not_observed'
+            report.runtimeBoundary.classification = 'not_covered'
+            fail('tool_boundary_not_observed')
+          }
           if (controller.signal.aborted && error?.name === 'AbortError') fail('stream_deadline')
           throw error
         }
@@ -169,7 +197,8 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
           report.sample.delayCancelledByFailure = true
         }
         if (sent) {
-          if (!stopPromise) void stop('error_cleanup')
+          if (!stopPromise && !naturalIdleConfirmed) void stop('error_cleanup')
+          if (naturalIdleConfirmed) report.cleanup.stopSkippedBecause = 'natural_completion_confirmed_idle'
           await stopPromise; controller?.abort()
           if (!completed) {
             report.postStopChatReads++; report.cleanupChatReads++

@@ -81,3 +81,73 @@ test('a true decoder error in delayed reader cancellation survives a concurrent 
   releaseRead.resolve(); await Promise.resolve(); releaseCancel.resolve()
   await assert.rejects(pending, /stream_error/); assert.equal(f.subscriptions, 0)
 })
+
+
+// Recovery regression: preserve the real driver/decoder and vary only offline I/O.
+function withOrdinaryFrames(f, { persistedText, beforeCommitted = [] } = {}) {
+  return { ...f.options, sessionProvider: (work, options) => f.provider(session => work({ ...session,
+    async request(path, input = {}) {
+      const response = await session.request(path, input)
+      if (path.startsWith('/api/coordinator/stream')) {
+        let buffered = '', sequence = 0
+        const decoder = new TextDecoder(), encoder = new TextEncoder()
+        return new Response(response.body.pipeThrough(new TransformStream({
+          transform(chunk, controller) {
+            buffered += decoder.decode(chunk, { stream: true })
+            let newline
+            while ((newline = buffered.indexOf('\n')) !== -1) {
+              const line = buffered.slice(0, newline); buffered = buffered.slice(newline + 1)
+              if (!line.trim()) continue
+              const frame = JSON.parse(line)
+              const frames = frame.type === 'committed'
+                ? [...beforeCommitted.map(event => ({ ...event, id: frame.id })), frame] : [frame]
+              for (const event of frames) controller.enqueue(encoder.encode(JSON.stringify({ ...event, sequence: ++sequence }) + '\n'))
+            }
+          },
+        })), { status: response.status, headers: response.headers })
+      }
+      if (persistedText !== undefined && input.body?.action === 'coordinator.syncCoordinatorChat' && f.state.sends) {
+        const value = await response.json()
+        for (const item of value.result.chat.items) item.text = persistedText
+        return Response.json(value)
+      }
+      return response
+    },
+  }), options) }
+}
+
+test('ordinary Stop compares the final visible stream with its own persisted stopped reply without logging text', async () => {
+  const f = stoppedSession({ kind: 'ordinary', releaseDuringRead: true })
+  const report = await runOrdinaryStop(withOrdinaryFrames(f, { persistedText: '42 tail',
+    beforeCommitted: [{ type: 'text', delta: ' tail' }] }))
+  assert.equal(report.status, 'observed', JSON.stringify(report))
+  assert.equal(report.textConsistency.matches, true)
+  assert.equal(report.textConsistency.liveCharacters, 7)
+  assert.equal(report.textConsistency.persistedCharacters, 7)
+  assert.equal(report.streamEvents.textCharactersAfterStop, 5)
+  assert.equal(f.state.stops, 1); assert.equal(f.state.clientCancelled, true)
+  assert.equal(report.cleanup.status, 'complete'); assert.equal(f.state.signouts, 1)
+  assert.equal(JSON.stringify(report).includes('42 tail'), false)
+})
+
+test('ordinary Stop retains a failed slot when persisted stopped text differs from the visible stream', async () => {
+  const f = stoppedSession({ kind: 'ordinary' })
+  const report = await runOrdinaryStop(withOrdinaryFrames(f, { persistedText: PRIVATE }))
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'stopped_text_mismatch')
+  assert.equal(report.textConsistency.matches, false)
+  assert.equal(f.state.stops, 1); assert.equal(f.state.signouts, 1)
+  assert.equal(report.cleanup.status, 'complete'); assert.equal(f.state.clientCancelled, true)
+  assert.equal(JSON.stringify(report).includes(PRIVATE), false)
+})
+
+test('ordinary Stop uses reset replacement when comparing persisted text', async () => {
+  const f = stoppedSession({ kind: 'ordinary' })
+  const report = await runOrdinaryStop(withOrdinaryFrames(f, { persistedText: 'final',
+    beforeCommitted: [{ type: 'reset', text: 'final' }] }))
+  assert.equal(report.status, 'observed', JSON.stringify(report))
+  assert.equal(report.textConsistency.matches, true)
+  assert.equal(report.textConsistency.liveCharacters, 5)
+  assert.equal(report.textConsistency.persistedCharacters, 5)
+  assert.equal(f.state.stops, 1); assert.equal(f.state.clientCancelled, true)
+})

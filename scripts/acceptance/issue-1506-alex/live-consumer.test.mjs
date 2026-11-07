@@ -58,7 +58,7 @@ test('an unrelated commit cannot label otherwise matching source bytes', { skip:
   assert.throws(() => prepareLiveSource(sourceRoot, { sourceBase: '0'.repeat(40) }), /live_source_commit_mismatch/)
 })
 
-for (const path of ['lib/live/presence.ts', 'hooks/use-live-key.tsx', 'components/coordinator/coordinator-chat.tsx']) {
+for (const path of ['lib/live/presence.ts', 'hooks/use-live-key.tsx', 'components/coordinator/coordinator-chat.tsx', 'lib/swr/read-observer.ts', 'components/swr-defaults.tsx']) {
   test(`source pin rejects drift in ${path} before creating a worker`, { skip: !sourceRoot }, () => {
     const directory = mkdtempSync(join(tmpdir(), 'mikka-live-pin-test-'))
     try {
@@ -80,7 +80,7 @@ test('exact reviewed sources compile and import actual exported classes without 
     const presence = await import(pathToFileURL(source.directory + '/lib/live/presence.mjs').href)
     assert.equal(typeof channel.LiveChannel, 'function'); assert.equal(typeof shares.TabShare, 'function')
     assert.equal(shares.CLAIM_WINDOW_MS, 30)
-    assert.equal(Object.keys(source.hashes).length, 10)
+    assert.equal(Object.keys(source.hashes).length, 12)
     assert.equal(source.sourceCommit, sourceBase)
     assert.deepEqual(presence.presenceReply({ type: 'presence_ready', version: 1 }), { type: 'presence_ready', version: 1 })
   } finally { source.close() }
@@ -203,3 +203,85 @@ test('the same actual sockets latch an early revision, deduplicate all tabs and 
     await Promise.allSettled(workers.map(worker => worker.terminate())); source.close()
   }
 })
+
+
+test('only exact pinned runtime dependencies can cross directories', async () => {
+  const { resolveLiveImport } = await import('./live-source.mjs')
+  assert.equal(resolveLiveImport('lib/live/channel.ts', '../swr/read-observer'), '../swr/read-observer.mjs')
+  assert.equal(resolveLiveImport('lib/live/channel.ts', './events'), './events.mjs')
+  for (const path of ['node:fs', 'react', '../../outside', '../swr/not-pinned', '../swr/read-observer?x=1', '../swr/../swr/defaults.tsx', '..\\swr\\read-observer']) {
+    assert.throws(() => resolveLiveImport('lib/live/channel.ts', path), /live_source_import_invalid/)
+  }
+})
+
+for (const order of ['after', 'before', 'later-revision']) test(
+  'same-realm observed read respects the real push boundary: ' + order,
+  { skip: !sourceRoot, timeout: 8_000 }, async () => {
+    const source = prepare(sourceRoot), records = []
+    let worker, phase = 'initial', held, released = false, refreshObserved = false, lastState
+    let ready, readStarted, finished, closed
+    const readyPromise = new Promise(resolve => { ready = resolve })
+    const readStartedPromise = new Promise(resolve => { readStarted = resolve })
+    const finishPromise = new Promise(resolve => { finished = resolve })
+    const closedPromise = new Promise(resolve => { closed = resolve })
+    const watchdog = setTimeout(() => { ready(false); readStarted(false); finished(false); closed(false) }, 6_000)
+    const target = order === 'later-revision' ? 3 : 2
+    const reply = (message, value) => worker.postMessage({ type: 'response', id: message.id, ok: true, value })
+    const push = revision => worker.postMessage({ type: 'fixture-push', botId: BOT_IDS[0], revision })
+    try {
+      worker = new Worker(new URL('./live-worker-offline.mjs', import.meta.url), { env: {}, workerData: {
+        sourceDirectory: source.directory, tabId: 1, ownerId: ALEX_OWNER_ID,
+        workspaceId: WORKSPACE_ID, transportScope: WORKSPACE_ID, build: SHA,
+        botId: BOT_IDS[0], initialChat: chatAt(1),
+      } })
+      worker.on('error', () => { ready(false); readStarted(false); finished(false) })
+      worker.on('message', message => {
+        if (message.type === 'request') {
+          if (message.method === 'ticket') {
+            reply(message, { url: 'wss://offline.invalid/v1/live/' + 'a'.repeat(64) + '/socket',
+              protocol: PRIVATE, expiresAt: Date.now() + 60_000 })
+          } else {
+            assert.equal(message.method, 'chat')
+            if (phase === 'initial') reply(message, chatAt(1))
+            else {
+              records.push({ id: message.id, requiredRevision: message.requiredRevision })
+              if (!held) { held = message; readStarted(true) }
+              else reply(message, chatAt(target))
+            }
+          }
+        } else if (message.type === 'ready') ready(true)
+        else if (message.type === 'refresh' && phase === 'turns' && message.requiredRevision >= 2 && !released) {
+          refreshObserved = true
+          assert.ok(held, 'the independent actual read was already in flight at this flush')
+          released = true
+          if (order === 'later-revision') push(3)
+          reply(held, chatAt(2))
+        } else if (message.type === 'state') {
+          lastState = message
+          if (phase === 'turns' && released && refreshObserved && message.latestRevision >= target && message.activeRefreshes === 0) finished(true)
+        } else if (message.type === 'fatal') finished(false)
+        else if (message.type === 'closed') closed(true)
+      })
+      assert.equal(await readyPromise, true)
+      phase = 'turns'
+      if (order === 'before') {
+        worker.postMessage({ type: 'fixture-read', requiredRevision: 0 })
+        assert.equal(await readStartedPromise, true)
+        push(2)
+      } else {
+        push(2)
+        worker.postMessage({ type: 'fixture-read', requiredRevision: 0 })
+        assert.equal(await readStartedPromise, true)
+      }
+      assert.equal(await finishPromise, true, JSON.stringify({ records, lastState }))
+      assert.equal(lastState.latestRevision, target)
+      assert.equal(records.length, order === 'after' ? 1 : 2,
+        'only an actual read beginning after this push can satisfy it; a later push still needs a new read')
+      worker.postMessage({ type: 'close' })
+      assert.equal(await closedPromise, true)
+    } finally {
+      clearTimeout(watchdog)
+      await worker?.terminate()
+      source.close()
+    }
+  })
