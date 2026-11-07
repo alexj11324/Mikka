@@ -12,15 +12,12 @@ import { GlassButton } from '@/components/GlassButton'
 import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
 import { tasksLive } from '@/lib/live-keys'
-import type { TaskActivity, TaskDetail, ThreadGroup } from '@/lib/types'
+import type { TaskActivity, TaskDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
 import { colors, LIST_INSET } from '@/lib/theme'
-import { GROUP_LABEL, PriorityIcon, priorityLabel, TaskGroupIcon } from '../components/task-icons'
-import { groupOf } from '../model/task-groups'
-
-/** An attempt's state in 活动, in words: a failed one says 失败; its raw error code is inside the attempt. */
-const ATTEMPT_WORD: Record<ThreadGroup, string> = { waiting: '等待你', running: '进行中', blocked: '受阻', idle: '空闲', resolved: '已解决' }
+import { BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
+import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
 
 const day = (iso: string) => {
   const d = new Date(iso)
@@ -44,6 +41,8 @@ export function TaskScreen() {
   const home = useHome().data
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
   const task = data?.task
+  // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
+  const shown = task ? rowState(task) : null
 
   // A push opens the task, then the attempt it was about, once.
   const opened = useRef(false)
@@ -65,7 +64,8 @@ export function TaskScreen() {
             {task.identifier ? <Text style={styles.key} selectable>{task.identifier}</Text> : null}
             <Text accessibilityRole="header" style={styles.title} selectable>{task.title}</Text>
             <View style={styles.properties}>
-              <Chip icon={<TaskGroupIcon group={groupOf(task)} size={15} />} label={GROUP_LABEL[groupOf(task)]} />
+              <Chip icon={<TaskStateIcon state={shown?.state ?? null} status={task.status} size={15} />}
+                label={shown?.reason ?? (shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
               <Chip icon={<PriorityIcon priority={task.priority} size={15} />} label={`${priorityLabel(task.priority)}优先级`} />
               {task.bot ? <Chip icon={<BotAvatar color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
               {task.agent ? <Chip icon={<Sparkles size={14} color={colors.secondary} strokeWidth={2} />} label={[HARNESS[task.agent.harness] ?? task.agent.harness, task.agent.model].filter(Boolean).join(' · ')} /> : null}
@@ -74,7 +74,7 @@ export function TaskScreen() {
             </View>
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {data.activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}
-            {data.activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} last={index === data.activity.length - 1} bot={task.bot}
+            {data.activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} last={index === data.activity.length - 1}
               onOpen={item.kind === 'attempt' ? () => router.push(attemptHref(item, task)) : undefined} />)}
           </>
         ) : null}
@@ -98,21 +98,25 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
   )
 }
 
-/** One entry of 活动 on the timeline: an attempt opens its thread; a replaced thread and the creation are lines. */
-function ActivityRow({ item, last, bot, onOpen }: { item: TaskActivity; last: boolean; bot?: { color?: string; shape?: string } | null; onOpen?: () => void }) {
+/**
+ * One entry of 活动 on the timeline: an attempt carries its own result's icon and word (2026-11-07-2230) and opens
+ * its thread; a replaced thread and the creation are lines.
+ */
+function ActivityRow({ item, last, onOpen }: { item: TaskActivity; last: boolean; onOpen?: () => void }) {
+  const result = item.kind === 'attempt' ? attemptState(item) : null
   const body = (
     <>
       <View style={styles.rail}>
         <View style={styles.node} />
         {last ? null : <View style={styles.line} />}
       </View>
-      {item.kind === 'attempt' ? <BotAvatar color={bot?.color} shape={bot?.shape} size={20} /> : <View style={styles.noBot} />}
+      {result ? <TaskStateIcon state={result === 'done' || result === 'todo' ? null : result} status={result === 'done' ? 'done' : 'todo'} size={20} /> : <View style={styles.noBot} />}
       <View style={styles.activityText}>
         <Text style={styles.activityTitle} numberOfLines={1}>
           {item.kind === 'attempt' ? `第 ${item.n} 次尝试` : item.kind === 'replaced' ? '换了新线程' : item.by ? `${item.by} 创建了任务` : '创建了任务'}
         </Text>
         <Text style={styles.activityMeta} numberOfLines={1}>
-          {item.kind === 'attempt' ? `${item.failed ? '失败' : ATTEMPT_WORD[item.group]} · ${HARNESS[item.harness] ?? item.harness} · ${day(item.createdAt)}` : day(item.createdAt)}
+          {result && item.kind === 'attempt' ? `${ATTEMPT_WORD[result]} · ${HARNESS[item.harness] ?? item.harness} · ${day(item.createdAt)}` : day(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}

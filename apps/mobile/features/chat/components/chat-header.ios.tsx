@@ -4,8 +4,7 @@ import { NavBar } from '@/components/NavBar'
 import { Spinner } from '@/components/icons'
 import { tap } from '@/lib/haptics'
 import { colors } from '@/lib/theme'
-import { TASK_SYMBOL } from '@/features/chat/model/chat-header-menu'
-import { groupOf } from '@/features/tasks/model/task-groups'
+import { taskSymbol } from '@/features/chat/model/chat-header-menu'
 import { displayTitle } from '@/lib/display-title'
 import type { ChatHeaderProps } from './chat-header.types'
 
@@ -20,7 +19,7 @@ export function ChatHeader({ name, tasks, onTask, onAllTasks, onInfo }: ChatHead
         modifiers={[buttonStyle('plain')]}>
         {tasks?.length ? (
           <Section title="任务">
-            {tasks.map(task => <Button key={task.id} label={displayTitle(task.title)} systemImage={TASK_SYMBOL[groupOf(task)]} onPress={() => { tap(); onTask(task.id) }} />)}
+            {tasks.map(task => <Button key={task.id} label={displayTitle(task.title)} systemImage={taskSymbol(task)} onPress={() => { tap(); onTask(task.id) }} />)}
           </Section>
         ) : null}
         <Button label="全部任务" systemImage="checklist" onPress={() => { tap(); onAllTasks() }} />

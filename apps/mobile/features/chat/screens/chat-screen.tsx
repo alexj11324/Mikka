@@ -21,7 +21,7 @@ import { Composer } from '@/features/chat/components/chat-composer'
 import { GlassButton } from '@/components/GlassButton'
 import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
-import { clockTime } from '@/lib/clock'
+import { clockTime, shortWhen } from '@/lib/clock'
 import { isOpenUI } from '@/lib/openui'
 import { holdMessage, type HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
@@ -32,6 +32,8 @@ import { runName, type BotPage, type Chat, type CitationSource, type PendingActi
 import { ChatHeader } from '@/features/chat/components/chat-header'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { useTasks } from '@/features/tasks/components/task-list'
+import { TaskStateIcon } from '@/features/tasks/components/task-icons'
+import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
 import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
@@ -271,7 +273,11 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
     const selected = selection?.key === item.position ? selection : null
     return (
       <Arrival animate={arrived(item.position)}>
-        {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => router.push(`/thread/${question.runId}`)} />
+        {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => {
+          // A question about a task's thread opens the task at that attempt (2026-11-07).
+          const run = sources[question.runId]
+          router.push(run?.kind === 'run' && run.issue ? `/task/${run.issue.id}?attempt=${question.runId}` : `/thread/${question.runId}`)
+        }} />
           : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
         {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text && !selected ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text && !selected ? () => actions(item.text, item.id, item.position) : undefined} menu={item.text ? message(item.text, item.id, item.position) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? <ChatSelectableText text={selected.text} color={colors.onAccent} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} /> : undefined} />{chips(item.id, 'right')}</TimedRow> : null}
         {item.from === 'coordinator' && item.text ? (
@@ -288,9 +294,18 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
         {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
         {item.threads.map(id => {
           const run = sources[id]
-          return run?.kind === 'run'
-            ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => open(run)} /></TimedRow>
-            : null
+          if (run?.kind !== 'run') return null
+          // A dispatch is its task's card (2026-11-07): the attempt's state icon, number and title, then state · bot · time.
+          const result = run.issue ? attemptState({ group: run.group, status: run.status }) : null
+          return (
+            <TimedRow key={id} time={time} offset={offset}>
+              {run.issue && result
+                ? <ThreadCard title={[run.issue.identifier, run.issue.title].filter(Boolean).join(' ')} status={runIcon(run)} onPress={() => open(run)}
+                  icon={<TaskStateIcon state={result === 'done' || result === 'todo' ? null : result} status={result === 'done' ? 'done' : 'todo'} />}
+                  info={[ATTEMPT_WORD[result], run.agentName, shortWhen(item.createdAt)].filter(Boolean).join(' · ')} />
+                : <ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => open(run)} />}
+            </TimedRow>
+          )
         })}
       </Arrival>
     )

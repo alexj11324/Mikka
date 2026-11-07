@@ -181,7 +181,14 @@ export interface Task { id: string; identifier: string | null; title: string; st
   bot?: TaskBot | null
   /** A scheduled task's next run. */
   schedule?: TaskSchedule | null
-  createdAt?: string }
+  createdAt?: string
+  /** Its current attempt's state in 等待你 and 进行中; null when the board status decides (decisions/2026-11-07-2230). Absent from an older server. */
+  state?: TaskState | null
+  /** The grey line's reason, in the server's words: 等你回复, 待审阅, 额度用完, 等 MIK-12. */
+  reason?: string | null }
+
+/** One icon per state (decisions/2026-11-07-2230-one-icon-per-task-state.md); open and closed tasks show their board status. */
+export type TaskState = 'waiting' | 'failed' | 'running' | 'queued'
 
 /** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
 export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
@@ -196,7 +203,7 @@ export type TaskActivity =
 
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
-  task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group'> & {
+  task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason'> & {
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null

@@ -5,8 +5,7 @@ import { WebBarMenu } from '@/components/WebBarMenu'
 import { Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { colors } from '@/lib/theme'
-import { TASK_SYMBOL } from '@/features/chat/model/chat-header-menu'
-import { groupOf } from '@/features/tasks/model/task-groups'
+import { taskSymbol } from '@/features/chat/model/chat-header-menu'
 import { displayTitle } from '@/lib/display-title'
 import type { ChatHeaderProps } from './chat-header.types'
 
@@ -17,7 +16,7 @@ export function ChatHeader({ name, tasks, onTask, onAllTasks, onInfo }: ChatHead
       icon: 'chevron.down', label: name, onOpen: () => {},
       web: <View style={styles.title}><Text style={styles.name} numberOfLines={1}>{name}</Text><ChevronDown size={14} color={colors.secondary} strokeWidth={2.4} /></View>,
       items: [
-        ...(tasks ?? []).map(task => ({ label: displayTitle(task.title), icon: TASK_SYMBOL[groupOf(task)], onPress: () => onTask(task.id) })),
+        ...(tasks ?? []).map(task => ({ label: displayTitle(task.title), icon: taskSymbol(task), onPress: () => onTask(task.id) })),
         { label: '全部任务', icon: 'checklist', onPress: onAllTasks },
         { label: '资料', icon: 'person.crop.circle', onPress: onInfo },
       ],
