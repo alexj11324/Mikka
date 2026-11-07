@@ -287,7 +287,21 @@ error code and its numbers.
 | Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
 | [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's weighted DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 2000)`, or its weighted JSON bytes exceed `max(3 × median, 10 MB)`. Needs 24 covered full hours after that route first appears; bytes require ≥95% weighted coverage (`alert-source-anomaly.sql`) | `3 *` and the floors `2000` / `10000000` in `metrics`; `covered_hours >= 24` for route-specific warm-up |
 | [1324] Mikka 日速率外推超过500GB月额度 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 500 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `500000000000` (the allowance) and `utc_hours >= 3` |
-| [1324] Mikka 错误码小时突增 | One service's weighted error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 50)`, after 24 observed hours. Weight is `1 / sample_rate`, with legacy missing rates treated as `0.1`. Known handled Workflow hook 404, duplicate 409 and terminal 410 chains are excluded only with a successful entry and matching span ancestry (`alert-error-spike.sql`). | `3 *` and the floor `50` in `metrics` |
+| [1324] Mikka 错误码小时突增 | One service's weighted error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 50)`, after 24 observed hours. Weight is `1 / sample_rate`, with legacy missing rates treated as `0.1`. Known handled Workflow hook 404, duplicate 409 and terminal 410 chains are excluded only with their own successful entry, proved by exact ancestry or an invocation-to-delivery span link (`alert-error-spike.sql`). | `3 *` and the floor `50` in `metrics` |
+
+The Workflow filter follows individual invocations within a continuous trace.
+A known hook lookup 404 must belong to that successful `after:workflow-wake`,
+or to that successful `cron:reconcile` and its 2xx HTTP request. A known event
+409/410 must belong to the SDK invocation tied to the exact successful 2xx
+`workflow.route.flow` delivery. Continuous mode uses its single native span
+link; legacy linked mode can use its exact local parent. Both allow the SDK's
+one known `vqs.process` consumer span between the invocation and delivery,
+with that consumer also successful. A link to a prior run origin does not
+establish delivery success by itself. The filter removes only the
+closed HTTP/SDK error pair and its recognized error wrapper; other errors stay
+visible. With neither a valid local parent chain nor a valid delivery link,
+the error remains in the alert. A successful root or another successful
+invocation in the same trace cannot excuse this invocation's failure.
 
 Every alert query returns exactly one row and the alert reads it
 (`first_row`). PostHog refuses an `any_row` alert whose query its `LIMIT`

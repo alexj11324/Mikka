@@ -121,50 +121,221 @@ test('the API key is required and never appears in errors', async () => {
   await assert.rejects(api.alerts(), error => !error.message.includes(key) && /403/.test(error.message))
 })
 
-test('only confirmed handled Workflow attempts and their exact wrappers leave the error alert', () => {
+function handledWorkflowSpans(rows) {
   const query = INSIGHTS.find(item => item.key === 'alert-error-spike').query.source.query
-  const start = query.indexOf('    successful_traces AS (')
-  assert.ok(start >= 0, 'the alert must classify handled attempts before aggregating errors')
+  const start = query.indexOf('    successful_entries AS (')
+  assert.ok(start >= 0, 'success must belong to an entry, never a whole trace')
   const filter = query.slice(start, query.indexOf('    service_start AS (')).trim().replace(/,$/, '')
+  const candidateStart = query.indexOf('AND (raw.is_root_span')
+  const candidate = query.slice(candidateStart + 4, start).trim().replace(/\),$/, '').trim()
+  const normalizationStart = query.indexOf("CASE WHEN raw.name LIKE 'workflow.execute %'")
+  const normalizedName = query.slice(normalizationStart, query.indexOf(' AS name,', normalizationStart))
   const db = new DatabaseSync(':memory:')
   try {
+    // Only adapt ClickHouse's Array(String)/JSON primitives; execute the actual
+    // candidate predicate, parent joins, success predicates and role expansion.
+    const array = value => value == null ? [] : JSON.parse(value)
+    db.function('length', value => array(value).length)
+    db.function('arrayElement', (value, index) => array(value)[index - 1] ?? '')
+    db.function('isValidJSON', value => { try { JSON.parse(value); return 1 } catch { return 0 } })
+    db.function('JSONExtractString', (value, key) => {
+      try { const result = JSON.parse(value)?.[key]; return typeof result === 'string' ? result : '' } catch { return '' }
+    })
     db.exec(`CREATE TABLE spans (
       service_name TEXT, trace_id TEXT, span_id TEXT, parent_span_id TEXT,
       name TEXT, is_root_span INTEGER, status_code INTEGER, route TEXT,
-      error_code TEXT, http_status INTEGER
+      error_code TEXT, http_status INTEGER, links TEXT
     )`)
-    const insert = db.prepare('INSERT INTO spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    function add(trace, { rootStatus = 1, rootHttp = 200, root = true, service = 'mikka-web',
-      job = false, cron = false, sdk = 'world.events.create run_started', wrapper = 'workflow.replay.load',
-      http = 410, code = 'HTTP 410', route = '/.well-known/workflow/v1/flow' } = {}) {
-      const row = (id, parent, name, status, error, httpCode = null, rootSpan = false, spanRoute = route) =>
-        insert.run(service, trace, id, parent, name, Number(rootSpan), status, spanRoute, error, httpCode)
-      if (root) row('root', '', job ? 'after:workflow-wake' : cron ? 'GET /api/cron/reconcile' : 'workflow.route.flow', rootStatus, 'unknown_error', job ? null : rootHttp, true, cron ? '/api/cron/reconcile' : route)
-      row('wrapper', 'root', wrapper, 2, 'unknown_error')
-      row('sdk', 'wrapper', sdk, 2, 'unknown_error')
-      row('http', 'sdk', http === 404 ? 'http GET' : 'http POST', 2, code, http)
-      row('transport', 'root', 'workflow.events.ws.connect', 2, 'TRANSPORT')
-    }
-    add('expired')
-    add('duplicate-wait', { sdk: 'world.events.create wait_created', wrapper: 'workflow.run', http: 409, code: 'HTTP 409' })
-    add('duplicate-step', { sdk: 'world.events.create step_started', wrapper: 'step.execute', http: 409, code: 'HTTP 409' })
-    add('wake', { job: true, rootStatus: 0, sdk: 'world.hooks.getByToken', wrapper: 'hook.resume', http: 404, code: 'not-found', route: 'after:workflow-wake' })
-    add('cron', { cron: true, sdk: 'world.hooks.getByToken', wrapper: 'cron:reconcile', http: 404, code: 'not-found', route: 'cron:reconcile' })
-    add('failed-entry', { rootStatus: 2, rootHttp: 500 })
-    add('missing-entry', { root: false })
-    add('missing-http-status', { rootHttp: null })
-    add('other-route', { route: '/api/rpc' })
-    add('other-operation', { sdk: 'world.events.create run_completed', http: 409, code: 'HTTP 409' })
-    add('other-error', { http: 500, code: 'not-found' })
-    add('other-service', { service: 'mikka-daemon' })
-    const excluded = db.prepare(`WITH ${filter} SELECT trace_id, span_id FROM handled_spans ORDER BY trace_id, span_id`).all()
+    const insert = db.prepare('INSERT INTO spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    for (const { service = 'mikka-web', trace = 'trace', id, parent, name, root = false, status = 0, route,
+      error = 'unknown_error', http = null, links = [] } of rows)
+      insert.run(service, trace, id, parent, name, Number(root), status, route, error, http, JSON.stringify(links))
+    db.exec(`CREATE VIEW workflow_spans AS SELECT raw.service_name, raw.trace_id, raw.span_id,
+      raw.parent_span_id, ${normalizedName} AS name, raw.is_root_span, raw.status_code, raw.route,
+      raw.error_code, raw.http_status, raw.links FROM spans raw
+      WHERE raw.service_name = 'mikka-web' AND ${candidate}`)
+    return db.prepare(`WITH ${filter} SELECT trace_id, span_id FROM handled_spans ORDER BY trace_id, span_id`).all()
       .map(row => `${row.trace_id}/${row.span_id}`)
-    assert.deepEqual(excluded, [
-      'cron/http', 'cron/sdk', 'duplicate-step/http', 'duplicate-step/sdk',
-      'duplicate-wait/http', 'duplicate-wait/sdk', 'expired/http', 'expired/sdk', 'expired/wrapper',
-      'wake/http', 'wake/sdk', 'wake/wrapper',
-    ])
-  } finally {
-    db.close()
+  } finally { db.close() }
+}
+
+function hookAttempt(parent, route, trace = 'trace') {
+  return [
+    { trace, id: 'resume', parent, name: 'hook.resume', status: 2, route },
+    { trace, id: 'sdk', parent: 'resume', name: 'world.hooks.getByToken', status: 2, route },
+    { trace, id: 'http', parent: 'sdk', name: 'http GET', status: 2, route, error: 'not-found', http: 404 },
+    { trace, id: 'transport', parent, name: 'workflow.events.ws.connect', status: 2, route, error: 'TRANSPORT' },
+  ]
+}
+
+const deliveryLink = (trace, span = 'delivery') => JSON.stringify({ trace_id: trace, span_id: span })
+
+function flowAttempt(trace, { sdk = 'world.events.create run_started', wrapper = 'workflow.replay.load',
+  http = 410, code = 'HTTP 410', route = '/.well-known/workflow/v1/flow',
+  deliveryStatus = 1, deliveryHttp = 200, delivery = true, links = [deliveryLink(`${trace}-delivery`)],
+  invocationStatus = 1, invocationError = 'unknown_error', legacyNames = false, service = 'mikka-web' } = {}) {
+  const rows = [
+    ...(delivery ? [{ trace: `${trace}-delivery`, id: 'delivery', parent: 'delivery-parent', name: 'workflow.route.flow', status: deliveryStatus,
+      route: '/.well-known/workflow/v1/flow', http: deliveryHttp }] : []),
+    { trace, id: 'invocation', parent: 'run-origin', name: legacyNames ? 'workflow.execute fixture' : 'workflow.execute',
+      status: invocationStatus, route, error: invocationError, links },
+    ...(wrapper ? [{ trace, id: 'wrapper', parent: 'invocation', name: legacyNames && wrapper === 'step.execute' ? 'step.execute fixture' : wrapper,
+      status: 2, route }] : []),
+    { trace, id: 'sdk', parent: wrapper ? 'wrapper' : 'invocation', name: sdk, status: 2, route },
+    { trace, id: 'http', parent: 'sdk', name: http === 404 ? 'http GET' : 'http POST', status: 2, route, error: code, http },
+    { trace, id: 'transport', parent: 'invocation', name: 'workflow.events.ws.connect', status: 2, route, error: 'TRANSPORT' },
+  ]
+  return rows.map(row => ({ ...row, service }))
+}
+
+function queuedFlowAttempt(trace, linked = false) {
+  const deliveryTrace = linked ? trace : `${trace}-delivery`
+  const rows = flowAttempt(trace, { links: [linked ? deliveryLink('origin', 'start') : deliveryLink(deliveryTrace, 'queue')] })
+  rows.find(row => row.id === 'delivery').trace = deliveryTrace
+  if (linked) rows.find(row => row.id === 'invocation').parent = 'queue'
+  rows.push({ trace: deliveryTrace, id: 'queue', parent: 'delivery', name: 'vqs.process', status: 0,
+    route: '/.well-known/workflow/v1/flow' })
+  return rows
+}
+
+test('only confirmed handled Workflow attempts and their exact wrappers leave the error alert', () => {
+  const rows = [
+    ...flowAttempt('expired'),
+    ...flowAttempt('duplicate-wait', { sdk: 'world.events.create wait_created', wrapper: 'workflow.run', http: 409, code: 'HTTP 409' }),
+    ...flowAttempt('duplicate-step', { sdk: 'world.events.create step_started', wrapper: 'step.execute', http: 409, code: 'HTTP 409', legacyNames: true }),
+    ...flowAttempt('failed-entry', { deliveryStatus: 2, deliveryHttp: 500 }),
+    ...flowAttempt('missing-entry', { delivery: false }),
+    ...flowAttempt('missing-http-status', { deliveryHttp: null }),
+    ...flowAttempt('other-route', { route: '/api/rpc' }),
+    ...flowAttempt('other-operation', { sdk: 'world.events.create run_completed', http: 409, code: 'HTTP 409' }),
+    ...flowAttempt('other-error', { http: 500, code: 'not-found' }),
+    ...flowAttempt('other-service', { service: 'mikka-daemon' }),
+  ]
+  assert.deepEqual(handledWorkflowSpans(rows), [
+    'duplicate-step/http', 'duplicate-step/sdk', 'duplicate-wait/http', 'duplicate-wait/sdk',
+    'expired/http', 'expired/sdk', 'expired/wrapper',
+  ])
+})
+
+test('successful non-root wake and cron entries handle only their own exact hook attempts', () => {
+  const rows = [
+    { trace: 'wake', id: 'request', parent: '', name: 'POST /api/rpc', root: true, route: '/api/rpc', http: 200 },
+    { trace: 'wake', id: 'entry', parent: 'request', name: 'after:workflow-wake', route: 'after:workflow-wake' },
+    ...hookAttempt('entry', 'after:workflow-wake', 'wake'),
+    { trace: 'cron', id: 'request', parent: 'remote-parent', name: 'GET /api/cron/reconcile', route: '/api/cron/reconcile', http: 200 },
+    { trace: 'cron', id: 'entry', parent: 'request', name: 'cron:reconcile', route: 'cron:reconcile' },
+    ...hookAttempt('entry', 'cron:reconcile', 'cron'),
+  ]
+  assert.deepEqual(handledWorkflowSpans(rows), [
+    'cron/http', 'cron/resume', 'cron/sdk', 'wake/http', 'wake/resume', 'wake/sdk',
+  ])
+})
+
+test('another successful entry in the same trace never handles a failed child entry', () => {
+  const rows = [
+    { id: 'success', parent: '', name: 'GET /api/cron/reconcile', root: true, route: '/api/cron/reconcile', http: 200 },
+    { id: 'failed', parent: 'success', name: 'after:workflow-wake', status: 2, route: 'after:workflow-wake' },
+    ...hookAttempt('failed', 'after:workflow-wake'),
+  ]
+  assert.deepEqual(handledWorkflowSpans(rows), [])
+})
+
+for (const [name, options] of [
+  ['missing link', { links: [] }],
+  ['multiple links', { links: [deliveryLink('guard-delivery'), deliveryLink('guard-delivery')] }],
+  ['malformed link', { links: ['{'] }],
+  ['missing link trace ID', { links: [JSON.stringify({ span_id: 'delivery' })] }],
+  ['wrong link trace', { links: [deliveryLink('another-delivery')] }],
+  ['wrong link span', { links: [deliveryLink('guard-delivery', 'another-span')] }],
+  ['failed invocation', { invocationStatus: 2 }],
+  ['business error on normal return', { invocationStatus: 1, invocationError: 'TypeError' }],
+  ['unknown intermediate span', { wrapper: 'unknown.wrapper' }],
+]) test(`a ${name} keeps the flow errors`, () => {
+  assert.deepEqual(handledWorkflowSpans(flowAttempt('guard', options)), [])
+})
+
+test('a successful delivery in the same trace cannot replace the failed linked delivery', () => {
+  const rows = flowAttempt('shared', { deliveryStatus: 2, deliveryHttp: 500 })
+  rows.push({ trace: 'shared', id: 'other-delivery', parent: '', name: 'workflow.route.flow', root: true,
+    route: '/.well-known/workflow/v1/flow', status: 1, http: 200 })
+  assert.deepEqual(handledWorkflowSpans(rows), [])
+})
+
+test('a legacy run-origin link alone never impersonates the invocation delivery', () => {
+  const rows = flowAttempt('legacy', { links: [deliveryLink('origin', 'start')] })
+  rows.push({ trace: 'origin', id: 'start', parent: '', name: 'workflow.start fixture', root: true,
+    route: '/.well-known/workflow/v1/flow', status: 1, http: 200 })
+  rows.push({ trace: 'legacy', id: 'local-delivery', parent: '', name: 'workflow.route.flow', root: true,
+    route: '/.well-known/workflow/v1/flow', status: 1, http: 200 })
+  assert.deepEqual(handledWorkflowSpans(rows), [])
+})
+
+test('a linked invocation keeps its exact successful delivery parent despite its separate run-origin link', () => {
+  const rows = flowAttempt('legacy', { links: [deliveryLink('origin', 'start')], legacyNames: true })
+  rows.find(row => row.id === 'delivery').trace = 'legacy'
+  rows.find(row => row.id === 'invocation').parent = 'delivery'
+  assert.deepEqual(handledWorkflowSpans(rows), ['legacy/http', 'legacy/sdk', 'legacy/wrapper'])
+})
+
+for (const linked of [false, true]) test(`${linked ? 'linked' : 'continuous'} mode follows only the exact vqs.process delivery hop`, () => {
+  assert.deepEqual(handledWorkflowSpans(queuedFlowAttempt('queue-attempt', linked)), [
+    'queue-attempt/http', 'queue-attempt/sdk', 'queue-attempt/wrapper',
+  ])
+})
+
+for (const [name, change] of [
+  ['failed queue', rows => { rows.find(row => row.id === 'queue').status = 2 }],
+  ['typed queue error', rows => { rows.find(row => row.id === 'queue').error = 'REAL_QUEUE_FAILURE' }],
+  ['unknown queue span', rows => { rows.find(row => row.id === 'queue').name = 'unknown.queue' }],
+  ['wrong queue parent', rows => { rows.find(row => row.id === 'queue').parent = 'another-delivery' }],
+  ['cross-service queue', rows => { rows.find(row => row.id === 'queue').service = 'mikka-daemon' }],
+  ['failed delivery', rows => { rows.find(row => row.id === 'delivery').http = 500 }],
+  ['typed delivery error', rows => { rows.find(row => row.id === 'delivery').error = 'REAL_DELIVERY_FAILURE' }],
+  ['extra queue hop', rows => {
+    const queue = rows.find(row => row.id === 'queue')
+    rows.push({ ...queue, id: 'extra-queue' })
+    queue.parent = 'extra-queue'
+  }],
+]) test(`a ${name} cannot borrow another successful entry to hide errors`, () => {
+  for (const linked of [false, true]) {
+    const rows = queuedFlowAttempt('guard-queue', linked)
+    change(rows)
+    rows.push({ trace: rows.find(row => row.id === 'queue').trace, id: 'unrelated-delivery', parent: '',
+      name: 'workflow.route.flow', status: 1, http: 200, route: '/.well-known/workflow/v1/flow' })
+    assert.deepEqual(handledWorkflowSpans(rows), [], linked ? 'linked' : 'continuous')
   }
+})
+
+test('two invocations in one trace retain the failed invocation even with a shared successful delivery', () => {
+  const rows = flowAttempt('shared')
+  const failed = flowAttempt('shared', { invocationStatus: 2 }).filter(row => row.trace === 'shared')
+    .map(row => ({ ...row, id: `failed-${row.id}`, parent: row.parent === 'run-origin' ? row.parent : `failed-${row.parent}` }))
+  assert.deepEqual(handledWorkflowSpans([...rows, ...failed]), ['shared/http', 'shared/sdk', 'shared/wrapper'])
+})
+
+test('a direct event write uses its exact cross-trace invocation link without requiring a root delivery', () => {
+  assert.deepEqual(handledWorkflowSpans(flowAttempt('direct', { wrapper: null })), ['direct/http', 'direct/sdk'])
+})
+
+test('a direct cron lookup still requires the corresponding successful HTTP entry', () => {
+  const rows = [
+    { id: 'request', parent: 'remote', name: 'GET /api/cron/reconcile', route: '/api/cron/reconcile', http: 200 },
+    { id: 'cron', parent: 'request', name: 'cron:reconcile', route: 'cron:reconcile' },
+    ...hookAttempt('cron', 'cron:reconcile').filter(row => row.id !== 'resume')
+      .map(row => row.id === 'sdk' ? { ...row, parent: 'cron' } : row),
+  ]
+  assert.deepEqual(handledWorkflowSpans(rows), ['trace/http', 'trace/sdk'])
+  rows[0].http = 502
+  rows.push({ id: 'other-request', parent: '', name: 'GET /api/cron/reconcile', root: true,
+    route: '/api/cron/reconcile', http: 200 })
+  assert.deepEqual(handledWorkflowSpans(rows), [])
+})
+
+test('a real SDK error code or an unrelated failed sibling is never hidden', () => {
+  const rows = flowAttempt('typed')
+  rows.find(row => row.id === 'sdk').error = 'REAL_FAILURE'
+  assert.deepEqual(handledWorkflowSpans(rows), [])
+  rows.find(row => row.id === 'sdk').error = 'unknown_error'
+  rows.find(row => row.id === 'wrapper').error = 'REAL_WRAPPER_FAILURE'
+  assert.deepEqual(handledWorkflowSpans(rows), ['typed/http', 'typed/sdk'])
 })
