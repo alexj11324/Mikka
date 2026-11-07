@@ -138,3 +138,5 @@ test('Apple API denial preserves the action/status and does not parse or expose 
 // Public protocol checkpoint: ce67 bridge; native/full threads follow the final fixed source.
 
 // Public release checkpoint: dispatch uses the commit subject prefix, independent of its explanatory body.
+
+// YAML mode expressions use block scalars because the commit prefix contains a colon.
