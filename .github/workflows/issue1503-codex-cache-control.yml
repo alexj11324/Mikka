@@ -1,0 +1,80 @@
+name: Issue 1503 Codex subscription cache-marker control
+on:
+  push:
+    branches: [ops/issue-1503-codex-cache-control]
+    paths:
+      - .github/workflows/issue1503-codex-cache-control.yml
+      - scripts/ops/issue1503/codex-cache-control.mjs
+      - scripts/ops/issue1503/codex-cache-control.test.mjs
+permissions:
+  contents: read
+concurrency:
+  group: issue1503-codex-cache-control
+  cancel-in-progress: false
+jobs:
+  control:
+    if: github.repository == 'alexj11324/Mikka' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Install exact application dependencies before secrets
+        run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - name: Build the unchanged production Go worker from the fixed CPA pin
+        run: node scripts/build-subscription-worker.mjs
+        env:
+          MIKKA_BUILD_BYOS_WORKER: '1'
+      - name: Read the existing workspace database configuration
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      # Same authoritative delivery as web-deploy.yml. The launcher passes only
+      # its fixed BYOS/DB/PostHog allowlist into the model-control child process.
+      - name: Read existing production application configuration
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Read existing token for selected configuration GET fallback
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Observe exactly two requests through the normal shared subscription service
+        run: node scripts/ops/issue1503/codex-cache-control.mjs
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1503-codex-cache-control-${{ github.run_id }}-${{ github.run_attempt }}
+          path: issue1503-report/codex-cache-control.json
+          retention-days: 3
