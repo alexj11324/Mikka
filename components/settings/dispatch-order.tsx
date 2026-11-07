@@ -2,21 +2,17 @@
 
 import { Fragment } from 'react'
 import Link from 'next/link'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { ChevronRight, Cloud, Laptop, Server } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { harnessName } from '@/components/labels/entity-labels'
 import type { OrderView } from '@/lib/model-order'
-import { DEVICE_STAGES, type DeviceStage } from '@/lib/model-order-plan'
+import { dispatchDotOf, useDispatchTiers, type DispatchDot } from '@/hooks/settings/use-dispatch-tiers'
 import { settingsHref } from '@/lib/settings-sections'
 import { cn } from '@/lib/utils'
 
-type Place = OrderView['places']['devices'][number]
-type Dot = 'ready' | 'idle' | 'attention'
-
-/** The dot on a place (R-24): green when it can take a run, grey when off or offline, amber when it needs something. */
-const dotOf = (stage: DeviceStage): Dot => stage === 'ready' ? 'ready' : stage === 'off' || stage === 'offline' ? 'idle' : 'attention'
+type Dot = DispatchDot
+const dotOf = dispatchDotOf
 
 function StatusDot({ dot, corner }: { dot: Dot; corner?: boolean }) {
   return <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full bg-muted-foreground/50', dot === 'ready' && 'bg-success', dot === 'attention' && 'bg-warning',
@@ -32,26 +28,7 @@ function StatusDot({ dot, corner }: { dot: Dot; corner?: boolean }) {
  */
 export function DispatchOrder({ data, workspaceId, e2bConfigured }: { data: Pick<OrderView, 'places' | 'first' | 'preferredHarness'>; workspaceId: string; e2bConfigured?: boolean }) {
   const t = useTranslations('Settings.modelOrder')
-  const format = useFormatter()
-  const now = useNow({ updateInterval: 60_000 })
-  const agent = harnessName(data.preferredHarness)
-  const stageWord = (place: Place) => place.stage === 'offline' && place.lastSeenAt ? t('stage.offlineSince', { time: format.relativeTime(new Date(place.lastSeenAt), now) })
-    : t(`stage.${place.stage}`, { agent })
-  const best = (places: Place[]): DeviceStage => places.reduce<DeviceStage>((top, place) => DEVICE_STAGES.indexOf(place.stage) > DEVICE_STAGES.indexOf(top) ? place.stage : top, 'off')
-  const tiers: { key: string; label: string; Icon: typeof Cloud; dot: Dot; first: boolean; state: string; devices: Place[] | null; empty?: string }[] = []
-  if (data.places.cloud) {
-    const ready = data.places.cloud === 'ready'
-    tiers.push({ key: 'cloud', label: t('cloud'), Icon: Cloud, dot: ready ? 'ready' : 'attention', first: data.first?.kind === 'cloud', devices: null,
-      state: ready ? t('stage.ready') : e2bConfigured === false ? t('cloudNoKey') : t('cloudUnavailable') })
-  }
-  for (const server of [true, false]) {
-    const devices = data.places.devices.filter(place => place.server === server)
-    const stage = best(devices)
-    tiers.push({ key: server ? 'servers' : 'computers', label: t(server ? 'placeServers' : 'placeComputers'), Icon: server ? Server : Laptop,
-      dot: devices.length ? dotOf(stage) : 'idle', devices, empty: t(server ? 'noServers' : 'noComputers'),
-      first: data.first?.kind === 'device' && data.first.server === server,
-      state: devices.length ? t(`stage.${stage}`, { agent }) : t(server ? 'noServers' : 'noComputers') })
-  }
+  const { tiers, stageWord } = useDispatchTiers({ data, e2bConfigured })
   return <span role="list" aria-label={t('placesLabel')} className="mt-1 flex flex-wrap items-center gap-0.5" data-slot="dispatch-order">
     {tiers.map((tier, index) => <Fragment key={tier.key}>
       {index > 0 && <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground/70" />}

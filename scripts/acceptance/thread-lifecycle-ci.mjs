@@ -12,11 +12,15 @@ const ROOT = resolve(import.meta.dirname, '../..')
 const SHA = /^[a-f0-9]{40}$/
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/
 const integer = value => Number.isSafeInteger(value) && value > 0
-const PROVIDER_CASES = ['active-monitor', 'provider-refusal', 'lost-pause-response', 'resume-monitor',
+const PROVIDER_CASES = ['active-monitor', 'provider-request-deadline', 'provider-refusal', 'lost-pause-response', 'resume-monitor',
   'stale-epoch', 'stop-idempotence', 'end-idempotence']
 const PROVIDER_SCOPE = Object.freeze({ realProviderRpc: true, injectedTransportFaults: true,
   naturalTimeoutExpiry: false, daemonAcceptance: false, subscriptionAcceptance: false, modelCalls: 0,
-  resumeScope: 'provider-resume-to-controller-monitor' })
+  resumeScope: 'provider-resume-to-controller-monitor', requestDeadlineScope: 'sdk-request-deadline-to-controller-recovery' })
+const REQUEST_DEADLINE = Object.freeze({ operation: 'setTimeout', requestTimeoutMs: 1, retries: 0,
+  errorName: 'TimeoutError', earlyReplayIo: 0, recovered: true })
+const requestDeadlineProved = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && Object.entries(REQUEST_DEADLINE).every(([key, expected]) => value[key] === expected)
 const QUESTION_RESUME_SCOPE = 'real_owner_factory_question_pause_resume_with_native_report'
 const ISSUE_PENDING = ['external_wait_and_adjacent_stage_continuity', 'terminal_revoke_and_close_grace_retention',
   'provider_timeout_fault_injection', 'latency_and_cost_measurement']
@@ -168,11 +172,13 @@ export async function providerReceipt({ sourceCommit, run }) {
       && UUID.test(report.runId ?? '') && /^[a-zA-Z0-9_-]{1,100}$/.test(report.sandboxId ?? '')
       && report.subscriptionAcceptance === false && report.modelCalls === 0
       && report.resumeScope === PROVIDER_SCOPE.resumeScope
+      && report.requestDeadlineScope === PROVIDER_SCOPE.requestDeadlineScope && requestDeadlineProved(report.requestDeadline)
       && JSON.stringify(report.cases) === JSON.stringify(PROVIDER_CASES)
       && ['info', 'keepAlive', 'pause', 'kill'].every(key => Number.isSafeInteger(report.counters?.[key]) && report.counters[key] >= 0)
       && report.cleanup?.provider === 'confirmed_missing' && report.cleanup?.database === 'dropped', 'provider_report')
     return { ...base, status: 'passed', acceptance: report.acceptance, workerHash: report.workerHash,
       template: report.template, sandboxId: report.sandboxId, runId: report.runId, cases: [...PROVIDER_CASES],
+      requestDeadline: { ...REQUEST_DEADLINE },
       counters: Object.fromEntries(['info', 'keepAlive', 'pause', 'kill'].map(key => [key, report.counters[key]])),
       cleanup: { status: 'passed', provider: 'confirmed_missing', database: 'dropped' } }
   } catch (error) {
@@ -190,6 +196,8 @@ export function completeEvidence(sourceCommit, provider, owner, outcomes) {
   const cases = owner?.cases
   const providerPassed = outcomes.provider === 'success' && provider?.sourceCommit === sourceCommit
     && provider.status === 'passed' && provider.cleanup?.status === 'passed'
+    && provider.scope?.requestDeadlineScope === PROVIDER_SCOPE.requestDeadlineScope && requestDeadlineProved(provider.requestDeadline)
+    && JSON.stringify(provider.cases) === JSON.stringify(PROVIDER_CASES)
   const questionResumePassed = outcomes.owner === 'success' && owner?.sourceCommit === sourceCommit && owner.scope === QUESTION_RESUME_SCOPE
     && owner.issueAcceptance === 'incomplete' && owner.status === 'passed' && owner.cleanup?.status === 'passed'
     && Array.isArray(cases) && cases.length === 2
@@ -199,7 +207,7 @@ export function completeEvidence(sourceCommit, provider, owner, outcomes) {
   const passed = SHA.test(sourceCommit ?? '') && providerPassed && questionResumePassed
   return { kind: 'thread-lifecycle-question-resume-evidence', issue: 1593, sourceCommit,
     scope: 'provider_controller_faults_and_task_vm_question_resume', status: passed ? 'passed' : 'failed',
-    issueAcceptance: 'incomplete', pending: [...ISSUE_PENDING],
+    issueAcceptance: 'incomplete', pending: ISSUE_PENDING.filter(item => item !== 'provider_timeout_fault_injection' || !providerPassed),
     providerIntegration: providerPassed ? 'passed' : 'incomplete',
     questionResume: questionResumePassed ? 'passed' : 'incomplete', providerScope: PROVIDER_SCOPE }
 }

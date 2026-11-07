@@ -29,11 +29,25 @@ A missing directory, or one outside the repository, fails the build.
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
 | `chat-message` | today's message rows (`Message`, `Bubble`, `ReplyWaiting`) | `ChatMessageProps`, `ChatWaitingProps` in `components/slots/chat-message-contract.ts`; also exports `CHAT_SURFACE` | `coordinator-chat.tsx`, through `@ui-slot/chat-message` |
 | `reply-activity` | a reply's thinking and tool calls as Trace rows | `ActivityThinkingProps`, `ActivityToolView`, `ActivityGroupProps` in `components/slots/reply-activity-contract.ts`; exports `ActivityList`, `ActivityThinking`, `ActivityTool`, `ActivityGroup` | `components/coordinator/reply-activity.tsx`, through `@ui-slot/reply-activity` |
+| `settings-frame` | app rail and window bar around settings (`AppFrame`) | `SettingsFrameProps` in `components/slots/settings-frame-contract.ts`; also exports `OWN_SETTINGS_FRAME` (`false` by default: settings stay in the workspace frame; `true`: `IssueWorkspace` draws settings in this frame) | `SettingsFrame` from `@/components/settings/settings-shell`; `IssueWorkspace` |
+| `settings-sidebar` | settings section list | `SettingsSidebarProps` in `components/slots/settings-sidebar-contract.ts` | `SettingsSidebar` from `@/components/settings/settings-sidebar` |
+| `settings-content` | heading and card around a section (`AppShellContent variant="settings"`) | `SettingsContentFrameProps` in `components/slots/settings-content-contract.ts` | `SettingsView` |
+| `settings-account` | 账户 body (picture, name, email, sign-out, delete account) | `SettingsAccountProps` in `components/slots/settings-account-contract.ts` | `AccountSettings` from `@/components/settings/account-settings` |
+| `settings-general` | 常规 body (icon, name, address, transfer, delete, archived bots) | `SettingsGeneralProps` in `components/slots/settings-general-contract.ts` | `SettingsView` |
+| `settings-memory` | 记忆与建议 body (switch, facts by kind, correct, delete) | `SettingsMemoryProps` in `components/slots/settings-memory-contract.ts` | `MemorySettings` from `@/components/settings/memory-settings` |
+| `settings-models` | 模型与订阅 body (subscriptions, API keys, fallback, model order, profiles, sharing) | `SettingsModelsProps` in `components/slots/settings-models-contract.ts` | `SettingsView` |
+| `settings-notifications` | 通知 body (push switches, when to push) | `SettingsNotificationsProps` in `components/slots/settings-notifications-contract.ts` | `NotificationSettings` from `@/components/settings/notifications-settings` |
+| `settings-preferences` | 偏好设置 body (appearance, language, task prefix, replay onboarding) | `SettingsPreferencesProps` in `components/slots/settings-preferences-contract.ts` | `SettingsView` |
+| `settings-privacy` | 数据与隐私 body (data export, shared links) | `SettingsPrivacyProps` in `components/slots/settings-privacy-contract.ts` | `PrivacySettings` from `@/components/settings/privacy-settings` |
+| `settings-secrets` | 密钥与登录 / 密钥与环境 body (my secrets and logins, workspace secrets) | `SettingsSecretsProps` in `components/slots/settings-secrets-contract.ts` | `SecretsPage` from `@/components/settings/secrets-page` |
+| `settings-security` | 安全 body (password, signed-in devices, Google sign-in) | `SettingsSecurityProps` in `components/slots/settings-security-contract.ts` | `SettingsView` |
 
 A slot changes how something looks, never what it does. Data, state and
 behaviour stay in this repository and reach the slot as props. A layer slot
 exports the same named component as the default, takes the same props and is
 a client component (`'use client'`).
+
+The settings slots are filled together: a layer's frame draws the whole settings page, and its sidebar and content slots hand it their section list and title rather than drawing their own.
 
 Adding a slot: move today's component to `components/slots/<name>.tsx`, put
 its props in a contract file next to it, keep the public import path

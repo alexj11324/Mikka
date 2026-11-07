@@ -1,13 +1,9 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
-import useSWR from 'swr'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Cloud, Ellipsis, EyeIcon, EyeOffIcon, FileUp, Plus } from 'lucide-react'
-import { createSecret, deleteSecret, importSecrets, replaceSecret, type listSecrets } from '@/app/actions/workspace-secrets'
 import { E2BKeyDialog, useE2BKeyStatus } from '@/components/settings/e2b-key-dialog'
-import { settingsRead } from '@/lib/settings-read'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,17 +18,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
-import { parseDotenv, DOTENV_MAX_BYTES, type DotenvEntry, type DotenvError } from '@/lib/secrets/dotenv'
-import { isReservedEnvName, SECRET_NOTE_MAX } from '@/lib/secrets/format'
-import { memberMayWrite, secretActionAllowed, type WorkspaceRole } from '@/lib/secrets/permissions'
+import { SECRET_NOTE_MAX } from '@/lib/secrets/format'
+import { secretActionAllowed, type WorkspaceRole } from '@/lib/secrets/permissions'
 import type { WorkspaceSecretView } from '@/lib/secrets/store'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
+import { SECRET_REPOSITORY as REPOSITORY, useDotenvFile, useDotenvPreview, useWorkspaceSecretEditor, useWorkspaceSecretImport, useWorkspaceSecrets, writableScopes, type SecretScope as Scope } from '@/hooks/settings/use-secrets'
 
 type Filter = 'all' | 'workspace' | 'repository'
-type Scope = 'workspace' | 'repository'
 type Editing = { kind: 'new' } | { kind: 'edit'; secret: WorkspaceSecretView } | { kind: 'bulk' }
 type Saved = { notice: string | null } | null
 
@@ -43,16 +38,13 @@ type Saved = { notice: string | null } | null
  */
 export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.secrets')
-  const actionError = useActionError()
   const locale = useLocale()
-  const list = useSWR(settingsKeys.secrets(workspaceId), () => settingsRead<Awaited<ReturnType<typeof listSecrets>>>('secrets', { workspace: workspaceId }))
+  const list = useWorkspaceSecrets(workspaceId)
   const [filter, setFilter] = useState<Filter>('all')
   const [editing, setEditing] = useState<Editing | null>(null)
   const sheet = usePresence(editing)
   const [notice, setNotice] = useState<string | null>(null)
-  const secrets = list.data && !list.data.error ? list.data.secrets : null
-  // Offer only what this reader may do (lib/secrets/permissions.ts); the server checks again.
-  const role = list.data && !list.data.error ? list.data.role : null
+  const { secrets, role } = list
   const shown = (secrets ?? []).filter(secret => filter === 'all' || secret.scopeType === filter)
   const open = (next: Editing) => { setNotice(null); setEditing(next) }
 
@@ -61,8 +53,8 @@ export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: s
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'bulk' })}>{t('bulkAdd')}</Button>
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'new' })}>{t('add')}</Button>
     </> : undefined}>
-      {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {(list.error || list.data?.error) && <FieldError className="px-5 py-4">{actionError(list.data?.error)}</FieldError>}
+      {list.loading && <SettingsLoading label={t('loading')} rows={2} bare />}
+      {list.error && <FieldError className="px-5 py-4">{list.error}</FieldError>}
       {secrets?.length === 0 && role && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
         <div className="flex gap-2">
@@ -110,8 +102,8 @@ export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: s
     </SettingsSection>
     {notice && <p role="status" className="px-1 text-sm text-muted-foreground">{notice}</p>}
     {sheet.value && role && (sheet.value.kind === 'bulk'
-      ? <BulkSheet role={role} workspaceId={workspaceId} workspaceName={workspaceName} open={sheet.open} onOpenChangeComplete={sheet.onOpenChangeComplete} onClose={saved => { setEditing(null); if (saved) { setNotice(saved.notice); void list.mutate() } }} />
-      : <SecretSheet role={role} workspaceId={workspaceId} workspaceName={workspaceName} secret={sheet.value.kind === 'edit' ? sheet.value.secret : null} open={sheet.open} onOpenChangeComplete={sheet.onOpenChangeComplete} onClose={saved => { setEditing(null); if (saved) { setNotice(saved.notice); void list.mutate() } }} />)}
+      ? <BulkSheet role={role} workspaceId={workspaceId} workspaceName={workspaceName} open={sheet.open} onOpenChangeComplete={sheet.onOpenChangeComplete} onClose={saved => { setEditing(null); if (saved) { setNotice(saved.notice); list.reload() } }} />
+      : <SecretSheet role={role} workspaceId={workspaceId} workspaceName={workspaceName} secret={sheet.value.kind === 'edit' ? sheet.value.secret : null} open={sheet.open} onOpenChangeComplete={sheet.onOpenChangeComplete} onClose={saved => { setEditing(null); if (saved) { setNotice(saved.notice); list.reload() } }} />)}
   </>
 }
 
@@ -140,11 +132,6 @@ export function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   </>
 }
 
-/** The scopes this reader may write: admins pick; a member writes repository entries only. */
-function writableScopes(role: WorkspaceRole): Scope[] {
-  return (['workspace', 'repository'] as const).filter(scopeType => role === 'admin' || memberMayWrite({ scopeType }))
-}
-
 function ScopeField({ role, scope, onScope, repository, onRepository, disabled, workspaceName }: { role: WorkspaceRole; scope: Scope; onScope: (scope: Scope) => void; repository: string; onRepository: (value: string) => void; disabled: boolean; workspaceName?: string }) {
   const t = useTranslations('Settings.secrets')
   const scopes = writableScopes(role)
@@ -162,15 +149,12 @@ function ScopeField({ role, scope, onScope, repository, onRepository, disabled, 
   </FieldGroup>
 }
 
-const REPOSITORY = /^[^/\s]+\/[^/\s]+$/
-const scopeInput = (scope: Scope, repository: string) => scope === 'workspace' ? { type: 'workspace' as const } : { type: 'repository' as const, repository: repository.trim() }
 
 /** Add one secret, or edit one: a new value, note or scope. Name and masking are fixed once saved. */
 function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; workspaceName?: string; role: WorkspaceRole; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets')
   const commonT = useTranslations('Common')
   const card = useTranslations('CredentialLogin')
-  const actionError = useActionError()
   const [name, setName] = useState(secret?.name ?? '')
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
@@ -178,8 +162,8 @@ function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open =
   const [masked, setMasked] = useState(secret ? secret.kind === 'secret' : true)
   const [scope, setScope] = useState<Scope>(secret?.scopeType ?? writableScopes(role)[0])
   const [repository, setRepository] = useState(secret?.scopeRef ?? '')
-  const [pending, setPending] = useState<'save' | 'delete' | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const editor = useWorkspaceSecretEditor(workspaceId, secret, secretName => t('shortValueNotMasked', { name: secretName }))
+  const { pending, error, setError } = editor
   const [confirm, setConfirm] = useState<'workspace' | 'delete' | null>(null)
   const moved = secret !== null && (scope !== secret.scopeType || (scope === 'repository' && repository.trim().toLowerCase() !== secret.scopeRef))
   const changed = secret === null || Boolean(value) || note.trim() !== secret.note || moved
@@ -188,35 +172,13 @@ function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open =
 
   async function save() {
     setConfirm(null)
-    setPending('save')
-    setError(null)
-    try {
-      const result = secret
-        ? await replaceSecret({ id: secret.id, ...(value ? { value } : {}), ...(note.trim() !== secret.note ? { note: note.trim() } : {}), ...(moved ? { scope: scopeInput(scope, repository) } : {}) }, workspaceId)
-        : await createSecret({ name: name.trim(), kind: masked ? 'secret' : 'env', value, note: note.trim(), scope: scopeInput(scope, repository) }, workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose({ notice: result.warning === 'shortValueNotMasked' ? t('shortValueNotMasked', { name: result.name }) : null })
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(null)
-    }
+    const saved = await editor.save({ name, value, note, masked, scope, repository, moved })
+    if (saved) onClose(saved)
   }
 
   async function remove() {
-    if (!secret) return
     setConfirm(null)
-    setPending('delete')
-    setError(null)
-    try {
-      const result = await deleteSecret({ id: secret.id }, workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose({ notice: null })
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(null)
-    }
+    if (await editor.remove()) onClose({ notice: null })
   }
 
   // Everyone in the workspace can use a workspace secret: say so once before saving one (Devin's safer default).
@@ -272,7 +234,6 @@ function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open =
   </Sheet>
 }
 
-type Preview = { entries: DotenvEntry[]; errors: Array<DotenvError | { line: number; name: string; reason: 'reserved' }> } | { tooLarge: true }
 
 /** Bulk add: paste a .env or pick one (≤ 2 MB); each line previewed by name, values shown as dots only. */
 function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; workspaceName?: string; role: WorkspaceRole; onClose: (saved: Saved) => void } & PresenceProps) {
@@ -284,44 +245,26 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
   const [replace, setReplace] = useState(true)
   const [scope, setScope] = useState<Scope>(writableScopes(role)[0])
   const [repository, setRepository] = useState('')
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const importer = useWorkspaceSecretImport(workspaceId)
+  const { pending, error, setError } = importer
   const [confirm, setConfirm] = useState(false)
-  const preview = useMemo<Preview | null>(() => {
-    if (!text.trim()) return null
-    try {
-      const parsed = parseDotenv(text)
-      const reserved = parsed.entries.filter(entry => isReservedEnvName(entry.name)).map(entry => ({ line: entry.line, name: entry.name, reason: 'reserved' as const }))
-      return { entries: parsed.entries.filter(entry => !isReservedEnvName(entry.name)), errors: [...parsed.errors, ...reserved].sort((a, b) => a.line - b.line) }
-    } catch { return { tooLarge: true } }
-  }, [text])
-  const count = preview && !('tooLarge' in preview) ? preview.entries.length : 0
+  const { preview, count } = useDotenvPreview(text)
   const ready = count > 0 && (scope === 'workspace' || REPOSITORY.test(repository.trim()))
+  const readFile = useDotenvFile(setText)
 
   const fileInput = useRef<HTMLInputElement>(null)
   function pick(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file) return
-    if (file.size > DOTENV_MAX_BYTES) { setError(actionError('secretImportTooLarge')); return }
-    setError(null)
-    void file.text().then(setText)
+    setError(readFile(file))
   }
 
   async function save() {
     setConfirm(false)
-    setPending(true)
-    setError(null)
-    try {
-      const result = await importSecrets({ text, masked, scope: scopeInput(scope, repository), onConflict: replace ? 'replace' : 'skip' }, workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      setText('')
-      onClose({ notice: t('importDone', { created: result.created.length, replaced: result.replaced.length, kept: result.kept.length + result.errors.length }) })
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(false)
-    }
+    const total = await importer.run({ text, masked, replace, scope, repository })
+    if (!total) return
+    setText('')
+    onClose({ notice: t('importDone', total) })
   }
 
   return <Sheet open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(null) }}>

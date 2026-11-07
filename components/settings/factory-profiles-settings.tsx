@@ -1,9 +1,8 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, KeyRound, MoreHorizontal, Pencil, Plus, SlidersHorizontal, UserRound } from 'lucide-react'
-import { toast } from 'sonner'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
 import { HarnessLabel, ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -18,13 +17,12 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from './primitives'
-import { profileAvailabilityKey, profileDefinition, profileModelKey, profileRequest, ProfileRequestError, useAgentProfiles, type AgentProfilesView } from './factory-profiles-data'
+import { profileAvailabilityKey, profileModelKey, type AgentProfilesView } from './factory-profiles-data'
+import { useAgentProfileEditor, useAgentProfileList, type ProfileEditor } from '@/hooks/settings/use-agent-profiles'
 
-type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean }
 const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 const SKILL_COPY = ['implementation-evidence', 'independent-review', 'systematic-debugging'] as const
 const skillCopyKey = (id: string) => (SKILL_COPY as readonly string[]).includes(id) ? id as typeof SKILL_COPY[number] : null
-const initialDefinition: AgentProfileDefinition = { name: '', description: '', roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' }, instructions: '', skills: [] }
 
 function modelSourceName(model: AgentProfilesView['catalog']['models'][number], t: ReturnType<typeof useTranslations<'Settings.agentProfiles'>>) {
   return model.sourceLabel || (model.sourceOrdinal ? t('numberedSource', { source: t(`sources.${model.source.kind}`), number: model.sourceOrdinal }) : t(`sources.${model.source.kind}`))
@@ -36,45 +34,13 @@ function ProfileSource({ model }: { model: AgentProfilesView['catalog']['models'
   return <span className="inline-flex min-w-0 items-center gap-1.5"><Icon aria-hidden="true" className="size-3.5 shrink-0" /><span className="truncate">{modelSourceName(model, t)}</span></span>
 }
 
-function profileFailure(error: unknown) {
-  if (!(error instanceof ProfileRequestError)) return 'saveUnconfirmed'
-  switch (error.code) {
-    case 'agentProfileVersionConflict': case 'agentProfileRequestConflict': return 'versionConflict'
-    case 'agentProfileModelUnavailable': return 'modelUnavailable'
-    case 'agentProfileSkillUnavailable': return 'skillUnavailable'
-    case 'agentProfileLimit': return 'limitReached'
-    case 'agentProfileInvalid': case 'agentProfileTooLarge': return 'invalid'
-    case 'agentProfileArchived': case 'agentProfileNotFound': return 'profileMissing'
-    case 'authRequired': case 'agentProfileScopeNotFound': case 'originMismatch': return 'accessChanged'
-    default: return 'saveFailed'
-  }
-}
 
 export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.agentProfiles')
   const common = useTranslations('Common')
-  const list = useAgentProfiles(workspaceId)
   const [editor, setEditor] = useState<ProfileEditor | null>(null)
   const [archiving, setArchiving] = useState<AgentProfile | null>(null)
-  const [pending, setPending] = useState<string | null>(null)
-  const [failure, setFailure] = useState<ReturnType<typeof profileFailure> | null>(null)
-  // Only a toggle's result is announced; the rows' states are read in place, not as live regions.
-  const [announce, setAnnounce] = useState('')
-  const data = list.data
-
-  async function update(profile: AgentProfile, archive = false) {
-    setPending(profile.id); setFailure(null)
-    try {
-      await profileRequest(workspaceId, archive ? 'DELETE' : 'PATCH', profile.id,
-        archive ? { version: profile.version } : { version: profile.version, profile: { ...profileDefinition(profile), enabled: !profile.enabled } })
-      setArchiving(null)
-      if (!archive) setAnnounce(t(profile.enabled ? 'disabledNamed' : 'enabledNamed', { name: profile.name }))
-      void list.mutate()
-    } catch (error) {
-      setFailure(profileFailure(error))
-      void list.mutate()
-    } finally { setPending(null) }
-  }
+  const { list, data, pending, failure, setFailure, announce, update } = useAgentProfileList(workspaceId, () => setArchiving(null))
 
   return <>
     <SettingsSection id="factory-profiles-heading" title={t('title')}
@@ -142,42 +108,8 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
   const t = useTranslations('Settings.agentProfiles')
   const common = useTranslations('Common')
   const id = useId()
-  const original = editor.duplicate ? undefined : editor.profile
-  const [draft, setDraft] = useState<AgentProfileDefinition>(() => editor.profile
-    ? { ...profileDefinition(editor.profile), ...(editor.duplicate ? { name: t('copyName', { name: editor.profile.name }).slice(0, 80) } : {}) }
-    : { ...initialDefinition })
-  const [roles, setRoles] = useState(draft.roles.join(', '))
-  const [modelMode, setModelMode] = useState(draft.model.mode)
-  const [modelKey, setModelKey] = useState(draft.model.mode === 'fixed' ? profileModelKey(draft.model) : '')
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<ReturnType<typeof profileFailure> | null>(null)
-  const requestId = useRef<string | null>(null)
-  const attempt = useRef<AgentProfileDefinition | null>(null)
-  const models = catalog.models.filter(model => draft.harness === 'auto' || model.harness === draft.harness)
-  const selectedModel = models.find(model => profileModelKey(model) === modelKey)
-  const frozen = error === 'saveUnconfirmed'
+  const { original, draft, change, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save } = useAgentProfileEditor({ workspaceId, editor, catalog, onSaved })
   const sourceName = (model: AgentProfilesView['catalog']['models'][number]) => modelSourceName(model, t)
-  function change(patch: Partial<AgentProfileDefinition>) { setDraft(current => ({ ...current, ...patch })); setError(null) }
-
-  async function save() {
-    if (pending) return
-    const roleList = [...new Set(roles.split(/[,，\n]/).map(role => role.trim()).filter(Boolean))]
-    if (!draft.name.trim() || roleList.length > 12 || roleList.some(role => role.length > 48) || (modelMode === 'fixed' && !selectedModel)) { setError('invalid'); return }
-    const profile: AgentProfileDefinition = frozen && attempt.current ? attempt.current : {
-      ...draft, name: draft.name.trim(), description: draft.description.trim(), roles: roleList,
-      model: modelMode === 'fixed' && selectedModel ? { mode: 'fixed', harness: selectedModel.harness, model: selectedModel.model, source: selectedModel.source } : { mode: 'inherit' },
-    }
-    attempt.current = profile
-    requestId.current ??= crypto.randomUUID()
-    setPending(true); setError(null)
-    try {
-      await profileRequest<{ profile: AgentProfile }>(workspaceId, original ? 'PATCH' : 'POST', original?.id,
-        { profile, ...(original ? { version: original.version } : { requestId: requestId.current }) })
-      toast.success(t('saved'))
-      onSaved()
-    } catch (failure) { setError(profileFailure(failure)) }
-    finally { setPending(false) }
-  }
 
   return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col sm:max-w-2xl" aria-describedby={undefined} closeLabel={common('close')}>
