@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac",
+  "sourceTree": "a32509917eab6cea995d2a2401d8b984ce2b37d1",
+  "branch": "diagnostic/issue-1506-group-audit-proof-20261107-01",
+  "helperPaths": [
+    ".github/workflows/group-audit-offline-proof.yml",
+    "scripts/diagnostics/group-audit-offline-proof.mjs",
+    "scripts/diagnostics/group-audit-offline-proof.json",
+    "scripts/diagnostics/group-stop-audit.sql"
+  ],
+  "auditSqlSha256": "e16efac4053b581bf67aff3758300d80999e9ef6a9fb56c43ca7fe6d8121ff08",
+  "proofKind": "isolated_pg17_synthetic_only",
+  "productionAcceptance": false,
+  "modelRequests": 0,
+  "oidc": false
+}
