@@ -5293,6 +5293,108 @@
     "renderFailed": "此页面未能打开",
     "renderHint": "请重试打开页面。"
   },
+  "Governance": {
+    "plan": {
+      "title": "套餐与席位",
+      "edition": {
+        "personal": "个人",
+        "community": "社区版",
+        "team_free": "Team Free",
+        "team_pro": "Team Pro",
+        "enterprise": "Enterprise"
+      },
+      "seats": "{count} / {limit} 位活跃成员",
+      "seatsUnlimited": "{count} 位活跃成员，不限人数",
+      "seatsNote": "只计算活跃的人。待接受的邀请、已停用的成员、Bot、Agent 和设备都不占席位。",
+      "overLimit": "活跃成员已超过当前套餐的 {limit} 位上限。现有成员都会保留；人数回到上限以内之前，不能再接受邀请或恢复成员。",
+      "concurrency": "托管模型同时运行上限：{count}",
+      "features": "团队功能",
+      "usageExport": "团队用量报告与 CSV 导出",
+      "approvalTemplates": "审批模板（最多 {count} 个）",
+      "included": "已包含",
+      "notIncluded": "不包含",
+      "upgradeTitle": "需要更多席位或团队功能",
+      "upgradeBody": "Team Pro 提供更多席位、团队用量报告与 CSV 导出、审批模板。目前由人工开通，不在线付款：请联系 Mikka 并附上下面的工作区标识。",
+      "memberNote": "席位和套餐由工作区管理员管理。需要更多席位时，请联系管理员。",
+      "workspaceId": "工作区标识",
+      "copy": "复制",
+      "copied": "已复制",
+      "loadFailed": "无法读取套餐信息。",
+      "retry": "重试"
+    },
+    "usage": {
+      "title": "团队用量",
+      "description": "按日期查看本工作区已结算的托管模型用量和运行次数。日期按 UTC 计算，含起止两天，最长 93 天。",
+      "from": "开始日期",
+      "to": "结束日期",
+      "show": "查看",
+      "csv": "导出 CSV",
+      "rangeInvalid": "结束日期不能早于开始日期，且范围最长 93 天。",
+      "hostedTitle": "托管模型用量",
+      "day": "日期",
+      "model": "模型",
+      "requests": "请求",
+      "inputTokens": "输入 tokens",
+      "outputTokens": "输出 tokens",
+      "cost": "费用",
+      "noHosted": "所选日期内没有已结算的托管模型用量。自有模型、设备和自带服务不在这里计费。",
+      "runsTitle": "运行",
+      "runsNone": "所选日期内没有运行。",
+      "total": "合计",
+      "noEntitlement": "团队用量报告和 CSV 导出属于 Team Pro，当前套餐不包含。",
+      "noAdmin": "只有工作区管理员可以查看团队用量报告。",
+      "loading": "正在读取用量…"
+    },
+    "templates": {
+      "title": "审批模板",
+      "description": "把一组 Agent 的审批方式和权限保存为模板，需要时应用到整个工作区。",
+      "applyNote": "应用会替换工作区的 Agent 策略，并停止不符合新策略的运行。删除模板不会撤回已应用的策略。",
+      "count": "{count} / {limit} 个模板",
+      "empty": "还没有审批模板。",
+      "create": "新建模板",
+      "edit": "编辑",
+      "apply": "应用",
+      "delete": "删除",
+      "save": "保存",
+      "cancel": "取消",
+      "name": "名称",
+      "namePlaceholder": "例如：外包仓库只读",
+      "approvalMode": "审批方式",
+      "approvalModes": {
+        "unset": "不设置",
+        "ask": "需要时询问",
+        "read_only": "只读"
+      },
+      "permissions": "权限",
+      "actions": {
+        "install_dependency": "安装依赖",
+        "write_outside_repo": "写入仓库以外的文件",
+        "git_push": "推送分支",
+        "network": "访问网络"
+      },
+      "decisions": {
+        "unset": "不设置",
+        "allow": "允许",
+        "ask": "询问",
+        "deny": "禁止"
+      },
+      "networkAllow": "允许访问的域名",
+      "networkAllowHint": "每行一个域名。留空表示不设置。",
+      "rulesEmpty": "至少设置一项规则。",
+      "nameEmpty": "请填写名称。",
+      "applyTitle": "应用「{name}」？",
+      "deleteTitle": "删除「{name}」？",
+      "deleteBody": "已经应用的策略不会撤回。",
+      "saved": "已保存",
+      "applied": "已应用「{name}」",
+      "deleted": "已删除",
+      "rulesSummary": "{count} 项规则",
+      "updated": "更新于 {date}",
+      "noEntitlement": "审批模板属于 Team Pro，当前套餐不包含。",
+      "noAdmin": "只有工作区管理员可以管理审批模板。",
+      "loading": "正在读取模板…"
+    }
+  },
   "HostedSettings": {
     "general": {
       "iconHint": "PNG、JPEG、WebP 或 GIF，最大 200 KB"

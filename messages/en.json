@@ -5293,6 +5293,108 @@
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
   },
+  "Governance": {
+    "plan": {
+      "title": "Plan and seats",
+      "edition": {
+        "personal": "Personal",
+        "community": "Community",
+        "team_free": "Team Free",
+        "team_pro": "Team Pro",
+        "enterprise": "Enterprise"
+      },
+      "seats": "{count} of {limit} active members",
+      "seatsUnlimited": "{count} active members, no limit",
+      "seatsNote": "Only active people count. Pending invitations, suspended members, bots, agents and devices don't take a seat.",
+      "overLimit": "Active members are over this plan's limit of {limit}. Everyone stays; until the count is back within the limit, invitations can't be accepted and members can't be restored.",
+      "concurrency": "Hosted model calls at once: {count}",
+      "features": "Team features",
+      "usageExport": "Team usage report and CSV export",
+      "approvalTemplates": "Approval templates (up to {count})",
+      "included": "Included",
+      "notIncluded": "Not included",
+      "upgradeTitle": "Need more seats or team features",
+      "upgradeBody": "Team Pro adds seats, the team usage report with CSV export, and approval templates. It is set up by hand for now, with no online payment: contact Mikka with the workspace ID below.",
+      "memberNote": "Workspace admins manage seats and the plan. Ask an admin if you need more seats.",
+      "workspaceId": "Workspace ID",
+      "copy": "Copy",
+      "copied": "Copied",
+      "loadFailed": "Couldn't load the plan.",
+      "retry": "Retry"
+    },
+    "usage": {
+      "title": "Team usage",
+      "description": "Settled hosted model usage and run counts for this workspace by date. Dates are UTC, both ends included, up to 93 days.",
+      "from": "From",
+      "to": "To",
+      "show": "Show",
+      "csv": "Export CSV",
+      "rangeInvalid": "The end date can't be before the start date, and the range can be at most 93 days.",
+      "hostedTitle": "Hosted model usage",
+      "day": "Date",
+      "model": "Model",
+      "requests": "Requests",
+      "inputTokens": "Input tokens",
+      "outputTokens": "Output tokens",
+      "cost": "Cost",
+      "noHosted": "No settled hosted model usage in these dates. Your own models, devices and services aren't billed here.",
+      "runsTitle": "Runs",
+      "runsNone": "No runs in these dates.",
+      "total": "Total",
+      "noEntitlement": "The team usage report and CSV export are part of Team Pro, which this plan doesn't include.",
+      "noAdmin": "Only workspace admins can see the team usage report.",
+      "loading": "Loading usage…"
+    },
+    "templates": {
+      "title": "Approval templates",
+      "description": "Save an agent approval mode and permissions as a template, and apply it to the whole workspace when needed.",
+      "applyNote": "Applying replaces the workspace's agent policy and stops runs that don't fit it. Deleting a template doesn't undo a policy already applied.",
+      "count": "{count} of {limit} templates",
+      "empty": "No approval templates yet.",
+      "create": "New template",
+      "edit": "Edit",
+      "apply": "Apply",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "name": "Name",
+      "namePlaceholder": "For example: contractor repos read-only",
+      "approvalMode": "Approval mode",
+      "approvalModes": {
+        "unset": "Not set",
+        "ask": "Ask when needed",
+        "read_only": "Read-only"
+      },
+      "permissions": "Permissions",
+      "actions": {
+        "install_dependency": "Install dependencies",
+        "write_outside_repo": "Write outside the repository",
+        "git_push": "Push branches",
+        "network": "Access the network"
+      },
+      "decisions": {
+        "unset": "Not set",
+        "allow": "Allow",
+        "ask": "Ask",
+        "deny": "Deny"
+      },
+      "networkAllow": "Allowed domains",
+      "networkAllowHint": "One domain per line. Leave empty to not set it.",
+      "rulesEmpty": "Set at least one rule.",
+      "nameEmpty": "Enter a name.",
+      "applyTitle": "Apply “{name}”?",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteBody": "A policy already applied stays as it is.",
+      "saved": "Saved",
+      "applied": "Applied “{name}”",
+      "deleted": "Deleted",
+      "rulesSummary": "{count, plural, one {# rule} other {# rules}}",
+      "updated": "Updated {date}",
+      "noEntitlement": "Approval templates are part of Team Pro, which this plan doesn't include.",
+      "noAdmin": "Only workspace admins can manage approval templates.",
+      "loading": "Loading templates…"
+    }
+  },
   "HostedSettings": {
     "general": {
       "iconHint": "PNG, JPEG, WebP or GIF, up to 200 KB"
