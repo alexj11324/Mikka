@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
-import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, X } from 'lucide-react'
+import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
 import useSWR from 'swr'
 import { toast } from 'sonner'
@@ -20,8 +20,6 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { cn } from '@/lib/utils'
-import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
-import { TaskWorkspace } from '@ui-slot/task-workspace'
 import { IssueEditor } from './issue-editor'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
@@ -39,8 +37,6 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
 }) {
   const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
-  // The task is created in the workspace this dialog names, even if another tab switched meanwhile.
-  const workspace = useCurrentWorkspace()
   const [teamId, setTeamId] = useState(initialTeamId)
   const [title, setTitle] = useState(initialTitle)
   const seenAhead = useRef(initialTitle)
@@ -114,7 +110,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
     setError('')
     setNotice('')
     try {
-      const result = await saveIssue({ title: currentTitle, content, status, priority, ...(workspace ? { workspaceId: workspace.id } : {}) })
+      const result = await saveIssue({ title: currentTitle, content, status, priority })
       if (!('issue' in result) || !result.issue) {
         setError(result.error ?? i18nText("Issue.create.createFailed"))
         return
@@ -153,7 +149,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
       }}>
         <header className="flex items-center justify-between gap-3 px-5 pt-4 sm:px-6">
           <div className="flex items-center gap-2 text-sm">
-            <TaskWorkspace variant="create" workspace={workspace ?? null} /><ChevronRight className="size-3 text-muted-foreground" />
+            <Badge variant="outline" className="gap-1.5 rounded-full"><SquareUserRound />ORV</Badge><ChevronRight className="size-3 text-muted-foreground" />
             <DialogTitle className="sr-only">{i18nText("Projects.detail.newIssue")}</DialogTitle><span aria-hidden="true">{i18nText("Projects.detail.newIssue")}</span>
           </div>
           <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? i18nText("Issue.create.collapse") : i18nText("Issue.create.expand")} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label={i18nText("Issue.create.close")} disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></div>

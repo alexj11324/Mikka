@@ -14,6 +14,8 @@ import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
+import { TaskWorkspace } from '@ui-slot/task-workspace'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -94,6 +96,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const fileRef = useRef<HTMLInputElement>(null)
   const composed = useRef<{ key: string; message: string; taskDestination?: TaskDestination } | null>(null)
   const fileId = useId()
+  // The task is created in the workspace the Coordinator runs in: the one shown now.
+  const current = useCurrentWorkspace()
+  const workspace = current && (!workspaceId || current.id === workspaceId) ? current : null
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: placement } = useSWR(open ? ['settings:model-order', 'current'] : null, () => settingsRead<Awaited<ReturnType<typeof getModelOrder>>>('model-order'))
@@ -173,6 +178,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
       <div className="flex flex-wrap items-center gap-2 pr-8 text-sm">
+        <TaskWorkspace variant="create" workspace={workspace} />
         {device
           ? <Select value={picked ?? 'auto'} onValueChange={value => { if (value) pick(value) }} items={[defaults, ...machines].map(({ value, label }) => ({ value, label }))}>
             <SelectTrigger size="sm" className="h-7 min-w-32 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue className="min-w-0 truncate" /></SelectTrigger>

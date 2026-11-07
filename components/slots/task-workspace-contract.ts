@@ -10,8 +10,8 @@ export type TaskWorkspaceProps = {
    */
   workspace: TaskWorkspaceInfo | null
   /**
-   * `create`: the new-task dialog's breadcrumb, naming where the task will be
-   * created. `detail`: the task's properties, showing where it is fixed.
+   * `create`: the new-task dialog's first pill, naming the workspace the task
+   * will be created in. `detail`: the task's properties, showing where it is fixed.
    */
   variant: 'create' | 'detail'
   /** Detail only: wraps a value in the properties list's own labelled row. */
