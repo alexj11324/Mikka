@@ -1,0 +1,610 @@
+{
+  "version": 1,
+  "kind": "issue1512_desktop_pkce_query_safety_analysis",
+  "status": "frozen_static_analysis_no_authentication_change",
+  "createdAt": "2026-11-07T10:01:26.937Z",
+  "language": "zh-CN",
+  "scope": {
+    "productFilesChanged": false,
+    "authenticationProtocolChanged": false,
+    "newTestsRun": false,
+    "databaseOrProviderCalls": false,
+    "newResources": false,
+    "scopeDescription": "只读核对固定产品源码、固定版本依赖实现与既有真实顺序 HTTP/PG 计数；仅创建本安全分析记录。"
+  },
+  "provenance": {
+    "profileRunId": 42361272198,
+    "profile": {
+      "path": "evidence/sql-profile-42361272198/desktop-query-decomposition.json",
+      "bytes": 29404,
+      "sha256": "f8f15cdcaceb1bd10977b47f4edd05d24ab1503ce3c90f7250a6fa79a0a0ebc2"
+    },
+    "source": {
+      "source": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+      "candidate": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+      "parents": "f811448d805e7baa7b032fd6ae62d991f59966c8 0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "artifactId": 13568227157,
+      "artifactRunId": 42357032863,
+      "artifactAttempt": 1,
+      "artifactBytes": 47856394,
+      "artifactSha256": "d40b0a33843af21cd60d9ee9fe2bd049b40dead647a3f077d8d1e048ca6c130c",
+      "verified": true,
+      "compiledVerified": true,
+      "clientVersion": "0.1.2"
+    },
+    "sourceLock": {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "pnpm-lock.yaml",
+      "sha256": "5e3aaf00012068e8ae9208c3dd41aca30e0972ff6b7ed5e61147f7087c559c9f",
+      "requiredPins": [
+        "better-auth@1.7.12",
+        "@better-auth/core@1.7.12",
+        "@better-auth/kysely-adapter@1.7.12",
+        "kysely@0.29.7"
+      ],
+      "pinsPresent": true
+    },
+    "dependencySourceBasis": "读取本地已安装且固定 source lock 中存在的版本源码；文件哈希在 dependencyEvidence。没有启动 BetterAuth 或数据库。"
+  },
+  "observed": {
+    "profileStatus": "passed",
+    "completedRequests": 14,
+    "comparisonRequests": 2,
+    "sameApiPid": true,
+    "unmeasuredGaps": {
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0
+    },
+    "cleanupComplete": true,
+    "requests": [
+      {
+        "id": "pkce_begin",
+        "action": null,
+        "status": "passed",
+        "httpStatus": 204,
+        "queryCalls": 1,
+        "pgProtocolSendBytes": 494,
+        "pgProtocolReceiveBytes": 37,
+        "sameApiPid": true
+      },
+      {
+        "id": "system_browser_bootstrap",
+        "action": "desktop.bootstrap",
+        "status": "passed",
+        "httpStatus": 200,
+        "queryCalls": 2,
+        "pgProtocolSendBytes": 602,
+        "pgProtocolReceiveBytes": 298,
+        "sameApiPid": true
+      },
+      {
+        "id": "pkce_return",
+        "action": null,
+        "status": "passed",
+        "httpStatus": 303,
+        "queryCalls": 2,
+        "pgProtocolSendBytes": 1188,
+        "pgProtocolReceiveBytes": 568,
+        "sameApiPid": true
+      },
+      {
+        "id": "pkce_exchange",
+        "action": null,
+        "status": "passed",
+        "httpStatus": 200,
+        "queryCalls": 9,
+        "pgProtocolSendBytes": 1813,
+        "pgProtocolReceiveBytes": 2310,
+        "sameApiPid": true,
+        "receipt": {
+          "sameLeasedOwner": true,
+          "sameBrowserSession": true,
+          "signedCachePresent": true
+        }
+      },
+      {
+        "id": "native_task_runs_first",
+        "action": "task-runs.pollTaskRuns",
+        "status": "passed",
+        "httpStatus": 200,
+        "queryCalls": 4,
+        "pgProtocolSendBytes": 2552,
+        "pgProtocolReceiveBytes": 982,
+        "sameApiPid": true
+      },
+      {
+        "id": "native_task_runs_second",
+        "action": "task-runs.pollTaskRuns",
+        "status": "passed",
+        "httpStatus": 200,
+        "queryCalls": 4,
+        "pgProtocolSendBytes": 2552,
+        "pgProtocolReceiveBytes": 982,
+        "sameApiPid": true
+      }
+    ],
+    "pkceTotalQueryCalls": 12
+  },
+  "conclusion": {
+    "exchangeQueryCalls": 9,
+    "sourceDecomposition": [
+      {
+        "responsibility": "application_pending_handoff_claim_and_secret_clear",
+        "queryCalls": 2
+      },
+      {
+        "responsibility": "betterauth_atomic_one_time_token_consumption_transaction",
+        "queryCalls": 5
+      },
+      {
+        "responsibility": "betterauth_fresh_session_and_user_lookup",
+        "queryCalls": 2
+      }
+    ],
+    "basis": "请求总数为真实计数；各条职责及 2+5+2 分解由匹配版本源码推导，与请求总数一致。没有记录或抓取 SQL 正文，也未新增逐 SQL 运行时探针。",
+    "duplicateSdkVerificationFound": false,
+    "cookieCacheGenerationQueries": 0,
+    "decision": "保留现有 PKCE / BetterAuth 路径；以下两项仅归档为未实施候选，不为减查询重写认证。"
+  },
+  "pkceResponsibilities": [
+    {
+      "request": "pkce_begin",
+      "queries": 1,
+      "operations": [
+        "INSERT pending handoff ON CONFLICT DO NOTHING"
+      ],
+      "purpose": "登记 state hash、严格 loopback callback、只有原生主进程持有的 verifier 对应 challenge 及有效期；不授予会话。",
+      "sources": [
+        "app/api/desktop/begin/route.ts:18-41"
+      ]
+    },
+    {
+      "request": "pkce_return",
+      "queries": 2,
+      "operations": [
+        "INSERT hashed one-time verification value for the current browser session",
+        "UPDATE eligible unbound handoff once with user binding, code hash, parked token and expiry"
+      ],
+      "purpose": "绑定真实浏览器会话并向 loopback 仅返回 code/state；必须保留 callback、未绑定、未消费和有效期条件。该次普通签名会话缓存下，读取会话不产生额外 DB 查询。",
+      "sources": [
+        "app/api/desktop/return/route.ts:47-76",
+        "better-auth@1.7.12/dist/plugins/one-time-token/index.mjs:20-29"
+      ]
+    },
+    {
+      "request": "pkce_exchange",
+      "queries": 9,
+      "steps": [
+        {
+          "order": 1,
+          "operation": "UPDATE pending handoff usedAt RETURNING old parked fields",
+          "queries": 1,
+          "purpose": "以 stateHash + boundAt + usedAt null + expiry 为条件原子争取首次消费权；尚未验证 code/verifier。",
+          "source": "app/api/desktop/exchange/route.ts:37-40"
+        },
+        {
+          "order": 2,
+          "operation": "UPDATE pending handoff token to null",
+          "queries": 1,
+          "purpose": "在检查 code/verifier 之前清除 parked token；格式合法且 eligible 的错误首尝试也烧毁 pending handoff，不能随后重试正确 verifier。",
+          "source": "app/api/desktop/exchange/route.ts:41-44"
+        },
+        {
+          "order": 3,
+          "operation": "BEGIN",
+          "queries": 1,
+          "purpose": "SDK 原子 verification 消费事务边界。",
+          "source": "@better-auth/kysely-adapter@1.7.12/dist/index.mjs:698-706; kysely@0.29.7/dist/dialect/postgres/postgres-driver.js:47-59"
+        },
+        {
+          "order": 4,
+          "operation": "SELECT latest verification by identifier",
+          "queries": 1,
+          "purpose": "选择 SDK 定义的最新一项，并把已有 snapshot 交给 hooks；本应用没有该项 delete.before hook，未再多读。",
+          "source": "better-auth@1.7.12/dist/db/internal-adapter.mjs:830-846; dist/db/with-hooks.mjs:189-231"
+        },
+        {
+          "order": 5,
+          "operation": "DELETE selected verification RETURNING consumed row",
+          "queries": 1,
+          "purpose": "数据库级一次性消费；成功返回是 SDK 后续颁发/返回凭据的门。PostgreSQL adapter 用单个 DELETE RETURNING，不是先 SELECT 再 DELETE 的非原子替代。",
+          "source": "better-auth@1.7.12/dist/db/internal-adapter.mjs:846-857; @better-auth/kysely-adapter@1.7.12/dist/index.mjs:613-650"
+        },
+        {
+          "order": 6,
+          "operation": "DELETE remaining verification rows with same identifier",
+          "queries": 1,
+          "purpose": "使同 identifier 的旧项全部失效；本次只有一项也仍执行该语义，不能因观测为零删除行而随意省略。",
+          "source": "better-auth@1.7.12/dist/db/internal-adapter.mjs:858-864"
+        },
+        {
+          "order": 7,
+          "operation": "COMMIT",
+          "queries": 1,
+          "purpose": "完成一次性消费；SDK 随后对已消费值的过期时间做拒绝检查。",
+          "source": "kysely@0.29.7/dist/dialect/postgres/postgres-driver.js:60-62; better-auth@1.7.12/dist/db/internal-adapter.mjs:871-872"
+        },
+        {
+          "order": 8,
+          "operation": "SELECT session by the consumed verification value",
+          "queries": 1,
+          "purpose": "重新查当前真实 session；不是从浏览器 cookie 缓存复制凭据，已撤销的 session 不得通过。",
+          "source": "better-auth@1.7.12/dist/plugins/one-time-token/index.mjs:80-85; dist/db/internal-adapter.mjs:355-365"
+        },
+        {
+          "order": 9,
+          "operation": "SELECT related user through adapter fallback join",
+          "queries": 1,
+          "purpose": "同一个 findSession 的用户关系读取，并非第二次独立验证或新建 session；用户不存在则拒绝。当前 advanced.database.joins 未启用。",
+          "source": "lib/auth.ts:165-168; @better-auth/core@1.7.12/dist/db/adapter/factory.mjs:191-201,345-374,552-593"
+        }
+      ]
+    }
+  ],
+  "zeroQueryAndSafetyNotes": [
+    "exchange 只调用一次 auth.api.verifyOneTimeToken，并传 new Headers()；没有把浏览器 Cookie 传入该校验。",
+    "SDK setSessionCookie/setCookieCache 使用已经真实读取的 session/user 生成签名 cookie 和缓存；本配置没有数据库型 cookie signer，因此这里为 0 次数据库调用。关闭生成缓存既不能省掉 9 次中的任何一条，还会失去后续正常签名缓存。",
+    "multiSession 的旧账号遍历来自入站 Cookie；本 exchange 的空 headers 没有旧 cookie 可遍历，不产生额外会话查询。",
+    "应用审计 after hook 仅对 sign-in/email 或 OAuth callback 记录登录；one-time-token/verify 不命中。",
+    "sameBrowserSession / signedCachePresent 是本次真实 profile 的通过回执；SDK 返回原来查到的 session，不新建身份或假造缓存。",
+    "应用错误 code/verifier 消费的是 eligible pending handoff；此分支不调用 SDK 消费 OTT。不能把它描述为所有畸形请求或所有错误都已删除 verification。",
+    "fresh findSession 必须保留。return 与 exchange 之间撤销、删除或过期的会话，不能因为浏览器此前认证成功而跳过此处校验。"
+  ],
+  "deferredCandidates": [
+    {
+      "id": "atomic_pending_claim_and_clear",
+      "status": "not_implemented_deferred_by_parent",
+      "target": "app/api/desktop/exchange/route.ts:37-44",
+      "design": "单条 PostgreSQL 语句先锁定符合现有条件的 pending 行，在同一次 UPDATE 写 usedAt 与 token=NULL，并从被锁定的旧行返回旧 token/codeHash/challenge；继续在写入后检查 code/verifier，再调用原 SDK。",
+      "potentialLocalQueryReduction": 1,
+      "measurementStatus": "source_based_candidate_not_measured",
+      "risks": [
+        "不能把并发读取旧 token 与更新拆成非锁定步骤；必须保证跨连接并发只有一个 eligible 消费者。",
+        "必须保留 usedAt tombstone、所有 bound/expiry/callback 前置语义，以及错误首尝试仍消费。",
+        "PostgreSQL 17 的普通 UPDATE RETURNING 返回更新后值，不能把 token=NULL 后返回的值当作旧 token。CTE/锁定方案未实施或执行验证。",
+        "需要真实 PostgreSQL 多连接竞争、错误首尝试、replay、expired/unbound、清除 parked token 的负例；现有 tests/desktop-auth-handoff.db.test.ts 只覆盖其中部分，且 SDK 是 stub。"
+      ],
+      "reasonNotSelected": "收益仅为局部一条；当前目标优先评估既有请求上下文复用，不为计数改写认证。"
+    },
+    {
+      "id": "supported_betterauth_native_database_joins",
+      "status": "not_implemented_deferred_by_parent",
+      "target": "lib/auth.ts advanced.database.joins",
+      "design": "BetterAuth 1.7.12 的受支持选项为 advanced.database.joins=true；Kysely 把 findSession 的 session+user 关系放入一条真实 LEFT JOIN，同时保留 SDK null/expiry/撤销门。不涉及签名缓存或免验。",
+      "potentialLocalQueryReduction": 1,
+      "measurementStatus": "source_based_candidate_not_measured",
+      "risks": [
+        "该开关属于整个认证适配器，非仅 desktop exchange，可能改变 sign-in/get-session/multiSession/OAuth/device 等其他关系读取。",
+        "必须验证 null user、已撤销/过期 session、同浏览器会话、关联字段映射、多会话切换等等价行为；不能只测成功路径 queryCalls。",
+        "两端共有的认证请求也可能同时变少，所以不能把全局节省额直接算作 Native/Web 差额减少。",
+        "不应改成自制 auth adapter、删除 verification 事务/同 identifier 清理，或用已有 Cookie 替换 fresh findSession 来追求更大数字。"
+      ],
+      "reasonNotSelected": "父代理明确暂不启用；保留现有认证安全职责。"
+    }
+  ],
+  "relatedTaskReadBoundary": {
+    "observedEachQueryCalls": 4,
+    "sourceDecomposition": [
+      "workspacePool: resolve exactly one active personal owner Live scope",
+      "main task database: read Live revision before data",
+      "main task database: bounded latest-per-issue task rows",
+      "main task database: owner-scoped bot looks for returned bot IDs"
+    ],
+    "sameDatabaseAssumptionAllowed": false,
+    "reason": "lib/workspace-db.ts:11 明确 workspace 位于 Marketplace 数据库，auth/tasks 位于 MIKKA_DATABASE_URL。本诊断使用单 loopback 数据库，不授权把生产跨库 scope/revision 合成 JOIN。",
+    "mustPreserve": [
+      "逐次真实授权",
+      "Live 初次 catch-up",
+      "远端/云端任务通知与 waiting-input badge",
+      "owner/scope/revision/expiry 边界",
+      "未 enrollment 仍可有远端任务"
+    ],
+    "futureDirection": "root/daemon 正独立评估有限 Native 只读 RPC 同请求复用现有 requestCache；该设计不属于本记录已审阅/已实现结果。"
+  },
+  "limitations": [
+    "这是 Ubuntu loopback PostgreSQL、固定编译 API、相同进程、顺序请求分解，不是 macOS 完整原生登录验收。",
+    "不把 1+2+9 或 taskRuns 4+4 机械归为此前并发窗口 Native +20 的精确分摊。没有重新运行 macOS 登录或改变测量窗口。",
+    "真实请求总数、协议字节和 cleanup 是既有 profile 证据；步骤级分解由源码闭合，没有逐语句运行时采样。",
+    "此次未执行新测试、数据库、模型、VM、浏览器或外部认证，也未修改产品源码。"
+  ],
+  "primaryReferences": [
+    {
+      "url": "https://www.postgresql.org/docs/17/transaction-iso.html#XACT-READ-COMMITTED",
+      "scope": "READ COMMITTED 下 UPDATE / SELECT FOR UPDATE 的并发等待与 WHERE 重判；仅支持候选安全设计要求，不代表候选已验证。"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/17/explicit-locking.html#LOCKING-ROWS",
+      "scope": "行锁跨事务排他语义；当前没有据此实施认证改动。"
+    }
+  ],
+  "repoEvidence": [
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "app/api/desktop/begin/route.ts",
+      "lines": [
+        [
+          18,
+          41
+        ]
+      ],
+      "sha256": "2283d4669e828112d3a79998e48fb313fa125be104300d514f65e5c4dc0eebaa"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "app/api/desktop/return/route.ts",
+      "lines": [
+        [
+          47,
+          76
+        ]
+      ],
+      "sha256": "0dc038c8958b0a797862999d4fd20ea4ad8c34280e0070c8e293f16b3cd701da"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "app/api/desktop/exchange/route.ts",
+      "lines": [
+        [
+          17,
+          57
+        ]
+      ],
+      "sha256": "238582479dd98f6520942b481d18fff2a1e4ef634fc9dfbe7292e4b5d3a0e687"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/auth.ts",
+      "lines": [
+        [
+          43,
+          64
+        ],
+        [
+          98,
+          121
+        ],
+        [
+          122,
+          178
+        ]
+      ],
+      "sha256": "c3ab527e85d05331dbdec6aa40e2d7277f613b66f81821df7b1f95a325a500eb"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/db/schema.ts",
+      "lines": [
+        [
+          65,
+          78
+        ]
+      ],
+      "sha256": "01f8a1bcbc452c4d24781213e08ee30be001e254c50a7296d577a583dcf3b596"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "app/actions/task-runs.ts",
+      "lines": [
+        [
+          47,
+          74
+        ]
+      ],
+      "sha256": "370f179901da7baa5b618c286a6aa9355cf81b086ae657eb272e342bf1f64d18"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/live/revision-read.ts",
+      "lines": [
+        [
+          11,
+          27
+        ]
+      ],
+      "sha256": "432804b9651efe90486ba3c770747d2eacb8bb400c023a2101f35357c7e7da46"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/live/owner-scope.ts",
+      "lines": [
+        [
+          6,
+          16
+        ]
+      ],
+      "sha256": "0619e87909882fd9e4251c166cbe1695942bdcc2cece494c9dac8580b91bd522"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/live/list-read-server.ts",
+      "lines": [
+        [
+          7,
+          17
+        ]
+      ],
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/workspace-db.ts",
+      "lines": [
+        [
+          11,
+          24
+        ]
+      ],
+      "sha256": "5d1f10fcbe7fa37cf20f875a2cbd9b97534767fae303c3e287d7cd7e0d5280eb"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "lib/live/revisions.ts",
+      "lines": [
+        [
+          16,
+          24
+        ],
+        [
+          37,
+          45
+        ]
+      ],
+      "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+    },
+    {
+      "source": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "path": "tests/desktop-auth-handoff.db.test.ts",
+      "lines": [
+        [
+          63,
+          109
+        ]
+      ],
+      "sha256": "26d2c7e6cec2613ecca3bd045bc1e33c253d8bb331f16879cba5c5ea797ac8ac"
+    }
+  ],
+  "dependencyEvidence": [
+    {
+      "package": "better-auth",
+      "version": "1.7.12",
+      "path": "dist/plugins/one-time-token/index.mjs",
+      "lines": [
+        [
+          20,
+          29
+        ],
+        [
+          74,
+          87
+        ]
+      ],
+      "sha256": "f5705d5c5a99b633dad9f81dc34680ce6ed943a1f91bd3880bd839763e544aa1"
+    },
+    {
+      "package": "better-auth",
+      "version": "1.7.12",
+      "path": "dist/db/internal-adapter.mjs",
+      "lines": [
+        [
+          333,
+          370
+        ],
+        [
+          783,
+          872
+        ]
+      ],
+      "sha256": "f9c5e9c8faa058a19ec73690b6faa5331e49ca8f9057cdb16307b064a017b1b6"
+    },
+    {
+      "package": "better-auth",
+      "version": "1.7.12",
+      "path": "dist/db/with-hooks.mjs",
+      "lines": [
+        [
+          189,
+          240
+        ]
+      ],
+      "sha256": "1f386ad4f386b15d5e9bcd9ae53afef0a2cc93ca611886dee3f25b43eb9d855a"
+    },
+    {
+      "package": "better-auth",
+      "version": "1.7.12",
+      "path": "dist/cookies/index.mjs",
+      "lines": [
+        [
+          76,
+          125
+        ],
+        [
+          167,
+          179
+        ]
+      ],
+      "sha256": "51757ee5897b568cfd5694d348dd1d5e5e5f72ce138ddd277a8861a20decf5f1"
+    },
+    {
+      "package": "better-auth",
+      "version": "1.7.12",
+      "path": "dist/plugins/multi-session/index.mjs",
+      "lines": [
+        [
+          161,
+          190
+        ]
+      ],
+      "sha256": "7ce0d91a4256822c2c228618145703229c50543ddcdfa67d3970dde910db7158"
+    },
+    {
+      "package": "@better-auth/core",
+      "version": "1.7.12",
+      "path": "dist/db/adapter/factory.mjs",
+      "lines": [
+        [
+          182,
+          202
+        ],
+        [
+          343,
+          385
+        ],
+        [
+          552,
+          598
+        ]
+      ],
+      "sha256": "68809ea9778a59590c91a2274d8029cdf359559e659b6dd1918cb6fdb2382323"
+    },
+    {
+      "package": "@better-auth/core",
+      "version": "1.7.12",
+      "path": "dist/context/transaction.mjs",
+      "lines": [
+        [
+          55,
+          84
+        ]
+      ],
+      "sha256": "30f8045eb7db3c01b878d8518f0acabe953e935961939d3decb01e08743ba2fb"
+    },
+    {
+      "package": "@better-auth/kysely-adapter",
+      "version": "1.7.12",
+      "path": "dist/index.mjs",
+      "lines": [
+        [
+          76,
+          79
+        ],
+        [
+          503,
+          526
+        ],
+        [
+          613,
+          650
+        ],
+        [
+          687,
+          706
+        ]
+      ],
+      "sha256": "b5f033d42be5c229089639a83a25d2bf42d26273a3181abba0f558205e797dfa"
+    },
+    {
+      "package": "kysely",
+      "version": "0.29.7",
+      "path": "dist/dialect/postgres/postgres-driver.js",
+      "lines": [
+        [
+          47,
+          64
+        ]
+      ],
+      "sha256": "d5ad238cd60056f400f905184a65aac8576408f6d2f9425b1056f42c0e05832b"
+    }
+  ]
+}

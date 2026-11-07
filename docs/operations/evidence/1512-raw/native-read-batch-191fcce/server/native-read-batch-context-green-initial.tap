@@ -1,0 +1,10 @@
+✔ concurrent owner-wide readers reuse their actual personal home only within the batch (1.448327ms)
+✔ different Live kinds share one revision query before either consumer reads its data (6.631744ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 401.136929

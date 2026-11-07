@@ -1,0 +1,279 @@
+TAP version 13
+# Subtest: retained-account local module loading overlaps the real bootstrap promise without mounting or an extra backend read
+ok 1 - retained-account local module loading overlaps the real bootstrap promise without mounting or an extra backend read
+  ---
+  duration_ms: 37.685884
+  type: 'test'
+  ...
+# Subtest: signed-out root and public/auth routes do not preload the workspace graph
+    # Subtest: /mikka
+    ok 1 - /mikka
+      ---
+      duration_ms: 18.200094
+      type: 'test'
+      ...
+    # Subtest: /mikka/en/sign-in
+    ok 2 - /mikka/en/sign-in
+      ---
+      duration_ms: 16.17472
+      type: 'test'
+      ...
+    # Subtest: /mikka/en/a/public-share
+    ok 3 - /mikka/en/a/public-share
+      ---
+      duration_ms: 15.017569
+      type: 'test'
+      ...
+    1..3
+ok 2 - signed-out root and public/auth routes do not preload the workspace graph
+  ---
+  duration_ms: 50.244062
+  type: 'test'
+  ...
+# Subtest: failure of the optional main identity hint leaves the normal bootstrap and lazy path available
+ok 3 - failure of the optional main identity hint leaves the normal bootstrap and lazy path available
+  ---
+  duration_ms: 29.765886
+  type: 'test'
+  ...
+# Subtest: local routing preserves workspace history state, locale, query and fragment without treating opaque origins as equal
+ok 4 - local routing preserves workspace history state, locale, query and fragment without treating opaque origins as equal
+  ---
+  duration_ms: 37.236299
+  type: 'test'
+  ...
+# Subtest: generated action stubs preserve declaration arity, including SWR zero-argument fetchers
+ok 5 - generated action stubs preserve declaration arity, including SWR zero-argument fetchers
+  ---
+  duration_ms: 51.482865
+  type: 'test'
+  ...
+# Subtest: action inventory includes the actual billing re-export chain and excludes type-only aliases
+ok 6 - action inventory includes the actual billing re-export chain and excludes type-only aliases
+  ---
+  duration_ms: 3.399813
+  type: 'test'
+  ...
+# Subtest: real billing client re-exports reach the native RPC with only their declared parameters
+ok 7 - real billing client re-exports reach the native RPC with only their declared parameters
+  ---
+  duration_ms: 24.808111
+  type: 'test'
+  ...
+# Subtest: public configuration keeps only existing flags and discards the previous owner snapshot on reset
+ok 8 - public configuration keeps only existing flags and discards the previous owner snapshot on reset
+  ---
+  duration_ms: 6.652886
+  type: 'test'
+  ...
+# Subtest: RPC sends only the versioned local envelope and preserves shared cache access-denial semantics
+ok 9 - RPC sends only the versioned local envelope and preserves shared cache access-denial semantics
+  ---
+  duration_ms: 16.084544
+  type: 'test'
+  ...
+# Subtest: bootstrap only transports a workspace selector and uses server-proved cache authority
+ok 10 - bootstrap only transports a workspace selector and uses server-proved cache authority
+  ---
+  duration_ms: 21.157128
+  type: 'test'
+  ...
+# Subtest: an old safe-session IPC completion cannot restore the previous account after an owner change
+ok 11 - an old safe-session IPC completion cannot restore the previous account after an owner change
+  ---
+  duration_ms: 13.9207
+  type: 'test'
+  ...
+# Subtest: native logout waits for queued shared-cache writes and clears them before returning
+ok 12 - native logout waits for queued shared-cache writes and clears them before returning
+  ---
+  duration_ms: 17.422448
+  type: 'test'
+  ...
+# Subtest: unsupported renderer state cannot be cleared by an older in-flight success
+ok 13 - unsupported renderer state cannot be cleared by an older in-flight success
+  ---
+  duration_ms: 13.465661
+  type: 'test'
+  ...
+# Subtest: live transport uses a local handle, subscribes before connecting, and closes an aborted preparation
+ok 14 - live transport uses a local handle, subscribes before connecting, and closes an aborted preparation
+  ---
+  duration_ms: 7.239143
+  type: 'test'
+  ...
+# Subtest: noVNC raw channel forwards exact binary slices and rejects malformed local handles
+ok 15 - noVNC raw channel forwards exact binary slices and rejects malformed local handles
+  ---
+  duration_ms: 6.993771
+  type: 'test'
+  ...
+# Subtest: viewer HTTP seam retains shared response errors and routes ordinary requests through the unchanged web transport
+ok 16 - viewer HTTP seam retains shared response errors and routes ordinary requests through the unchanged web transport
+  ---
+  duration_ms: 8.624157
+  type: 'test'
+  ...
+# Subtest: a valid system-browser PKCE page reads only the existing session and public login methods
+ok 17 - a valid system-browser PKCE page reads only the existing session and public login methods
+  ---
+  duration_ms: 57.571468
+  type: 'test'
+  ...
+# Subtest: leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts
+ok 18 - leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts
+  ---
+  duration_ms: 20.622299
+  type: 'test'
+  ...
+# Subtest: malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+    # Subtest: duplicate state
+    ok 1 - duplicate state
+      ---
+      duration_ms: 11.358894
+      type: 'test'
+      ...
+    # Subtest: Electron host
+    ok 2 - Electron host
+      ---
+      duration_ms: 9.067378
+      type: 'test'
+      ...
+    1..2
+ok 19 - malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+  ---
+  duration_ms: 21.284059
+  type: 'test'
+  ...
+# Subtest: pending identity and workspace reads never join across phases or mount from a late identity result
+ok 20 - pending identity and workspace reads never join across phases or mount from a late identity result
+  ---
+  duration_ms: 11.710897
+  type: 'test'
+  ...
+# Subtest: a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration
+ok 21 - a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration
+  ---
+  duration_ms: 10.510541
+  type: 'test'
+  ...
+# Subtest: a retired workspace request cannot expire or disconnect the current PKCE identity page
+    # Subtest: 401
+    ok 1 - 401
+      ---
+      duration_ms: 11.512407
+      type: 'test'
+      ...
+    # Subtest: 503
+    ok 2 - 503
+      ---
+      duration_ms: 10.01492
+      type: 'test'
+      ...
+    1..2
+ok 22 - a retired workspace request cannot expire or disconnect the current PKCE identity page
+  ---
+  duration_ms: 22.05128
+  type: 'test'
+  ...
+# Subtest: account and same-account session changes invalidate a pending identity response and clear prior caches
+    # Subtest: different owner
+    ok 1 - different owner
+      ---
+      duration_ms: 9.890913
+      type: 'test'
+      ...
+    # Subtest: same owner, new session
+    ok 2 - same owner, new session
+      ---
+      duration_ms: 10.283708
+      type: 'test'
+      ...
+    1..2
+ok 23 - account and same-account session changes invalidate a pending identity response and clear prior caches
+  ---
+  duration_ms: 20.597701
+  type: 'test'
+  ...
+# Subtest: only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+    # Subtest: 401
+    ok 1 - 401
+      ---
+      duration_ms: 12.586782
+      type: 'test'
+      ...
+    # Subtest: 503
+    ok 2 - 503
+      ---
+      duration_ms: 8.538158
+      type: 'test'
+      ...
+    1..2
+ok 24 - only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+  ---
+  duration_ms: 21.552265
+  type: 'test'
+  ...
+# Subtest: a new session for the same owner retires the actual in-memory SWR cache
+ok 25 - a new session for the same owner retires the actual in-memory SWR cache
+  ---
+  duration_ms: 10.734088
+  type: 'test'
+  ...
+# Subtest: web RPC keeps the shared codec but uses only normal same-origin cookie transport
+ok 26 - web RPC keeps the shared codec but uses only normal same-origin cookie transport
+  ---
+  duration_ms: 33.663589
+  type: 'test'
+  ...
+# Subtest: an old web owner delayed 401 cannot clear the newly authenticated owner
+ok 27 - an old web owner delayed 401 cannot clear the newly authenticated owner
+  ---
+  duration_ms: 17.51024
+  type: 'test'
+  ...
+# Subtest: an old web owner network rejection does not overwrite the new owner transport
+ok 28 - an old web owner network rejection does not overwrite the new owner transport
+  ---
+  duration_ms: 16.382935
+  type: 'test'
+  ...
+# Subtest: web owner changes fence both asynchronous response bodies and pre-request encoding
+ok 29 - web owner changes fence both asynchronous response bodies and pre-request encoding
+  ---
+  duration_ms: 15.307037
+  type: 'test'
+  ...
+# Subtest: web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+ok 30 - web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+  ---
+  duration_ms: 16.711233
+  type: 'test'
+  ...
+# Subtest: identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+ok 31 - identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+  ---
+  duration_ms: 12.794806
+  type: 'test'
+  ...
+# Subtest: web session owner watches the actual SDK atom without mutating it or treating an error as logout
+ok 32 - web session owner watches the actual SDK atom without mutating it or treating an error as logout
+  ---
+  duration_ms: 3.129945
+  type: 'test'
+  ...
+# Subtest: deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+ok 33 - deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+  ---
+  duration_ms: 6.618824
+  type: 'test'
+  ...
+1..33
+# tests 44
+# suites 0
+# pass 44
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2411.182808

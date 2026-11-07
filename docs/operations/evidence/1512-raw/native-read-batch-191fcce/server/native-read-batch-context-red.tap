@@ -1,0 +1,46 @@
+✖ concurrent owner-wide readers reuse their actual personal home only within the batch (3.275596ms)
+✖ different Live kinds share one revision query before either consumer reads its data (0.961722ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 285.797778
+
+✖ failing tests:
+
+test at lib/desktop-rpc/read-batch-context.test.ts:1:496
+✖ concurrent owner-wide readers reuse their actual personal home only within the batch (3.275596ms)
+  AssertionError [ERR_ASSERTION]: one real membership/home query for the two batch readers
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/desktop-rpc/read-batch-context.test.ts:18:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/desktop-rpc/read-batch-context.test.ts:1:1386
+✖ different Live kinds share one revision query before either consumer reads its data (0.961722ms)
+  AssertionError [ERR_ASSERTION]: the two validated kinds share one bounded SQL read
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/desktop-rpc/read-batch-context.test.ts:43:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,185 @@
+✖ Native coalesces allowed reads in one microtask with one codec pass and ordered results (42.395073ms)
+✖ Native splits at sixteen items and captures each locale before the microtask flush (29.40841ms)
+✖ only an exact unknown batch action on 404 falls back and disables batching for this page (14.601077ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 667.015946
+
+✖ failing tests:
+
+test at apps/desktop/scripts/read-batch.test.mjs:35:1
+✖ Native coalesces allowed reads in one microtask with one codec pass and ordered results (42.395073ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:45:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async fixture (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:26:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/scripts/read-batch.test.mjs:70:1
+✖ Native splits at sixteen items and captures each locale before the microtask flush (29.40841ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  -     'desktop.readBatch',
+  -     16,
+  -     'en'
+      ],
+      [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  -     'desktop.readBatch',
+  -     2,
+  -     'en'
+      ],
+      [
+  +     'projects.listProjects',
+  +     undefined,
+  -     'desktop.readBatch',
+  -     2,
+        'zh-CN'
+      ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'projects.listProjects',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'teams.listTeams',
+  +     undefined,
+  +     'zh-CN'
+  +   ],
+  +   [
+  +     'teams.listTeams',
+  +     undefined,
+  +     'zh-CN'
+  +   ]
+    ]
+  
+      at file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:76:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async fixture (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:26:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'projects.listProjects', undefined, 'zh-CN' ], [ 'teams.listTeams', undefined, 'zh-CN' ], [ 'teams.listTeams', undefined, 'zh-CN' ] ],
+    expected: [ [ 'desktop.readBatch', 16, 'en' ], [ 'desktop.readBatch', 2, 'en' ], [ 'desktop.readBatch', 2, 'zh-CN' ] ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/scripts/read-batch.test.mjs:81:1
+✖ only an exact unknown batch action on 404 falls back and disables batching for this page (14.601077ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  -   'desktop.readBatch',
+      'projects.listProjects',
+      'teams.listTeams'
+    ]
+  
+      at file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:88:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async fixture (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:26:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'projects.listProjects', 'teams.listTeams' ],
+    expected: [ 'desktop.readBatch', 'projects.listProjects', 'teams.listTeams' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

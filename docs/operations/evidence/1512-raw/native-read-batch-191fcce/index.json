@@ -1,0 +1,548 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-native-read-batch-source-validation",
+  "recordedAt": "2026-11-07T10:30:34.458Z",
+  "issue": 1512,
+  "pr": 1518,
+  "productionAcceptance": false,
+  "archive": {
+    "previousEvidenceHead": "8acc2cfb0766aa7114856ea6f9823f94267b0a44",
+    "preservedOperationParent": "0f2ddd52158d70d9af29ef60b8242bb92254bc20",
+    "ref": "evidence/1512-observability",
+    "originalFileCount": 22,
+    "originalBytes": 113000,
+    "bytePolicy": "All listed original receipts/logs retain exact bytes. This index alone is new synthesis. Empty successful typecheck/lint logs are retained as zero-byte files, not omitted."
+  },
+  "candidate": {
+    "commit": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+    "tree": "8496f5f9ddab1c55cce1d6cc454b5b1d46cb346c",
+    "parent": "deca620efec43c3f870ec368cef0b600579a79d6",
+    "previousRemoteFeature": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "sourceFilesMatchOriginalReceipts": true,
+    "rendererFilesMatchFrozenTestedHashes": true,
+    "sourceFiles": [
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "bytes": 1004,
+        "sha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d",
+        "gitBlobSha": "64fabbf385b646ff9fe6f7f07d2a6eecf0211625"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "bytes": 3546,
+        "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108",
+        "gitBlobSha": "48e1ec4556d16393c9b95e65e82c91fc3dd1e0f8"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "bytes": 8536,
+        "sha256": "c6eb4a456b99d693476dedbb7645fc21ad33999e3f99bac4fed3cb9aba4d437e",
+        "gitBlobSha": "66f6d33d31c5ff7d454b3232e48ac917e3186c6b"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch.ts",
+        "bytes": 3066,
+        "sha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045",
+        "gitBlobSha": "603982e23fafd342cc38177fa1ece09e2df26be6"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch.test.ts",
+        "bytes": 9960,
+        "sha256": "67a6601893454e80880513b5b44a230cc2a379940320a542dbfc43aa40265399",
+        "gitBlobSha": "bceb21ca1cb80147765c20d2c9688fe8038818a5"
+      },
+      {
+        "path": "lib/desktop-rpc/registry.ts",
+        "bytes": 14530,
+        "sha256": "03d3b4e8fb23f6365b5d53f67c383495731bb091542db063d5495f3ce40081d5",
+        "gitBlobSha": "d4ac12dd81cfb51ed3f9ede32903cb74d402d918"
+      },
+      {
+        "path": "lib/desktop-rpc/schemas.ts",
+        "bytes": 20761,
+        "sha256": "ebd3f5254eb26312668131d1043e635db070a10fe05368b148f753a416180d0a",
+        "gitBlobSha": "0d865dc31de7a29191f5be621cbf3859c1314dca"
+      },
+      {
+        "path": "lib/live/owner-scope.ts",
+        "bytes": 1284,
+        "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673",
+        "gitBlobSha": "962829a3e69f508f93621e897209e408f6ad1d2a"
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "bytes": 1712,
+        "sha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46",
+        "gitBlobSha": "beb3193ba6e10a586e86e8e0988d799e00a482bd"
+      },
+      {
+        "path": "lib/request-log.ts",
+        "bytes": 9890,
+        "sha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054",
+        "gitBlobSha": "3e6a99e4b6e63a5e491e44d4ad2379cf9d0e75a7"
+      },
+      {
+        "path": "lib/tracing/clients.test.ts",
+        "bytes": 16234,
+        "sha256": "0fc42054d3e189005a39737ce0bf8eb3dec9a7619df4b168a1c534983bcfedd2",
+        "gitBlobSha": "f14238d92fb56c7e2e44d086f5239fe739a9e6df"
+      },
+      {
+        "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+        "bytes": 18915,
+        "sha256": "7fd3254d5df5b7b180c6e64365b80380bb1d08ed34ca46d80e37e9ab93a28b5b",
+        "gitBlobSha": "35d3cfcf3b9d9c1f4e6d471028afb26ea4779950"
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "bytes": 26685,
+        "sha256": "ac51990cdf43182f5862f0a03b1c8dc646043fe01d5d6fb9b72231273d90a87b",
+        "gitBlobSha": "260fa837d4a277756cc5260d1d16b977c1742b1d"
+      },
+      {
+        "path": "package.json",
+        "bytes": 73879,
+        "sha256": "893f2678d04b2750488de59c392519036987aee45956feb0cb35f4bebbd483b5",
+        "gitBlobSha": "4eac8449482a811c048410a818213b4597ab2dd3"
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "bytes": 55605,
+        "sha256": "443bb9b1a6d2f72e68caedcf4f334bb963d4019ce92db397ffea0a1161bb4f27",
+        "gitBlobSha": "4eb8baf49eb86f0b1b561b6435ea75b083ed32d0"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "bytes": 3818,
+        "sha256": "43ebb82c6c84b1de5e1cdc4f7ee4d9c54133f66183c4cac5627a9cea53b93b65",
+        "gitBlobSha": "230766f11a150ebb2f949b32df71b5a47a73c1f0"
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "bytes": 4991,
+        "sha256": "becd52c03f361ca40da5f29f6eb0edbd1480ff4a1e63c91811296fdd089b0b09",
+        "gitBlobSha": "63936f23c44f2ce0e65abb9c6670b3428740872b"
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "bytes": 13945,
+        "sha256": "95aa9597d7dcdb575dd4c520a2cc1e67de3e987ca936961d168eceee7d8f98a8",
+        "gitBlobSha": "73400c1630ab843c79270e39bf0ce902d67f3327"
+      },
+      {
+        "path": "apps/desktop/scripts/read-batch.test.mjs",
+        "bytes": 12870,
+        "sha256": "9eff7dab28253e559aac24cc61419c396703645ab03e9a0ce07a8d96797c3600",
+        "gitBlobSha": "945d3865de64bb16feb0641239ed757075ba076d"
+      }
+    ],
+    "ciForThisCandidate": "not_asserted_by_this_source_only_archive",
+    "runtimeAcceptance": "not_run_by_this_archive",
+    "productionPublished": "not_asserted_by_this_archive"
+  },
+  "currentAcceptance": {
+    "measuredHead": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "nativeLoginQueries": 213,
+    "webLoginQueries": 193,
+    "nativeMinusWeb": 20,
+    "nativeNotMoreThanWeb": "unmet_on_measured_head",
+    "newCandidateNativeNotMoreThanWeb": "unknown_pending_real_native_acceptance",
+    "previousIndex": "https://github.com/alexj11324/Mikka/blob/8acc2cfb0766aa7114856ea6f9823f94267b0a44/docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/index.json",
+    "interpretation": "Do not change the old real macOS failure to success. Source-only batching and fake query-count assertions do not establish the complete native login budget."
+  },
+  "nativeReadBatch": {
+    "scope": "Nine existing Native read actions only, one microtask, at most 16, same locale/workspace/generation/explicit guard. Web stays single-request. Original per-item authorization, live initial catch-up, fresh mutations, server scopes and main-process bearer/session boundaries remain.",
+    "renderer": {
+      "initialRed": {
+        "pass": 0,
+        "fail": 3,
+        "exitCode": 1,
+        "reporter": "Node spec reporter despite .tap suffix",
+        "reason": "Old code sent separate reads, did not split/coalesce at 16 or capture enqueue locale, and had no explicit old-server batch capability fallback."
+      },
+      "finalFocused": {
+        "pass": 23,
+        "fail": 0,
+        "exitCode": 0
+      },
+      "existingRendererStartupWebRuntimeAuthOnly": {
+        "pass": 44,
+        "fail": 0,
+        "exitCode": 0
+      },
+      "lint": {
+        "files": 4,
+        "exitCode": 0,
+        "source": "Agent tool exit receipt; no separate raw lint log was produced."
+      },
+      "boundaries": [
+        "Queued scope changes reject before sending old arguments under a new observed identity/workspace; late in-flight results retain existing current-scope fences.",
+        "Only exact HTTP 404 plus desktop_rpc_action_unknown disables batching for the current page and permits safe single-read fallback. Network/5xx errors do not retry.",
+        "Arguments and results pass through the existing codec once; per-item errors retain code/status.",
+        "No timer, polling, cross-flush response cache or auth protocol change."
+      ]
+    },
+    "server": {
+      "initialRed": {
+        "pass": 0,
+        "fail": 2
+      },
+      "finalFocused": {
+        "pass": 56,
+        "fail": 0,
+        "skipped": 0,
+        "exitCode": 0
+      },
+      "lint": {
+        "files": 9,
+        "exitCode": 0
+      },
+      "source": "Preserved server regression receipt and every raw artifact it references.",
+      "boundaries": [
+        "No server, database service, VM, provider, browser or CI run was started. No full typecheck was run.",
+        "The source tests count calls through the actual owner/revision SQL helpers against fake query boundaries; they do not establish real Native login query totals.",
+        "Owner memo applies only to ownerLiveReadScope in beginOwnerListRead; original writer/after-COMMIT ownerLiveScope remains fresh.",
+        "Read batches preserve every original data reader and Live catch-up; no cross-request cache or timer was introduced.",
+        "All inner arguments validate before execution. Original reader ownership remains enforced. Any thrown or returned authRequired becomes whole-request HTTP 401 after items settle."
+      ]
+    },
+    "attributionAndDiagnostics": {
+      "attributionRed": {
+        "pass": 0,
+        "fail": 2
+      },
+      "attributionFinal": {
+        "pass": 15,
+        "fail": 0
+      },
+      "diagnosticsRed": {
+        "pass": 0,
+        "fail": 2
+      },
+      "diagnosticsFinal": {
+        "pass": 15,
+        "fail": 0
+      },
+      "intermediate": "first green attempt had two overly strict assertions expecting absent critical instead of existing explicit false; corrected to assert not true",
+      "policies": [
+        {
+          "command": [
+            "node",
+            "scripts/error-cause-policy.mjs"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "node",
+            "scripts/polling-policy.mjs"
+          ],
+          "exit_code": 0
+        }
+      ]
+    },
+    "countPolicy": "Counts are per invocation; suites overlap. Do not sum them as a count of distinct tests."
+  },
+  "canonicalTypechecks": {
+    "scope": "Four canonical checks on the integrated source, recorded by root before candidate commit.",
+    "receipt": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-typechecks.json",
+    "heapMiB": 4096,
+    "checks": [
+      {
+        "name": "root",
+        "command": [
+          "./node_modules/.bin/tsrs",
+          "--noEmit"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 6.3,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rawLog": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-root-typecheck.log"
+      },
+      {
+        "name": "api",
+        "command": [
+          "./node_modules/.bin/tsrs",
+          "--noEmit",
+          "-p",
+          "apps/api/tsconfig.json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 1.7,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rawLog": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-api-typecheck.log"
+      },
+      {
+        "name": "frontend",
+        "command": [
+          "node",
+          "apps/desktop/node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "apps/frontend/tsconfig.json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 34.5,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rawLog": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-frontend-typecheck.log"
+      },
+      {
+        "name": "desktop-renderer",
+        "command": [
+          "node",
+          "apps/desktop/node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "apps/desktop/tsconfig.renderer.json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 33.2,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rawLog": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-desktop-renderer-typecheck.log"
+      }
+    ],
+    "allExitCodesZero": true,
+    "reexecutedDuringArchival": false,
+    "chronology": "Earlier server/renderer reports accurately said no full typecheck at their creation. The later integrated four-check receipt is retained separately; original statements were not rewritten."
+  },
+  "sqlProfileAndPkce": {
+    "runId": 42361272198,
+    "completedRequests": 14,
+    "allRequestsPassed": true,
+    "gapQueries": 0,
+    "cleanupComplete": true,
+    "compiledSource": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+    "candidate": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+    "previousProfileSha256": "f8f15cdcaceb1bd10977b47f4edd05d24ab1503ce3c90f7250a6fa79a0a0ebc2",
+    "previousProfileUrl": "https://github.com/alexj11324/Mikka/blob/8acc2cfb0766aa7114856ea6f9823f94267b0a44/docs/operations/evidence/1512-raw/auth-bootstrap-sql-profile-42361272198/sql-profile/desktop-query-decomposition.json",
+    "analysis": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/analysis/desktop-pkce-query-analysis-42361272198.json",
+    "beginQueries": 1,
+    "returnQueries": 2,
+    "exchangeQueries": 9,
+    "exchangeSourceDecomposition": {
+      "pendingClaimAndClear": 2,
+      "atomicOttConsumptionTransaction": 5,
+      "freshSessionAndUser": 2
+    },
+    "pkceTotalQueries": 12,
+    "pkceRoutesUnchangedFromMeasuredSource": true,
+    "authenticationOptimizationsImplemented": false,
+    "interpretation": "Existing compiled Linux API, sequential real HTTP/PG requests, no browser or Electron. Step-level exchange responsibilities come from pinned source, not captured SQL. This is not exact allocation of the concurrent macOS Native minus Web delta, and does not measure the new batch/auth-only source."
+  },
+  "privacy": {
+    "allOriginalFilesScanned": true,
+    "emailJwtBearerPrivateKeySignedUrlMatches": 0,
+    "nonemptyCredentialJsonFields": 0,
+    "rawPrivateLogsIncluded": false,
+    "sourceOnlyTestLogsIncluded": true,
+    "imagesIncluded": false,
+    "signedDownloadUrlsIncluded": false,
+    "secretValuesIncluded": false,
+    "productFilesIncluded": false
+  },
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/server/native-read-batch-source-regression.json",
+      "bytes": 4271,
+      "sha256": "ed96a19685d9217c28baa2c243f151ab25216ce1c54c0962065f1a06e6e1cbc7",
+      "gitBlobSha": "d9017df85a5341f29cf7ef279c8b43be87c81d06"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/attribution/native-read-batch-attribution-diagnostics.json",
+      "bytes": 2861,
+      "sha256": "bd792561814036964e204e87311b12446658487ab84f096535d4203422c5e087",
+      "gitBlobSha": "bc651ffee7f3bf57b3a6b6b9e0a66eda544dac99"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-typechecks.json",
+      "bytes": 1462,
+      "sha256": "47cf863e28977734c90a5add82f2ab5c47e8d476d0e1b1b650177d09e852564e",
+      "gitBlobSha": "d867957dc73a7f080c37654b6cbbe5d2729704a9"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/analysis/desktop-pkce-query-analysis-42361272198.json",
+      "bytes": 22014,
+      "sha256": "bbd2fd429d8f398fca0ddcd81f54b795090c9dedcc8f8704ccc5c2cbd703d972",
+      "gitBlobSha": "7ea56d52805acaeb5bad388ba4cdd9a968a26d49"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/server/native-read-batch-context-red.tap",
+      "bytes": 1688,
+      "sha256": "d176bed96666f03534def77334df28a57c4811d8cbca916c6374df1ac7f788bc",
+      "gitBlobSha": "9089a259fa36a34321c16e82fb8ee154b89e75dd"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/server/native-read-batch-context-green-initial.tap",
+      "bytes": 318,
+      "sha256": "13f9ca7455e888cb41ae671d40dced8fbea4c25652a572d82845f52f91848953",
+      "gitBlobSha": "fea2d7f30b654326f98e16929a3eed633e613f7b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/server/native-read-batch-handler-initial.tap",
+      "bytes": 2254,
+      "sha256": "665f23414c2f8e56ae15f6eea2ff23a30e93a110e996c6a523325a6781d7d56e",
+      "gitBlobSha": "dab464bda4ddd396879d33420cd2fefdeef389f8"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/server/native-read-batch-source-green-final.tap",
+      "bytes": 5613,
+      "sha256": "b5dd750eb8167b44202633382f431b4b74c6a5b2c291492cc3c034c8fd4b03e2",
+      "gitBlobSha": "22a52e51b2e44b2ea548f24a6413a94901285f41"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/server/native-read-batch-source-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/attribution/read-batch-attribution-red.tap",
+      "bytes": 1847,
+      "sha256": "f70d8e6bfe45a234ce410fb2023fca31d46db0b04ef22fca006eb0937ca45fa3",
+      "gitBlobSha": "3a6afbbd3f6ed6979e1616eacf47f8685cd5cedd"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/attribution/read-batch-attribution-intermediate.tap",
+      "bytes": 2903,
+      "sha256": "f82154def8f61a0682d12e6fcaed17ce4e01e192049517679b9d91abca603ea7",
+      "gitBlobSha": "035c80ced0c1d3a647c821718ccd9ba79fa23e17"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/attribution/read-batch-attribution-final.tap",
+      "bytes": 1459,
+      "sha256": "0fbb05225810fd7565c69fcf3888bf8205bd5de455bfa55cffeccd351b6b0de3",
+      "gitBlobSha": "ac8e32916993c9a47f37a7f8178352b8e0df55da"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/attribution/read-batch-diagnostics-red.tap",
+      "bytes": 1593,
+      "sha256": "bd19319ca8bd0bf7a73dd75b075678029b8bb994a57fd474162e56cc960be02c",
+      "gitBlobSha": "26e919b630773917fd780dc842ba4cafed0e2379"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/attribution/read-batch-diagnostics-green.tap",
+      "bytes": 1815,
+      "sha256": "45d17ad2a34ff1ee43fdc90e7a5b357dbcdac59a254985603c14970387bcbcba",
+      "gitBlobSha": "2c3cac2c2c417e912c6debff5fe9e819876537cc"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/renderer/renderer-read-batch-red.tap",
+      "bytes": 6128,
+      "sha256": "5dd3586e8efcaa10e7a2a79a94092123e34c3703affc43d34f5e69b62d7da11e",
+      "gitBlobSha": "b49c6616135076a00b26a1c0e3579b123d99e66c"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/renderer/renderer-read-batch-green.tap",
+      "bytes": 4683,
+      "sha256": "c55dc905f4fb98ebeb36afb38d44cd316b71503f4edbf4606237f63b912f4812",
+      "gitBlobSha": "0cbffe3476cd5b3a935b976ae8a04dbff688aa44"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/renderer/renderer-read-batch-existing.tap",
+      "bytes": 9870,
+      "sha256": "481239a389a2fd5cc121e884052f8ce78ccf9d5e1d183287f50cb4d016a694fd",
+      "gitBlobSha": "da4043f7ae25c170ecfeb986b8e67ab0bb11ef86"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-root-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-api-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-frontend-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/typechecks/read-batch-desktop-renderer-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/query-preparation/posthog-pagination-schema-191fcce2.json",
+      "bytes": 42221,
+      "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74",
+      "gitBlobSha": "63d39e407d96d2408b099f467b19acdab80a51a1"
+    }
+  ],
+  "posthogQueryPreparation": {
+    "status": "schema_compatible_not_production_validated",
+    "acceptanceEvidence": false,
+    "sqlChanged": false,
+    "projectId": 670821,
+    "candidate": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+    "validatedAtUtc": "2026-11-07 10:31:54 UTC",
+    "templateFileSha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+    "fixedScope": {
+      "trace_id_hex": "77cad3a99b9e154b27aaa2c6c0226283",
+      "window_start_utc": "2026-11-06 20:00:00",
+      "window_end_utc": "2026-11-06 20:10:00",
+      "row_offset": 0,
+      "lookup_ids": "intentionally empty; compiler check only, no trace discovery"
+    },
+    "queries": [
+      {
+        "name": "lookup_trace_by_ids",
+        "compiled": true,
+        "executedOnce": true,
+        "returnedRows": 0,
+        "columnCount": 8,
+        "acceptanceEvidence": false
+      },
+      {
+        "name": "span_timeline",
+        "compiled": true,
+        "executedOnce": true,
+        "returnedRows": 27,
+        "columnCount": 18,
+        "acceptanceEvidence": false
+      },
+      {
+        "name": "safe_native_logs",
+        "compiled": true,
+        "executedOnce": true,
+        "returnedRows": 0,
+        "columnCount": 17,
+        "acceptanceEvidence": false
+      },
+      {
+        "name": "apm_generation_spans",
+        "compiled": true,
+        "executedOnce": true,
+        "returnedRows": 0,
+        "columnCount": 38,
+        "acceptanceEvidence": false
+      },
+      {
+        "name": "native_generation_collection",
+        "compiled": true,
+        "executedOnce": true,
+        "returnedRows": 0,
+        "columnCount": 23,
+        "acceptanceEvidence": false
+      }
+    ],
+    "notes": [
+      "All five changed pagination SQL texts executed once successfully. The earlier five call attempts failed JSON parsing before SQL execution; the command format was corrected.",
+      "Existing historical web-only trace is used solely for live schema compatibility. No real issue1512 production run, generation receipt, native collection, Logs or Replay acceptance is established.",
+      "Timeline returned 27 rows; remaining four scoped queries returned zero. No pagination completeness or native exporter flush is inferred from this fixture.",
+      "No new provider generation, recording scan, alert mutation, VM, or background resource was created."
+    ],
+    "receipt": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/query-preparation/posthog-pagination-schema-191fcce2.json",
+    "interpretation": "Five previously changed pagination queries were checked against one fixed historical trace/window. Empty lookup IDs deliberately check compilation only. 27 historical span rows and zero AI/native-collection/log rows are schema results, not production AI/Replay or complete generation evidence. No query SQL or production setting was changed."
+  }
+}

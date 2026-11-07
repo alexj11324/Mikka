@@ -1,0 +1,61 @@
+✔ logs paired start/completion lines with safe fields only (5.605724ms)
+✔ 4xx is warn, 5xx is error, anonymous has null user (1.126286ms)
+✔ thrown errors log status 500 with the error name only and rethrow (1.058458ms)
+✔ generates a request id when x-vercel-id is missing or malformed (0.411681ms)
+✔ a failing sink never breaks the request (0.439954ms)
+✔ outcomes allow only fixed values and stay isolated between concurrent requests (0.738965ms)
+✔ request attribution publishes an internal invocation ID before auth and caches each authenticated identity (1.098258ms)
+✔ mobile API context joins the server and database spans with version attribution (11.835785ms)
+✔ mobile attribution stays in its request and cannot overwrite machine routes (5.880699ms)
+✔ untrusted version and unrelated request headers never enter spans (3.03956ms)
+✔ a failed request records its error code on the span, never the message (2.257218ms)
+✔ request attribution stays on each parent chain when concurrent requests share a trace (7.977905ms)
+✔ request attribution channel projects only valid closed metadata (1.80083ms)
+✖ read-batch actions retain separate parent chains and one physical request identity (5.730653ms)
+✖ read-batch failures retain error status without exporting payloads or forcing ordinary sampling (6.807057ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 13
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 658.08401
+
+✖ failing tests:
+
+test at lib/tracing/clients.test.ts:1:9604
+✖ read-batch actions retain separate parent chains and one physical request identity (5.730653ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + false
+  - undefined
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/tracing/clients.test.ts:215:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/tracing/clients.test.ts:1:12658
+✖ read-batch failures retain error status without exporting payloads or forcing ordinary sampling (6.807057ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(actions.every(span => span.status.code === 2 && span.attributes['mikka.trace.critical'] === undefined))
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/tracing/clients.test.ts:252:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

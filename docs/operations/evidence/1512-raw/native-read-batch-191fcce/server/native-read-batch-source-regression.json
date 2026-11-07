@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "kind": "native-read-batch-source-regression",
+  "createdAt": "2026-11-07T10:16:25.374Z",
+  "baseHead": "deca620efec43c3f870ec368cef0b600579a79d6",
+  "productionAcceptance": false,
+  "files": [
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "bytes": 1004,
+      "sha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 3546,
+      "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "bytes": 8536,
+      "sha256": "c6eb4a456b99d693476dedbb7645fc21ad33999e3f99bac4fed3cb9aba4d437e"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "bytes": 3066,
+      "sha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.test.ts",
+      "bytes": 9960,
+      "sha256": "67a6601893454e80880513b5b44a230cc2a379940320a542dbfc43aa40265399"
+    },
+    {
+      "path": "lib/desktop-rpc/registry.ts",
+      "bytes": 14530,
+      "sha256": "03d3b4e8fb23f6365b5d53f67c383495731bb091542db063d5495f3ce40081d5"
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "bytes": 20761,
+      "sha256": "ebd3f5254eb26312668131d1043e635db070a10fe05368b148f753a416180d0a"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "bytes": 1284,
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "bytes": 1712,
+      "sha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46"
+    }
+  ],
+  "tests": {
+    "red": {
+      "path": "native-read-batch-context-red.tap",
+      "pass": 0,
+      "fail": 2,
+      "boundary": "The initial batch seam forwarded to the existing owner/revision readers; each issued two query calls where one per batch was expected. Fake PG query boundary, no database service."
+    },
+    "green": {
+      "path": "native-read-batch-source-green-final.tap",
+      "pass": 56,
+      "fail": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "command": "node --import ./scripts/server-test.mjs --import tsx --test lib/desktop-rpc/read-batch-context.test.ts lib/desktop-rpc/read-batch.test.ts lib/desktop-rpc/handler.test.ts lib/desktop-rpc/session.test.ts lib/desktop-rpc/wire.test.ts lib/request-log.test.ts lib/tracing/clients.test.ts"
+    },
+    "lint": {
+      "path": "native-read-batch-source-lint.log",
+      "exitCode": 0,
+      "files": 9
+    },
+    "diffCheck": {
+      "exitCode": 0
+    }
+  },
+  "artifacts": [
+    {
+      "path": "native-read-batch-context-red.tap",
+      "bytes": 1688,
+      "sha256": "d176bed96666f03534def77334df28a57c4811d8cbca916c6374df1ac7f788bc"
+    },
+    {
+      "path": "native-read-batch-context-green-initial.tap",
+      "bytes": 318,
+      "sha256": "13f9ca7455e888cb41ae671d40dced8fbea4c25652a572d82845f52f91848953"
+    },
+    {
+      "path": "native-read-batch-handler-initial.tap",
+      "bytes": 2254,
+      "sha256": "665f23414c2f8e56ae15f6eea2ff23a30e93a110e996c6a523325a6781d7d56e"
+    },
+    {
+      "path": "native-read-batch-source-green-final.tap",
+      "bytes": 5613,
+      "sha256": "b5dd750eb8167b44202633382f431b4b74c6a5b2c291492cc3c034c8fd4b03e2"
+    },
+    {
+      "path": "native-read-batch-source-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "boundaries": [
+    "No server, database service, VM, provider, browser or CI run was started. No full typecheck was run.",
+    "The source tests count calls through the actual owner/revision SQL helpers against fake query boundaries; they do not establish real Native login query totals.",
+    "Owner memo applies only to ownerLiveReadScope in beginOwnerListRead; original writer/after-COMMIT ownerLiveScope remains fresh.",
+    "Read batches preserve every original data reader and Live catch-up; no cross-request cache or timer was introduced.",
+    "All inner arguments validate before execution. Original reader ownership remains enforced. Any thrown or returned authRequired becomes whole-request HTTP 401 after items settle."
+  ]
+}

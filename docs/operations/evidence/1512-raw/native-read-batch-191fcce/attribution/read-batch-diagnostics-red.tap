@@ -1,0 +1,38 @@
+✖ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (14.792927ms)
+✖ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (4.178089ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 96.581982
+
+✖ failing tests:
+
+test at apps/desktop/test/db-metrics.test.mjs:387:1
+✖ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (14.792927ms)
+  TypeError [Error]: Cannot read properties of undefined (reading 'status')
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.test.mjs:402:31)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at apps/desktop/test/db-metrics.test.mjs:412:1
+✖ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (4.178089ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'complete'
+  - 'incomplete'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.test.mjs:426:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'complete',
+    expected: 'incomplete',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,98 @@
+{
+  "scope": "source-only native batch action attribution and physical/logical diagnostics; no database or provider",
+  "parent": "deca620efec43c3f870ec368cef0b600579a79d6",
+  "tests": {
+    "attribution_new_old": {
+      "pass": 0,
+      "fail": 2
+    },
+    "attribution_final_including_existing": {
+      "pass": 15,
+      "fail": 0
+    },
+    "diagnostics_new_old": {
+      "pass": 0,
+      "fail": 2
+    },
+    "diagnostics_final_including_existing": {
+      "pass": 15,
+      "fail": 0
+    }
+  },
+  "intermediate": "first green attempt had two overly strict assertions expecting absent critical instead of existing explicit false; corrected to assert not true",
+  "files": [
+    {
+      "path": "Mikka/lib/request-log.ts",
+      "bytes": 9890,
+      "sha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054"
+    },
+    {
+      "path": "Mikka/lib/tracing/clients.test.ts",
+      "bytes": 16234,
+      "sha256": "0fc42054d3e189005a39737ce0bf8eb3dec9a7619df4b168a1c534983bcfedd2"
+    },
+    {
+      "path": "Mikka/apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 18915,
+      "sha256": "7fd3254d5df5b7b180c6e64365b80380bb1d08ed34ca46d80e37e9ab93a28b5b"
+    },
+    {
+      "path": "Mikka/apps/desktop/test/db-metrics.test.mjs",
+      "bytes": 26685,
+      "sha256": "ac51990cdf43182f5862f0a03b1c8dc646043fe01d5d6fb9b72231273d90a87b"
+    },
+    {
+      "path": "Mikka/package.json",
+      "bytes": 73879,
+      "sha256": "893f2678d04b2750488de59c392519036987aee45956feb0cb35f4bebbd483b5"
+    },
+    {
+      "path": "Mikka/docs/operations/tracing.md",
+      "bytes": 55605,
+      "sha256": "443bb9b1a6d2f72e68caedcf4f334bb963d4019ce92db397ffea0a1161bb4f27"
+    }
+  ],
+  "raw_test_outputs": [
+    {
+      "path": "ops1512/read-batch-attribution-red.tap",
+      "bytes": 1847,
+      "sha256": "f70d8e6bfe45a234ce410fb2023fca31d46db0b04ef22fca006eb0937ca45fa3"
+    },
+    {
+      "path": "ops1512/read-batch-attribution-intermediate.tap",
+      "bytes": 2903,
+      "sha256": "f82154def8f61a0682d12e6fcaed17ce4e01e192049517679b9d91abca603ea7"
+    },
+    {
+      "path": "ops1512/read-batch-attribution-final.tap",
+      "bytes": 1459,
+      "sha256": "0fbb05225810fd7565c69fcf3888bf8205bd5de455bfa55cffeccd351b6b0de3"
+    },
+    {
+      "path": "ops1512/read-batch-diagnostics-red.tap",
+      "bytes": 1593,
+      "sha256": "bd19319ca8bd0bf7a73dd75b075678029b8bb994a57fd474162e56cc960be02c"
+    },
+    {
+      "path": "ops1512/read-batch-diagnostics-green.tap",
+      "bytes": 1815,
+      "sha256": "45d17ad2a34ff1ee43fdc90e7a5b357dbcdac59a254985603c14970387bcbcba"
+    }
+  ],
+  "policies": [
+    {
+      "command": [
+        "node",
+        "scripts/error-cause-policy.mjs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "node",
+        "scripts/polling-policy.mjs"
+      ],
+      "exit_code": 0
+    }
+  ]
+}

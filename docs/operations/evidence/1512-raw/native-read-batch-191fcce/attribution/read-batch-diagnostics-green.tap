@@ -1,0 +1,23 @@
+✔ next cjs: bind the actual PG after tracing, with distinct copies and no double count (210.510075ms)
+✔ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (179.16354ms)
+✔ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (163.762586ms)
+✔ Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output (82.889418ms)
+✔ lifecycle query windows retain exact counter deltas and omit unrelated content (0.914191ms)
+✔ lifecycle query windows refuse a changed process, reset, missing driver and unknown readings (0.369698ms)
+✔ lifecycle reads only the attested primary metric socket, with bounded closed errors (1.443811ms)
+✔ RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields (4.265313ms)
+✔ RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts (8.211193ms)
+✔ RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls (2.467542ms)
+✔ RPC diagnostics accept only the descriptor-bound primary log and complete measured windows (1.916395ms)
+✔ RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable (1.63512ms)
+✔ RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases (2.345793ms)
+✔ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (3.410271ms)
+✔ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (3.254677ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 745.693785

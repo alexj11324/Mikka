@@ -1,0 +1,29 @@
+✔ RPC never authenticates a cookie-only, revoked, invalid or delegated token (6.234093ms)
+✔ authenticated bearer wins over foreign cookies and the original action sees its real session (5.281495ms)
+✔ parallel users retain separate request scopes and original tenant checks (1.414846ms)
+✔ current and previous versions work and unsupported versions return the fixed update code (2.165139ms)
+✔ closed whitelist rejects arbitrary exports and prototype names before dispatch (0.934181ms)
+✔ request attribution records only registry-owned RPC actions without arguments or credentials (5.519363ms)
+✔ all parameters are validated, including extras and malformed nested wire tags (1.863704ms)
+✔ safe session summary omits token, timestamps, network and provider credentials (0.231049ms)
+✔ native header adapter preserves browser authority but strips all bearer cookies (0.310989ms)
+✔ registry schemas reject forged authority, malformed nested input and extra arguments (5.290359ms)
+✔ explicit schemas and function map have exactly matching action names (0.591854ms)
+✔ billing re-export consumers accept only the existing workspace selector and purchase amounts (0.489599ms)
+✔ Coordinator history keeps the current bounded page size and previous two-argument calls (0.227163ms)
+✔ cached list cursors retain each reader limit, old calls and unique bounded row proofs (4.284008ms)
+✔ cached chat metadata repair is literal, bounded and cannot authorize another reader (0.559084ms)
+✔ cached detail and bootstrap accept identity-free selectors while preserving legacy bootstrap (0.307384ms)
+✔ the ordinary version-1 RPC preserves batch order, original results and wire values (10.140532ms)
+✔ every item is validated before any original action runs, including nested and mutating calls (8.545122ms)
+✔ each business failure keeps the single-action HTTP mapping without exposing its error message (1.07988ms)
+✔ thrown and returned authRequired both preserve Main HTTP 401 after all item work settles (1.460375ms)
+✔ parallel batch requests retain their real session and each original ownership check (1.505624ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 695.179653

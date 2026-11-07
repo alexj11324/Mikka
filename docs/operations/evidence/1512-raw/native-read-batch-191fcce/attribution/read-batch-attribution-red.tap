@@ -1,0 +1,52 @@
+✖ read-batch actions retain separate parent chains and one physical request identity (12.086389ms)
+✖ read-batch failures retain error status without exporting payloads or forcing ordinary sampling (0.519594ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1265.328585
+
+✖ failing tests:
+
+test at lib/tracing/clients.test.ts:1:9604
+✖ read-batch actions retain separate parent chains and one physical request identity (12.086389ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/tracing/clients.test.ts:178:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/tracing/clients.test.ts:1:12658
+✖ read-batch failures retain error status without exporting payloads or forcing ordinary sampling (0.519594ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/tracing/clients.test.ts:235:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,58 @@
+{
+  "scope": "current integrated native read batch, source-only; no database/services",
+  "heap_mib": 4096,
+  "checks": [
+    {
+      "name": "root",
+      "command": [
+        "./node_modules/.bin/tsrs",
+        "--noEmit"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.3,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "api",
+      "command": [
+        "./node_modules/.bin/tsrs",
+        "--noEmit",
+        "-p",
+        "apps/api/tsconfig.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.7,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "frontend",
+      "command": [
+        "node",
+        "apps/desktop/node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/frontend/tsconfig.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 34.5,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "desktop-renderer",
+      "command": [
+        "node",
+        "apps/desktop/node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/desktop/tsconfig.renderer.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 33.2,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
