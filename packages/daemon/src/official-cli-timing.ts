@@ -167,10 +167,11 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   server.on("error", () => { collector.reject(); mcpCollector.reject() })
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const endpoint = `${origin}${path}`
+  // Leave compression unset: Codex 0.166.0 rejects "none" during initialization.
   const env: Record<string, string> = {
     OTEL_METRICS_EXPORTER: "none", OTEL_TRACES_EXPORTER: "none", OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: endpoint,
-    OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "", OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: "none",
+    OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "",
     OTEL_LOGS_EXPORT_INTERVAL: "1000", OTEL_BLRP_SCHEDULE_DELAY: "1000",
     OTEL_LOG_USER_PROMPTS: "0", OTEL_LOG_ASSISTANT_RESPONSES: "0", OTEL_LOG_TOOL_DETAILS: "0", OTEL_LOG_TOOL_CONTENT: "0", OTEL_LOG_RAW_API_BODIES: "0",
     ...(harness === "claude_code" ? { CLAUDE_CODE_ENABLE_TELEMETRY: "1" } : {}),
