@@ -2,8 +2,11 @@ import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { isCloudEdition } from '@/lib/edition'
+import { cloudDecisionTarget } from '@/lib/default-model'
+import { CloudServiceError } from '@/lib/cloud-services/errors'
 import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
+import type { HostedModelBilling } from '@/lib/abuse/model'
 
 const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -21,25 +24,29 @@ export interface DecisionExecution {
   vision: 'image-input-submitted' | 'no-image-input'
 }
 /** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
-export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}) {
+export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}, billingAdapter?: HostedModelBilling) {
   'use step'
   if (signal?.aborted) return null
-  // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
-  const key = DECISIONS_URL === 'https://ai-gateway.vercel.sh/v1/decisions'
-    ? process.env.DECISIONS_API_KEY || (await gatewayAuth())?.token
-    : process.env.DECISIONS_API_KEY || process.env.AI_GATEWAY_API_KEY
-  if (!key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
   if (!scope) return null
+  const cloud = await cloudDecisionTarget(scope.ownerId)
+  // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
+  const key = cloud ? null : DECISIONS_URL === 'https://ai-gateway.vercel.sh/v1/decisions'
+    ? process.env.DECISIONS_API_KEY || (await gatewayAuth())?.token
+    : process.env.DECISIONS_API_KEY || process.env.AI_GATEWAY_API_KEY
+  if (!cloud && !key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { assertUnmanagedModelTransport } = await import('@/lib/model-admission/runtime')
   await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
-  const usage = await import('@/lib/abuse/runtime')
+  const usage = cloud ? null : await import('@/lib/abuse/runtime')
+  const store = billingAdapter?.usage ?? usage?.hostedUsage
   const callId = randomUUID()
   // Like every hosted call (lib/abuse/model.ts): the workspace's own balance first, then shared credits.
   const { withSharedCredits } = await import('@/lib/credit-shares')
-  await withSharedCredits(scope.workspaceId, usage.canUseMikkaPaid)
-  await withSharedCredits(scope.workspaceId, payer => usage.hostedUsage.reserve(payer, DECISION_MODEL, callId))
+  if (store && usage) {
+    await withSharedCredits(scope.workspaceId, billingAdapter?.admit ?? usage.canUseMikkaPaid)
+    await withSharedCredits(scope.workspaceId, payer => store.reserve(payer, DECISION_MODEL, callId))
+  }
   let requestStarted = false
   try {
     const requestInput = decisionRequestInput(input)
@@ -54,18 +61,21 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
     if (signal?.aborted) throw new DOMException('Model request cancelled', 'AbortError')
     requestStarted = true
-    const response = await fetch(DECISIONS_URL, {
+    const init: RequestInit = {
       method: 'POST',
       redirect: 'error',
-      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+      headers: { ...(key ? { Authorization: 'Bearer ' + key } : {}), 'Content-Type': 'application/json' },
       body,
       signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
-    })
+    }
+    const response = cloud && scope.ownerId
+      ? await (await import('@/lib/cloud-services/runtime')).cloudRequest(scope.ownerId, 'models', '/v1/decisions', init)
+      : await fetch(DECISIONS_URL, init)
     if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
     const payload: unknown = await response.json()
-    {
+    if (store) {
       const receipt = payload as {provider_metadata?:unknown}
-      await usage.hostedUsage.settle(callId,gatewayCost(receipt.provider_metadata),0,0,gatewayGenerationId(receipt.provider_metadata))
+      await store.settle(callId,gatewayCost(receipt.provider_metadata),0,0,gatewayGenerationId(receipt.provider_metadata))
       if (isCloudEdition()) await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
     }
     const answers = validatedAnswers(payload, requestedQuestions)
@@ -83,8 +93,9 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     // No usable answer is exposed; the default contract of all other callers
     // (including decide/callDecisionRequest) remains null for invalid answers.
     return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
-  } catch {
-    await usage.hostedUsage.settle(callId,requestStarted ? null : 0)
+  } catch (error) {
+    if (store) await store.settle(callId,requestStarted ? null : 0)
+    if (cloud && error instanceof CloudServiceError) throw error
     // No upstream text, credentials, image bytes or untrusted purpose in logs.
     console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
     return null

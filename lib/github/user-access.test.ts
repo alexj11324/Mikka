@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 
 const originalAppId = process.env.GITHUB_APP_ID
+mock.module(new URL('./cloud.ts', import.meta.url).href, { namedExports: { cloudGitHubRepositories: async () => null, cloudGitHubCredential: async () => null, useCloudGitHub: async () => false } })
+mock.module(new URL('./app-config.ts', import.meta.url).href, { namedExports: { readGitHubAppConfig: async () => ({ id: process.env.GITHUB_APP_ID ?? null }) } })
 const requestHeaders = new Headers({ cookie: 'test-session' })
 let user: string | null = 'person-1'
 let sessionUsers: (string | null)[] = []

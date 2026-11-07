@@ -42,7 +42,7 @@ export async function sendToCoordinator(userId: string, text: string) {
   const after = await lastPosition(userId)
   await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, await coordinatorChat(userId), text))
   await wakeCoordinator(userId)
-  return { queued: true, coordinatorRunning: coordinatorEnabled(), after }
+  return { queued: true, coordinatorRunning: await coordinatorEnabled(userId), after }
 }
 
 /** One stored message as text: what was said, and which tools the Coordinator called. */
@@ -117,7 +117,7 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
     if (!final && !failed && !await hasAssistantAfter(userId, botId, after)) return { done: false }
     const messages = await messagesAfter(userId, botId, after, limit)
     const replied = messages.some(message => message.role === 'assistant')
-    return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() } }
+    return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: await coordinatorEnabled(userId) } }
   }, { deadline, signal, subscribe: changed => subscribeToCoordinatorReplies(scope, botId, changed) })
 }
 

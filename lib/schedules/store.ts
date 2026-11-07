@@ -37,7 +37,7 @@ export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventI
 /** Definitions, due slots and original-chat publication share PostgreSQL commits.
  * Model reads use the existing inbox; no external write permission is created. */
 export class ScheduleStore {
-  constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: () => boolean, private clock: () => Date = () => new Date()) {}
+  constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: (ownerId: string) => boolean | Promise<boolean>, private clock: () => Date = () => new Date()) {}
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
     observePoolCommits(this.pool)
     const tx = await this.pool.connect()
@@ -53,7 +53,7 @@ export class ScheduleStore {
     if (!actor.sourceEventId || !(await tx.query(`SELECT id FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid AND kind='user_message'`, [actor.sourceEventId,actor.ownerId,actor.botId])).rowCount) throw new ScheduleError('scheduleUserSourceRequired',403)
   }
   private async permission(tx: PoolClient, owner: string, def: Definition) {
-    if(def.task.kind==='agent_read'&&!this.agentAvailable())throw new ScheduleError('scheduleAgentReadUnavailable',503)
+    if(def.task.kind==='agent_read'&&!await this.agentAvailable(owner))throw new ScheduleError('scheduleAgentReadUnavailable',503)
     if (def.task.kind !== 'issue_snapshot') return null
     const issue = await this.issue(tx,owner,def.task.issueId)
     if (!issue) throw new ScheduleError('scheduleTaskAccessDenied',403)

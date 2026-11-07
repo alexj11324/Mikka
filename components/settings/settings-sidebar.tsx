@@ -18,10 +18,10 @@ const icons: Record<SettingsSectionId, LucideIcon> = {
   account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks,
   models: Gauge, logins: KeyRound, privacy: Lock, computers: Monitor, developer: SquareTerminal,
   general: Building2, members: Users, teams: SquareUserRound, permissions: CircleCheck, secrets: HardDrive,
-  audit: FileText, usage: ChartColumn, billing: CreditCard,
+  audit: FileText, usage: ChartColumn, billing: CreditCard, cloud: Blocks,
 }
 
-export function SettingsSidebar({ section, activeSection, admin, personal = false, billing = true, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: {
+export function SettingsSidebar({ section, activeSection, admin, personal = false, billing = true, cloudAdmin = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: {
   section: SettingsSectionId
   activeSection?: SettingsSectionId
   /** Viewer is a workspace admin. Admin-only sections stay hidden until this is known (S-P). */
@@ -29,6 +29,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   /** Not (yet) known to be a team workspace: only the account group, 用量 and 计费 (decision 2026-11-01-2310). */
   personal?: boolean
   billing?: boolean
+  cloudAdmin?: boolean
   /** The second group is named after the current workspace. */
   workspaceName?: string
   selectedTeamId?: string
@@ -53,7 +54,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
   const groups = (['personal', 'workspace'] as const).map(group => {
     const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
-    const items = visibleSettingsSections({ admin, personal, billing }).filter(item => item.group === group && settingsItemVisible({
+    const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin }).filter(item => item.group === group && settingsItemVisible({
       query, groupTitle: group === 'personal' ? 'Account' : 'Workspace', groupLabel, itemTitle: item.title,
       label: i18nText(`Settings.sections.${item.id}.title` as never),
       keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',

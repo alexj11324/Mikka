@@ -1,7 +1,7 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { authorizeDesktopGitHubToken, authorizeDeviceRunGitHubToken } from '@/lib/github/desktop-token-authority'
 import { createRunGitHubTokenExchange, RUN_GITHUB_MIN_VALIDITY_MS } from '@/lib/github/run-token-exchange'
-import { githubTokenForUser } from '@/lib/github/user-access'
+import { githubMachineCredential } from '@/lib/github/machine-credential'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +11,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const runId = new URL(request.url).searchParams.get('runId')
   return createRunGitHubTokenExchange({
     authorize: value => runId === null ? authorizeDesktopGitHubToken(value, deviceId) : authorizeDeviceRunGitHubToken(value, deviceId, runId),
-    issue: userId => githubTokenForUser(userId, { minValidityMs: RUN_GITHUB_MIN_VALIDITY_MS }),
+    issue: (userId, scope) => githubMachineCredential(userId, { remoteKey: scope.remoteKey, minValidityMs: RUN_GITHUB_MIN_VALIDITY_MS }),
     naturalExpiry: runId !== null,
   })(request)
 }

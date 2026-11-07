@@ -24,6 +24,8 @@ export interface BotModelMenuOption {
   modelId: string
   /** `claude`, `codex`, `mikka` for the hosted model, or an API key's provider (`anthropic`, `deepseek`, `custom`…). */
   provider: string
+  /** A community default uses cloud credits or the administrator's own provider. */
+  hostedSource?: 'cloud' | 'self-hosted'
 }
 
 export interface BotModelMenuGroup {
@@ -40,6 +42,7 @@ export interface BotModelMenuGroup {
   points?: number
   /** Mikka 默认 with no points yet: the free messages left before a card is needed. */
   trialLeft?: number
+  hostedSource?: 'cloud' | 'self-hosted'
   options: BotModelMenuOption[]
 }
 

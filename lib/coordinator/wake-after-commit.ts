@@ -1,12 +1,7 @@
-import { defaultModelConfigured } from '@/lib/default-model-config'
 import { afterDatabaseCommit } from '../db/commit-effects'
-import { runTestFixture } from '../run-test-fixture'
 
 /** Tests replace `wake` here to observe wakes without a Coordinator runtime. */
 export const coordinatorWakeTransport: { wake?: (userId: string) => Promise<unknown> } = {}
-
-/** Same condition as coordinatorEnabled (lib/coordinator/wake.ts), without loading the runtime. */
-const enabled = () => Boolean(coordinatorWakeTransport.wake || defaultModelConfigured() || runTestFixture('mock') !== undefined)
 
 const wake = async (userId: string) => {
   if (coordinatorWakeTransport.wake) return coordinatorWakeTransport.wake(userId)
@@ -24,7 +19,7 @@ const pending = (event: { tier?: string | null; deliveredAt?: unknown }) => !eve
  * chat defers, and that turn's lease release wakes it again (store.releaseLease).
  */
 export function wakeCoordinatorAfterCommit(executor: object, userId: string, event: { tier?: string | null; deliveredAt?: unknown } = {}) {
-  if (!pending(event) || !enabled()) return
+  if (!pending(event)) return
   try {
     afterDatabaseCommit(executor, `coordinator-wake:${userId}`, async () => {
       const { afterJob } = await import('../background')
@@ -35,6 +30,7 @@ export function wakeCoordinatorAfterCommit(executor: object, userId: string, eve
 
 /** wakeCoordinatorAfterCommit after the current request, for a write that has already committed. */
 export function wakeCoordinatorSoon(userId: string) {
-  if (!enabled()) return
+  // Per-person cloud readiness is resolved by wakeCoordinator after the write,
+  // when the committed binding can be read; never query inside this callback.
   void import('../background').then(({ afterJob }) => afterJob('after:coordinator-wake', () => wake(userId), { orRun: true })).catch(() => {})
 }

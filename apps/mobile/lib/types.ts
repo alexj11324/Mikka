@@ -1,5 +1,6 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
 import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
+import type { CloudErrorCode } from '../../../lib/cloud-services/errors'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
 export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' | 'stopped'
@@ -87,7 +88,7 @@ export type ChatFailure =
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
-  | { kind: 'failed'; reason?: 'balance' }
+  | { kind: 'failed'; reason?: 'balance'; cloudCode?: CloudErrorCode }
 
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }

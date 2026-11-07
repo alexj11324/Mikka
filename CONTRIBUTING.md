@@ -46,6 +46,42 @@ Thank you for helping improve Mikka.
   on focus. See
   [`docs/design/decisions/2026-11-01-0400-no-refetch-on-focus.md`](docs/design/decisions/2026-11-01-0400-no-refetch-on-focus.md).
 
+## Public core and Mikka Cloud ownership
+
+This repository contains the independently runnable Mikka server, its clients
+and the public contracts for optional Mikka Cloud services. Login, bots, threads,
+devices, the built-in live gateway, user-supplied credentials and integration
+setup must work without a Mikka account. Cloud connection settings and clients
+that request scoped cloud services belong here too.
+
+New services that hold Mikka's own credentials or act on behalf of other
+deployments belong in the private `mikka-cloud` repository: cloud token issuance
+and private signing keys, official GitHub App token brokerage and webhook
+distribution, the Expo push relay, and cross-server model metering and billing.
+Do not import or vendor that service into a public package. Its public protocol,
+verification code and client-side errors may remain here without private keys.
+
+Existing plugins, credential storage, billing, model routing and first-party
+integration code remain public; this boundary does not move existing code.
+See [the self-hosting design, § 8](https://github.com/alexj11324/Mikka/blob/804e0571a6d20c62e0be4c19c75d52444067de93/docs/design/self-hosting-cloud-services.md#8-代码放哪)
+and [#1571](https://github.com/alexj11324/Mikka/issues/1571).
+
+`pnpm check:cloud-boundary` runs the source policy and its positive/negative
+fixtures. It is part of `pnpm check` and the required Source checks CI job.
+The policy scans tracked and new source files, migrations and package manifests
+for known private service primitives while allowing public client calls and
+contracts. It catches accidental placement; reviewers still check new service
+ownership and dynamically constructed implementations.
+
+Retained first-party primitives have narrow exceptions in
+[`scripts/cloud-boundary-policy.mjs`](scripts/cloud-boundary-policy.mjs), each
+with an exact file, rule, fingerprint, count and reason. There are no whole-file
+exceptions: a second primitive or a new private issuer in the same file fails.
+Removing or changing a retained primitive also requires updating its stale
+exception. Add an exception only for independently runnable or existing public
+code, explain its ownership, and add a regression that keeps new cloud service
+code rejected.
+
 ## How changes are tested
 
 Slow checks run less often and later. Each layer catches what the one before

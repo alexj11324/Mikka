@@ -271,7 +271,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
     await t.test('an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present', async () => {
       const { failUnclaimedCloudStart } = await import('../run-leases')
       const { coordinatorEnabled } = await import('../coordinator/wake')
-      assert.equal(coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
+      assert.equal(await coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
       const botId = randomUUID()
       await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup list fixture')`, [botId, home])
       const makeRun = async (deduped: boolean) => {

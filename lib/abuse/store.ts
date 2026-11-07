@@ -13,8 +13,10 @@ import {
 type Query = Pick<PoolClient, 'query'>
 export class HostedUsageStore {
   readonly metered: boolean
-  constructor(readonly pool: Pool, options: { metered?: boolean } = {}) {
+  readonly allowTrial: boolean
+  constructor(readonly pool: Pool, options: { metered?: boolean; allowTrial?: boolean } = {}) {
     this.metered = options.metered ?? true
+    this.allowTrial = options.allowTrial ?? true
   }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
     const tx = await this.pool.connect()
@@ -151,6 +153,7 @@ export class HostedUsageStore {
     const balance = await this.balance(workspaceId)
     if (!this.metered) return balance
     if (!balance.verified && balance.purchased <= 0) {
+      if (!this.allowTrial) throw new PaidResourceError('verification_required')
       const left = await this.trialLeft(workspaceId, balance)
       if (left !== null && left >= 0) return { ...balance, trialLeft: left }
       throw new PaidResourceError('verification_required')
@@ -197,7 +200,8 @@ export class HostedUsageStore {
       if (prior) throw new PaidResourceError('usage_in_progress') // Never replay a paid provider call.
       const balance = await this.balance(workspaceId, tx)
       // No card and nothing bought: only the first TRIAL_MESSAGES messages' turns, paid by the platform.
-      const trial = await this.trialLeft(workspaceId, balance, tx)
+      if (!this.allowTrial && !balance.verified && balance.purchased <= 0) throw new PaidResourceError('verification_required')
+      const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance, tx) : null
       if (trial !== null && trial < 0)
         throw new PaidResourceError('verification_required')
       const available = balance.free + balance.purchased
@@ -335,7 +339,7 @@ export class HostedUsageStore {
     )
     // Whether the next call would be admitted, by the same rules as reserve().
     const available = balance.free + balance.purchased
-    const trial = await this.trialLeft(workspaceId, balance)
+    const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance) : null
     const state = trial !== null
       ? trial > 0 ? (spent >= abuseLimits(env).dailyMicroUsd ? 'platform_paused' : 'ready') : 'verification_required'
       : !balance.verified

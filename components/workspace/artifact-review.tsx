@@ -30,7 +30,7 @@ export function useArtifactReview(taskId: string | null | undefined, { hasArtifa
   const { data: detail } = useSWR<FactoryTaskDetail>(id ? taskDetailKey(id) : null, request, { refreshInterval: 0 })
   const v2 = isFlowV2(detail)
   const { flow } = useFactoryFlow(id ?? '', detail, Boolean(id) && v2)
-  const { data: ledger } = useSWR<{ merges?: AcceptanceMerge[] }>(id ? ledgerKey(id) : null, request, { refreshInterval: 0 })
+  const { data: ledger } = useSWR<{ merges?: AcceptanceMerge[]; rejections?: { note: string | null; createdAt: string }[] }>(id ? ledgerKey(id) : null, request, { refreshInterval: 0 })
   useLiveKey('factory_task', id, id ? [taskDetailKey(id), ledgerKey(id)] : [], detail?.liveWorkspaceId ?? null)
   const merges = Array.isArray(ledger?.merges) ? ledger.merges : []
   const task = detail?.task
@@ -38,7 +38,7 @@ export function useArtifactReview(taskId: string | null | undefined, { hasArtifa
     : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges })
   const kind = artifactReviewKind({ hasArtifact, runSucceeded, flow: v2 ? flow : null, merge: v2 && !flow ? null : merge })
   const pullRequest = detail?.delivery?.pullRequest ?? null
-  return { kind, detail, flow, pullRequest, number: pullNumberOf(pullRequest?.url) }
+  return { kind, detail, flow, ledger, merge, pullRequest, number: pullNumberOf(pullRequest?.url) }
 }
 
 /** 「Artifact · PR #1288 待你审」 in the tooltip; 「Artifact · 待你审」 under a card. */

@@ -137,6 +137,46 @@ mobile trust. This flag reports sign-in readiness, not push-relay availability.
 | Sign-in returns to an error page | Check origin/callback configuration and finish the one-time handoff before it expires; start a new login after a failed exchange. |
 | Login works but realtime does not | Preserve the configured Host and allow the base-path WebSocket upgrade through the reverse proxy. |
 
+## Connect the official iOS app
+
+Use an iOS release that includes server selection. Add the following to your
+server's environment, then recreate the app container:
+
+```dotenv
+AUTH_TRUSTED_ORIGINS=mikka://
+MIKKA_SERVER_NAME=Acme Mikka
+```
+
+Preserve any other explicitly trusted origins already needed by your deployment.
+`GET /mikka/api/desktop/discovery` must now report `mobileReady: true`. This
+enables the existing native sign-in return, not the cloud push relay.
+
+On the sign-in screen, tap **更改 → 自托管服务器**, enter
+`https://mikka.example.com/mikka`, and tap **连接**. A bare hostname is also
+accepted and probes the root before `/mikka`. Verify the displayed name and
+version, then tap **继续** and sign in with an account on this installation.
+The app displays only the providers configured by this server. If it says
+「请在服务器上允许 Mikka iOS」, check the exact `mikka://` trust setting.
+An older server asks for a server update; an incompatible protocol or minimum
+client version asks for an app update, using the desktop's error vocabulary.
+
+Use HTTPS with a valid certificate reachable by the iPhone. `localhost` and
+`127.0.0.1` mean the phone itself, so the development-only HTTP exception does
+not make a computer's unencrypted LAN address acceptable. Preserve WebSocket
+upgrades and the `/mikka` path through the reverse proxy, as described above.
+
+In **设置 → 账号与服务器**, add or switch saved accounts. Each native account
+keeps its own server, session and workspace in SecureStore. Mikka Cloud remains
+available as the default choice, and switching back restores that account's
+session. Sign-out affects the selected account only. The official app continues
+to receive JavaScript updates through Mikka's official Expo project, regardless
+of which server is selected.
+
+Realtime chat works with the built-in server gateway without Mikka Cloud.
+iOS remote push requires the separately configured cloud relay because the
+official app's push credentials remain with Mikka. Push data names its server
+and account so a notification cannot route into a different saved account.
+
 ## Models, computers, and GitHub
 
 In **Settings → Models and subscriptions**, connect your own Claude or ChatGPT subscription, or add your own provider API key. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.
@@ -147,13 +187,34 @@ Connect your own computer or server using the commands shown in Mikka's **Device
 
 For an E2B cloud computer, save your own E2B key in your account. This does not buy Mikka-hosted compute and does not charge Mikka credits.
 
-GitHub repository access uses your deployment's GitHub App. Manual configuration uses `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET` as required by the integration. The installation link is derived from the configured slug. It never sends a community user to the official Mikka App by default. The current OAuth configuration also enables GitHub sign-in; keep its callback registered on your own origin.
+## Create your GitHub App
+
+GitHub repository access uses an App that you own. Mikka generates its registration form locally and sends your browser to GitHub; it does not contact Mikka Cloud or fetch the official App's configuration at runtime.
+
+1. Sign in to your self-hosted Mikka account. In that browser, open `/mikka/api/auth/get-session` on your server and copy your own `user.id` from the response. Keep the response private; it also describes your session.
+2. Add `MIKKA_SERVER_ADMIN_USER_IDS=<your-user-id>` to the server environment, then recreate the app container. Multiple IDs are separated by commas. Only the server operator can appoint administrators. The first registered user and workspace administrators receive no automatic server authority.
+3. Open **Plugins → GitHub → Server GitHub App → Create GitHub App**. Choose your personal GitHub account, or enter an organization you administer. GitHub asks you to confirm creation and the requested permissions.
+4. GitHub returns to your server, which exchanges the one-time code and stores the App credentials. Select **Authorize repositories** to install your App on the repositories you choose, then **Link GitHub** to connect your account.
+
+Use a public HTTPS origin in `BETTER_AUTH_URL`; GitHub must be able to reach the webhook. All callback, setup and webhook URLs include the deployment base path. The app is private (`public: false`), so installation is limited to its owning personal account or organization. The permission and event template is versioned with the code; see [GitHub App manifest](github-app-manifest.md).
+
+The state expires after one hour, is stored only as a hash and is bound to the administrator's user ID, current session and exact origin. The callback checks those bindings and the browser cookie again before exchanging the code. Signing out, changing accounts, removing administrator access, or reusing a callback prevents registration. Starting again replaces that administrator's earlier pending setup. A completed registration cannot overwrite an already configured App.
+
+The six returned fields—App ID, slug, private key, webhook secret, OAuth client ID and OAuth client secret—are encrypted together in `server_github_app` with `WORKSPACE_SECRETS_KEY`. Only the App slug and installation link are shown in settings. Keep the database and installation keys in the same backup plan. A missing or incorrect encryption key fails explicitly; it never silently selects another App.
+
+Repository linking, installation links, token refresh, installation checks, webhook verification and webhook redelivery read the saved App immediately. Existing manual installations remain supported: if no App has been saved in the database, the server reads `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. Remove an incomplete manual App configuration before starting the creation flow. The community installation link never defaults to the official Mikka App.
+
+### Reuse the App for sign-in
+
+Repository linking works independently of the Mikka sign-in method. By default, GitHub sign-in continues to use the separately configured `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, so the official cloud's existing login configuration is unchanged.
+
+To use your newly stored App for GitHub sign-in too, set `GITHUB_SIGN_IN_USE_APP=true` after creating it and restart the app container. Better Auth initializes provider options once, so this choice requires a restart. Its callback is already in the generated manifest. Keep another working sign-in method while making the change; changing the GitHub OAuth application can require existing users to sign in again or link their GitHub account. Disabling App sign-in restores the environment-configured OAuth client on the next restart; it does not remove repository connections or App credentials.
 
 ## Edition and hosted deployment
 
 `MIKKA_EDITION` is read at runtime through `lib/edition.ts`. Its default is `community`; the only other accepted value is `cloud`. Invalid values fail configuration rather than silently choosing a billing mode. The same image can be used with a new origin without rebuilding its browser assets.
 
-Official Mikka production must explicitly set `MIKKA_EDITION=cloud` through Infisical `prod:/vercel` and its existing Vercel sync before this default reaches production. Its Stripe checks, trial limits, reservation/settlement, and existing providers remain enabled. The previous domain redirect is separately configured with `MIKKA_LEGACY_APP_HOST`; it grants no authenticated access through the old host.
+Official Mikka production must explicitly set the non-secret `MIKKA_EDITION=cloud` selector in both the release build environment and Vercel Production before this default reaches production. The release job declares its build value and verifies the matching Vercel value; credentials still come from Infisical. Its Stripe checks, trial limits, reservation/settlement, and existing providers remain enabled. The previous domain redirect is separately configured with `MIKKA_LEGACY_APP_HOST`; it grants no authenticated access through the old host.
 
 Optional Mikka cloud services are a separate connection. The community edition remains usable without connecting them. The hosted-compute resale option is not included; its pricing decision is tracked separately in #1569.
 
@@ -172,3 +233,9 @@ The build uses the pinned pnpm lockfile, Vite frontend, Nitro Node server, and N
 The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 17 database, checks migrations/startup health, verifies public configuration and static assets, and restarts the same persisted installation. A successful main build publishes `ghcr.io/alexj11324/mikka:<commit-sha>` and updates `latest`; release tags publish matching tags. Pin the SHA or release tag in `.env` before an upgrade, back up the two volumes, then run `docker compose pull` and `docker compose up -d --wait`.
 
 `/mikka/api/version` reports the compiled revision. `docker compose ps` reports health. Startup logs include migration names and bounded error codes, never generated installation keys.
+
+## Optional Mikka Cloud services
+
+The server works without a Mikka account. For optional official GitHub, iOS push and hosted models, set `MIKKA_SERVER_ADMIN_USER_IDS` to the explicit local administrator IDs and use Settings → Mikka Cloud. Each person binds their own cloud account under Settings → Account, or the administrator supplies a team server key. The account settings show which credits apply. See [the public API contract](cloud-services-api.md).
+
+See [BYOK services](self-hosting-byok.md) for SMTP, S3, local vault and default-model configuration, and [builtin realtime](self-hosting-realtime.md) for multi-instance operation.

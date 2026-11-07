@@ -49,7 +49,7 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { leaseDevice } from '@/lib/subscription-native-device'
 import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
-import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
+import { githubMachineConfigured, githubMachineCredential } from '@/lib/github/machine-credential'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
@@ -343,9 +343,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       return runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal)
     }),
     cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
-      if (!githubRepository || !await linkedGitHubAccountId(caller.userId)) return undefined
-      const { githubTokenForUser } = await import('@/lib/github/user-access')
-      const issued = await githubTokenForUser(caller.userId)
+      if (!githubRepository || !await githubMachineConfigured(caller.userId)) return undefined
+      const issued = await githubMachineCredential(caller.userId, { remoteKey: repo.repoPath })
       return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
     }),
   ] as const) : undefined
@@ -440,7 +439,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     if (github.status === 'fulfilled') githubCredential = github.value
   }
   const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
-    : repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
+    : repo.repoPath.startsWith('v2/github.com/') && await githubMachineConfigured(caller.userId)
   timings.next('response_fence')
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
     ...publication,

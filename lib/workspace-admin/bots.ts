@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, bots, issues, users, githubRepositoryInstallations, WORKSPACE_BOT_MODELS, workspaceSettings, type WorkspaceBotModel } from '@/lib/db/schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
@@ -34,7 +34,10 @@ async function installedRepositories(workspaceId: string) {
   if (!members.length) return []
   const rows = await db.selectDistinct({ remoteKey: githubRepositoryInstallations.remoteKey }).from(githubRepositoryInstallations)
     .where(inArray(githubRepositoryInstallations.userId, members)).orderBy(asc(githubRepositoryInstallations.remoteKey))
-  return rows.map(row => row.remoteKey)
+  const cloud = await pool.query<{ remote_key: string }>(`SELECT DISTINCT r.remote_key FROM cloud_github_repositories r
+    WHERE r.user_id=ANY($1::text[]) AND EXISTS(SELECT 1 FROM cloud_service_bindings b JOIN cloud_service_registration s ON s.server_id=b.server_id
+      WHERE b.revoked=false AND 'github'=ANY(b.scopes) AND (b.owner='user:'||r.user_id OR b.owner='server'))`, [members])
+  return [...new Set([...rows.map(row => row.remoteKey), ...cloud.rows.map(row => row.remote_key)])].sort()
 }
 
 /** True when an active member of the workspace has installed this repository. */

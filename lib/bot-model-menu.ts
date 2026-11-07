@@ -6,6 +6,8 @@ import type { ExecutionSettings, ExecutionSettingsScope } from "./execution-sett
 import { apiKeyChatBaseUrl } from "./model-api-key-providers";
 import { subscriptionAvailability } from "./subscription-quota";
 import { resolveBotModelChoice } from "./bot-model-choice";
+import { isCloudEdition } from "./edition";
+import { defaultModelTarget } from "./default-model";
 
 export { quotaExhausted } from "./subscription-quota";
 import {
@@ -74,10 +76,14 @@ export async function botModelMenu(
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
   // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
   const { hostedPointsHere } = await import("./points-fallback");
-  const { points, trialLeft } = await hostedPointsHere(scope.workspaceId);
-  const usable = points > 0 || trialLeft > 0;
+  const local = !isCloudEdition();
+  const target = local ? await defaultModelTarget(scope.ownerId) : null;
+  const { points, trialLeft } = local ? { points: 0, trialLeft: 0 } : await hostedPointsHere(scope.workspaceId);
+  const usable = local ? target !== null : points > 0 || trialLeft > 0;
+  const hostedSource = local ? target?.kind === "cloud" ? "cloud" as const : "self-hosted" as const : undefined;
+  const hostedOption = { ...HOSTED, ...(hostedSource ? { hostedSource } : {}) };
   const groups: BotModelMenuGroup[] = [
-    ...(usable ? [{ kind: "hosted" as const, points, ...(points > 0 ? {} : { trialLeft }), options: [{ ...HOSTED }] }] : []),
+    ...(usable ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points, ...(points > 0 ? {} : { trialLeft }) }), options: [hostedOption] }] : []),
     ...subscriptions.values(),
     ...ownKeys.map((key) => ({ kind: "apiKey" as const, credentialLabel: keyLabel(key), options: keyOptions(key) })),
     ...keys.filter((key) => !key.mine && ownerNames.has(key.ownerId)).map((key) => ({
@@ -100,7 +106,7 @@ export async function botModelMenu(
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "hosted") {
-    current = { ...HOSTED, kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
+    current = { ...hostedOption, kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
   } else if (choice.kind === "apiKey") {
     current = {
       id: apiKeyOptionId(choice.key.id, choice.model), modelId: choice.model, provider: choice.key.provider,

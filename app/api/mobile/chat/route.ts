@@ -70,7 +70,7 @@ async function handleGET(request: Request) {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const botId = await openChatBotId(user, bot.data)
       if (read.kind === 'history') return history(user.id, await chatView(user.id, CHAT_FIRST_PAGE, botId, { through: read.through }))
-      const enabled = coordinatorEnabled()
+      const enabled = await coordinatorEnabled(user.id)
       const view = await chatUpdate(user.id, botId, read.kind === 'update' ? read.continuation : undefined)
       // The app shows a failed welcome through `failure`; the empty Bot item is no message (nor unread, nor reactable).
       const chat = { ...view, items: view.items.filter(item => !item.welcome) }

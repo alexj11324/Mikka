@@ -5,7 +5,7 @@ import customRoutes from 'next/dist/lib/load-custom-routes.js'
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match.js'
 import { prepareDestination } from 'next/dist/shared/lib/router/utils/prepare-destination.js'
 import { getRedirectStatus } from 'next/dist/lib/redirect-status.js'
-import { applySecurityHeaders, isMachinePath, localizePage, pageResponse } from './http-policy.mjs'
+import { applySecurityHeaders, isMachinePath, localizePage, pageRedirect, pageResponse } from './http-policy.mjs'
 
 const request = (path, init) => new Request(`https://example.test${path}`, init)
 const render = () => '<html lang="zh-CN"><body>shared app</body></html>'
@@ -91,4 +91,20 @@ test('token pages keep private headers in both locales; document requests alone 
   const document = await pageResponse(request('/mikka/en', { headers: { 'sec-fetch-dest': 'document' } }), render)
   assert.equal(document.headers.get('set-cookie'), 'NEXT_LOCALE=en; Max-Age=31536000; Path=/mikka; SameSite=Lax')
   assert.equal((await pageResponse(request('/mikka/en'), render)).headers.get('set-cookie'), null)
+})
+
+test('only official GitHub cloud installation state continues from the unchanged homepage Setup URL', () => {
+  const state = `mikka-gh.00000000-0000-4000-8000-000000000001.${'x'.repeat(43)}`
+  const path = `/mikka?installation_id=99&state=${state}&return_to=https://untrusted.example`
+  const response = pageRedirect(request(path), { edition: 'cloud' })
+  assert.equal(response.status, 302)
+  const target = new URL(response.headers.get('location'))
+  assert.equal(target.origin, 'https://example.test'); assert.equal(target.pathname, '/mikka/cloud/v1/github/setup')
+  assert.deepEqual([...target.searchParams.entries()].sort(), [['installation_id', '99'], ['state', state]])
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer'); assert.equal(response.headers.get('cache-control'), 'no-store')
+  for (const candidate of ['/mikka', '/mikka?installation_id=99', '/mikka?installation_id=99&state=ordinary-install', `${path}&state=duplicate`, path.replace('installation_id=99', 'installation_id=invalid'), path.replace('/mikka?', '/mikka/settings?')]) {
+    assert.equal(pageRedirect(request(candidate), { edition: 'cloud' }), undefined)
+  }
+  assert.equal(pageRedirect(request(path), { edition: 'community' }), undefined)
+  assert.equal(pageRedirect(request(path, { method: 'POST' }), { edition: 'cloud' }), undefined)
 })

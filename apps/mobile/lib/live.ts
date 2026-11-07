@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { AppState, Platform } from 'react-native'
 import { authHeaders } from '@/lib/api'
-import { API_URL } from '@/lib/config'
+import { API_URL, onServerChange } from '@/lib/config'
 import { createLiveClient, type LiveRef, type LiveSpecOptions } from './live-client'
 
 export { UNRESOLVED_LIVE_ID, type LiveRef } from './live-client'
@@ -19,6 +19,7 @@ async function ticket(workspaceId: string, signal: AbortSignal): Promise<unknown
     const response = await fetch(`${API_URL}/api/live/ticket?workspace=${encodeURIComponent(workspaceId)}`, {
       headers: { accept: 'application/json', ...await authHeaders() },
       credentials: Platform.OS === 'web' ? 'include' : 'omit',
+      redirect: 'error',
       signal: controller.signal,
     })
     return response.ok ? await response.json() : null
@@ -34,6 +35,7 @@ export const live = createLiveClient({
   socket: (url, protocol) => new WebSocket(url, protocol),
   monotonicNow: typeof performance !== 'undefined' && typeof performance.now === 'function' ? () => performance.now() : undefined,
 })
+onServerChange(() => live.reset())
 
 /** A deadline as the server observed it, for a read that started at `requestedAt` (performance clock). */
 export type LiveDeadline = { at: string; afterMs: number } | null | undefined

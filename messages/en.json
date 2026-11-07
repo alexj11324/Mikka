@@ -1776,6 +1776,10 @@
       },
       "billing": {
         "title": "Billing"
+      },
+      "cloud": {
+        "title": "Mikka Cloud",
+        "keywords": "cloud Mikka 云 自托管 self-hosted"
       }
     },
     "appearance": {
@@ -2010,6 +2014,8 @@
       "githubLinkReady": "The browser is signed in as the app's account",
       "githubContinueLink": "Continue linking GitHub",
       "githubLinkExpired": "This link expired. GitHub is not linked.",
+      "githubCloudConnection": "Mikka Cloud services",
+      "githubManageCloud": "Manage connection",
       "githubDisconnectFailed": "Could not disconnect GitHub.",
       "githubDescription": "Agents read code, push branches and open pull requests in the repositories you authorize, and read issues and CI checks.",
       "githubConnectionHeading": "Connection",
@@ -2090,7 +2096,15 @@
       "readTools": "Read {count}",
       "info": "Information",
       "category": "Category",
-      "version": "Version"
+      "version": "Version",
+      "githubApp": "Server GitHub App",
+      "githubAppCreate": "Create GitHub App",
+      "githubAppCreated": "GitHub App created",
+      "githubAppConfigured": "Configured",
+      "githubAppOwner": "Owner",
+      "githubAppPersonal": "Personal account",
+      "githubAppOrganization": "Organization",
+      "githubAppOrganizationName": "Organization name"
     },
     "telegram": {
       "title": "Telegram",
@@ -2631,7 +2645,16 @@
       "noComputers": "No computer connected",
       "cloudNoKey": "No E2B key",
       "cloudUnavailable": "Unavailable",
-      "stage": {"ready": "Available", "off": "Not in scheduling", "offline": "Offline", "offlineSince": "Offline · {time}", "notInstalled": "{agent} not installed", "modelNotReported": "None of the listed models", "needsUpdate": "Needs a Mikka update", "subscriptionRuntimeUnavailable": "Subscription unavailable"},
+      "stage": {
+        "ready": "Available",
+        "off": "Not in scheduling",
+        "offline": "Offline",
+        "offlineSince": "Offline · {time}",
+        "notInstalled": "{agent} not installed",
+        "modelNotReported": "None of the listed models",
+        "needsUpdate": "Needs a Mikka update",
+        "subscriptionRuntimeUnavailable": "Subscription unavailable"
+      },
       "title": "Preferred models",
       "loading": "Loading preferred models…",
       "location": "Run location",
@@ -2849,6 +2872,43 @@
         "systematic-debugging": "Reproduce the failure, identify its cause and verify the fix."
       },
       "numberedSource": "{source} {number}"
+    },
+    "cloud": {
+      "title": "Mikka Cloud",
+      "account": "Personal account",
+      "server": "Server",
+      "team": "Team",
+      "connected": "Connected",
+      "disconnected": "Not connected",
+      "revoked": "Authorization revoked",
+      "billing": "Credits",
+      "personalBilling": "My Mikka credits",
+      "defaultModel": "Mikka default (Mikka Cloud credits)",
+      "topUp": "Top up in Mikka Cloud",
+      "teamBilling": "Team Mikka credits",
+      "services": "Services",
+      "scopes": {
+        "github": "GitHub",
+        "push": "iOS push",
+        "models": "Hosted models"
+      },
+      "disconnect": "Disconnect",
+      "connectAccount": "Connect Mikka account",
+      "administratorRequired": "Waiting for the server administrator",
+      "name": "Server name",
+      "connect": "Connect",
+      "serverKey": "Server key",
+      "save": "Save",
+      "revokeKey": "Revoke key",
+      "connectedServers": "Connected servers",
+      "manage": "Manage",
+      "loading": "Loading",
+      "confirmRevokeKey": "Revoke the team server key?",
+      "confirmDisconnectServer": "Disconnect all Mikka Cloud accounts on this server?",
+      "cancel": "Cancel",
+      "pushContent": "Notification content",
+      "pushFull": "Full message",
+      "pushReminder": "Reminder only"
     }
   },
   "TelegramBot": {
@@ -3302,6 +3362,8 @@
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",
       "credits": "Credits",
+      "cloudCredits": "Mikka Cloud credits",
+      "ownProvider": "Own provider",
       "points": "{points} points",
       "trialLeft": "{count} free left",
       "hostedUnavailable": "Mikka Default can’t run in this workspace",
@@ -3863,7 +3925,12 @@
       "e2bKey": "{owner} E2B key",
       "shared": "Shared in the workspace",
       "runsOn": "Runs on",
-      "roles": {"requester": "Started by", "botOwner": "Bot owner", "executionPrincipal": "Ran as", "outputOwner": "Output owner"},
+      "roles": {
+        "requester": "Started by",
+        "botOwner": "Bot owner",
+        "executionPrincipal": "Ran as",
+        "outputOwner": "Output owner"
+      },
       "rolesTogether": "{first} and {last}",
       "roleSeparator": ", ",
       "costModelSubscription": "{owner} {provider} subscription pays for the model",
@@ -4728,6 +4795,7 @@
     "mergeConfirm": "Merge"
   },
   "ArtifactReview": {
+    "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · Made when the thread finishes",
       "preparing": "Artifact · Preparing the PR",
@@ -5060,18 +5128,42 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
-    "desktop_client_update_required": { "default": "Update Mikka to continue" },
-    "desktop_session_expired": { "default": "Sign in to Mikka again" },
-    "desktop_session_changed": { "default": "The account or workspace changed. Try again" },
-    "desktop_account_limit_reached": { "default": "Five accounts are already signed in" },
-    "desktop_request_failed": { "default": "The desktop request failed. Try again" },
-    "desktop_backend_unreachable": { "default": "Cannot connect to Mikka" },
-    "desktop_rpc_request_invalid": { "default": "Check the information and try again" },
-    "desktop_rpc_action_unknown": { "default": "This action is unavailable in this version of Mikka" },
-    "desktop_rpc_failed": { "default": "The action could not be completed" },
-    "desktop_rpc_request_rejected": { "default": "Mikka could not accept this request" },
-    "desktop_rpc_response_invalid": { "default": "Mikka returned an unreadable response" },
-    "desktop_rpc_value_invalid": { "default": "This content could not be sent" },
+    "desktop_client_update_required": {
+      "default": "Update Mikka to continue"
+    },
+    "desktop_session_expired": {
+      "default": "Sign in to Mikka again"
+    },
+    "desktop_session_changed": {
+      "default": "The account or workspace changed. Try again"
+    },
+    "desktop_account_limit_reached": {
+      "default": "Five accounts are already signed in"
+    },
+    "desktop_request_failed": {
+      "default": "The desktop request failed. Try again"
+    },
+    "desktop_backend_unreachable": {
+      "default": "Cannot connect to Mikka"
+    },
+    "desktop_rpc_request_invalid": {
+      "default": "Check the information and try again"
+    },
+    "desktop_rpc_action_unknown": {
+      "default": "This action is unavailable in this version of Mikka"
+    },
+    "desktop_rpc_failed": {
+      "default": "The action could not be completed"
+    },
+    "desktop_rpc_request_rejected": {
+      "default": "Mikka could not accept this request"
+    },
+    "desktop_rpc_response_invalid": {
+      "default": "Mikka returned an unreadable response"
+    },
+    "desktop_rpc_value_invalid": {
+      "default": "This content could not be sent"
+    },
     "subscription_local_runtime_unavailable": {
       "default": "The subscription run could not start on this computer",
       "assignment_invalid": "This thread's subscription setting is no longer valid. Please choose the model again.",
@@ -5139,6 +5231,52 @@
     },
     "factory_spec_approval_required": {
       "default": "Review and approve the specification before implementation starts."
+    },
+    "cloud_not_connected": {
+      "default": "Mikka Cloud is not connected."
+    },
+    "cloud_scope_missing": {
+      "default": "The Mikka Cloud authorization does not include this service."
+    },
+    "cloud_server_revoked": {
+      "default": "Mikka Cloud authorization was revoked. Connect again."
+    },
+    "cloud_invalid_request": {
+      "default": "The Mikka Cloud configuration or authorization request is invalid.",
+      "configuration": "The Mikka Cloud configuration or authorization request is invalid.",
+      "protocol": "The Mikka Cloud configuration or authorization request is invalid.",
+      "state": "The Mikka Cloud configuration or authorization request is invalid."
+    },
+    "cloud_rate_limited": {
+      "default": "Too many Mikka Cloud requests. Try again later."
+    },
+    "cloud_access_denied": {
+      "default": "You do not have permission for this Mikka Cloud action.",
+      "origin": "You do not have permission for this Mikka Cloud action.",
+      "administrator": "You do not have permission for this Mikka Cloud action."
+    },
+    "cloud_unavailable": {
+      "default": "Mikka Cloud is temporarily unavailable.",
+      "network": "Mikka Cloud is temporarily unavailable.",
+      "response": "Mikka Cloud is temporarily unavailable.",
+      "protocol": "Mikka Cloud is temporarily unavailable.",
+      "storage": "Mikka Cloud is temporarily unavailable.",
+      "refresh_uncertain": "Mikka Cloud is temporarily unavailable."
+    },
+    "cloud_quota_exhausted": {
+      "default": "Mikka Cloud credits are insufficient or the team limit was reached."
+    },
+    "github_app_setup_failed": {
+      "default": "GitHub App was not created. Try again.",
+      "admin": "Only a server administrator can create a GitHub App. Sign in again with the original account.",
+      "origin": "The page address differs from the configured server address. Open the configured server address.",
+      "state": "This setup expired or the session changed. Start again.",
+      "encryption": "The server could not encrypt the credentials. Ask the administrator to check the encryption key.",
+      "storage": "The server could not save the GitHub App. Try again later.",
+      "configured": "This server already has a GitHub App configured.",
+      "request": "GitHub App setup did not finish. Try again.",
+      "response": "GitHub did not return complete App credentials. Start again.",
+      "template": "This version cannot create a GitHub App yet. Update the server and try again."
     }
   },
   "FactoryFlow": {
@@ -5257,5 +5395,37 @@
     "checkUpdate": "Check for update",
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
+  },
+  "MobileServer": {
+    "title": "Choose a server",
+    "server": "Server",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "Self-hosted server",
+    "address": "Server address",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "change": "Change",
+    "accounts": "Accounts and servers",
+    "addAccount": "Add account",
+    "savedAccounts": "Signed-in accounts",
+    "retry": "Retry",
+    "saving": "Saving",
+    "readFailed": "Accounts could not be loaded",
+    "saveFailed": "Account could not be saved",
+    "switchFailed": "Account switch failed",
+    "version": "Version {version}",
+    "errors": {
+      "invalid_address": "This address isn't valid",
+      "https_required": "The address must start with https://",
+      "unreachable": "Can't reach this server",
+      "not_mikka": "This address isn't a Mikka server",
+      "serverUpdate": "This server runs {version}, which is too old. Update the server to the latest version",
+      "serverUpdateUnknown": "This server is too old. Update the server to the latest version",
+      "appUpdate": "Update Mikka to {version} or later",
+      "appUpdateUnknown": "Update Mikka to the latest version",
+      "mobile_not_ready": "Allow Mikka iOS on this server"
+    }
   }
 }
