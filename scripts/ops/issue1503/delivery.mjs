@@ -409,13 +409,17 @@ export async function runDeliveryAcceptance(env = process.env) {
     originalOrder = currentOrder = await order(); report.originalOrder = briefOrder(originalOrder)
     check(originalOrder.cloudReady, 'cloud_unavailable')
     live = new LiveChanges(json, workspaceId); await live.start()
-    await stage('create_project')
-    project = (await rpc('projects.saveProject', [{ name: `Factory 1503 ${marker}`, summary: 'Production delivery acceptance for issue #1503',
-      description: 'Two tiny, independent text-file changes in alexj11324/Mikka-handoff. Each is reviewed, sent back once, repaired on the same PR, and merged by the owner.',
-      status: 'started', priority: 'normal', lead: 'me', team: 'Mikka', startDate: '', targetDate: '' }])).project
-    check(uuid(project?.id), 'project_missing')
-    project = await rpc('team-relations.setProjectTeams', [{ projectId: project.id, revision: project.revision, teamIds: [teamId], primaryTeamId: teamId }])
-    report.projectId = project.id
+    // Existing tasks join the project before dispatch. Explicit new tasks are
+    // already dispatched by their creation turn; changing scope then stops them.
+    if (submissionMode === 'existing_issue') {
+      await stage('create_project')
+      project = (await rpc('projects.saveProject', [{ name: `Factory 1503 ${marker}`, summary: 'Production delivery acceptance for issue #1503',
+        description: 'Two tiny, independent text-file changes in alexj11324/Mikka-handoff. Each is reviewed, sent back once, repaired on the same PR, and merged by the owner.',
+        status: 'started', priority: 'normal', lead: 'me', team: 'Mikka', startDate: '', targetDate: '' }])).project
+      check(uuid(project?.id), 'project_missing')
+      project = await rpc('team-relations.setProjectTeams', [{ projectId: project.id, revision: project.revision, teamIds: [teamId], primaryTeamId: teamId }])
+      report.projectId = project.id
+    }
     for (const definition of cases) {
       const specification = fileSpecification(marker, definition.harness)
       const confirmation = codexQuestion && definition.harness === 'codex' ? codexQuestionConfirmation(marker, specification) : null
@@ -498,7 +502,6 @@ export async function runDeliveryAcceptance(env = process.env) {
         activeCase.taskId = found.tasks[0].id
         activeCase.creation = explicitNewTaskEvidence(completed, dispatchText, beforeChat.cursor, issue.id)
         activeCase.threadRunId = activeCase.creation.runId
-        project = (await rpc('projects.setProjectIssues', [{ id: project.id, revision: project.revision, issueIds: report.cases.map(item => item.issueId) }])).project
         await checkpoint()
       } else {
         await stage('create_numbered_task')
