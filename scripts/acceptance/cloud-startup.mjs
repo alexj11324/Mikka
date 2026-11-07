@@ -27,7 +27,53 @@ const STARTUP_PHASES = new Set(['daemon.adapter.model_report', 'daemon.adapter.a
   'daemon.adapter.cli_init', 'daemon.adapter.account_check', 'daemon.adapter.account_check.account_info', 'daemon.adapter.account_check.login'])
 const sha = value => createHash('sha256').update(value).digest('hex')
 const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cause } : undefined) }
-const safeError = error => /^startup_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'startup_failed'
+export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
+  'team_selection', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
+  'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
+  'subscription_proof', 'execution_watch', 'execution_receipt', 'cleanup'])
+// These are driver-owned codes, never a prefix rule accepting arbitrary error
+// messages. The candidate validator independently projects this same contract.
+export const STARTUP_FAILURE_CODES = Object.freeze([
+  'aborted', 'action_refused', 'api_refused', 'bot_create_failed', 'bot_invalid', 'build_changed', 'build_mismatch', 'build_missing',
+  'candidate_target_invalid', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
+  'coordinator_stream_invalid', 'coordinator_stream_too_large', 'coordinator_stream_unavailable', 'daemon_startup_timing_incomplete',
+  'dispatch_not_new', 'dispatch_not_observed', 'dispatch_refused', 'dispatch_run_missing', 'dispatch_timings_required',
+  'ended_before_execution_proof', 'execution_device_mismatch', 'execution_timeout', 'factory_list_invalid', 'failed',
+  'fixture_required', 'fixture_scope_invalid', 'foreign_origin', 'harness_invalid', 'http_error', 'issue_create_failed',
+  'live_capability_missing', 'live_disconnected', 'live_origin_invalid', 'live_scope_missing', 'live_ticket_expired', 'live_ticket_invalid',
+  'mode_invalid', 'model_invalid', 'multiple_dispatches', 'node_websocket_required', 'observation_aborted',
+  'official_agent_acceptance_missing', 'official_timing_invalid', 'option_invalid', 'origin_invalid', 'placement_mismatch',
+  'profile_create_failed', 'profile_source_mismatch', 'request_failed', 'response_invalid', 'rpc_refused', 'runs_invalid',
+  'runtime_evidence_failed', 'runtime_evidence_invalid', 'runtime_evidence_required', 'sample_id_invalid', 'session_identity_mismatch',
+  'shared_chat_model_ambiguous', 'shared_chat_model_unavailable', 'shared_scope_required', 'shared_subscription_identity_mismatch',
+  'shared_subscription_model_missing_or_ambiguous', 'sign_in_failed', 'sign_out_failed', 'smoke_account_required', 'strategy_invalid',
+  'subscription_provenance_mismatch', 'test_bot_required', 'threshold_invalid', 'timeout', 'timeout_invalid',
+  'timing_variable_cleanup_forbidden', 'timing_variable_create_failed', 'timing_variable_exists', 'timings_invalid',
+  'vercel_token_required', 'version_pin_required', 'worker_configuration_invalid', 'worker_configuration_missing', 'worker_pin_invalid',
+  'worker_release_changed', 'worker_release_mismatch', 'workflow_run_missing', 'workspace_identity_mismatch', 'workspace_invalid',
+  'workspace_restore_failed',
+].map(code => `startup_${code}`))
+const failureCodes = new Set(STARTUP_FAILURE_CODES)
+export function startupFailure(error, phase = 'unknown') {
+  const at = STARTUP_FAILURE_PHASES.includes(phase) ? phase : 'unknown'
+  const seen = new Set()
+  // Fetch wraps native aborts/timeouts as request_failed/response_invalid. A
+  // bounded cause walk preserves their class without exposing any message.
+  for (let item = error, depth = 0; item && typeof item === 'object' && depth < 5 && !seen.has(item); item = item.cause, depth++) {
+    seen.add(item)
+    if (item.name === 'TimeoutError') return { phase: at, code: 'startup_timeout' }
+    if (item.name === 'AbortError' || item.code === 'ABORT_ERR') return { phase: at, code: 'startup_aborted' }
+  }
+  const http = typeof error?.message === 'string' && /^startup_http_([45][0-9]{2})$/.exec(error.message)
+  if (http) return { phase: at, code: 'startup_http_error', httpStatus: Number(http[1]) }
+  return { phase: at, code: failureCodes.has(error?.message) ? error.message : 'startup_failed' }
+}
+const safeError = error => {
+  const failure = startupFailure(error)
+  // Existing cleanup rows already have a closed HTTP-code projection. Keep
+  // its numeric status for those consumers; samples use failure directly.
+  return failure.httpStatus ? `startup_http_${failure.httpStatus}` : failure.code
+}
 const assert = (condition, code) => { if (!condition) fail(code) }
 const iso = value => new Date(value).toISOString()
 const dateValue = value => typeof value === 'string' ? Date.parse(value) : value instanceof Date ? value.getTime() : NaN
@@ -142,9 +188,12 @@ export function createSessionClient(origin, fetchImpl = fetch) {
   }
   async function json(path, init, timeoutMs) {
     const response = await request(path, init, timeoutMs)
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {})
+      fail(`http_${response.status}`)
+    }
     let body
     try { body = await response.json() } catch (error) { fail('response_invalid', error) }
-    if (!response.ok) fail(`http_${response.status}`)
     assert(!body?.error, 'api_refused')
     return body
   }
@@ -191,21 +240,23 @@ export async function restoreAcceptanceWorkspace(client, ownerId, workspaceId) {
   assert(current.currentUserId === ownerId && current.workspace?.id === workspaceId && session.user?.id === ownerId, 'workspace_restore_failed')
 }
 
-export async function acceptanceBot(client, botId, fixtureId) {
+export async function acceptanceBot(client, botId, fixtureId, { issue = 1505, rememberCreated } = {}) {
+  assert([1505, 1593].includes(issue), 'fixture_scope_invalid')
   let created = false
   if (!botId) {
-    const value = await client.rpc('bots.createBot', [{ name: `测试1505 ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
+    const value = await client.rpc('bots.createBot', [{ name: `测试${issue} ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
     assert(UUID.test(value.id ?? ''), 'bot_create_failed')
     botId = value.id; created = true
+    rememberCreated?.(botId)
   }
   assert(UUID.test(botId), 'bot_invalid')
   // This normal GET only returns bots owned by this session in its selected workspace.
   const bot = await client.json(`/api/bots/${botId}`)
-  assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+  assert(bot.id === botId && new RegExp(`^测试\\s*${issue}(?:\\s|$)`).test(bot.name ?? ''), 'test_bot_required')
   return { botId, created, retention: 'retained_no_delete_api' }
 }
 
-async function chooseSharedChatModel(client, botId, harness) {
+export async function chooseSharedChatModel(client, botId, harness) {
   const provider = harness === 'codex' ? 'codex' : 'claude'
   const menu = await client.rpc('execution-settings.getBotModelMenu', [botId])
   const matches = (menu.groups ?? []).filter(group => group.kind === 'subscription' && group.provider === provider
@@ -239,10 +290,16 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
   record.requestTraceId = trace.traceId
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
   record.messageSubmittedAt = iso(now())
+  record.phase = 'coordinator_submit'
   await client.rpc('coordinator.sendCoordinatorMessage', [text, null, botId, randomUUID(),
     deviceId ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId],
   { headers: { traceparent: trace.traceparent } })
+  record.phase = 'coordinator_stream'
   const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, timeoutMs)
+  if (response.status >= 400 && response.status <= 599) {
+    await response.body?.cancel().catch(() => {})
+    fail(`http_${response.status}`)
+  }
   assert(response.status === 200 && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'coordinator_stream_unavailable')
   const workflowRunId = response.headers.get('x-mikka-stream-run')
   assert(/^wrun_[A-Za-z0-9]+$/.test(workflowRunId ?? ''), 'workflow_run_missing')
@@ -281,6 +338,7 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
         // The public stream intentionally truncates output at 200 characters.
         // Resolve the one thread of our newly-created issue after its push;
         // this is one event-triggered read, not a background polling loop.
+        record.phase = 'thread_lookup'
         const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
         assert(Array.isArray(threads) && threads.length === 1 && UUID.test(threads[0].id ?? '')
           && threads[0].ownedByCurrentUser === true, 'dispatch_run_missing')
@@ -407,12 +465,21 @@ function cleanupAttempts(detail, runId) {
 
 /** One live owner channel per server-reported scope. Reads happen on pushes,
  * once on connection (to cover the opening race), and once at the deadline. */
-async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cleanupRunIds) {
+export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cleanupRunIds, hooks = {}) {
   const sockets = new Map(), timers = new Set()
   const watchedRunIds = new Set([record.runId])
-  let closed = false, reading = false, dirty = false, settle
+  const extraScopes = new Set()
+  let closed = false, reading = false, dirty = false, deadline = false, settle, refreshWork
   const outcome = new Promise((resolve, reject) => { settle = { resolve, reject } })
-  const observed = detail => {
+  const abort = () => settle.reject(new Error('startup_observation_aborted'))
+  if (hooks.signal?.aborted) abort()
+  else hooks.signal?.addEventListener('abort', abort, { once: true })
+  const observed = async detail => {
+    if (hooks.observe) return hooks.observe(detail, {
+      checkActive: () => { if (closed || hooks.signal?.aborted) fail('observation_aborted') },
+      watchRun: id => { assert(UUID.test(id ?? ''), 'live_scope_missing'); watchedRunIds.add(id) },
+      watchScope: id => { assert(UUID.test(id ?? ''), 'live_scope_missing'); extraScopes.add(id) },
+    })
     if (!cleanupRunIds) return observeChunks(record, detail, now())
     const attempts = cleanupAttempts(detail, record.runId)
     for (const attempt of attempts) { cleanupRunIds.add(attempt.runId); watchedRunIds.add(attempt.runId) }
@@ -423,11 +490,12 @@ async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cleanupRu
   const kick = () => {
     if (closed) return
     dirty = true
-    if (!reading) void refresh().catch(reject)
+    if (!reading) refreshWork = refresh().catch(reject)
   }
   async function connect(workspaceId) {
-    if (sockets.has(workspaceId)) return
+    if (closed || sockets.has(workspaceId)) return
     const ticket = await client.json(`/api/live/ticket?workspace=${workspaceId}`)
+    if (closed) return
     const url = new URL(ticket.url)
     assert(['wss:', 'ws:'].includes(url.protocol) && !url.username && !url.password && typeof ticket.protocol === 'string'
       && Number.isFinite(ticket.expiresAt) && ticket.expiresAt > now(), 'live_ticket_invalid')
@@ -446,7 +514,8 @@ async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cleanupRu
         kick(); return
       }
       if ((['thread', 'run'].includes(value.kind) && watchedRunIds.has(value.id))
-        || (value.kind === 'issue_threads' && value.id === record.issueId)) kick()
+        || (value.kind === 'issue_threads' && value.id === record.issueId)
+        || hooks.matches?.(value)) kick()
     }
     socket.onopen = () => {
       const heartbeat = () => { if (closed) return; if (socket.readyState === 1) socket.send('ping'); later(heartbeat, 30000) }
@@ -459,29 +528,35 @@ async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cleanupRu
     try {
       do {
         dirty = false
+        const finalRead = deadline
         const detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+        if (closed) return
         record.detailReads = (record.detailReads ?? 0) + 1
         record.runCreatedAt ??= detail.thread?.createdAt ?? null
-        if (observed(detail)) { settle.resolve(); return }
-        if (!cleanupRunIds && TERMINAL.has(record.lastStatus)) fail('ended_before_execution_proof')
-        const scopes = [...new Set((detail.live?.runs ?? []).filter(run => watchedRunIds.has(run.id)).map(run => run.workspaceId))]
+        if (await observed(detail)) { settle.resolve(); return }
+        if (closed) return
+        if (finalRead) fail(cleanupRunIds ? 'cleanup_terminal_timeout' : 'execution_timeout')
+        // A deadline that arrived during an observer is serialized behind it;
+        // exactly one final read uses the same active/closed fences.
+        if (deadline) { dirty = true; continue }
+        if (!cleanupRunIds && !hooks.allowTerminal && TERMINAL.has(record.lastStatus)) fail('ended_before_execution_proof')
+        const scopes = [...new Set([...extraScopes, ...(detail.live?.runs ?? []).filter(run => watchedRunIds.has(run.id)).map(run => run.workspaceId)])]
         assert(scopes.length && scopes.every(id => UUID.test(id ?? '')), 'live_scope_missing')
         for (const scope of scopes) await connect(scope)
       } while (dirty && !closed)
     } finally { reading = false }
   }
-  later(() => {
-    void client.rpc('agents.getIssueThread', [record.issueId, record.runId]).then(detail => {
-      if (observed(detail)) settle.resolve()
-      else fail(cleanupRunIds ? 'cleanup_terminal_timeout' : 'execution_timeout')
-    }).catch(reject)
-  }, timeoutMs)
-  kick()
+  later(() => { deadline = true; kick() }, timeoutMs)
+  if (!hooks.signal?.aborted) kick()
   try { await outcome }
   finally {
     closed = true
+    hooks.signal?.removeEventListener('abort', abort)
     for (const timer of timers) clearTimeout(timer)
     for (const socket of sockets.values()) { socket.onclose = socket.onerror = socket.onmessage = socket.onopen = null; socket.close() }
+    // Hooks check the active fence after every bounded read. Finish that last
+    // read before the caller starts resource cleanup or serializes its report.
+    await refreshWork
   }
 }
 
@@ -493,7 +568,7 @@ function safeIdentity(identity) {
     subscriptionAccess: identity.resourceBindings?.filter(resource => resource.kind === 'subscription').map(resource => resource.access) ?? [] }
 }
 
-async function subscriptionProof(client, record, scope, profile) {
+export async function subscriptionProof(client, record, scope, profile) {
   const evidence = await client.json(`/api/runs/${record.runId}/evidence`), run = evidence.run
   assert(run?.id === record.runId && run.issueId === record.issueId && run.harness === record.harness
     && run.model === MODELS[record.harness] && run.credentialType === 'subscription'
@@ -608,7 +683,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
     profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId), requireOfficialTiming: officialTiming === 'enabled',
     requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required'),
-    stages: [], status: 'running', ...(sourceCommit ? { sourceCommit } : {}) }
+    stages: [], status: 'running', phase: 'build_pin', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
@@ -616,24 +691,35 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   })
   try {
     await pin()
+    record.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
     assert(identity.user?.id === scope.ownerId && isSmokeAccountEmail(identity.user.email), 'session_identity_mismatch')
+    record.phase = 'workspace_identity'
     const workspace = await client.json('/api/workspace')
     assert(workspace.currentUserId === scope.ownerId && workspace.workspace?.id === scope.workspaceId, 'workspace_identity_mismatch')
+    record.phase = 'bot_identity'
     const bot = await client.json(`/api/bots/${botId}`)
     assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+    record.phase = 'chat_model_selection'
     await chooseSharedChatModel(client, botId, harness)
+    record.phase = 'issue_create'
     const created = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: {
       type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.` }] }],
     } }])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
     await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs }, now)
+    record.phase = 'coordinator_stop'
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
+    record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
+    record.phase = 'execution_watch'
     await watchRun(client, record, timeoutMs, WebSocketImpl, now)
+    record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
+    record.phase = 'build_pin'
     await pin()
+    record.phase = 'execution_receipt'
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
     if (record.requireAgentAcceptance) assert(record.runtimeTiming?.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack'), 'official_agent_acceptance_missing')
     if (!deviceId) assert(record.startupTimingStatus === 'complete' && record.daemonStartupTiming?.outcome === 'ok'
@@ -644,13 +730,21 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
       warning: 'tool stream reception can lag dispatch; these are observations, not the <=5s gate' }
     record.credentialRoute = 'subscription'
     record.status = 'execution_proved_awaiting_server_timing'
-  } catch (error) { record.status = 'failed'; record.error = safeError(error) }
+  } catch (error) {
+    record.status = 'failed'; record.failure = startupFailure(error, record.phase); record.error = record.failure.code
+  }
   finally {
     if (record.messageSubmittedAt && !record.coordinatorStopped) {
       try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]); record.coordinatorStopped = true }
-      catch (error) { record.status = 'failed'; record.stopError = safeError(error) }
+      catch (error) {
+        record.status = 'failed'; record.stopFailure = startupFailure(error, 'coordinator_stop'); record.stopError = record.stopFailure.code
+        record.failure ??= record.stopFailure; record.error ??= record.failure.code
+      }
     }
     await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now })
+    if (record.cleanup.status !== 'passed' && !record.failure) {
+      record.failure = startupFailure(new Error(record.cleanup.errors[0]?.code), 'cleanup'); record.error = record.failure.code
+    }
   }
   return record
 }
@@ -666,7 +760,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     target: options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
     timingMethod: 'dispatch_run_entry to later of agent_start database receipt and actual official task acceptance; missing entry boundary is legacy lower-bound evidence only',
     executionGate: options.runtimeEvidence === 'required' ? 'later_of_agent_start_and_actual_official_cli_acceptance' : 'legacy_agent_start_actual_ack_unavailable',
-    samples: [], cleanup: { errors: [] }, status: 'running' }
+    samples: [], cleanup: { errors: [] }, status: 'running', phase: 'build_pin' }
   const profiles = new Map()
   let botId = options.botId, loggedIn = false, testBotValidated = false, timingVariableId, scope, originalWorkspaceId, ownerId
   const pin = async () => {
@@ -685,14 +779,18 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
   }
   try {
     await pin()
+    report.phase = 'sign_in'
     const login = await client.request('/api/auth/sign-in/email', post({ email, password, rememberMe: false }))
     assert(login.ok, 'sign_in_failed'); loggedIn = true
+    report.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
     assert(identity.user?.email?.toLowerCase() === email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'session_identity_mismatch')
     ownerId = identity.user.id
     report.accountHash = sha(identity.user.id).slice(0, 16)
+    report.phase = 'team_selection'
     scope = await selectAcceptanceTeam(client, { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
     report.team = scope.evidence
+    report.phase = 'timing_configuration'
     if (options.officialTiming === 'enabled') {
       if (options.mode === 'candidate') {
         assert(UUID.test(options.deviceId ?? '') && UUID.test(options.agentId ?? ''), 'candidate_target_invalid')
@@ -716,6 +814,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         report.officialTiming = { enabled: true, variableId: timingVariableId, scope: 'acceptance_repository_only' }
       }
     }
+    report.phase = 'bot_create'
     const fixture = await acceptanceBot(client, botId, fixtureId)
     botId = fixture.botId
     if (fixture.created) report.createdBotId = botId
@@ -723,43 +822,53 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     scope.botId = botId
     testBotValidated = true
     report.botId = botId
+    report.phase = 'profile_selection'
     const order = await client.rpc('model-order.getModelOrder', [scope.workspaceId])
     const harnesses = options.harness === 'both' ? ['claude_code', 'codex'] : [options.harness]
     for (const harness of harnesses) {
+      let phase = 'profile_selection'
       try {
         const candidates = (order.candidates ?? []).filter(item => item.harness === harness && item.model === MODELS[harness]
           && item.source?.kind === 'subscription' && UUID.test(item.source.connectionId ?? ''))
         assert(candidates.length === 1 && candidates[0].credentialOwnerId === scope.adminId, 'shared_subscription_model_missing_or_ambiguous')
         const candidate = candidates[0]
+        phase = 'profile_create'
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
           name: `测试1505 ${fixtureId.slice(0, 8)} ${harness}`, description: 'Temporary startup measurement', enabled: true,
           harness, model: { mode: 'fixed', harness, model: MODELS[harness], source: candidate.source }, effort: 'low', roles: [],
           instructions: 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
         } }))
+        phase = 'profile_validation'
         assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version) && created.profile.version > 0, 'profile_create_failed')
         profiles.set(harness, created.profile)
         assert(/^[a-f0-9]{64}$/.test(created.profile.digest ?? '') && created.profile.harness === harness
           && created.profile.model?.mode === 'fixed' && created.profile.model.harness === harness && created.profile.model.model === MODELS[harness]
           && created.profile.model.source?.kind === 'subscription' && created.profile.model.source.connectionId === candidate.source.connectionId, 'profile_source_mismatch')
-      } catch (error) { profiles.set(harness, { ...profiles.get(harness), error: safeError(error) }) }
+      } catch (error) {
+        const failure = startupFailure(error, phase)
+        profiles.set(harness, { ...profiles.get(harness), error: failure.code, failure })
+      }
     }
     for (let index = 0; index < options.runs; index++) {
       const harness = harnesses[index % harnesses.length], sampleId = `${fixtureId.slice(0, 8)}_${index + 1}`
       const profile = profiles.get(harness)
       if (profile?.error) {
-        report.samples.push({ sampleId, harness, status: 'failed', error: profile.error, cleanup: { status: 'passed', errors: [] } })
+        report.samples.push({ sampleId, harness, status: 'failed', error: profile.error, failure: profile.failure, cleanup: { status: 'passed', errors: [] } })
         continue
       }
+      report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
         sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl })
       report.samples.push(sample)
       if (['startup_build_mismatch', 'startup_build_changed', 'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error)) {
         report.batchAborted = 'version_pin_changed'
+        report.phase = 'build_pin'
         fail(sample.error.slice('startup_'.length))
       }
     }
+    report.phase = 'build_pin'
     await pin()
-  } catch (error) { report.error = safeError(error) }
+  } catch (error) { report.failure = startupFailure(error, report.phase); report.error = report.failure.code }
   finally {
     if (loggedIn) {
       if (timingVariableId) {
