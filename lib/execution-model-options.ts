@@ -11,7 +11,7 @@ const fullColumns = `b.id AS "bindingId",b."ownerId",b."consumerId",b."workspace
   c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan,c.quota`
 const catalogueColumns = `b."ownerId",b."modelId",c.id AS "connectionId",c.provider`
 const connected = `FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
-  AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
+  AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false AND c."removedAt" IS NULL
   WHERE b."ownerId"=$1 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')`
 
 /** Saved binding lookup is exact and independent of catalogue deduplication. */
