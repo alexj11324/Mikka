@@ -1,7 +1,7 @@
 // A run-scoped adapter to the existing MCP endpoint, not a message bus. Only
 // the host sees the claimed bearer. The CLI uses its existing host control stream; no IPC endpoint or bearer.
 import { z } from 'zod'
-import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
+import { mailboxCatalogueSchema, mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 import { isTerminalRunState, type RunAssignment, type RunState } from '@mikka/protocol'
 import { personalMessagePacket, PERSONAL_MESSAGE_INSTRUCTIONS } from '@mikka/protocol/personal-agent-message'
 import { trustedServerEndpoint } from './trusted-endpoint'
@@ -69,6 +69,8 @@ export async function createRunMailbox(host: {
   headers?: Record<string, string>
 }): Promise<RunMailbox | undefined> {
   const assigned = host.assignment.mcp
+  // A present invalid catalogue must never silently use the legacy handshake.
+  const catalogue = assigned?.mailboxCatalogue === undefined ? undefined : mailboxCatalogueSchema.parse(assigned.mailboxCatalogue)
   if (assigned?.mailbox !== true) return undefined
   let endpoint: URL
   try { endpoint = new URL(assigned.url) } catch { throw unavailable() }
@@ -97,13 +99,21 @@ export async function createRunMailbox(host: {
       return packet.result
     } catch { throw unavailable() } finally { pending.delete(abort) }
   }
-  const initialized = await rpc('initialize', { protocolVersion: version, capabilities: {}, clientInfo: { name: 'mikka-run-mailbox', version: '1' } })
-  if (!['2025-03-26', '2025-06-18', '2025-11-25'].includes(initialized.protocolVersion)) throw unavailable()
-  version = initialized.protocolVersion
-  await rpc('notifications/initialized', {}, undefined, true)
-  const offered = await rpc('tools/list', {})
-  if (!Array.isArray(offered.tools)) throw unavailable()
-  const allowed = Object.keys(mailboxInputs).filter(name => offered.tools.some((tool: { name?: unknown }) => tool.name === name))
+  active()
+  let allowed: string[]
+  if (catalogue) {
+    version = '2025-06-18'
+    allowed = catalogue.tools
+  } else {
+    // Older servers do not declare stateless transport or a canonical set.
+    const initialized = await rpc('initialize', { protocolVersion: version, capabilities: {}, clientInfo: { name: 'mikka-run-mailbox', version: '1' } })
+    if (!['2025-03-26', '2025-06-18', '2025-11-25'].includes(initialized.protocolVersion)) throw unavailable()
+    version = initialized.protocolVersion
+    await rpc('notifications/initialized', {}, undefined, true)
+    const offered = await rpc('tools/list', {})
+    if (!Array.isArray(offered.tools)) throw unavailable()
+    allowed = Object.keys(mailboxInputs).filter(name => offered.tools.some((tool: { name?: unknown }) => tool.name === name))
+  }
   if (!allowed.length) return undefined
   // Ignore every other remote tool. The JSON schemas and source fields are
   // fixed locally from the same protocol definitions as the server's tools.

@@ -364,7 +364,9 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
           const { CUSTOM_MCP_TOOLKIT, runMcpAdvertised } = await import('@/lib/plugins/run-mcp')
           if (await runMcpAdvertised(caller.userId, run.id)) apps = [...apps.filter(app => app !== CUSTOM_MCP_TOOLKIT).slice(0, 63), CUSTOM_MCP_TOOLKIT]
         }
-        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
+        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token,
+          mailboxCatalogue: { version: 1 as const, transport: 'mikka-stateless-2025-06-18' as const, tools },
+          ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
       })
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,

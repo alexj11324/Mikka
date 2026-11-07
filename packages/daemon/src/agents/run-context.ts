@@ -232,6 +232,38 @@ export function runPaths(stateDir: string, runId: string) {
   }
 }
 
+/** Only run-owned files and fixed MCP configuration. It does not stat or create
+ * the future checkout; the final RunContext still validates realpath and Git. */
+export function prepareRunContextFiles(options: RunContextOptions) {
+  if (options.policyHash && (!options.policy || policySnapshotHash(options.policy) !== options.policyHash)) throw new Error('Run child policy hash mismatch')
+  ownDir(options.runDir)
+  const runDir = realpathSync(options.runDir)
+  const files = { worktree: resolve(options.worktree), runDir, handoffFile: join(runDir, 'handoff.json'),
+    tmpDir: join(runDir, 'tmp'), capturesDir: join(runDir, CAPTURES_DIR) }
+  ownDir(files.tmpDir); ownDir(files.capturesDir)
+  return { ...files, mcpServer: () => runMcpServer(options, files),
+    tempEnv: (): Record<string, string> => options.policyHash ? { MIKKA_POLICY_HASH: options.policyHash } : {} }
+}
+
+function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'worktree' | 'handoffFile' | 'capturesDir' | 'tmpDir'>): McpServerSpec {
+    const command = options.nodeBinary ?? process.execPath
+    const repositoryExecution = !options.factoryCheck && ['implement', 'fix'].includes(options.kind ?? '')
+    const readOnlyInspection = !options.factoryCheck && ['implement', 'fix', 'plan'].includes(options.kind ?? '') && runPolicy(options.policy).readOnly === true
+    return {
+      command,
+      args: [
+        MCP_SERVER_SCRIPT, "--handoff", files.handoffFile,
+        "--captures", files.capturesDir, "--capture-root", files.worktree, "--capture-root", files.tmpDir,
+        ...(options.factoryCheck && (!options.factoryCheck.reportOnly || options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: files.worktree, command: options.verifyCommand ?? null, infer: options.factoryCheck.inferCommand })] : []),
+        ...(options.factoryCheck?.reportOnly || readOnlyInspection ? ['--factory-artifacts', files.worktree] : []),
+        ...(repositoryExecution ? ['--repository-selection', files.worktree] : []),
+      ],
+      // Inside Electron, `process.execPath` is the app; run it as plain Node.
+      env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...(options.mcp ? { MIKKA_DECISION_MCP_URL: options.mcp.url, MIKKA_DECISION_MCP_TOKEN: options.mcp.token } : {}),
+        ...(options.mcpHttpObservationUrl ? { MIKKA_MCP_HTTP_OBSERVATION_URL: options.mcpHttpObservationUrl } : {}) },
+    }
+}
+
 export class RunContext {
   private githubEnv: Record<string, string> = {}
   /** Real path of the worktree (macOS: `/tmp` is `/private/tmp`). */
@@ -396,22 +428,7 @@ export class RunContext {
   }
 
   mcpServer(): McpServerSpec {
-    const command = this.options.nodeBinary ?? process.execPath
-    const repositoryExecution = !this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '')
-    const readOnlyInspection = !this.options.factoryCheck && ['implement', 'fix', 'plan'].includes(this.options.kind ?? '') && runPolicy(this.options.policy).readOnly === true
-    return {
-      command,
-      args: [
-        MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
-        "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
-        ...(this.options.factoryCheck && (!this.options.factoryCheck.reportOnly || this.options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: this.worktree, command: this.options.verifyCommand ?? null, infer: this.options.factoryCheck.inferCommand })] : []),
-        ...(this.options.factoryCheck?.reportOnly || readOnlyInspection ? ['--factory-artifacts', this.worktree] : []),
-        ...(repositoryExecution ? ['--repository-selection', this.worktree] : []),
-      ],
-      // Inside Electron, `process.execPath` is the app; run it as plain Node.
-      env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...this.decisionMcpEnv(),
-        ...(this.options.mcpHttpObservationUrl ? { MIKKA_MCP_HTTP_OBSERVATION_URL: this.options.mcpHttpObservationUrl } : {}) },
-    }
+    return runMcpServer(this.options, this)
   }
 
   /**

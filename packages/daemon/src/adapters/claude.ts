@@ -22,16 +22,19 @@ import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 import { daemonTracer, runIdHash } from "../tracing"
+import { prepareClaudeSession, ClaudeProjectSettingsNotClaimable, type ClaudePrewarmBinding, type ClaudePreparation } from './claude-prewarm'
 import { runRuntimeTimings } from '../run-runtime-timing'
 import type { Readable, Writable } from "node:stream"
 
 import {
   query,
+  prewarm,
   createSdkMcpServer,
   type SDKMessage,
   type SDKResultMessage,
   type SDKUserMessage,
   type Settings,
+  type Options,
   type SpawnOptions,
   type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
@@ -47,6 +50,8 @@ import {
   COMPUTER_MCP_SERVER_NAME,
   RESUME_MESSAGE,
   RunContext,
+  prepareRunContextFiles,
+  type RunContextOptions,
   runPaths,
   type McpServerSpec,
   type ComputerSpecProvider,
@@ -427,6 +432,14 @@ function spawnBinary(binary?: string, oauthToken?: string) {
   }
 }
 
+function claudePrewarmOptionsKey(options: SessionOptions) {
+  const { cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
+    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume } = options
+  return JSON.stringify({ cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
+    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume,
+    mailbox: options.mailbox?.tools })
+}
+
 export class ClaudeAdapter implements AgentAdapter {
   readonly harness = "claude_code" as const
   readonly capabilities = { supportsInterject: true, supportsResume: true }
@@ -445,6 +458,14 @@ export class ClaudeAdapter implements AgentAdapter {
       : this.open(randomUUID(), "new", options.prompt, options)
   }
 
+  /** Trusted hosted fresh-task path. The same open/account/input logic runs
+   * after checkout; no separate adapter or alternate CLI is introduced. */
+  startPrepared(options: StartOptions, binding: ClaudePrewarmBinding, control: ClaudePreparation, stop: () => Promise<void>): Promise<AgentSession> {
+    if (!options.machineEnvironment || !this.options.spawnHosted || !this.options.subscriptionAuth ||
+      options.continueSession || options.requireSessionResume) throw Error('Claude preparation requires a fresh hosted subscription')
+    return this.open(binding.sessionId, 'new', options.prompt, options, { binding, control, stop })
+  }
+
   resume(sessionId: string, options: SessionOptions): Promise<AgentSession> {
     return this.open(sessionId, "restart", RESUME_MESSAGE, options)
   }
@@ -460,6 +481,7 @@ export class ClaudeAdapter implements AgentAdapter {
     mode: "new" | "restart" | "continue",
     firstMessage: string,
     options: SessionOptions & Partial<Pick<StartOptions, "prompt" | "continueSession">>,
+    preparation?: { binding: ClaudePrewarmBinding; control: ClaudePreparation; stop(): Promise<void> },
   ): Promise<AgentSession> {
     const approval = requireRunToolApproval(options.runId, options.toolApproval)
     if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
@@ -515,7 +537,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const providerDomain = credentialDomain(options.credential)
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? (this.options.spawnHosted ? undefined : await this.options.ensureBinary?.())
-    const ctx = new RunContext({
+    const contextOptions = (): RunContextOptions => ({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       githubEnvironment: options.githubEnvironment,
@@ -540,7 +562,7 @@ export class ClaudeAdapter implements AgentAdapter {
       runDir,
       privateDir: paths.privateDir,
       // Its session store, so `resume` works; keyed by the cwd it sees.
-      extraWrite: [
+      extraWrite: options.machineEnvironment ? [] : [
         join(configDir, "projects", claudeProjectDirName(options.cwd)),
         join(
           configDir,
@@ -549,6 +571,10 @@ export class ClaudeAdapter implements AgentAdapter {
         ),
       ],
     })
+    const files = preparation ? prepareRunContextFiles(contextOptions()) : undefined
+    let ctx!: RunContext
+    if (!preparation) ctx = new RunContext(contextOptions())
+
     const log = options.log.child({
       harness: "claude_code",
       session_id: sessionId,
@@ -556,12 +582,13 @@ export class ClaudeAdapter implements AgentAdapter {
     // A hand-in the last daemon never got to act on ends the session now.
     // The run dir is this run's own: a follow-up never sees the earlier
     // run's hand-in.
-    const earlier = mode === "restart" ? ctx.readHandoff(log) : null
+    const earlier = mode === "restart" ? ctx!.readHandoff(log) : null
     if (earlier) return endedSession(sessionId, earlier)
-    ctx.clearHandoff()
+    if (!preparation) ctx!.clearHandoff()
 
     const queue = new EventQueue()
-    const prompts = new PromptQueue(sessionId)
+    let prompts: Pick<PromptQueue, "push" | "close"> = new PromptQueue(sessionId)
+    let closePrepared: (() => Promise<void>) | undefined
     let firstPromptId: string | undefined
     let written = 0
     let results = 0
@@ -612,11 +639,9 @@ export class ClaudeAdapter implements AgentAdapter {
         return nativeToken
       },
     } : {}
-    const session = query({
-      prompt: prompts,
-      options: {
+    const sdkOptions = (context: Pick<RunContext, "worktree" | "tmpDir" | "tempEnv" | "mcpServer">, append: string): Options => ({
         ...refreshOptions,
-        cwd: ctx.worktree,
+        cwd: context.worktree,
         // The official CLI echoes the exact stdin user frame after reading
         // it. Its UUID distinguishes this task from init and resumed history.
         extraArgs: { 'replay-user-messages': null },
@@ -624,9 +649,9 @@ export class ClaudeAdapter implements AgentAdapter {
         // runs retain their existing child environment preparation.
         env: {
           ...options.env,
-          ...ctx.tempEnv(),
+          ...context.tempEnv(),
           ...CLAUDE_RUN_ENV,
-          CLAUDE_CODE_TMPDIR: ctx.tmpDir,
+          CLAUDE_CODE_TMPDIR: context.tmpDir,
           ...credentialEnv,
           ...(!options.machineEnvironment ? { HOME: nativeHome, CLAUDE_CONFIG_DIR: configDir } : {}),
         },
@@ -637,15 +662,15 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         mcpServers: {
           ...(options.mailbox ? { mikka_mailbox: claudeMailboxServer(options.mailbox) } : {}),
-          [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
+          [MCP_SERVER_NAME]: { type: "stdio", ...context.mcpServer() },
           ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
           ...claudeAppServers(options.apps),
         },
         strictMcpConfig: !options.machineEnvironment,
         systemPrompt: {
-          type: "preset",
-          preset: "claude_code",
-          append: ctx.instructions(),
+          type: "preset" as const,
+          preset: "claude_code" as const,
+          append: append,
         },
         // Nothing is asked per tool (decision 2026-11-01-2335).
         permissionMode: "bypassPermissions" as const,
@@ -673,8 +698,51 @@ export class ClaudeAdapter implements AgentAdapter {
           })
           return child
         },
-      },
     })
+    let session: ReturnType<typeof query>
+    if (preparation) {
+      const { binding, control } = preparation
+      // Only instructions, prompt attachments and validated Git metadata may
+      // arrive after clone. All process/MCP/credential options are immutable.
+      const fixed = claudePrewarmOptionsKey(options)
+      const parking = join(runDir, 'claude-parking')
+      ownDir(parking)
+      const prepared = prepareClaudeSession({ binding, signal: control.signal, stop: preparation.stop,
+        assertLive: () => { if (approval.revoked) throw Error('Run tool approval unavailable'); control.signal.throwIfAborted() },
+        prepare: abortController => daemonTracer.span('daemon.adapter.cli_init.prewarm',
+          { 'mikka.harness': 'claude_code', 'mikka.run.id_hash': runIdHash(options.runId) },
+          () => prewarm({ initializeTimeoutMs: INITIALIZATION_TIMEOUT_MS,
+            options: { ...sdkOptions(files!, ''), cwd: parking, abortController } })),
+      })
+      try {
+        await prepared.ready
+        control.parked()
+        const finalOptions = await control.finalOptions
+        control.signal.throwIfAborted()
+        if (fixed !== claudePrewarmOptionsKey(finalOptions) || !await approval.checkLive()) throw Error('Claude prepared options changed')
+        options = finalOptions
+        firstMessage = finalOptions.prompt
+        ctx = new RunContext(contextOptions())
+        ctx.clearHandoff()
+        try {
+          const claimed = await prepared.consume({ binding, appendSystemPrompt: ctx.instructions(),
+            verify: async (_query, signal) => { signal.throwIfAborted(); if (!await approval.checkLive()) throw Error('Run tool approval unavailable') },
+          })
+          session = claimed.query
+          closePrepared = claimed.close
+          prompts = { push: claimed.send, close: () => { void claimed.close().catch(() => undefined) } }
+        } catch (error) {
+          // consume already drained this precise refused claim. No other
+          // initialization, auth, binding, cancellation or post-input error
+          // can silently create a replacement session.
+          if (!(error instanceof ClaudeProjectSettingsNotClaimable)) throw error
+          control.signal.throwIfAborted()
+          if (!await approval.checkLive()) throw Error('Run tool approval unavailable')
+          session = query({ prompt: prompts as PromptQueue, options: sdkOptions(ctx, ctx.instructions()) })
+        }
+      } catch (error) { await prepared.cancel(); throw error }
+    } else session = query({ prompt: prompts as PromptQueue, options: sdkOptions(ctx!, ctx!.instructions()) })
+
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
@@ -689,6 +757,7 @@ export class ClaudeAdapter implements AgentAdapter {
       session.close()
       await gone
       const processExited = await nativeExit
+      await closePrepared?.()
       wipeRunCredentials(runDir)
       if (event) queue.exit({ ...event, ...(processExited ? {} : { sessionExited: false as const }) })
     }

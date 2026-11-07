@@ -1,9 +1,49 @@
-// Per-task ownership of an official SDK spare. This module is intentionally
-// not wired into the runner until the original CLI's anonymous claim control
-// has proved the required MCP/cwd behavior. There is no pool or cold fallback.
+// Per-task ownership of an official SDK spare. There is no cross-run pool.
 import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import type { Query, SDKUserMessage, SpareProcess } from '@anthropic-ai/claude-agent-sdk'
+import type { AgentSession, PreparedAgentStart, StartOptions } from './types'
+
+export interface ClaudePreparation {
+  signal: AbortSignal
+  finalOptions: Promise<StartOptions>
+  parked(): void
+}
+
+/** The supervisor owns this join before starting checkout. An early checkout
+ * failure drains the same in-progress start, even if initialization is late. */
+export function prepareAgentStart(signal: AbortSignal, open: (control: ClaudePreparation) => Promise<AgentSession>): PreparedAgentStart {
+  const lifetime = new AbortController()
+  let accept!: (options: StartOptions) => void, refuse!: (error: unknown) => void
+  const finalOptions = new Promise<StartOptions>((resolve, reject) => { accept = resolve; refuse = reject })
+  void finalOptions.catch(() => undefined)
+  let parked!: () => void, failed!: (error: unknown) => void
+  const ready = new Promise<void>((resolve, reject) => { parked = resolve; failed = reject })
+  void ready.catch(() => undefined)
+  let consumed = false, closing: Promise<void> | undefined
+  const starting = Promise.resolve().then(() => { lifetime.signal.throwIfAborted(); return open({ signal: lifetime.signal, finalOptions, parked }) })
+  void starting.catch(error => { failed(error); abort() })
+  const cancel = () => {
+    if (closing) return closing
+    closing = Promise.resolve().then(async () => {
+      try {
+        const session = await starting.catch(() => undefined)
+        await session?.cancel()
+      }
+      finally { signal.removeEventListener('abort', abort) }
+    })
+    lifetime.abort()
+    refuse(Error('Claude preparation cancelled'))
+    return closing
+  }
+  const abort = () => { void cancel().catch(() => undefined) }
+  signal.addEventListener('abort', abort, { once: true })
+  if (signal.aborted) abort()
+  return { ready, cancel, start(options) {
+    if (consumed || lifetime.signal.aborted) return Promise.reject(Error('Claude preparation is closed or consumed'))
+    consumed = true; accept(options); return starting
+  } }
+}
 
 /** All values come from the same authorized task and its prepared lease.
  * No credential, prompt, or user-controlled replacement is stored here. */
@@ -47,6 +87,11 @@ class ClaimedPromptQueue implements AsyncIterable<SDKUserMessage> {
 }
 
 type State = 'preparing' | 'parked' | 'claiming' | 'ready' | 'closed'
+/** Only this exact claimed rejection is safe for the caller's ordinary query
+ * fallback. Errors at preparation, verification or after input are not it. */
+export class ClaudeProjectSettingsNotClaimable extends Error {
+  constructor(cause: unknown) { super('Claude project settings require an ordinary session', { cause }) }
+}
 interface PreparedOptions {
   binding: ClaudePrewarmBinding
   signal: AbortSignal
@@ -134,7 +179,13 @@ export function prepareClaudeSession(options: PreparedOptions) {
         const query = spare!.claim({ prompt: prompts, options: {
           cwd: binding.cwd, appendSystemPrompt: input.appendSystemPrompt, permissionMode: 'bypassPermissions',
         } })
-        const claimed = await spare!.claimed
+        const claimed = await spare!.claimed.catch((cause: unknown) => {
+          // The installed official SDK preserves the CLI's closed refusal in
+          // Error.message; it does not expose an independent `code` property.
+          if (cause instanceof Error && /^project_settings_not_claimable(?:$|:)/.test(cause.message))
+            throw new ClaudeProjectSettingsNotClaimable(cause)
+          throw cause
+        })
         assertOpen()
         if (claimed.sessionId !== binding.sessionId || claimed.cwd !== binding.cwd)
           throw Error('Claude claimed session binding changed')

@@ -25,6 +25,7 @@ import { runStopReason, runBenchmarkContext } from "./run"
 import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
 import { nativeLeaseSchema } from './subscription'
+import { mailboxCatalogueSchema } from './mailbox'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -441,6 +442,7 @@ export const runAssignmentSchema = z.object({
    */
   mcp: z.object({
     url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional(),
+    mailboxCatalogue: mailboxCatalogueSchema.optional(),
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
   }).optional(),
