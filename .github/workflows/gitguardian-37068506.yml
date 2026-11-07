@@ -1,0 +1,52 @@
+name: GitGuardian incident 37068506 disposition
+
+on:
+  push:
+    branches: [ops/gitguardian-37068506]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitguardian-incident-37068506
+  cancel-in-progress: false
+
+jobs:
+  dispose:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/gitguardian-37068506' && github.run_attempt == 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Fetch only the fixed public source object
+        run: git fetch --no-tags --depth=1 origin 518b9d32eb9315656173ae7a074c920546fdcb70
+      - name: Test the metadata-only client and fail-closed scope guards
+        run: node --test scripts/ops/gitguardian-37068506.test.mjs
+      - name: Verify this exact ops branch and public source before credentials
+        run: node scripts/ops/gitguardian-37068506.mjs --preflight
+      - name: Use the existing OIDC identity and read only its existing GitGuardian token
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITGUARDIAN_API_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Verify the exact incident, ignore the false positive once and read it back
+        run: node scripts/ops/gitguardian-37068506.mjs --apply
