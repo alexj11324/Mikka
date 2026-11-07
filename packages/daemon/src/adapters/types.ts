@@ -23,6 +23,7 @@ import type { SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import type { Logger } from "../log"
 import type { RunMailbox } from '../run-mailbox'
 import type { QuotaSignal } from '../runs/quota-exhausted'
+import type { DaemonPreparationTiming } from '../tracing'
 
 /**
  * Terminal event of a session; the daemon turns it into the run's end state.
@@ -174,6 +175,8 @@ export interface AgentSession {
 /** One run's already-starting native session, with no task input released. */
 export interface PreparedAgentStart {
   readonly ready: Promise<void>
+  /** Present only after an opted-in early start settles; never rebased onto agent_start. */
+  readonly preparationTiming?: DaemonPreparationTiming
   start(options: StartOptions): Promise<AgentSession>
   cancel(): Promise<void>
 }
