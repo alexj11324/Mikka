@@ -1,7 +1,7 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
-import { useViewScroll } from '@/lib/hooks/view-state'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
@@ -52,7 +52,8 @@ const WIDE = '(min-width: 80rem)'
 const ME = 'me'
 const NONE = 'none'
 const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
-const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', filters: { assignee: [ME] } as Filters, display: DEFAULT_DISPLAY }
+const DEFAULT_FILTERS: Filters = { assignee: [ME] }
+const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
 /** A 显示 chip: checked and tinted when on, plain grey when off. */
 const DISPLAY_CHIP = 'h-7 rounded-md px-2 text-xs font-normal text-muted-foreground aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary'
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
@@ -62,13 +63,18 @@ const FILTER_FIELDS: { field: FilterField; icon: typeof Flag }[] = [
   { field: 'labels', icon: Tag }, { field: 'project', icon: Box }, { field: 'agentState', icon: SquareKanban },
 ]
 
-/** Board settings kept per browser: scope, view, filters and the 显示 options. */
+/** Browser preferences remain durable; named filters belong to the authenticated view scope. */
 function useBoardSettings() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   useEffect(() => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? 'null')
-      if (stored) setSettings(current => ({ ...current, ...stored, display: { ...current.display, ...stored.display } }))
+      if (stored) {
+        const { filters: legacyFilters, ...preferences } = stored
+        setSettings(current => ({ ...current, ...preferences, display: { ...current.display, ...preferences.display } }))
+        // The old entry has no owner/workspace proof, so its names cannot migrate.
+        if (legacyFilters !== undefined) window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences))
+      }
     } catch { /* storage unavailable */ }
   }, [])
   function update(patch: Partial<typeof DEFAULT_SETTINGS>) {
@@ -114,7 +120,8 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
-  const { scope, view, filters, display } = settings
+  const { scope, view, display } = settings
+  const [filters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
   useListExpiry(display.completed === 'all' ? [] : issues.filter(issue => issue.status === 'done')
     .map(issue => new Date(issue.updatedAt).getTime() + COMPLETED_DAYS[display.completed] * 86_400_000))
   const listScroll = useViewScroll<HTMLDivElement>(`${stateKey}:list`, view === 'list')
@@ -208,7 +215,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   function toggleFilter(field: FilterField, value: string) {
     const current = filters[field] ?? []
     const next = current.includes(value) ? current.filter(item => item !== value) : [...current, value]
-    update({ filters: { ...filters, [field]: next } })
+    setFilters({ ...filters, [field]: next })
   }
   const setDisplay = (patch: Partial<Display>) => update({ display: { ...display, ...patch } })
   const activeFilters = (Object.entries(filters) as [FilterField, string[]][]).filter(([, values]) => values?.length)
@@ -238,7 +245,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
         {activeFilters.map(([field, values]) => <div key={field} role="group" aria-label={t(`filterField.${field}`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-md bg-control pr-0.5 pl-2.5 text-xs">
           <span className="text-muted-foreground">{t(`filterField.${field}`)}</span>
           {field !== 'creator' && <span className="max-w-48 truncate font-medium">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</span>}
-          <Button variant="ghost" size="icon-xs" className="rounded-sm text-muted-foreground hover:bg-control-hover" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
+          <Button variant="ghost" size="icon-xs" className="rounded-sm text-muted-foreground hover:bg-control-hover" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => setFilters({ ...filters, [field]: [] })}><X data-icon="inline-start" /></Button>
         </div>)}
         <div className="ml-auto flex items-center gap-1">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>

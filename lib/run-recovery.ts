@@ -2,7 +2,7 @@ import { sweepExpiredRunLeases } from '@/lib/run-leases'
 import { reconcileCloudMachines } from '@/lib/computer/reconcile'
 import { pool } from '@/lib/db'
 import { judgePendingOutcomes } from '@/lib/run-outcome-judge'
-import { endClosedTaskMachines } from '@/lib/cloud-computer/thread-machines'
+import { reconcileDueThreadMachines } from '@/lib/cloud-computer/thread-lifecycle-due'
 import { retrySandboxKills } from '@/lib/cloud-computer/workspace-teardown'
 import { resumePendingGroupTurns } from '@/lib/group-conversations-route'
 import type { RunRecoverySweep } from '@/lib/run-recovery-due'
@@ -22,8 +22,9 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   const machines = runs('machines') ? await reconcileCloudMachines(pool).catch(() => null) : null
   // Ended runs never judged (any end path, and the last week before outcomes existed) get their outcome (R-52).
   const outcomes = runs('outcomes') ? await judgePendingOutcomes().catch(() => null) : null
-  // Paused task sandboxes whose task closed are killed (one task, one sandbox).
-  const taskMachines = runs('taskMachines') ? await endClosedTaskMachines(pool).catch(() => null) : null
+  // The same durable owner follows create/resume, pause retries and retention,
+  // including running machines whose individual Workflow ended or disappeared.
+  const taskMachines = runs('taskMachines') ? await reconcileDueThreadMachines(pool).catch(() => null) : null
   // Sandboxes of deleted workspaces whose kill did not go through are killed again.
   const sandboxKills = runs('sandboxKills') ? await retrySandboxKills(pool).catch(() => null) : null
   // Durable task progress, independent of heartbeat or an open client.

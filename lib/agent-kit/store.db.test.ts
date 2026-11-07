@@ -250,6 +250,31 @@ test('audit events are idempotent, immutable, redacted and closed to unassigned 
   await store.finishExecution(scope,execution.id,'failed','tool_error')
   await assert.rejects(store.recordTool(scope,execution.id,'new-call','web_search','start'),/agentExecutionClosed/)
 })
+
+test('a stopped execution closes only its already-started tool audits, without inventing failure cases',async()=>{
+  const scope=await owner()
+  for(const outcome of ['stopped','ok'] as const){
+    const execution=await store.beginExecution(scope,`stopped-audit-${outcome}`,'host',{harness:'ai_sdk',model:'fixture'},defaults)
+    await store.recordTool(scope,execution.id,'already-started','web_search','start')
+    await store.finishExecution(scope,execution.id,'completed')
+    await assert.rejects(store.recordTool(scope,execution.id,'already-started','get_issue','finish',outcome),/agentExecutionClosed/)
+    await store.recordTool(scope,execution.id,'already-started','web_search','finish',outcome)
+    await store.recordTool(scope,execution.id,'already-started','web_search','finish',outcome)
+    const events=await pool.query('select kind,payload from agent_kit_events where execution_id=$1 and kind=$2',[execution.id,'tool_finished'])
+    assert.deepEqual(events.rows,[{kind:'tool_finished',payload:{toolName:'web_search',outcome}}])
+    await assert.rejects(store.recordTool(scope,execution.id,'never-started','web_search','finish',outcome),/agentExecutionClosed/)
+    await assert.rejects(store.recordTool(scope,execution.id,'already-started','get_issue','finish',outcome),/agentEventConflict|agentExecutionClosed/)
+    await assert.rejects(store.recordTool(scope,execution.id,'new-call','web_search','start'),/agentExecutionClosed/)
+  }
+  const unrelated=await store.beginExecution(scope,'unrelated-execution','host',{harness:'ai_sdk',model:'fixture'},defaults)
+  await store.finishExecution(scope,unrelated.id,'completed')
+  await assert.rejects(store.recordTool(scope,unrelated.id,'already-started','web_search','finish','stopped'),/agentExecutionClosed/)
+  const failed=await store.beginExecution(scope,'failed-audit','host',{harness:'ai_sdk',model:'fixture'},defaults)
+  await store.recordTool(scope,failed.id,'started-before-failure','web_search','start')
+  await store.finishExecution(scope,failed.id,'failed')
+  await assert.rejects(store.recordTool(scope,failed.id,'started-before-failure','web_search','finish','stopped'),/agentExecutionClosed/)
+  assert.equal((await store.dataset(scope)).length,0,'a user stop is not a tool failure')
+})
 test('three distinct failure cases generate an inactive capability-preserving candidate',async()=>{
   const scope=await owner();const proposal=await failures(scope)
   assert.equal(proposal.evidence.length,3)
@@ -309,7 +334,9 @@ test('authenticated HTTP commands use the actual PostgreSQL store with optimisti
 /** Bytes each statement returns, the same estimate as the db_sample log (lib/db/egress-sample.ts), by the table it reads. */
 function measuredStore(){
   const read={agent_kit_executions:0,coordinator_messages:0,statements:0}
+  const queries:string[]=[]
   const count=(sql:string,rows:unknown[])=>{
+    queries.push(sql)
     const table=/^\s*select\b[\s\S]*?\bfrom (agent_kit_executions|coordinator_messages)\b/i.exec(sql)?.[1] as 'agent_kit_executions'|'coordinator_messages'|undefined
     if(table){read[table]+=Buffer.byteLength(JSON.stringify(rows));read.statements++}
   }
@@ -324,7 +351,7 @@ function measuredStore(){
     if(prop==='query') return async(sql:string,values?:unknown[])=>{const result=await target.query(sql,values);count(sql,result.rows??[]);return result}
     return Reflect.get(target,prop)
   }}) as Pool
-  return {store:new AgentKitStore(measured),pool:measured,read}
+  return {store:new AgentKitStore(measured),pool:measured,read,queries}
 }
 
 test('one Coordinator turn with five tool calls reads the execution row without its snapshot (bytes per turn)',async t=>{
@@ -367,4 +394,82 @@ test('the narrow execution read still refuses a tool outside the grant and a clo
   await store.recordTool(scope,execution.id,'call-1',tool,'start')
   await assert.rejects(store.recordTool(scope,execution.id,'call-2',tool,'start'),/agentExecutionClosed/)
   await assert.rejects(store.executionStatus({...scope,botId:randomUUID()},execution.id),/agentScopeNotFound/)
+})
+
+test('terminal preparation recovery by key preserves the snapshot and replays its failure events once',async()=>{
+  const scope=await owner(),executionKey=`preparation:${randomUUID()}:0`
+  const execution=await store.beginExecution(scope,executionKey,'frozen host policy',{harness:'ai_sdk',model:'fixture'},defaults)
+  assert.ok(execution.snapshot.definition.hooks.includes('failure_cases'))
+  const result=await store.failExecutionByKey(scope,executionKey)
+  assert.deepEqual(await store.failExecutionByKey(scope,executionKey),result)
+  const saved=await store.readExecution(scope,execution.id)
+  assert.equal(saved.status,'failed')
+  assert.deepEqual(saved.snapshot,execution.snapshot)
+  const events=await pool.query('select event_key,kind,payload from agent_kit_events where execution_id=$1 order by event_key',[execution.id])
+  assert.deepEqual(events.rows.map(row=>[row.event_key,row.kind]),[['failure','failure_case'],['finished','run_finished']])
+  assert.deepEqual(events.rows.find(row=>row.event_key==='finished')?.payload,{status:'failed',failure:'turn_failed'})
+})
+
+test('an identical preparation key cannot finish another owner or another bot execution',async()=>{
+  const one=await owner(),two=await owner(),third={...one,botId:randomUUID()}
+  await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)',[third.botId,third.ownerId,third.workspaceId,'Synthetic second bot'])
+  const executionKey=`shared-preparation:${randomUUID()}:0`
+  const executions=await Promise.all([one,two,third].map(scope=>store.beginExecution(scope,executionKey,'host',{harness:'ai_sdk',model:'fixture'},defaults)))
+  await store.failExecutionByKey(one,executionKey)
+  assert.equal((await store.readExecution(one,executions[0].id)).status,'failed')
+  assert.equal((await store.readExecution(two,executions[1].id)).status,'running')
+  assert.equal((await store.readExecution(third,executions[2].id)).status,'running')
+  await assert.rejects(store.failExecutionByKey({...one,botId:two.botId},executionKey),/agentScopeNotFound/)
+  await assert.rejects(store.failExecutionByKey({...one,workspaceId:two.workspaceId},executionKey),/agentScopeNotFound/)
+})
+
+test('a missing preparation key creates nothing and a malformed key reaches no database statement',async()=>{
+  const scope=await owner(),measured=measuredStore()
+  assert.equal(await store.failExecutionByKey(scope,'never-created:0'),null)
+  const rows=await pool.query('select count(*)::int as count from agent_kit_executions where owner_id=$1 and bot_key=$2',[scope.ownerId,scope.botId])
+  assert.equal(rows.rows[0].count,0)
+  const events=await pool.query('select count(*)::int as count from agent_kit_events where owner_id=$1 and bot_key=$2',[scope.ownerId,scope.botId])
+  assert.equal(events.rows[0].count,0)
+  await assert.rejects(measured.store.failExecutionByKey(scope,''))
+  await assert.rejects(measured.store.failExecutionByKey(scope,'x'.repeat(241)))
+  assert.equal(measured.queries.length,0)
+  await assert.rejects(store.finishExecution(scope,randomUUID(),'failed','turn_failed'),/agentExecutionNotFound/)
+})
+
+test('key recovery cannot rewrite an already completed execution or its immutable finished event',async()=>{
+  const scope=await owner(),executionKey=`completed-preparation:${randomUUID()}:0`
+  const execution=await store.beginExecution(scope,executionKey,'host',{harness:'ai_sdk',model:'fixture'},defaults)
+  await store.finishExecution(scope,execution.id,'completed')
+  await assert.rejects(store.failExecutionByKey(scope,executionKey),/agentEventConflict/)
+  assert.equal((await store.readExecution(scope,execution.id)).status,'completed')
+  const events=await pool.query('select payload from agent_kit_events where execution_id=$1 and event_key=$2',[execution.id,'finished'])
+  assert.deepEqual(events.rows,[{payload:{status:'completed',failure:null}}])
+})
+
+test('concurrent preparation recovery locks one execution and records one terminal failure',async()=>{
+  const scope=await owner(),executionKey=`concurrent-preparation:${randomUUID()}:0`
+  const execution=await store.beginExecution(scope,executionKey,'host',{harness:'ai_sdk',model:'fixture'},defaults)
+  const results=await Promise.all([store.failExecutionByKey(scope,executionKey),store.failExecutionByKey(scope,executionKey)])
+  assert.deepEqual(results[0],results[1])
+  assert.equal((await store.readExecution(scope,execution.id)).status,'failed')
+  const events=await pool.query('select event_key,count(*)::int as count from agent_kit_events where execution_id=$1 group by event_key order by event_key',[execution.id])
+  assert.deepEqual(events.rows,[{event_key:'failure',count:1},{event_key:'finished',count:1}])
+})
+
+test('key recovery replaces the existing state query with the same statement count and no snapshot read',async t=>{
+  const scope=await owner(),key=`query-count:${randomUUID()}`
+  const executions=await Promise.all(['id','key'].map(suffix=>store.beginExecution(scope,`${key}:${suffix}`,'Frozen host policy. '.repeat(2000),{harness:'ai_sdk',model:'fixture'},defaults)))
+  const byId=measuredStore(),byKey=measuredStore()
+  const idResult=await byId.store.finishExecution(scope,executions[0].id,'failed','turn_failed')
+  assert.deepEqual(await byKey.store.failExecutionByKey(scope,`${key}:key`),idResult)
+  assert.equal(byKey.queries.length,byId.queries.length,'key lookup is the state read, not an additional lookup before finish')
+  for(const measured of [byId,byKey]){
+    assert.equal(measured.read.statements,1)
+    const stateReads=measured.queries.filter(query=>/from agent_kit_executions\b/.test(query))
+    assert.equal(stateReads.length,1)
+    assert.doesNotMatch(stateReads[0].split(/\bfrom\b/i)[0],/\bsnapshot\s*(?:,|$)|select\s+\*/i)
+    assert.ok(measured.read.agent_kit_executions<=512,'only narrow state facts cross this read')
+  }
+  assert.ok(byKey.read.agent_kit_executions<=byId.read.agent_kit_executions+64,'the recovery projection adds only the execution id')
+  t.diagnostic(JSON.stringify({event:'preparation_finish_statement_counts',id:byId.queries.length,key:byKey.queries.length,idStateBytes:byId.read.agent_kit_executions,keyStateBytes:byKey.read.agent_kit_executions}))
 })

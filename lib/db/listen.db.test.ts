@@ -55,22 +55,22 @@ test('PG17: device waiters share one LISTEN session; each wakes only for its own
     await notifyChannel(pool!, DEVICE_WORK_CHANNEL, [device])
     await new Promise(resolve => setTimeout(resolve, 200))
     let started = performance.now()
-    await mine.next(10_000)
+    assert.equal(await mine.next(10_000), 'notified')
     assert.ok(performance.now() - started < 50, 'heard during the read')
     // reset forgets it: with nothing new, the wait runs to its timer.
     mine.reset()
     started = performance.now()
-    await mine.next(300)
+    assert.equal(await mine.next(300), 'timeout')
     assert.ok(performance.now() - started >= 250, 'no push, so the timer ends the wait')
     // A credential push wakes it; another device's push does not.
     mine.reset(); theirs.reset()
     started = performance.now()
     const woke = mine.next(10_000)
     await notifyChannel(pool!, DEVICE_WORK_CHANNEL, [`token:${device}`])
-    await woke
+    assert.equal(await woke, 'notified')
     assert.ok(performance.now() - started < 2_000, 'the committed push wakes the waiter at once')
     started = performance.now()
-    await theirs.next(300)
+    assert.equal(await theirs.next(300), 'timeout')
     assert.ok(performance.now() - started >= 250, 'another device sleeps through it')
     assert.equal(mine.lost, false)
   } finally { mine.close(); theirs.close() }

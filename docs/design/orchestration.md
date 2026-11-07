@@ -291,6 +291,58 @@ reclamation is also available when the task must end.
   refusal line appears with 验证银行卡 / 充值 and 重试. Admission checks only
   that the balance is positive, then charges actual use afterwards.
 
+### Task VM lifecycle (#1593)
+
+Authorized task dispatch creates or resumes the task's own VM. Reading a page,
+typing, inspecting artifacts and receiving a heartbeat do not authorize a wake.
+Each `thread_machines` row stores an epoch, a lifecycle deadline and its pending
+operation. The existing deployment-owned run-recovery timer follows that row;
+an individual Workflow ending, being cancelled or losing its response does not
+remove this responsibility. Its slow recovery sweep recovers lost wakeups.
+
+Execution leases, estimated running compute, monitor duration and paused data
+retention are separate clocks. The monitor's 12-hour limit performs a final
+state read and hands responsibility to the recovery owner. A run's 12-hour
+compute budget requests a stop; paused time does not consume that budget.
+This is a budget for the admitted run, not the lifetime of the task's VM. A
+new authorized continuation run receives its own budget while the previous
+run retains its compute record. Heartbeat renewal and Workflow replay do not
+reset a run's budget, and a stopped run cannot silently restart itself.
+Missing leases use the existing lease recovery, and the Factory watchdog
+continues to distinguish progress from a healthy heartbeat.
+
+| State or event | Action and default deadline |
+| --- | --- |
+| Claimed execution, including an offline person's long command | Keep the running provider VM alive under its execution lease and budget. |
+| Created/resumed but unclaimed, with no live bootstrap lease | Pause after two minutes. |
+| Native `ask_human`, successful, failed or stopped completion | Wait for final worker evidence, then pause; revoke the device token and retain the filesystem/native session. |
+| Quota wait after confirmed native exit | Pause without cancelling the waiting run; its existing quota/recovery event authorizes the next dispatch. |
+| Adjacent admitted Factory stage, compatible repository and harness | Transfer the same running VM and rotate authority within a 45-second window. An incompatible stage parks the previous VM. |
+| Stop or revoked execution that does not acknowledge within 30 seconds | Freeze the full VM state and revoke runtime tokens; keep the sole filesystem, and do not invent a native completion receipt. Automatic adoption stays blocked until native exit is confirmed. |
+| Closed task | Pause first; after one hour, retire only with the final exited/ready receipt and its exact uploaded checkpoint. Recheck task closure and epoch under locks. |
+| Unfinished task paused for seven days | Review the retained evidence. A Git checkpoint alone does not archive native CLI sessions: keep the VM paused with `native_archive_unverified` until a verified recovery archive exists. Never destroy the only copy by age alone. |
+
+The daemon closes the native session, finishes publications/capture uploads and
+uploads its final checkpoint before completing a run. Its `safePoint` report is
+constructed by the supervisor, not accepted from model output. A failed upload,
+forced detach or unconfirmed native exit cannot authorize retirement.
+
+Provider pause and kill intents commit before the external call. Their bounded
+retries remain due after a crash or refused response, and a confirmed provider
+result is reconciled with read-only `getInfo`. Maintenance never uses `connect`,
+which can resume a paused VM. A lost creation response is recovered through a
+bounded, read-only lookup of its exact owner/workspace/run/operation metadata.
+The recovered reference commits before pause or kill. An ambiguous or absent
+allocation remains an explicit unresolved intent. Duplicate callbacks share a persisted claim and
+deadline; run/task ownership, sandbox ID and epoch fence every destructive
+operation. A kill intent with an uncleared provider reference is shown as an
+error requiring reconciliation, not as an already retired machine.
+
+Lifecycle events contain fixed reason codes, stable identity hashes, epoch,
+deadline, provider outcome and database-estimated compute. Raw provider output,
+credentials, prompts and native session contents are excluded. The separate
+anonymous warm pool and its retention remain independent of task ownership.
+
 ## 6. Credentials lifecycle
 
 This section follows Alex's [#1505 decision of 2026-11-06](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md).
