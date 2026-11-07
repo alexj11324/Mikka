@@ -3,6 +3,7 @@ import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 import { randomUUID } from "node:crypto"
 import { currentSubscriptionTiming, withSubscriptionWorkerTiming } from './subscription-worker-timing'
+import { captureRunFailure, type RunFailure } from "@mikka/protocol/run-failure"
 
 export interface CredentialScope {
   ownerId: string
@@ -41,7 +42,18 @@ export interface WorkerMetadata { id: string; provider: string; state: string; r
 export interface NativeLease { accessToken: string; accountId?: string; chatgptAccountId?: string; chatgptPlanType?: string; expiresAt?: string }
 
 export class WorkerRefusal extends Error {
-  constructor(readonly code: string = "subscription_worker_unavailable") { super(code); this.name = "WorkerRefusal" }
+  constructor(readonly code: string = "subscription_worker_unavailable", readonly failureDetails?: RunFailure) { super(code); this.name = "WorkerRefusal" }
+}
+function providerDiagnostic(value: unknown, provider: string): { provider: string; status?: number; error: { type: string; message?: string } } | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return
+  const v = value as Record<string, unknown>
+  if (v.provider !== provider || Object.keys(v).some(key => !['provider', 'status', 'error'].includes(key))) return
+  if (v.status !== undefined && (typeof v.status !== 'number' || !Number.isInteger(v.status) || v.status < 400 || v.status > 599)) return
+  if (!v.error || typeof v.error !== 'object' || Array.isArray(v.error)) return
+  const e = v.error as Record<string, unknown>
+  if (Object.keys(e).some(key => !['type', 'message'].includes(key)) || typeof e.type !== 'string' || !/^[a-z_]{1,64}$/.test(e.type)) return
+  if (e.message !== undefined && (typeof e.message !== 'string' || !e.message.length || e.message.length > 512)) return
+  return { provider, ...(typeof v.status === 'number' ? { status: v.status } : {}), error: { type: e.type, ...(typeof e.message === 'string' ? { message: e.message } : {}) } }
 }
 const STORE_FAILURE = /^(secret_store_failure (GET|POST|DELETE) (no_token|network|http_\d{3})|subscription_upstream_failure (claude|codex) (transport|response|event|incomplete|convert) \d{1,3} [a-z_]{1,40})$/
 const REQUEST_BYTES = '(0|[1-9]\\d{0,9})'
@@ -112,7 +124,12 @@ export class SubscriptionWorkerClient {
             binary(value)
           }
           else if (typeof frame.chunk === "string" && chunk) { timing?.chunk(); chunk(frame.chunk) }
-          else if (frame.error) { timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing')); finish(new WorkerRefusal(safeCode(frame.error))) }
+          else if (frame.error) {
+            timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing'))
+            const diagnostic = providerDiagnostic(frame.providerFailure, this.config.scope.provider)
+            const failure = diagnostic ? captureRunFailure({ ...diagnostic, requestBodyValues: request.payload }, { runId: this.config.use?.runId, provider: this.config.scope.provider, credential: 'subscription' }) : undefined
+            finish(new WorkerRefusal(safeCode(frame.error), failure))
+          }
           else if (Object.hasOwn(frame, "result")) { timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing')); finish(undefined, frame.result) }
           else finish(new WorkerRefusal())
         } catch { finish(new WorkerRefusal()) }

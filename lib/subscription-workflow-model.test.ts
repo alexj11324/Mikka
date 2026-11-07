@@ -4,11 +4,16 @@ import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import { cacheableInstructions, withCacheBreakpoints } from './prompt-cache'
+import { WorkflowRunFailureError } from './workflow-run-failure'
+import { currentSubscriptionTiming, type SubscriptionCallTiming } from '../packages/daemon/src/subscription-worker-timing'
 const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
+let resolveFailure: Error | undefined
+let timingAtResolveFailure: SubscriptionCallTiming | null | undefined
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
 mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
   resolveSubscriptionWorkflowModel: async (selection: unknown, signal: unknown) => {
     const call = {selection, signal, options: undefined as unknown}; calls.push(call)
+    if (resolveFailure) { timingAtResolveFailure = currentSubscriptionTiming(); throw resolveFailure }
     return {specificationVersion: 'v4', doStream: async (options: unknown) => {call.options = options; return {...streamResult, stream: new ReadableStream({start(controller) {controller.close()}})}}}
   },
 }})
@@ -148,5 +153,42 @@ test('timing reports whether the actual Codex layout was applied without changin
     const line = logs.at(-1)!
     assert.equal(line.codexLayoutApplied, sample.expected, 'actual_codex_layout_not_reported')
     assert.equal(Object.hasOwn(line, 'codexLayoutApplied'), sample.expected !== undefined)
+  }
+})
+
+test('a subscription setup refusal is durably redacted without starting a provider or inventing model timing', async t => {
+  const privateRequest = 'A private setup request fixture.'
+  const upstream = Object.assign(new Error('points_exhausted'), {
+    statusCode: 400,
+    responseBody: JSON.stringify({ error: { type: 'invalid_request_error', message: `Unsupported field. ${privateRequest}` } }),
+  })
+  const logs: string[] = []
+  t.mock.method(console, 'info', (...values: unknown[]) => { logs.push(values.map(String).join(' ')) })
+  const priorCalls = calls.length
+  const abort = new AbortController()
+  resolveFailure = upstream
+  timingAtResolveFailure = null
+  try {
+    await assert.rejects(new SubscriptionWorkflowModel(selection).doStream({
+      prompt: [{ role: 'user', content: [{ type: 'text', text: privateRequest }] }],
+      abortSignal: abort.signal,
+    }), error => {
+      assert.ok(error instanceof WorkflowRunFailureError)
+      assert.equal(error.message, 'points_exhausted')
+      assert.equal(error.cause, upstream, 'the host retains its original cause only in memory')
+      const persisted = WorkflowRunFailureError[WORKFLOW_SERIALIZE](error)
+      assert.doesNotMatch(JSON.stringify(persisted), /A private setup request fixture|responseBody|requestBodyValues/)
+      assert.ok(persisted.failureDetails)
+      return true
+    })
+    assert.equal(calls.length, priorCalls + 1)
+    assert.equal(calls.at(-1)!.signal, abort.signal)
+    assert.equal(calls.at(-1)!.options, undefined, 'provider doStream was never called')
+    assert.equal(timingAtResolveFailure, undefined, 'post-resolution timing scope was never entered')
+    assert.equal(logs.filter(line => line.includes('model_call_timing')).length, 0, 'no stream was established to time')
+    assert.equal(logs.filter(line => line.includes('subscriptionStages')).length, 0, 'unobserved worker stages stay absent')
+  } finally {
+    resolveFailure = undefined
+    timingAtResolveFailure = undefined
   }
 })

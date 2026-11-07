@@ -1,3 +1,5 @@
+import { captureRunFailure } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { z } from "zod"
@@ -67,13 +69,15 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
   if (!link.coordinatorCommand || !link.coordinatorToolResult) throw new Error("coordinatorTransportUnavailable")
   const submit = link.coordinatorCommand.bind(link)
   const result = link.coordinatorToolResult.bind(link)
-  const budget = Math.min(120_000, Date.parse(job.expiresAt) - Date.now())
-  if (budget <= 0) throw new Error("coordinatorJobExpired")
-  mkdirSync(options.stateDir, { recursive: true, mode: 0o700 })
-  const dir = mkdtempSync(join(options.stateDir, "turn-"))
-  const cwd = join(dir, "context")
-  mkdirSync(cwd, { mode: 0o700 })
+  let directory: string | undefined
   try {
+    const budget = Math.min(120_000, Date.parse(job.expiresAt) - Date.now())
+    if (budget <= 0) throw new Error("coordinatorJobExpired")
+    mkdirSync(options.stateDir, { recursive: true, mode: 0o700 })
+    const dir = mkdtempSync(join(options.stateDir, "turn-"))
+    directory = dir
+    const cwd = join(dir, "context")
+    mkdirSync(cwd, { mode: 0o700 })
     const tools: CoordinatorTool[] = job.tools.map(spec => {
       const schema = z.fromJSONSchema(spec.inputSchema)
       if (!(schema instanceof z.ZodObject)) throw new Error("coordinatorToolSchemaUnsupported")
@@ -86,8 +90,8 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
     })
     const input = { instructions: job.instructions, context: job.context, model: job.model, signal, timeoutMs: budget }
     const reply = job.harness === "claude_code"
-      ? await runClaudeCoordinator(input, { cwd, tools, executable: options.claudeBinary })
-      : await runCodexCoordinator(input, { cwd, tools, connect: async active => {
+      ? await runClaudeCoordinator(input, { cwd, tools, runId: job.id, executable: options.claudeBinary })
+      : await runCodexCoordinator(input, { cwd, tools, runId: job.id, connect: async active => {
         active.throwIfAborted()
         const home = prepareCodexHome(join(dir,"codex-home"),options.log)
         // Never inherit a coding worker's permissive defaults or the user's MCP config.
@@ -112,7 +116,11 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
     signal.throwIfAborted()
     await submit(deviceId,job.id,{ type: "complete",text: reply.text },signal)
   } catch (error) {
-    if (!signal.aborted) await submit(deviceId,job.id,{ type: "failed" },signal).catch(() => undefined)
+    if (!signal.aborted) {
+      const failureDetails = captureRunFailure(error, { runId: job.id, appVersion: DAEMON_VERSION, provider: job.harness === "claude_code" ? "claude" : "codex", credential: "subscription", sensitiveText: [job.instructions, job.context] })
+      // Older servers reject unknown keys on their strict failed command.
+      await submit(deviceId,job.id,{ type: "failed", ...(job.failureDetailsVersion === 1 ? { failureDetails } : {}) },signal).catch(() => undefined)
+    }
     throw error
-  } finally { rmSync(dir,{ recursive: true,force: true }) }
+  } finally { if (directory) rmSync(directory,{ recursive: true,force: true }) }
 }

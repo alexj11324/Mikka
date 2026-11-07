@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { runCompleteRequest } from '@mikka/protocol/run'
+import { completionFailureDetails } from '@/lib/run-failure-details'
 import { authenticateDevice } from '@/lib/device-link'
 import { persistRunCompletion } from '@/lib/run-publications'
 import { startRunPublication } from '@/lib/run-publication-workflow'
@@ -36,7 +37,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   }
   let result: Awaited<ReturnType<typeof persistRunCompletion>>
   // 4e2 ②: report / error text from a cloud worker is masked before it is stored.
-  const completion = maskDeep(parsed.data, await secretMaskerFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId }))
+  const failureDetails = completionFailureDetails(parsed.data, runId)
+  const { failureDetails: _suppliedFailure, ...body } = parsed.data
+  const completion = maskDeep({ ...body, ...(failureDetails ? { failureDetails } : {}) }, await secretMaskerFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId }))
   try { result = await persistRunCompletion(caller.userId, runId, completion, caller.scopeDeviceId) }
   catch (error) {
     if (error instanceof ImprovementError) return NextResponse.json({ error: error.code }, { status: 409 })

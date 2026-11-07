@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
+import { runFailureSchema } from '@mikka/protocol/run-failure'
 import { makeSnapshot } from './definition'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import type { AgentExecution } from './store'
@@ -423,12 +424,23 @@ test('welcome-only workflow passes no executable tools; a later or coalesced use
   }
 })
 
+function assertToolFailureDetails(value:unknown){
+  const failure=runFailureSchema.parse(value)
+  assert.equal(failure.code,'model_tool_unavailable')
+  assert.equal(failure.runId,'synthetic-workflow')
+  assert.equal(failure.providerMessage,undefined)
+  assert.doesNotMatch(JSON.stringify(failure),/Synthetic blocked receipt|credential_secret_detected|"messages"|"tool-call"|"tool-result"|"requestBodyValues"|"responseBody"|"stack"|"headers"/)
+}
+
 test('exhausted invalid-tool recovery fails the execution and turn without a success commit',async()=>{
   reset('ai_sdk');hostedError=new Error('model_tool_unavailable')
   try{
     await assert.rejects(coordinatorTurn(owner,bot),{message:'model_tool_unavailable'})
     assert.deepEqual(calls.find(call=>call.name==='finish')?.args,[owner,bot,execution!.id,'turn_failed'])
-    assert.deepEqual(calls.find(call=>call.name==='failed')?.args,[owner,'synthetic-workflow','model_tool_unavailable',bot,undefined])
+    const args=calls.find(call=>call.name==='failed')?.args
+    assert.equal(args?.length,6)
+    assert.deepEqual(args?.slice(0,5),[owner,'synthetic-workflow','model_tool_unavailable',bot,undefined])
+    assertToolFailureDetails(args?.[5])
     assert.equal(calls.some(call=>call.name==='append'),false)
     assert.equal(calls.some(call=>call.name==='stream' && (call.args[1] as {type:string}).type==='coordinator-turn-committed'),false)
   }finally{hostedError=null}
@@ -440,7 +452,10 @@ test('invalid-tool failure hands finished receipts to the atomic failure step, w
     {role:'tool',content:[{type:'tool-result',toolCallId:'done',toolName:'registered',output:{type:'json',value:{receipt:'completed'}}}]}]
   try{
     await assert.rejects(coordinatorTurn(owner,bot),{message:'model_tool_unavailable'})
-    assert.deepEqual(calls.find(call=>call.name==='failed')?.args,[owner,'synthetic-workflow','model_tool_unavailable',bot,{messages:hostedCompleted,streamId:'synthetic-workflow:0'}])
+    const args=calls.find(call=>call.name==='failed')?.args
+    assert.equal(args?.length,6)
+    assert.deepEqual(args?.slice(0,5),[owner,'synthetic-workflow','model_tool_unavailable',bot,{messages:hostedCompleted,streamId:'synthetic-workflow:0'}])
+    assertToolFailureDetails(args?.[5])
     assert.equal(calls.filter(call=>call.name==='hosted').length,1)
     assert.equal(calls.some(call=>call.name==='append'),false,'only the atomic failure step persists these receipts')
     assert.deepEqual(calls.find(call=>call.name==='finish')?.args,[owner,bot,execution!.id,'turn_failed'])
@@ -461,7 +476,9 @@ test('a rejected receipt still releases the failed lease once and retains both f
     })
     const failures=calls.filter(call=>call.name==='failed')
     assert.equal(failures.length,2)
-    assert.deepEqual(failures[1].args,[owner,'synthetic-workflow','model_tool_unavailable',bot])
+    assert.equal(failures[1].args.length,6)
+    assert.deepEqual(failures[1].args.slice(0,5),[owner,'synthetic-workflow','model_tool_unavailable',bot,undefined])
+    assertToolFailureDetails(failures[1].args[5])
     assert.equal(calls.filter(call=>call.name==='hosted').length,1)
     assert.equal(calls.some(call=>call.name==='append'),false)
   }finally{hostedError=null;hostedCompleted=[];receiptPersistenceError=null}

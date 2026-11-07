@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
@@ -47,6 +48,10 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
       await pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)', [randomUUID(),id,JSON.stringify({type:'text-delta',delta:'secret-output'})])
       await pool.query('insert into run_messages (id,"runId","userId",text) values ($1,$2,$3,\'secret-message\')', [randomUUID(),id,u])
     }
+    const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+      providerMessage: 'secret-provider-message', causes: [{ name: 'APIError', code: 'invalid_api_key' }],
+      runId: sharedRun, appVersion: 'test', occurredAt: '2026-11-07T12:00:00.000Z' }
+    await pool.query('update agent_runs set "failureDetails"=$2 where id=$1', [sharedRun, JSON.stringify(failureDetails)])
     assert.equal((await issueForUser(owner,personal))?.id,personal)
     assert.equal((await issueForUser(owner,unlinked))?.id,unlinked)
     assert.equal(await issueForUser(member,personal),null)
@@ -87,9 +92,16 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.equal((await readRun(owner,sharedRun))?.chunks.length,1)
     assert.equal((await readRun(owner,sharedRun))?.messages.length,1)
     assert.equal((await readRun(owner,sharedRun))?.run.report?.summary,'secret-report')
+    assert.deepEqual((await readRun(owner,sharedRun))?.run.failureDetails, failureDetails)
+    const ownBrief = await visibleRuns(owner, { issueId: shared, brief: true })
+    assert.equal(ownBrief[0].failureDetails?.code, 'run_api_key_invalid')
+    assert.doesNotMatch(JSON.stringify(ownBrief[0].failureDetails), /secret-provider-message|APIError/)
     const detail = await readRun(member,sharedRun)
     assert.ok(detail)
     assert.equal(detail.run.status,'running')
+    assert.equal(detail.run.failureDetails?.code, 'run_api_key_invalid')
+    assert.equal(Object.hasOwn(detail.run.failureDetails!, 'providerMessage'), false)
+    assert.equal(Object.hasOwn(detail.run.failureDetails!, 'causes'), false)
     assert.equal(detail.run.agentId,'')
     assert.deepEqual(detail.chunks,[])
     assert.deepEqual(detail.messages,[])

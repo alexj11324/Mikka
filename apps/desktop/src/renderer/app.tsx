@@ -17,6 +17,7 @@ import { InvitationCard } from '@/components/workspace/invitation-card'
 import { DeviceAuthorization } from '@/components/device-authorization'
 import NotFound from '@/app/[locale]/not-found'
 import { safeAuthReturn } from '@/lib/auth-return'
+import { withBasePath } from '@/lib/base-path'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { readBootstrap, type DesktopBootstrap } from './bootstrap'
 import { Link } from './i18n-navigation'
@@ -27,10 +28,12 @@ import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, PlatformExtras, requireUpdate } from 'mikka:platform'
 import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 import { InstalledWorkspace } from './installed-workspace'
+import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
 const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
 const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
+const GitHubHandoff = lazy(() => import('@/components/plugins/github-settings').then(module => ({ default: module.GitHubSettings })))
 
 /** Runtime-specific composition only. The application surfaces below are the
  * exact same components, data hooks and lazy chunks as the web application. */
@@ -138,12 +141,14 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   const query = location.searchParams
   const locale = localeOf(location.pathname)
   const user = bootstrap.user
+  const serverDocument = platform === 'web' ? serverDocumentKind() : null
   const authentication = path === '/sign-in' || path === '/sign-up'
   const invitation = /^\/invite\/([^/]+)$/.exec(path)
   const sharedArtifact = /^\/a\/([^/]+)$/.exec(path)
   const workspaceLink = /^\/w\/([a-z0-9]([a-z0-9-]{1,62}[a-z0-9]))$/.exec(path)
   const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent'
   useEffect(() => {
+    if (serverDocument && !serverPageKind(location)) { window.location.replace(withBasePath('/')); return }
     if (path === '/dashboard') navigate(`/${location.search}`, true, { locale }, true)
     else if (path === '/devices') navigate('/settings?section=devices', true, { locale }, true)
     else if (user && authentication) {
@@ -154,7 +159,7 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
       const next = safeAuthReturn(`${path}${location.search}`)
       navigate(`/sign-in${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`, true, { locale }, true)
     }
-  }, [location.href, user?.id])
+  }, [location.href, user?.id, serverDocument])
   if (browserRoute || (platform === 'desktop' && path === '/sign-up')) return <BrowserRoute signUp={path === '/sign-up'} account={user?.email ?? null} />
   if (sharedArtifact) return <Suspense fallback={<WorkspaceLoading />}><SharedArtifactRoute key={sharedArtifact[1]} token={sharedArtifact[1]} /></Suspense>
   if (invitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><InvitationCard token={/^[a-f0-9]{64}$/.test(invitation[1]) ? invitation[1] : ''} email={user?.email ?? null} /></main>
@@ -163,6 +168,10 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   if (path === '/device') return <DeviceAuthorization account={user.email} initialCode={query.get('user_code') ?? ''} />
   if (path === '/workspaces/new') return <NewWorkspace email={user.email} />
   if (path === '/devices') return <WorkspaceLoading />
+  // Reuse the existing narrow account-linking surface. A native GitHub OAuth
+  // return must still finish after the surrounding community app is disabled.
+  if (serverDocument && serverPageKind(location) === 'github') return <Suspense fallback={<WorkspaceLoading />}><GitHubHandoff /></Suspense>
+  if (serverDocument) return <WorkspaceLoading />
   if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
   if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap} />
   return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap} /></Suspense>
