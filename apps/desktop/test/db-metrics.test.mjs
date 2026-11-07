@@ -138,7 +138,9 @@ assert.equal(require.cache[selectedEntry], undefined, 'tracing setup itself does
   assert.equal(Object.values(attributed.queryOperations).reduce((total, count) => total + count, 0), attributed.queryCalls)
   assert.deepEqual(attributed.unattributedSources, Object.fromEntries(sourceKeys.map(key => [key, ['otherScoped', 'noScope'].includes(key) ? 1 : 0])))
   assert.equal(JSON.stringify(attributed).includes('PRIVATE_'), false)
-  const labels = sourceKeys.filter(key => !['otherScoped', 'noScope'].includes(key))
+  // Exercise these shared chat routes even when an older vocabulary omits them.
+  const labels = [...new Set([...sourceKeys.filter(key => !['otherScoped', 'noScope'].includes(key)),
+    '/api/approved-writes', '/api/conversations/[id]/read', '/api/mobile/reactions'])]
   const unlisted = ['noScope', '/v1/devices/PRIVATE_ID_CANARY/heartbeat', { private: 'PRIVATE_SCOPE_CANARY' }]
   await Promise.all([...labels, ...unlisted].map(route => routeScope.run(route, async () => {
     await Promise.resolve()
@@ -149,8 +151,8 @@ assert.equal(require.cache[selectedEntry], undefined, 'tracing setup itself does
   assert.equal(refined.queryOperations['/actions/coordinator/poll'], 1)
   assert.equal(refined.queryOperations['/api/live/ticket'], 1)
   assert.equal(refined.unattributedSources.noScope, 1)
-  assert.equal(refined.unattributedSources.otherScoped, 4, 'concrete IDs, non-string scopes and reserved bucket names are not templates')
   for (const label of labels) assert.equal(refined.unattributedSources[label], 1, label)
+  assert.equal(refined.unattributedSources.otherScoped, 4, 'concrete IDs, non-string scopes and reserved bucket names are not templates')
   assert.equal(Object.values(refined.unattributedSources).reduce((total, count) => total + count, 0), refined.queryOperations.unattributed)
   assert.equal(Object.values(refined.queryOperations).reduce((total, count) => total + count, 0), refined.queryCalls)
   assert.equal(JSON.stringify(refined).includes('PRIVATE_'), false)
@@ -297,13 +299,28 @@ test('unattributed source refinement rejects incomplete evidence without upgradi
 })
 
 test('unattributed source refinement fits the unchanged control-response limit at the largest safe count', () => {
+  const each = Math.floor(Number.MAX_SAFE_INTEGER / unattributedSourceKeys.length)
+  const remainder = Number.MAX_SAFE_INTEGER - each * unattributedSourceKeys.length
+  const sources = Object.fromEntries(unattributedSourceKeys.map((key, index) => [key, each + (index < remainder ? 1 : 0)]))
   const value = counterSample({ queryCalls: Number.MAX_SAFE_INTEGER,
     queryOperations: operationCounts({ unattributed: Number.MAX_SAFE_INTEGER }),
-    unattributedSources: sourceCounts({ otherScoped: Number.MAX_SAFE_INTEGER }),
+    unattributedSources: sources,
     excludes: ['connection_handshake', 'TCP_TLS_overhead', 'other_processes'],
   })
   assert.ok(Buffer.byteLength(JSON.stringify(value)) <= 8192)
-  assert.equal(projectQuerySnapshot(value, counterIdentity).unattributedSources.otherScoped, Number.MAX_SAFE_INTEGER)
+  assert.deepEqual(projectQuerySnapshot(value, counterIdentity).unattributedSources, sources)
+})
+
+test('the 78-source refinement rejects a historical 75-key partition without backfilling it', () => {
+  assert.equal(unattributedSourceKeys.length, 78)
+  const historical = sourceCounts({ otherScoped: 5 })
+  for (const key of ['/api/approved-writes', '/api/conversations/[id]/read', '/api/mobile/reactions']) delete historical[key]
+  const original = JSON.stringify(historical)
+  assert.equal(Object.keys(historical).length, 75)
+  assert.throws(() => projectQuerySnapshot(counterSample({
+    queryOperations: operationCounts({ unattributed: 5 }), unattributedSources: historical,
+  }), counterIdentity), /LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID/)
+  assert.equal(JSON.stringify(historical), original, 'the original unknown source count is not reclassified')
 })
 
 test('lifecycle query windows refuse a changed process, reset, missing driver and unknown readings', () => {
