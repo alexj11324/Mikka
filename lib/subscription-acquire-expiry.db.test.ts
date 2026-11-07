@@ -26,6 +26,8 @@ async function withDatabase(run: (pool: Pool) => Promise<void>) {
       '20261027164506_byos_access_and_cleanup.sql',
       '20261027164508_byos_enrollment_transfers.sql',
       '20261027164509_byos_enrollment_cleanup.sql',
+      '20261029043631_byos_account_label.sql',
+      '20261029043633_byos_connection_removed.sql',
       migration,
       migration,
     ]) await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
@@ -72,6 +74,7 @@ test('expired acquisitions are fenced and consumed atomically; unrelated states 
     const currentAttempt = await attempt(pool, expired[0])
     const consumedAttempt = await attempt(pool, expired[0], expired[0].operationId, true)
     const otherOperationAttempt = await attempt(pool, expired[0], randomUUID())
+    await pool.query('UPDATE byos_oauth_attempts SET "expiresAt"=now()-interval \'1 second\' WHERE "connectionId"=$1', [expired[0].id])
     const beforeConsumed = (await pool.query('SELECT "consumedAt" FROM byos_oauth_attempts WHERE "stateHash"=$1', [consumedAttempt])).rows[0].consumedAt
     await pool.query(`INSERT INTO byos_secret_artifacts
       (name,"connectionId","ownerId","workspaceId",provider,kind,"operationId","notBefore","createStarted","createSettled")
@@ -95,7 +98,8 @@ test('expired acquisitions are fenced and consumed atomically; unrelated states 
 
     assert.deepEqual(await expireSubscriptionAcquisitions(pool), { expired: 19, ownerIds: ['alice', 'bob'] })
     for (const row of await rows(pool, expired.map(row => row.id))) {
-      assert.equal(row.state, 'reconnect_required')
+      assert.equal(row.state, 'disconnected')
+      assert.ok(row.removedAt)
       assert.equal(row.lastErrorCode, 'acquire_expired')
       assert.equal(row.epoch, '5')
       assert.equal(row.credentialVersion, '7')
@@ -144,10 +148,64 @@ test('owner-scoped expiry changes only that owner and returns only changed owner
   })
 })
 
+test('stale empty failures are removed; account, credential, binding and live OAuth evidence are preserved', { skip: !disposable }, async () => {
+  await withDatabase(async pool => {
+    const abandoned = await connection(pool, 'alice', 'reconnect_required', null)
+    const disconnected = await connection(pool, 'alice', 'disconnected', null)
+    const protectedRows = []
+    for (const column of ['providerSubject', 'accountLabel', 'secretName', 'accessSecretName', 'stagedSecretName', 'stagedAccessName']) {
+      const row = await connection(pool, 'alice', 'reconnect_required', null)
+      const value = column === 'accountLabel' ? 'fixture@example.test' : 'fixture-evidence'
+      const digestColumn = column === 'secretName' ? 'secretDigest' : column === 'accessSecretName' ? 'accessDigest' : column === 'stagedSecretName' ? 'stagedDigest' : column === 'stagedAccessName' ? 'stagedAccessDigest' : null
+      await pool.query(`UPDATE byos_connections SET "${column}"=$2${digestColumn ? `,"${digestColumn}"='${digest}'` : ''} WHERE id=$1`, [row.id, value])
+      protectedRows.push(row)
+    }
+    const bound = await connection(pool, 'alice', 'reconnect_required', null)
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      VALUES ($1,'alice','workspace','consumer',$2,4,'codex_cpa','fixture-model')`, [randomUUID(), bound.id])
+    protectedRows.push(bound)
+    const active = await connection(pool, 'alice')
+    await attempt(pool, active)
+    protectedRows.push(active)
+    const retainedAccount = await connection(pool, 'alice')
+    await pool.query('UPDATE byos_connections SET "providerSubject"=\'known-account\' WHERE id=$1', [retainedAccount.id])
+    await pool.query('UPDATE byos_connections SET "updatedAt"=now()-interval \'2 hours\'')
+    const before = await rows(pool, protectedRows.map(row => row.id))
+    assert.equal(await subscriptionCleanupDue(pool), true)
+    assert.deepEqual(await expireSubscriptionAcquisitions(pool), { expired: 3, ownerIds: ['alice'] })
+    for (const row of await rows(pool, [abandoned.id, disconnected.id])) {
+      assert.equal(row.state, 'disconnected')
+      assert.ok(row.removedAt)
+      assert.equal(row.epoch, '5')
+    }
+    const [retained] = await rows(pool, [retainedAccount.id])
+    assert.equal(retained.state, 'reconnect_required', 'a previously identified account still offers reconnect')
+    assert.equal(retained.removedAt, null)
+    assert.deepEqual(await rows(pool, protectedRows.map(row => row.id)), before)
+    assert.deepEqual(await expireSubscriptionAcquisitions(pool), { expired: 0, ownerIds: [] })
+  })
+})
+
+test('a successful reconnect removes older empty shells in the same account and provider without waiting an hour', { skip: !disposable }, async () => {
+  await withDatabase(async pool => {
+    const old = await connection(pool, 'alice', 'reconnect_required', null)
+    const otherOwner = await connection(pool, 'bob', 'reconnect_required', null)
+    const otherProvider = await connection(pool, 'alice', 'reconnect_required', null)
+    await pool.query('UPDATE byos_connections SET provider=\'claude\' WHERE id=$1', [otherProvider.id])
+    await pool.query('UPDATE byos_connections SET "createdAt"=now()-interval \'5 minutes\'')
+    const reconnected = await connection(pool, 'alice', 'connected')
+    await pool.query('UPDATE byos_connections SET "workspaceId"=\'other-workspace\',"createdAt"=now()-interval \'1 day\' WHERE id=$1', [reconnected.id])
+    assert.deepEqual(await expireSubscriptionAcquisitions(pool, 'alice'), { expired: 1, ownerIds: ['alice'] })
+    assert.ok((await rows(pool, [old.id]))[0].removedAt)
+    assert.ok((await rows(pool, [otherOwner.id, otherProvider.id])).every(row => row.removedAt === null))
+  })
+})
+
 test('a concurrent credential publication keeps its epoch, staged credentials and OAuth attempt', { skip: !disposable }, async () => {
   await withDatabase(async pool => {
     const publishing = await connection(pool, 'alice')
     const stateHash = await attempt(pool, publishing)
+    await pool.query('UPDATE byos_oauth_attempts SET "expiresAt"=now()-interval \'1 second\' WHERE "stateHash"=$1', [stateHash])
     await connection(pool, 'bob')
     const writer = await pool.connect()
     try {

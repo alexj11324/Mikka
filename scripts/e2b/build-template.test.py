@@ -266,6 +266,129 @@ class Publish(unittest.TestCase):
             self.assertEqual(sandbox.calls[-1], ('kill',))
             self.assertEqual(sum(call[0] == 'run' for call in sandbox.calls), 1)
 
+    def test_model_probe_timeout_records_only_safe_counts_and_preserves_the_failure(self):
+        class TimeoutException(Exception): pass
+        for stage in ('ready_check', 'receipt_read'):
+            with self.subTest(stage=stage):
+                failure = TimeoutException('private transport detail')
+                cause = OSError('private connection detail')
+                receipt = model_receipt('codex')
+                class Probe(ModelSandbox):
+                    def run(self, command, **options):
+                        result = super().run(command, **options)
+                        if stage == 'ready_check': raise failure from cause
+                        return result
+                    def read(self, path, **options):
+                        if path.endswith('preloaded-models.json'):
+                            self.calls.append(('read', path, options))
+                            raise failure from cause
+                        return super().read(path, **options)
+                sandbox = Probe(receipt)
+                def factory(*args, **options):
+                    sandbox.calls.append(('create', args, options))
+                    return sandbox
+                log = io.StringIO()
+                with patch.object(bt.time, 'monotonic', side_effect=[100, 145.25]), patch.object(bt.sys, 'stderr', log):
+                    with self.assertRaises(TimeoutException) as raised:
+                        bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], factory)
+                self.assertIs(raised.exception, failure)
+                self.assertIs(raised.exception.__cause__, cause)
+                expected_calls = ['create', 'run', 'kill'] if stage == 'ready_check' else ['create', 'run', 'read', 'read', 'read', 'kill']
+                self.assertEqual([call[0] for call in sandbox.calls], expected_calls)
+                self.assertEqual(sandbox.calls[0][2]['timeout'], 60)
+                self.assertEqual(sandbox.calls[1][2]['timeout'], 45)
+                self.assertNotIn('--probe-models', sandbox.calls[1][1])
+                self.assertNotIn('request_timeout', sandbox.calls[1][2])
+                self.assertTrue(all(call[2]['request_timeout'] == 30 for call in sandbox.calls if call[0] == 'read'))
+                self.assertEqual(json.loads(log.getvalue()), {
+                    'event': 'mikka_model_probe_failed', 'kind': 'codex', 'stage': stage, 'error': 'timeout',
+                    'bytes': {'workerIdentity': None if stage == 'ready_check' else len(receipt['workerSha'] + '\n'),
+                              'manifest': None if stage == 'ready_check' else len(json.dumps(receipt['manifest']).encode('utf-8')),
+                              'receipt': None},
+                    'elapsedMs': 45250, 'receiptJsonReceived': False,
+                })
+                self.assertNotIn('private', log.getvalue())
+
+    def test_model_probe_receipt_errors_record_only_the_completed_reads(self):
+        receipt = model_receipt('claude')
+        invalid = {**receipt, 'credential': 'private-凭证'}
+        cases = [
+            (None, RuntimeError('private read error'), 'receipt_read', 'read_failed', False),
+            ('{"private-凭证":', None, 'receipt_parse', 'invalid_json', False),
+            (json.dumps(invalid, ensure_ascii=False), None, 'receipt_validate', 'identity_invalid', True),
+            (json.dumps(receipt), RuntimeError('private validation error'), 'receipt_validate', 'unexpected', True),
+        ]
+        for raw, failure, stage, category, parsed in cases:
+            with self.subTest(stage=stage, category=category):
+                class Probe(ModelSandbox):
+                    def read(self, path, **options):
+                        if path.endswith('preloaded-models.json'):
+                            self.calls.append(('read', path, options))
+                            if raw is None: raise failure
+                            return raw
+                        return super().read(path, **options)
+                sandbox = Probe(receipt)
+                log = io.StringIO()
+                validator = bt.validate_model_receipt
+                with patch.object(bt.time, 'monotonic', side_effect=[10, 11]), patch.object(bt.sys, 'stderr', log), \
+                        patch.object(bt, 'validate_model_receipt', side_effect=failure if category == 'unexpected' else validator):
+                    with self.assertRaises((RuntimeError, json.JSONDecodeError)) as raised:
+                        bt.probe_models('private-template', 'claude', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+                if failure is not None: self.assertIs(raised.exception, failure)
+                self.assertEqual([call[0] for call in sandbox.calls], ['run', 'read', 'read', 'read', 'kill'])
+                self.assertEqual(json.loads(log.getvalue()), {
+                    'event': 'mikka_model_probe_failed', 'kind': 'claude', 'stage': stage, 'error': category,
+                    'bytes': {'workerIdentity': len(receipt['workerSha'] + '\n'),
+                              'manifest': len(json.dumps(receipt['manifest']).encode('utf-8')),
+                              'receipt': None if raw is None else len(raw.encode('utf-8'))},
+                    'elapsedMs': 1000, 'receiptJsonReceived': parsed,
+                })
+                self.assertNotIn('private', log.getvalue())
+                self.assertNotIn('凭证', log.getvalue())
+
+    def test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error(self):
+        for log_fails in (False, True):
+            with self.subTest(log_fails=log_fails):
+                failure = TimeoutError('private receipt read failure')
+                cause = OSError('private transport cause')
+                receipt = model_receipt('codex')
+                class Probe(ModelSandbox):
+                    def read(self, path, **options):
+                        if path.endswith('preloaded-models.json'):
+                            self.calls.append(('read', path, options))
+                            raise failure from cause
+                        return super().read(path, **options)
+                    def kill(self):
+                        self.calls.append(('kill',))
+                        raise RuntimeError('private cleanup failure')
+                class Log(io.StringIO):
+                    def write(self, message):
+                        if log_fails:
+                            raise OSError('private logging failure')
+                        return super().write(message)
+                log = Log()
+                sandbox = Probe(receipt)
+                with patch.object(bt.sys, 'stderr', log):
+                    with self.assertRaises(TimeoutError) as raised:
+                        bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+                self.assertIs(raised.exception, failure)
+                self.assertIs(raised.exception.__cause__, cause)
+                self.assertEqual([call[0] for call in sandbox.calls], ['run', 'read', 'read', 'read', 'kill'])
+                self.assertEqual(failure.__notes__, (['model_probe_diagnostic_failed'] if log_fails else []) + ['model_probe_cleanup_failed'])
+                self.assertNotIn('private', log.getvalue())
+
+    def test_model_probe_success_still_fails_if_its_sandbox_cannot_be_cleaned_up(self):
+        failure = RuntimeError('private cleanup failure')
+        receipt = model_receipt('codex')
+        class Probe(ModelSandbox):
+            def kill(self): raise failure
+        log = io.StringIO()
+        with patch.object(bt.sys, 'stderr', log):
+            with self.assertRaises(RuntimeError) as raised:
+                bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: Probe(receipt))
+        self.assertIs(raised.exception, failure)
+        self.assertEqual(log.getvalue(), '')
+
     def test_capability_manifest_matches_template_kinds_and_task_environment(self):
         manifest = json.loads((bt.ROOT / 'scripts/e2b/template-capabilities.json').read_text())
         self.assertEqual(set(manifest), set(bt.KINDS))

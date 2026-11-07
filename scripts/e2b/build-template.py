@@ -464,6 +464,18 @@ def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
+    began = time.monotonic()
+    stage = 'ready_check'
+    byte_counts = {'workerIdentity': None, 'manifest': None, 'receipt': None}
+    receipt_json_received = False
+    failure = None
+
+    def read_file(key, path):
+        data = sandbox.files.read(path, user='user', request_timeout=30)
+        # A failed read exposes no partial count. None means unknown, not zero.
+        byte_counts[key] = len(data.encode('utf-8'))
+        return data
+
     try:
         path = '/home/user/.mikka/preloaded-models.json'
         # No identity has been handed to this disposable instance. Check that
@@ -475,17 +487,67 @@ def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_
             f' && test "$(stat -c %u {path})" = "$(id -u)" && readlink -f /opt/mikka/worker', user='user', timeout=45)
         if result.exit_code != 0 or result.stdout.strip() != f'/opt/mikka/releases/{source_commit}/source':
             raise RuntimeError('model_receipt_worker_not_ready')
-        installed_sha = sandbox.files.read('/opt/mikka/worker-source-sha', user='user', request_timeout=30).strip()
+        stage = 'worker_identity'
+        installed_sha = read_file('workerIdentity', '/opt/mikka/worker-source-sha').strip()
         if installed_sha != worker_sha:
             raise RuntimeError('model_receipt_worker_mismatch')
-        manifest = json.loads(sandbox.files.read('/opt/mikka/worker/.mikka-original-cli.json', user='user', request_timeout=30))
-        raw = sandbox.files.read(path, user='user', request_timeout=30)
+        stage = 'manifest_read'
+        manifest_raw = read_file('manifest', '/opt/mikka/worker/.mikka-original-cli.json')
+        stage = 'manifest_parse'
+        manifest = json.loads(manifest_raw)
+        stage = 'receipt_read'
+        raw = read_file('receipt', path)
         if len(raw) > 1_048_576:
             raise RuntimeError('model_receipt_too_large')
-        return validate_model_receipt(json.loads(raw), source_commit, worker_sha, manifest, kind)
+        stage = 'receipt_parse'
+        receipt = json.loads(raw)
+        # Decoded JSON is not evidence that the release or catalogue is valid.
+        receipt_json_received = True
+        stage = 'receipt_validate'
+        return validate_model_receipt(receipt, source_commit, worker_sha, manifest, kind)
+    except Exception as error:
+        failure = error
+        try:
+            codes = {
+                'model_receipt_worker_not_ready': 'worker_not_ready',
+                'model_receipt_worker_mismatch': 'worker_mismatch',
+                'model_receipt_too_large': 'receipt_too_large',
+                'model_receipt_identity_invalid': 'identity_invalid',
+                'model_receipt_manifest_mismatch': 'manifest_mismatch',
+                'model_receipt_selection_mismatch': 'selection_mismatch',
+                'model_receipt_reports_invalid': 'reports_invalid',
+                'model_receipt_required_harness_missing': 'required_harness_missing',
+                'official_cli_manifest_invalid': 'manifest_invalid',
+            }
+            code = error.args[0] if len(error.args) == 1 and isinstance(error.args[0], str) else None
+            category = codes.get(code)
+            if type(error).__name__ in ('TimeoutException', 'TimeoutError', 'ReadTimeout', 'ConnectTimeout'):
+                category = 'timeout'
+            elif category is None:
+                if isinstance(error, json.JSONDecodeError):
+                    category = 'invalid_json'
+                elif stage in ('worker_identity', 'manifest_read', 'receipt_read'):
+                    category = 'read_failed'
+                else:
+                    category = 'unexpected'
+            # File counts and closed categories only; never receipt text,
+            # transport messages, CLI output or account/credential details.
+            print(json.dumps({
+                'event': 'mikka_model_probe_failed', 'kind': kind, 'stage': stage, 'error': category,
+                'bytes': byte_counts, 'elapsedMs': round((time.monotonic() - began) * 1000),
+                'receiptJsonReceived': receipt_json_received,
+            }, separators=(',', ':')), file=sys.stderr, flush=True)
+        except Exception:
+            error.add_note('model_probe_diagnostic_failed')
+        raise
     finally:
         # This probe created this disposable sandbox; no existing worker is touched.
-        sandbox.kill()
+        try:
+            sandbox.kill()
+        except Exception:
+            if failure is None:
+                raise
+            failure.add_note('model_probe_cleanup_failed')
 
 
 CONSERVATION_DIAGNOSTIC_MAX_BYTES = 262144

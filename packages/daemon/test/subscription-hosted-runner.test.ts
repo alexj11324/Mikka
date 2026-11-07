@@ -163,6 +163,35 @@ it('honors the installed official CLI model report before spawning', async () =>
   expect(f.never).not.toHaveBeenCalled()
 })
 
+it.each(['missing', 'shortcuts', 'failed'] as const)('Claude admits its exact prepared catalogue model with a %s CLI report and no remote check', async reportKind => {
+  const f = await fixture()
+  const model = 'claude-haiku-5-5'
+  f.assignment.model = model
+  Object.assign(f.assignment.subscriptionLease!, { modelId: model, modelCatalogueVerified: true })
+  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { claude_code: f.binary },
+    reportedModels: async () => {
+      if (reportKind === 'failed') throw Error('fixture probe failed')
+      return reportKind === 'missing' ? null : { models: ['haiku', 'sonnet', 'opus'] }
+    },
+  })
+  expect((await collect(await runner.start(f.assignment, { ...f.options, model }))).at(-1))
+    .toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(f.never).not.toHaveBeenCalled()
+  expect(JSON.parse(readFileSync(join(f.stateDir, 'native-ledgers', f.assignment.runId + '.json'), 'utf8')).scope.modelId).toBe(model)
+})
+
+it.each(['codex', 'different-model'] as const)('catalogue evidence cannot admit %s outside the selected model and Claude route', async reason => {
+  const harness = reason === 'codex' ? 'codex' : 'claude_code'
+  const f = await fixture(harness)
+  f.assignment.subscriptionLease!.modelCatalogueVerified = true
+  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { [harness]: f.binary },
+    reportedModels: async () => ({ models: [] }),
+  })
+  await expect(runner.start(f.assignment, { ...f.options, ...(reason === 'different-model' ? { model: 'another-model' } : {}) })).rejects.toThrow()
+  expect(existsSync(join(f.config, 'fixture-process.json'))).toBe(false)
+  expect(f.never).not.toHaveBeenCalled()
+})
+
 it.each([
   ['codex', 'ask'], ['codex', 'allow'], ['codex', 'deny'],
   ['claude_code', 'ask'], ['claude_code', 'allow'], ['claude_code', 'deny'],
@@ -203,6 +232,7 @@ it.each([true, false])('advertises hosted execution only with the installed loca
     const advertised = registered.mock.calls.at(-1)?.[1].harnesses.find(info => info.harness === 'claude_code')
     expect(advertised?.installed).toBe(true)
     expect(advertised?.subscriptionBroker).toBe(true)
+    expect(advertised?.subscriptionModelCatalogue).toBe(true)
     expect(advertised?.toolApproval).toBe(available ? true : undefined)
     expect(f.never).not.toHaveBeenCalled()
   } finally { await daemon.stop() }

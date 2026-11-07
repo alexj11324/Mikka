@@ -20,12 +20,19 @@ let stopDuringTurn=false
 let stopDuringTool=false
 // A tool's finish record the model call started and the round has not awaited yet: 'slow' settles after the model, 'fail' rejects.
 let pendingAudit:'slow'|'fail'|null=null
+let hostedError:Error|null=null
+let hostedCompleted:unknown[]=[]
+let receiptPersistenceError:Error|null=null
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable,
   createHook:()=>({[Symbol.asyncIterator]:()=>({next:()=>new Promise(resolve=>{stopNow=()=>resolve({value:{},done:false})})})})}})
 stub('../coordinator/model.ts',{COORDINATOR_MODEL:'current-default',coordinatorStep:()=>({}),turnWarning:(_reason:string,text:string)=>text})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
 stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{
   record('hosted')(...args)
+  if(hostedError){
+    if(hostedCompleted.length) (args[2] as {onStepEnd?:(step:unknown)=>void}).onStepEnd?.({response:{messages:hostedCompleted}})
+    throw hostedError
+  }
   if(pendingAudit){
     const audits=(calls.find(c=>c.name==='tools')!.args[3] as {audits:Promise<unknown>[]}).audits
     const failing=pendingAudit==='fail'
@@ -83,12 +90,12 @@ stub('../../workflows/coordinator/steps.ts',{
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
-  failTurn:async(...args:unknown[])=>{record('failed')(...args)},
+  failTurn:async(...args:unknown[])=>{record('failed')(...args);if(args[4]&&receiptPersistenceError)throw receiptPersistenceError},
 })
 let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
 function reset(harness?:string){
-  calls.length=0;stopDuringTurn=false;stopDuringTool=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
+  calls.length=0;stopDuringTurn=false;stopDuringTool=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined;hostedError=null;hostedCompleted=[];receiptPersistenceError=null
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
 }
 test('real workflow entry uses the returned execution snapshot for model, prompt and tool registry',async()=>{
@@ -190,4 +197,70 @@ test('the prepared prompt reaches the model with its stable rules as their own s
     assert.deepEqual(options.instructions,[{role:'system',content:'RULES and catalog'},{role:'system',content:'memory, GitHub, computers'}])
     assert.equal('stable' in options,false,'stable is never a model option')
   }finally{preparedPrompt=null}
+})
+
+test('welcome-only workflow passes no executable tools; a later or coalesced user request keeps tools',async()=>{
+  for(const messages of [
+    [{role:'user',content:'[Welcome] Reply with a greeting only.'}],
+    [{role:'user',content:'[Welcome] Reply with a greeting only.'},{role:'assistant',content:'Hello'},{role:'user',content:'Choose D and find my repository'}],
+    [{role:'user',content:'[Welcome] Reply with a greeting only.'},{role:'user',content:'A real task queued beside the welcome'}],
+  ]){
+    reset('ai_sdk');preparedPrompt={instructions:'RULES',messages}
+    try{
+      await coordinatorTurn(owner,bot)
+      const [,,options]=calls.find(call=>call.name==='hosted')!.args as [unknown,unknown,{toolChoice?:string;activeTools?:string[]}]
+      if(messages.length===1){
+        assert.equal(calls.some(call=>call.name==='tools'),false,'welcome never constructs the executable registry')
+        assert.deepEqual(calls.find(call=>call.name==='hosted')!.args[1],{})
+        assert.equal(options.toolChoice,'none');assert.deepEqual(options.activeTools,[])
+      }else{
+        assert.equal(calls.filter(call=>call.name==='tools').length,1)
+        assert.equal(options.toolChoice,undefined);assert.equal(options.activeTools,undefined)
+      }
+    }finally{preparedPrompt=null}
+  }
+})
+
+test('exhausted invalid-tool recovery fails the execution and turn without a success commit',async()=>{
+  reset('ai_sdk');hostedError=new Error('model_tool_unavailable')
+  try{
+    await assert.rejects(coordinatorTurn(owner,bot),{message:'model_tool_unavailable'})
+    assert.deepEqual(calls.find(call=>call.name==='finish')?.args,[owner,bot,execution!.id,'turn_failed'])
+    assert.deepEqual(calls.find(call=>call.name==='failed')?.args,[owner,'synthetic-workflow','model_tool_unavailable',bot,undefined])
+    assert.equal(calls.some(call=>call.name==='append'),false)
+    assert.equal(calls.some(call=>call.name==='stream' && (call.args[1] as {type:string}).type==='coordinator-turn-committed'),false)
+  }finally{hostedError=null}
+})
+
+test('invalid-tool failure hands finished receipts to the atomic failure step, without replay or a success commit',async()=>{
+  reset('ai_sdk');hostedError=new Error('model_tool_unavailable')
+  hostedCompleted=[{role:'assistant',content:[{type:'tool-call',toolCallId:'done',toolName:'registered',input:{}}]},
+    {role:'tool',content:[{type:'tool-result',toolCallId:'done',toolName:'registered',output:{type:'json',value:{receipt:'completed'}}}]}]
+  try{
+    await assert.rejects(coordinatorTurn(owner,bot),{message:'model_tool_unavailable'})
+    assert.deepEqual(calls.find(call=>call.name==='failed')?.args,[owner,'synthetic-workflow','model_tool_unavailable',bot,{messages:hostedCompleted,streamId:'synthetic-workflow:0'}])
+    assert.equal(calls.filter(call=>call.name==='hosted').length,1)
+    assert.equal(calls.some(call=>call.name==='append'),false,'only the atomic failure step persists these receipts')
+    assert.deepEqual(calls.find(call=>call.name==='finish')?.args,[owner,bot,execution!.id,'turn_failed'])
+  }finally{hostedError=null;hostedCompleted=[]}
+})
+
+test('a rejected receipt still releases the failed lease once and retains both failure causes',async()=>{
+  reset('ai_sdk');hostedError=new Error('model_tool_unavailable')
+  hostedCompleted=[{role:'assistant',content:'Synthetic blocked receipt'}]
+  receiptPersistenceError=new Error('credential_secret_detected')
+  try{
+    await assert.rejects(coordinatorTurn(owner,bot),(error:unknown)=>{
+      assert.ok(error instanceof AggregateError)
+      assert.equal(error.message,'model_tool_unavailable')
+      assert.deepEqual(error.errors,[hostedError,receiptPersistenceError])
+      assert.equal(error.cause,receiptPersistenceError)
+      return true
+    })
+    const failures=calls.filter(call=>call.name==='failed')
+    assert.equal(failures.length,2)
+    assert.deepEqual(failures[1].args,[owner,'synthetic-workflow','model_tool_unavailable',bot])
+    assert.equal(calls.filter(call=>call.name==='hosted').length,1)
+    assert.equal(calls.some(call=>call.name==='append'),false)
+  }finally{hostedError=null;hostedCompleted=[];receiptPersistenceError=null}
 })

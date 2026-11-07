@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { FACTORY_CLOUD_DISPATCH_AVAILABLE, createFactoryDispatchRecovery, factoryDeviceOnline, factoryDispatchClarification, factoryDispatchFailureReason } from './dispatch-recovery';
+import { FACTORY_CLOUD_DISPATCH_AVAILABLE, createFactoryDispatchRecovery, factoryDeviceOnline, factoryDispatchClarification, factoryDispatchFailureReason, recordFactoryDispatchFailure } from './dispatch-recovery';
 import { handleFactoryDispatchRecovery } from './dispatch-recovery-http';
 
 const now = Date.parse('2026-10-30T07:00:00Z');
@@ -20,6 +20,20 @@ test('reason codes: disabled before offline before harness', () => {
   assert.equal(factoryDispatchFailureReason(device({ lastSeenAt: new Date(now - 120_000) }), 'codex', now), 'deviceOffline');
   assert.equal(factoryDispatchFailureReason(device(), 'claude_code', now), 'harnessUnavailable');
   assert.equal(factoryDispatchFailureReason(device({ harnesses: [{ harness: 'codex', installed: false }] }), 'codex', now), 'harnessUnavailable');
+});
+
+test('a heartbeat received during the query does not write a false dispatch failure', async t => {
+  let clock = now, queries = 0;
+  t.mock.method(Date, 'now', () => clock);
+  const tx = { query: async (sql: string) => {
+    queries++;
+    assert.match(sql, /^SELECT /, 'a fresh heartbeat must not produce a failure write');
+    await Promise.resolve();
+    clock += 20;
+    return { rows: [{ ...device({ lastSeenAt: new Date(clock) }), dId: 'd', status: 'queued', harness: 'codex' }] };
+  } };
+  assert.equal(await recordFactoryDispatchFailure(tx as never, 'owner', 'run'), null);
+  assert.equal(queries, 1);
 });
 
 test('clarification follows #453 BeQuestions limits; cloud links to key settings only without a key', () => {

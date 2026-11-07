@@ -3,6 +3,7 @@ import { coordinatorMessages } from '@/lib/db/schema'
 import { HIDDEN_TOOLS, QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE } from './context'
 import { compactToolCallMetadata, compactToolResultMetadata } from './tool-metadata-sql'
 import type { ChatToolMetadataPart } from './chat-tool-metadata'
+import { INVALID_TOOL_ERROR_PATTERN } from './invalid-tool-call'
 
 /** Characters of a tool's input or output a chat summary keeps. */
 export const TOOL_PREVIEW_CHARS = 200
@@ -35,6 +36,11 @@ const preview = sql.raw(String(TOOL_PREVIEW_CHARS))
 // Only string fields, trimmed of the same whitespace as quoteText (btrim would leave newlines and tabs).
 const quoteFields = sql.raw(QUOTE_KEYS.map(key => `case when jsonb_typeof(p#>'{input,${key}}') = 'string' then nullif(regexp_replace(p#>>'{input,${key}}', '^[${QUOTE_SPACE}]+|[${QUOTE_SPACE}]+$', '', 'g'), '') end`).join(', '))
 const quoteChars = sql.raw(String(QUOTE_PREVIEW_CHARS + 1))
+// SDK response.messages used to lose invalid:true. Keep only a boolean and
+// its call id in public projections, including those historical error rows.
+const invalidToolResult = sql`(p->'mikkaInvalidToolCall' = 'true'::jsonb or
+  (p#>>'{output,type}' like 'error%' and (p#>>'{output,value}' ~ ${INVALID_TOOL_ERROR_PATTERN}
+    or p#>>'{output,value,name}' ~ ${INVALID_TOOL_ERROR_PATTERN})))`
 
 /**
  * `coordinator_messages.message` with reasoning text, tool inputs and tool
@@ -48,12 +54,15 @@ export const compactChatMessage: SQL<Record<string, unknown>> = sql`case when js
     select jsonb_agg(case p->>'type'
       when 'reasoning' then jsonb_build_object('type', 'reasoning', 'chars', char_length(coalesce(p->>'text', '')))
       when 'tool-call' then jsonb_strip_nulls(jsonb_build_object('type', 'tool-call', 'toolCallId', p->'toolCallId', 'toolName', p->'toolName',
+        'mikkaInvalidToolCall', p->'mikkaInvalidToolCall',
         'inputPreview', left(p->>'input', ${preview}),
         'quotePreview', left(coalesce(${quoteFields}), ${quoteChars}))) || ${compactToolCallMetadata}
-      when 'tool-result' then jsonb_strip_nulls(jsonb_build_object('type', 'tool-result', 'toolCallId', p->'toolCallId', 'toolName', p->'toolName',
+      when 'tool-result' then case when ${invalidToolResult}
+        then jsonb_build_object('type', 'tool-result', 'toolCallId', p->'toolCallId', 'toolName', p->'toolName', 'mikkaInvalidToolCall', true)
+        else jsonb_strip_nulls(jsonb_build_object('type', 'tool-result', 'toolCallId', p->'toolCallId', 'toolName', p->'toolName',
         'outputPreview', left(p#>>'{output,value}', ${preview}),
         'output', case when p->>'toolName' in (${dispatchTools}) and p#>>'{output,type}' = 'json'
-          then jsonb_build_object('type', 'json', 'value', jsonb_strip_nulls(jsonb_build_object('runId', p#>'{output,value,runId}'))) end)) || ${compactToolResultMetadata}
+          then jsonb_build_object('type', 'json', 'value', jsonb_strip_nulls(jsonb_build_object('runId', p#>'{output,value,runId}'))) end)) || ${compactToolResultMetadata} end
       when 'file' then jsonb_strip_nulls(jsonb_build_object('type', 'file', 'mediaType', p->'mediaType'))
       else p end order by ord)
     from jsonb_array_elements(${coordinatorMessages.message}->'content') with ordinality as part(p, ord)), '[]'::jsonb))
@@ -65,8 +74,9 @@ const hiddenTools = sql.raw([...HIDDEN_TOOLS].map(name => `'${name}'`).join(',')
  * text, input/output previews and dispatch receipts stay inside PostgreSQL. */
 export const compactChatToolMetadata: SQL<ChatToolMetadataPart[]> = sql`coalesce((
   select jsonb_agg(case p->>'type'
-    when 'tool-call' then jsonb_build_object('type', 'tool-call', 'ordinal', ord, 'toolCallId', p->'toolCallId', 'toolName', p->'toolName') || ${compactToolCallMetadata}
+    when 'tool-call' then jsonb_strip_nulls(jsonb_build_object('type', 'tool-call', 'ordinal', ord, 'toolCallId', p->'toolCallId', 'toolName', p->'toolName', 'mikkaInvalidToolCall', p->'mikkaInvalidToolCall')) || ${compactToolCallMetadata}
     when 'tool-result' then jsonb_build_object('type', 'tool-result', 'ordinal', ord, 'toolCallId', p->'toolCallId') || ${compactToolResultMetadata}
+      || case when ${invalidToolResult} then '{"mikkaInvalidToolCall":true}'::jsonb else '{}'::jsonb end
     end order by ord)
   from jsonb_array_elements(case when jsonb_typeof(${coordinatorMessages.message}->'content') = 'array' then ${coordinatorMessages.message}->'content' else '[]'::jsonb end) with ordinality as part(p, ord)
   where (${coordinatorMessages.message}->>'role' = 'assistant' and p->>'type' = 'tool-call' and p->>'toolName' not in (${hiddenTools}))
