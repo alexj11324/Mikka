@@ -38,6 +38,17 @@ test('explicit new task retains optional single-harness selection and strict dep
   ]) assert.throws(() => delivery.deliveryConfiguration({ ...environment, ...changed }), /^Error: issue1503_/)
 })
 
+test('the optional permission round requires Codex and leaves the default flow disabled', () => {
+  assert.equal(delivery.deliveryConfiguration(environment).codexQuestion, false)
+  assert.equal(delivery.deliveryConfiguration({ ...environment, MIKKA_1503_CODEX_QUESTION: '0' }).codexQuestion, false)
+  assert.equal(delivery.deliveryConfiguration({ ...environment, MIKKA_1503_CODEX_QUESTION: '1' }).codexQuestion, true)
+  assert.equal(delivery.deliveryConfiguration({ ...environment, MIKKA_1503_HARNESS: 'codex', MIKKA_1503_CODEX_QUESTION: '1' }).codexQuestion, true)
+  for (const changed of [
+    { MIKKA_1503_HARNESS: 'claude_code', MIKKA_1503_CODEX_QUESTION: '1' },
+    { MIKKA_1503_CODEX_QUESTION: 'yes' },
+  ]) assert.throws(() => delivery.deliveryConfiguration({ ...environment, ...changed }), /^Error: issue1503_delivery_configuration_required$/)
+})
+
 const runId = '10000000-0000-4000-8000-000000000001'
 const attemptId = '10000000-0000-4000-8000-000000000002'
 const candidateId = '10000000-0000-4000-8000-000000000003'
@@ -116,7 +127,11 @@ test('initial task criteria retain full scope and defer the exact revision until
   assert.ok(text.includes(specification.initial))
   assert.match(text, /Do not edit any other file/)
   assert.match(text, /Run a small command/)
-  assert.match(text, /host automatically pushes/)
+  assert.match(text, /push HEAD via https:\/\/github\.com\/alexj11324\/Mikka-handoff\.git to the assigned task branch/)
+  assert.match(text, /owner's own GitHub credential/)
+  assert.match(text, /checks to pass for the pushed commit, and then call the Mikka submit tool/)
+  assert.match(text, /Do not merge it yourself/)
+  assert.doesNotMatch(text, /host automatically pushes|host-managed submit/)
   const [initialRequirements, laterWorkflow] = text.split('Later workflow instructions:')
   assert.doesNotMatch(initialRequirements, /State to revised|State: revised|If the human requests changes/)
   assert.match(laterWorkflow, /If the human requests changes, update only State to revised/)

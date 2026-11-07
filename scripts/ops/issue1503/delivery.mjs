@@ -7,10 +7,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { smokeSession, fail, SMOKE_ID } from './http.ts'
+import { smokeSession, fail, SMOKE_ID, OWNER_ID } from './http.ts'
 import { encode, decode } from '../../../lib/desktop-rpc/wire.ts'
 import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
 import { explicitNewTaskArguments, explicitNewTaskComplete, explicitNewTaskEvidence, explicitNewTaskCleanupReceipts } from './explicit-submission.mjs'
+import { codexQuestionConfirmation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
@@ -67,7 +68,7 @@ export function fileSpecification(marker, harness) {
 }
 
 export function deliveryTaskText(specification) {
-  return `Repository: ${REPOSITORY}. Create only ${specification.path} as UTF-8 text with a final newline.\nInitial contents:\n${specification.initial}\nAcceptance for this initial candidate: the header and Case line must stay exactly as given; State is initially initial. Do not edit any other file. Run a small command that reads the file and verifies these requirements.\nLater workflow instructions: If the human requests changes, update only State to revised and preserve the header, Case line, final newline, and all other files. This later revision is not required for the initial candidate; wait for the actual human change request.\nDelivery instructions: Commit your change and complete the normal Mikka submission so the host automatically pushes the assigned task branch and opens the PR. Leave the PR open for human review. Do not merge it yourself. Do not call any external messaging API.`
+  return `Repository: ${REPOSITORY}. Create only ${specification.path} as UTF-8 text with a final newline.\nInitial contents:\n${specification.initial}\nAcceptance for this initial candidate: the header and Case line must stay exactly as given; State is initially initial. Do not edit any other file. Run a small command that reads the file and verifies these requirements.\nLater workflow instructions: If the human requests changes, update only State to revised and preserve the header, Case line, final newline, and all other files. This later revision is not required for the initial candidate; wait for the actual human change request.\nDelivery instructions: Follow the injected Mikka agent delivery instructions. Keep the current local branch, commit your tested change, and push HEAD via https://github.com/${REPOSITORY}.git to the assigned task branch given in the run instructions. Use the provided owner's own GitHub credential to open or update the task PR with gh, retain the required Mikka issue marker, wait for its checks to pass for the pushed commit, and then call the Mikka submit tool. Mikka reads back the delivered commit and PR before Factory review. Leave the PR open for human review. Do not merge it yourself. Do not call any external messaging API.`
 }
 
 export function deliveryProfileInstructions(specification) {
@@ -295,10 +296,12 @@ export function deliveryConfiguration(env = process.env) {
   const marker = env.MIKKA_1503_RUN_MARKER ?? `${env.GITHUB_RUN_ID ?? 'manual'}-${env.GITHUB_RUN_ATTEMPT ?? '1'}`
   const harness = env.MIKKA_1503_HARNESS || undefined
   const submissionMode = env.MIKKA_1503_SUBMISSION_MODE ?? 'existing_issue'
+  const codexQuestion = env.MIKKA_1503_CODEX_QUESTION ?? '0'
   const timeoutMs = Number(env.MIKKA_ACCEPTANCE_TIMEOUT_MS ?? 1200000)
   check(sha(expectedSha) && uuid(workspaceId) && uuid(teamId) && /^[a-zA-Z0-9_-]{3,43}$/.test(marker)
     && (harness === undefined || ['claude_code', 'codex'].includes(harness))
     && ['existing_issue', 'explicit_new_task'].includes(submissionMode)
+    && ['0', '1'].includes(codexQuestion) && (codexQuestion !== '1' || harness !== 'claude_code')
     && Number.isFinite(timeoutMs) && timeoutMs >= 60000 && timeoutMs <= 3600000, 'delivery_configuration_required')
   const cases = [
     { harness: 'claude_code', model: 'claude-haiku-5-5', source: { kind: 'subscription', connectionId: env.MIKKA_1503_CLAUDE_CONNECTION_ID ?? '93b6ab23-900b-4e18-9ea0-baccf2d104ce' } },
@@ -306,7 +309,7 @@ export function deliveryConfiguration(env = process.env) {
   ].filter(item => harness === undefined || item.harness === harness)
   check(cases.every(item => uuid(item.source.connectionId)), 'subscription_reference_invalid')
   const specifications = cases.map(item => fileSpecification(marker, item.harness))
-  return { expectedSha, workspaceId, teamId, marker, submissionMode, timeoutMs, cases, specifications }
+  return { expectedSha, workspaceId, teamId, marker, submissionMode, codexQuestion: codexQuestion === '1', timeoutMs, cases, specifications }
 }
 
 /** A single failure-path discovery, scoped to the issue actually created by
@@ -325,9 +328,9 @@ export async function discoverExplicitCleanupTask(json, workspaceId, item) {
 }
 
 export async function runDeliveryAcceptance(env = process.env) {
-  const { expectedSha, workspaceId, teamId, marker, submissionMode, timeoutMs, cases, specifications } = deliveryConfiguration(env)
+  const { expectedSha, workspaceId, teamId, marker, submissionMode, codexQuestion, timeoutMs, cases, specifications } = deliveryConfiguration(env)
   const report = { issue: 1503, phase: 'delivery', startedAt: new Date().toISOString(), expectedSha, workspaceId, teamId,
-    marker, submissionMode, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
+    marker, submissionMode, codexQuestion, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
   let session, live, chatLive, originalOrder, currentOrder, profile, activeCase, project, originalVerification, explicitSubmission
   const chatLiveCounts = { messages: 0, reconnects: 0 }
   const closeChatLive = () => {
@@ -415,9 +418,11 @@ export async function runDeliveryAcceptance(env = process.env) {
     report.projectId = project.id
     for (const definition of cases) {
       const specification = fileSpecification(marker, definition.harness)
+      const confirmation = codexQuestion && definition.harness === 'codex' ? codexQuestionConfirmation(marker, specification) : null
       const { initial: initialText, revised: revisedText } = specification
       const verifyCommand = repositoryVerifyCommand(specifications, specification.path)
       activeCase = { harness: definition.harness, model: definition.model, status: 'running', filePath: specification.path, runs: [] }
+      if (confirmation) activeCase.questionConfirmation = { required: true, questionSha256: digest(confirmation.question), answerAttempted: false }
       explicitSubmission = null
       report.cases.push(activeCase)
       await stage('configure_repository_verification'); await pin()
@@ -444,7 +449,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       check(uuid(profile?.id), 'profile_missing'); activeCase.profileId = profile.id
       const bot = await rpc('bots.createBot', [{ name: `1503 ${marker} ${definition.harness}`, color: 'bleu', shape: 'cercle', repository: botRepository, model: null }])
       check(uuid(bot?.id), 'bot_missing'); activeCase.botId = bot.id
-      const taskText = deliveryTaskText(specification)
+      const taskText = `${confirmation ? confirmation.instructions + '\n\n' : ''}${deliveryTaskText(specification)}`
       let issue, found, issueKeys
       if (submissionMode === 'explicit_new_task') {
         const title = `Factory #1503 ${marker} ${definition.harness} explicit cloud`
@@ -452,7 +457,7 @@ export async function runDeliveryAcceptance(env = process.env) {
         // Match NewTaskDialog's English prompt/context and transport. The
         // Coordinator creates the issue and binds taskEventId itself; there is
         // no saveIssue/promote call or operator-written provenance in this mode.
-        const dispatchText = `Create a task for me (run it on Mikka Cloud): Create one new task with this exact title: ${title}. Put the following complete requirements in its body.\n${taskText}\nCreate the task through normal create_issue in this workspace's sole F1503 team, then dispatch that created task with normal dispatch_run, repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, selected Profile ${profile.id}, needsSpec false. Do not create another task or use dispatch_bot_computer. Leave its PR for my Factory review.`
+        const dispatchText = `Create a task for me (run it on Mikka Cloud): Create one new task with this exact title: ${title}. Put the following complete requirements in its body.\n${taskText}\nCreate the task through normal create_issue in this workspace's sole F1503 team, then dispatch that created task with normal dispatch_run, repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, selected Profile ${profile.id}, needsSpec false. Do not create another task or use dispatch_bot_computer. Follow the injected Mikka agent delivery instructions and leave its PR open for my Factory review.`
         const readChat = async () => {
           if (chatLive?.failure) throw chatLive.failure
           const chat = (await rpc('coordinator.syncCoordinatorChat', [bot.id])).chat
@@ -514,7 +519,7 @@ export async function runDeliveryAcceptance(env = process.env) {
         // The ordinary chat dispatches this existing issue. Keep the human source
         // and Profile, with cloud-only placement in its normal dispatch_run call.
         const submissionId = randomUUID()
-        const dispatchText = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read its existing description and use that exact task; do not create a duplicate. This is repository work, so use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, and the selected Profile ${profile.id}. It is a tiny file task and needs no specification approval: needsSpec false. Preserve the task's existing acceptance criteria, publish automatically, and leave its PR for my Factory review.`
+        const dispatchText = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read its existing description and use that exact task; do not create a duplicate. This is repository work, so use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${definition.harness}, and the selected Profile ${profile.id}. It is a tiny file task and needs no specification approval: needsSpec false. Preserve the task's existing acceptance criteria, follow the injected Mikka agent delivery instructions, and leave its PR open for my Factory review.`
         const readChat = async () => (await rpc('coordinator.syncCoordinatorChat', [bot.id])).chat
         const beforeChat = await readChat()
         check(beforeChat?.botId === bot.id && beforeChat.live?.ownerId === SMOKE_ID && uuid(beforeChat.live.workspaceId)
@@ -569,6 +574,39 @@ export async function runDeliveryAcceptance(env = process.env) {
             ...(typeof item.output?.reasonCode === 'string' && /^[a-zA-Z0-9_]{1,100}$/.test(item.output.reasonCode) ? { reasonCode: item.output.reasonCode } : {}) }))[0]
           fail('factory_terminal_failure')
         }
+        if (confirmation && state.task.stage === 'execute' && state.task.status === 'waiting') {
+          check(!activeCase.questionConfirmation.answerAttempted, 'confirmation_repeated_question')
+          const pending = await json(`/api/factory/questions?taskId=${activeCase.taskId}`)
+          check(pending.questions?.length === 1 && uuid(pending.questions[0].questionId)
+            && pending.questions[0].type === 'permission' && pending.questions[0].originalText === confirmation.question
+            && pending.questions[0].taskId === activeCase.taskId && pending.questions[0].runId === activeCase.threadRunId,
+          'confirmation_unknown_question')
+          const question = await json(`/api/factory/questions/${pending.questions[0].questionId}`)
+          const expected = { ownerId: SMOKE_ID, credentialOwnerId: OWNER_ID, workspaceId, taskId: activeCase.taskId,
+            issueId: issue.id, botId: bot.id, originRunId: activeCase.threadRunId, sourceEventId: state.task.sourceEventId, profile }
+          const originEvidence = await json(`/api/runs/${expected.originRunId}/evidence`)
+          const reference = confirmationQuestionReference(state, question, originEvidence, expected, confirmation)
+          // Permission is escalated through the existing live Factory channel.
+          // Wait for its human-facing state; no timer or business-data polling.
+          if (question.status === 'open') return state
+          const origin = confirmationRunEvidence(originEvidence, expected, expected.originRunId)
+          const answerId = randomUUID()
+          Object.assign(activeCase.questionConfirmation, { questionId: question.id, kind: question.kind,
+            questionStatus: question.status, questionRevision: question.revision, origin,
+            originSessionSha256: digest(reference.originSessionId), answerId })
+          await stage('answer_codex_permission'); await pin()
+          activeCase.questionConfirmation.answerAttempted = true; await checkpoint()
+          const result = await json(`/api/factory/questions/${question.id}`, session.post({ reference, answerId, text: confirmation.answer }))
+          // Retain the real returned child for cleanup before proof assertions.
+          if (uuid(result.continuationRunId)) activeCase.runIdsSeen = [...new Set([...activeCase.runIdsSeen, result.continuationRunId])]
+          const answered = await json(`/api/factory/questions/${question.id}`)
+          const receipt = confirmationAnswerReceipt(result, answered, reference, answerId, expected, confirmation)
+          const continuation = confirmationRunEvidence(await json(`/api/runs/${receipt.continuationRunId}/evidence`), expected, receipt.continuationRunId)
+          check(continuation.bindingId === origin.bindingId && continuation.executionIdentitySha256 === origin.executionIdentitySha256,
+            'confirmation_changed_frozen_subscription')
+          Object.assign(activeCase.questionConfirmation, { receipt, continuation, answeredAt: new Date().toISOString() })
+          await stage('wait_initial_review')
+        }
         return state
       }
       const approval = previous => live.until(keys, read, state => state.task.stage === 'approval' && ['pending', 'waiting'].includes(state.task.status)
@@ -576,6 +614,17 @@ export async function runDeliveryAcceptance(env = process.env) {
       const proof = async (state, expectedText, label) => {
         const candidate = state.candidates.find(item => item.id === state.task.candidateId)
         check(candidate && sha(candidate.sha) && uuid(candidate.runId), 'candidate_missing')
+        if (confirmation && label === 'initial') {
+          const receipt = activeCase.questionConfirmation.receipt
+          check(receipt && candidate.runId === receipt.continuationRunId && state.task.sourceEventId === receipt.sourceEventId
+            && state.attempts.some(item => item.id === receipt.originAttemptId && item.runId === receipt.originRunId && item.stage === 'execute'),
+          'confirmation_continuation_not_producer')
+          const resolved = await json(`/api/factory/questions/${receipt.questionId}`)
+          check(resolved.status === 'resolved' && resolved.answerSource === 'human' && resolved.answerId === receipt.answerId
+            && resolved.originRunId === receipt.originRunId && resolved.continuationRunId === candidate.runId
+            && digest(resolved.originSessionId) === receipt.originSessionSha256, 'confirmation_not_resolved')
+          activeCase.questionConfirmation.resolved = true
+        }
         check(state.delivery?.pullRequest?.state === 'open' && new RegExp(`^https://github\\.com/${REPOSITORY}/pull/\\d+$`, 'i').test(state.delivery.pullRequest.url), 'automatic_pr_missing')
         const flowVersion = state.task.route?.flowVersion ?? 1
         const historicalReview = flowVersion === 2 && label === 'repaired'
@@ -592,6 +641,10 @@ export async function runDeliveryAcceptance(env = process.env) {
         for (const runId of [...new Set(state.attempts.map(item => item.runId).filter(uuid))]) {
           if (activeCase.runs.some(item => item.runId === runId)) continue
           const evidence = await json(`/api/runs/${runId}/evidence`)
+          if (confirmation && runId === activeCase.questionConfirmation.receipt?.continuationRunId) {
+            check(evidence.run.status === 'succeeded', 'confirmation_producer_not_succeeded')
+            activeCase.questionConfirmation.producerStatus = evidence.run.status
+          }
           check(evidence.run.harness === definition.harness && evidence.run.model === definition.model && evidence.run.credentialType === 'subscription'
             && evidence.run.subscriptionRoute === (definition.harness === 'codex' ? 'codex_cli' : 'claude_code_cli'), 'official_model_provenance_mismatch')
           if (submissionMode === 'explicit_new_task') check(evidence.run.issueId === issue.id
@@ -599,7 +652,7 @@ export async function runDeliveryAcceptance(env = process.env) {
             && evidence.run.agentProfile?.profileId === profile.id && evidence.run.agentProfile.version === profile.version
             && evidence.run.agentProfile.source === (state.attempts.some(item => item.stage === 'execute' && item.runId === runId) ? 'explicit' : 'decision'),
           'new_task_cloud_profile_provenance_mismatch')
-          activeCase.runs.push({ runId, harness: evidence.run.harness, model: evidence.run.model, credentialType: evidence.run.credentialType, subscriptionRoute: evidence.run.subscriptionRoute,
+          activeCase.runs.push({ runId, status: evidence.run.status, harness: evidence.run.harness, model: evidence.run.model, credentialType: evidence.run.credentialType, subscriptionRoute: evidence.run.subscriptionRoute,
             profileId: evidence.run.agentProfile?.profileId, profileVersion: evidence.run.agentProfile?.version,
             ...(submissionMode === 'explicit_new_task' ? { profileSource: evidence.run.agentProfile.source, runtimeKind: evidence.run.executionIdentity.billingAccount.runtime.kind } : {}) })
         }

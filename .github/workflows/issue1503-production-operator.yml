@@ -9,13 +9,13 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: issue1503-credential-maintenance
+  group: issue1503-production-operator
   cancel-in-progress: false
 jobs:
-  renew_github_expiry:
+  delivery:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 90
     permissions:
       contents: read
       id-token: write
@@ -24,75 +24,55 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        id: setup_node
         with:
           node-version: 24
-      - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - id: dependencies
+        run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        id: smoke_secrets
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /neon
-          secret-name: DATABASE_URL
+          secret-path: /
           recursive: false
           include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_DATABASE_URL
-          recursive: false
-          include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: BETTER_AUTH_SECRET
-          recursive: false
-          include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: GITHUB_CLIENT_ID
-          recursive: false
-          include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: GITHUB_CLIENT_SECRET
-          recursive: false
-          include-imports: false
-
-      - name: Extend only the local validity of the same verified scoped GitHub token
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/renew-github-expiry.mjs
+      - name: Exercise explicit cloud task creation and full delivery on Claude Code
+        id: claude_delivery
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' }}
+        run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
-          VERCEL_ENV: production
-          BETTER_AUTH_URL: https://app.aspectlylabs.com
-          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
-      - if: always()
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: __EXPECTED_PRODUCTION_SHA__
+          MIKKA_1503_SUBMISSION_MODE: explicit_new_task
+          MIKKA_1503_HARNESS: claude_code
+          MIKKA_1503_CODEX_QUESTION: '0'
+          MIKKA_1503_REPORT: issue1503-report/claude-code-delivery.json
+      - name: Upload Claude Code delivery receipt
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-github-expiry-renewal
+          name: issue1503-claude-code-delivery
+          path: issue1503-report/claude-code-delivery.json
+          retention-days: 3
+      - name: Exercise explicit cloud task creation and full delivery on Codex
+        id: codex_delivery
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' }}
+        run: node --import tsx scripts/ops/issue1503/delivery.mjs
+        env:
+          NODE_ENV: production
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: __EXPECTED_PRODUCTION_SHA__
+          MIKKA_1503_SUBMISSION_MODE: explicit_new_task
+          MIKKA_1503_HARNESS: codex
+          MIKKA_1503_CODEX_QUESTION: '1'
+          MIKKA_1503_REPORT: issue1503-report/codex-delivery.json
+      - name: Upload all delivery receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1503-delivery
           path: issue1503-report
           retention-days: 3
