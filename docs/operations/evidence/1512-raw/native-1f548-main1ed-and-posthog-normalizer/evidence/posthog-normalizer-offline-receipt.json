@@ -1,0 +1,352 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_normalization_verified_not_production_validated",
+  "scope": "fixed_existing_metadata_queries_only",
+  "projectId": 670821,
+  "acceptanceEvidence": false,
+  "upstreamCompleteness": "not_proven",
+  "newSqlExecutions": 0,
+  "productFilesModified": false,
+  "queryTemplatesModified": false,
+  "sourceInputs": [
+    {
+      "path": "evidence/posthog-pagination-schema-191fcce2.json",
+      "bytes": 42221,
+      "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74"
+    },
+    {
+      "path": "production-evidence-query-templates.json",
+      "bytes": 56861,
+      "sha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873"
+    },
+    {
+      "path": "evidence/posthog-normalizer-contract-readonly.json",
+      "bytes": 4876,
+      "sha256": "d4e4eac4b887164953a6640443897410be1de656e4eea656d5ddf82681483738"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "normalize-posthog-metadata.mjs",
+      "bytes": 19782,
+      "sha256": "b74fa507a7fe545a7926f32c3cead14eef6490160fa64d932bd330dbd0853be0"
+    },
+    {
+      "path": "normalize-posthog-metadata.test.mjs",
+      "bytes": 14795,
+      "sha256": "8358b58661438bd572f6c910c0e7c597679bb6079da5997053600ca709b32e17"
+    },
+    {
+      "path": "normalize-posthog-metadata.md",
+      "bytes": 7470,
+      "sha256": "57eff1e19820e0e98df639fe1806d0c3c31acb61b1b6ac6e0d946d15304ca8f1"
+    },
+    {
+      "path": "reconcile-production-evidence.mjs",
+      "bytes": 26617,
+      "sha256": "86aace9b34cfe0d0465c43fe7fa56032d88acb9b45a11c96c8e5fc83422ef44f"
+    },
+    {
+      "path": "reconcile-production-evidence.test.mjs",
+      "bytes": 15455,
+      "sha256": "b37ef6bef27632ec022d1a40c9b5afd8e383dc6c0dae5cd42cf53f56c591b68f"
+    }
+  ],
+  "validation": {
+    "normalizerTests": 12,
+    "reconcilerTests": 8,
+    "totalTests": 20,
+    "exitCode": 0,
+    "syntaxExitCode": 0,
+    "lintExitCode": 0,
+    "command": "node --test normalize-posthog-metadata.test.mjs reconcile-production-evidence.test.mjs",
+    "rawStdout": [
+      {
+        "path": "evidence/posthog-normalizer-final-offline.tap",
+        "bytes": 2356,
+        "sha256": "6f0723cea26384c4ab781248c24b320a42da290d231eb85c51a6d49f4b7d2172"
+      },
+      {
+        "path": "evidence/posthog-normalizer-oxlint.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "bodyCodeRedGreen": {
+      "evidence": "saved real SQL explicitly projects completed/failed; its zero-row schema response is not production log data",
+      "implementationChange": "one closed comparison set: raw log body names -> projected completed/failed",
+      "red": {
+        "tests": 8,
+        "passed": 3,
+        "failed": 5,
+        "exitCode": 1,
+        "log": {
+          "path": "evidence/posthog-reconciler-body-code-red.tap",
+          "bytes": 9231,
+          "sha256": "8041b1e8093aba81f3e1be121053108efceacf2f4639832bcd1ded4cb2f3aec6"
+        }
+      },
+      "green": {
+        "tests": 8,
+        "passed": 8,
+        "failed": 0,
+        "exitCode": 0,
+        "log": {
+          "path": "evidence/posthog-reconciler-body-code-green.tap",
+          "bytes": 1042,
+          "sha256": "4f5d0ab7e4b7d8cf4b9176529e54edf3fcf99f35dc5a68aea8ed3d3c59df5a15"
+        }
+      }
+    },
+    "lintWarnings": 0
+  },
+  "normalized": [
+    {
+      "queryName": "lookup_trace_by_ids",
+      "actualColumns": [
+        "trace_id_hex",
+        "started_utc",
+        "ended_utc",
+        "services",
+        "observed_span_ids",
+        "run_ids",
+        "thread_ids",
+        "task_ids"
+      ],
+      "columnCount": 8,
+      "returnedRows": 0,
+      "offset": 0,
+      "truncated": null,
+      "normalizedJsonSha256": "191e451123aca8a3904b1a1dc56dc089a8f754d9ce938286ac19b92485eeffba",
+      "parsedRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": {
+        "rawResponseInputSha256": "f2164a335a5f5894cbe80083fc99fa066a34ae3569df587ec0698b1052bfdb13",
+        "contentTextSha256": "49f2afec742c5f3ad4e98515597038b9138e3e54f055023fb7114b14778eea07",
+        "formattedResultsSha256": "509f83accd8e92c79a84d91e04acca48380d030c3e84f6066515b9d05d8a8bfd",
+        "formattedOverrideMatched": true,
+        "executedQuerySha256": "a53abadb3bb61aa8786f9deaec99978675d9bd3ec752f6486c46ede56ed7412f",
+        "queryTemplateSha256": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+        "templateFileSha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+        "requestInputSha256": null,
+        "requestTruncate": null,
+        "requestTruncateSource": "request_not_saved",
+        "requestTruncateScope": "large_blob_or_json_cell_values_not_row_completeness"
+      },
+      "acceptanceEvidence": false
+    },
+    {
+      "queryName": "span_timeline",
+      "actualColumns": [
+        "started_utc",
+        "span_row_uuid",
+        "offset_ms",
+        "duration_ms",
+        "service",
+        "stage",
+        "workflow",
+        "workflow_step",
+        "span_id_hex",
+        "parent_span_id_hex",
+        "parent_stage",
+        "parent_presence",
+        "status_code",
+        "run_id",
+        "thread_id",
+        "task_id",
+        "workflow_run_id",
+        "session_id"
+      ],
+      "columnCount": 18,
+      "returnedRows": 27,
+      "offset": 0,
+      "truncated": null,
+      "normalizedJsonSha256": "a410e40973510f8ce730e0f46e9d9c0e948b93b1c138ef07f091dedde1693b98",
+      "parsedRowsSha256": "162c8205e844889cd14890df3a6b13976b158c47eea0c561b703d37b1ebc792c",
+      "source": {
+        "rawResponseInputSha256": "966ee8d0944c7036060d6b2f21801fc03d056d32fcebc86f7f7dcd50895cc1a8",
+        "contentTextSha256": "873e3b58d20a7fd02d7f3d60eb2b0e47a94d1e9c3a1be44ea64d8a51895824fe",
+        "formattedResultsSha256": "be88e0a0a5b7ed7abcfa9c8c976db03a20c6eb2a96f49824f6682adb780a8009",
+        "formattedOverrideMatched": true,
+        "executedQuerySha256": "c0c30b24d3f28bec24b155d797ce4fadf3c05dcc72b20d4ad8703ece2d5fb64e",
+        "queryTemplateSha256": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+        "templateFileSha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+        "requestInputSha256": null,
+        "requestTruncate": null,
+        "requestTruncateSource": "request_not_saved",
+        "requestTruncateScope": "large_blob_or_json_cell_values_not_row_completeness"
+      },
+      "acceptanceEvidence": false
+    },
+    {
+      "queryName": "safe_native_logs",
+      "actualColumns": [
+        "emitted_utc",
+        "log_uuid",
+        "service",
+        "severity_text",
+        "body_code",
+        "safe_body_shape",
+        "stage",
+        "duration_ms",
+        "trace_id_hex",
+        "span_id_hex",
+        "has_matching_apm_span",
+        "run_id",
+        "thread_id",
+        "task_id",
+        "session_id",
+        "error_code",
+        "error_type"
+      ],
+      "columnCount": 17,
+      "returnedRows": 0,
+      "offset": 0,
+      "truncated": null,
+      "normalizedJsonSha256": "c9af6aed32729536959664f4ad8feaaf062f63ab2d90d653c9228906da0a1cab",
+      "parsedRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": {
+        "rawResponseInputSha256": "4f165ec17538fea6ff409efb2510003f0c18893c55a923a17ac24befbe12cfdc",
+        "contentTextSha256": "9f28ce8e188119c80be54ea971d8485966bfcf2b52dcf2fbdf82446a2f0f1cdc",
+        "formattedResultsSha256": "570818b83d520fde2a6b189a3c85c9d8b447091fee82bcf0c59d257ff80679a0",
+        "formattedOverrideMatched": true,
+        "executedQuerySha256": "6c402492091a517a787b400b2795735a2fc40f60373276402793e52f98462d68",
+        "queryTemplateSha256": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+        "templateFileSha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+        "requestInputSha256": null,
+        "requestTruncate": null,
+        "requestTruncateSource": "request_not_saved",
+        "requestTruncateScope": "large_blob_or_json_cell_values_not_row_completeness"
+      },
+      "acceptanceEvidence": false
+    },
+    {
+      "queryName": "apm_generation_spans",
+      "actualColumns": [
+        "started_utc",
+        "span_row_uuid",
+        "service",
+        "stage",
+        "span_id_hex",
+        "parent_span_id_hex",
+        "model",
+        "provider",
+        "outcome",
+        "operation",
+        "harness",
+        "route",
+        "fallback_reason",
+        "zerocat_ms",
+        "tier",
+        "tier_score",
+        "tier_confidence",
+        "effort",
+        "effort_score",
+        "effort_confidence",
+        "timing_basis",
+        "ttft_basis",
+        "model_basis",
+        "native_unavailable_reason",
+        "first_output_item_ms",
+        "sample_rate",
+        "run_id",
+        "thread_id",
+        "task_id",
+        "span_duration_ms",
+        "model_latency_ms",
+        "ttft_ms",
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_creation_tokens",
+        "captured_cost_usd",
+        "session_id"
+      ],
+      "columnCount": 38,
+      "returnedRows": 0,
+      "offset": 0,
+      "truncated": null,
+      "normalizedJsonSha256": "5c005deb6be01c516e12b54b65bb524b86b49458f0e0637c95d0e307ecf9f06d",
+      "parsedRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": {
+        "rawResponseInputSha256": "1bba1199907e4a92e7d9a33a2bc16a4345d3f81b2d0993677009cf45de3ae6b8",
+        "contentTextSha256": "b3ddf5f19a5b5f1c989eaec6bbd87fc212b2cb95a3599e5ebb781a5e3419c634",
+        "formattedResultsSha256": "5e949715db9f5c339c24dfb139a50c48400e4195bdff037947c1fe8fec2f0111",
+        "formattedOverrideMatched": true,
+        "executedQuerySha256": "91cdf445eb41823e3bc637b02db87631d11da6ce1cd4d22302458196a9a3595f",
+        "queryTemplateSha256": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+        "templateFileSha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+        "requestInputSha256": null,
+        "requestTruncate": null,
+        "requestTruncateSource": "request_not_saved",
+        "requestTruncateScope": "large_blob_or_json_cell_values_not_row_completeness"
+      },
+      "acceptanceEvidence": false
+    },
+    {
+      "queryName": "native_generation_collection",
+      "actualColumns": [
+        "emitted_utc",
+        "span_row_uuid",
+        "collection_span_id_hex",
+        "parent_span_id_hex",
+        "run_id",
+        "thread_id",
+        "task_id",
+        "workflow_run_id",
+        "session_id",
+        "harness",
+        "native_unavailable_reason",
+        "sample_rate",
+        "native_generations",
+        "fallback_generations",
+        "matched_fallbacks",
+        "missing_native",
+        "incomplete_requests",
+        "invalid_spans",
+        "rejected_batches",
+        "duplicate_completions",
+        "collection_truncated_raw",
+        "cli_exit_observed_raw",
+        "native_flush_confirmed_raw"
+      ],
+      "columnCount": 23,
+      "returnedRows": 0,
+      "offset": 0,
+      "truncated": null,
+      "normalizedJsonSha256": "95c283d8159cb988b31f02f07893c4c556cec88e5f0a4a1174e1f143b37b2b02",
+      "parsedRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "source": {
+        "rawResponseInputSha256": "8ddcb42bfc144cb1e744766e984bd56e08d5f0734b190f6a1597f5e1ec507933",
+        "contentTextSha256": "d9ed0d3b5a5aadfe14f9361f6bd1c40b666014e0212347a59d80d1450a115746",
+        "formattedResultsSha256": "139378f50b0d6d168e1e12257179f74c7aaa7cefc26273d2289b76846af316a6",
+        "formattedOverrideMatched": true,
+        "executedQuerySha256": "4b16db217b600cade4f453c4b093d9f7a4f523b16646abcba79bca9aaf1939cd",
+        "queryTemplateSha256": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4",
+        "templateFileSha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+        "requestInputSha256": null,
+        "requestTruncate": null,
+        "requestTruncateSource": "request_not_saved",
+        "requestTruncateScope": "large_blob_or_json_cell_values_not_row_completeness"
+      },
+      "acceptanceEvidence": false
+    }
+  ],
+  "completenessContract": {
+    "requestTruncateFalse": "disables large blob/JSON cell truncation; no documented full-row-set guarantee",
+    "savedRequestFlag": "not recorded in the five saved query entries or raw responses",
+    "responseTruncation": "not reported",
+    "pageTruncated": null,
+    "reconcilerTruncationGate": "unchanged; unknown remains incomplete",
+    "physicalCluster": "query contract only, not response attestation"
+  },
+  "boundaries": [
+    "Only span_timeline has nonempty real rows (27); the other four real responses prove header/schema parsing only.",
+    "Array and boolean spellings and other eight query projections are synthetic offline guards, not newly executed live data.",
+    "No implicit columns, numeric zero substitutions, null substitutions for (empty), array repair, missing-page insertion or completion flags.",
+    "Strict parser rejects extra pipes, malformed/truncated JSON, duplicate JSON keys, override conflicts, payload columns, unsafe metadata shapes and invalid UTF-8.",
+    "Per-page and whole-query enumeration requires original physical UUIDs, stable exact scope, consecutive pages, independent counts and bidirectional identity reconciliation.",
+    "Matching counts/sets proves only agreement with the stable captured database snapshots, not an unconditional formatter or upstream exporter guarantee.",
+    "A typed explicit-completion response or separately reviewed count/end-marker encoding may supply transport evidence later; this patch does neither.",
+    "Claude upstream subcall totals and Codex native flush remain unconfirmed where receipts cannot prove them; no acceptance, billing, Replay or scout claim is made."
+  ]
+}

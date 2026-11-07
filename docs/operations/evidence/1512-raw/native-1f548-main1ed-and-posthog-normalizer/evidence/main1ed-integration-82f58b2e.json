@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 1,
+  "scope": "local_related_main_merge_verification",
+  "recordedAt": "2026-11-07T11:58:07.602963+00:00",
+  "revision": "82f58b2e849abc41f6a6886ab18aa2d9c0e7ea45",
+  "tree": "7405b1e49836129bc9f842cfdfa7c9325360d9f1",
+  "parents": [
+    "ba9d59632d1f646c2363b4eefc8443b533e5f7d4",
+    "1edbeca687119eb0ef71f209ac3d411fbc85b888"
+  ],
+  "published": false,
+  "previousPublishedCandidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "main": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+  "mergeMethod": "ordinary_merge_commit",
+  "conflictsResolved": [
+    "packages/daemon/bin/cloud-worker.ts",
+    "packages/daemon/src/runs/supervisor.ts",
+    "packages/daemon/src/adapters/claude.ts",
+    "packages/daemon/src/subscription-hosted-runner.ts"
+  ],
+  "decisions": [
+    "preserve main initialClaim, read-ahead policy fence, owned Claude prewarm and cancellation drains",
+    "preserve daemon.run parent carrier, identifiers, failure outcome and asynchronous final flush",
+    "move captured run carrier into shared baseOptions for both prewarm and final consumption",
+    "preserve per-message Claude generation metrics, partial frames and original observation/failure lifecycle",
+    "preserve Codex native telemetry configuration ordering and collector drains",
+    "adopt main stored diagnostics opt-in without disabling OpenTelemetry",
+    "retain authorized claim catalogue and diagnostic scope without new database calls"
+  ],
+  "sourceFiles": [
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "bytes": 2343,
+      "sha256": "be0a4388f0b1289aed92981615e814f64d4423e024e3343821e507558d2b471e",
+      "gitBlob": "680467e4bbe77e6e4c237b98572d34076d00909b"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "bytes": 98393,
+      "sha256": "3c13eaa057f94ac596b86b34557f237381caa6967315522823550cc99d45b4b5",
+      "gitBlob": "7157546b744f22fc7d6b08e44a879890abcd3e17"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "bytes": 46513,
+      "sha256": "b3cdc02033acd0a1e2b2d1f7bce0fe7f2f67139c5bcfe1f50f8ff2a16e7ad514",
+      "gitBlob": "8104dbd4eb74a04b026b9e2f2f420efc935deb0c"
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "bytes": 23186,
+      "sha256": "645e05a1493821d9e40bab9e840cba00db69e82856059a69e004a7accd9aa69f",
+      "gitBlob": "bda8713dc4dc072a50f545c3a4f1337c9ba1f150"
+    },
+    {
+      "path": "packages/daemon/src/adapters/types.ts",
+      "bytes": 8242,
+      "sha256": "d611d119bca0f4277348e7f5ff157e9974bb52ac71dfe6f6258f250444156dde",
+      "gitBlob": "1c761d74571909cc60e0965974123f0b1feb72ba"
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "bytes": 92027,
+      "sha256": "78c72e4192269ec0886331dcd3e52f3b23639f6160f801636d651e0f452d2f39",
+      "gitBlob": "3a62e8a1968d066cbb55dee2cb709c81d8a7dff0"
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "bytes": 23883,
+      "sha256": "13f937e643c9337e1338019b21b840a57edfb53414081de7b69d36ab82ae77b0",
+      "gitBlob": "7210daa36a6cba2dbca8ccb1f75b7e5c39b6cf6d"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "bytes": 41191,
+      "sha256": "0a182f2738b885235c888eb35f6d259ad41f8c47935b5309824b20a58f2e924b",
+      "gitBlob": "0f173547e45ad19bb88a0b849be1d51a2715cc92"
+    },
+    {
+      "path": "packages/protocol/src/device.ts",
+      "bytes": 34851,
+      "sha256": "be2330bdc648f1cf6b2ec7b95e2cceffa9a12858d3d62325561a2284844fd79f",
+      "gitBlob": "fe43d990d5f6b1c219cce904c0e1050b51df3d54"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "bytes": 52122,
+      "sha256": "506a779375e088a62b3a795862228f9e606443e09d468efd4a2047c8e1c72dae",
+      "gitBlob": "9364dae974bb74ec636e87795670a8cd4d30b415"
+    },
+    {
+      "path": "scripts/e2b/build-template.test.py",
+      "bytes": 53537,
+      "sha256": "700dfa03ddb73f105343e1235c60d35b36602fe2812a0719c64a367c4c924200",
+      "gitBlob": "8c8b4c467aeb2497b024285ddec791e8126858eb"
+    },
+    {
+      "path": "package.json",
+      "bytes": 73946,
+      "sha256": "1a5f4a35c9aaa3ee640308372875fda673eb84d682daffac23fa5e78005edcc4",
+      "gitBlob": "d703d58a101ce5dce4a58983fc253eec48b7bbc2"
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "bytes": 34351,
+      "sha256": "d11f05926277f886206cb0d51e0d7493f6241d352b55b7490c8bed3b2edd0a5a",
+      "gitBlob": "94ab42b9d3ec77b69e44496bdf1075b9068202e6"
+    }
+  ],
+  "tests": [
+    {
+      "name": "e2b builder",
+      "passed": 32,
+      "failed": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "server startup and MCP catalogue",
+      "passed": 6,
+      "failed": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "protocol device and trace context",
+      "passed": 20,
+      "failed": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "selected daemon runtime suites",
+      "filesPassed": 12,
+      "filesFailed": 1,
+      "passed": 121,
+      "failed": 1,
+      "exitCode": 1,
+      "failure": "cloud-bootstrap actual private Unix socket listen EPERM at rpc/server.ts:80; no runtime claim from this local case",
+      "failedFixtureRemoved": true
+    },
+    {
+      "name": "acceptance scripts",
+      "passed": 158,
+      "failed": 0,
+      "exitCode": 0
+    }
+  ],
+  "typechecksInitial": [
+    {
+      "name": "daemon",
+      "command": [
+        "/workspace/scratch/812e3b7d6d45/ops1512/pinned-bin/pnpm",
+        "--filter",
+        "@mikka/daemon",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 3.405,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-daemon.log"
+    },
+    {
+      "name": "root",
+      "command": [
+        "node",
+        "node_modules/tsrs/bin/tsrs",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "seconds": 4.666,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-root.log"
+    },
+    {
+      "name": "api",
+      "command": [
+        "node",
+        "node_modules/tsrs/bin/tsrs",
+        "--noEmit",
+        "-p",
+        "apps/api/tsconfig.json"
+      ],
+      "exitCode": 0,
+      "seconds": 1.465,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-api.log"
+    },
+    {
+      "name": "frontend",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/frontend/tsconfig.json"
+      ],
+      "exitCode": -6,
+      "seconds": 39.761,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-frontend.log"
+    },
+    {
+      "name": "renderer",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/desktop/tsconfig.renderer.json"
+      ],
+      "exitCode": -6,
+      "seconds": 44.147,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-renderer.log"
+    }
+  ],
+  "typechecksHeapCorrected": [
+    {
+      "name": "frontend",
+      "command": [
+        "node",
+        "--max-old-space-size=4096",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/frontend/tsconfig.json"
+      ],
+      "exitCode": 0,
+      "seconds": 35.308,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-frontend-4gb.log"
+    },
+    {
+      "name": "renderer",
+      "command": [
+        "node",
+        "--max-old-space-size=4096",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/desktop/tsconfig.renderer.json"
+      ],
+      "exitCode": 0,
+      "seconds": 35.039,
+      "stdout": "/workspace/scratch/812e3b7d6d45/ops1512/merge-main1ed-types-renderer-4gb.log"
+    }
+  ],
+  "sourceLintExitCode": 0,
+  "daemonBuildExitCode": 0,
+  "diffAgainstMainExitCode": 0,
+  "workflowDeltaFromPublishedCandidate": false,
+  "localSetupFailures": [
+    {
+      "kind": "launcher",
+      "file": "merge-main1ed-protocol.log",
+      "detail": "initial root vitest path did not exist; canonical package-local Vitest completed 20 tests"
+    },
+    {
+      "kind": "heap",
+      "files": [
+        "merge-main1ed-types-frontend.log",
+        "merge-main1ed-types-renderer.log"
+      ],
+      "detail": "initial default Node 2 GiB heap exhausted, exit -6; same source passed sequentially at explicit 4096 MiB"
+    },
+    {
+      "kind": "inherited_main_whitespace",
+      "detail": "cached diff against first parent reported an existing extra EOF blank line in components/settings/settings-view.tsx at main; this file exactly equals origin/main, and net diff against main passes",
+      "blob": "b7949f3a2982faa68fb1adc474acde4f6d1363cf",
+      "mainBlob": "b7949f3a2982faa68fb1adc474acde4f6d1363cf"
+    }
+  ],
+  "limitations": [
+    "No new candidate CI yet",
+    "Fixed PostgreSQL fixture still requires normal real PostgreSQL CI",
+    "Current Native run is for previous published 1f548a73 synthetic7355553d, not this merge",
+    "No real production ACME/model/Replay acceptance performed",
+    "Local prewarm tests use installed SDK with anonymous process fixtures, not provider models"
+  ],
+  "stdout": [
+    {
+      "path": "merge-main1ed-e2b.log",
+      "bytes": 5419,
+      "sha256": "217eebe155e3b40471e608bf205e955c857278c526ec82dc45658c28afa9bd03"
+    },
+    {
+      "path": "merge-main1ed-auto-server.tap",
+      "bytes": 2567,
+      "sha256": "55268c1c3b3d30adf65e8bb04abf4bb90689fcac53eaa9f71393861a1810cd57"
+    },
+    {
+      "path": "merge-main1ed-protocol.log",
+      "bytes": 783,
+      "sha256": "632f67cebedb6a94b3c20ce9e4a9aebfa9ab737b2d3203812915505be44b2efa"
+    },
+    {
+      "path": "merge-main1ed-protocol-canonical.log",
+      "bytes": 218,
+      "sha256": "72a787a51c91d11d1abaca39880566faae51d1cf66e387b8ff3514d23842984c"
+    },
+    {
+      "path": "merge-main1ed-daemon.log",
+      "bytes": 7008,
+      "sha256": "28b1e646dd1f6a6cc79f3df299ac407ff0bad117647dc2d5068996fa7f9389f8"
+    },
+    {
+      "path": "merge-main1ed-lint-source.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "merge-main1ed-acceptance.tap",
+      "bytes": 17004,
+      "sha256": "1df280a2d032f7b53223eaa3e3d9610534a2d9a7061d7651e6c5dfe5ad1b334b"
+    },
+    {
+      "path": "merge-main1ed-daemon-build.log",
+      "bytes": 215,
+      "sha256": "a531f853c5f9d5abdfa42223d1aa425b93bd9b019bee713a3bc9159141cddabc"
+    },
+    {
+      "path": "merge-main1ed-types-daemon.log",
+      "bytes": 121,
+      "sha256": "348a1a10a0b4f0d2af4f24467eee9a09039f796a5f6fffb1483858ab8252455c"
+    },
+    {
+      "path": "merge-main1ed-types-root.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "merge-main1ed-types-api.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "merge-main1ed-types-frontend.log",
+      "bytes": 817,
+      "sha256": "b54246ba166bb6dafeb177df8956771a935ceaf84be28d5c31ae02ef28118e95"
+    },
+    {
+      "path": "merge-main1ed-types-renderer.log",
+      "bytes": 871,
+      "sha256": "3473f8371cbd212c8faa165c4192268eed8d3142f857b7f6bfc638b12d8d8a3e"
+    },
+    {
+      "path": "merge-main1ed-types-frontend-4gb.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "merge-main1ed-types-renderer-4gb.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "merge-main1ed-diff-main.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

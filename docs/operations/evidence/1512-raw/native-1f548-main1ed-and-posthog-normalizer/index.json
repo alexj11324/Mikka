@@ -1,0 +1,789 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "pr": 1518,
+  "recordedAt": "2026-11-07T12:13:40.445423+00:00",
+  "kind": "real_native_1f548_and_frozen_main1ed_offline_verification",
+  "archiveParents": {
+    "evidenceHead": "808c877a8d6b1865683437a3d8939e20aa73941b",
+    "opsTransportHead": "d2ca56a94254eb5efc429c7a272d142a54fb28fe"
+  },
+  "sourceBindings": {
+    "testedFeatureHead": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "actualNativeAppAndHarness": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "actualSyntheticTree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+    "actualSyntheticParents": [
+      "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+      "1f548a73304923da466ebe702c99b6a8f6096f15"
+    ],
+    "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+    "nativeJobCheckoutProof": {
+      "jobId": 128393486990,
+      "command": "git log -1 --format=%H",
+      "observed": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "rawLogPersisted": false
+    },
+    "pendingRelatedMainMerge": {
+      "source": "82f58b2e849abc41f6a6886ab18aa2d9c0e7ea45",
+      "tree": "7405b1e49836129bc9f842cfdfa7c9325360d9f1",
+      "parents": [
+        "ba9d59632d1f646c2363b4eefc8443b533e5f7d4",
+        "1edbeca687119eb0ef71f209ac3d411fbc85b888"
+      ],
+      "sourceObjectRemoteVerified": true,
+      "featurePublished": false,
+      "reasonHeld": "native_login_SQL_196_gt_173",
+      "note": "The native run in this archive tests 1f548 merged with f722. It does not test the newer local merge 82f58b2e with main 1edbeca."
+    }
+  },
+  "ci": {
+    "desktop": {
+      "runId": 42368835389,
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": 4,
+      "allFourJobsSucceeded": true,
+      "receipt": "evidence/desktop-1f548/ci-final.json"
+    },
+    "mainWorkflow": {
+      "receipt": "evidence/ci-1f-owned-final.json",
+      "runId": 42368835440,
+      "jobs": 12,
+      "success": 9,
+      "failure": 2,
+      "skipped": 1,
+      "allTerminal": true,
+      "firstFailure": {
+        "job": "Database checks (4/4)",
+        "code": "23505",
+        "constraint": "agents_user_name_key",
+        "cause": "two fixture agents for one owner used the same case-insensitive name",
+        "beforeProductPoll": true
+      },
+      "secondFailure": "dependent CI aggregation",
+      "fixtureFixPresentInPending82f": true,
+      "fixtureFixRealPostgresRetested": false
+    },
+    "fullFeatureCIClaimedGreen": false
+  },
+  "nativeAcceptance": {
+    "functional": {
+      "lifecycle": "passed",
+      "lifecycleChecks": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "unknown": 0
+      },
+      "parity": {
+        "result": "passed",
+        "total": 100,
+        "passed": 100,
+        "pageErrors": 0
+      },
+      "smoke": "passed",
+      "smokeChecks": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "unknown": 0
+      },
+      "nativeCryptoPassed": true,
+      "sameImmutablePackage": true,
+      "signedPackagePassed": true
+    },
+    "ordinaryLogin": {
+      "nativeSql": 196,
+      "webSql": 173,
+      "difference": 23,
+      "nativeAtMostWeb": false,
+      "nativePhases": {
+        "ordinaryEmailAuthentication": 19,
+        "pkceAndAutomaticRenderer": 16,
+        "workspaceUsable": 161
+      },
+      "webPhases": {
+        "ordinaryEmailAuthentication": 19,
+        "domNavigation": 0,
+        "workspaceUsable": 154
+      },
+      "allQueriesIncluded": true,
+      "pkceOrBackgroundSubtracted": false,
+      "scope": "One paired normal email-auth login plus native PKCE and Chromium Web flow against the same existing primary API and leased fixture. Counts include background work within the recorded windows."
+    },
+    "firstAuthenticatedElectronStartup": {
+      "bundledSql": 172,
+      "hostedSql": 187,
+      "difference": -15,
+      "bundledAtMostHosted": true,
+      "scope": "First already-authenticated bundled and hosted Electron pair only; this is not the Chromium ordinary-login comparison or a production model tracing result."
+    },
+    "integrity": {
+      "expectedCheckpointCount": 12,
+      "observedCheckpointCount": 12,
+      "pid": 29495,
+      "pidConsistent": true,
+      "processStartConsistent": true,
+      "runtimeConsistent": true,
+      "cumulativeQueriesNondecreasing": true,
+      "unknownReadingsAllZero": true
+    },
+    "rpcActionCountsAreSqlCounts": false,
+    "logicalLoginActionDifferences": [
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "native": 2,
+        "web": 1,
+        "difference": 1
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "native": 2,
+        "web": 0,
+        "difference": 2
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "native": 2,
+        "web": 1,
+        "difference": 1
+      },
+      {
+        "action": "desktop.session",
+        "native": 1,
+        "web": 0,
+        "difference": 1
+      }
+    ],
+    "cleanup": {
+      "lifecycleRecordedStages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "lifecycleNativeCleaned": true,
+      "lifecycleLeaseState": "released",
+      "lifecycleBlocked": false,
+      "ownerAfterMatchesSealedBaseline": true,
+      "peerAfterMatchesSealedBaseline": true,
+      "parityReportedCleanup": "passed",
+      "smokeRecordedStages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "nativeCryptoCleanup": "passed",
+      "missingAggregateCleanupFieldsRemainUnknown": true
+    },
+    "productionAcceptance": null,
+    "remainingBlockingCriterion": "native ordinary login SQL exceeds matched Web by 23"
+  },
+  "offlineDesktopSummary": {
+    "validation": "evidence/desktop-native-summary-validation.json",
+    "newSummary": "evidence/desktop-1f548-offline-summary.json",
+    "priorSummary": "evidence/desktop-191fcce-offline-summary.json",
+    "testsPassed": 6,
+    "sourceAndInputHashesPreserved": true,
+    "prior191Counts": {
+      "nativeLogin": 208,
+      "webLogin": 161,
+      "bundledStartup": 173,
+      "hostedStartup": 200
+    },
+    "crossRunCountsProveCausalImprovement": false,
+    "summaryExitZeroMeans": "offline parsing and consistency checks completed; it does not convert a failed acceptance comparison into success"
+  },
+  "relatedMainMergeVerification": {
+    "receipt": "evidence/main1ed-integration-82f58b2e.json",
+    "resolvedConflicts": [
+      "packages/daemon/bin/cloud-worker.ts",
+      "packages/daemon/src/runs/supervisor.ts",
+      "packages/daemon/src/adapters/claude.ts",
+      "packages/daemon/src/subscription-hosted-runner.ts"
+    ],
+    "e2bBuilderPassed": 32,
+    "protocolPassed": 20,
+    "serverStartupAndCataloguePassed": 6,
+    "acceptanceScriptPassed": 158,
+    "selectedDaemon": {
+      "passed": 121,
+      "failed": 1,
+      "cause": "local Unix socket listen EPERM",
+      "fixtureCleanupVerified": true,
+      "notCountedAsPass": true
+    },
+    "canonicalTypesFinal": {
+      "daemon": 0,
+      "root": 0,
+      "api": 0,
+      "frontend": 0,
+      "desktopRenderer": 0
+    },
+    "initialLauncherAndHeapFailuresPreserved": true,
+    "normalCIForPendingMerge": "not_run",
+    "realProductionACMEModelReplay": "not_executed"
+  },
+  "posthogOfflineNormalization": {
+    "receipt": "evidence/posthog-normalizer-offline-receipt.json",
+    "contract": "evidence/posthog-normalizer-contract-readonly.json",
+    "normalizerTests": 12,
+    "reconcilerTests": 8,
+    "all20Passed": true,
+    "existingResponsesParsed": [
+      {
+        "name": "lookup_trace_by_ids",
+        "returnedRows": 0,
+        "columnCount": 8,
+        "pageTruncated": null,
+        "normalizedJsonSha256": "191e451123aca8a3904b1a1dc56dc089a8f754d9ce938286ac19b92485eeffba"
+      },
+      {
+        "name": "span_timeline",
+        "returnedRows": 27,
+        "columnCount": 18,
+        "pageTruncated": null,
+        "normalizedJsonSha256": "a410e40973510f8ce730e0f46e9d9c0e948b93b1c138ef07f091dedde1693b98"
+      },
+      {
+        "name": "safe_native_logs",
+        "returnedRows": 0,
+        "columnCount": 17,
+        "pageTruncated": null,
+        "normalizedJsonSha256": "c9af6aed32729536959664f4ad8feaaf062f63ab2d90d653c9228906da0a1cab"
+      },
+      {
+        "name": "apm_generation_spans",
+        "returnedRows": 0,
+        "columnCount": 38,
+        "pageTruncated": null,
+        "normalizedJsonSha256": "5c005deb6be01c516e12b54b65bb524b86b49458f0e0637c95d0e307ecf9f06d"
+      },
+      {
+        "name": "native_generation_collection",
+        "returnedRows": 0,
+        "columnCount": 23,
+        "pageTruncated": null,
+        "normalizedJsonSha256": "95c283d8159cb988b31f02f07893c4c556cec88e5f0a4a1174e1f143b37b2b02"
+      }
+    ],
+    "newSqlExecutions": 0,
+    "pageTruncated": null,
+    "truncationGateChanged": false,
+    "upstreamCompleteness": "not_proven",
+    "acceptanceEvidence": false,
+    "bodyCodeCorrection": "Use the existing SQL projected completed/failed enumeration; preserve failing red stdout and passing green stdout. No production native Logs were established by the zero-row response.",
+    "otherBounds": "Historical fixed trace/schema data; only timeline has 27 rows. No complete Claude subcall census, Codex exporter flush, billing, Replay playback or scout acceptance is inferred."
+  },
+  "previouslyArchivedInputReferences": [
+    {
+      "localPath": "ops1512/evidence/posthog-pagination-schema-191fcce2.json",
+      "commit": "0799447dd2f05bc48c585d29b1c2a4089d44a175",
+      "path": "docs/operations/evidence/1512-raw/native-read-batch-191fcce/query-preparation/posthog-pagination-schema-191fcce2.json",
+      "bytes": 42221,
+      "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74",
+      "gitBlobSha1": "63d39e407d96d2408b099f467b19acdab80a51a1",
+      "remoteReadbackMatchedLocalBytes": true
+    },
+    {
+      "localPath": "ops1512/production-evidence-query-templates.json",
+      "commit": "110437724daa690167b3dd4163cd3ba094f925b1",
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/queries/production-evidence-query-templates.json",
+      "bytes": 56861,
+      "sha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+      "gitBlobSha1": "0b0f0f4c3eb129e90cf2f357762001e630103705",
+      "remoteReadbackMatchedLocalBytes": true
+    }
+  ],
+  "artifactDownloadProvenance": {
+    "version": 1,
+    "repository": "alexj11324/Mikka",
+    "runId": 42368835389,
+    "source": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "harness": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "artifacts": [
+      {
+        "id": 13573552231,
+        "kind": "native",
+        "name": "desktop-native-evidence-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+        "bytes": 14883838,
+        "sha256": "1fba326b81858cc44c8707e4074f996d3d8f7a70b0ff87ff964a8712876d47e2",
+        "headSha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+        "workflowRunId": 42368835389,
+        "digestVerified": true,
+        "zipRetained": false
+      },
+      {
+        "id": 13573119123,
+        "kind": "package",
+        "name": "desktop-package-evidence-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+        "bytes": 1593,
+        "sha256": "349ce2b5f4264bcd880ddb6902bb080aa8440bdbe318db9af15c5208973eb39b",
+        "headSha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+        "workflowRunId": 42368835389,
+        "digestVerified": true,
+        "zipRetained": false
+      }
+    ],
+    "scope": "Known JSON members only; ZIP verified in memory then discarded; no URL, PNG or runtime log retained."
+  },
+  "privacy": {
+    "scannedOriginalFiles": 47,
+    "scannedOriginalBytes": 930049,
+    "runtimeAndOperationalSensitiveMatches": 0,
+    "intentionalOfflineCanaryExceptions": [
+      {
+        "path": "ops1512/desktop-native-summary.test.mjs",
+        "category": "email",
+        "line": 71,
+        "hash": "50d89b80e47642c318e283948281c088c85c5e40846df942760e841961e6fece",
+        "reservedExampleDomain": true,
+        "classification": "intentional_reserved_example_domain_canary_in_offline_privacy_test",
+        "rawRuntimeAccountData": false
+      },
+      {
+        "path": "ops1512/normalize-posthog-metadata.test.mjs",
+        "category": "email",
+        "line": 146,
+        "hash": "9dc98d058b1d6f4688703fdded7387b1851cddf5e946b37e324c029fc811905f",
+        "reservedExampleDomain": true,
+        "classification": "intentional_reserved_example_domain_canary_in_offline_privacy_test",
+        "rawRuntimeAccountData": false
+      },
+      {
+        "path": "ops1512/reconcile-production-evidence.test.mjs",
+        "category": "email",
+        "line": 191,
+        "hash": "92160a4e3b08ffce26e7ef9b1e8ccce892455aeba96f64e0a8b4a804936f9624",
+        "reservedExampleDomain": true,
+        "classification": "intentional_reserved_example_domain_canary_in_offline_privacy_test",
+        "rawRuntimeAccountData": false
+      }
+    ],
+    "originalBytesPreserved": true,
+    "rawPrivateLogsIncluded": false,
+    "signedUrlsIncluded": false,
+    "paidUiSourceIncluded": false,
+    "screenshotsDmgsOrZipFilesIncluded": false
+  },
+  "files": [
+    {
+      "path": "ops1512/evidence/desktop-1f548/download-receipt.json",
+      "bytes": 1140,
+      "sha256": "dc8657fa5ca119190730ac56535609cb6022deeb2b84a9fd7562008359aee07c",
+      "gitBlobSha1": "853940018f8f6c9ae8b9e8b8743af879a37cb26d",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/download-receipt.json",
+      "characters": 1140
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/lifecycle.json",
+      "bytes": 171073,
+      "sha256": "df182491760f1288fc55d55293e3965a2905d2535dd50cb41b94b988992872c1",
+      "gitBlobSha1": "536d1e166bcee4b32f8ee922ac25e12d2cf39532",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/lifecycle.json",
+      "characters": 171073
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "96c8cb19fac129808018d4e5dcb2304c4b53bbab9e238e74b205f7f850a76d5b",
+      "gitBlobSha1": "42ba3c9029a0eae8c3babddefcbf8bde8e71d644",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/mac-acceptance-package.json",
+      "characters": 957
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "87bdc583e2c75f312f1e2236e4f6351935320280e4aa0d6c8f3520ea9d838b93",
+      "gitBlobSha1": "abacb272c01daeb9b89ab9eaa2174d5419b19ce9",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/native-crypto.json",
+      "characters": 2868
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/privacy-scan.json",
+      "bytes": 1923,
+      "sha256": "23e600dbd4826cc82cd2876c31f8ed73426c079369c7d47e5e233c7acb9f7360",
+      "gitBlobSha1": "60ce996fd02795afb18b7dd56f4070c5b63e6bba",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/privacy-scan.json",
+      "characters": 1923
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/smoke.json",
+      "bytes": 3125,
+      "sha256": "e0553a29892a0afc97ace8e8132361cfca58283ae43093dd8585b1140bb9a560",
+      "gitBlobSha1": "dda3021b3bf631e1b8fe7a6db162c94b6577a4a6",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/smoke.json",
+      "characters": 3125
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/parity/parity.json",
+      "bytes": 106296,
+      "sha256": "4588c0a4135b87846c39dbee485cc655b6a6e0a2d9cb9e32b8f3abd3251c6328",
+      "gitBlobSha1": "bdd0d06c481b1b67ae58842bfacab05328b32b2a",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/parity/parity.json",
+      "characters": 106288
+    },
+    {
+      "path": "ops1512/evidence/ci-1f-owned-final.json",
+      "bytes": 181601,
+      "sha256": "e3333babe1eab1410240177d90cbe585c3e7209aad965b8b9076962e1072bd81",
+      "gitBlobSha1": "a9ab4db1522a95f413465b5889f30d78605019da",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/ci-1f-owned-final.json",
+      "characters": 179637
+    },
+    {
+      "path": "ops1512/evidence/main1ed-integration-82f58b2e.json",
+      "bytes": 11742,
+      "sha256": "ee47ea9fc27f8e2b620574f02b4a818ce3e47d78b727ea9e4324934b0d27d6a5",
+      "gitBlobSha1": "13f23fe310dbd748e19e71d4a0ad3e9088d459ca",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/main1ed-integration-82f58b2e.json",
+      "characters": 11742
+    },
+    {
+      "path": "ops1512/merge-main1ed-e2b.log",
+      "bytes": 5419,
+      "sha256": "217eebe155e3b40471e608bf205e955c857278c526ec82dc45658c28afa9bd03",
+      "gitBlobSha1": "1b65c6636a868b433f8750ca86efd234627c9183",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-e2b.log",
+      "characters": 5419
+    },
+    {
+      "path": "ops1512/merge-main1ed-auto-server.tap",
+      "bytes": 2567,
+      "sha256": "55268c1c3b3d30adf65e8bb04abf4bb90689fcac53eaa9f71393861a1810cd57",
+      "gitBlobSha1": "20ac398bd27b15b2f36d242c5ddc47f57e61fae6",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-auto-server.tap",
+      "characters": 2539
+    },
+    {
+      "path": "ops1512/merge-main1ed-protocol.log",
+      "bytes": 783,
+      "sha256": "632f67cebedb6a94b3c20ce9e4a9aebfa9ab737b2d3203812915505be44b2efa",
+      "gitBlobSha1": "03fc84c39d1e2d81f89386c3cc019ffbf2111ef7",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-protocol.log",
+      "characters": 783
+    },
+    {
+      "path": "ops1512/merge-main1ed-protocol-canonical.log",
+      "bytes": 218,
+      "sha256": "72a787a51c91d11d1abaca39880566faae51d1cf66e387b8ff3514d23842984c",
+      "gitBlobSha1": "acbdd86eed458e386552dd22194cc236325d80de",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-protocol-canonical.log",
+      "characters": 218
+    },
+    {
+      "path": "ops1512/merge-main1ed-daemon.log",
+      "bytes": 7008,
+      "sha256": "28b1e646dd1f6a6cc79f3df299ac407ff0bad117647dc2d5068996fa7f9389f8",
+      "gitBlobSha1": "02beb65fba0bb3c150c0d5cce889e4a908256aa4",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-daemon.log",
+      "characters": 6917
+    },
+    {
+      "path": "ops1512/merge-main1ed-lint-source.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-lint-source.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/merge-main1ed-acceptance.tap",
+      "bytes": 17004,
+      "sha256": "1df280a2d032f7b53223eaa3e3d9610534a2d9a7061d7651e6c5dfe5ad1b334b",
+      "gitBlobSha1": "d7c5bfc16189a6919e95c045a658e4de902ad3a2",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-acceptance.tap",
+      "characters": 16672
+    },
+    {
+      "path": "ops1512/merge-main1ed-daemon-build.log",
+      "bytes": 215,
+      "sha256": "a531f853c5f9d5abdfa42223d1aa425b93bd9b019bee713a3bc9159141cddabc",
+      "gitBlobSha1": "f41b470a35e3fcd925f83fb74b2a13373b6db974",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-daemon-build.log",
+      "characters": 215
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-daemon.log",
+      "bytes": 121,
+      "sha256": "348a1a10a0b4f0d2af4f24467eee9a09039f796a5f6fffb1483858ab8252455c",
+      "gitBlobSha1": "8c16057863849006c981270795712026c6b74fda",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-daemon.log",
+      "characters": 121
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-root.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-root.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-api.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-api.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-frontend.log",
+      "bytes": 817,
+      "sha256": "b54246ba166bb6dafeb177df8956771a935ceaf84be28d5c31ae02ef28118e95",
+      "gitBlobSha1": "ceceb250fb0939bf3c611f07ab65811588a29316",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-frontend.log",
+      "characters": 817
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-renderer.log",
+      "bytes": 871,
+      "sha256": "3473f8371cbd212c8faa165c4192268eed8d3142f857b7f6bfc638b12d8d8a3e",
+      "gitBlobSha1": "6a5fee82960ba369004c62d044b927fadafd72c5",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-renderer.log",
+      "characters": 871
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-frontend-4gb.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-frontend-4gb.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/merge-main1ed-types-renderer-4gb.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-types-renderer-4gb.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/merge-main1ed-diff-main.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/merge-main1ed-diff-main.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/evidence/desktop-native-summary-validation.json",
+      "bytes": 6578,
+      "sha256": "2dee6d55afdfe19febed2094cacb2b8e16a7d088e7cd4e4dfd22a2b959a058c9",
+      "gitBlobSha1": "36e8bc1cf530a20ac0fe13b78d9f528c81c1b28a",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-native-summary-validation.json",
+      "characters": 6578
+    },
+    {
+      "path": "ops1512/desktop-native-summary.mjs",
+      "bytes": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlobSha1": "dad196c96077ab1504fd8858343d31b00cf0da3a",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary.mjs",
+      "characters": 19258
+    },
+    {
+      "path": "ops1512/desktop-native-summary.test.mjs",
+      "bytes": 5952,
+      "sha256": "73517b9026c6d61fbf9b0165c44b3345af4a865bac82a86eb609688e765e95d5",
+      "gitBlobSha1": "fe41f9b377afc39f3c93bbfaf59d22db2c32b38a",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary.test.mjs",
+      "characters": 5952
+    },
+    {
+      "path": "ops1512/desktop-native-summary.md",
+      "bytes": 3457,
+      "sha256": "1f7c90769981018626df689904596cf40852455925f394811e04f2d6341ddfa3",
+      "gitBlobSha1": "9173840f628acd7e99c738ec9c6bf7002a6d9ade",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary.md",
+      "characters": 3457
+    },
+    {
+      "path": "ops1512/desktop-native-summary-tests-final.tap",
+      "bytes": 765,
+      "sha256": "a108af300fd9c5a5db4d4038003583b70f95cf62b90c7fa1452a792a801284f6",
+      "gitBlobSha1": "7388559adcfd97cea689b0920f8c1decb5c97e1d",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary-tests-final.tap",
+      "characters": 737
+    },
+    {
+      "path": "ops1512/desktop-native-summary-lint-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary-lint-final.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/desktop-native-summary-191.stdout.json",
+      "bytes": 590,
+      "sha256": "35c6551d24eece0ee5f6c77f183268b190884287e1e830cc889bd4cc2c88923a",
+      "gitBlobSha1": "0cbda8c890cf9a3781ce692881893d3b130d0beb",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary-191.stdout.json",
+      "characters": 590
+    },
+    {
+      "path": "ops1512/desktop-native-summary-1f.stdout.json",
+      "bytes": 590,
+      "sha256": "a0f545b8facd46d32399be09fee3684baee3a4aa74bd41273881fc683d433f37",
+      "gitBlobSha1": "eca0c88a7a2a1d9bf431acad6b4d7d08e53a7b1f",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/desktop-native-summary-1f.stdout.json",
+      "characters": 590
+    },
+    {
+      "path": "ops1512/evidence/desktop-191fcce-offline-summary.json",
+      "bytes": 113262,
+      "sha256": "ab2fe975d5819218c57a5c579c7e6f20ffc6944482338e8b8e474c70640b4c00",
+      "gitBlobSha1": "8e70be13cfd7d8991a17d16625091e5534054c79",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-191fcce-offline-summary.json",
+      "characters": 113262
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548-offline-summary.json",
+      "bytes": 130233,
+      "sha256": "c6987d3cc5f6fc5abc7a0a54cddbe7791552297165520da5fb28b0f763d22433",
+      "gitBlobSha1": "a1cab67338c99d9d6c60413ed94e5351cdb2c940",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548-offline-summary.json",
+      "characters": 130233
+    },
+    {
+      "path": "ops1512/evidence/desktop-1f548/ci-final.json",
+      "bytes": 18008,
+      "sha256": "1625c5dd408d3d383825f13e3ee65ca7890a5c46988e7353448f54f3028a1516",
+      "gitBlobSha1": "c8948d752b65f2d78f981f5deba28792a6ec4623",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/desktop-1f548/ci-final.json",
+      "characters": 18008
+    },
+    {
+      "path": "ops1512/evidence/posthog-normalizer-offline-receipt.json",
+      "bytes": 13984,
+      "sha256": "49be39b11f8f183ead25b6321c208fbb4af81d01ab9152006e41044fa94b760f",
+      "gitBlobSha1": "9cb969926e5d62a52b02631f90bbf3d7be21cc7b",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/posthog-normalizer-offline-receipt.json",
+      "characters": 13984
+    },
+    {
+      "path": "ops1512/normalize-posthog-metadata.mjs",
+      "bytes": 19782,
+      "sha256": "b74fa507a7fe545a7926f32c3cead14eef6490160fa64d932bd330dbd0853be0",
+      "gitBlobSha1": "f4c1e06fe0d789b226d55cdb66716208d0f9e3e6",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/normalize-posthog-metadata.mjs",
+      "characters": 19780
+    },
+    {
+      "path": "ops1512/normalize-posthog-metadata.test.mjs",
+      "bytes": 14795,
+      "sha256": "8358b58661438bd572f6c910c0e7c597679bb6079da5997053600ca709b32e17",
+      "gitBlobSha1": "75de4ab47d049dd0001546cf035b1d57c5ab610c",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/normalize-posthog-metadata.test.mjs",
+      "characters": 14795
+    },
+    {
+      "path": "ops1512/normalize-posthog-metadata.md",
+      "bytes": 7470,
+      "sha256": "57eff1e19820e0e98df639fe1806d0c3c31acb61b1b6ac6e0d946d15304ca8f1",
+      "gitBlobSha1": "8f816ec9a8c4486676a5fe980e507a5668d1de1d",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/normalize-posthog-metadata.md",
+      "characters": 7470
+    },
+    {
+      "path": "ops1512/reconcile-production-evidence.mjs",
+      "bytes": 26617,
+      "sha256": "86aace9b34cfe0d0465c43fe7fa56032d88acb9b45a11c96c8e5fc83422ef44f",
+      "gitBlobSha1": "c3a95c49b89c9f2d3575f0faedae08de159f31d5",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/reconcile-production-evidence.mjs",
+      "characters": 26617
+    },
+    {
+      "path": "ops1512/reconcile-production-evidence.test.mjs",
+      "bytes": 15455,
+      "sha256": "b37ef6bef27632ec022d1a40c9b5afd8e383dc6c0dae5cd42cf53f56c591b68f",
+      "gitBlobSha1": "196dcedcdc53538321573a15d9cf91390301c443",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/reconcile-production-evidence.test.mjs",
+      "characters": 15455
+    },
+    {
+      "path": "ops1512/evidence/posthog-normalizer-final-offline.tap",
+      "bytes": 2356,
+      "sha256": "6f0723cea26384c4ab781248c24b320a42da290d231eb85c51a6d49f4b7d2172",
+      "gitBlobSha1": "62f2f7d16ce2ad4fd8f55bc2c0a79133c76d51b5",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/posthog-normalizer-final-offline.tap",
+      "characters": 2300
+    },
+    {
+      "path": "ops1512/evidence/posthog-normalizer-oxlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/posthog-normalizer-oxlint.log",
+      "characters": 0
+    },
+    {
+      "path": "ops1512/evidence/posthog-reconciler-body-code-red.tap",
+      "bytes": 9231,
+      "sha256": "8041b1e8093aba81f3e1be121053108efceacf2f4639832bcd1ded4cb2f3aec6",
+      "gitBlobSha1": "2400fa3a18fbe6fcb41756df05c1375a7160e692",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/posthog-reconciler-body-code-red.tap",
+      "characters": 9187
+    },
+    {
+      "path": "ops1512/evidence/posthog-reconciler-body-code-green.tap",
+      "bytes": 1042,
+      "sha256": "4f5d0ab7e4b7d8cf4b9176529e54edf3fcf99f35dc5a68aea8ed3d3c59df5a15",
+      "gitBlobSha1": "9b8b5f14a76affbc848deb44b3d83db5f9ee508a",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/posthog-reconciler-body-code-green.tap",
+      "characters": 1010
+    },
+    {
+      "path": "ops1512/evidence/posthog-normalizer-contract-readonly.json",
+      "bytes": 4876,
+      "sha256": "d4e4eac4b887164953a6640443897410be1de656e4eea656d5ddf82681483738",
+      "gitBlobSha1": "1715b45aec3ca0eb81f310aa8f45c48be8b021eb",
+      "archivePath": "docs/operations/evidence/1512-raw/native-1f548-main1ed-and-posthog-normalizer/evidence/posthog-normalizer-contract-readonly.json",
+      "characters": 4876
+    }
+  ]
+}

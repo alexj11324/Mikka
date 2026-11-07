@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42368835389,
+  "source": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "harness": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+  "artifacts": [
+    {
+      "id": 13573552231,
+      "kind": "native",
+      "name": "desktop-native-evidence-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "bytes": 14883838,
+      "sha256": "1fba326b81858cc44c8707e4074f996d3d8f7a70b0ff87ff964a8712876d47e2",
+      "headSha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "workflowRunId": 42368835389,
+      "digestVerified": true,
+      "zipRetained": false
+    },
+    {
+      "id": 13573119123,
+      "kind": "package",
+      "name": "desktop-package-evidence-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "bytes": 1593,
+      "sha256": "349ce2b5f4264bcd880ddb6902bb080aa8440bdbe318db9af15c5208973eb39b",
+      "headSha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "workflowRunId": 42368835389,
+      "digestVerified": true,
+      "zipRetained": false
+    }
+  ],
+  "scope": "Known JSON members only; ZIP verified in memory then discarded; no URL, PNG or runtime log retained."
+}

@@ -1,0 +1,599 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42368835389,
+  "runAttempt": 1,
+  "status": "completed",
+  "conclusion": "success",
+  "featureHead": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "actualCheckout": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+  "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+  "parents": [
+    "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "1f548a73304923da466ebe702c99b6a8f6096f15"
+  ],
+  "checkoutProof": {
+    "jobId": 128393486990,
+    "command": "git log -1 --format=%H",
+    "observed": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "rawLogPersisted": false
+  },
+  "jobs": [
+    {
+      "id": 128392526764,
+      "name": "smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Install Chromium system dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Install the pinned Electron runtime and its Linux sandbox helper",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Apply tracked migrations to the disposable database",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Prepare the isolated E2E schema",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Build the production web backend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Archive the compiled Linux backend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Build the dev Electron shell",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Audit runtime evidence before upload",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Keep audited Electron evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35
+        },
+        {
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39
+        }
+      ]
+    },
+    {
+      "id": 128392527035,
+      "name": "checks",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install dependencies without the Electron runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run pnpm test:platform",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Run pnpm test:idle-budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Run pnpm lint:ui",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        }
+      ]
+    },
+    {
+      "id": 128392527077,
+      "name": "icon",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Select Xcode 26 for actool",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Compile build/icon.icon as electron-builder does",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        }
+      ]
+    },
+    {
+      "id": 128393486990,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run test \"$(uname -m)\" = arm64",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Keep setup-node 24 in the native installer login shell",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run pnpm exec playwright install chromium",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Start an independent local PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run pnpm migrate && pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Build the production API for the native ARM64 runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Select Xcode 26",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Package an inspector-enabled harness input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Real Keychain encryption across three independent packaged processes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Real packaged Apple Silicon native acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Keep final package integrity evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Audit closed package and crypto reports",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Audit native evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40
+        },
+        {
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 42
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 43
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 13573552231,
+      "name": "desktop-native-evidence-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "size_in_bytes": 14883838,
+      "digest": "sha256:1fba326b81858cc44c8707e4074f996d3d8f7a70b0ff87ff964a8712876d47e2",
+      "expired": false,
+      "created_at": "2026-11-07T12:00:12Z",
+      "expires_at": "2026-11-14T12:00:09Z",
+      "workflow_run": {
+        "id": 42368835389,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "feat/1512-run-observability",
+        "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+      }
+    },
+    {
+      "id": 13573285584,
+      "name": "desktop-icon",
+      "size_in_bytes": 1753541,
+      "digest": "sha256:e65a0c062841baaa3b0dd03474ae141ced7e838b009165f14e14a6f58543f122",
+      "expired": false,
+      "created_at": "2026-11-07T11:35:56Z",
+      "expires_at": "2026-11-14T11:35:55Z",
+      "workflow_run": {
+        "id": 42368835389,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "feat/1512-run-observability",
+        "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+      }
+    },
+    {
+      "id": 13573119123,
+      "name": "desktop-package-evidence-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "size_in_bytes": 1593,
+      "digest": "sha256:349ce2b5f4264bcd880ddb6902bb080aa8440bdbe318db9af15c5208973eb39b",
+      "expired": false,
+      "created_at": "2026-11-07T12:00:08Z",
+      "expires_at": "2026-11-14T12:00:06Z",
+      "workflow_run": {
+        "id": 42368835389,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "feat/1512-run-observability",
+        "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+      }
+    },
+    {
+      "id": 13572757059,
+      "name": "desktop-smoke-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "size_in_bytes": 101205,
+      "digest": "sha256:64cc4751c248ddd3ce5899af0f434fa60a1f56ffc7102a58d888c0d44cd472cb",
+      "expired": false,
+      "created_at": "2026-11-07T11:40:20Z",
+      "expires_at": "2026-11-14T11:40:19Z",
+      "workflow_run": {
+        "id": 42368835389,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "feat/1512-run-observability",
+        "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+      }
+    },
+    {
+      "id": 13572179042,
+      "name": "desktop-api-build-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "size_in_bytes": 47871680,
+      "digest": "sha256:33b411a43819c5ad08ff47c69a6283aa697898cb18fce2e79ac2e8040cc56cff",
+      "expired": false,
+      "created_at": "2026-11-07T11:39:34Z",
+      "expires_at": "2026-11-09T11:39:32Z",
+      "workflow_run": {
+        "id": 42368835389,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "feat/1512-run-observability",
+        "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+      }
+    }
+  ],
+  "acceptance": {
+    "login": {
+      "native": 196,
+      "web": 173,
+      "delta": 23,
+      "met": false
+    },
+    "startupFirstPair": {
+      "bundled": 172,
+      "hosted": 187,
+      "delta": -15,
+      "met": true
+    },
+    "allQueriesIncluded": true,
+    "samePid": 29495,
+    "unknownReadings": 0,
+    "productionAcceptance": false
+  },
+  "notes": [
+    "All counts are from original lifecycle checkpoints in the actual synthetic merge, not the newer local merge 82f58b2e.",
+    "Full login includes real PKCE/automatic renderer and concurrent API background traffic.",
+    "Artifact ZIPs were verified in memory; only five known JSON reports persisted, plus provenance and privacy receipts.",
+    "No 1f548 CI run was rerun or canceled by this task."
+  ]
+}

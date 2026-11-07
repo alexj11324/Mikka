@@ -1,0 +1,16 @@
+✔ log safety uses the completed/failed projection from the saved real query, not raw body text (22.688803ms)
+✔ all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success (7.472194ms)
+✔ 501 rows require continuous pages and original UUIDs, including the explicit final short page (43.708035ms)
+✔ equal row totals cannot hide different event, span, physical UUID, parent or model identities (1.954081ms)
+✔ native emissions and app-server receipts use distinct equations, without double counting matched fallbacks (4.382173ms)
+✔ missing fields/tables, wrong cluster/window, truncation and unstable aggregates remain incomplete (0.995223ms)
+✔ null is distinct from zero and arbitrary payload/labels never appear in output (2.020942ms)
+✔ Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence (1.155445ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 169.61888

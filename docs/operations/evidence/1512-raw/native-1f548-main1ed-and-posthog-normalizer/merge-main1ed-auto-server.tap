@@ -1,0 +1,24 @@
+{"msg":"cloud_startup_timing","runIdHash":"f6b7c26147eb34e9","stage":"cloud.sandbox.create","startedAt":1794052236800,"endedAt":1794052236800,"ms":0}
+{"msg":"cloud_startup_timing","runIdHash":"f6b7c26147eb34e9","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794052236799,"endedAt":1794052236800,"ms":1},{"phase":"connect","startedAt":1794052236800,"endedAt":1794052236801,"ms":1}]}
+{"msg":"cloud_startup_timing","runIdHash":"f6b7c26147eb34e9","stage":"cloud.thread.ensure","startedAt":1794052236797,"endedAt":1794052236801,"ms":4}
+✔ operator diagnostics only enter the dedicated Bot/repository subscription window (6.613055ms)
+{"msg":"cloud_startup_timing","runIdHash":null,"stage":"cloud.sandbox.create","startedAt":1794052236805,"endedAt":1794052236806,"ms":1}
+✔ startup phases preserve their parent and expose only a hashed run identity (8.033919ms)
+{"msg":"cloud_startup_timing","runIdHash":"96db3c54708a912b","stage":"cloud.worker.claim.native_credentials","startedAt":1794052236812,"endedAt":1794052236812,"ms":0}
+{"msg":"cloud_startup_timing","runIdHash":"96db3c54708a912b","stage":"cloud.worker.claim.github_credentials","startedAt":1794052236812,"endedAt":1794052236812,"ms":0}
+{"msg":"cloud_startup_timing","runIdHash":"96db3c54708a912b","stage":"cloud.worker.claim.phases","phases":[{"phase":"authorize","startedAt":1794052236812,"endedAt":1794052236812,"ms":0},{"phase":"assignment_context","startedAt":1794052236812,"endedAt":1794052236812,"ms":0},{"phase":"response_fence","startedAt":1794052236813,"endedAt":1794052236813,"ms":0}]}
+{"msg":"cloud_startup_timing","runIdHash":"96db3c54708a912b","stage":"cloud.worker.claim","startedAt":1794052236811,"endedAt":1794052236813,"ms":2}
+✔ failed provisioning preserves the original error without publishing its message (6.185258ms)
+{"msg":"cloud_startup_timing","runIdHash":null,"stage":"cloud.bootstrap.phases","startedAt":1794052231814,"endedAt":1794052235814,"phases":[{"name":"source","ms":1200},{"name":"dependencies","ms":2500}]}
+{"msg":"cloud_startup_timing","runIdHash":null,"stage":"cloud.sandbox.bootstrap","startedAt":1794052236814,"endedAt":1794052236815,"ms":1}
+✔ claim phases and parallel credential spans keep the claim parent (2.784514ms)
+✔ remote bootstrap receipts produce exact phase durations without exporting command output (3.862477ms)
+✔ claim catalogue exactly matches the real installed MCP tools/list serialization (27.571536ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 771.757243

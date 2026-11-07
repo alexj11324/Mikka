@@ -1,0 +1,9 @@
+
+ RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/Mikka/packages/protocol
+
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  06:51:16
+   Duration  527ms (transform 51%, import 38%, tests 10%, worker 2%)
+

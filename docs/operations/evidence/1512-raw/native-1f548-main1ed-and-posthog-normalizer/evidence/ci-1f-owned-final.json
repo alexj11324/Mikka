@@ -1,0 +1,6858 @@
+{
+  "schemaVersion": 1,
+  "collectedAt": "2026-11-07T11:47:25.003Z",
+  "scope": "UI policy/source/core/integration, four PostgreSQL shards and daemon in CI workflow only",
+  "metadataNature": "Allowlisted original GitHub metadata fields and closed projections from exact completed job logs. No raw log, credentials, account identities or runtime payloads are persisted.",
+  "source": {
+    "candidateHead": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "syntheticCheckout": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+    "parents": [
+      "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+      "1f548a73304923da466ebe702c99b6a8f6096f15"
+    ],
+    "actualCheckoutProof": {
+      "jobId": 128392526972,
+      "source": "actual job log",
+      "matches": [
+        {
+          "line": 97,
+          "shas": [
+            "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+          ],
+          "pullMerge": false,
+          "checkout": false,
+          "logCommand": false
+        },
+        {
+          "line": 1925,
+          "shas": [
+            "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+          ],
+          "pullMerge": false,
+          "checkout": false,
+          "logCommand": false
+        },
+        {
+          "line": 1950,
+          "shas": [
+            "1f548a73304923da466ebe702c99b6a8f6096f15",
+            "f7225f3eb1e38762dfdecde0395792c85b81ec22"
+          ],
+          "pullMerge": false,
+          "checkout": false,
+          "logCommand": false
+        },
+        {
+          "line": 1953,
+          "shas": [
+            "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+          ],
+          "pullMerge": false,
+          "checkout": false,
+          "logCommand": false
+        }
+      ]
+    },
+    "allObservedCheckoutShas": [
+      "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+    ],
+    "commitUrl": "https://github.com/alexj11324/Mikka/commit/7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+  },
+  "run": {
+    "id": 42368835440,
+    "name": "CI",
+    "path": ".github/workflows/ui-policy.yml",
+    "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "head_branch": "feat/1512-run-observability",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "failure",
+    "run_attempt": 1,
+    "created_at": "2026-11-07T11:35:37Z",
+    "updated_at": "2026-11-07T11:45:09Z",
+    "run_started_at": "2026-11-07T11:35:37Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440",
+    "check_suite_id": 114790463469
+  },
+  "pagination": {
+    "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42368835440/jobs?filter=latest&per_page=100",
+    "page": 1,
+    "perPage": 100,
+    "totalCount": 12,
+    "returnedCount": 12,
+    "complete": true
+  },
+  "jobs": [
+    {
+      "id": 128392526972,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:37Z",
+      "started_at": "2026-11-07T11:35:39Z",
+      "completed_at": "2026-11-07T11:35:51Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392526972",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392526972",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:40Z",
+          "completed_at": "2026-11-07T11:35:41Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:41Z",
+          "completed_at": "2026-11-07T11:35:48Z"
+        },
+        {
+          "number": 3,
+          "name": "Run git fetch origin main --no-tags",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:48Z",
+          "completed_at": "2026-11-07T11:35:49Z"
+        },
+        {
+          "number": 6,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:49Z",
+          "completed_at": "2026-11-07T11:35:49Z"
+        },
+        {
+          "number": 7,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:49Z",
+          "completed_at": "2026-11-07T11:35:49Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576113,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:53Z",
+      "completed_at": "2026-11-07T11:39:50Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576113",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576113",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:54Z",
+          "completed_at": "2026-11-07T11:35:56Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:56Z",
+          "completed_at": "2026-11-07T11:36:13Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:13Z",
+          "completed_at": "2026-11-07T11:36:15Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:15Z",
+          "completed_at": "2026-11-07T11:37:10Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:10Z",
+          "completed_at": "2026-11-07T11:37:10Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:10Z",
+          "completed_at": "2026-11-07T11:37:11Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:11Z",
+          "completed_at": "2026-11-07T11:37:17Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:17Z",
+          "completed_at": "2026-11-07T11:37:17Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:17Z",
+          "completed_at": "2026-11-07T11:37:17Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:17Z",
+          "completed_at": "2026-11-07T11:37:24Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:24Z",
+          "completed_at": "2026-11-07T11:37:27Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:27Z",
+          "completed_at": "2026-11-07T11:37:27Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:27Z",
+          "completed_at": "2026-11-07T11:37:27Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:27Z",
+          "completed_at": "2026-11-07T11:37:27Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-07T11:37:27Z",
+          "completed_at": "2026-11-07T11:39:45Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:45Z",
+          "completed_at": "2026-11-07T11:39:45Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:45Z",
+          "completed_at": "2026-11-07T11:39:46Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:46Z",
+          "completed_at": "2026-11-07T11:39:46Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:46Z",
+          "completed_at": "2026-11-07T11:39:47Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:47Z",
+          "completed_at": "2026-11-07T11:39:47Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576121,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:54Z",
+      "completed_at": "2026-11-07T11:43:08Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576121",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576121",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:35:56Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:56Z",
+          "completed_at": "2026-11-07T11:36:05Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:05Z",
+          "completed_at": "2026-11-07T11:37:10Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm test:active-agents",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:10Z",
+          "completed_at": "2026-11-07T11:37:11Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm test:auth-composio",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:11Z",
+          "completed_at": "2026-11-07T11:37:15Z"
+        },
+        {
+          "number": 6,
+          "name": "Test environment binding and fail-closed guards",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:15Z",
+          "completed_at": "2026-11-07T11:37:20Z"
+        },
+        {
+          "number": 7,
+          "name": "Authentication email integration tests (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:20Z",
+          "completed_at": "2026-11-07T11:37:57Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm test:groups",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:57Z",
+          "completed_at": "2026-11-07T11:38:09Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:live-lists",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:09Z",
+          "completed_at": "2026-11-07T11:39:55Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm test:group-turns",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:55Z",
+          "completed_at": "2026-11-07T11:40:01Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:integrations",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:01Z",
+          "completed_at": "2026-11-07T11:40:50Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:github",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:50Z",
+          "completed_at": "2026-11-07T11:41:00Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm test:request-log",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:00Z",
+          "completed_at": "2026-11-07T11:41:04Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm test:legacy-reads",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:04Z",
+          "completed_at": "2026-11-07T11:41:05Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm test:slack",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:05Z",
+          "completed_at": "2026-11-07T11:41:06Z"
+        },
+        {
+          "number": 16,
+          "name": "Run pnpm test:telegram",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:06Z",
+          "completed_at": "2026-11-07T11:41:07Z"
+        },
+        {
+          "number": 17,
+          "name": "Run pnpm test:agent",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:07Z",
+          "completed_at": "2026-11-07T11:41:25Z"
+        },
+        {
+          "number": 18,
+          "name": "Run pnpm test:acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:25Z",
+          "completed_at": "2026-11-07T11:41:25Z"
+        },
+        {
+          "number": 19,
+          "name": "Run pnpm test:suggestions",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:25Z",
+          "completed_at": "2026-11-07T11:41:31Z"
+        },
+        {
+          "number": 20,
+          "name": "Run pnpm test:captures",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:31Z",
+          "completed_at": "2026-11-07T11:41:34Z"
+        },
+        {
+          "number": 21,
+          "name": "Run pnpm test:db-runner",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:34Z",
+          "completed_at": "2026-11-07T11:41:35Z"
+        },
+        {
+          "number": 22,
+          "name": "Run pnpm test:csv",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:35Z",
+          "completed_at": "2026-11-07T11:41:36Z"
+        },
+        {
+          "number": 23,
+          "name": "Run pnpm test:settings",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:36Z",
+          "completed_at": "2026-11-07T11:41:54Z"
+        },
+        {
+          "number": 24,
+          "name": "Run pnpm test:settings-backend",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:54Z",
+          "completed_at": "2026-11-07T11:41:56Z"
+        },
+        {
+          "number": 25,
+          "name": "Run pnpm test:workspace-settings",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:41:56Z",
+          "completed_at": "2026-11-07T11:42:01Z"
+        },
+        {
+          "number": 26,
+          "name": "Run pnpm test:settings-prefs",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:01Z",
+          "completed_at": "2026-11-07T11:42:02Z"
+        },
+        {
+          "number": 27,
+          "name": "Run pnpm test:account",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:02Z",
+          "completed_at": "2026-11-07T11:42:06Z"
+        },
+        {
+          "number": 28,
+          "name": "Run pnpm test:issues",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:06Z",
+          "completed_at": "2026-11-07T11:42:49Z"
+        },
+        {
+          "number": 29,
+          "name": "Run pnpm test:issue-search",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:49Z",
+          "completed_at": "2026-11-07T11:42:51Z"
+        },
+        {
+          "number": 30,
+          "name": "Shared protocol unit tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:51Z",
+          "completed_at": "2026-11-07T11:42:54Z"
+        },
+        {
+          "number": 31,
+          "name": "E2B local API relay",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:54Z",
+          "completed_at": "2026-11-07T11:42:54Z"
+        },
+        {
+          "number": 32,
+          "name": "Audit business UI composition",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:54Z",
+          "completed_at": "2026-11-07T11:43:04Z"
+        },
+        {
+          "number": 33,
+          "name": "Show audit summary",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:43:04Z",
+          "completed_at": "2026-11-07T11:43:04Z"
+        },
+        {
+          "number": 34,
+          "name": "Upload detailed audit",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:43:04Z",
+          "completed_at": "2026-11-07T11:43:05Z"
+        },
+        {
+          "number": 67,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:43:05Z",
+          "completed_at": "2026-11-07T11:43:05Z"
+        },
+        {
+          "number": 68,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:43:05Z",
+          "completed_at": "2026-11-07T11:43:06Z"
+        },
+        {
+          "number": 69,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:43:06Z",
+          "completed_at": "2026-11-07T11:43:06Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576127,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:53Z",
+      "completed_at": "2026-11-07T11:39:33Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576127",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576127",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:54Z",
+          "completed_at": "2026-11-07T11:35:55Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:36:09Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:09Z",
+          "completed_at": "2026-11-07T11:36:12Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:12Z",
+          "completed_at": "2026-11-07T11:36:59Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:59Z",
+          "completed_at": "2026-11-07T11:36:59Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:59Z",
+          "completed_at": "2026-11-07T11:37:00Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:00Z",
+          "completed_at": "2026-11-07T11:37:07Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:07Z",
+          "completed_at": "2026-11-07T11:37:07Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:07Z",
+          "completed_at": "2026-11-07T11:37:07Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:07Z",
+          "completed_at": "2026-11-07T11:37:15Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:15Z",
+          "completed_at": "2026-11-07T11:37:17Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:17Z",
+          "completed_at": "2026-11-07T11:37:18Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:18Z",
+          "completed_at": "2026-11-07T11:37:18Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:18Z",
+          "completed_at": "2026-11-07T11:37:18Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:18Z",
+          "completed_at": "2026-11-07T11:39:30Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:30Z",
+          "completed_at": "2026-11-07T11:39:30Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:30Z",
+          "completed_at": "2026-11-07T11:39:30Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:30Z",
+          "completed_at": "2026-11-07T11:39:30Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:30Z",
+          "completed_at": "2026-11-07T11:39:31Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:31Z",
+          "completed_at": "2026-11-07T11:39:31Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576128,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:54Z",
+      "completed_at": "2026-11-07T11:39:29Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576128",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576128",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:35:56Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:56Z",
+          "completed_at": "2026-11-07T11:35:58Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:58Z",
+          "completed_at": "2026-11-07T11:37:07Z"
+        },
+        {
+          "number": 4,
+          "name": "Daemon unit and transport regression tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:07Z",
+          "completed_at": "2026-11-07T11:39:02Z"
+        },
+        {
+          "number": 5,
+          "name": "Existing mailbox CLI integration tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:02Z",
+          "completed_at": "2026-11-07T11:39:04Z"
+        },
+        {
+          "number": 6,
+          "name": "Daemon repository identity, GitHub credential and trusted endpoint tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:04Z",
+          "completed_at": "2026-11-07T11:39:06Z"
+        },
+        {
+          "number": 7,
+          "name": "Local computer authority through actual daemon and adapter protocol",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:06Z",
+          "completed_at": "2026-11-07T11:39:08Z"
+        },
+        {
+          "number": 8,
+          "name": "Preserve daemon unit evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:08Z",
+          "completed_at": "2026-11-07T11:39:10Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/daemon typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:10Z",
+          "completed_at": "2026-11-07T11:39:13Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/daemon build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:13Z",
+          "completed_at": "2026-11-07T11:39:13Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/daemon test:package",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:13Z",
+          "completed_at": "2026-11-07T11:39:26Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:26Z",
+          "completed_at": "2026-11-07T11:39:26Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:26Z",
+          "completed_at": "2026-11-07T11:39:27Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:27Z",
+          "completed_at": "2026-11-07T11:39:27Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576161,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:54Z",
+      "completed_at": "2026-11-07T11:39:54Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576161",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576161",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:35:55Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:36:10Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:10Z",
+          "completed_at": "2026-11-07T11:36:12Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:12Z",
+          "completed_at": "2026-11-07T11:37:02Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:02Z",
+          "completed_at": "2026-11-07T11:37:02Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:02Z",
+          "completed_at": "2026-11-07T11:37:03Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:03Z",
+          "completed_at": "2026-11-07T11:37:04Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:04Z",
+          "completed_at": "2026-11-07T11:37:04Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:04Z",
+          "completed_at": "2026-11-07T11:37:04Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:04Z",
+          "completed_at": "2026-11-07T11:37:09Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:09Z",
+          "completed_at": "2026-11-07T11:37:10Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:10Z",
+          "completed_at": "2026-11-07T11:37:11Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:11Z",
+          "completed_at": "2026-11-07T11:37:11Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:37:11Z",
+          "completed_at": "2026-11-07T11:37:11Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:11Z",
+          "completed_at": "2026-11-07T11:39:50Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:50Z",
+          "completed_at": "2026-11-07T11:39:50Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:50Z",
+          "completed_at": "2026-11-07T11:39:50Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:50Z",
+          "completed_at": "2026-11-07T11:39:50Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:50Z",
+          "completed_at": "2026-11-07T11:39:51Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:51Z",
+          "completed_at": "2026-11-07T11:39:51Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576179,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:54Z",
+      "completed_at": "2026-11-07T11:38:31Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576179",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576179",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:35:55Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:35:58Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:58Z",
+          "completed_at": "2026-11-07T11:36:43Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm lint:code",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:43Z",
+          "completed_at": "2026-11-07T11:36:46Z"
+        },
+        {
+          "number": 5,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:46Z",
+          "completed_at": "2026-11-07T11:36:47Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm lint:runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:47Z",
+          "completed_at": "2026-11-07T11:36:47Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:api",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:47Z",
+          "completed_at": "2026-11-07T11:37:00Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:00Z",
+          "completed_at": "2026-11-07T11:37:35Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:35Z",
+          "completed_at": "2026-11-07T11:38:18Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:18Z",
+          "completed_at": "2026-11-07T11:38:20Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:20Z",
+          "completed_at": "2026-11-07T11:38:29Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:29Z",
+          "completed_at": "2026-11-07T11:38:29Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:29Z",
+          "completed_at": "2026-11-07T11:38:29Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:29Z",
+          "completed_at": "2026-11-07T11:38:29Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576185,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:54Z",
+      "completed_at": "2026-11-07T11:42:47Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576185",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576185",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:54Z",
+          "completed_at": "2026-11-07T11:35:56Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:56Z",
+          "completed_at": "2026-11-07T11:36:01Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:01Z",
+          "completed_at": "2026-11-07T11:36:50Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm test:factory-check-independence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:50Z",
+          "completed_at": "2026-11-07T11:36:51Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm test:factory-check-recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:51Z",
+          "completed_at": "2026-11-07T11:36:52Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm test:factory-routing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:52Z",
+          "completed_at": "2026-11-07T11:37:03Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:self-improvement-semantic-source",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:03Z",
+          "completed_at": "2026-11-07T11:37:05Z"
+        },
+        {
+          "number": 8,
+          "name": "Run node --test scripts/ci-docs-only.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:05Z",
+          "completed_at": "2026-11-07T11:37:06Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:ui-policy",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:06Z",
+          "completed_at": "2026-11-07T11:37:16Z"
+        },
+        {
+          "number": 10,
+          "name": "Idle request budget (main pages, no browser)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:16Z",
+          "completed_at": "2026-11-07T11:37:23Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:motion",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:23Z",
+          "completed_at": "2026-11-07T11:37:23Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:i18n",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:23Z",
+          "completed_at": "2026-11-07T11:37:24Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm i18n:check",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:24Z",
+          "completed_at": "2026-11-07T11:37:27Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm test:ssh-target",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:27Z",
+          "completed_at": "2026-11-07T11:37:27Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm test:linear-sync",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:27Z",
+          "completed_at": "2026-11-07T11:37:30Z"
+        },
+        {
+          "number": 16,
+          "name": "Run pnpm check:agent-definitions",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:30Z",
+          "completed_at": "2026-11-07T11:37:30Z"
+        },
+        {
+          "number": 17,
+          "name": "Release identity, vulnerability policy and artifact tamper regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:30Z",
+          "completed_at": "2026-11-07T11:37:31Z"
+        },
+        {
+          "number": 18,
+          "name": "Run pnpm test:mailbox-verification",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:31Z",
+          "completed_at": "2026-11-07T11:37:32Z"
+        },
+        {
+          "number": 19,
+          "name": "Run pnpm test:factory-approval",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:32Z",
+          "completed_at": "2026-11-07T11:37:33Z"
+        },
+        {
+          "number": 20,
+          "name": "Run pnpm test:personal-mailbox-core",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:33Z",
+          "completed_at": "2026-11-07T11:37:40Z"
+        },
+        {
+          "number": 21,
+          "name": "Run pnpm test:factory-monitor",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:40Z",
+          "completed_at": "2026-11-07T11:37:40Z"
+        },
+        {
+          "number": 22,
+          "name": "Run pnpm test:execution-rules",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:40Z",
+          "completed_at": "2026-11-07T11:37:51Z"
+        },
+        {
+          "number": 23,
+          "name": "Run pnpm test:abuse",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:51Z",
+          "completed_at": "2026-11-07T11:37:55Z"
+        },
+        {
+          "number": 24,
+          "name": "Run pnpm test:hosted-usage",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:55Z",
+          "completed_at": "2026-11-07T11:37:56Z"
+        },
+        {
+          "number": 25,
+          "name": "Run pnpm test:model-admission",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:56Z",
+          "completed_at": "2026-11-07T11:37:58Z"
+        },
+        {
+          "number": 26,
+          "name": "Run pnpm test:audit",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:58Z",
+          "completed_at": "2026-11-07T11:37:59Z"
+        },
+        {
+          "number": 27,
+          "name": "Run pnpm test:agent-kit",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:59Z",
+          "completed_at": "2026-11-07T11:38:00Z"
+        },
+        {
+          "number": 28,
+          "name": "Run pnpm test:agent-kit-compat",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:00Z",
+          "completed_at": "2026-11-07T11:38:17Z"
+        },
+        {
+          "number": 29,
+          "name": "Run pnpm test:approved-writes",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:17Z",
+          "completed_at": "2026-11-07T11:38:39Z"
+        },
+        {
+          "number": 30,
+          "name": "Run pnpm test:coordinator-events",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:38:39Z",
+          "completed_at": "2026-11-07T11:39:11Z"
+        },
+        {
+          "number": 31,
+          "name": "Run pnpm test:schedules",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:11Z",
+          "completed_at": "2026-11-07T11:39:13Z"
+        },
+        {
+          "number": 32,
+          "name": "Run pnpm test:run-recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:13Z",
+          "completed_at": "2026-11-07T11:39:14Z"
+        },
+        {
+          "number": 33,
+          "name": "Run pnpm test:mvp-fixtures",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:14Z",
+          "completed_at": "2026-11-07T11:39:19Z"
+        },
+        {
+          "number": 34,
+          "name": "Run pnpm test:credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:19Z",
+          "completed_at": "2026-11-07T11:39:21Z"
+        },
+        {
+          "number": 35,
+          "name": "Run pnpm test:run-publication",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:21Z",
+          "completed_at": "2026-11-07T11:39:23Z"
+        },
+        {
+          "number": 36,
+          "name": "Run pnpm test:workflow-wakes",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:23Z",
+          "completed_at": "2026-11-07T11:39:25Z"
+        },
+        {
+          "number": 37,
+          "name": "Factory daemon check regressions and shared report contract",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:25Z",
+          "completed_at": "2026-11-07T11:39:46Z"
+        },
+        {
+          "number": 38,
+          "name": "Run pnpm test:mobile-push",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:46Z",
+          "completed_at": "2026-11-07T11:39:48Z"
+        },
+        {
+          "number": 39,
+          "name": "Run pnpm test:mobile",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:48Z",
+          "completed_at": "2026-11-07T11:39:55Z"
+        },
+        {
+          "number": 40,
+          "name": "Run pnpm test:coordinator-native-relay",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:55Z",
+          "completed_at": "2026-11-07T11:39:56Z"
+        },
+        {
+          "number": 41,
+          "name": "Run pnpm test:coordinator-native-scope",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:56Z",
+          "completed_at": "2026-11-07T11:39:59Z"
+        },
+        {
+          "number": 42,
+          "name": "Run pnpm test:coordinator-issue-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:59Z",
+          "completed_at": "2026-11-07T11:40:11Z"
+        },
+        {
+          "number": 43,
+          "name": "Run pnpm test:signup-turnstile",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:11Z",
+          "completed_at": "2026-11-07T11:40:11Z"
+        },
+        {
+          "number": 44,
+          "name": "Run pnpm test:cloud-limits",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:11Z",
+          "completed_at": "2026-11-07T11:40:14Z"
+        },
+        {
+          "number": 45,
+          "name": "Run pnpm test:analytics",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:14Z",
+          "completed_at": "2026-11-07T11:40:15Z"
+        },
+        {
+          "number": 46,
+          "name": "Run pnpm test:artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:15Z",
+          "completed_at": "2026-11-07T11:40:20Z"
+        },
+        {
+          "number": 47,
+          "name": "Run pnpm test:factory-config",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:20Z",
+          "completed_at": "2026-11-07T11:40:20Z"
+        },
+        {
+          "number": 48,
+          "name": "Run pnpm test:user-message-text",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:20Z",
+          "completed_at": "2026-11-07T11:40:21Z"
+        },
+        {
+          "number": 49,
+          "name": "Run pnpm test:run-info",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:21Z",
+          "completed_at": "2026-11-07T11:40:22Z"
+        },
+        {
+          "number": 50,
+          "name": "Run pnpm test:thread-changes",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:22Z",
+          "completed_at": "2026-11-07T11:40:24Z"
+        },
+        {
+          "number": 51,
+          "name": "Run pnpm check:agent-ui",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:24Z",
+          "completed_at": "2026-11-07T11:40:25Z"
+        },
+        {
+          "number": 52,
+          "name": "Run pnpm test:dev-local",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:25Z",
+          "completed_at": "2026-11-07T11:40:28Z"
+        },
+        {
+          "number": 53,
+          "name": "Run pnpm test:lib-units",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:28Z",
+          "completed_at": "2026-11-07T11:42:15Z"
+        },
+        {
+          "number": 54,
+          "name": "Run pnpm test:project-decisions",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:15Z",
+          "completed_at": "2026-11-07T11:42:17Z"
+        },
+        {
+          "number": 55,
+          "name": "Run pnpm test:unread",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:17Z",
+          "completed_at": "2026-11-07T11:42:18Z"
+        },
+        {
+          "number": 56,
+          "name": "Run pnpm test:issue-readonly-dom",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:18Z",
+          "completed_at": "2026-11-07T11:42:45Z"
+        },
+        {
+          "number": 111,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:45Z",
+          "completed_at": "2026-11-07T11:42:45Z"
+        },
+        {
+          "number": 112,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:45Z",
+          "completed_at": "2026-11-07T11:42:45Z"
+        },
+        {
+          "number": 113,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:42:45Z",
+          "completed_at": "2026-11-07T11:42:45Z"
+        }
+      ]
+    },
+    {
+      "id": 128392576198,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:53Z",
+      "completed_at": "2026-11-07T11:39:29Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392576198",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392576198",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:54Z",
+          "completed_at": "2026-11-07T11:35:55Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:35:55Z",
+          "completed_at": "2026-11-07T11:36:07Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:07Z",
+          "completed_at": "2026-11-07T11:36:09Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:09Z",
+          "completed_at": "2026-11-07T11:36:51Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:51Z",
+          "completed_at": "2026-11-07T11:36:51Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:51Z",
+          "completed_at": "2026-11-07T11:36:52Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:52Z",
+          "completed_at": "2026-11-07T11:36:54Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-07T11:36:54Z",
+          "completed_at": "2026-11-07T11:36:54Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:54Z",
+          "completed_at": "2026-11-07T11:36:54Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:54Z",
+          "completed_at": "2026-11-07T11:36:56Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:56Z",
+          "completed_at": "2026-11-07T11:36:58Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:58Z",
+          "completed_at": "2026-11-07T11:36:58Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:58Z",
+          "completed_at": "2026-11-07T11:36:58Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:36:58Z",
+          "completed_at": "2026-11-07T11:37:21Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:37:21Z",
+          "completed_at": "2026-11-07T11:39:21Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:21Z",
+          "completed_at": "2026-11-07T11:39:22Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:22Z",
+          "completed_at": "2026-11-07T11:39:22Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:22Z",
+          "completed_at": "2026-11-07T11:39:22Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:22Z",
+          "completed_at": "2026-11-07T11:39:22Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:39:22Z",
+          "completed_at": "2026-11-07T11:39:22Z"
+        }
+      ]
+    },
+    {
+      "id": 128392577003,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-07T11:35:52Z",
+      "started_at": "2026-11-07T11:35:52Z",
+      "completed_at": "2026-11-07T11:35:52Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128392577003",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128392577003",
+      "steps": []
+    },
+    {
+      "id": 128393385875,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-07T11:39:54Z",
+      "started_at": "2026-11-07T11:40:28Z",
+      "completed_at": "2026-11-07T11:40:32Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128393385875",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128393385875",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:29Z",
+          "completed_at": "2026-11-07T11:40:29Z"
+        },
+        {
+          "number": 2,
+          "name": "Require the full suite unless only documentation changed",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-07T11:40:29Z",
+          "completed_at": "2026-11-07T11:40:29Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:40:30Z",
+          "completed_at": "2026-11-07T11:40:30Z"
+        }
+      ]
+    },
+    {
+      "id": 128394048619,
+      "run_id": 42368835440,
+      "workflow_name": "CI",
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "run_attempt": 1,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-07T11:43:08Z",
+      "started_at": "2026-11-07T11:45:06Z",
+      "completed_at": "2026-11-07T11:45:09Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42368835440/job/128394048619",
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128394048619",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:45:06Z",
+          "completed_at": "2026-11-07T11:45:06Z"
+        },
+        {
+          "number": 2,
+          "name": "Require the full suite unless only documentation changed",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:45:06Z",
+          "completed_at": "2026-11-07T11:45:07Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-07T11:45:07Z",
+          "completed_at": "2026-11-07T11:45:07Z"
+        }
+      ]
+    }
+  ],
+  "finalCounts": {
+    "success": 9,
+    "failure": 2,
+    "skipped": 1,
+    "incomplete": 0
+  },
+  "firstCause": {
+    "jobId": 128392576113,
+    "step": 15,
+    "test": "task run rows keep the newest owner run and the 200-row limit without unused fields",
+    "file": "tests/action-read-egress.db.test.ts",
+    "line": 57,
+    "errorName": "error",
+    "code": "23505",
+    "constraint": "agents_user_name_key",
+    "table": "agents",
+    "schema": "public",
+    "cause": "Two fixture agents use the same owner and name before invoking pollTaskRuns.",
+    "minimumFix": "Give the fixture agent and runtimeAgent distinct names; retain all query semantics and assertions.",
+    "productQueryReached": false,
+    "boundedAggregateTest": [
+      {
+        "line": 2344,
+        "text": "✔ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (113.687069ms)"
+      }
+    ]
+  },
+  "dependentFailure": {
+    "jobId": 128393385875,
+    "name": "Production build and browser interactions",
+    "code": "DEPENDENCY_DATABASE_SUITE_FAILURE",
+    "basis": "Its fixed workflow gate mirrors browser-tests-full matrix; completed job log explicitly reports database suites failure."
+  },
+  "boundaries": {
+    "sourceAndDaemonPassed": true,
+    "postgresPassedShards": [
+      1,
+      2,
+      3
+    ],
+    "postgresFailedShards": [
+      4
+    ],
+    "dbContainersStopped": [
+      {
+        "jobId": 128392576113,
+        "stopContainers": "success"
+      },
+      {
+        "jobId": 128392576127,
+        "stopContainers": "success"
+      },
+      {
+        "jobId": 128392576161,
+        "stopContainers": "success"
+      },
+      {
+        "jobId": 128392576198,
+        "stopContainers": "success"
+      }
+    ],
+    "daemon": {
+      "vitestPassed": 1154,
+      "vitestSkipped": 2,
+      "filesPassed": 110,
+      "filesSkipped": 1,
+      "realAgentsFileTests": 0,
+      "commandsPassed": 8,
+      "hostedCommandPassed": 5,
+      "typecheck": "success",
+      "build": "success",
+      "package": "success"
+    },
+    "liveLists": {
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "requestLog": {
+      "separateNodeCommandTotals": [
+        7,
+        22
+      ],
+      "failed": 0,
+      "skipped": 0
+    },
+    "previousLocalUnixSocketLimitation": "commands.test.ts 8 cases now passed on the actual Linux CI checkout; this does not change the original local EPERM result.",
+    "fixtureCorrection": {
+      "receipt": "task-read-db-fixture-1f548a73.json",
+      "sha256": "f6e108c5d625a073ee66afd1c1e8aaea7932c3bf0b1629f11ccf23b57f730bc1",
+      "testOnly": true,
+      "postgresRetest": false,
+      "originalCandidateConclusionUnchanged": true
+    },
+    "nativeDesktop": "Excluded; root agent monitors the separate Desktop workflow and real query counts.",
+    "productionAcceptance": "Not established by these checks.",
+    "remoteMutations": false,
+    "reruns": false
+  },
+  "logEvidence": [
+    {
+      "jobId": 128392576113,
+      "jobName": "Database checks (4/4)",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 244,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 800,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 802,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 803,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 805,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1176,
+          "value": "ℹ tests 28"
+        },
+        {
+          "line": 1178,
+          "value": "ℹ pass 28"
+        },
+        {
+          "line": 1179,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1181,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1253,
+          "value": "ℹ tests 51"
+        },
+        {
+          "line": 1255,
+          "value": "ℹ pass 51"
+        },
+        {
+          "line": 1256,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1258,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1287,
+          "value": "ℹ tests 16"
+        },
+        {
+          "line": 1289,
+          "value": "ℹ pass 16"
+        },
+        {
+          "line": 1290,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1292,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1312,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 1314,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 1315,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1317,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1326,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1328,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1329,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1331,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1810,
+          "value": "ℹ tests 39"
+        },
+        {
+          "line": 1812,
+          "value": "ℹ pass 39"
+        },
+        {
+          "line": 1813,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1815,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1858,
+          "value": "ℹ tests 22"
+        },
+        {
+          "line": 1860,
+          "value": "ℹ pass 22"
+        },
+        {
+          "line": 1861,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1863,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1891,
+          "value": "ℹ tests 20"
+        },
+        {
+          "line": 1893,
+          "value": "ℹ pass 20"
+        },
+        {
+          "line": 1894,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1896,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1906,
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 1908,
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 1909,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1911,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2109,
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 2111,
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 2112,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2114,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2130,
+          "value": "ℹ tests 12"
+        },
+        {
+          "line": 2132,
+          "value": "ℹ pass 12"
+        },
+        {
+          "line": 2133,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2135,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2147,
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 2149,
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 2150,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2152,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2159,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2161,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2162,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2164,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2211,
+          "value": "ℹ tests 13"
+        },
+        {
+          "line": 2213,
+          "value": "ℹ pass 13"
+        },
+        {
+          "line": 2214,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2216,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2223,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2225,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2226,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2228,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2236,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2238,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2239,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2241,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2250,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2252,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2253,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2255,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2274,
+          "value": "ℹ tests 12"
+        },
+        {
+          "line": 2276,
+          "value": "ℹ pass 12"
+        },
+        {
+          "line": 2277,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2279,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2308,
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 2310,
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 2311,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2313,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2320,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2322,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2323,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2325,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2332,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2334,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2335,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2337,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2419,
+          "value": "ℹ tests 36"
+        },
+        {
+          "line": 2421,
+          "value": "ℹ pass 35"
+        },
+        {
+          "line": 2422,
+          "value": "ℹ fail 1"
+        },
+        {
+          "line": 2424,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2471,
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 2473,
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 2474,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2476,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3014,
+          "value": "ℹ tests 247"
+        },
+        {
+          "line": 3016,
+          "value": "ℹ pass 247"
+        },
+        {
+          "line": 3017,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3019,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3035,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 3037,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 3038,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3040,
+          "value": "ℹ skipped 0"
+        }
+      ],
+      "failure": {
+        "jobId": 128392576113,
+        "step": 15,
+        "test": "task run rows keep the newest owner run and the 200-row limit without unused fields",
+        "file": "tests/action-read-egress.db.test.ts",
+        "line": 57,
+        "errorName": "error",
+        "code": "23505",
+        "constraint": "agents_user_name_key",
+        "table": "agents",
+        "schema": "public",
+        "cause": "Two fixture agents use the same owner and name before invoking pollTaskRuns.",
+        "minimumFix": "Give the fixture agent and runtimeAgent distinct names; retain all query semantics and assertions.",
+        "productQueryReached": false,
+        "boundedAggregateTest": [
+          {
+            "line": 2344,
+            "text": "✔ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (113.687069ms)"
+          }
+        ]
+      }
+    },
+    {
+      "jobId": 128392576121,
+      "jobName": "Integration unit checks",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 132,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 511,
+          "command": "pnpm test:active-agents",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 513,
+          "command": "pnpm test:active-agents",
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 514,
+          "command": "pnpm test:active-agents",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 516,
+          "command": "pnpm test:active-agents",
+          "value": "ℹ skipped 1"
+        },
+        {
+          "line": 550,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 552,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 553,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 555,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 598,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ tests 40"
+        },
+        {
+          "line": 600,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ pass 40"
+        },
+        {
+          "line": 601,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 603,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 607,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 609,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 610,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 612,
+          "command": "pnpm test:auth-composio",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 717,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ tests 73"
+        },
+        {
+          "line": 719,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ pass 73"
+        },
+        {
+          "line": 720,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 722,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 735,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 737,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 738,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 740,
+          "command": "pnpm test:test-accounts",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1308,
+          "command": "pnpm test:test-accounts",
+          "value": "# tests 25"
+        },
+        {
+          "line": 1310,
+          "command": "pnpm test:test-accounts",
+          "value": "# pass 25"
+        },
+        {
+          "line": 1311,
+          "command": "pnpm test:test-accounts",
+          "value": "# fail 0"
+        },
+        {
+          "line": 1313,
+          "command": "pnpm test:test-accounts",
+          "value": "# skipped 0"
+        },
+        {
+          "line": 1347,
+          "command": "pnpm test:groups",
+          "value": "ℹ tests 12"
+        },
+        {
+          "line": 1349,
+          "command": "pnpm test:groups",
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 1350,
+          "command": "pnpm test:groups",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1352,
+          "command": "pnpm test:groups",
+          "value": "ℹ skipped 1"
+        },
+        {
+          "line": 1476,
+          "command": "pnpm test:groups",
+          "value": "ℹ tests 79"
+        },
+        {
+          "line": 1478,
+          "command": "pnpm test:groups",
+          "value": "ℹ pass 79"
+        },
+        {
+          "line": 1479,
+          "command": "pnpm test:groups",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1481,
+          "command": "pnpm test:groups",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1566,
+          "command": "pnpm test:live-lists",
+          "value": "ℹ tests 55"
+        },
+        {
+          "line": 1568,
+          "command": "pnpm test:live-lists",
+          "value": "ℹ pass 55"
+        },
+        {
+          "line": 1569,
+          "command": "pnpm test:live-lists",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1571,
+          "command": "pnpm test:live-lists",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1706,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ tests 110"
+        },
+        {
+          "line": 1708,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ pass 101"
+        },
+        {
+          "line": 1709,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1711,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ skipped 9"
+        },
+        {
+          "line": 1724,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1726,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1727,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1729,
+          "command": "pnpm test:group-turns",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1867,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 97"
+        },
+        {
+          "line": 1869,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 97"
+        },
+        {
+          "line": 1870,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1872,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1888,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 1890,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 1891,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1893,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1986,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 71"
+        },
+        {
+          "line": 1988,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 71"
+        },
+        {
+          "line": 1989,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1991,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2022,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 14"
+        },
+        {
+          "line": 2024,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 14"
+        },
+        {
+          "line": 2025,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2027,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2061,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 21"
+        },
+        {
+          "line": 2063,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 21"
+        },
+        {
+          "line": 2064,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2066,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2077,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 2079,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 2080,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2082,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2093,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 2095,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 2096,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2098,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2115,
+          "command": "pnpm test:integrations",
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 2117,
+          "command": "pnpm test:integrations",
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 2118,
+          "command": "pnpm test:integrations",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2120,
+          "command": "pnpm test:integrations",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2328,
+          "command": "pnpm test:github",
+          "value": "ℹ tests 130"
+        },
+        {
+          "line": 2330,
+          "command": "pnpm test:github",
+          "value": "ℹ pass 130"
+        },
+        {
+          "line": 2331,
+          "command": "pnpm test:github",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2333,
+          "command": "pnpm test:github",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2362,
+          "command": "pnpm test:request-log",
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 2364,
+          "command": "pnpm test:request-log",
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 2365,
+          "command": "pnpm test:request-log",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2367,
+          "command": "pnpm test:request-log",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2395,
+          "command": "pnpm test:request-log",
+          "value": "ℹ tests 22"
+        },
+        {
+          "line": 2397,
+          "command": "pnpm test:request-log",
+          "value": "ℹ pass 22"
+        },
+        {
+          "line": 2398,
+          "command": "pnpm test:request-log",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2400,
+          "command": "pnpm test:request-log",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2431,
+          "command": "pnpm test:legacy-reads",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 2433,
+          "command": "pnpm test:legacy-reads",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 2434,
+          "command": "pnpm test:legacy-reads",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2436,
+          "command": "pnpm test:legacy-reads",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2473,
+          "command": "pnpm test:slack",
+          "value": "ℹ tests 12"
+        },
+        {
+          "line": 2475,
+          "command": "pnpm test:slack",
+          "value": "ℹ pass 12"
+        },
+        {
+          "line": 2476,
+          "command": "pnpm test:slack",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2478,
+          "command": "pnpm test:slack",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2505,
+          "command": "pnpm test:telegram",
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 2507,
+          "command": "pnpm test:telegram",
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 2508,
+          "command": "pnpm test:telegram",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2510,
+          "command": "pnpm test:telegram",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2652,
+          "command": "pnpm test:agent",
+          "value": "ℹ tests 82"
+        },
+        {
+          "line": 2654,
+          "command": "pnpm test:agent",
+          "value": "ℹ pass 81"
+        },
+        {
+          "line": 2655,
+          "command": "pnpm test:agent",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2657,
+          "command": "pnpm test:agent",
+          "value": "ℹ skipped 1"
+        },
+        {
+          "line": 2748,
+          "command": "pnpm test:agent",
+          "value": "ℹ tests 22"
+        },
+        {
+          "line": 2750,
+          "command": "pnpm test:agent",
+          "value": "ℹ pass 22"
+        },
+        {
+          "line": 2751,
+          "command": "pnpm test:agent",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2753,
+          "command": "pnpm test:agent",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2781,
+          "command": "pnpm test:acceptance",
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 2783,
+          "command": "pnpm test:acceptance",
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 2784,
+          "command": "pnpm test:acceptance",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2786,
+          "command": "pnpm test:acceptance",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3034,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ tests 107"
+        },
+        {
+          "line": 3036,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ pass 107"
+        },
+        {
+          "line": 3037,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3039,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3075,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ tests 21"
+        },
+        {
+          "line": 3077,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ pass 21"
+        },
+        {
+          "line": 3078,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3080,
+          "command": "pnpm test:suggestions",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3112,
+          "command": "pnpm test:captures",
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 3114,
+          "command": "pnpm test:captures",
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 3115,
+          "command": "pnpm test:captures",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3117,
+          "command": "pnpm test:captures",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3153,
+          "command": "pnpm test:captures",
+          "value": "ℹ tests 33"
+        },
+        {
+          "line": 3155,
+          "command": "pnpm test:captures",
+          "value": "ℹ pass 33"
+        },
+        {
+          "line": 3156,
+          "command": "pnpm test:captures",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3158,
+          "command": "pnpm test:captures",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3166,
+          "command": "pnpm test:captures",
+          "value": "Test Files  1 passed (1)"
+        },
+        {
+          "line": 3167,
+          "command": "pnpm test:captures",
+          "value": "Tests  3 passed (3)"
+        },
+        {
+          "line": 3219,
+          "command": "pnpm test:db-runner",
+          "value": "ℹ tests 28"
+        },
+        {
+          "line": 3221,
+          "command": "pnpm test:db-runner",
+          "value": "ℹ pass 28"
+        },
+        {
+          "line": 3222,
+          "command": "pnpm test:db-runner",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3224,
+          "command": "pnpm test:db-runner",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3254,
+          "command": "pnpm test:csv",
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 3256,
+          "command": "pnpm test:csv",
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 3257,
+          "command": "pnpm test:csv",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3259,
+          "command": "pnpm test:csv",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3323,
+          "command": "pnpm test:settings",
+          "value": "ℹ tests 42"
+        },
+        {
+          "line": 3325,
+          "command": "pnpm test:settings",
+          "value": "ℹ pass 42"
+        },
+        {
+          "line": 3326,
+          "command": "pnpm test:settings",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3328,
+          "command": "pnpm test:settings",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3360,
+          "command": "pnpm test:settings",
+          "value": "ℹ tests 29"
+        },
+        {
+          "line": 3362,
+          "command": "pnpm test:settings",
+          "value": "ℹ pass 29"
+        },
+        {
+          "line": 3363,
+          "command": "pnpm test:settings",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3365,
+          "command": "pnpm test:settings",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3438,
+          "command": "pnpm test:settings",
+          "value": "ℹ tests 36"
+        },
+        {
+          "line": 3440,
+          "command": "pnpm test:settings",
+          "value": "ℹ pass 36"
+        },
+        {
+          "line": 3441,
+          "command": "pnpm test:settings",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3443,
+          "command": "pnpm test:settings",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3644,
+          "command": "pnpm test:settings",
+          "value": "ℹ tests 146"
+        },
+        {
+          "line": 3646,
+          "command": "pnpm test:settings",
+          "value": "ℹ pass 146"
+        },
+        {
+          "line": 3647,
+          "command": "pnpm test:settings",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3649,
+          "command": "pnpm test:settings",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3746,
+          "command": "pnpm test:settings-backend",
+          "value": "ℹ tests 34"
+        },
+        {
+          "line": 3748,
+          "command": "pnpm test:settings-backend",
+          "value": "ℹ pass 34"
+        },
+        {
+          "line": 3749,
+          "command": "pnpm test:settings-backend",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3751,
+          "command": "pnpm test:settings-backend",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3815,
+          "command": "pnpm test:workspace-settings",
+          "value": "ℹ tests 18"
+        },
+        {
+          "line": 3817,
+          "command": "pnpm test:workspace-settings",
+          "value": "ℹ pass 18"
+        },
+        {
+          "line": 3818,
+          "command": "pnpm test:workspace-settings",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3820,
+          "command": "pnpm test:workspace-settings",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3848,
+          "command": "pnpm test:settings-prefs",
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 3850,
+          "command": "pnpm test:settings-prefs",
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 3851,
+          "command": "pnpm test:settings-prefs",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3853,
+          "command": "pnpm test:settings-prefs",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3884,
+          "command": "pnpm test:account",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 3886,
+          "command": "pnpm test:account",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 3887,
+          "command": "pnpm test:account",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3889,
+          "command": "pnpm test:account",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3927,
+          "command": "pnpm test:account",
+          "value": "ℹ tests 23"
+        },
+        {
+          "line": 3929,
+          "command": "pnpm test:account",
+          "value": "ℹ pass 23"
+        },
+        {
+          "line": 3930,
+          "command": "pnpm test:account",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3932,
+          "command": "pnpm test:account",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4229,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 247"
+        },
+        {
+          "line": 4231,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 247"
+        },
+        {
+          "line": 4232,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4234,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4308,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 33"
+        },
+        {
+          "line": 4310,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 33"
+        },
+        {
+          "line": 4311,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4313,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4370,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 23"
+        },
+        {
+          "line": 4372,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 23"
+        },
+        {
+          "line": 4373,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4375,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4384,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 4386,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 4387,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4389,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4396,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 4398,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 4399,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4401,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4406,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 4408,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 4409,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4411,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4417,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 4419,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 4420,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4422,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4662,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 31"
+        },
+        {
+          "line": 4664,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 31"
+        },
+        {
+          "line": 4665,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4667,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4673,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 4675,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 4676,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4678,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4741,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 53"
+        },
+        {
+          "line": 4743,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 53"
+        },
+        {
+          "line": 4744,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4746,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4781,
+          "command": "pnpm test:issues",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 4783,
+          "command": "pnpm test:issues",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 4784,
+          "command": "pnpm test:issues",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4786,
+          "command": "pnpm test:issues",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4838,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ tests 30"
+        },
+        {
+          "line": 4840,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ pass 30"
+        },
+        {
+          "line": 4841,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4843,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4900,
+          "command": "pnpm test:issue-search",
+          "value": "Test Files  31 passed (31)"
+        },
+        {
+          "line": 4901,
+          "command": "pnpm test:issue-search",
+          "value": "Tests  319 passed (319)"
+        },
+        {
+          "line": 4927,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 4929,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 4930,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4932,
+          "command": "pnpm test:issue-search",
+          "value": "ℹ skipped 0"
+        }
+      ],
+      "failure": []
+    },
+    {
+      "jobId": 128392576127,
+      "jobName": "Database checks (3/4)",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 246,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 800,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 802,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 803,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 805,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1157,
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 1159,
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 1160,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1162,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1275,
+          "value": "ℹ tests 90"
+        },
+        {
+          "line": 1277,
+          "value": "ℹ pass 90"
+        },
+        {
+          "line": 1278,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1280,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1304,
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 1306,
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 1307,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1309,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1329,
+          "value": "ℹ tests 12"
+        },
+        {
+          "line": 1331,
+          "value": "ℹ pass 12"
+        },
+        {
+          "line": 1332,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1334,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1441,
+          "value": "ℹ tests 79"
+        },
+        {
+          "line": 1443,
+          "value": "ℹ pass 79"
+        },
+        {
+          "line": 1444,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1446,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1470,
+          "value": "ℹ tests 17"
+        },
+        {
+          "line": 1472,
+          "value": "ℹ pass 17"
+        },
+        {
+          "line": 1473,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1475,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1521,
+          "value": "ℹ tests 34"
+        },
+        {
+          "line": 1523,
+          "value": "ℹ pass 34"
+        },
+        {
+          "line": 1524,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1526,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1538,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 1540,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 1541,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1543,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1569,
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 1571,
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 1572,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1574,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1695,
+          "value": "ℹ tests 25"
+        },
+        {
+          "line": 1697,
+          "value": "ℹ pass 25"
+        },
+        {
+          "line": 1698,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1700,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1778,
+          "value": "ℹ tests 67"
+        },
+        {
+          "line": 1780,
+          "value": "ℹ pass 67"
+        },
+        {
+          "line": 1781,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1783,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1810,
+          "value": "ℹ tests 20"
+        },
+        {
+          "line": 1812,
+          "value": "ℹ pass 20"
+        },
+        {
+          "line": 1813,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1815,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1847,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 1849,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 1850,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1852,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1873,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 1875,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 1876,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1878,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1888,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 1890,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 1891,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1893,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1900,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 1902,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 1903,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1905,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1922,
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 1924,
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 1925,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1927,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1948,
+          "value": "ℹ tests 14"
+        },
+        {
+          "line": 1950,
+          "value": "ℹ pass 14"
+        },
+        {
+          "line": 1951,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1953,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1969,
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 1971,
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 1972,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1974,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4595,
+          "value": "ℹ tests 290"
+        },
+        {
+          "line": 4597,
+          "value": "ℹ pass 290"
+        },
+        {
+          "line": 4598,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4600,
+          "value": "ℹ skipped 0"
+        }
+      ]
+    },
+    {
+      "jobId": 128392576128,
+      "jobName": "Daemon checks",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 132,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 858,
+          "value": "Test Files  110 passed | 1 skipped (111)"
+        },
+        {
+          "line": 859,
+          "value": "Tests  1154 passed | 2 skipped (1156)"
+        },
+        {
+          "line": 925,
+          "value": "ℹ tests 40"
+        },
+        {
+          "line": 927,
+          "value": "ℹ pass 40"
+        },
+        {
+          "line": 928,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 930,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 958,
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 960,
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 961,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 963,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 977,
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 979,
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 980,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 982,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 993,
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 995,
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 996,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 998,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1029,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1031,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1032,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1034,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1140,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 1142,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 1143,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1145,
+          "value": "ℹ skipped 0"
+        }
+      ]
+    },
+    {
+      "jobId": 128392576161,
+      "jobName": "Database checks (2/4)",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 247,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 804,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 806,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 807,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 809,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1283,
+          "value": "ℹ tests 114"
+        },
+        {
+          "line": 1285,
+          "value": "ℹ pass 114"
+        },
+        {
+          "line": 1286,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1288,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1301,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1303,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1304,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1306,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1366,
+          "value": "ℹ tests 54"
+        },
+        {
+          "line": 1368,
+          "value": "ℹ pass 54"
+        },
+        {
+          "line": 1369,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1371,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1377,
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 1379,
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 1380,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1382,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1457,
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 1459,
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 1460,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1462,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1535,
+          "value": "ℹ tests 34"
+        },
+        {
+          "line": 1537,
+          "value": "ℹ pass 34"
+        },
+        {
+          "line": 1538,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1540,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1593,
+          "value": "ℹ tests 39"
+        },
+        {
+          "line": 1595,
+          "value": "ℹ pass 39"
+        },
+        {
+          "line": 1596,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1598,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1695,
+          "value": "ℹ tests 40"
+        },
+        {
+          "line": 1697,
+          "value": "ℹ pass 40"
+        },
+        {
+          "line": 1698,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1700,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2240,
+          "value": "ℹ tests 499"
+        },
+        {
+          "line": 2242,
+          "value": "ℹ pass 499"
+        },
+        {
+          "line": 2243,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2245,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2371,
+          "value": "ℹ tests 91"
+        },
+        {
+          "line": 2373,
+          "value": "ℹ pass 91"
+        },
+        {
+          "line": 2374,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2376,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2473,
+          "value": "ℹ tests 69"
+        },
+        {
+          "line": 2475,
+          "value": "ℹ pass 69"
+        },
+        {
+          "line": 2476,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2478,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2488,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 2490,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 2491,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2493,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2904,
+          "value": "ℹ tests 308"
+        },
+        {
+          "line": 2906,
+          "value": "ℹ pass 308"
+        },
+        {
+          "line": 2907,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2909,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2927,
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 2929,
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 2930,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2932,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2952,
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 2954,
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 2955,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2957,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2974,
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 2976,
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 2977,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2979,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2987,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2989,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2990,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2992,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3013,
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 3015,
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 3016,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3018,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3030,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 3032,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 3033,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3035,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3059,
+          "value": "ℹ tests 16"
+        },
+        {
+          "line": 3061,
+          "value": "ℹ pass 16"
+        },
+        {
+          "line": 3062,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3064,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3085,
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 3087,
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 3088,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3090,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3105,
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 3107,
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 3108,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3110,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4409,
+          "value": "ℹ tests 126"
+        },
+        {
+          "line": 4411,
+          "value": "ℹ pass 126"
+        },
+        {
+          "line": 4412,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4414,
+          "value": "ℹ skipped 0"
+        }
+      ]
+    },
+    {
+      "jobId": 128392576179,
+      "jobName": "Source checks",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 131,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 562,
+          "value": "ℹ tests 55"
+        },
+        {
+          "line": 564,
+          "value": "ℹ pass 55"
+        },
+        {
+          "line": 565,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 567,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 663,
+          "value": "ℹ tests 31"
+        },
+        {
+          "line": 665,
+          "value": "ℹ pass 31"
+        },
+        {
+          "line": 666,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 668,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 747,
+          "value": "ℹ tests 52"
+        },
+        {
+          "line": 749,
+          "value": "ℹ pass 52"
+        },
+        {
+          "line": 750,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 752,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 839,
+          "value": "ℹ tests 40"
+        },
+        {
+          "line": 841,
+          "value": "ℹ pass 40"
+        },
+        {
+          "line": 842,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 844,
+          "value": "ℹ skipped 0"
+        }
+      ]
+    },
+    {
+      "jobId": 128392576185,
+      "jobName": "Core unit checks",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 131,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 735,
+          "command": "pnpm test:factory-check-independence",
+          "value": "ℹ tests 244"
+        },
+        {
+          "line": 737,
+          "command": "pnpm test:factory-check-independence",
+          "value": "ℹ pass 244"
+        },
+        {
+          "line": 738,
+          "command": "pnpm test:factory-check-independence",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 740,
+          "command": "pnpm test:factory-check-independence",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 786,
+          "command": "pnpm test:factory-check-recovery",
+          "value": "ℹ tests 18"
+        },
+        {
+          "line": 788,
+          "command": "pnpm test:factory-check-recovery",
+          "value": "ℹ pass 18"
+        },
+        {
+          "line": 789,
+          "command": "pnpm test:factory-check-recovery",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 791,
+          "command": "pnpm test:factory-check-recovery",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 843,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ tests 21"
+        },
+        {
+          "line": 845,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ pass 21"
+        },
+        {
+          "line": 846,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 848,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1064,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ tests 135"
+        },
+        {
+          "line": 1066,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ pass 135"
+        },
+        {
+          "line": 1067,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1069,
+          "command": "pnpm test:factory-routing",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1126,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ tests 34"
+        },
+        {
+          "line": 1128,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ pass 34"
+        },
+        {
+          "line": 1129,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1131,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1202,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ tests 20"
+        },
+        {
+          "line": 1204,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ pass 20"
+        },
+        {
+          "line": 1205,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1207,
+          "command": "pnpm test:self-improvement-semantic-source",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1574,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ tests 310"
+        },
+        {
+          "line": 1576,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ pass 310"
+        },
+        {
+          "line": 1577,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1579,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1598,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 1600,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 1601,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1603,
+          "command": "pnpm test:ui-policy",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1640,
+          "command": "pnpm test:idle-budget",
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 1642,
+          "command": "pnpm test:idle-budget",
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 1643,
+          "command": "pnpm test:idle-budget",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1645,
+          "command": "pnpm test:idle-budget",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1672,
+          "command": "pnpm test:motion",
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1674,
+          "command": "pnpm test:motion",
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1675,
+          "command": "pnpm test:motion",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1677,
+          "command": "pnpm test:motion",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1713,
+          "command": "pnpm test:i18n",
+          "value": "ℹ tests 14"
+        },
+        {
+          "line": 1715,
+          "command": "pnpm test:i18n",
+          "value": "ℹ pass 14"
+        },
+        {
+          "line": 1716,
+          "command": "pnpm test:i18n",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1718,
+          "command": "pnpm test:i18n",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1765,
+          "command": "pnpm test:ssh-target",
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1767,
+          "command": "pnpm test:ssh-target",
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1768,
+          "command": "pnpm test:ssh-target",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1770,
+          "command": "pnpm test:ssh-target",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1825,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ tests 33"
+        },
+        {
+          "line": 1827,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ pass 33"
+        },
+        {
+          "line": 1828,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1830,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1862,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 1864,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 1865,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1867,
+          "command": "pnpm test:linear-sync",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2019,
+          "command": "pnpm test:release-security",
+          "value": "ℹ tests 98"
+        },
+        {
+          "line": 2021,
+          "command": "pnpm test:release-security",
+          "value": "ℹ pass 98"
+        },
+        {
+          "line": 2022,
+          "command": "pnpm test:release-security",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2024,
+          "command": "pnpm test:release-security",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2060,
+          "command": "pnpm test:mailbox-verification",
+          "value": "ℹ tests 14"
+        },
+        {
+          "line": 2062,
+          "command": "pnpm test:mailbox-verification",
+          "value": "ℹ pass 14"
+        },
+        {
+          "line": 2063,
+          "command": "pnpm test:mailbox-verification",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2065,
+          "command": "pnpm test:mailbox-verification",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2111,
+          "command": "pnpm test:factory-approval",
+          "value": "ℹ tests 15"
+        },
+        {
+          "line": 2113,
+          "command": "pnpm test:factory-approval",
+          "value": "ℹ pass 15"
+        },
+        {
+          "line": 2114,
+          "command": "pnpm test:factory-approval",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2116,
+          "command": "pnpm test:factory-approval",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2270,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ tests 96"
+        },
+        {
+          "line": 2272,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ pass 96"
+        },
+        {
+          "line": 2273,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2275,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2279,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 2281,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 2282,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2284,
+          "command": "pnpm test:personal-mailbox-core",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2321,
+          "command": "pnpm test:factory-monitor",
+          "value": "ℹ tests 15"
+        },
+        {
+          "line": 2323,
+          "command": "pnpm test:factory-monitor",
+          "value": "ℹ pass 15"
+        },
+        {
+          "line": 2324,
+          "command": "pnpm test:factory-monitor",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2326,
+          "command": "pnpm test:factory-monitor",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2442,
+          "command": "pnpm test:execution-rules",
+          "value": "ℹ tests 88"
+        },
+        {
+          "line": 2444,
+          "command": "pnpm test:execution-rules",
+          "value": "ℹ pass 88"
+        },
+        {
+          "line": 2445,
+          "command": "pnpm test:execution-rules",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2447,
+          "command": "pnpm test:execution-rules",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2462,
+          "command": "pnpm test:execution-rules",
+          "value": "Test Files  1 passed (1)"
+        },
+        {
+          "line": 2463,
+          "command": "pnpm test:execution-rules",
+          "value": "Tests  8 passed (8)"
+        },
+        {
+          "line": 2472,
+          "command": "pnpm test:execution-rules",
+          "value": "Test Files  1 passed (1)"
+        },
+        {
+          "line": 2473,
+          "command": "pnpm test:execution-rules",
+          "value": "Tests  2 passed (2)"
+        },
+        {
+          "line": 2592,
+          "command": "pnpm test:abuse",
+          "value": "ℹ tests 49"
+        },
+        {
+          "line": 2594,
+          "command": "pnpm test:abuse",
+          "value": "ℹ pass 49"
+        },
+        {
+          "line": 2595,
+          "command": "pnpm test:abuse",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2597,
+          "command": "pnpm test:abuse",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2633,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 2635,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 2636,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2638,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2647,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 2649,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 2650,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2652,
+          "command": "pnpm test:hosted-usage",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2723,
+          "command": "pnpm test:model-admission",
+          "value": "ℹ tests 12"
+        },
+        {
+          "line": 2725,
+          "command": "pnpm test:model-admission",
+          "value": "ℹ pass 12"
+        },
+        {
+          "line": 2726,
+          "command": "pnpm test:model-admission",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2728,
+          "command": "pnpm test:model-admission",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2764,
+          "command": "pnpm test:audit",
+          "value": "ℹ tests 14"
+        },
+        {
+          "line": 2766,
+          "command": "pnpm test:audit",
+          "value": "ℹ pass 14"
+        },
+        {
+          "line": 2767,
+          "command": "pnpm test:audit",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2769,
+          "command": "pnpm test:audit",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2781,
+          "command": "pnpm test:audit",
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 2783,
+          "command": "pnpm test:audit",
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 2784,
+          "command": "pnpm test:audit",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2786,
+          "command": "pnpm test:audit",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2855,
+          "command": "pnpm test:agent-kit",
+          "value": "ℹ tests 46"
+        },
+        {
+          "line": 2857,
+          "command": "pnpm test:agent-kit",
+          "value": "ℹ pass 46"
+        },
+        {
+          "line": 2858,
+          "command": "pnpm test:agent-kit",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2860,
+          "command": "pnpm test:agent-kit",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3036,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ tests 53"
+        },
+        {
+          "line": 3038,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ pass 53"
+        },
+        {
+          "line": 3039,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3041,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3263,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ tests 143"
+        },
+        {
+          "line": 3265,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ pass 143"
+        },
+        {
+          "line": 3266,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3268,
+          "command": "pnpm test:agent-kit-compat",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3402,
+          "command": "pnpm test:approved-writes",
+          "value": "ℹ tests 97"
+        },
+        {
+          "line": 3404,
+          "command": "pnpm test:approved-writes",
+          "value": "ℹ pass 97"
+        },
+        {
+          "line": 3405,
+          "command": "pnpm test:approved-writes",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3407,
+          "command": "pnpm test:approved-writes",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3439,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 3441,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 3442,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3444,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 3584,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 137"
+        },
+        {
+          "line": 3586,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 137"
+        },
+        {
+          "line": 3587,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 3589,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4023,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 154"
+        },
+        {
+          "line": 4025,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 154"
+        },
+        {
+          "line": 4026,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4028,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4058,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 23"
+        },
+        {
+          "line": 4060,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 23"
+        },
+        {
+          "line": 4061,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4063,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4087,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 4089,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 4090,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4092,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4098,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 4100,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 4101,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4103,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4126,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 20"
+        },
+        {
+          "line": 4128,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 20"
+        },
+        {
+          "line": 4129,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4131,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4140,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 4142,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 4143,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4145,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4231,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ tests 55"
+        },
+        {
+          "line": 4233,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ pass 55"
+        },
+        {
+          "line": 4234,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4236,
+          "command": "pnpm test:coordinator-events",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4340,
+          "command": "pnpm test:schedules",
+          "value": "ℹ tests 63"
+        },
+        {
+          "line": 4342,
+          "command": "pnpm test:schedules",
+          "value": "ℹ pass 63"
+        },
+        {
+          "line": 4343,
+          "command": "pnpm test:schedules",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4345,
+          "command": "pnpm test:schedules",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4389,
+          "command": "pnpm test:run-recovery",
+          "value": "ℹ tests 13"
+        },
+        {
+          "line": 4391,
+          "command": "pnpm test:run-recovery",
+          "value": "ℹ pass 13"
+        },
+        {
+          "line": 4392,
+          "command": "pnpm test:run-recovery",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4394,
+          "command": "pnpm test:run-recovery",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4450,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ tests 34"
+        },
+        {
+          "line": 4452,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ pass 34"
+        },
+        {
+          "line": 4453,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4455,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4468,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 4470,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 4471,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4473,
+          "command": "pnpm test:mvp-fixtures",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4532,
+          "command": "pnpm test:credentials",
+          "value": "ℹ tests 37"
+        },
+        {
+          "line": 4534,
+          "command": "pnpm test:credentials",
+          "value": "ℹ pass 37"
+        },
+        {
+          "line": 4535,
+          "command": "pnpm test:credentials",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4537,
+          "command": "pnpm test:credentials",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4556,
+          "command": "pnpm test:credentials",
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 4558,
+          "command": "pnpm test:credentials",
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 4559,
+          "command": "pnpm test:credentials",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4561,
+          "command": "pnpm test:credentials",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4608,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ tests 25"
+        },
+        {
+          "line": 4610,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ pass 25"
+        },
+        {
+          "line": 4611,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4613,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4623,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 4625,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 4626,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4628,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4663,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ tests 23"
+        },
+        {
+          "line": 4665,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ pass 23"
+        },
+        {
+          "line": 4666,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4668,
+          "command": "pnpm test:run-publication",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4854,
+          "command": "pnpm test:workflow-wakes",
+          "value": "ℹ tests 141"
+        },
+        {
+          "line": 4856,
+          "command": "pnpm test:workflow-wakes",
+          "value": "ℹ pass 141"
+        },
+        {
+          "line": 4857,
+          "command": "pnpm test:workflow-wakes",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4859,
+          "command": "pnpm test:workflow-wakes",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 4883,
+          "command": "pnpm test:workflow-wakes",
+          "value": "Test Files  1 passed (1)"
+        },
+        {
+          "line": 4884,
+          "command": "pnpm test:workflow-wakes",
+          "value": "Tests  13 passed (13)"
+        },
+        {
+          "line": 4930,
+          "command": "pnpm test:workflow-wakes",
+          "value": "Test Files  4 passed (4)"
+        },
+        {
+          "line": 4931,
+          "command": "pnpm test:workflow-wakes",
+          "value": "Tests  93 passed (93)"
+        },
+        {
+          "line": 4961,
+          "command": "pnpm test:mobile-push",
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 4963,
+          "command": "pnpm test:mobile-push",
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 4964,
+          "command": "pnpm test:mobile-push",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 4966,
+          "command": "pnpm test:mobile-push",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5019,
+          "command": "pnpm test:mobile",
+          "value": "ℹ tests 29"
+        },
+        {
+          "line": 5021,
+          "command": "pnpm test:mobile",
+          "value": "ℹ pass 29"
+        },
+        {
+          "line": 5022,
+          "command": "pnpm test:mobile",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5024,
+          "command": "pnpm test:mobile",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5112,
+          "command": "pnpm test:mobile",
+          "value": "ℹ tests 18"
+        },
+        {
+          "line": 5114,
+          "command": "pnpm test:mobile",
+          "value": "ℹ pass 18"
+        },
+        {
+          "line": 5115,
+          "command": "pnpm test:mobile",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5117,
+          "command": "pnpm test:mobile",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5311,
+          "command": "pnpm test:mobile",
+          "value": "ℹ tests 161"
+        },
+        {
+          "line": 5313,
+          "command": "pnpm test:mobile",
+          "value": "ℹ pass 161"
+        },
+        {
+          "line": 5314,
+          "command": "pnpm test:mobile",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5316,
+          "command": "pnpm test:mobile",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5343,
+          "command": "pnpm test:coordinator-native-relay",
+          "value": "Test Files  1 passed (1)"
+        },
+        {
+          "line": 5344,
+          "command": "pnpm test:coordinator-native-relay",
+          "value": "Tests  6 passed (6)"
+        },
+        {
+          "line": 5450,
+          "command": "pnpm test:coordinator-native-scope",
+          "value": "ℹ tests 78"
+        },
+        {
+          "line": 5452,
+          "command": "pnpm test:coordinator-native-scope",
+          "value": "ℹ pass 78"
+        },
+        {
+          "line": 5453,
+          "command": "pnpm test:coordinator-native-scope",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5455,
+          "command": "pnpm test:coordinator-native-scope",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5501,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ tests 18"
+        },
+        {
+          "line": 5503,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ pass 18"
+        },
+        {
+          "line": 5504,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5506,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5543,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ tests 21"
+        },
+        {
+          "line": 5545,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ pass 21"
+        },
+        {
+          "line": 5546,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5548,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5764,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ tests 135"
+        },
+        {
+          "line": 5766,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ pass 135"
+        },
+        {
+          "line": 5767,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5769,
+          "command": "pnpm test:coordinator-issue-tools",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5795,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 5797,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 5798,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5800,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5809,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 5811,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 5812,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5814,
+          "command": "pnpm test:signup-turnstile",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5967,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ tests 47"
+        },
+        {
+          "line": 5969,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ pass 47"
+        },
+        {
+          "line": 5970,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5972,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 5986,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 5988,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 5989,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 5991,
+          "command": "pnpm test:cloud-limits",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6034,
+          "command": "pnpm test:analytics",
+          "value": "ℹ tests 21"
+        },
+        {
+          "line": 6036,
+          "command": "pnpm test:analytics",
+          "value": "ℹ pass 21"
+        },
+        {
+          "line": 6037,
+          "command": "pnpm test:analytics",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6039,
+          "command": "pnpm test:analytics",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6078,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ tests 17"
+        },
+        {
+          "line": 6080,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ pass 17"
+        },
+        {
+          "line": 6081,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6083,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6087,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 6089,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 6090,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6092,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6123,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ tests 22"
+        },
+        {
+          "line": 6125,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ pass 22"
+        },
+        {
+          "line": 6126,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6128,
+          "command": "pnpm test:artifacts",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6157,
+          "command": "pnpm test:factory-config",
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 6159,
+          "command": "pnpm test:factory-config",
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 6160,
+          "command": "pnpm test:factory-config",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6162,
+          "command": "pnpm test:factory-config",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6191,
+          "command": "pnpm test:user-message-text",
+          "value": "ℹ tests 4"
+        },
+        {
+          "line": 6193,
+          "command": "pnpm test:user-message-text",
+          "value": "ℹ pass 4"
+        },
+        {
+          "line": 6194,
+          "command": "pnpm test:user-message-text",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6196,
+          "command": "pnpm test:user-message-text",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6225,
+          "command": "pnpm test:run-info",
+          "value": "ℹ tests 7"
+        },
+        {
+          "line": 6227,
+          "command": "pnpm test:run-info",
+          "value": "ℹ pass 7"
+        },
+        {
+          "line": 6228,
+          "command": "pnpm test:run-info",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6230,
+          "command": "pnpm test:run-info",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6244,
+          "command": "pnpm test:run-info",
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 6246,
+          "command": "pnpm test:run-info",
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 6247,
+          "command": "pnpm test:run-info",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6249,
+          "command": "pnpm test:run-info",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6279,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ tests 8"
+        },
+        {
+          "line": 6281,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ pass 8"
+        },
+        {
+          "line": 6282,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6284,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6296,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 6298,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 6299,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6301,
+          "command": "pnpm test:thread-changes",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6445,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ tests 97"
+        },
+        {
+          "line": 6447,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ pass 97"
+        },
+        {
+          "line": 6448,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6450,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6462,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 6464,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 6465,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6467,
+          "command": "pnpm test:dev-local",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6561,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 72"
+        },
+        {
+          "line": 6563,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 72"
+        },
+        {
+          "line": 6564,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6566,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6570,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 6572,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 6573,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6575,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6748,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 162"
+        },
+        {
+          "line": 6750,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 162"
+        },
+        {
+          "line": 6751,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6753,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6771,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 9"
+        },
+        {
+          "line": 6773,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 9"
+        },
+        {
+          "line": 6774,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6776,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6812,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 18"
+        },
+        {
+          "line": 6814,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 18"
+        },
+        {
+          "line": 6815,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6817,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6898,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 78"
+        },
+        {
+          "line": 6900,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 78"
+        },
+        {
+          "line": 6901,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6903,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 6933,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 27"
+        },
+        {
+          "line": 6935,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 27"
+        },
+        {
+          "line": 6936,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 6938,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 7011,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 55"
+        },
+        {
+          "line": 7013,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 55"
+        },
+        {
+          "line": 7014,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 7016,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 7183,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ tests 164"
+        },
+        {
+          "line": 7185,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ pass 164"
+        },
+        {
+          "line": 7186,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 7188,
+          "command": "pnpm test:lib-units",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 7231,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ tests 21"
+        },
+        {
+          "line": 7233,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ pass 21"
+        },
+        {
+          "line": 7234,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 7236,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 7326,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ tests 72"
+        },
+        {
+          "line": 7328,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ pass 72"
+        },
+        {
+          "line": 7329,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 7331,
+          "command": "pnpm test:project-decisions",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 7364,
+          "command": "pnpm test:unread",
+          "value": "ℹ tests 11"
+        },
+        {
+          "line": 7366,
+          "command": "pnpm test:unread",
+          "value": "ℹ pass 11"
+        },
+        {
+          "line": 7367,
+          "command": "pnpm test:unread",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 7369,
+          "command": "pnpm test:unread",
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 7443,
+          "command": "pnpm test:issue-readonly-dom",
+          "value": "ℹ tests 28"
+        },
+        {
+          "line": 7445,
+          "command": "pnpm test:issue-readonly-dom",
+          "value": "ℹ pass 28"
+        },
+        {
+          "line": 7446,
+          "command": "pnpm test:issue-readonly-dom",
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 7448,
+          "command": "pnpm test:issue-readonly-dom",
+          "value": "ℹ skipped 0"
+        }
+      ],
+      "failure": []
+    },
+    {
+      "jobId": 128392576198,
+      "jobName": "Database checks (1/4)",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [
+        {
+          "line": 246,
+          "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2"
+        }
+      ],
+      "summaryLines": [
+        {
+          "line": 793,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 795,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 796,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 798,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1122,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 1124,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 1125,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1127,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1158,
+          "value": "ℹ tests 1"
+        },
+        {
+          "line": 1160,
+          "value": "ℹ pass 1"
+        },
+        {
+          "line": 1161,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1163,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1302,
+          "value": "ℹ tests 90"
+        },
+        {
+          "line": 1304,
+          "value": "ℹ pass 90"
+        },
+        {
+          "line": 1305,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1307,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1395,
+          "value": "ℹ tests 43"
+        },
+        {
+          "line": 1397,
+          "value": "ℹ pass 43"
+        },
+        {
+          "line": 1398,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1400,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1468,
+          "value": "ℹ tests 17"
+        },
+        {
+          "line": 1470,
+          "value": "ℹ pass 17"
+        },
+        {
+          "line": 1471,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1473,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1490,
+          "value": "ℹ tests 10"
+        },
+        {
+          "line": 1492,
+          "value": "ℹ pass 10"
+        },
+        {
+          "line": 1493,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1495,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1519,
+          "value": "ℹ tests 16"
+        },
+        {
+          "line": 1521,
+          "value": "ℹ pass 16"
+        },
+        {
+          "line": 1522,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1524,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1540,
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 1542,
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 1543,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1545,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1556,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 1558,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 1559,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1561,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1569,
+          "value": "ℹ tests 2"
+        },
+        {
+          "line": 1571,
+          "value": "ℹ pass 2"
+        },
+        {
+          "line": 1572,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1574,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1630,
+          "value": "ℹ tests 23"
+        },
+        {
+          "line": 1632,
+          "value": "ℹ pass 23"
+        },
+        {
+          "line": 1633,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1635,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1648,
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 1650,
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 1651,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1653,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1662,
+          "value": "ℹ tests 3"
+        },
+        {
+          "line": 1664,
+          "value": "ℹ pass 3"
+        },
+        {
+          "line": 1665,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1667,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1730,
+          "value": "ℹ tests 55"
+        },
+        {
+          "line": 1732,
+          "value": "ℹ pass 55"
+        },
+        {
+          "line": 1733,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1735,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1751,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1753,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1754,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1756,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1815,
+          "value": "ℹ tests 23"
+        },
+        {
+          "line": 1817,
+          "value": "ℹ pass 23"
+        },
+        {
+          "line": 1818,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1820,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1835,
+          "value": "ℹ tests 5"
+        },
+        {
+          "line": 1837,
+          "value": "ℹ pass 5"
+        },
+        {
+          "line": 1838,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1840,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1896,
+          "value": "ℹ tests 42"
+        },
+        {
+          "line": 1898,
+          "value": "ℹ pass 42"
+        },
+        {
+          "line": 1899,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1901,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 1919,
+          "value": "ℹ tests 6"
+        },
+        {
+          "line": 1921,
+          "value": "ℹ pass 6"
+        },
+        {
+          "line": 1922,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 1924,
+          "value": "ℹ skipped 0"
+        },
+        {
+          "line": 2200,
+          "value": "ℹ tests 166"
+        },
+        {
+          "line": 2202,
+          "value": "ℹ pass 166"
+        },
+        {
+          "line": 2203,
+          "value": "ℹ fail 0"
+        },
+        {
+          "line": 2205,
+          "value": "ℹ skipped 0"
+        }
+      ]
+    },
+    {
+      "jobId": 128393385875,
+      "jobName": "Production build and browser interactions",
+      "source": "GitHub decoded job log read in memory; raw log not saved",
+      "checkout": [],
+      "summaryLines": [],
+      "failure": [
+        {
+          "line": 55,
+          "code": "DEPENDENCY_DATABASE_SUITE_FAILURE"
+        },
+        {
+          "line": 56,
+          "code": "EXIT_1"
+        }
+      ]
+    }
+  ]
+}

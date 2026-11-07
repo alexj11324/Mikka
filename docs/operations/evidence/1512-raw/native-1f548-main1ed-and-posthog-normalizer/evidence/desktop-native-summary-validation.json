@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-07T12:05:41.018Z",
+  "scope": "Offline reading and comparison of saved Desktop JSON evidence only",
+  "artifacts": {
+    "desktop-native-summary.mjs": {
+      "bytes": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b"
+    },
+    "desktop-native-summary.test.mjs": {
+      "bytes": 5952,
+      "sha256": "73517b9026c6d61fbf9b0165c44b3345af4a865bac82a86eb609688e765e95d5"
+    },
+    "desktop-native-summary.md": {
+      "bytes": 3457,
+      "sha256": "1f7c90769981018626df689904596cf40852455925f394811e04f2d6341ddfa3"
+    },
+    "desktop-native-summary-tests-final.tap": {
+      "bytes": 765,
+      "sha256": "a108af300fd9c5a5db4d4038003583b70f95cf62b90c7fa1452a792a801284f6"
+    },
+    "desktop-native-summary-lint-final.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "desktop-native-summary-191.stdout.json": {
+      "bytes": 590,
+      "sha256": "35c6551d24eece0ee5f6c77f183268b190884287e1e830cc889bd4cc2c88923a"
+    },
+    "desktop-native-summary-1f.stdout.json": {
+      "bytes": 590,
+      "sha256": "a0f545b8facd46d32399be09fee3684baee3a4aa74bd41273881fc683d433f37"
+    },
+    "evidence/desktop-191fcce-offline-summary.json": {
+      "bytes": 113262,
+      "sha256": "ab2fe975d5819218c57a5c579c7e6f20ffc6944482338e8b8e474c70640b4c00"
+    },
+    "evidence/desktop-1f548-offline-summary.json": {
+      "bytes": 130233,
+      "sha256": "c6987d3cc5f6fc5abc7a0a54cddbe7791552297165520da5fb28b0f763d22433"
+    }
+  },
+  "validation": {
+    "syntaxExitCode": 0,
+    "lintExitCode": 0,
+    "tests": {
+      "exitCode": 0,
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0
+    },
+    "summaryExitCodes": {
+      "191fcce": 0,
+      "1f548": 0
+    },
+    "receiptAssembly": "Initial parser expected TAP prefix but the preserved Node stdout uses the spec reporter; statistics were read from its actual summary without rerunning tests."
+  },
+  "summaries": [
+    {
+      "inputSet": "191fcce",
+      "source": {
+        "source": "a5be42ddee7690de2c2ce11574a47cac0f482a79",
+        "harnessRevision": "a5be42ddee7690de2c2ce11574a47cac0f482a79",
+        "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+        "identityMatched": true
+      },
+      "identityValidated": true,
+      "originalFilesUnchanged": true,
+      "comparisons": {
+        "loginNativeVsWeb": {
+          "first": 208,
+          "second": 161,
+          "difference": 47,
+          "firstNotAboveSecond": false
+        },
+        "startupBundledVsHosted": {
+          "first": 173,
+          "second": 200,
+          "difference": -27,
+          "firstNotAboveSecond": true
+        }
+      },
+      "integrity": {
+        "expectedCheckpointCount": 12,
+        "observedCheckpointCount": 12,
+        "pid": 47001,
+        "pidConsistent": true,
+        "processStartConsistent": true,
+        "runtimeConsistent": true,
+        "cumulativeQueriesNondecreasing": true,
+        "unknownReadingsAllZero": true
+      },
+      "logicalLoginActionDifferences": [
+        {
+          "action": null,
+          "native": 1,
+          "web": 0,
+          "difference": 1
+        },
+        {
+          "action": "coordinator.pollBotChatSummaries",
+          "native": 2,
+          "web": 1,
+          "difference": 1
+        },
+        {
+          "action": "coordinator.syncCoordinatorChat",
+          "native": 2,
+          "web": 1,
+          "difference": 1
+        },
+        {
+          "action": "issues.syncIssueList",
+          "native": 3,
+          "web": 1,
+          "difference": 2
+        },
+        {
+          "action": "task-runs.pollTaskRuns",
+          "native": 2,
+          "web": 0,
+          "difference": 2
+        },
+        {
+          "action": "task-runs.syncThreadList",
+          "native": 2,
+          "web": 1,
+          "difference": 1
+        },
+        {
+          "action": "desktop.session",
+          "native": 1,
+          "web": 0,
+          "difference": 1
+        }
+      ],
+      "issues": [],
+      "privacy": {
+        "email": false,
+        "credential": false,
+        "signedUrl": false
+      },
+      "productionAcceptance": null
+    },
+    {
+      "inputSet": "1f548",
+      "source": {
+        "source": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+        "harnessRevision": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+        "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+        "identityMatched": true
+      },
+      "identityValidated": true,
+      "originalFilesUnchanged": true,
+      "comparisons": {
+        "loginNativeVsWeb": {
+          "first": 196,
+          "second": 173,
+          "difference": 23,
+          "firstNotAboveSecond": false
+        },
+        "startupBundledVsHosted": {
+          "first": 172,
+          "second": 187,
+          "difference": -15,
+          "firstNotAboveSecond": true
+        }
+      },
+      "integrity": {
+        "expectedCheckpointCount": 12,
+        "observedCheckpointCount": 12,
+        "pid": 29495,
+        "pidConsistent": true,
+        "processStartConsistent": true,
+        "runtimeConsistent": true,
+        "cumulativeQueriesNondecreasing": true,
+        "unknownReadingsAllZero": true
+      },
+      "logicalLoginActionDifferences": [
+        {
+          "action": "coordinator.syncCoordinatorChat",
+          "native": 2,
+          "web": 1,
+          "difference": 1
+        },
+        {
+          "action": "task-runs.pollTaskRuns",
+          "native": 2,
+          "web": 0,
+          "difference": 2
+        },
+        {
+          "action": "task-runs.syncThreadList",
+          "native": 2,
+          "web": 1,
+          "difference": 1
+        },
+        {
+          "action": "desktop.session",
+          "native": 1,
+          "web": 0,
+          "difference": 1
+        }
+      ],
+      "issues": [],
+      "privacy": {
+        "email": false,
+        "credential": false,
+        "signedUrl": false
+      },
+      "productionAcceptance": null
+    }
+  ],
+  "boundaries": {
+    "networkCalls": 0,
+    "remoteMutations": 0,
+    "applicationsStarted": 0,
+    "databasesStarted": 0,
+    "browsersStarted": 0,
+    "modelsCalled": 0,
+    "originalJsonRewritten": false,
+    "productFilesChanged": false,
+    "subtractedPkceOrBackground": false,
+    "productionAcceptance": null,
+    "sourceRelations": "Expected actual app and harness revisions are caller-supplied; this script does not independently attest GitHub ancestry or ZIP provenance."
+  }
+}

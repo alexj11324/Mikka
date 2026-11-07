@@ -1,0 +1,14 @@
+✔ reconciles the real saved 191 login and first startup pair without subtracting PKCE or background (6.690458ms)
+✔ rejects source, counter source, harness hash and embedded package mismatch (11.744089ms)
+✔ keeps missing SQL and RPC observations unknown rather than replacing them with zero (3.720649ms)
+✔ refuses a comparison conclusion when PID, unknown readings, first-pair identity or checkpoint deltas disagree (14.92021ms)
+✔ outputs closed labels and numbers without names, URLs, error text or arbitrary source properties (2.071658ms)
+✔ compares saved summaries without equating unknown RPC rows or SQL counts with zero (8.333814ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 186.094714

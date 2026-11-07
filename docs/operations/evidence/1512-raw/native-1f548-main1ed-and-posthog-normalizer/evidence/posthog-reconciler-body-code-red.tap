@@ -1,0 +1,208 @@
+✖ log safety uses the completed/failed projection from the saved real query, not raw body text (14.992401ms)
+✖ all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success (3.496179ms)
+✖ 501 rows require continuous pages and original UUIDs, including the explicit final short page (17.246714ms)
+✔ equal row totals cannot hide different event, span, physical UUID, parent or model identities (2.243428ms)
+✖ native emissions and app-server receipts use distinct equations, without double counting matched fallbacks (1.48329ms)
+✔ missing fields/tables, wrong cluster/window, truncation and unstable aggregates remain incomplete (1.015844ms)
+✔ null is distinct from zero and arbitrary payload/labels never appear in output (1.312332ms)
+✖ Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence (1.18535ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 3
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 131.518528
+
+✖ failing tests:
+
+test at reconcile-production-evidence.test.mjs:74:1
+✖ log safety uses the completed/failed projection from the saved real query, not raw body text (14.992401ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'before',
+  +     traceId: '00000000000000000000000000000001'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'after',
+  +     traceId: '00000000000000000000000000000001'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:87:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'capture_count', snapshot: 'before', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'after', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at reconcile-production-evidence.test.mjs:98:1
+✖ all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success (3.496179ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'before',
+  +     traceId: '00000000000000000000000000000001'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'before',
+  +     traceId: '00000000000000000000000000000002'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'after',
+  +     traceId: '00000000000000000000000000000001'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'after',
+  +     traceId: '00000000000000000000000000000002'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:100:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'capture_count', snapshot: 'before', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'before', traceId: '00000000000000000000000000000002', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'after', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'after', traceId: '00000000000000000000000000000002', field: 'unsafe_log_body_rows' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at reconcile-production-evidence.test.mjs:115:1
+✖ 501 rows require continuous pages and original UUIDs, including the explicit final short page (17.246714ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'before',
+  +     traceId: '00000000000000000000000000000001'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'after',
+  +     traceId: '00000000000000000000000000000001'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:122:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'capture_count', snapshot: 'before', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'after', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at reconcile-production-evidence.test.mjs:149:1
+✖ native emissions and app-server receipts use distinct equations, without double counting matched fallbacks (1.48329ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'before',
+  +     traceId: '00000000000000000000000000000001'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'after',
+  +     traceId: '00000000000000000000000000000001'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:167:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'capture_count', snapshot: 'before', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'after', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at reconcile-production-evidence.test.mjs:207:1
+✖ Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence (1.18535ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'before',
+  +     traceId: '00000000000000000000000000000001'
+  +   },
+  +   {
+  +     code: 'capture_count',
+  +     field: 'unsafe_log_body_rows',
+  +     snapshot: 'after',
+  +     traceId: '00000000000000000000000000000001'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:218:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'capture_count', snapshot: 'before', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' }, { code: 'capture_count', snapshot: 'after', traceId: '00000000000000000000000000000001', field: 'unsafe_log_body_rows' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

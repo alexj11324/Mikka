@@ -1,0 +1,28 @@
+✔ the five saved real MCP responses parse with actual columns and unknown completeness (8.047009ms)
+✔ only the thirteen fixed SQL contracts are accepted; columns are never fabricated for empty results (6.328763ms)
+✔ typed arrays retain order and UUID bytes; null, zero, booleans and raw string flags remain distinct (1.4706ms)
+✔ the log projection contains only closed body codes, including explicit unsafe-body evidence (1.055323ms)
+✔ SQL offsets and parsed row counts are receipts, never an inferred terminal or untruncated page (24.794891ms)
+✔ incomplete JSON, duplicate JSON keys, unrecognized envelopes and a conflicting override are rejected (1.01331ms)
+✔ column count, header, multi-pipe cells, footers, line breaks and truncation markers fail closed (1.248394ms)
+✔ numeric and null ambiguity cannot silently become zero or a missing value (4.573665ms)
+✔ the matched query and request cannot widen the scope, cross clusters or smuggle a payload column (1.899878ms)
+✔ metadata projection rejects private payload shapes and prints no supplied value in its errors (2.101253ms)
+✔ unknown response truncation still fails the unchanged downstream reconciliation gate (3.569568ms)
+✔ CLI writes a private non-overwriting receipt and emits only closed summaries on failure (275.368968ms)
+✔ log safety uses the completed/failed projection from the saved real query, not raw body text (23.908508ms)
+✔ all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success (16.915206ms)
+✔ 501 rows require continuous pages and original UUIDs, including the explicit final short page (74.660261ms)
+✔ equal row totals cannot hide different event, span, physical UUID, parent or model identities (2.546985ms)
+✔ native emissions and app-server receipts use distinct equations, without double counting matched fallbacks (3.455236ms)
+✔ missing fields/tables, wrong cluster/window, truncation and unstable aggregates remain incomplete (1.460594ms)
+✔ null is distinct from zero and arbitrary payload/labels never appear in output (1.866477ms)
+✔ Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence (1.820809ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 426.366436
