@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "inputFixtureSha256": "f90cb691131d2ca7e25bfd1c71c1067485adbafac639f113ef43868b78a2fda0",
+  "inputFixtureSha256": "d8379ac824e0a813cec76cbabed93cd3430e4af3a4a4411a30e271a311deb21c",
   "version": 1,
   "issue": 1503,
   "phase": "github_scoped_child_rotation",
@@ -8,7 +8,7 @@
   "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
-  "startedAt": "2026-11-07T16:13:47.416Z",
+  "startedAt": "2026-11-07T18:36:36.536Z",
   "changed": true,
   "installAttempted": true,
   "before": {
@@ -25,10 +25,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T21:56:24.000Z",
-    "connectionExpiresAt": "2026-11-07T17:56:16.280Z",
-    "connectionUpdatedAt": "2026-11-07T13:56:26.281Z",
-    "tokenSha256": "96d51747751667a75cc216f29bc6a3afe826310f76de7bf0299d9ce978e7c356"
+    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
+    "connectionExpiresAt": "2026-11-07T20:13:41.400Z",
+    "connectionUpdatedAt": "2026-11-07T16:13:51.401Z",
+    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
   },
   "activityBefore": {
     "activeRuns": 0,
@@ -51,7 +51,7 @@
   "stage": "new_child_committed",
   "ownerProvider": {
     "providerExpiresAt": "2026-11-07T23:30:34.000Z",
-    "checkedAt": "2026-11-07T16:13:48.156Z"
+    "checkedAt": "2026-11-07T18:36:37.678Z"
   },
   "providerStage": "mint_scoped_token",
   "newChild": {
@@ -64,8 +64,8 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
-    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
+    "providerExpiresAt": "2026-11-08T02:36:39.000Z",
+    "tokenSha256": "0a3086532dca655cafa78f31f94eec52a5b768123c8b24dfe1d2a17849e58e49"
   },
   "activityAtSave": {
     "activeRuns": 0,
@@ -96,10 +96,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
-    "connectionExpiresAt": "2026-11-07T20:13:41.400Z",
-    "connectionUpdatedAt": "2026-11-07T16:13:51.401Z",
-    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
+    "providerExpiresAt": "2026-11-08T02:36:39.000Z",
+    "connectionExpiresAt": "2026-11-07T22:36:31.473Z",
+    "connectionUpdatedAt": "2026-11-07T18:36:41.474Z",
+    "tokenSha256": "0a3086532dca655cafa78f31f94eec52a5b768123c8b24dfe1d2a17849e58e49"
   },
   "after": {
     "version": 1,
@@ -115,10 +115,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
-    "connectionExpiresAt": "2026-11-07T20:13:41.400Z",
-    "connectionUpdatedAt": "2026-11-07T16:13:51.401Z",
-    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
+    "providerExpiresAt": "2026-11-08T02:36:39.000Z",
+    "connectionExpiresAt": "2026-11-07T22:36:31.473Z",
+    "connectionUpdatedAt": "2026-11-07T18:36:41.474Z",
+    "tokenSha256": "0a3086532dca655cafa78f31f94eec52a5b768123c8b24dfe1d2a17849e58e49"
   },
   "ownerAfter": {
     "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
@@ -139,5 +139,5 @@
     "activeThreadMachines": 0,
     "activeCloudMachines": 0
   },
-  "completedAt": "2026-11-07T16:13:51.608Z"
+  "completedAt": "2026-11-07T18:36:42.140Z"
 }
