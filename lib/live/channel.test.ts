@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { LiveChannel, LIVE_FALLBACK_MS, type LiveRuntime, type LiveSocket, type LiveTicket } from './channel'
 import { DEVICE_GATEWAY_TICKET_SECONDS } from '../device-gateway-ticket'
+import { readBoundary } from '../swr/read-observer'
 
 import { LIVE_KINDS, type LiveKind } from './events'
 import type { PresenceProof } from './presence'
@@ -237,6 +238,79 @@ test('duplicate badges share a connection and one revalidation per SWR key', asy
   assert.deepEqual(f.reads, ['detail', 'ledger'])
   stop(); assert.equal(f.sockets[0].readyState, 1)
   stopDuplicate(); assert.equal(f.sockets[0].readyState, 3)
+})
+
+test('a supported late subscription uses the continuous ready boundary instead of its registration time', async () => {
+  const f = fixture(), after: number[] = []
+  f.subscribe()
+  await f.open()
+  const began = readBoundary()
+  f.channel.subscribe('bot_chat', other, ['chat'], (_key, _required, _reuse, boundary) => { after.push(boundary!) })
+  await f.advance(100)
+  assert.equal(after.length, 1)
+  assert.ok(after[0] < began)
+  f.channel.dispose()
+})
+
+for (const missing of ['capabilities', 'kind', 'presence'] as const) test(`a late subscription without ${missing} coverage retains its new read boundary`, async () => {
+  const f = fixture(), after: number[] = []
+  if (missing === 'capabilities') f.capabilities(null)
+  if (missing === 'kind') f.capabilities(['factory_task'])
+  f.subscribe(); await f.open()
+  const began = readBoundary()
+  f.channel.subscribe('thread_list', other, ['threads'], (_key, _required, _reuse, boundary) => { after.push(boundary!) },
+    missing === 'presence' ? { presence: proof(f) } : {})
+  await f.advance(100)
+  assert.equal(after.length, 1)
+  assert.ok(after[0] > began)
+  f.channel.dispose()
+})
+
+for (const rev of [undefined, 6]) test(`a ${rev ? 'versioned' : 'unversioned'} event for an unsubscribed key advances continuous coverage`, async () => {
+  const f = fixture(), after: number[] = []
+  f.subscribe(); await f.open()
+  f.sockets[0].message(JSON.stringify({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat'] }))
+  const began = readBoundary()
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: other, ...(rev ? { rev } : {}) }))
+  const received = readBoundary()
+  f.channel.subscribe('bot_chat', other, ['chat'], (_key, _required, _reuse, boundary) => { after.push(boundary!) })
+  await f.advance(100)
+  assert.equal(after.length, 1)
+  assert.ok(after[0] > began && after[0] < received, 'the actual received event, not a new subscription, sets the boundary')
+  f.channel.dispose()
+})
+
+test('a late subscription cannot replace a newer pending deadline boundary with older continuous coverage', async () => {
+  const f = fixture(), after: number[] = []
+  const refresh = (_key: string, _required?: Readonly<Record<string, number>>, _reuse?: boolean, boundary?: number) => { after.push(boundary!) }
+  f.channel.subscribe('bot_chat', task, ['chat'], refresh, { deadline: { at: 'fixture-expiry', afterMs: 1000 } })
+  await f.open(); after.length = 0
+  const began = readBoundary()
+  await f.advance(900)
+  f.channel.subscribe('bot_chat', task, ['chat'], refresh)
+  await f.advance(100)
+  assert.equal(after.length, 1)
+  assert.ok(after[0] > began, 'the pending expiry remains the stronger freshness requirement')
+  f.channel.dispose()
+})
+
+test('live observations describe received, skipped and read keys without changing reads', async () => {
+  const f = fixture(), observations: unknown[] = []
+  f.runtime.observe = observation => { observations.push(observation) }
+  f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
+  await f.open()
+  f.sockets[0].message(JSON.stringify({ type: 'live_ready', version: 2, kinds: ['bot_chat'], revisions: ['bot_chat'] }))
+  f.reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 5 }))
+  await f.advance(100)
+  assert.deepEqual(f.reads, [])
+  assert.ok(observations.some(value => JSON.stringify(value).includes('revision_held')))
+  assert.ok(observations.some(value => JSON.stringify(value).includes('received')))
+  f.runtime.observe = () => { throw new Error('analytics unavailable') }
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 6 }))
+  await f.advance(100)
+  assert.deepEqual(f.reads, ['chat'])
+  f.channel.dispose()
 })
 
 test('online idle channels send pings and perform no polling reads', async () => {
@@ -525,6 +599,20 @@ test('a subscriber joining an already healthy channel reconciles a read that sta
   f.channel.dispose()
 })
 
+test('a pending shared-key catch-up uses a remaining subscriber when the last reader unmounts', async () => {
+  const f = fixture()
+  let mounted = true
+  f.channel.subscribe('task_run_list', task, ['task-runs'], () => { f.reads.push('persistent badge') })
+  const stop = f.channel.subscribe('task_run_list', task, ['task-runs'], () => { if (mounted) f.reads.push('board') })
+  try {
+    await f.open(); f.reads.length = 0
+    f.sockets[0].message(JSON.stringify({ kind: 'task_run_list', id: task }))
+    mounted = false; stop()
+    await f.advance(100)
+    assert.deepEqual(f.reads, ['persistent badge'], 'a retired refresh closure must not consume the remaining subscriber\'s obligation')
+  } finally { f.channel.dispose() }
+})
+
 test('a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs', async () => {
   const f = fixture(); f.capabilities(null)
   f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) })
@@ -705,13 +793,26 @@ test('one coalesced read requires the highest pushed revision of every entity be
   reads.length = 0
   f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
   await f.advance(1_000)
-  assert.deepEqual(reads, [{ key: 'chat', required: undefined, reuseCompleted: false }], 'unversioned events retain their existing read path')
+  assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 5, [`run:${other}`]: 2 }, reuseCompleted: false }], 'unversioned events retain their read path and every held revision')
   for (const revisions of [[6, undefined], [undefined, 6]]) {
     reads.length = 0
     for (const rev of revisions) f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev }))
     await f.advance(1_000)
-    assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 6 }, reuseCompleted: false }], 'an unversioned event preserves known requirements but cannot reuse a completed read')
+    assert.deepEqual(reads, [{ key: 'chat', required: { [`bot_chat:${task}`]: 6, [`run:${other}`]: 2 }, reuseCompleted: false }], 'an unversioned event preserves pushed and held requirements')
   }
+  f.channel.dispose()
+})
+
+test('an unversioned flush retains a higher revision from another active consumer of the same key', async () => {
+  const f = revisionFixture(), reads: (Readonly<Record<string, number>> | undefined)[] = []
+  const refresh = (_key: string, required?: Readonly<Record<string, number>>) => { reads.push(required) }
+  f.channel.subscribe('bot_chat', task, ['chat'], refresh, { revisions: { chat: 5 } })
+  const otherConsumer = f.channel.subscribe('run', other, ['chat'], refresh, { revisions: { chat: 9 } })
+  await f.open(); reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
+  otherConsumer.update({ revisions: { chat: 12 } })
+  await f.advance(100)
+  assert.deepEqual(reads, [{ [`bot_chat:${task}`]: 5, [`run:${other}`]: 12 }])
   f.channel.dispose()
 })
 

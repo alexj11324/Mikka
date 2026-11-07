@@ -199,14 +199,13 @@ describe('server tracing', () => {
     assert.equal(root.attributes['mikka.route'], '/v1/devices/[deviceId]/commands')
   })
 
-  test("an after() job's queries carry the job's route in their own trace, not the scheduling request's", () => {
+  test("an after() job keeps its own route and continues the scheduling request's trace", () => {
     const request = spans.find(span => span.name === 'POST' && span.attributes['http.target'] === '/mikka/api/coordinator/messages')!
     const job = spans.find(span => span.name === 'after:coordinator-wake')!
     const statement = query('select "note" from "issues" where "email" = $1 and "body" = $2')
     assert.equal(query('select ? as "request_read"').attributes['mikka.route'], '/api/coordinator/messages')
-    assert.equal(job.parentSpanContext, undefined)
-    assert.equal(job.links[0]?.context.spanId, request.spanContext().spanId)
-    assert.notEqual(traceOf(job), traceOf(request))
+    assert.equal(job.parentSpanContext?.spanId, request.spanContext().spanId)
+    assert.equal(traceOf(job), traceOf(request))
     assert.equal(job.attributes['mikka.route'], 'after:coordinator-wake')
     assert.equal(job.attributes['mikka.client_kind'], 'background')
     assert.equal(traceOf(statement), traceOf(job))

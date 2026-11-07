@@ -3,7 +3,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 import type { ExecutionContextSource, ExecutionFacts } from './execution-context'
 import type { PoolDevice } from '../model-order-plan'
 
-const calls = { scopes: [] as string[], devices: [] as string[], hosted: [] as string[] }
+const calls = { scopes: [] as string[], devices: [] as string[], hosted: [] as string[], projections: [] as (string | undefined)[] }
 let failScope = false, failDevices = false
 const pool = { query: async () => ({ rows: [], rowCount: 1 }) }
 const devices = async (_pool: unknown, ownerId: string): Promise<PoolDevice[]> => {
@@ -21,7 +21,8 @@ stub('../db/index.ts', { pool })
 stub('../workspace-db.ts', { workspacePool: { query: async (_sql: string, [workspaceId]: string[]) => ({ rows: [{ name: workspaceId, kind: 'team' }] }) } })
 stub('../model-order.ts', {
   poolDevices: devices,
-  orderView: async (query: unknown, scope: { ownerId: string; workspaceId: string }, readDevices?: () => Promise<PoolDevice[]>) => {
+  orderView: async (query: unknown, scope: { ownerId: string; workspaceId: string }, readDevices?: () => Promise<PoolDevice[]>, projection?: 'context') => {
+    calls.projections.push(projection)
     await (readDevices ? readDevices() : devices(query, scope.ownerId))
     return { location: 'local', entries: [], candidates: [], preferredHarness: 'codex', cloudReady: false, cloudModels: {} }
   },
@@ -33,13 +34,14 @@ stub('../abuse/runtime.ts', { hostedUsage: { status: async (workspaceId: string)
 let readExecutionFacts: typeof import('./execution-context')['readExecutionFacts']
 let executionContextParts: typeof import('./execution-context')['executionContextParts']
 before(async () => { ({ readExecutionFacts, executionContextParts } = await import('./execution-context')) })
-beforeEach(() => { calls.scopes.length = 0; calls.devices.length = 0; calls.hosted.length = 0; failScope = false; failDevices = false })
+beforeEach(() => { calls.scopes.length = 0; calls.devices.length = 0; calls.hosted.length = 0; calls.projections.length = 0; failScope = false; failDevices = false })
 
 test('two display reads each get one fresh scope and one device read, including orderView', async () => {
   const first = await readExecutionFacts('alice', 'bot-a')
   await executionContextParts('alice', 'bot-a')
   assert.deepEqual(calls.scopes, ['alice:bot-a', 'alice:bot-a'])
   assert.deepEqual(calls.devices, ['alice', 'alice'])
+  assert.deepEqual(calls.projections, ['context', 'context'], 'prompt facts never request the unused settings-page credential count')
   assert.equal(first.workspace?.name, 'workspace-alice-bot-a')
   assert.equal(first.devices?.[0].name, "alice's computer")
 })
@@ -78,5 +80,5 @@ test('an explicit facts source retains its arguments and does not invoke the def
   }])) as ExecutionContextSource
   assert.deepEqual(await readExecutionFacts('alice', 'bot-a', from), facts)
   assert.deepEqual(inputs.sort(), ['devices', 'e2b', 'hosted', 'order', 'workspace'].map(key => `${key}:alice:bot-a`))
-  assert.deepEqual(calls, { scopes: [], devices: [], hosted: [] })
+  assert.deepEqual(calls, { scopes: [], devices: [], hosted: [], projections: [] })
 })

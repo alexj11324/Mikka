@@ -15,6 +15,7 @@ import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-wor
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
 import { getEdition, type MikkaEdition } from '@/lib/edition'
+import { isServerAdmin } from '@/lib/server-admin'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -111,7 +112,7 @@ export async function loadWorkspaceSettings(requestedId?: string, authenticatedU
     ...(nextExpiry === undefined ? {} : { deadline: { at: new Date(nextExpiry).toISOString(), afterMs: nextExpiry - observedAt } }),
   } }
   // Optional on the wire for clients that still connect to a pre-edition server.
-  const deployment: { edition?: MikkaEdition } = { edition: getEdition() }
+  const deployment: { edition?: MikkaEdition; serverAdmin?: boolean } = { edition: getEdition(), serverAdmin: isServerAdmin(context.currentUserId) }
   return {
     ...context,
     ...live,

@@ -4,6 +4,8 @@ import { auth } from '@/lib/api-auth'
 import { auth as sessionAuth } from '@/lib/auth'
 import { withRequestLog } from '@/lib/request-log'
 import { disconnectGitHub, githubConnectConfigured, githubConnection } from '@/lib/github/connection'
+import { useCloudGitHub } from '@/lib/github/cloud'
+import { CloudServiceError, cloudErrorStatus } from '@/lib/cloud-services/errors'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 
@@ -16,10 +18,12 @@ async function handleGET(request: Request) {
     const result = await listAuthorizedRepositories(request.headers)
     if (result.userId !== viewerId) throw new GitHubAccessError('authRequired', 401)
     const connection = await githubConnection(viewerId)
-    return Response.json({ viewerId, configured: true, connected: true, login: connection?.githubLogin ?? null, installed: result.installations.length > 0, repositories: result.repositories }, { headers })
+    const cloud = await useCloudGitHub(viewerId)
+    return Response.json({ viewerId, configured: true, connected: true, ...(cloud ? { source: 'cloud' } : {}), login: cloud ? null : connection?.githubLogin ?? null, installed: result.installations.length > 0, repositories: result.repositories }, { headers })
   } catch (error) {
+    if (error instanceof CloudServiceError) return Response.json({ ...(viewerId ? { viewerId } : {}), error: error.code }, { status: cloudErrorStatus(error.code), headers })
     if (error instanceof GitHubAccessError) {
-      if (viewerId && (error.code === 'githubNotConnected' || error.code === 'githubNotConfigured')) return Response.json({ viewerId, configured: error.code !== 'githubNotConfigured' && githubConnectConfigured(), connected: false, installed: false, repositories: [] }, { headers })
+      if (viewerId && (error.code === 'githubNotConnected' || error.code === 'githubNotConfigured')) return Response.json({ viewerId, configured: error.code !== 'githubNotConfigured' && await githubConnectConfigured(), connected: false, installed: false, repositories: [] }, { headers })
       return Response.json({ ...(viewerId ? { viewerId } : {}), error: error.code }, { status: error.status, headers })
     }
     return Response.json({ ...(viewerId ? { viewerId } : {}), error: 'githubUnavailable' }, { status: 502, headers })
@@ -30,6 +34,7 @@ async function handleGET(request: Request) {
 async function handleDELETE(request: Request) {
   const session = await sessionAuth.api.getSession({ headers: request.headers })
   if (!session?.user) return Response.json({ error: 'authRequired' }, { status: 401, headers })
+  if (await useCloudGitHub(session.user.id)) return Response.json({ viewerId: session.user.id, error: 'cloud_access_denied' }, { status: 403, headers })
   await disconnectGitHub(session.user.id)
   return Response.json({ viewerId: session.user.id }, { headers })
 }

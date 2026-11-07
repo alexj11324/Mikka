@@ -1167,7 +1167,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
       try {
         const runId = await run(await task()), fixture = fake();
-        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0;
+        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0, starts = 0;
         fixture.provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
           files: {
@@ -1185,10 +1185,13 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               assert.equal('initialRunId' in JSON.parse(primary.data), false, 'old strict bootstrap consumers retain the original schema');
             },
           },
-          commands: { run: async (command: string) => {
+          commands: { run: async (command: string, options: { user?: string; background?: boolean }) => {
             if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap);
               assert.equal(uploads, 1, 'the optional locator shares the existing upload RPC');
+              assert.equal(options.user, 'root');
+              assert.notEqual(options.background, true, 'publication failures must complete before any fallback');
+              assert.match(command, /runuser -u user -- sh -c/);
               assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
@@ -1196,8 +1199,10 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               authenticated++;
               // Make the historical late floor observably later than this real authentication.
               await pool.query('SELECT pg_sleep(0.02)');
+              return { stdout: 'mikka-preloaded-worker-woken\n', stderr: '', exitCode: 0 };
             }
             if (command.includes('node dist/cloud/cloud-worker.js')) {
+              starts++;
               // The preloader already authenticated. Production throttles the token
               // timestamp, so explicit startup must not manufacture another use.
               let reads = 0;
@@ -1208,6 +1213,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         }) as never;
         assert.deepEqual(await ensureThreadMachine(pool, actor, runId, fixture.provider), { runId, state: 'running' });
         assert.equal(authenticated, 1);
+        assert.equal(starts, 0, 'the registered preloader needs no second remote start command');
       } finally {
         Date.now = realNow;
         if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;

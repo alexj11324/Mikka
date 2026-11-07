@@ -16,6 +16,8 @@ import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
+import { CloudSettings } from '@/components/settings/cloud-settings'
+
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
@@ -60,7 +62,9 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
   const requestedSection = activeSection ?? localSection
   const billing = workspace !== undefined && workspace.edition !== 'community'
-  const section = requestedSection === 'billing' && !billing ? 'preferences' : requestedSection
+  const community = workspace?.edition === 'community'
+  const cloudAdmin = community && workspace?.serverAdmin === true
+  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) ? 'preferences' : requestedSection
   const admin = workspace?.role === 'admin'
   const personal = workspace?.workspace.kind === 'personal'
   // Team settings show once the workspace is known to be a team, as admin-only ones wait for the role.
@@ -92,25 +96,28 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const enter = switched.current ? 'animate-in fade-in-0 duration-150 motion-reduce:animate-none' : undefined
 
   return <>
-    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} cloudAdmin={cloudAdmin} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
     <SettingsContentFrame parent={t('title')} title={title}>
+
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
-        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} community={community} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
     </SettingsContentFrame>
   </>
 }
 
-function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceName, personal = false, team = false, admin = false, workspaceError = false, linearNotice, preview, onSignOut, signingOut, onSection }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceName?: string; personal?: boolean; team?: boolean; admin?: boolean; workspaceError?: boolean; onSection: (section: SettingsSectionId) => void }) {
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceName, personal = false, team = false, admin = false, community = false, workspaceError = false, linearNotice, preview, onSignOut, signingOut, onSection }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceName?: string; personal?: boolean; team?: boolean; admin?: boolean; community?: boolean; workspaceError?: boolean; onSection: (section: SettingsSectionId) => void }) {
   // Workspace sections wait for the workspace instead of rendering nothing.
   const waiting = preview || !workspaceId
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
     : null
   switch (section) {
-    case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
+    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
+    case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
+
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
@@ -118,7 +125,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
-    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} /> : waiting}</>
+    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} cloudUserKey={community ? userKey : undefined} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} /> : waiting
@@ -130,5 +137,3 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     default: return null
   }
 }
-
-

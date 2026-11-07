@@ -10,14 +10,21 @@ import { PostHogAnalytics } from '@/components/posthog-analytics'
 import { posthogConfig } from '@/lib/posthog-config'
 import { authClient, cloudAuthClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
+import { bridgeFromWindow } from '@/lib/platform/detect'
 import { navigate, useLocation, withoutLocale } from '../../../desktop/src/renderer/location'
 import type { DesktopSession } from '../../../desktop/src/renderer/host'
-import { webAuthentication } from './auth-routing'
+import type { BootstrapScope } from '../../../desktop/src/renderer/bootstrap'
+import { isDesktopHandoffPage, webAuthentication } from './auth-routing'
 import { watchSessionOwner } from './session-owner'
 import { currentWebServers, subscribeWebServers } from '@/lib/web-connection/browser'
 
 export { authenticatedReturn } from './auth-routing'
 export const platform = 'web' as const
+
+export function bootstrapScope(location: URL): BootstrapScope {
+  return typeof window !== 'undefined' && !bridgeFromWindow(window) && isDesktopHandoffPage(location)
+    ? 'authentication' : 'workspace'
+}
 
 export function AuthForm(props: ComponentProps<typeof ExistingAuthForm>) {
   const location = useLocation()

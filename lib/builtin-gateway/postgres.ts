@@ -183,7 +183,7 @@ export class PostgresGatewayBus implements GatewayBus {
           // releases a blocked backend after an observer process dies; it adds
           // no application SQL polling or heartbeat writes. Network blackholes
           // still depend on the kernel's TCP failure detection.
-          const setup = { text: 'SET statement_timeout = 0; SET lock_timeout = 0; SET client_connection_check_interval = 1000', query_timeout: 5_000 }
+          const setup = { text: 'SET statement_timeout = 0; SET lock_timeout = 0; SET client_connection_check_interval = 1000; SET client_min_messages = notice', query_timeout: 5_000 }
           await watchedQuery(current, setup)
           if (current.closed) throw new CodedError('BUILTIN_GATEWAY_PRESENCE_UNAVAILABLE')
           const initial = { text: 'SELECT pg_try_advisory_lock_shared($1::bigint) AS absent', values: [sourceLock(source)], query_timeout: 5_000 }
@@ -193,9 +193,28 @@ export class PostgresGatewayBus implements GatewayBus {
             // lock. It must never masquerade as, or extend, the source lease.
             throw new CodedError('BUILTIN_GATEWAY_PRESENCE_UNAVAILABLE')
           }
-          // Queue before readiness. Source death between try and wait makes
-          // this finish immediately; both resolve and reject revoke coverage.
-          void watchedQuery(current, { text: 'SELECT pg_advisory_lock_shared($1::bigint)', values: [sourceLock(source)] }).then(failed, failed)
+          // CancelRequest is ignored while a backend is idle. Queuing a local
+          // write alone cannot prove PG has started it. A notice flushed from
+          // inside the same command acknowledges that it is cancellable before
+          // observe returns; the command then waits on the source's lease.
+          // The interpolated key is a derived signed bigint, never caller SQL.
+          const started = Promise.withResolvers<void>()
+          const announced = (notice: { message?: string }) => {
+            if (notice.message === 'mikka_gateway_wait_started') started.resolve()
+          }
+          let startTimer: ReturnType<typeof setTimeout> | undefined
+          client.on('notice', announced)
+          try {
+            const waiting = watchedQuery(current, { text: `DO $mikka$ BEGIN
+              RAISE NOTICE 'mikka_gateway_wait_started';
+              PERFORM pg_advisory_lock_shared('${sourceLock(source)}'::bigint);
+            END $mikka$` })
+            // Source death between try and wait still revokes the same watch.
+            void waiting.then(failed, failed)
+            await Promise.race([started.promise, waiting, new Promise<never>((_, reject) => {
+              startTimer = setTimeout(() => reject(new CodedError('BUILTIN_GATEWAY_PRESENCE_UNAVAILABLE')), 5_000)
+            })])
+          } finally { clearTimeout(startTimer); client.off('notice', announced) }
         } catch (error) { failed(); throw error }
       })()
     }

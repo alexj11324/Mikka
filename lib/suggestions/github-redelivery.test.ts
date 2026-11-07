@@ -135,3 +135,16 @@ test('rejects an incomplete delivery scan without posting redeliveries', async (
   await assert.rejects(redeliverFailedGitHubWebhooks({ now, env: { GITHUB_APP_ID: '4840908', GITHUB_APP_PRIVATE_KEY: privateKey }, fetcher }), /GitHub delivery log answered 403/)
   assert.equal(pages, 2)
 })
+
+test('the configured official cloud relay recovers all GitHub event types for 24 hours using the existing sweep', async () => {
+  const now = new Date('2026-10-27T08:00:00Z'), posted: string[] = []
+  const result = await redeliverFailedGitHubWebhooks({ now,
+    env: { MIKKA_EDITION: 'cloud', MIKKA_CLOUD_BACKEND_URL: 'https://private.example.com', GITHUB_APP_ID: '4840908', GITHUB_APP_PRIVATE_KEY: privateKey },
+    fetcher: async (url, init) => {
+      if (init?.method === 'POST') { posted.push(String(url)); return new Response(null, { status: 202 }) }
+      return Response.json([delivery(1, 'repository-added', 23 * 60, 503, 'installation_repositories'), delivery(2, 'old-push', 24 * 60 + 1, 503, 'push'), delivery(3, 'finished-push', 30, 202, 'push'), delivery(4, 'signed-push', 6 * 60, 503, 'push')])
+    },
+  })
+  assert.deepEqual(posted, ['https://api.github.com/app/hook/deliveries/1/attempts', 'https://api.github.com/app/hook/deliveries/4/attempts'])
+  assert.deepEqual(result, { configured: true, scanned: 4, failed: 2, redelivered: 2, errors: 0 })
+})

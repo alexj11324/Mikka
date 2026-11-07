@@ -10,4 +10,8 @@ import type { RailDestination } from '@/components/nav/icon-rail'
 
 export type RailMenu = { user: { name: string; email: string; image?: string | null }; onSettings: (href?: string) => void; onSignOut: () => void; signingOut: boolean }
 
-export type SettingsFrameProps = RailMenu & { onRail: (destination: RailDestination) => void; onSearch: () => void; onBrowser: () => void; children: ReactNode }
+export type SettingsFrameProps = RailMenu & {
+  onRail: (destination: RailDestination) => void; onSearch: () => void; onBrowser: () => void; children: ReactNode
+  /** Leaves Settings for the app page shown before it was opened, or home when Settings was opened directly. Optional: a frame without it uses onRail. */
+  onBack?: () => void
+}

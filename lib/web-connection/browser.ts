@@ -85,4 +85,3 @@ export async function signInToServer(server: string): Promise<void> {
     })
   } finally { popup.close() }
 }
-

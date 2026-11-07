@@ -1022,6 +1022,10 @@ export class RunSupervisor {
         waitingQuestionId: report.question.questionId,
       })
     }
+    // A provider's terminal failure is an ordinary iterator result, not a
+    // throw. Mark its run span explicitly without passing private CLI text.
+    if (state === 'failed') active?.span?.fail({ name: 'RunFailure' }, stopReason)
+    else active?.span?.set('mikka.outcome', stopReason)
     this.setState(runId, state, {
       stopReason,
       ...(error ? { error } : {}),
@@ -1370,10 +1374,10 @@ export class RunSupervisor {
     const harness = assignment?.harness
     if (assignment && runDiagnosticsEnabled(assignment.taskEnv, this.deps.collectCliTiming))
       run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
-    run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
+    run.done = daemonTracer.span("daemon.run", { "mikka.run_id": runId, "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run, initialClaim)
-    }, { root: true })
+    }, { root: true, traceContext: assignment?.traceContext })
       .catch(async (error: unknown) => {
         run.repositoryPreparing?.refuseEffects(error)
         run.repositoryPreparing?.abort.abort()
@@ -1410,7 +1414,12 @@ export class RunSupervisor {
         finally {
           try { run.github?.close() }
           catch { this.deps.log.warn('GitHub credential cleanup failed') }
-          finally { clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId) }
+          finally {
+            clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId)
+            // Start draining all three telemetry queues before an idle cloud VM
+            // can pause; the completed run never waits for the collector.
+            void daemonTracer.flush()
+          }
         }
       })
   }
@@ -1517,6 +1526,7 @@ export class RunSupervisor {
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     const baseOptions = {
+      traceContext: daemonTracer.capture(),
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
         ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,

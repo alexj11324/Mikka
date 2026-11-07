@@ -1,0 +1,188 @@
+name: Run trace production acceptance
+# Explicit operator runs only. Preflight reads configuration; execute uses the
+# existing tagged account and fixed small subscription models for issue #1512.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Read-only preflight, bounded real tasks, or native PostHog PNG export
+        type: choice
+        options: [preflight, execute, export]
+        default: preflight
+      expected-deployment-sha:
+        description: Exact main commit already served by the production domain
+        type: string
+        required: true
+      model-case:
+        description: Subscription model case
+        type: choice
+        options: [all, claude, codex]
+        default: all
+      prepare:
+        description: Temporarily prepare and restore idle account settings through normal APIs
+        type: boolean
+        default: false
+      browser-submit:
+        description: Prepare one model case and wait for a real browser New task submission
+        type: boolean
+        default: false
+      export-target:
+        description: Native saved PostHog object to export after verifying production evidence
+        type: choice
+        options: [dashboard, insight]
+        default: dashboard
+      export-id:
+        description: Positive numeric PostHog object ID; required only for export
+        type: string
+        required: false
+      session-id:
+        description: Optional real browser Replay UUID; requires trace-id and export mode
+        type: string
+        required: false
+      trace-id:
+        description: Matching actual APM trace hex ID; requires session-id and export mode
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: run-trace-production-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  acceptance:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && inputs.mode != 'export'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    env:
+      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}
+      MIKKA_OBSERVABILITY_MODEL_CASE: ${{ inputs.model-case }}
+      ACCEPTANCE_MODE: ${{ inputs.mode }}
+      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}
+      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}
+      REPLAY_SESSION_ID: ${{ inputs.session-id }}
+      REPLAY_TRACE_ID: ${{ inputs.trace-id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Bind acceptance to this exact main revision
+        run: |
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict'
+          assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? '', /^[a-f0-9]{40}$/)
+          assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)
+          assert.ok(['preflight', 'execute'].includes(process.env.ACCEPTANCE_MODE))
+          assert.ok(process.env.ACCEPTANCE_MODE === 'execute' || (process.env.ACCEPTANCE_PREPARE !== 'true' && process.env.ACCEPTANCE_BROWSER_SUBMIT !== 'true'))
+          assert.ok(process.env.ACCEPTANCE_BROWSER_SUBMIT !== 'true' || process.env.MIKKA_OBSERVABILITY_MODEL_CASE !== 'all')
+          assert.ok(!process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)
+          JS
+      - name: Verify the acceptance guards before loading credentials
+        run: node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs
+      - name: Read the existing production acceptance account
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          include-imports: false
+      - name: Read the account password inside this runner
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          include-imports: false
+      - name: Run bounded production acceptance
+        env:
+          MIKKA_ACCEPTANCE_PROGRESS_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          if [ "$ACCEPTANCE_MODE" = execute ]; then
+            args+=(--execute)
+          fi
+          if [ "$ACCEPTANCE_PREPARE" = true ]; then args+=(--prepare); fi
+          if [ "$ACCEPTANCE_BROWSER_SUBMIT" = true ]; then args+=(--browser-submit); fi
+          node scripts/acceptance/run-observability-workflow.mjs "${args[@]}"
+      - name: Preserve only the safe acceptance report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: run-trace-acceptance-${{ github.run_id }}
+          path: production-run-observability-report/report.json
+          retention-days: 7
+          if-no-files-found: warn
+  export:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && inputs.mode == 'export'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}
+      EXPORT_TARGET: ${{ inputs.export-target }}
+      EXPORT_ID: ${{ inputs.export-id }}
+      REPLAY_SESSION_ID: ${{ inputs.session-id }}
+      REPLAY_TRACE_ID: ${{ inputs.trace-id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Validate the immutable source and numeric export target
+        run: |
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict'
+          import { parseArguments } from './scripts/ops/posthog-export-evidence.mjs'
+          import { optionalReplayOptions } from './scripts/ops/posthog-replay-evidence.mjs'
+          assert.match(process.env.EXPECTED_DEPLOYMENT_SHA ?? '', /^[a-f0-9]{40}$/)
+          assert.equal(process.env.EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)
+          parseArguments([`--${process.env.EXPORT_TARGET}`, process.env.EXPORT_ID])
+          optionalReplayOptions(process.env.REPLAY_SESSION_ID, process.env.REPLAY_TRACE_ID)
+          JS
+      - name: Verify the offline export guards before loading credentials
+        run: node --test scripts/ops/posthog-export-evidence.test.mjs scripts/ops/posthog-replay-evidence.test.mjs
+      - name: Read the existing PostHog key inside this runner
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: POSTHOG_PERSONAL_API_KEY
+          include-imports: false
+      - name: Export the actual saved PostHog view
+        run: node scripts/ops/posthog-export-evidence.mjs "--$EXPORT_TARGET" "$EXPORT_ID"
+      - name: Read one actual Replay segment into a safe receipt
+        if: inputs.session-id != ''
+        run: node scripts/ops/posthog-replay-evidence.mjs --session-id "$REPLAY_SESSION_ID" --trace-id "$REPLAY_TRACE_ID"
+      - name: Preserve the native PNG and safe evidence receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: run-trace-posthog-${{ github.run_id }}
+          path: |
+            production-run-observability-report/posthog-*.png
+            production-run-observability-report/posthog-*.receipt.json
+          retention-days: 7
+          if-no-files-found: warn

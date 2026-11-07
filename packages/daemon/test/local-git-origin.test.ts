@@ -3,11 +3,13 @@ import { createServer } from 'node:http'
 import { connect } from 'node:net'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { afterEach, expect, it, vi } from 'vitest'
 import { localGitOrigin } from '../src/agents/local-git-origin'
 import { prepareGitHubEnvironment } from '../src/agents/github-runtime'
+import { prepareLocalGitHub } from '../src/agents/local-github'
 import { RunContext } from '../src/agents/run-context'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 
@@ -64,6 +66,43 @@ it('the sanitized run Git environment pushes the exact GitHub-shaped origin to t
   policy.readOnly = false; policy.permissions.git_push = 'deny'
   // A stored git_push deny no longer withholds the agent's own push (decision 2026-11-02-1600).
   expect(context('push-denied').policy().allowWrite).toContain(origin)
+})
+
+it('prepared native GitHub keeps the owned fixture origin and reads the prepared login through the synthetic CLI', async () => {
+  const { createTraceGitHubBinary } = await import(new URL('../../../tests/mvp/trace-codex.mjs', import.meta.url).href) as {
+    createTraceGitHubBinary(directory: string): string
+  }
+  const { root, origin } = fixture()
+  const directory = join(root, 'daemon'), worktree = join(root, 'native-worktree')
+  const binary = createTraceGitHubBinary(directory)
+  mkdirSync(worktree)
+  const assignment = { runId: randomUUID(), deviceId: randomUUID(), issueId: randomUUID(), repoId: randomUUID(), harness: 'codex' as const, prompt: 'synthetic',
+    github: { endpoint: 'http://localhost:3100/mikka/api/runs/github-token', repository: 'mikka-e2e/core-loop', branch: 'main',
+      token: 'mvp-synthetic-installation-run', expiresAt: null } }
+  const host = { stateDir: join(directory, 'adapters', 'github'), signal: new AbortController().signal,
+    path: `${dirname(binary)}:${process.env.PATH}`, link: {}, onCredential() {} }
+  const prepared = (await prepareLocalGitHub(assignment, host))!
+  try {
+    const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: root, ...prepared.env,
+      GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_ALLOW_PROTOCOL: 'file' }
+    const git = (args: string[]) => execFileSync('git', args, { cwd: worktree, env, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
+    const repository = 'https://github.com/mikka-e2e/core-loop.git'
+    expect(git(['ls-remote', '--get-url', repository])).toBe(pathToFileURL(origin).href)
+    expect(env.GH_TOKEN).toBe('')
+    expect(execFileSync('gh', ['--version'], { env, encoding: 'utf8' }).trim()).toBe('gh version local-fixture (synthetic GitHub transport)')
+    git(['init', '--bare', origin]); git(['init', '-b', 'main'])
+    writeFileSync(join(worktree, 'README.md'), 'native local delivery\n')
+    git(['add', 'README.md']); git(['commit', '-m', 'fixture'])
+    git(['remote', 'add', 'origin', repository]); git(['push', 'origin', 'HEAD:main'])
+    expect(git(['--git-dir', origin, 'rev-parse', 'main'])).toBe(git(['rev-parse', 'HEAD']))
+    expect(git(['config', '--get', 'remote.origin.url'])).toBe(repository)
+    // The same preparation outside the explicit local-test guard adds no
+    // fixture rewrite or file-protocol grant to ordinary Git configuration.
+    vi.stubEnv('MIKKA_LOCAL_TEST_ACCOUNTS', '0')
+    const ordinary = (await prepareLocalGitHub(assignment, host))!
+    try { expect(ordinary.env.GIT_CONFIG_COUNT).toBe('4'); expect(ordinary.env.GIT_CONFIG_KEY_4).toBeUndefined() }
+    finally { ordinary.close() }
+  } finally { prepared.close() }
 })
 
 it('the local GitHub helper uses its authenticated sandbox proxy for the isolated host loopback', async () => {

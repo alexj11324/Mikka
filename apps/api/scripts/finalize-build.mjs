@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { build } from 'esbuild'
 import { configuredDeploymentId } from '../../../lib/deployment-id.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
+import { cloudServiceRewrite } from '../cloud-service-rewrite.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const within = (root, path) => path === root || path.startsWith(`${root}${sep}`)
@@ -92,6 +93,8 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     const path = join(output, 'config.json')
     const config = JSON.parse(await readFile(path, 'utf8'))
     if (config.version !== 3 || !Array.isArray(config.routes)) throw new Error('API_VERCEL_CONFIG_INVALID')
+    const cloudRewrite = cloudServiceRewrite()
+    if (cloudRewrite) config.routes.unshift(cloudRewrite)
     const deploymentId = configuredDeploymentId()
     if (process.env.VERCEL_ENV === 'production' && !deploymentId) throw new Error('API_PRODUCTION_DEPLOYMENT_ID_REQUIRED')
     if (deploymentId) config.deploymentId = deploymentId

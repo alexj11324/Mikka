@@ -5,6 +5,7 @@ import { HOSTED_CHOICE, type BotModelQuota } from './bot-model-menu-view'
 import { apiKeyChatBaseUrl } from './model-api-key-providers'
 import { botApiKeyChoice, usableApiKeys, type UsableApiKey } from './model-api-keys'
 import { subscriptionAvailability } from './subscription-quota'
+import { isCloudEdition } from './edition'
 
 type Settings = Pick<ExecutionSettings, 'chatModels' | 'chatBinding'> & Partial<Pick<ExecutionSettings, 'pooledBindings' | 'sharedChatBinding'>>
 export interface BotSubscriptionChoice {
@@ -61,6 +62,9 @@ export async function resolveBotModelChoice(
   const fallback = preference.key ? 'preference' as const : undefined
 
   const hosted = async (state: ChoiceState): Promise<BotModelChoice> => {
+    // Community defaults either spend their explicitly bound cloud workspace
+    // or their own provider. Local hosted balances never redirect that choice.
+    if (!isCloudEdition()) return { kind: 'hosted', ...state }
     const { hostedPointsRefusal, pointsFallback } = await import('./points-fallback')
     const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope) : null
     if (next?.kind === 'api_key') {

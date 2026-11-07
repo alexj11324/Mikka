@@ -36,9 +36,9 @@ test('PG17: two app replicas share live pushes, device wakes/presence and one cr
 })
 
 type RecordedClient = { client: Client; options: ClientConfig; statements: string[] }
-function recordedBus(after?: (sql: string, result: QueryResult, client: RecordedClient) => Promise<void>) {
+function recordedBus(after?: (sql: string, result: QueryResult, client: RecordedClient) => Promise<void>, options: ClientConfig = {}) {
   const clients: RecordedClient[] = []
-  const bus = new PostgresGatewayBus({ connectionString: url }, options => {
+  const bus = new PostgresGatewayBus({ connectionString: url, ...options }, options => {
     const client = new Client(options), execute = client.query
     const record = { client, options, statements: [] as string[] }
     // Preserve actual PG execution; record only statement names, never values.
@@ -115,7 +115,7 @@ test('PG17: a remote producer session ending revokes an acknowledged presence wa
 })
 
 test('PG17: a shared source waiter stays until its last subscriber and then releases the physical session', { skip: !disposable, timeout: 30_000 }, async t => {
-  const producer = recordedBus(), observer = recordedBus()
+  const producer = recordedBus(), observer = recordedBus(undefined, { options: '-c client_min_messages=warning' })
   t.after(async () => { await Promise.all([producer.bus.stop(), observer.bus.stop()]) })
   await Promise.all([producer.bus.ready(), observer.bus.ready()])
   const source = await sourceEpoch(producer.bus), lost = () => assert.fail('the live source did not end')

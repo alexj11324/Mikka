@@ -31,7 +31,7 @@ export const navigationAllowlist = {
   'hooks/settings/use-google-sign-in.ts': { 'navigation/history': { count: 1, reason: 'drops the Google link return key after showing the result' } },
   'lib/subscription-enrollment-binding-proof.ts': { 'navigation/history': { count: 1, reason: 'script in the subscription enrollment page drops its one-time proof from the address' } },
   'lib/subscription-enrollment-handoff.ts': { 'navigation/history': { count: 1, reason: 'script in the subscription hand-off page drops its one-time key from the address' } },
-  'components/workspace/issue-workspace.tsx': { 'navigation/router': { count: 5, reason: 'sign-out leaves for /sign-in; Settings opened on its own route goes back to the app when pushSettingsHistory cannot' } },
+  'components/workspace/issue-workspace.tsx': { 'navigation/router': { count: 6, reason: 'sign-out leaves for /sign-in; Settings opened on its own route goes back to the app (home or the page before Settings) when pushSettingsHistory cannot' } },
   'components/settings/settings-shell.tsx': { 'navigation/router': { count: 2, reason: 'sign-out leaves for /sign-in; Settings links fall back to the router where pushSettingsHistory cannot' } },
   'components/settings/settings-view.tsx': { 'navigation/router': { count: 1, reason: 'an unknown settings section is replaced by 通用' } },
   'components/settings/settings-preview.tsx': { 'navigation/router': { count: 6, reason: 'the signed-out Settings preview sends every control to sign-in' } },

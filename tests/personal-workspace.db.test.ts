@@ -327,6 +327,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
     const { coordinatorEnabled, triageInbox } = await import('../lib/coordinator/wake')
     const { defaultModelConfigured } = await import('../lib/default-model-config')
+    const { defaultModelAvailable } = await import('../lib/default-model')
     const { ExecutionSettings } = await import('../lib/execution-settings')
     const { HOSTED_CHOICE } = await import('../lib/bot-model-menu-view')
     const { seedBot } = await import('./support/workspace-admin-db')
@@ -334,6 +335,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
     const bot = await seedBot(pool, workspace.id, owner), settings = new ExecutionSettings(appPool)
     assert.equal(defaultModelConfigured(), false)
+    assert.equal(await defaultModelAvailable(owner), false)
     assert.equal(await coordinatorEnabled(owner, bot), false, 'a bot with no credential remains disabled')
     const connection = randomUUID(), binding = randomUUID()
     const quota = (used: number, age = 0) => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null,

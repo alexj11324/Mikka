@@ -16,7 +16,7 @@ mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExport
   json, mobileUser: async () => signedIn, writeAllowed: () => true,
   unauthorized: () => json({ error: 'authRequired' }, 401), forbiddenOrigin: () => json({ error: 'originNotAllowed' }, 403),
 } })
-mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
+mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../lib/tokens/scope.ts', import.meta.url).href, { namedExports: { runOutsideToken: async () => outsideToken } })
 mock.module(new URL('../lib/run-quota.ts', import.meta.url).href, { namedExports: {
   resumeQuotaPausedRunOnApiKey: (userId: string, runId: string) => { calls.push(['key', userId, runId]); return outcome() },
