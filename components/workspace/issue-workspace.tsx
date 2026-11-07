@@ -159,6 +159,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // While Settings is shown these reads are not on screen. Paused, they cannot queue
   // server actions ahead of a settings save (Next runs a page's actions one at a time).
   const settingsShown = settingsOpen || pathname.startsWith('/settings')
+  // The app page last shown outside Settings, for Settings' way back (backFromSettings).
+  const appHref = useRef<string | null>(null)
+  const appQuery = params.toString()
+  useEffect(() => { if (!settingsShown) appHref.current = `${pathname}${appQuery ? `?${appQuery}` : ''}` }, [settingsShown, pathname, appQuery])
   const inSettings = useRef(settingsShown)
   inSettings.current = settingsShown
   const whileSettings = { isPaused: () => inSettings.current }
@@ -539,6 +543,14 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) { router.push('/'); return }
     openRail(destination)
   }
+  // ← in a Settings frame returns to the app page shown before Settings opened. The workspace stays
+  // mounted under Settings (#1603), so its own state is intact; only the address goes back.
+  const backFromSettings = () => {
+    const href = appHref.current
+    if (!href) { leaveSettings('chats'); return }
+    closeSettings()
+    if (pathname.startsWith('/settings') && !pushSettingsHistory(href)) router.push(href)
+  }
   const searchFromBar = () => {
     if (boardBusy) return
     if (settingsShown) closeSettings()
@@ -557,7 +569,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // the default keeps the workspace frame mounted around settings (#1603).
   // Both visual frames share the workspace's pending notes and computer registry.
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
-    ? <SettingsFrame user={user} onRail={leaveSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
+    ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} />}>
