@@ -28,6 +28,21 @@ export const gatedFeatures = {
 
 export type GatedFeature = keyof typeof gatedFeatures
 
+/** Production capabilities when an installation has no PostHog project.
+ * Billing and unshipped experiments remain off. See docs/self-hosting-byok.md. */
+export const PRODUCTION_FLAG_DEFAULTS: Readonly<Record<string, boolean>> = {
+  'mikka-cloud-computer': true,
+  'mikka-computer-billing': false,
+  'mikka-byos-subscription-chat': true,
+  'mikka-byos-subscription-native': true,
+  'mikka-email-sign-in-off': false,
+  'mikka-computer-tab-off': false,
+  'mikka-proactive-profile': false,
+  'mikka-proactive-research': false,
+  ...Object.fromEntries(Object.values(upcomingFeatures).map(feature => [feature.key, false])),
+}
+export const productionFlagDefault = (key: string) => PRODUCTION_FLAG_DEFAULTS[key] ?? false
+
 /**
  * Who gets proactive work (R-73, docs/design/proactive.md § 3), checked on the
  * server per person (lib/posthog-server.ts) and only once the deployment's

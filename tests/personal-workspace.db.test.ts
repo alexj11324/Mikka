@@ -299,15 +299,23 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'un-sharing stops it at once')
     await service.check(use(ownBot, ownBinding))
 
-    // The menu and the resolver read one readiness: a route that does not answer chats is never offered.
+    // Without a PostHog project, shipped subscription routes are available.
+    // The real connection state still fences both the menu and saved choices.
     const settings = new ExecutionSettings(appPool)
-    const before = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
-    t.after(() => { process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = before })
-    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'codex_cpa'
-    assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
-    assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
-    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
-    assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+    const savedRoutes = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+    try {
+      delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+      assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+      assert.equal((await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding))?.connectionId, connection)
+      await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connection])
+      assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
+      assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
+      await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connection])
+      assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+    } finally {
+      if (savedRoutes === undefined) delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+      else process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = savedRoutes
+    }
   })
 
   await t.test('由我的卡支付这个团队: one member\'s card per team; leaving releases it with a 7-day grace that admins see', async () => {

@@ -36,6 +36,13 @@ export async function installationSecrets(directory, env) {
 export function selfHostedEnvironment(env, root) {
   if (env.VERCEL || env.VERCEL_ENV) throw new Error('SELF_HOSTED_PLATFORM_ENV_REFUSED')
   env.BETTER_AUTH_URL ||= 'http://localhost:3000'
+  let origin
+  try { origin = new URL(env.BETTER_AUTH_URL) }
+  catch (cause) { throw new Error('SELF_HOSTED_ORIGIN_INVALID', { cause }) }
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)
+  if ((origin.protocol !== 'https:' && !(origin.protocol === 'http:' && loopback)) || origin.username || origin.password
+    || origin.pathname !== '/' || origin.search || origin.hash || origin.hostname.includes('*')) throw new Error('SELF_HOSTED_ORIGIN_INVALID')
+  env.BETTER_AUTH_URL = origin.origin
   env.MIKKA_DATABASE_URL ||= env.DATABASE_URL
   env.DATABASE_URL ||= env.MIKKA_DATABASE_URL
   if (!env.MIKKA_DATABASE_URL || !env.DATABASE_URL) throw new Error('SELF_HOSTED_DATABASE_REQUIRED')

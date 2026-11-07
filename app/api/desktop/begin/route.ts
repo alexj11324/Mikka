@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
-import { DESKTOP_AUTH_PENDING_TTL_MS, desktopAuthChallenge, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { DESKTOP_AUTH_PENDING_TTL_MS, desktopAuthChallenge, desktopAuthState, desktopLoopbackCallback, desktopSameOriginRequest } from '@/lib/desktop-auth'
 import { sha256Hex } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
 
@@ -16,8 +16,7 @@ export const dynamic = 'force-dynamic'
  * only the holder of the verifier can trade the result for a token (/exchange).
  */
 async function handlePOST(request: Request) {
-  const origin = request.headers.get('origin')
-  if (origin && origin !== new URL(request.url).origin) return new NextResponse(null, { status: 403 })
+  if (!desktopSameOriginRequest(request)) return new NextResponse(null, { status: 403 })
 
   let body: unknown
   try {

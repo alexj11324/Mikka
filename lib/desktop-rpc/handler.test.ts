@@ -107,6 +107,16 @@ test('native header adapter preserves browser authority but strips all bearer co
   assert.equal(desktopBearerHeaders(request('fixture.read', [], { cookie: 'browser=1' }))?.has('cookie'), false)
 })
 
+test('native bearer requests cannot import another origin or cross-site fetch metadata', async () => {
+  const f = fixture()
+  for (const headers of [{ origin: 'https://attacker.example' }, { origin: 'null' }, { 'sec-fetch-site': 'cross-site' }] as Record<string, string>[]) {
+    assert.equal((await f.handle(request('fixture.read', [], headers))).status, 403)
+  }
+  assert.equal(f.calls(), 0)
+  const ownOrigin = new URL(request().url).origin
+  assert.equal((await f.handle(request('fixture.read', [], { origin: ownOrigin }))).status, 200)
+})
+
 test('registry schemas reject forged authority, malformed nested input and extra arguments', () => {
   const cases: [keyof typeof desktopActionSchemas, unknown[]][] = [
     ['desktop.workspaceLink', ['valid-slug', { userId: peer }]],

@@ -68,6 +68,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/computer/reconcile.ts', file: 'lib/computer/reconcile.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/computer/event-log.ts', file: 'lib/computer/event-log.db.test.ts', script: 'test:live-db' },
+  { marker: 'lib/builtin-gateway/postgres.ts', file: 'lib/builtin-gateway/postgres.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/computer/event-writers.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },

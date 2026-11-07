@@ -57,6 +57,86 @@ Use your own Google or GitHub OAuth clients. Register callbacks on your exact or
 
 `AUTH_TRUSTED_ORIGINS` can add explicitly trusted origins when needed. It does not change the application's canonical origin. Your deployment uses its own OAuth credentials; it does not borrow Mikka's login proxy.
 
+## Connect the official desktop app
+
+Use a desktop release with self-hosted server selection. Enter
+`https://mikka.example.com/mikka`; a bare `https://mikka.example.com` is also
+supported by the desktop's discovery fallback. For a local installation, enter
+`http://localhost:3000/mikka`. Network installations require HTTPS.
+
+Set the optional `MIKKA_SERVER_NAME=Acme Mikka` to name this installation in the
+server chooser. The server publishes its actual build revision and available
+login methods at `GET /mikka/api/desktop/discovery`. This public endpoint needs
+no session, returns JSON under 64 KB, and never redirects. The desktop sends
+`x-mikka-client: desktop`, `x-mikka-client-version` and
+`x-mikka-desktop-protocol: 1` when probing it. The response contains:
+
+| Field | Meaning |
+| --- | --- |
+| `name`, `version` | Configured name and the running build revision |
+| `edition`, `basePath` | `community` and the compiled `/mikka` mount |
+| `desktopProtocol` | Supported range, currently `{ "min": 0, "max": 1 }` |
+| `signIn` | Actual availability of `google`, `github` and `email` |
+| `minDesktopVersion` | Valid `MIN_CLIENT_VERSION`, or `null` |
+| `cloud.connected` | Optional cloud connection state; initially `false` |
+| `mobileReady` | Whether the effective auth configuration trusts `mikka://` |
+
+Email and password sign-in use this server's own accounts. Configure the email
+sender described above for account verification and password reset. Google and
+GitHub are optional; methods without a complete configured OAuth client are not
+advertised. With `GITHUB_SIGN_IN_USE_APP=true`, discovery reads the initialized
+GitHub provider so a manifest-managed deployment App is reported correctly.
+
+For Google, create a **Web application** OAuth client in your own Google Cloud
+project, configure its consent screen/audience, and add this exact authorized
+redirect URI: `https://mikka.example.com/mikka/api/auth/callback/google`. Store
+its client ID and secret as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+[Google documents the web-server OAuth setup and exact redirect matching](https://developers.google.com/identity/protocols/oauth2/web-server).
+
+For GitHub, register your own OAuth App, set its homepage to
+`https://mikka.example.com/mikka`, and set the authorization callback URL to
+`https://mikka.example.com/mikka/api/auth/callback/github`. Store its client ID
+and secret as `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+[GitHub documents OAuth App registration](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app).
+These values configure sign-in; repository access uses the deployment's GitHub
+App described below. Recreate the app container after changing configuration.
+
+The desktop opens the system browser on your server. After sign-in, your server
+returns a one-time code to `http://127.0.0.1:<port>/auth/callback` on the same
+computer. The desktop exchanges that code and its retained PKCE verifier with
+the same server. No desktop callback registration is needed in Google or
+GitHub: their registered callback is the server URL above. The loopback receives
+a code, never a session token; the `mikka-auth://` link only brings the app to
+the foreground. No polling is used for this handoff.
+
+Community servers reject `BETTER_AUTH_OAUTH_PROXY_URL` and
+`BETTER_AUTH_OAUTH_PROXY_SECRET`; leave both unset. OAuth must return to your own
+registered client and server. `BETTER_AUTH_URL` must be the public **origin**,
+for example `https://mikka.example.com`, without `/mikka`. An invalid origin
+fails startup with `SELF_HOSTED_ORIGIN_INVALID` before database migration.
+
+Realtime updates use the server's built-in gateway. Allow WebSocket upgrades
+for `/mikka/v1/live/<channel>/socket` and the device gateway paths through your
+reverse proxy. Authenticated `/api/live/ticket` responses contain the actual
+socket address; keep the base path when validating or opening it. See
+[self-hosted realtime and scheduling](self-hosting-realtime.md) for replica and
+external-Worker configuration.
+
+For iOS readiness, explicitly add `mikka://` to `AUTH_TRUSTED_ORIGINS` on a
+community server. This exact scheme is supported; arbitrary custom schemes or
+lookalike origins are refused. Official cloud deployments retain their existing
+mobile trust. This flag reports sign-in readiness, not push-relay availability.
+
+| Symptom | What to check |
+| --- | --- |
+| Server update requested | Discovery is missing, or `desktopProtocol.max` is below the app's supported protocol. Upgrade the server image. |
+| App update requested | `desktopProtocol.min` or `minDesktopVersion` requires a newer app. HTTP `426` uses `desktop_client_update_required`. |
+| Google `redirect_uri_mismatch` | Compare the registered callback, public HTTPS origin and `/mikka/api/auth/callback/google` exactly. |
+| GitHub/Google button absent | Configure both fields for that provider, or explicitly enable the deployment GitHub App sign-in option. |
+| `SELF_HOSTED_OAUTH_PROXY_UNSUPPORTED` | Remove hosted OAuth-proxy settings and use your own OAuth client. |
+| Sign-in returns to an error page | Check origin/callback configuration and finish the one-time handoff before it expires; start a new login after a failed exchange. |
+| Login works but realtime does not | Preserve the configured Host and allow the base-path WebSocket upgrade through the reverse proxy. |
+
 ## Models, computers, and GitHub
 
 In **Settings → Models and subscriptions**, connect your own Claude or ChatGPT subscription, or add your own provider API key. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.

@@ -1,11 +1,75 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth } from 'better-auth'
-import { oAuthProxy } from 'better-auth/plugins'
-import { authOAuthProxyOptions, authTrustedOrigins as configuredAuthTrustedOrigins, resolveAppOrigin } from './auth-config'
+import { bearer, oAuthProxy } from 'better-auth/plugins'
+import { authOAuthProxyOptions as configuredAuthOAuthProxyOptions, authTrustedOrigins as configuredAuthTrustedOrigins, authEffectiveTrustedOrigins, resolveAppOrigin } from './auth-config'
 
 // Existing hosted behavior remains strict; a community deployment is tested separately.
 const authTrustedOrigins = (env: Record<string, string | undefined>) => configuredAuthTrustedOrigins({ MIKKA_EDITION: 'cloud', ...env })
+const authOAuthProxyOptions = (env: Record<string, string | undefined>) => configuredAuthOAuthProxyOptions({ MIKKA_EDITION: 'cloud', ...env })
+
+test('community trusts the exact mobile scheme only when configured; cloud retains its current mobile default', () => {
+  const env = { MIKKA_EDITION: 'community', BETTER_AUTH_URL: 'https://self.example' }
+  assert.deepEqual(authEffectiveTrustedOrigins(env), ['https://self.example'])
+  assert.deepEqual(authEffectiveTrustedOrigins({ ...env, AUTH_TRUSTED_ORIGINS: 'mikka://,https://self.example,mikka://' }), ['https://self.example', 'mikka://'])
+  assert.ok(authEffectiveTrustedOrigins({ ...env, MIKKA_EDITION: 'cloud' }).includes('mikka://'))
+  for (const value of ['mikka://app', 'mikka://*', 'mikka:///callback', 'mikka://?target=other', 'other://']) {
+    assert.throws(() => authEffectiveTrustedOrigins({ ...env, AUTH_TRUSTED_ORIGINS: value }))
+  }
+  assert.throws(() => authEffectiveTrustedOrigins({ ...env, BETTER_AUTH_URL: 'mikka://' }))
+})
+
+test('community cannot borrow the hosted OAuth proxy or enable one with a partial setting', () => {
+  for (const value of [{ BETTER_AUTH_OAUTH_PROXY_URL: 'https://app.aspectlylabs.com' }, { BETTER_AUTH_OAUTH_PROXY_SECRET: 'fixture-proxy-secret' }]) {
+    assert.throws(() => configuredAuthOAuthProxyOptions(value), /SELF_HOSTED_OAUTH_PROXY_UNSUPPORTED/)
+  }
+  assert.equal(configuredAuthOAuthProxyOptions({ BETTER_AUTH_URL: 'https://self.example' }), undefined)
+})
+
+test('real Better Auth uses each community server OAuth callback without the hosted proxy', async () => {
+  for (const origin of ['https://self.example.test', 'http://localhost:3030']) {
+    const env = { BETTER_AUTH_URL: origin, MIKKA_EDITION: 'community' }
+    const auth = betterAuth({
+      baseURL: resolveAppOrigin(env), basePath: '/mikka/api/auth',
+      secret: 'fixture-community-secret-with-sufficient-entropy',
+      trustedOrigins: authEffectiveTrustedOrigins(env), logger: { disabled: true },
+      socialProviders: { google: { clientId: 'fixture-google', clientSecret: 'fixture-secret' },
+        github: { clientId: 'fixture-github', clientSecret: 'fixture-secret' } },
+    })
+    for (const provider of ['google', 'github']) {
+      const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
+        method: 'POST', headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({ provider, callbackURL: `${origin}/mikka/api/desktop/return`, disableRedirect: true }),
+      }))
+      assert.equal(response.status, 200)
+      const authorization = new URL((await response.json()).url)
+      assert.equal(authorization.searchParams.get('redirect_uri'), `${origin}/mikka/api/auth/callback/${provider}`)
+      assert.ok(authorization.searchParams.get('state'))
+      assert.ok(response.headers.get('set-cookie'))
+    }
+  }
+})
+
+test('community email sessions authenticate locally and foreign browser origins remain refused', async () => {
+  const origin = 'https://self-email.example.test'
+  const auth = betterAuth({
+    baseURL: origin, basePath: '/mikka/api/auth', secret: 'fixture-email-secret-with-sufficient-entropy',
+    trustedOrigins: authEffectiveTrustedOrigins({ BETTER_AUTH_URL: origin }),
+    emailAndPassword: { enabled: true }, plugins: [bearer()], logger: { disabled: true },
+  })
+  const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-up/email`, {
+    method: 'POST', headers: { origin, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Local user', email: 'local-desktop@example.test', password: 'fixture-password-123' }),
+  }))
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  const session = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${body.token}` }) })
+  assert.equal(session?.user.id, body.user.id)
+  const denied = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-out`, {
+    method: 'POST', headers: { origin: 'https://attacker.example', cookie: response.headers.getSetCookie().map(value => value.split(';')[0]).join('; '), 'content-type': 'application/json' }, body: '{}',
+  }))
+  assert.equal(denied.status, 403)
+})
 
 test('community production permits its exact loopback origin without allowing cleartext network origins', () => {
   for (const origin of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {

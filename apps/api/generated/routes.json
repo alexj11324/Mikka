@@ -685,7 +685,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "2283d4669e828112d3a79998e48fb313fa125be104300d514f65e5c4dc0eebaa"
+      "sourceHash": "c60a9bfef2b79d74a4bd1310f30510a89f6b4e73f152ddfbda0b4ad3899c35da"
     },
     {
       "path": "/mikka/api/desktop/config",
@@ -697,13 +697,22 @@
       "sourceHash": "bfd648370967aab90b78d326edc874805096674c5d8fbc8a529d461c1e0f739f"
     },
     {
+      "path": "/mikka/api/desktop/discovery",
+      "template": "/api/desktop/discovery",
+      "source": "app/api/desktop/discovery/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "559f613ad1c8cb8d699c2cedb23380a4b4192ddefa59b116fa75e95d6309ded8"
+    },
+    {
       "path": "/mikka/api/desktop/exchange",
       "template": "/api/desktop/exchange",
       "source": "app/api/desktop/exchange/route.ts",
       "methods": [
         "POST"
       ],
-      "sourceHash": "238582479dd98f6520942b481d18fff2a1e4ef634fc9dfbe7292e4b5d3a0e687"
+      "sourceHash": "acb80f690c3053f98d1a82049deb0768d243d1657d3526261ec152ce12890caf"
     },
     {
       "path": "/mikka/api/desktop/finish",
@@ -1893,7 +1902,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "34ce1299473f6b4a26f3ab4bdb350a995f24a3c9df5de0477fc33b67384a7595"
+      "sourceHash": "3c5a79fbfc2a2a7d18d9261a2786489515cd5ef8409313648e23b432941bd8d8"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/github-token",
