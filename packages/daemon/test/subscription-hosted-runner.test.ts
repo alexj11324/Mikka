@@ -1,6 +1,6 @@
 // Real adapters/Claude Agent SDK with offline native CLI protocol fixtures.
 // These tests run on a non-root Linux runner and never contact a provider.
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -24,7 +24,9 @@ async function fixture(harness: 'codex' | 'claude_code' = 'claude_code', collect
   const link = Object.assign(new MemoryServer(deviceId).link(), {
     nativeLease: never, nativeContext: never, nativeRequest: never, githubLease: never,
   })
-  const binary = resolve(import.meta.dirname, 'fakes', harness === 'codex' ? 'fake-codex-subscription.mjs' : 'fake-claude-subscription.mjs')
+  const fixtureName = harness === 'codex' ? 'fake-codex-subscription.mjs' : 'fake-claude-subscription.mjs'
+  const binary = join(root, fixtureName)
+  copyFileSync(resolve(import.meta.dirname, 'fakes', fixtureName), binary)
   chmodSync(binary, 0o700)
   const assignment: RunAssignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main',
     harness, prompt: 'hello', model: 'fixture-model',
@@ -170,6 +172,63 @@ it.each(['codex', 'claude_code'] as const)('%s passes the actual model key and p
   expect(JSON.parse(readFileSync(join(f.config, 'fixture-auth.json'), 'utf8')))
     .toEqual({ tokenSha: createHash('sha256').update(key).digest('hex'), baseUrl: 'https://provider.example/v1' })
   expect(existsSync(join(f.stateDir, 'native-brokers'))).toBe(false)
+  expect(f.never).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['codex', 'subscription'], ['claude_code', 'subscription'],
+  ['codex', 'api_key'], ['claude_code', 'api_key'],
+] as const)('%s starts an owned desktop with %s credentials without changing the credential owner', async (harness, source) => {
+  const f = await fixture(harness)
+  f.assignment.subscriptionBinding!.ownerId = 'shared-subscription-payer'
+  const binding = structuredClone(f.assignment.subscriptionBinding!)
+  f.assignment.policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'allow' } }
+  f.assignment.computer = { botId: randomUUID(), ownerId: 'task-owner', display: ':2', policyVersion: 0 }
+  if (source === 'api_key') {
+    delete f.assignment.subscriptionBinding; delete f.assignment.subscriptionLease
+    f.assignment.modelCredential = { kind: 'provider', protocol: harness === 'codex' ? 'openai' : 'anthropic',
+      baseUrl: 'https://provider.example/v1', key: 'fixture-direct-provider-key' }
+  }
+  const before = structuredClone(f.assignment)
+  // Use the real local grant code. This fixture sends no desktop action, so
+  // it needs neither a listening socket nor a display/provider process.
+  const broker = new ComputerBroker({ socketPath: join(f.root, 'computer.sock'),
+    driver: { installed: true, version: 'fixture', path: '/fake', fingerprint: 'f'.repeat(64) },
+    permitted: (runId: string) => runId === f.assignment.runId,
+  })
+  const spec = vi.spyOn(broker, 'spec'), revoke = vi.spyOn(broker, 'revoke')
+  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { [harness]: f.binary }, computerBroker: broker })
+  try {
+    const session = await runner.start(f.assignment, { ...f.options, policy: f.assignment.policy })
+    expect((await collect(session)).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+    expect(JSON.parse(readFileSync(join(f.config, 'fixture-process.json'), 'utf8')).prompts).toBe(1)
+    expect(spec).toHaveBeenCalledExactlyOnceWith(f.assignment.runId, 'allow', { display: ':2' })
+    expect(revoke).toHaveBeenCalledExactlyOnceWith(spec.mock.results[0]!.value!.token)
+    const ledger = join(f.stateDir, 'native-ledgers', f.assignment.runId + '.json')
+    if (source === 'subscription') {
+      expect(JSON.parse(readFileSync(ledger, 'utf8'))).toMatchObject({ sessionId: session.sessionId, scope: {
+        runId: f.assignment.runId, bindingId: binding.bindingId, ownerId: binding.ownerId,
+        workspaceId: binding.workspaceId, consumerId: binding.consumerId, route: binding.route,
+        accountId: 'fixture-account', modelId: 'fixture-model', revision: 2,
+      } })
+    } else expect(existsSync(ledger)).toBe(false)
+    expect(JSON.parse(readFileSync(join(f.config, 'fixture-auth.json'), 'utf8'))).toMatchObject({
+      tokenSha: createHash('sha256').update(source === 'subscription' ? 'fixture-access' : 'fixture-direct-provider-key').digest('hex'),
+    })
+    expect(f.assignment).toEqual(before)
+    expect(f.never).not.toHaveBeenCalled()
+  } finally { await broker.close() }
+})
+
+it.each(['codex', 'claude_code'] as const)('%s refuses a shared-subscription desktop before CLI startup when its broker is missing', async harness => {
+  const f = await fixture(harness)
+  f.assignment.subscriptionBinding!.ownerId = 'shared-subscription-payer'
+  f.assignment.policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'allow' } }
+  f.assignment.computer = { botId: randomUUID(), ownerId: 'task-owner', display: ':2', policyVersion: 0 }
+  await expect(f.runner.start(f.assignment, { ...f.options, policy: f.assignment.policy })).rejects.toMatchObject({
+    code: 'subscription_hosted_runtime_unavailable', detail: 'computer_unavailable',
+  })
+  expect(existsSync(join(f.config, 'fixture-process.json'))).toBe(false)
   expect(f.never).not.toHaveBeenCalled()
 })
 
