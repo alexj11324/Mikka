@@ -14,10 +14,10 @@ const PUBLIC_VERSION = 'https://app.aspectlylabs.com/mikka/api/version'
 // Root binds these after the reviewed workflow is on main and the actual
 // production target is read. An unbound CLI refuses before any network request.
 export const BINDING = Object.freeze({
-  driverSha: 'b8045b5661bcbf51eeecc74ceef19eceead93a10',
-  applicationSha: '71a2438a844e35f1c191806cca735665db272d02',
-  webRunId: 42305731897,
-  deploymentId: 'dpl_FkNHu4GYmwcVZkjsuSxfg26QAZ4c',
+  driverSha: '8180f687d19e117437403b865692388a9c05b554',
+  applicationSha: '8180f687d19e117437403b865692388a9c05b554',
+  webRunId: 42310651693,
+  deploymentId: 'dpl_AxsJehgEH2kv7ECLno5m1C2Dv3rv',
 })
 class ClosedError extends Error {
   constructor(code, { status = null, cause } = {}) {
