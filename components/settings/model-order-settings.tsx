@@ -1,15 +1,10 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { toast } from 'sonner'
-import useSWR, { unstable_serialize } from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
-import { arrayMove } from '@dnd-kit/sortable'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
-import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -22,21 +17,17 @@ import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
+import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
 import { DispatchOrder } from '@/components/settings/dispatch-order'
 import type { OrderRow, OrderView } from '@/lib/model-order'
 import type { OrderCandidate, OrderHarness } from '@/lib/model-order-plan'
-import { settingsRead } from '@/lib/settings-read'
-import { useLiveKey } from '@/hooks/use-live-key'
 import { settingsHref } from '@/lib/settings-sections'
 import { usePresence } from '@/lib/use-presence'
-import { useActionError } from '@/lib/use-action-error'
+import { modelOrderKey, orderRowRepair, readModelOrder, useModelOrder, useOrderRowStatus } from '@/hooks/settings/use-model-order'
 import { cn } from '@/lib/utils'
 
-export const modelOrderKey = settingsKeys.modelOrder
-export const readModelOrder = (workspaceId: string) => settingsRead<Awaited<ReturnType<typeof getModelOrder>>>('model-order', { workspace: workspaceId })
+export { modelOrderKey, readModelOrder }
 
-type Change = Parameters<typeof changeModelOrder>[0]
 type Candidate = OrderView['candidates'][number]
 const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =>
   `${item.harness}:${item.model}:${item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId}`
@@ -53,85 +44,12 @@ const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =
 export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.modelOrder')
   const commonT = useTranslations('Common')
-  const actionError = useActionError()
-  const order = useSWR(modelOrderKey(workspaceId), () => readModelOrder(workspaceId))
-  const e2b = useOwnE2BKey()
-  const [failed, setFailed] = useState<{ message: string; retry: () => void } | null>(null)
-  // A refused reorder: the list is back as saved and the moved row says so, with 重试 (R3).
-  const [unsaved, setUnsaved] = useState<{ id: string; to: number } | null>(null)
-  const [pending, setPending] = useState(false)
+  const { data, loadError, e2b, pending, failed, unsaved, shown, offered, other, backup, offeredOther, checkQuota, save, move, remove, reload } = useModelOrder(workspaceId)
   const [adding, setAdding] = useState(false)
   const [keyOpen, setKeyOpen] = useState(false)
   const keyDialog = usePresence(keyOpen)
-  const data = order.data && !order.data.error ? order.data : null
-  // One Agent's list at a time (decision 2026-11-05-0400): 优先使用的 Agent picks it; each keeps its own order.
-  const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness) : []
-  const offered = data ? data.candidates.filter(candidate => candidate.harness === data.preferredHarness) : []
-  // The other Agent's list is the fallback dispatch takes after this one (decision 2026-11-05-0400).
-  const other: OrderHarness = data?.preferredHarness === 'codex' ? 'claude_code' : 'codex'
-  const backup = data ? data.entries.filter(entry => entry.harness === other) : []
-  const offeredOther = data ? data.candidates.filter(candidate => candidate.harness === other) : []
-  // A subscription connected, paused or read again elsewhere: this list re-reads (no polling).
-  useLiveKey('model_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
 
-  async function checkQuota(connectionId: string) {
-    setPending(true); setFailed(null)
-    try {
-      // The server resolves the credential's owner from authorized candidates,
-      // including a teammate's currently shared subscription.
-      const result = await checkModelOrderQuota(connectionId, workspaceId)
-      if (result.error) throw new Error('Allowance unconfirmed')
-      await order.mutate(result, { revalidate: false })
-      const entries = result.entries.filter(row => row.source.kind === 'subscription' && row.source.connectionId === connectionId)
-      if (!entries.length || entries.some(row => row.block?.reason === 'checking')) throw new Error('Allowance unconfirmed')
-    } catch {
-      setFailed({ message: t('quotaCheckUnconfirmed'), retry: () => void checkQuota(connectionId) })
-    } finally { setPending(false) }
-  }
-
-  /** Saves one change; `onFail` replaces the page's error line for changes with their own place to say so. */
-  async function save(change: Change, optimistic?: OrderView, onFail?: () => void) {
-    setPending(true); setFailed(null); setUnsaved(null)
-    const fail = (error?: string) => onFail ? onFail() : setFailed({ message: actionError(error), retry: () => void save(change, optimistic) })
-    const restore = async () => {
-      if (optimistic && data) await order.mutate(data, { revalidate: false })
-      // Keep the last saved value visible even if an offline reread also fails.
-      await order.mutate().catch(() => undefined)
-    }
-    try {
-      if (optimistic) await order.mutate(optimistic, { revalidate: false })
-      const result = await changeModelOrder(change, workspaceId)
-      if (result.error) { fail(result.error); await restore(); return false }
-      await order.mutate(result, { revalidate: false })
-      return true
-    } catch {
-      fail()
-      await restore()
-      return false
-    } finally { setPending(false) }
-  }
-  const move = (from: number, to: number) => {
-    if (!data) return
-    // 重试 on a list that changed meanwhile: nothing left to move clears the mark.
-    if (to < 0 || to >= shown.length || from === to) { setUnsaved(null); return }
-    // Only this Agent's rows move, into each other's places; the other Agent's list is untouched.
-    const moved = arrayMove(shown, from, to)
-    const queue = [...moved]
-    const entries = data.entries.map(entry => entry.harness === data.preferredHarness ? queue.shift()! : entry)
-    const id = shown[from].id
-    void save({ kind: 'reorder', ids: moved.map(entry => entry.id) }, { ...data, entries }, () => setUnsaved({ id, to }))
-  }
-  /** 移出列表 at once; the toast's 撤销 puts the same model back where it was (R2). */
-  const remove = async (row: OrderRow) => {
-    if (!data) return
-    const at = data.entries.findIndex(entry => entry.id === row.id)
-    if (!await save({ kind: 'remove', id: row.id }, { ...data, entries: data.entries.filter(entry => entry.id !== row.id) })) return
-    toast(t('removed', { model: row.model }), {
-      action: { label: t('undo'), onClick: () => { void save({ kind: 'add', at, entries: [{ harness: row.harness, model: row.model, source: row.source }] }) } },
-    })
-  }
-
-  if (order.data?.error || order.error) return <FieldError>{actionError(order.data?.error)}</FieldError>
+  if (loadError) return <FieldError>{loadError}</FieldError>
   if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
 
   // The order each location tries (decision 2026-11-02-2330) is drawn as a chain, not a sentence (Alex, 2026-11-06).
@@ -141,14 +59,11 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     ? <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
     : data.first?.kind !== 'cloud' && <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
   const repair = (row: OrderRow) => {
-    const reason = row.block?.reason
-    if (reason === 'checking' && row.source.kind === 'subscription') return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { if (row.source.kind === 'subscription') void checkQuota(row.source.connectionId) }}>{t('checkQuota')}</Button>
-    if (reason === 'noDevice') return <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
-    if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#subscription-${row.source.connectionId}`} />}>{t(reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription')}</Button>
-    if (reason === 'keyRefused' && row.source.kind === 'api_key') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#api-key-${row.source.keyId}`} />}>{t('openApiKey')}</Button>
-    // A removed source may have no row left: its source section retains the recovery control.
-    if (reason === 'missing' || reason === 'removed') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
-    return null
+    const fix = orderRowRepair(row)
+    if (!fix) return null
+    if (fix.kind === 'checkQuota') return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { void checkQuota(fix.connectionId) }}>{t('checkQuota')}</Button>
+    if (fix.kind === 'devices') return <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
+    return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#${fix.anchor}`} />}>{t(fix.label)}</Button>
   }
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
@@ -210,7 +125,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
       if (picked.length) await save({ kind: 'add', entries: picked.map(({ harness, model, source }) => ({ harness, model, source })) })
     }} />}
     {keyDialog.value && e2b.configured !== undefined && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={e2b.configured}
-      onClose={changed => { setKeyOpen(false); if (changed) void Promise.all([e2b.mutate(), order.mutate()]) }} />}
+      onClose={changed => { setKeyOpen(false); if (changed) void Promise.all([e2b.mutate(), reload()]) }} />}
   </>
 }
 
@@ -262,18 +177,8 @@ function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove
 
 function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
-  const runtimeT = useTranslations('RunErrors.subscription_local_runtime_unavailable')
   const commonT = useTranslations('Common')
-  const format = useFormatter()
-  const block = row.block
-  // 顺序未保存 wins over the row's own state until 重试 or the next change (R3).
-  const checking = !retry && block?.reason === 'checking'
-  const warn = Boolean((block && !checking) || retry)
-  const status = retry ? t('orderUnsaved') : checking ? t('blocked.checking')
-    : !block ? t('ready')
-    : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
-      : block.reason === 'noDevice' ? (block.device.why === 'subscriptionRuntimeUnavailable' ? runtimeT(block.device.detail ?? 'default') : block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
-        : t(`blocked.${block.reason}`)
+  const { status, checking, warn } = useOrderRowStatus()(row, Boolean(retry))
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
   return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
     <KanbanItemHandle render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('handle', { model: row.model, position: index + 1 })} />} className="touch-none text-muted-foreground">
