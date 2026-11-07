@@ -140,6 +140,7 @@ test('PG17: a shared source waiter stays until its last subscriber and then rele
 })
 
 test('PG17: an observer socket disappearing releases its blocked backend without application polling', { skip: !disposable, timeout: 30_000 }, async t => {
+  const monitor = new Client({ connectionString: url })
   const sentinel = BigInt.asUintN(63, BigInt(`0x${randomUUID().replaceAll('-', '')}`)).toString()
   const producer = recordedBus(), observer = recordedBus(async (sql, _result, record) => {
     if (sql.startsWith('SET statement_timeout')) {
@@ -148,12 +149,16 @@ test('PG17: an observer socket disappearing releases its blocked backend without
       await record.client.query('SELECT pg_advisory_lock($1::bigint)', [sentinel])
     }
   })
-  t.after(async () => { await Promise.all([producer.bus.stop(), observer.bus.stop()]) })
-  await Promise.all([producer.bus.ready(), observer.bus.ready()])
+  t.after(async () => { await Promise.all([producer.bus.stop(), observer.bus.stop(), monitor.end()]) })
+  await Promise.all([producer.bus.ready(), observer.bus.ready(), monitor.connect()])
   const source = await sourceEpoch(producer.bus), lost = Promise.withResolvers<void>()
   await observer.bus.observe(source, () => lost.resolve())
   const watcher = observer.clients.find(record => record.options.application_name?.startsWith('mikka-gateway-watch:'))!
-  const released = producer.clients[0].client.query('SELECT pg_advisory_lock($1::bigint)', [sentinel])
+  // A separate test session must wait for the sentinel. The producer holds
+  // the source lease the watcher is waiting on: waiting on its sentinel from
+  // that producer creates an artificial lock cycle and races PG deadlock
+  // detection against the disconnected watcher's socket check.
+  const released = monitor.query('SELECT pg_advisory_lock($1::bigint)', [sentinel])
   // No CancelRequest can repair this already-lost transport. Like a killed
   // observer, it relies on PG's per-session kernel socket check, not the
   // application cleanup callback, to interrupt the blocked server query.
