@@ -77,7 +77,7 @@ export type SharedSubscription = {
   /** Forget what was heard, right before a fresh read. */
   reset(): void
   /** Resolves on a notification for one of the keys (or one heard since reset), after `ms`, or on abort. */
-  next(ms: number, signal?: AbortSignal): Promise<void>
+  next(ms: number, signal?: AbortSignal): Promise<'notified' | 'timeout' | 'aborted'>
   /** True once the shared session dropped: the caller falls back to its timer. */
   readonly lost: boolean
   close(): void
@@ -145,12 +145,14 @@ export async function subscribeShared(database: { options: PoolConfig }, channel
     reset() { heard = false },
     get lost() { return lost },
     next(ms, signal) {
-      return new Promise<void>(resolve => {
-        if (heard || signal?.aborted) { resolve(); return }
-        const done = () => { clearTimeout(timer); signal?.removeEventListener('abort', done); wake = undefined; resolve() }
-        const timer = setTimeout(done, Math.max(0, ms))
-        wake = done
-        signal?.addEventListener('abort', done, { once: true })
+      return new Promise(resolve => {
+        if (signal?.aborted) { resolve('aborted'); return }
+        if (heard) { resolve('notified'); return }
+        const done = (reason: 'notified' | 'timeout' | 'aborted') => { clearTimeout(timer); signal?.removeEventListener('abort', abort); wake = undefined; resolve(reason) }
+        const abort = () => done('aborted')
+        const timer = setTimeout(() => done('timeout'), Math.max(0, ms))
+        wake = () => done('notified')
+        signal?.addEventListener('abort', abort, { once: true })
       })
     },
     close: leave,
