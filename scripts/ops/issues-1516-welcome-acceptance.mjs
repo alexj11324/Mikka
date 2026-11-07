@@ -6,6 +6,9 @@ import { resolve } from 'node:path'
 import { decode, encode } from '../../lib/desktop-rpc/wire.ts'
 import { parseOpenUI, isComponent } from '../../lib/openui-lang.ts'
 import { detectAgentUISource } from '../../lib/agent-ui-source.ts'
+import { createParser } from '@openuidev/react-lang'
+import { createAgentLibrary } from '../../lib/agent-ui-catalog.ts'
+import { getAgentUIIssue } from '../../lib/agent-ui-status.ts'
 import { invalidToolParts } from '../../lib/coordinator/invalid-tool-call.ts'
 import { selectTeamWorkspace, isTeamWorkspaceReadPath, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
 
@@ -37,14 +40,20 @@ export function verifySharedSelection(row, scope) {
   return { bindingId: row.bindingId, connectionRevision: Number(row.connectionRevision), route: row.route }
 }
 
-/** Only parse the declarative response; model-produced strings are never evaluated. */
+const welcomeLibrary = createAgentLibrary()
+const welcomeParser = createParser(welcomeLibrary.toJSONSchema(), welcomeLibrary.root)
+
+/** Use the web renderer's schema/parser and issue check, without rendering or executing actions. */
 export function welcomeOptions(text) {
-  const root = parseOpenUI(text), questions = []
+  const detected = detectAgentUISource(text)
+  const parsed = welcomeParser.parse(detected.source), questions = []
+  check(detected.isOpenUI && !getAgentUIIssue(parsed) && parsed.queryStatements.length === 0 && parsed.mutationStatements.length === 0, 'welcome_options_missing')
+  const root = parsed.root
   const walk = (value, depth = 0) => {
     if (depth > 25 || !value || typeof value !== 'object') return
     if (Array.isArray(value)) { for (const child of value) walk(child, depth + 1); return }
-    if (isComponent(value)) {
-      if (value.name === 'BeQuestions') questions.push(...(Array.isArray(value.props.questions) ? value.props.questions : []))
+    if (value.type === 'element') {
+      if (value.typeName === 'BeQuestions') questions.push(...(Array.isArray(value.props.questions) ? value.props.questions : []))
       for (const child of Object.values(value.props)) walk(child, depth + 1)
     }
   }
@@ -510,7 +519,10 @@ if (process.argv.includes('--self-test')) {
   assert.equal(requestAllowed('https://example.com', 'GET'), false)
   const text = 'root = Stack([TextContent("Hi"), BeQuestions("Start", [{id:"start", title:"What", options:[{value:"a", label:"A"},{value:"b",label:"B"},{value:"c",label:"C"},{value:"d",label:"D"}], allowCustom:true}])])'
   assert.equal(welcomeOptions(text).get('d').label, 'D')
+  assert.equal(welcomeOptions(text.slice(0,-1)).get('b').label,'B','the real web renderer closes a complete card tree with one missing trailing parenthesis')
   assert.throws(() => welcomeOptions('root = globalThis.process.exit(1)'), /welcome_options_missing/)
+  assert.throws(() => welcomeOptions(text.replace('{value:"d",label:"D"}', '{value:"c",label:"D"}')),/welcome_options_invalid/)
+  assert.equal(welcomeOptions(text.replace('root = ', '')).get('a').label,'A')
   assert.equal(requestAllowed('/api/rpc','POST',{version:1,action:'workspace.createWorkspace',args:[]}),false)
   assert.equal(requestAllowed('/api/rpc','POST',{version:1,action:'workspace-settings.deleteWorkspace',args:[]}),false)
   assert.equal(requestAllowed('/api/workspace','GET'),true)
@@ -526,5 +538,5 @@ if (process.argv.includes('--self-test')) {
   for(const change of forbidden)assert.throws(()=>verifySharedSelection({...row,...change},scope),/shared_binding_unverified/)
   assert.throws(()=>verifySharedSelection(row,{...scope,adminId:scope.ownerId}),/shared_binding_unverified/)
   assert.equal(verifySharedSelection({...row,provider:'codex',modelId:'gpt-6-luna',route:'codex_cpa'}, {...scope,provider:'codex',model:'gpt-6-luna'}).route,'codex_cpa')
-  console.log('26 acceptance-driver identity and request boundary checks passed')
+  console.log('29 acceptance-driver identity, web-parser and request boundary checks passed')
 } else await runAcceptance()
