@@ -240,15 +240,16 @@ export function createFactoryStore(
     userId: string,
     eventId: string,
     issueId: string,
+    sourceBotId = botId,
   ) {
     const { rows } = await tx.query(
       `SELECT e.id FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM $3::uuid AND (e."issueId" IS NULL OR e."issueId"=$4) AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$3 AND b."ownerId"=$2))`,
-      [eventId, userId, botId, issueId],
+      [eventId, userId, sourceBotId, issueId],
     );
     return rows.length === 1;
   }
   /** lock=false is the read-only variant for GETs: same ownership/scope checks, no row locks. */
-  async function owned(tx: PoolClient, userId: string, taskId: string, lock = true) {
+  async function owned(tx: PoolClient, userId: string, taskId: string, lock = true, readScope: "bot" | "user" = "bot") {
     uuid(taskId);
     const {
       rows: [task],
@@ -261,10 +262,10 @@ export function createFactoryStore(
     const issue = task ? await lockedIssue(tx, task.issueId, lock) : undefined;
     if (
       !task ||
-      task.botId !== botId ||
+      (task.botId !== botId && (lock || readScope === "bot")) ||
       !factoryScopeAllows(task, issue) ||
       !(await authorize(userId, task.issueId, tx)) ||
-      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId))
+      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId, task.botId))
     )
       fail("factoryNotFound");
     return task;
@@ -419,6 +420,8 @@ export function createFactoryStore(
     lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
     /** Read-only GET paths: ownership/scope checked, nothing locked. */
     readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
+    /** Human question collections span the user's Bots; the actual task's source and issue ACL still apply. */
+    readTaskForUser: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false, "user"),
     async route(userId: string, input: unknown, existing?: PoolClient) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
