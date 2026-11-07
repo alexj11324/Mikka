@@ -1,0 +1,123 @@
+name: Issue 1506 Go startup connection PG wire proof
+
+"on":
+  push:
+    branches:
+      - diagnostic/issue-1506-go-startup-proof-20261107-03
+    paths:
+      - .github/workflows/go-startup-connection-proof.yml
+      - scripts/diagnostics/go-startup-connection-proof.py
+      - scripts/diagnostics/go-startup-connection-proof.json
+      - scripts/diagnostics/go-startup-pg-wire-proof.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-startup-connection-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    # LOCAL PREPARATION. Only Root may remove literal false after reviewing all four exact files.
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/diagnostic/issue-1506-go-startup-proof-20261107-03' && github.run_attempt == 1 }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Initialize original evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          PROOF_ARTIFACTS="$RUNNER_TEMP/go-startup-connection-proof-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf 'PROOF_ARTIFACTS=%s\n' "$PROOF_ARTIFACTS" >> "$GITHUB_ENV"
+          mkdir -m 700 "$PROOF_ARTIFACTS"
+          printf '{"runId":"%s","attempt":"%s","helperSha":"%s","startedAt":%s}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$(date +%s)" > "$PROOF_ARTIFACTS/workflow-start.json"
+
+      - name: Check out exact helper
+        id: helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: helper
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Check out fixed baseline
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac
+          path: baseline
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out fixed candidate and its parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 81c98b53ce0cbe0e615199757ed91e6f2c7e8fd2
+          path: candidate
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Use repository pinned pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+          run_install: false
+
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+
+      - name: Locate dependency cache
+        id: store
+        shell: bash
+        working-directory: candidate
+        run: printf 'path=%s\n' "$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore existing dependency cache without saving this branch
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('candidate/pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install locked candidate dependencies for tracked migrations
+        timeout-minutes: 3
+        working-directory: candidate
+        shell: bash
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          OPENUI_TELEMETRY_DISABLED: '1'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build both exact binaries and run the isolated proof
+        timeout-minutes: 11
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 helper/scripts/diagnostics/go-startup-connection-proof.py \
+            --config helper/scripts/diagnostics/go-startup-connection-proof.json \
+            --helper helper --baseline baseline --candidate candidate \
+            --out "$PROOF_ARTIFACTS"
+
+      - name: Confirm only this proof's owned containers are absent
+        if: always() && steps.helper.outcome == 'success'
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 helper/scripts/diagnostics/go-startup-connection-proof.py \
+            --config helper/scripts/diagnostics/go-startup-connection-proof.json \
+            --helper helper --baseline baseline --candidate candidate \
+            --out "$PROOF_ARTIFACTS" --cleanup-only
+
+      - name: Preserve original source, process, wire, retained regression and cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: go-startup-connection-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/go-startup-connection-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 7

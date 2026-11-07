@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "branch": "diagnostic/issue-1506-go-startup-proof-20261107-03",
+  "baseline": "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac",
+  "baselineTree": "a32509917eab6cea995d2a2401d8b984ce2b37d1",
+  "candidate": "81c98b53ce0cbe0e615199757ed91e6f2c7e8fd2",
+  "candidateTree": "214b5119e802e4728e0ef0533659331e970cb1ba",
+  "candidateParents": [
+    "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac"
+  ],
+  "mainPath": "packages/subscription-worker/cmd/mikka-subscription-worker/main.go",
+  "baselineMainSha256": "0c19b41a69bfeb136434bea87e6d6c96718dd1d91d6f831c35f1a42218a6013b",
+  "candidateMainSha256": "0f171cf2c56667c0a17e42fd39f3cf1546870a848fd023b5d6fbf914f2824aab",
+  "wirePath": "scripts/diagnostics/go-startup-pg-wire-proof.py",
+  "wireSha256": "fb4155339b125a52a771fcc774bf081ab9ba436e5e55073234d6388266f76dd2",
+  "cpa": "8289ec4c71ad914d0612c2776352b76ba3d355a6",
+  "goImage": "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
+  "pgImage": "postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb",
+  "dependencySha256": {
+    "packages/subscription-worker/CPA_COMMIT": "752926809037306f0f5ff4884d0cae47547fa98d3d03992d7a312b4774da53b1",
+    "packages/subscription-worker/bootstrap.mjs": "37f36e07d88ea1342a3c323144eba71a82b7a851503bc2540bd4d384989c5015",
+    "packages/subscription-worker/go.mod": "856105c86e858918a92a6ad69851393d4209c1f722e0f910d3a9afdc60d73088",
+    "packages/subscription-worker/go.sum": "a4df9009acc94e0af2ded2516f69b094e5c4b522f49d8677b0dc495dbf117ee5",
+    "packages/subscription-worker/compat/bridge.go.txt": "cecf710f98dc2c82a33f7d2f73428228a0ba6dce60acd186964b6b0f8fc5201b",
+    "packages/subscription-worker/compat/codex-http.go.txt": "beddd86eecda56c04a3ece8745dc1aa9c08a3862d7d4d6dfce4eca6b9c4063bd",
+    "packages/subscription-worker/compat/claude-http.go.txt": "93bdaeb090f0368d580b12fe80aaff1d53579c668526cdc7d1bb6d2cd4e9c739"
+  },
+  "requiredPgTests": [
+    "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+    "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+    "TestStreamChecksAuthorizeEveryChunkWithoutFetchingUnusedCredentialRecord"
+  ],
+  "parentCancellationTest": "cancelling during preparation cannot start inference afterward",
+  "wireCaseCount": 10,
+  "jobTimeoutMinutes": 15,
+  "runtimeBudgetFromWorkflowStartSeconds": 720,
+  "productionCredentials": false,
+  "realProviderCalls": false,
+  "carriedRegressionEvidence": {
+    "schemaVersion": 1,
+    "status": "carried_forward",
+    "executedThisRun": false,
+    "originalInvocation": {
+      "helperSha": "cf2f6c4a62d1d559c89a5d25c19541aeca26b5b9",
+      "runId": "42375543153",
+      "jobId": "128412248038",
+      "attempt": 1,
+      "artifactId": "13576045271",
+      "artifactZipSha256": "1f3118e151383b34f5101f164a432df6310f811af1082647ecbe9196ca90ad35",
+      "overallConclusion": "failure"
+    },
+    "source": {
+      "baseline": "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac",
+      "baselineTree": "a32509917eab6cea995d2a2401d8b984ce2b37d1",
+      "candidate": "81c98b53ce0cbe0e615199757ed91e6f2c7e8fd2",
+      "candidateTree": "214b5119e802e4728e0ef0533659331e970cb1ba",
+      "candidateParents": [
+        "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac"
+      ],
+      "baselineMainSha256": "0c19b41a69bfeb136434bea87e6d6c96718dd1d91d6f831c35f1a42218a6013b",
+      "candidateMainSha256": "0f171cf2c56667c0a17e42fd39f3cf1546870a848fd023b5d6fbf914f2824aab",
+      "dependencySha256": {
+        "packages/subscription-worker/CPA_COMMIT": "752926809037306f0f5ff4884d0cae47547fa98d3d03992d7a312b4774da53b1",
+        "packages/subscription-worker/bootstrap.mjs": "37f36e07d88ea1342a3c323144eba71a82b7a851503bc2540bd4d384989c5015",
+        "packages/subscription-worker/go.mod": "856105c86e858918a92a6ad69851393d4209c1f722e0f910d3a9afdc60d73088",
+        "packages/subscription-worker/go.sum": "a4df9009acc94e0af2ded2516f69b094e5c4b522f49d8677b0dc495dbf117ee5",
+        "packages/subscription-worker/compat/bridge.go.txt": "cecf710f98dc2c82a33f7d2f73428228a0ba6dce60acd186964b6b0f8fc5201b",
+        "packages/subscription-worker/compat/codex-http.go.txt": "beddd86eecda56c04a3ece8745dc1aa9c08a3862d7d4d6dfce4eca6b9c4063bd",
+        "packages/subscription-worker/compat/claude-http.go.txt": "93bdaeb090f0368d580b12fe80aaff1d53579c668526cdc7d1bb6d2cd4e9c739"
+      },
+      "cpa": "8289ec4c71ad914d0612c2776352b76ba3d355a6",
+      "goImage": "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
+      "pgImage": "postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb",
+      "sourceUnchangedAfterRun": true
+    },
+    "binarySha256": {
+      "baseline": "645585564bc489f9536f92cd27a842c550329e7c0d7533805f7d3148997baa02",
+      "candidate": "fe889c7694ce6632bdde91601e5287de8e890868db2a08ea3a8735a7c77c1644"
+    },
+    "regressions": {
+      "pg": {
+        "topLevelTestCount": 3,
+        "subtestCount": 4,
+        "classification": {
+          "accepted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "started": [
+            "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+            "TestConcurrentRotationPreservesStreamButDisconnectStopsIt/disconnect",
+            "TestConcurrentRotationPreservesStreamButDisconnectStopsIt/refresh",
+            "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+            "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding/claude",
+            "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding/codex",
+            "TestStreamChecksAuthorizeEveryChunkWithoutFetchingUnusedCredentialRecord"
+          ],
+          "passed": [
+            "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+            "TestConcurrentRotationPreservesStreamButDisconnectStopsIt/disconnect",
+            "TestConcurrentRotationPreservesStreamButDisconnectStopsIt/refresh",
+            "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+            "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding/claude",
+            "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding/codex",
+            "TestStreamChecksAuthorizeEveryChunkWithoutFetchingUnusedCredentialRecord"
+          ],
+          "failed": [],
+          "skipped": [],
+          "packageTerminal": [
+            "pass"
+          ]
+        }
+      },
+      "parent": {
+        "selectedTestCount": 1,
+        "otherUnselectedSkippedTests": 10,
+        "classification": {
+          "accepted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "targetCount": 1,
+          "targetStatus": "passed",
+          "passedTests": 1,
+          "failedTests": 0
+        }
+      }
+    },
+    "originalWire": {
+      "planned": 10,
+      "started": 6,
+      "passed": 5,
+      "failed": 1,
+      "notRun": 4,
+      "status": "failed"
+    },
+    "evidenceFiles": {
+      "source-proof.json": {
+        "bytes": 1680,
+        "sha256": "0e2afc8bf67edf7cb61b97aa02f9b7a929a779179c57eb257ca12ce0bb76ab97"
+      },
+      "actual-binaries.json": {
+        "bytes": 699,
+        "sha256": "1be45832b03f3115a5f535aa61d0d589d8e39f4d89e6f621ef501c575733da2b"
+      },
+      "summary.json": {
+        "bytes": 1753,
+        "sha256": "70787ad714077d83d26d99019ccd409ebab80ca85d25c4283b2de2fa0ec05e8d"
+      },
+      "pg-regression.stdout.log": {
+        "bytes": 7750,
+        "sha256": "fa51c88d5af3784b29f8742a7ea0bff1a4fd1a05efd02d50ca471d8050dd6c8e"
+      },
+      "pg-regression.classification.json": {
+        "bytes": 1198,
+        "sha256": "279b93c2d6a046a885d03853764a31aaf3c6486a9a74756706ebcd1bbf4a6e9b"
+      },
+      "parent-cancellation.json": {
+        "bytes": 3869,
+        "sha256": "11f420ae920e5ff6576a4940342d169b30e2ba199850c488dfb693daa71e5432"
+      },
+      "parent-cancellation.classification.json": {
+        "bytes": 149,
+        "sha256": "831e551b97ee43346ffdf5869ac443d459da3287b5b56fffd611422ce346dfec"
+      },
+      "pg-regression.command.json": {
+        "bytes": 2132,
+        "sha256": "6a61e25fab23579318021586797fc4b7e0f9538de520fcfd6690514596387a27"
+      },
+      "parent-cancellation.command.json": {
+        "bytes": 574,
+        "sha256": "e5accba954cc213a552d0af156ac60afec400a11a1dbc09e90e2cce9db5d29c3"
+      }
+    }
+  }
+}
