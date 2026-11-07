@@ -278,6 +278,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
       - run: pnpm check:cloud-boundary
+      - name: Verify all production release credentials use existing Infisical OIDC
+        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
         if: always()
       - run: pnpm lint:code
         if: always()
