@@ -50,7 +50,7 @@ export function browserReadyComment(value, { revision, item, timeoutMs, now = Da
       .map(([key, text]) => '| ' + key + ' | `' + text + '` |'),
     '',
     '在已有登录的浏览器中切换到上述工作空间，从无项目上下文的页面打开 **New task（新建任务）**，选择 **Coordinator（协调机器人）**、**Mikka Cloud（云端）**，以及名称等于 **marker** 的临时 Profile（配置档案）。',
-    '原样粘贴以下由验收代码生成的输入，在 **expiresAt** 之前点击 **Send（发送）一次**。过期后不得发送，也不要重复提交。',
+    '原样粘贴以下由验收代码生成的输入，在 **expiresAt** 之前点击 **Create task（创建任务）一次**。过期后不得发送，也不要重复提交。',
     '', '```text', fixture.input, '```', '',
     '浏览器使用自身的真实登录、提交、trace 和回放标识。执行器负责观察和清理本次任务；之后再核验 PostHog 与 Session Replay（会话回放）。',
   ].join('\n')
