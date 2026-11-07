@@ -1,0 +1,91 @@
+name: Issue 1512 bounded candidate diagnosis
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths:
+      - '.github/workflows/issue1512-candidate-diagnostic.yml'
+      - 'scripts/ops/issue1512-candidate-diagnostic.mjs'
+      - 'scripts/ops/issue1512-candidate-diagnostic.test.mjs'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: github.repository == 'alexj11324/Mikka' && startsWith(github.event.head_commit.message, 'issue1512:diagnose ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: alexj11324/Mikka
+          ref: cad613ef0a2c553a94aaf72d44d609c93a603a1b
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the exact failed production candidate run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          try {
+            const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/actions/runs/42336625140', {
+              headers: { authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json' },
+              redirect: 'error', signal: AbortSignal.timeout(15000),
+            })
+            assert.equal(response.status, 200)
+            const run = await response.json()
+            assert.equal(run.id, 42336625140)
+            assert.equal(run.head_sha, 'cad613ef0a2c553a94aaf72d44d609c93a603a1b')
+            assert.equal(run.head_branch, 'main')
+            assert.equal(run.repository?.full_name, 'alexj11324/Mikka')
+            assert.equal(run.path, '.github/workflows/e2b-official-runtime.yml')
+            assert.equal(run.event, 'push')
+            assert.equal(run.run_attempt, 1)
+            assert.equal(run.status, 'completed')
+            assert.equal(run.conclusion, 'failure')
+            console.log('issue1512_exact_failed_candidate_verified')
+          } catch { console.error('issue1512_target_run_guard_failed'); process.exitCode = 1 }
+          JS
+      - name: Verify the bounded read-only operation before credentials
+        run: node --test scripts/ops/issue1512-candidate-diagnostic.test.mjs
+      - name: Read the existing authorized account email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          include-imports: false
+      - name: Read the existing authorized account password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          include-imports: false
+      - name: Read only the failed run and exact registered device
+        run: node scripts/ops/issue1512-candidate-diagnostic.mjs "$RUNNER_TEMP/candidate-diagnostic.json"
+      - name: Preserve only the closed diagnostic projection
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-candidate-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate-diagnostic.json
+          if-no-files-found: warn
+          retention-days: 7
