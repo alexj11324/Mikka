@@ -19,7 +19,9 @@ mock.module('./questions/execution-continuation.ts', { namedExports: {
 mock.module('./profile-watchdog.ts', { namedExports: {
   watchdogProfileAdmission: async () => 'none', watchdogProfileClaimContext: async () => null,
 } })
-mock.module('../model-order.ts', { namedExports: { credentialStates: async () => new Map(), orderCandidates: async () => [] } })
+mock.module('../model-order.ts', { namedExports: { credentialStates: async () => new Map(), orderCandidates: async () => [],
+  selectedOrderCandidates: async () => { assert.fail('continuation admission must not reselect quota candidates') },
+} })
 mock.module('../model-routing.ts', { namedExports: { MODEL_ROUTING_TIERS: ['light'], modelTier: () => 'light' } })
 mock.module('../execution-identity.ts', { namedExports: { executionIdentityForRun: async () => undefined, ExecutionIdentityError: class extends Error {} } })
 const admission = import('./profile-admission')

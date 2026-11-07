@@ -320,6 +320,9 @@ worker claim 为 3.778–4.577 秒，仓库准备为 2.151–5.633 秒。阶段�
 同一查询重读原 binding 与当前 connection，保留 owner/workspace、分享及 epoch
 检查且不回退到旧 binding。Factory claim 复用同一事务已锁定的 repo 行。
 claim 的强制 fresh quota 仍在原位置；不在正常拒绝路径提前发 usage 或写入配额。
+Factory 的布尔任务授权继续每次调用完整 canonical ACL，只用既有 withoutBody 投影
+避免传回任务正文。共享凭据的 share 开关与 workspace policy 在同一条 fresh SQL
+中判定；缺共享、关闭共享和关闭策略仍拒绝，缺策略仍保留默认允许，不跨调用缓存。
 
 bootstrap 的同一次文件上传仍承载私有凭据，root 命令原子发布后降为普通 user
 检查并唤醒现有 wait-bootstrap 进程。只有固定唤醒收据才省掉第二条远程启动命令；
