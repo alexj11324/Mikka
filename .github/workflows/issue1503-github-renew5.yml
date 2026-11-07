@@ -11,6 +11,7 @@ permissions:
 concurrency:
   group: production-smoke-owner-acceptance
   cancel-in-progress: false
+  queue: max
 jobs:
   refresh_source_and_rotate_child:
     if: github.repository == 'alexj11324/Mikka' && github.run_attempt == 1
