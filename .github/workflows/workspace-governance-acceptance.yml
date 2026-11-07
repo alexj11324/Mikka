@@ -57,7 +57,6 @@ jobs:
       MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
       MIKKA_VERIFICATION_IP_HOURLY: '1000'
       MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
-      WORKSPACE_GOVERNANCE_ARTIFACT_DIR: ${{ runner.temp }}/workspace-governance-acceptance
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -111,6 +110,8 @@ jobs:
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Run real HTTP Item 11 with its ordinary owner and peer sessions
         timeout-minutes: 12
+        env:
+          WORKSPACE_GOVERNANCE_ARTIFACT_DIR: ${{ runner.temp }}/workspace-governance-acceptance
         run: |
           node --import ./tests/support/server-only.mjs --import tsx --input-type=module <<'JS'
           import assert from 'node:assert/strict'

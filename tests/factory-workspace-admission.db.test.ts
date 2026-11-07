@@ -6,6 +6,7 @@ import { Pool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import type { FactoryTask } from '../lib/factory/store'
 import type { FactoryBinding } from '../lib/factory/contract'
+import { enterprisePrincipal } from '../lib/enterprise/principal'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
@@ -89,7 +90,6 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   const native = await (await auth.$context).internalAdapter.createSession(owner); assert.ok(native)
   const { getApiSession } = await import('../lib/api-auth')
   const { actAs } = await import('../lib/acting-user')
-  const { enterprisePrincipal } = await import('../lib/enterprise/principal')
   const { withTaskWorkspace, borrowTaskWorkspaceMembership, taskReaderScope } = await import('../lib/task-workspace')
   const { withFactoryWorkspace, factoryWorkspaceReader } = await import('../lib/factory/workspace-reader')
   const { acquireProfileMembership } = await import('../lib/factory/agent-profile-store')
@@ -105,21 +105,22 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   const question = await import('../app/api/factory/questions/[questionId]/route')
   const profiles = await import('../app/api/factory/agent-profiles/route')
   const profileDetail = await import('../app/api/factory/agent-profiles/[profileId]/route')
-  const session = await getApiSession({ headers: new Headers({ authorization: 'Bearer ' + native.token }), query: { disableCookieCache: true } })
-  assert.ok(session); assert.equal(session.user[enterprisePrincipal]?.kind, 'session')
-
   type Handler = (request: Request) => Promise<Response>
   const request = (path: string, workspaceId: string, body?: unknown, bearer = native.token) => new Request(origin + '/mikka' + path, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { authorization: 'Bearer ' + bearer, 'x-mikka-workspace-id': workspaceId, origin, 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
-  const run = async (req: Request, handler: Handler) => {
+  const run = async <T,>(req: Request, handler: (request: Request) => Promise<T>): Promise<T> => {
     const scope = context.createRequestScope(req)
     try { return await context.runRequestScope(scope, () => handler(req)) }
     finally { await scope.after.finish() }
   }
   const call = (path: string, workspaceId: string, handler: Handler, body?: unknown, bearer?: string) => run(request(path, workspaceId, body, bearer), handler)
+  const verifiedSession = await run(request('/api/factory/tasks', alpha), req => getApiSession({ headers: req.headers, query: { disableCookieCache: true } }))
+  assert.ok(verifiedSession)
+  const session = verifiedSession
+  assert.equal(session.user[enterprisePrincipal]?.kind, 'session')
   const params = (taskId: string) => ({ params: Promise.resolve({ taskId }) })
   const state = async () => (await controls.query(`SELECT
     (SELECT coalesce(jsonb_agg(jsonb_build_array(id,revision,status,"attemptId","candidateId") ORDER BY id),'[]') FROM factory_tasks WHERE "userId"=$1) AS tasks,
