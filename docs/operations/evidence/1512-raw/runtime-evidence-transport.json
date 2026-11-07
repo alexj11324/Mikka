@@ -19,10 +19,19 @@
       "cleanupJob": 128283654772,
       "shellStarted": false,
       "errorCode": "E2BIG"
+    },
+    {
+      "runId": 42333305079,
+      "sourceCommit": "c594da2b81aac8ff466a94e5050839513a002b0e",
+      "reportUtf8Bytes": 310679,
+      "subscriptionJob": 128289384602,
+      "cleanupJob": 128289493620,
+      "shellStarted": false,
+      "errorCode": "E2BIG"
     }
   ],
   "fixCommit": "c117d138de223e263767aafa0f00d51da3fbe36f",
-  "candidateHead": "e0eb1d56fdb01ba74387d594c47a7126ba1b2cc8",
+  "candidateHead": "f7e901ed2c71c3d66318877a8e8f48fa69a82e09",
   "offlineNodeGate": {
     "passed": 72,
     "total": 72,
@@ -31,7 +40,8 @@
   "recovery": {
     "opsCommits": [
       "38a6d0ba647936a709335d00494c140de18170b3",
-      "27b07bb346fd85e6098954a6fa51e7e45c1fcd4c"
+      "27b07bb346fd85e6098954a6fa51e7e45c1fcd4c",
+      "a1c1ffde5b05be6193f9efe52ecb683cb8b0dc63"
     ],
     "reports": [
       {
@@ -41,8 +51,12 @@
       {
         "file": "080-candidate-recovery-42333571360.json",
         "sha256": "a7b42e05ed70ecc335861604acc22e4582f470590c51481002f3b2c6dcc8a18a"
+      },
+      {
+        "file": "c594-candidate-recovery-42335137865.json",
+        "sha256": "9e103dac8ac26f012a8c89e3b46a7ef22ed0b443e9157dd873e7ca4b1db28d75"
       }
     ],
-    "conclusion": "All six recorded candidate IDs returned 404 at recovery time; both exact-target sandbox inventories were empty and untruncated. Neither recovery issued DELETE. The earlier disappearance cause is unverified."
+    "conclusion": "All nine recorded candidate IDs returned 404 at recovery time; all three exact-target sandbox inventories were empty and untruncated. None of the recoveries issued DELETE. The earlier disappearance cause is unverified."
   }
 }

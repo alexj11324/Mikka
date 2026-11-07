@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "scope": "Test-only orphan terminal-state observation; no production process behavior change",
+  "failedCi": {
+    "head": "e0eb1d56fdb01ba74387d594c47a7126ba1b2cc8",
+    "runId": 42333155852,
+    "jobId": 128284010309,
+    "attempt": 1,
+    "file": "packages/daemon/test/hosted-command.test.ts",
+    "failedTests": 1,
+    "passedTests": 1089
+  },
+  "observedProcess": {
+    "pid": 18169,
+    "ppid": 1,
+    "group": 18168,
+    "state": "R",
+    "flags": 4195340,
+    "pfExitingBit": 4,
+    "vsize": 0,
+    "rss": 0,
+    "exitCode": 9
+  },
+  "primaryMechanism": {
+    "linuxSourceVersion": "v6.8 (mechanism reference, not CI runner kernel version attestation)",
+    "references": [
+      "https://github.com/torvalds/linux/blob/v6.8/include/linux/sched.h#L1617",
+      "https://github.com/torvalds/linux/blob/v6.8/kernel/exit.c#L811-L891",
+      "https://github.com/torvalds/linux/blob/v6.8/fs/proc/array.c#L484-L599",
+      "https://nodejs.org/download/release/latest-v22.x/docs/api/child_process.html#event-close"
+    ],
+    "conclusion": "File descriptors close in do_exit before EXIT_ZOMBIE is published; Node close is not an orphan task state-publication barrier."
+  },
+  "fix": {
+    "commit": "32e6b5f7edb67298c5e4ff559efacdabc94ee74a",
+    "fileSha256": "67bc09ee4b9d92671bef1fafdbd8259d09917a540bdecb2dc6acf4cb3c7f4c4d",
+    "observationTimeoutMs": 1000,
+    "acceptedStates": [
+      "Z",
+      "X",
+      "PID absent confirmed by ESRCH"
+    ],
+    "rejectsLiveProcess": true,
+    "productFilesChanged": 0
+  },
+  "localValidation": {
+    "runtime": "v24.22.1",
+    "testsPassed": 5,
+    "testsTotal": 5,
+    "includesRealLiveProcessNegative": true,
+    "lintPassed": true,
+    "ownedFixtureProcessesClosed": true,
+    "procNamespaceBoundary": "A real positive child PID accepted signal 0 while its /proc stat returned ENOENT. The test now requires ESRCH after ENOENT, avoiding a false success in this environment."
+  },
+  "relatedMainIntegration": {
+    "main": "c594da2b81aac8ff466a94e5050839513a002b0e",
+    "merge": "29b1ff9923bf7bef884d5b08ccbdb641c7d9ff70",
+    "timingAiSubscriptionTestsPassed": 19
+  },
+  "newCandidate": "f7e901ed2c71c3d66318877a8e8f48fa69a82e09",
+  "newCandidateCi": "pending at evidence creation; requires independent latest-head results"
+}
