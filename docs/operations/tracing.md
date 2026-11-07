@@ -279,6 +279,9 @@ Edit the definitions or SQL in a PR, then apply once it merges. A change made
 in the PostHog app shows as drift in the next `--check`; copy it back into the
 repository or it is overwritten on the next `--apply`.
 
+Validate the error-spike classifier with `node scripts/ops/posthog-alert-acceptance.mjs`.
+It uses the authenticated PostHog CLI to check synthetic query fixtures in project 670821.
+
 ## Sampling and cost
 
 - Head sampling per trace, `MIKKA_TRACE_SAMPLE_RATE` (0–1), default `0.1`. A

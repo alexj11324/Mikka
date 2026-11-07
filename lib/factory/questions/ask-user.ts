@@ -43,7 +43,7 @@ const query = z.union([
 ]);
 
 export async function handleFactoryQuestionList(
-  service: { pending(userId: string, runId?: string): Promise<unknown[]>; list(userId: string, taskId: string): Promise<unknown[]> },
+  service: { pending(userId: string, runId?: string, readScope?: "bot" | "user"): Promise<unknown[]>; list(userId: string, taskId: string, readScope?: "bot" | "user"): Promise<unknown[]> },
   request: { actor: { userId: string } | null; authorization: string | null; method: string; url: string },
 ) {
   if (!request.actor || request.authorization) return { status: 401, body: { error: "authRequired" } };
@@ -53,7 +53,8 @@ export async function handleFactoryQuestionList(
   if (!parsed.success) return { status: 422, body: { error: "factoryInvalid" } };
   const { taskId, runId } = parsed.data;
   try {
-    const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase()) : await service.pending(request.actor.userId, runId?.toLowerCase())) as QuestionView[];
+    // This authenticated collection is user-wide; model/runtime readers keep their default Bot scope.
+    const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase(), "user") : await service.pending(request.actor.userId, runId?.toLowerCase(), "user")) as QuestionView[];
     // runId (origin or continuation) is filtered in SQL by `pending`, before its 50-row cap.
     const questions = rows
       .filter((q) => (PENDING_QUESTION_STATUSES as readonly string[]).includes(q.status))

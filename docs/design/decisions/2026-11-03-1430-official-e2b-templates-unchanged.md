@@ -245,6 +245,15 @@ exact ACK 两者较晚的时间。没有入口标记或确切 ACK 的样本不�
 先测原流程分段基线，再测派生模板。只有仍不能达标时才按实测选择预热池或组合。
 运行费用由任务所有者自己的 E2B key 承担，空闲机器自动暂停或回收，不新增数据库轮询。
 
+自定义固定模型 Profile 的重复目标核验只读取已冻结的 source/model/harness，
+不再为这一步枚举无关账号、模型和 API key。实际 credential owner 仍由当前数据库
+记录及工作区分享策略推导；共享订阅的 owner 成员校验、原来源行锁、后置分享与
+凭证状态、epoch/catalogue、配额和持久 provider health 检查保持原边界。Profile
+版本与内容锁、requester 成员提交 fence 不变，不缓存或复用前一次授权结果。
+默认、继承模型和历史无 Profile 的路径继续读取完整目录，原候选排序、模型规划及
+回退不变。这项缩读的离线查询清单不能代替真实 PG 锁与等价回归，也不代表已测得
+生产耗时收益；正式完整入口到 ACK 的同版本样本仍是性能结论的依据。
+
 新领取的 hosted 仓库任务可将已授权远端的 clone/fetch 与原首次 policy GET 并行。
 claim 已给出的仓库身份和 GitHub 凭证仍是远端读取的依据；旧 claim 的凭证交换、
 本机凭证准备及恢复路径维持原顺序。原签名校验和 Skill/session 入口检查通过前，
@@ -266,6 +275,19 @@ initialize、initialized 和 tools/list；实际 tools/call 继续经过原服�
 停在本任务自己的临时目录，输入队列保持为空。最终工作区及 Git/Skill 校验完成后，
 claim 绑定同一 session 和规范 cwd，再执行原账号来源及本地有效租约检查，最后才
 发送本任务输入。初始化和接管完成都不冒充本任务的精确 ACK。
+
+启用本次诊断时，任务自己的 PreparedAgentStart 保存预热 Promise 的闭式计时，
+通过原 agent_start chunk 的 preparationTiming 字段回传。它声明
+source=prepared_agent_start，并有独立的起止时间、run/harness 绑定和单调区间；
+包含实际 cli_init.prewarm、接管后的 cli_init 与账号检查，准备总时间还包含等待
+checkout。原 startupTiming 仍只记录晚开始的 agent_start，不把此前发生的 span
+塞进该根区间，也不把两个时间轴或与 repository 的重叠相加。正式分段验证分别核对
+两个边界：预热路径必须有真实成功的预热及接管初始化，普通路径仍需原 cli_init；
+缺失、错误、截断或错绑不会用零或另一条路径替代。未启用诊断时不收集或新增字段。
+
+此修复针对 1edbeca 发布的真实 Claude 候选收据：晚阶段为 114.431ms，phases 为空，
+原因是已经开始的预热 Promise 没有继承后来的阶段 AsyncLocalStorage。它修复测量
+归属，不改变 prompt、租约、取消、CLI 或验收起止点；不从修复本身宣称启动加速。
 
 只有官方 SDK 在 claimed 阶段明确返回 project_settings_not_claimable，且没有
 发送用户输入时，才允许先关闭并等待该进程组退出，再以同一 session 走一次普通

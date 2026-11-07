@@ -17,11 +17,11 @@ export function useRunErrorText() {
   }
 }
 
-/** 详情 under a failure line: the raw code, folded. */
+/** 详情 under a failure line: the raw code (one per line when a cause follows), folded. */
 export function RunErrorDetails({ code }: { code: string }) {
   const t = useTranslations('IssueThreads')
   return <Collapsible data-slot="run-error-details">
     <CollapsibleTrigger render={<Button variant="link" size="xs" className="h-auto px-0 py-0.5 text-xs text-muted-foreground" />}>{t('errorDetails')}</CollapsibleTrigger>
-    <CollapsibleContent><code className="block text-xs break-all text-muted-foreground">{code}</code></CollapsibleContent>
+    <CollapsibleContent><code className="block text-xs break-all whitespace-pre-wrap text-muted-foreground">{code}</code></CollapsibleContent>
   </Collapsible>
 }

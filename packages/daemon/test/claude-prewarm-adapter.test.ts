@@ -10,13 +10,14 @@ import type { StartOptions } from '../src/adapters/types'
 import { createLogger } from '../src/log'
 import { createRunMailbox } from '../src/run-mailbox'
 import { stopGroup } from '../src/process-group'
+import { runIdHash } from '../src/tracing'
 import { cleanupTempDirs, tempDir } from './helpers'
 import type { RunAssignment } from '@mikka/protocol'
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); cleanupTempDirs() })
 
-async function fixture(mode = 'normal') {
+async function fixture(mode = 'normal', diagnostics = false) {
   const root = realpathSync(tempDir('mikka-prewarm-adapter-')), stateDir = join(root, 'adapters'), cwd = join(root, 'checkout'), home = join(root, 'home')
   mkdirSync(stateDir); mkdirSync(home)
   const runId = randomUUID(), sessionId = randomUUID()
@@ -52,7 +53,8 @@ async function fixture(mode = 'normal') {
     },
   })
   const stop = async () => { await Promise.all(children.map(child => stopGroup(child, 1000))) }
-  const handle = prepareAgentStart(signal.signal, control => adapter.startPrepared(options, binding, control, stop))
+  const handle = prepareAgentStart(signal.signal, control => adapter.startPrepared(options, binding, control, stop),
+    diagnostics ? { runId, harness: 'claude_code' } : undefined)
   cleanups.push(async () => { await handle.cancel(); await mailbox?.close(); await stop() })
   const checkout = () => {
     mkdirSync(cwd); execFileSync('git', ['init', '-q'], { cwd })
@@ -63,7 +65,7 @@ async function fixture(mode = 'normal') {
 }
 
 it('prepares the real SDK before clone, registers the entire mailbox once, then sends the final prompt only after claimed account validation', async () => {
-  const f = await fixture(); await f.handle.ready
+  const f = await fixture('normal', true); await f.handle.ready
   expect(existsSync(f.options.cwd)).toBe(false)
   expect(await f.wait(event => event.event === 'spawn')).toMatchObject({ awaitingClaim: true, home: f.options.env.HOME, model: f.options.model })
   expect(f.events.some(event => event.event === 'user' || event.type === 'claim_session')).toBe(false)
@@ -73,6 +75,11 @@ it('prepares the real SDK before clone, registers the entire mailbox once, then 
   expect(await f.wait(event => event.event === 'catalogue')).toMatchObject({ names: ['mailbox_inbox', 'mailbox_ack'] })
   expect(await f.wait(event => event.event === 'user')).toMatchObject({ sessionId: f.binding.sessionId, text: 'Final task plus fully materialized attachments' })
   expect(f.children).toHaveLength(1); expect(f.transport).not.toHaveBeenCalled()
+  expect(f.handle.preparationTiming).toMatchObject({ source: 'prepared_agent_start', runIdHash: runIdHash(f.options.runId), outcome: 'ok', truncated: false })
+  expect(f.handle.preparationTiming?.phases).toEqual(expect.arrayContaining([
+    expect.objectContaining({ name: 'daemon.adapter.cli_init.prewarm', outcome: 'ok' }),
+    expect.objectContaining({ name: 'daemon.adapter.cli_init', outcome: 'ok' }),
+  ]))
   await session.cancel()
 })
 
@@ -81,11 +88,12 @@ it('drains a parked CLI on clone failure without claiming or sending a task', as
   await f.handle.cancel()
   expect(f.events.some(event => event.type === 'claim_session' || event.event === 'user')).toBe(false)
   expect(f.children.every(child => child.exitCode !== null || child.signalCode !== null)).toBe(true)
+  expect(f.handle.preparationTiming).toBeUndefined()
   await expect(f.handle.start(f.options)).rejects.toThrow('closed')
 })
 
 it('falls back exactly once only for an actual project-settings claim refusal, after draining the spare', async () => {
-  const f = await fixture('project_settings'); await f.handle.ready; f.checkout()
+  const f = await fixture('project_settings', true); await f.handle.ready; f.checkout()
   const session = await f.handle.start(f.options)
   const frames = f.events.filter(event => event.event === 'spawn')
   expect(frames).toHaveLength(2)
@@ -93,6 +101,11 @@ it('falls back exactly once only for an actual project-settings claim refusal, a
   expect(f.children[0].exitCode !== null || f.children[0].signalCode !== null).toBe(true)
   expect(await f.wait(event => event.event === 'user')).toMatchObject({ sessionId: f.binding.sessionId, text: f.options.prompt })
   expect(f.events.filter(event => event.event === 'user')).toHaveLength(1)
+  expect(f.handle.preparationTiming).toMatchObject({ source: 'prepared_agent_start', runIdHash: runIdHash(f.options.runId), outcome: 'ok', truncated: false })
+  expect(f.handle.preparationTiming?.phases).toEqual(expect.arrayContaining([
+    expect.objectContaining({ name: 'daemon.adapter.cli_init.prewarm', outcome: 'ok' }),
+    expect.objectContaining({ name: 'daemon.adapter.cli_init', outcome: 'ok' }),
+  ]))
   await session.cancel()
 })
 
