@@ -354,8 +354,22 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     check(bots.bots.every(bot => bot.status === 'idle' && bot.runningThreads === 0)
       && threads.threads.every(thread => ['failed', 'done', 'stopped'].includes(thread.status)), 'workspace_busy')
     for (let index = 0; index < tasks.length; index += 10) {
-      const ledgers = await Promise.all(tasks.slice(index, index + 10).map(task => read('/api/factory/tasks?issueId=' + task.id)))
-      check(ledgers.every(ledger => Array.isArray(ledger.tasks) && ledger.tasks.every(task => settledTask(task))), 'workspace_busy')
+      await Promise.all(tasks.slice(index, index + 10).map(async issue => {
+        const ledger = await read('/api/factory/tasks?issueId=' + issue.id)
+        check(Array.isArray(ledger.tasks), 'workspace_busy')
+        for (const task of ledger.tasks) {
+          if (task && settledTask(task)) continue
+          check(uuid(task?.id) && task.issueId === issue.id && Number.isSafeInteger(task.revision) && task.revision >= 0
+            && taskStages.has(task.stage) && taskStatuses.has(task.status)
+            && (task.attemptId === null || uuid(task.attemptId)) && (task.candidateId === null || uuid(task.candidateId)), 'workspace_busy')
+          // Issue search is visibility-scoped. Only the authenticated task detail
+          // binds its persisted Bot workspace; the list's live scope is the issue's.
+          const detail = await read('/api/factory/tasks/' + task.id)
+          check(detail.task?.userId === ownerId
+            && ['id', 'issueId', 'revision', 'stage', 'status', 'attemptId', 'candidateId'].every(key => detail.task[key] === task[key])
+            && uuid(detail.liveWorkspaceId) && detail.liveWorkspaceId.toLowerCase() !== workspaceId.toLowerCase(), 'workspace_busy')
+        }
+      }))
     }
     check(chat.botId === botId && chat.enabled === true, 'coordinator_disabled')
     check(chat.working === false && !chat.streamRunId && !chat.items.some(item => item.pending), 'coordinator_busy')

@@ -21,9 +21,12 @@ function inventory() {
 const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archivedAt: null, name: 'PRIVATE_PROFILE_NAME',
   description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
   skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
-function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value } = {}) {
+function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value,
+  historicalTask = null, historicalDetail = value => value } = {}) {
   const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set(), machineEnds = new Set()
   const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
+  const historical = historicalTask && { id: id(901), issueId: id(902), revision: 7, stage: 'execute', status: 'blocked',
+    attemptId: id(903), candidateId: null, ...historicalTask }
   if (profileBusy) profiles.set(existingProfile.id, structuredClone(existingProfile))
   let current = { ...original }, closed = 0, liveClosed = 0, fallback = paidFallback || failure === 'paid_fallback', concurrentEdit = false
   const response = (value, status = 200, headers) => Response.json(value, { status, headers })
@@ -78,7 +81,7 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
     if (path === '/api/settings/workspace-bots') return response({ bots: [{ status: 'idle', runningThreads: failure === 'busy' ? 1 : 0 }] })
     if (path === '/api/mobile/threads') return response({ threads: threads() })
     if (path === '/api/mobile/tasks') return response({ tasks: submissions.map(value => ({ id: value.issueId, title: value.marker })) })
-    if (path === '/api/issues/search') return response({ items: submissions.map(value => ({ id: value.issueId, revision: 1, updatedAt: '2026-11-06T00:00:00.000Z' })), nextCursor: null, truncated: false })
+    if (path === '/api/issues/search') return response({ items: [...(historical ? [historical] : []), ...submissions].map(value => ({ id: value.issueId, revision: 1, updatedAt: '2026-11-06T00:00:00.000Z' })), nextCursor: null, truncated: false })
     if (path === '/api/mobile/model' && method === 'GET') {
       if (failure === 'concurrent_model' && submissions.length) current = { ...original, id: id(999) }
       if (failure === 'unchosen') current.chosen = false
@@ -185,6 +188,8 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
         ? { kind: 'cloud', state: 'ended', cloud: null } : null })
     }
     if (path === '/api/factory/tasks') {
+      if (historical?.issueId === url.searchParams.get('issueId')) return response({ contractVersion: 1,
+        issueId: historical.issueId, liveWorkspaceId: workspaceId, tasks: [historical] })
       const found = submissions.find(value => value.issueId === url.searchParams.get('issueId'))
       return response({ tasks: found ? [{ id: found.taskId, stage: 'approval', candidateId: found.candidateId, candidateSha: null,
         status: cancelled.has(found.taskId) ? 'cancelled' : accepted.has(found.taskId) ? 'passed' : 'pending' }] : [] })
@@ -201,6 +206,10 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
       return response({ status: 'accepted', acceptanceId: found.acceptanceId, binding: { ...binding, revision: 2 } })
     }
     if (path.startsWith('/api/factory/tasks/')) {
+      if (historical && path === '/api/factory/tasks/' + historical.id) {
+        assert.equal(method, 'GET', 'historical tasks must never be changed')
+        return response(historicalDetail({ task: { ...historical, userId: ownerId, botId: id(904) }, liveWorkspaceId: id(905) }))
+      }
       const found = submissions.find(value => value.taskId === path.split('/').at(-1)); assert.ok(found)
       if (method === 'POST') { assert.equal(body.action, 'cancel'); cancelled.add(found.taskId) }
       const complete = accepted.has(found.taskId)
@@ -245,6 +254,65 @@ test('preflight reads both exact subscription paths without creating profiles, c
   assert.equal(data.submissions.length, 0); assert.equal(data.profiles.size, 0); assert.equal(data.state.closed, 1)
   safe(report)
 })
+
+test('preflight excludes only a version-bound Factory task proven to belong to another workspace', async () => {
+  const data = fixture({ historicalTask: {} }), report = await run(data)
+  assert.equal(report.status, 'ready', JSON.stringify(report))
+  assert.equal(data.calls.filter(call => call.path === '/mikka/api/factory/tasks/' + id(901)).length, 1)
+  assert.deepEqual(data.calls.filter(call => call.method !== 'GET').map(call => call.path),
+    ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out'])
+  assert.equal(data.submissions.length, 0); assert.equal(data.state.cancelled.size, 0); assert.equal(data.state.closed, 1); safe(report)
+})
+test('preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked', async () => {
+  const guards = [
+    value => ({ ...value, liveWorkspaceId: workspaceId }),
+    value => ({ ...value, liveWorkspaceId: null }),
+    value => ({ task: value.task }),
+    value => ({ ...value, liveWorkspaceId: 'PRIVATE_WORKSPACE' }),
+    value => ({ ...value, task: { ...value.task, id: id(906) } }),
+    value => ({ ...value, task: { ...value.task, issueId: id(906) } }),
+    value => ({ ...value, task: { ...value.task, userId: 'PRIVATE_OTHER_OWNER' } }),
+    value => ({ ...value, task: { ...value.task, revision: 8 } }),
+    value => ({ ...value, task: { ...value.task, revision: undefined, version: 7 } }),
+    value => ({ ...value, task: { ...value.task, stage: 'review' } }),
+    value => ({ ...value, task: { ...value.task, status: 'running' } }),
+    value => ({ ...value, task: { ...value.task, attemptId: id(906) } }),
+    value => ({ ...value, task: { ...value.task, candidateId: id(906) } }),
+  ]
+  for (const [index, historicalDetail] of guards.entries()) {
+    const data = fixture({ historicalTask: {}, historicalDetail }), report = await run(data)
+    assert.equal(report.status, 'blocked', String(index))
+    assert.equal(report.cases[0].code, 'workspace_busy', String(index))
+    assert.equal(data.submissions.length, 0); assert.equal(data.state.cancelled.size, 0); assert.equal(data.state.closed, 1); safe(report)
+  }
+})
+test('preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks', async () => {
+  for (const status of ['failed', 'blocked']) {
+    const data = fixture({ historicalTask: { status }, historicalDetail: value => ({ ...value, liveWorkspaceId: workspaceId }) })
+    const report = await run(data)
+    assert.equal(report.status, 'blocked'); assert.equal(report.cases[0].code, 'workspace_busy')
+    assert.equal(data.state.cancelled.size, 0); assert.equal(data.state.closed, 1); safe(report)
+  }
+})
+test('preflight does not request scope details for already settled Factory tasks', async () => {
+  for (const historicalTask of [{ status: 'cancelled' }, { status: 'revoked' }, { status: 'completed' }, { status: 'succeeded' },
+    { status: 'passed', stage: 'monitor' }, { status: 'passed', stage: 'approval', candidateId: id(904), candidateSha: null }]) {
+    const data = fixture({ historicalTask }), report = await run(data)
+    assert.equal(report.status, 'ready', JSON.stringify(report))
+    assert.equal(data.calls.some(call => call.path === '/mikka/api/factory/tasks/' + id(901)), false)
+    assert.equal(data.state.cancelled.size, 0); assert.equal(data.state.closed, 1); safe(report)
+  }
+})
+test('foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task', async () => {
+  const data = fixture({ historicalTask: {}, failure: 'review_failed' }), report = await run(data, true)
+  assert.equal(data.submissions.length, 1, JSON.stringify(report))
+  assert.equal(report.status, 'blocked'); assert.equal(data.state.cancelled.size, 1)
+  assert.equal(data.state.cancelled.has(data.submissions[0].taskId), true)
+  assert.equal(data.state.cancelled.has(id(901)), false)
+  assert.equal(data.calls.filter(call => call.path === '/mikka/api/factory/tasks/' + id(901)).every(call => call.method === 'GET'), true)
+  assert.equal(report.cases[0].cleanup.state, 'complete'); assert.equal(data.state.closed, 1); safe(report)
+})
+
 test('a default team switches only this login session to its verified personal workspace before reading Coordinator', async () => {
   const data = fixture({ teamDefault: true }), report = await run(data)
   assert.equal(report.status, 'ready', JSON.stringify(report))
