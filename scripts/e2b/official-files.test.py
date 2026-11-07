@@ -2,15 +2,147 @@ import importlib.util
 import hashlib
 import json
 import os
+import stat
+import sys
 from copy import deepcopy
+from contextlib import redirect_stderr, redirect_stdout
+import io
 import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
+from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location('official_files', Path(__file__).with_name('official-files.py'))
 files = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(files)
+
+
+def root_file_metadata(uid=0):
+    """Model root ownership on unprivileged CI; all bytes/modes/inodes are real."""
+    original = os.fstat
+    def metadata(fd):
+        value = original(fd)
+        fields = {name: getattr(value, name) for name in dir(value) if name.startswith('st_')}
+        return SimpleNamespace(**{**fields, 'st_uid': uid})
+    return patch.object(files.os, 'fstat', side_effect=metadata)
+
+
+class CliVerification(unittest.TestCase):
+    def inventory(self, root):
+        private = root / 'mikka'
+        release = private / 'releases' / 'pinned' / 'source'
+        release.mkdir(parents=True)
+        worker = private / 'worker'
+        worker.symlink_to(release, target_is_directory=True)
+        original = root / 'official-claude'
+        original.write_bytes(b'official fixture executable\n')
+        original.chmod(0o755)
+        added = release / 'codex'
+        added.write_bytes(b'private fixture executable\n' + b'x' * (1024 * 1024))
+        added.chmod(0o755)
+        row = lambda path: {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+        manifest = release / '.mikka-original-cli.json'
+        manifest.write_text(json.dumps({'version': 1, 'kind': 'desktop',
+            'original': {'claude_code': row(original), 'codex': None}, 'added': {'codex': row(added)}}))
+        manifest.chmod(0o444)
+        return private, worker / manifest.name, original, added
+
+    def test_verifies_real_selected_bytes_through_worker_symlink_without_rewriting_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private, manifest, original, added = self.inventory(Path(directory))
+            before, metadata = manifest.read_bytes(), manifest.stat()
+            with patch.object(files, 'PRIVATE', private), root_file_metadata():
+                result = files.verify_cli(manifest, 'desktop')
+            self.assertEqual(set(result), {'kind', 'files', 'elapsedMs'})
+            self.assertEqual(result['kind'], 'desktop')
+            self.assertEqual({row['harness']: row['bytes'] for row in result['files']}, {
+                'claude_code': original.stat().st_size, 'codex': added.stat().st_size})
+            for row in result['files']:
+                self.assertEqual(set(row), {'harness', 'bytes', 'elapsedMs', 'matched'})
+                self.assertIs(row['matched'], True)
+                self.assertGreaterEqual(row['elapsedMs'], 0)
+            self.assertNotIn(str(private), json.dumps(result))
+            self.assertNotIn('fixture executable', json.dumps(result))
+            self.assertEqual(manifest.read_bytes(), before)
+            self.assertEqual((manifest.stat().st_ino, manifest.stat().st_mtime_ns, stat.S_IMODE(manifest.stat().st_mode)),
+                             (metadata.st_ino, metadata.st_mtime_ns, 0o444))
+
+    def test_changed_added_byte_fails_without_resigning_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private, manifest, _, added = self.inventory(Path(directory))
+            before, metadata = manifest.read_bytes(), manifest.stat()
+            with added.open('r+b') as handle:
+                handle.write(b'!')
+            with patch.object(files, 'PRIVATE', private), root_file_metadata():
+                with self.assertRaisesRegex(ValueError, '^runtime_cli_changed$'):
+                    files.verify_cli(manifest, 'desktop')
+            self.assertEqual(manifest.read_bytes(), before)
+            self.assertEqual((manifest.stat().st_ino, manifest.stat().st_mtime_ns, stat.S_IMODE(manifest.stat().st_mode)),
+                             (metadata.st_ino, metadata.st_mtime_ns, 0o444))
+
+    def test_manifest_owner_mode_symlink_size_and_cli_canonical_path_fail_closed(self):
+        for defect in ('owner', 'writable', 'manifest_link', 'oversized', 'binary_link', 'original_changed', 'missing_harness'):
+            with self.subTest(defect=defect), tempfile.TemporaryDirectory() as directory:
+                private, manifest, original, added = self.inventory(Path(directory))
+                if defect == 'writable': manifest.chmod(0o644)
+                elif defect == 'manifest_link':
+                    actual = manifest.resolve()
+                    retained = actual.with_suffix('.retained')
+                    actual.rename(retained)
+                    actual.symlink_to(retained)
+                elif defect == 'oversized':
+                    manifest.chmod(0o644)
+                    manifest.write_text(' ' * 8193)
+                    manifest.chmod(0o444)
+                elif defect == 'binary_link':
+                    retained = added.with_suffix('.retained')
+                    added.rename(retained)
+                    added.symlink_to(retained)
+                elif defect == 'original_changed': original.write_text('changed original')
+                elif defect == 'missing_harness':
+                    data = json.loads(manifest.read_text())
+                    data['added'] = {}
+                    manifest.chmod(0o644)
+                    manifest.write_text(json.dumps(data))
+                    manifest.chmod(0o444)
+                with patch.object(files, 'PRIVATE', private), root_file_metadata(uid=1 if defect == 'owner' else 0):
+                    with self.assertRaises((ValueError, OSError)):
+                        files.verify_cli(manifest, 'desktop')
+
+    def test_cli_emits_only_closed_verification_metadata_on_stderr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private, manifest, _, _ = self.inventory(Path(directory))
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with patch.object(files, 'PRIVATE', private), root_file_metadata(), \
+                    patch.object(sys, 'argv', ['official-files.py', 'cli-verify', str(manifest), '--kind', 'desktop']), \
+                    redirect_stdout(stdout), redirect_stderr(stderr):
+                files.main()
+            self.assertEqual(stdout.getvalue(), '')
+            result = json.loads(stderr.getvalue().removeprefix('mikka-cli-verification '))
+            self.assertEqual([row['harness'] for row in result['files']], ['claude_code', 'codex'])
+            self.assertNotIn(str(private), stderr.getvalue())
+            self.assertNotIn('fixture executable', stderr.getvalue())
+
+    def test_replacing_a_verified_file_or_manifest_with_identical_bytes_is_rejected(self):
+        for target in ('binary', 'manifest'):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                private, manifest, original, _ = self.inventory(Path(directory))
+                actual_hash, replaced = files.file_sha256, []
+                def change_identity(handle):
+                    digest = actual_hash(handle)
+                    if not replaced:
+                        path = original if target == 'binary' else manifest.resolve()
+                        replacement = path.with_suffix('.replacement')
+                        replacement.write_bytes(path.read_bytes())
+                        replacement.chmod(stat.S_IMODE(path.stat().st_mode))
+                        replacement.replace(path)
+                        replaced.append(True)
+                    return digest
+                with patch.object(files, 'PRIVATE', private), root_file_metadata(), \
+                        patch.object(files, 'file_sha256', side_effect=change_identity):
+                    with self.assertRaisesRegex(ValueError, 'runtime_cli_changed|official_cli_manifest_changed'):
+                        files.verify_cli(manifest, 'desktop')
 
 
 class OfficialFiles(unittest.TestCase):

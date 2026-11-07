@@ -52,6 +52,12 @@ ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
                           "read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && "
                           "kill -0 \"$mikka_preloaded_pid\" && "
                           "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
+# One deadline includes reading/verifying selected native CLI bytes and the
+# real anonymous catalogue exchange. Never warm files in a separate command.
+MODEL_PROBE_COMMAND = ('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; '
+                       'python3 /opt/mikka/worker/scripts/e2b/official-files.py cli-verify '
+                       '/opt/mikka/worker/.mikka-original-cli.json --kind {kind} && '
+                       'exec /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
 
 NPM_RUNTIME_CHECK = r'''export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
 node --input-type=module <<'JS'
@@ -426,7 +432,7 @@ def probe_models(template_id, kind, api_key, sandbox_factory=None):
     required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
     try:
-        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js', user='user', timeout=45)
+        result = sandbox.commands.run(MODEL_PROBE_COMMAND.format(kind=kind), user='user', timeout=45)
         if result.exit_code != 0:
             raise RuntimeError('model_probe_failed')
         reports = json.loads(result.stdout)
