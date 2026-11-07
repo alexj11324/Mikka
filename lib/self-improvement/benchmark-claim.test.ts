@@ -14,6 +14,7 @@ import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
 import * as startupTracing from '../computer/startup-tracing'
+import * as startupDiagnostics from '../computer/startup-diagnostics'
 import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
 import messages from '@/messages/zh-CN.json'
 const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
@@ -41,6 +42,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
     '@/lib/computer/startup-tracing':startupTracing,
+    '@/lib/computer/startup-diagnostics':startupDiagnostics,
     '@/lib/live/lists':{runListChanged:async(executor:unknown,runId:string)=>{
       assert.equal(executor,db);assert.equal(runId,run.id);assert.equal(run.status,'failed');calls.push('listChanged')
     }},

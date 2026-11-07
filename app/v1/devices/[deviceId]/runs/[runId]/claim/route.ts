@@ -54,6 +54,7 @@ import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
 import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
+import { cloudStartupDiagnosticEnv } from '@/lib/computer/startup-diagnostics'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
@@ -443,7 +444,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
     : repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
   timings.next('response_fence')
-  const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
+  const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => {
+    const assignedEnv = cloudStartupDiagnosticEnv(taskEnv, { deviceKind: device.kind, run: current,
+      repository: remoteRepositoryRef(repo.remoteUrl), harness, subscriptionBindingId: subscription?.id })
+    return NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
@@ -466,7 +470,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(subscriptionLease ? { subscriptionLease } : {}),
     ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
-    ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
+    ...(Object.keys(assignedEnv).length ? { taskEnv: assignedEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
     ...threadContinuation,
     ...retry,
@@ -475,7 +479,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...benchmarkAssignment,
     policy: assignmentPolicy,
     ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
-  }, { headers: { 'cache-control': 'private, no-store' } }))
+    }, { headers: { 'cache-control': 'private, no-store' } })
+  })
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
 

@@ -155,7 +155,7 @@ export interface DaemonOptions {
   initialRunId?: string
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
-  /** Trusted acceptance launcher only; collect hosted CLI diagnostics without task-secret injection. */
+  /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
   collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
   e2bContainerRuntime?: boolean
@@ -485,6 +485,7 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
+      collectCliTiming: this.options.collectCliTiming,
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
       downloadChatFile: this.options.link.downloadChatFile?.bind(this.options.link),

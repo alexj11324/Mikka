@@ -58,7 +58,10 @@ for (const harness of ['codex', 'claude_code'] as const) {
         env: { ...f.options.env, FIXTURE_MACHINE_AUTH: '1' } })
       expect((await collect(session)).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
       const receipt = observation.finish()!
-      if (source === 'default') expect(receipt.officialCliTiming).toBeUndefined()
+      if (source === 'default') {
+        expect(receipt.officialCliTiming).toBeUndefined()
+        expect(receipt.mcpHttpTiming).toBeUndefined()
+      }
       else expect(receipt.officialCliTiming).toMatchObject({ harness, source: 'official_cli_otlp',
         collection: 'best_effort', flush: 'not_confirmed', cliExitObserved: true, events: [] })
       expect(f.assignment).toEqual(before)

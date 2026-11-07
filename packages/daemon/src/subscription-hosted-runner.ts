@@ -25,7 +25,7 @@ import type { ComputerBroker } from './computer/broker.mjs'
 import { decide } from './permissions'
 import { removeRunCredentials } from './run-scratch'
 import { daemonTracer, runIdHash } from './tracing'
-import { runRuntimeTimings } from './run-runtime-timing'
+import { runDiagnosticsEnabled, runRuntimeTimings } from './run-runtime-timing'
 import { startCliTimingCollector } from './official-cli-timing'
 import { hostedBinaries } from './hosted-binaries'
 import { stopGroup } from './process-group'
@@ -230,7 +230,7 @@ export async function createHostedBotRunner(host: {
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, '--captures'], env: {},
         } : undefined
-        if (host.collectCliTiming === true || assignment.taskEnv?.CLOUD_STARTUP_TIMING === '1') {
+        if (runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming)) {
           try {
             cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
               remoteMcpServerCount: options.apps?.apps.length ?? 0 })

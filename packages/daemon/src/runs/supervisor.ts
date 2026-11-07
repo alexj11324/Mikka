@@ -108,9 +108,11 @@ import type { ToolApprovalGate } from "../agents/tool-approval"
 import type { PreparedRunGitHub } from '../agents/local-github'
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
 import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
-import { runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
+import { runDiagnosticsEnabled, runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
 
 export interface SupervisorDeps {
+  /** Trusted candidate launcher opt-in, shared with the official CLI collector. */
+  collectCliTiming?: boolean
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
   /** Existing authenticated checkpoint route, before terminal completion releases the lease. */
   saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<void>
@@ -1020,7 +1022,7 @@ export class RunSupervisor {
     let startupTiming: DaemonStartupTiming | undefined
     try {
       const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
-        { onStartupTiming: timing => { startupTiming = timing } })
+        this.active.get(runId)?.runtimeTiming ? { onStartupTiming: timing => { startupTiming = timing } } : undefined)
       if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
       this.emit(runId, runStageChunk(stage, performance.now() - started, true, startupTiming))
       return value
@@ -1317,7 +1319,8 @@ export class RunSupervisor {
     this.active.set(runId, run)
     const assignment = this.deps.journal.get(runId)?.assignment
     const harness = assignment?.harness
-    if (assignment) run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
+    if (assignment && runDiagnosticsEnabled(assignment.taskEnv, this.deps.collectCliTiming))
+      run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
     run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run)

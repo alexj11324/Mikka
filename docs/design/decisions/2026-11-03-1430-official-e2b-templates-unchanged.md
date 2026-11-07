@@ -130,12 +130,29 @@ Mikka 请求。`mikka-mcp` 的唯一远程发送路径只允许工具目录发�
 不是零。观测不得增加远程鉴权请求、数据库请求或轮询，也不为等待统计而延迟原有
 取消与进程终止。官方 provider 的 OTLP 事件同样是尽力收集，不冒充完整调用总数。
 
-2026-11-07 起，可信云 worker 入口与候选模板启动器直接开启上述每任务本机观测，
-普通个人 daemon 仍只在明确配置时开启。收集器在收到任务后创建，随该任务退出
-关闭；不把身份或凭据放进快照，不增加远程请求、数据库请求或授权步骤。
-共享测试账号的正式云端验收使用实际收据，不要求普通成员创建或删除管理员
-工作区变量。CLI/MCP 收据缺失、错绑、截断，或执行期间出现额外授权往返时仍失败；
-已有工作区变量保持原状，旧 worker 的空收据不能被“可信入口”标记代替。
+2026-11-07 曾让可信云 worker 无条件开启本机观测。随后确认：虽然没有增加 SQL
+轮次，finish 中的 `mikkaRuntimeTiming`、`agent_start.startupTiming` 以及其中的
+official CLI/MCP 收据会增加写入与读取的 JSONB 字节，不能称为数据库流量不变。
+普通云任务和个人 daemon 因此统一默认关闭全部新增详细诊断；原有
+`data-run-stage` 的 `stage/ms/ok`、OTel spans、日志与用户消息保持。只有明确 opt-in
+的任务才创建运行计数和 CLI/MCP 接收器，并在原有消息中附加收据。
+
+候选模板启动器保留显式宿主 opt-in。正式云端验收由 operator 配置短期
+`MIKKA_CLOUD_DIAGNOSTIC_WINDOW` JSON：`version: 1`、`requesterId`、`workspaceId`、
+专用 `botId`、精确 `repository`（owner/repo）和 ISO `expiresAt`，剩余时长不得超过
+24 小时。在已有 claim 最终响应授权点，仅当当前主体、冻结工作区/Bot、仓库、
+只读任务与 Claude/Codex 真实订阅匹配时，向现有任务环境注入
+`CLOUD_STARTUP_TIMING=1`；不增加 DB 查询、不写任务授权字段、不重复 Profile
+admission，也不增加 agent/tool 调用前的权限检查。未配置、过期或不匹配均不注入，
+用户原有显式仓库变量机制保持。该授权覆盖专用 Bot/仓库的诊断窗口，不能说成
+单 run 授权；operator 在验收后移除配置，过期配置也不能继续开启新任务。
+
+正式 driver 明确传入专用 Bot，按正常共享配置创建、冻结并核验 Profile，不要求
+普通成员写入或删除管理员工作区变量。诊断任务仍会产生明确的额外收据字节；
+CLI/MCP 收据缺失、错绑、截断或额外授权往返仍判失败，不能用配置存在代替实证。
+收集器随任务结束关闭，不把身份或凭据放进快照。普通任务的默认关闭以及同一
+daemon 后续普通任务不继承 opt-in，由真实 supervisor 到 `outbox.push` 的输出边界回归验证；
+这些回归不冒充生产 provider 回收、数据库网络字节或启动时延证明。
 
 同日候选订阅门槛在 Codex 的 `initialize` 阶段失败，尚未执行官方 CLI 的订阅
 登录，或发送 `thread/start`、`turn/start`。随后在官方 Codex 0.166.0 上做无账号控制，复现原生
@@ -158,6 +175,22 @@ OTLP 压缩变量，使用原生不压缩默认值；Claude 与未开启观测�
 终止行为。[真实失败、源码依据和清理记录](../research/2026-11-07-codex-otlp-unknown-time.json)
 保留未改动的原失败收据；通过实际收集器的匿名输入只用于前瞻回归，不能改写
 原发布结果，也不能替代新候选的双真实订阅门槛或完整云启动验收。
+
+验收 fixture 的清理使用服务端解析的完整 run 链。正常链 stop 接受请求后，还须
+通过既有 live 推送确认全部 attempt 的真实终态；云任务再对所有发现的 run 调用
+正常 owner end API，逐项核对返回的 run ID 与 `ended` 回执，并为每条解析链做
+一次既有机器视图回读，确认当前机器为 `ended` 且不再引用云资源。VM 转移后，
+旧 run 的 ended/空资源行不能代替当前 owner 的回收；DB ended 写入也不能单独
+证明 provider 已确认删除。Factory 取消、run 停止、end 或回读失败时保留 issue
+及其 run IDs，让正常恢复入口继续可用，不将保留资源记作清理通过。
+产品的 owner/lease 与生命周期处理仍由现有 API 决定；不新增产品 API、轮询或
+每次 agent/tool 的授权门槛，也不要求清理前另取公开接口没有的 safePoint 字段。
+
+该修正基于 `4f0f68e971b2676a156a3cedd7bc97413afb2310` 的实际 end/转移语义。
+两条确定性假 API 回归先复现“遗漏持有 VM 的续跑”及“end 失败仍删除 issue”，
+修复后 `scripts/acceptance/cloud-startup.test.mjs` 40/40 通过，另覆盖 end 回执后
+当前机器仍保留资源的拒绝路径。这些离线结果只证明 driver 的控制流与证据判定，
+不声称已完成真实 provider 回收或生产性能验收。
 
 worker 升级重新构建带唯一版本名的三个模板，不覆盖旧模板或别名；上一版有效配置
 保存在 `MIKKA_CLOUD_RUNTIME_PREVIOUS`，旧模板继续保留以便回滚。三模板 ID、

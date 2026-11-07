@@ -160,6 +160,11 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         if (action === 'coordinator.stopCoordinatorTurn') return rpc({ stopped: true })
         if (action === 'agents.pollIssueThreads') return rpc({ threads: [{ id: current.runId, ownedByCurrentUser: true }] })
         if (action === 'agents.getIssueThread') return rpc(readDetail(samples.find(sample => sample.runId === args[1])))
+        if (action === 'agents.getThreadMachine') {
+          assert.deepEqual(args, [current.issueId, current.runId])
+          return rpc({ kind: 'cloud', state: current.machineEnded ? 'ended' : 'running',
+            cloud: current.machineEnded ? null : { sandboxId: 'fixture-vm', template: 'fixture' } })
+        }
         if (action === 'agents.stopRun') {
           current.stopRequested = true; current.finished ||= !deferTerminal
           if (stopRace) return Response.json({ version: 1, ok: false, error: { code: 'runChainEnded' } }, { status: 409 })
@@ -202,7 +207,10 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         if (init.method === 'POST') { current.cancelled = true; current.finished ||= !stopRace && !deferTerminal; return json({ cancelled: true }) }
         return json({ task: { id: current.taskId, issueId: current.issueId, status: 'running', revision: 1 }, attempts: [{ runId: current.runId }] })
       }
-      if (/^\/api\/threads\/.*\/machine$/.test(path)) { assert.equal(candidate, false); current.machineEnded = true; return json({ ended: true }) }
+      if (/^\/api\/threads\/.*\/machine$/.test(path)) {
+        assert.equal(candidate, false); assert.equal(path, `/api/threads/${current.runId}/machine`)
+        current.machineEnded = true; return json({ runId: current.runId, state: 'ended' })
+      }
       assert.fail(`unexpected endpoint ${path}`)
     },
   }
@@ -482,13 +490,14 @@ test('trusted candidate timing still refuses missing official CLI or MCP observa
   }
 })
 
-test('member production acceptance observes the cloud host without reading or writing workspace secrets', async () => {
+test('member production acceptance observes its dedicated Bot window without reading or writing workspace secrets', async () => {
   for (const harness of ['claude_code', 'codex']) for (const timingSecret of [false, true]) {
     const io = fixture({ runtime: true, timingSecret })
     const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', harness,
-      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40), '--bot-id', botId]), { env, ...io })
     assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
-    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_host', scope: 'cloud_task', variableCreated: false, cleaned: true })
+    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_claim', scope: 'dedicated_bot_repository_window',
+      botId, variableCreated: false, cleaned: true })
     assert.equal(report.samples.length, 3)
     assert.ok(report.samples.every(sample => sample.requireOfficialTiming && sample.requireRuntimeReceipt
       && sample.runtimeEvidence?.status === 'passed' && sample.cleanup.status === 'passed'))
@@ -506,12 +515,34 @@ test('trusted cloud timing refuses missing CLI/MCP observations and extra remote
         delete item.chunk.messageMetadata.mikkaRuntimeTiming[field]
     }
     const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', 'codex',
-      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40), '--bot-id', botId]), { env, ...io })
     assert.equal(report.status, 'failed')
     assert.equal(report.samples.length, 3)
     assert.ok(report.samples.every(sample => sample.error === 'startup_runtime_evidence_failed' && sample.cleanup.status === 'passed'))
     assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
   }
+})
+
+test('formal cloud diagnostics require the prepared dedicated Bot before creating task fixtures', async () => {
+  const io = fixture({ runtime: true })
+  const report = await runCloudStartup(options(['--mode', 'acceptance', '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+  assert.equal(report.error, 'startup_diagnostic_bot_required')
+  assert.equal(report.status, 'failed')
+  assert.equal(io.samples.length, 0)
+  assert.equal(io.calls.some(call => call.path === '/api/factory/agent-profiles' || call.init.body?.includes('bots.createBot') || call.init.body?.includes('workspace-secrets.')), false)
+  assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+})
+
+test('optional historical baseline reads keep missing detailed diagnostics unavailable', async () => {
+  const io = fixture()
+  io.onDetail = (_sample, detail) => {
+    for (const item of detail.chunks) if (item.chunk?.type === 'data-run-stage') delete item.chunk.data.startupTiming
+  }
+  const report = await runCloudStartup(options(), { env, ...io })
+  assert.equal(report.status, 'awaiting_server_timings')
+  assert.equal(report.samples.length, 3)
+  assert.ok(report.samples.every(sample => sample.daemonStartupTiming === undefined && sample.startupTimingStatus !== 'complete'
+    && sample.cleanup.status === 'passed'))
 })
 
 test('trusted candidate timing cannot claim a host without a pinned device and agent', async () => {
@@ -692,6 +723,95 @@ test('candidate cleanup retains both original and queued continuation IDs when n
   assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
   assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1)
   assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('cloud cleanup follows an adopted VM to its live continuation before ending every owned attempt', async () => {
+  const io = continuationCleanupFixture(), endTargets = []
+  const json = io.client.json.bind(io.client), rpc = io.client.rpc.bind(io.client)
+  let machineLive = true, deleted = false, settled = false
+  io.client.json = async (path, init) => {
+    if (!path.endsWith('/machine')) return json(path, init)
+    assert.equal(JSON.parse(init.body).action, 'end')
+    const runId = path.split('/')[3]
+    assert.ok([io.root, io.child].includes(runId))
+    endTargets.push(runId)
+    // Adoption left the old row ended with no sandbox. Ending that row cannot
+    // release the same sandbox now owned by the continuation.
+    if (runId === io.child) machineLive = false
+    return { runId, state: 'ended' }
+  }
+  io.client.rpc = async (action, args) => {
+    if (action === 'agents.getThreadMachine') {
+      assert.deepEqual(args, [io.record.issueId, io.root])
+      return { kind: 'cloud', state: machineLive ? 'running' : 'ended',
+        cloud: machineLive ? { sandboxId: 'fixture-current-vm', template: 'fixture' } : null }
+    }
+    if (action === 'issue-operations.setIssueDeleted') deleted = true
+    return rpc(action, args)
+  }
+  const pending = cleanupCase(io.client, io.record, 'cloud', { ...io, timeoutMs: 1000 }).then(() => { settled = true })
+  try {
+    await Promise.race([io.stopRequested, pending])
+    await new Promise(setImmediate)
+    assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1)
+    assert.equal(settled, false, 'cloud cleanup must wait for the actual continuation terminal push')
+    assert.equal(deleted, false)
+    assert.deepEqual(endTargets, [], 'the old ended row cannot stand in for its still-active continuation')
+    io.finishChild()
+    await pending
+    assert.deepEqual(endTargets, [io.root, io.child])
+    assert.equal(machineLive, false)
+    assert.equal(io.record.cleanup.status, 'passed')
+    assert.deepEqual(io.record.cleanup.machines.map(({ runId, outcome, state }) => ({ runId, outcome, state })),
+      [io.root, io.child].map(runId => ({ runId, outcome: 'ended', state: 'ended' })))
+    assert.equal(io.record.cleanup.machineViews.at(-1).state, 'ended')
+    assert.equal(deleted, true)
+  } finally { io.finishChild(); await pending }
+})
+
+test('cloud cleanup retains the issue when owner end fails after the DB row was marked ended', async () => {
+  const runId = id(820), issueId = id(821), calls = []
+  const record = { runId, issueId, title: '测试 1505 provider end failure' }
+  const client = {
+    async json(path, init) {
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [] }
+      assert.equal(path, `/api/threads/${runId}/machine`)
+      assert.equal(JSON.parse(init.body).action, 'end')
+      throw new Error('startup_http_503')
+    },
+    async rpc(action, args) {
+      calls.push({ action, args })
+      if (action === 'agents.getIssueThread') return { thread: { id: runId, status: 'failed',
+        latestRunId: runId, attempts: [{ runId, status: 'failed' }] } }
+      if (action === 'agents.getThreadMachine') return { kind: 'cloud', state: 'error',
+        cloud: { sandboxId: 'fixture-retained-vm', template: 'fixture' } }
+      if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
+      assert.equal(action, 'issue-operations.setIssueDeleted')
+    },
+  }
+  await cleanupCase(client, record, 'cloud')
+  assert.equal(record.cleanup.status, 'failed')
+  assert.equal(calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false,
+    'a failed provider retirement must keep the normal recovery entry accessible')
+  assert.deepEqual(record.cleanup.retainedFixture, { issueId, runIds: [runId] })
+  assert.ok(record.cleanup.errors.some(error => error.step === `machineEnded_${runId}` && error.code === 'startup_http_503'))
+})
+
+test('cloud cleanup does not equate end acknowledgements with a still-retained current VM', async () => {
+  const io = continuationCleanupFixture(), json = io.client.json.bind(io.client), rpc = io.client.rpc.bind(io.client)
+  io.finishChild()
+  io.client.json = async (path, init) => path.endsWith('/machine')
+    ? { runId: path.split('/')[3], state: 'ended' } : json(path, init)
+  io.client.rpc = async (action, args) => action === 'agents.getThreadMachine'
+    ? { kind: 'cloud', state: 'error', cloud: { sandboxId: 'PRIVATE_RETAINED_VM', template: 'fixture' } } : rpc(action, args)
+  await cleanupCase(io.client, io.record, 'cloud', io)
+  assert.equal(io.record.cleanup.status, 'failed')
+  assert.deepEqual(io.record.cleanup.errors, [{ step: `machineVerified_${io.root}`, code: 'startup_cleanup_machine_unconfirmed' }])
+  assert.deepEqual(io.record.cleanup.retainedFixture, { issueId: io.record.issueId, runIds: [io.root, io.child] })
+  assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
+  assert.equal(io.record.cleanup.machineViews[0].state, 'error')
+  assert.match(io.record.cleanup.machineViews[0].sandboxIdHash, /^[a-f0-9]{16}$/)
+  assert.doesNotMatch(JSON.stringify(io.record.cleanup), /PRIVATE_/)
 })
 
 test('cleanup retains its fixture when Factory cancellation loses its revision fence', async () => {
