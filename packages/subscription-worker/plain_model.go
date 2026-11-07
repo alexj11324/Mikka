@@ -201,7 +201,11 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	response, err := client.Do(req)
 	if err != nil {
 		upstreamFailure(e.Provider, "transport", 0, "network")
-		return nil, ErrProvider
+		kind := "network_error"
+		if ctx.Err() == context.DeadlineExceeded {
+			kind = "timeout_error"
+		}
+		return nil, providerTransportFailure(e.Provider, kind, err)
 	}
 	contentType := response.Header.Get("Content-Type")
 	// Codex can omit MIME on a successful streaming response. The parser below
@@ -213,7 +217,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		response.Body.Close()
 		upstreamFailure(e.Provider, "response", response.StatusCode, upstreamErrorType(body))
 		if response.StatusCode != http.StatusOK {
-			return nil, providerStatusFailure(response.StatusCode)
+			return nil, providerFailure(providerStatusFailure(response.StatusCode), e.Provider, response.StatusCode, body, request.Payload, token)
 		}
 		return nil, ErrProvider
 	}
@@ -257,7 +261,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			if kind == "error" || kind == "response.failed" || event["error"] != nil {
 				kind := upstreamErrorType(raw)
 				upstreamFailure(e.Provider, "event", 200, kind)
-				emit(ex.StreamChunk{Err: providerEventFailure(kind)})
+				emit(ex.StreamChunk{Err: providerFailure(providerEventFailure(kind), e.Provider, 0, raw, request.Payload, token)})
 				return
 			}
 			completed = kind == "message_stop" || kind == "response.completed" || kind == "response.incomplete"

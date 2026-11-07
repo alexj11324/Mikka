@@ -145,6 +145,9 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 		message := map[string]any{"id": request.ID}
 		if err != nil {
 			message["error"] = safeCode(err)
+			if diagnostic := failureDiagnostic(err); diagnostic != nil {
+				message["providerFailure"] = diagnostic
+			}
 		} else {
 			message["result"] = result
 		}

@@ -140,11 +140,16 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 	}()
 	response, err := client.Do(upstream)
 	if err != nil {
-		return ErrProvider
+		kind := "network_error"
+		if callCtx.Err() == context.DeadlineExceeded {
+			kind = "timeout_error"
+		}
+		return providerTransportFailure(w.Scope.Provider, kind, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return providerStatusFailure(response.StatusCode)
+		failureBody, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
+		return providerFailure(providerStatusFailure(response.StatusCode), w.Scope.Provider, response.StatusCode, failureBody, request.Body, token)
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
 	if contentType == "" && w.Scope.Provider == "codex" && body.Stream {
