@@ -69,7 +69,7 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
     const selected = result.reads.find(read => read.text.startsWith('select distinct on'))
     assert.ok(selected)
     t.diagnostic(JSON.stringify({ read: 'task-runs', rowCount: selected.rows, beforeResultBytes: baseline.reads[0].bytes, resultBytes: selected.bytes, actionBytes: Buffer.byteLength(JSON.stringify(result.value)), fields: selected.fields }))
-    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId: _botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: null })))
+    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId: _botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: null, failureDetails: null })))
     assert.equal(result.value.items.length, 200)
     assert.equal(result.value.items.find(row => row.issueId === issueIds[0])?.runId, newest)
     assert.ok(result.value.items.every(row => row.runId !== peerRun && row.runId !== oldRun))

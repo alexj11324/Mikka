@@ -164,6 +164,23 @@ test('run result publication commits one owner-scoped result through retries and
     await t.test('device completion and server terminal transitions persist diagnostics under their existing fences', async () => {
       const { completeRunForDevice } = await import('../lib/run-completion')
       const { failRunForDaemonUpgrade } = await import('../lib/run-leases')
+      const { AfterContext } = await import('next/dist/server/after/after-context')
+      const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
+      const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
+      const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
+      const { NextRequest } = await import('next/server')
+      // Like issue-scope-detachment.db.test.ts, supply Next's real request
+      // lifecycle and drain after() work without replacing any database writer.
+      async function failFromRequest(...args: Parameters<typeof failRunForDaemonUpgrade>) {
+        const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
+        const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: close => { closes.push(close) }, onTaskError: error => { errors.push(error) } })
+        const request = new NextRequest(`http://127.0.0.1/mikka/v1/runs/${args[0]}/complete`)
+        const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
+        return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+          try { return await failRunForDaemonUpgrade(...args) }
+          finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
+        }))
+      }
       const f = await fixture()
       const stranger = await fixture()
       assert.equal(await completeRunForDevice(stranger.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'timeout' }), null)
@@ -175,11 +192,11 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual((await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails, first)
       const queued = await fixture()
       await pool.query("update agent_runs set status='queued' where id=$1", [queued.runId])
-      assert.equal(await failRunForDaemonUpgrade(queued.runId, stranger.deviceId, queued.userId), false)
-      assert.equal(await failRunForDaemonUpgrade(queued.runId, queued.deviceId, stranger.userId), false)
-      assert.equal(await failRunForDaemonUpgrade(queued.runId, queued.deviceId, queued.userId), true)
+      assert.equal(await failFromRequest(queued.runId, stranger.deviceId, queued.userId), false)
+      assert.equal(await failFromRequest(queued.runId, queued.deviceId, stranger.userId), false)
+      assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), true)
       assert.equal((await pool.query('select "failureDetails" from agent_runs where id=$1', [queued.runId])).rows[0].failureDetails.code, 'run_failed')
-      assert.equal(await failRunForDaemonUpgrade(queued.runId, queued.deviceId, queued.userId), false)
+      assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), false)
     })
 
     await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
