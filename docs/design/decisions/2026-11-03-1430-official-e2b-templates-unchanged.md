@@ -335,13 +335,33 @@ bootstrap 的同一次文件上传仍承载私有凭据，root 命令原子发�
 旧、缺失或退出的 preloader 保留原启动回退。信号成功不代替新设备凭证实际注册，
 原 lease/stop 栅栏和注册时限保持，凭据不进入命令、参数或日志。
 
-实例接收身份后，daemon 可在注册和 claim 期间异步只读预取已选择的官方 CLI 文件；
-Codex 还按官方 launcher 的安装布局读取其 native backend。每次 daemon 激活只做
-一次，256 KiB 缓冲、单文件 512 MiB、总量 768 MiB、10 秒预算；停止时先取消，
-任务原有终止完成后才等待在途读取关闭。此路径不执行 CLI、不读 HOME/账号配置、
-不改原文件，也不增加远端请求、数据库操作或轮询。它针对冷实例软件页读取的假设，
-不是已证实的加速结果；真实 CLI 初始化、模型目录、文件保全和双订阅 gate 均保持。
-下一候选仍须新的同版本完整六次生产验收，当前 #1505 未达标。
+此前 #1658 候选在实例接收身份后，注册和 claim 期间异步只读预取已选官方 CLI 软件。
+该假设现已实测，后续 #1660 停用 daemon 默认调用，保留独立实验函数和其测试供复核。
+不以“只读且无远程请求”推断它能缩短启动时间；bootstrap 一次 publish/wake 与 fresh
+授权读取优化不受影响。
+
+2026-11-07 的[匿名对照原件](../research/2026-11-07-e2b-cold-prefetch-control.json)
+来自 [Actions 42403752740](https://github.com/alexj11324/Mikka/actions/runs/42403752740)：
+固定 d75 发布及官方派生模板，8 个 fresh VM、两种 CLI 每臂各 2 次、平衡次序，
+control 与 prefetch 均有 2 秒准备窗口。只做 Claude SDK prewarm 或 Codex initialize，
+没有账户登录、claim、用户 prompt 或模型调用；官方 CLI SHA 和版本在计时后验证。
+
+| 初始化毫秒 | control | prefetch |
+|---|---:|---:|
+| Claude Code | 2260.151 / 3129.288 | 2341.121 / 1026.186 |
+| Codex | 1049.070 / 618.395 | 2033.094 / 3811.812 |
+
+Codex 两次仅读到 9154 字节 launcher，均为 partial，native 文件未读；因此不是有效的
+native 预读对照，也不能以每臂 n=2 将变慢归因为预读。Claude 两次读完同一 290532720
+字节文件，耗时 2915.832 / 1670.389ms；前一次与初始化重叠，收益仍不稳定。provider
+物理页缓存和后台 HTTP 未完整观测，保留 unavailable。全部 8 个 VM 已回收并按实际 ID
+读回 404，独立最终 ownedSandboxesAfter=[]，临时 ops ref 删除成功。
+原始 report.json 为 19019 bytes，SHA256
+`5296d17e7c612b481b98ed0bd92110cdaa85525efeb46d1eccf5fabf6f1ddcca`；
+artifact ZIP 的 SHA256 和固定 helper/release 元组随原件索引保留。
+
+这组匿名初始化时间不计入完整 dispatch 验收，也不能替代两条真实订阅发布 gate。
+下一候选仍须新的同版本 Claude×3、Codex×3 完整生产验收，当前 #1505 未达标。
 
 本记录保留早期 #1131、#1124 的官方文件保护要求，并取代其中禁止派生模板的
 解释；独立的官方机器种类和所有者绑定凭证规则保持有效。
