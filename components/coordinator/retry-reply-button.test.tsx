@@ -23,6 +23,7 @@ let menu: unknown = undefined
 let refusalCode: string | null = null
 let visibility: 'visible' | 'hidden' = 'visible'
 let versionReads = 0
+let pageRefreshRequired = false
 let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
 const notices: unknown[] = []
@@ -47,7 +48,12 @@ mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { na
 mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => refusalCode } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
   checkPageBuildBeforeAction: () => buildCheck(),
-  markPageNeedsRefresh: () => {}, pageNeedsRefresh: () => false, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
+  markPageNeedsRefresh: () => { pageRefreshRequired = true }, pageNeedsRefresh: () => pageRefreshRequired, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
+  subscribePageRefresh: (target: Pick<Window, 'addEventListener' | 'removeEventListener'>, offer: () => void) => {
+    target.addEventListener('mikka:stale-build', offer)
+    if (pageRefreshRequired) offer()
+    return () => { target.removeEventListener('mikka:stale-build', offer) }
+  },
   isStaleBuild: (page: string, server: string) => Boolean(page && server && page !== server),
   desktopBelowMinimum: () => false,
   readAppVersion: async () => { versionReads++; return serverVersion },
@@ -109,7 +115,7 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
@@ -227,6 +233,12 @@ test('a stale send does not clear an artifact quote', async () => {
   assert.equal(submissions, 0)
   assert.equal(cleared, 0)
   assert.equal(composer.value, 'keep the quote attached')
+})
+
+test('required refresh raised before VersionGuard mounts still shows a prompt without document reload', async () => {
+  pageRefreshRequired = true
+  await act(async () => root.render(<VersionGuard />))
+  assert.match(document.body.textContent ?? '', /Common.appUpdated/)
 })
 
 test('switching only the Bot search parameter checks the page version and requires a refresh', async () => {
