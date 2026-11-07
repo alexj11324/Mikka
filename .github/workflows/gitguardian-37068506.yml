@@ -48,7 +48,7 @@ jobs:
           secret-name: GITGUARDIAN_API_TOKEN
           recursive: false
           include-imports: false
-      - name: Restore the mixed incident so Cordy is not ignored
-        run: node scripts/ops/gitguardian-37068506.mjs --restore-cordy
+      - name: Check existing token against source-scoped pattern settings
+        run: node scripts/ops/gitguardian-37068506.mjs --scoped-rules
 
 # Fresh rollout readback, 2026-11-07.

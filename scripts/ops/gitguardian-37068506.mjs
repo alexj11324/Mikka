@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: '2933023be45a9e0f9f2ed69d83beb7ab4b97e1cd',
+  base: 'b78376f7b190c728be3e656ba5a44dad9fccb0b9',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -248,17 +248,27 @@ export async function restoreCordy({ request, report }) {
   report.result = 'mixed_incident_open'
 }
 
+export async function inspectScopedRules({ token, fetcher = fetch, report }) {
+ const url = 'https://dashboard.gitguardian.com/api/v1/accounts/837165/secret-pattern-exclusions/'
+ const r = await fetcher(url, { redirect:'error', signal:AbortSignal.timeout(15000), headers:{authorization:'Token '+token,accept:'application/json','x-privacy-mode':'true'} })
+ report.scopedRuleApiStatus=r.status
+ if(r.ok && r.headers.get('content-type')?.includes('application/json')) { const data=await r.json();report.scopedRuleArray=Array.isArray(data);report.scopedRuleCount=Array.isArray(data)?data.length:null }
+ else await r.body?.cancel()
+ report.result='scoped_rule_access_checked'
+}
+
 async function main() {
   const report = { incident: TARGET.incident, workspace: TARGET.workspace, result: 'blocked', writeAttempts: 0, requests: [],
     secretContentRequested: false, scannerConfigurationChanged: false, checkRunEditedOrSkipped: false }
   try {
     // This diagnostic revision deliberately has no CLI disposition entry point.
-    requireThat(process.argv.length === 3 && ['--preflight', '--inspect', '--restore-cordy'].includes(process.argv[2]), 'MODE')
+    requireThat(process.argv.length === 3 && ['--preflight', '--inspect', '--restore-cordy', '--scoped-rules'].includes(process.argv[2]), 'MODE')
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
     report.execution = validateExecution({ env: process.env, event, head: git('rev-parse', 'HEAD'),
       parent: git('rev-parse', 'HEAD^'), changed: git('diff', '--name-only', 'HEAD^', 'HEAD').split('\n').filter(Boolean) })
     report.source = validateSource(execFileSync('git', ['show', `${TARGET.source}:${TARGET.file}`], { stdio: ['ignore', 'pipe', 'pipe'] }))
     if (process.argv[2] === '--preflight') report.result = 'source_verified'
+    else if(process.argv[2]==='--scoped-rules') await inspectScopedRules({token:process.env.GITGUARDIAN_API_TOKEN,report})
     else await (process.argv[2] === '--restore-cordy' ? restoreCordy : inspect)({ request: guardianClient(process.env.GITGUARDIAN_API_TOKEN, fetch, row => report.requests.push(row)), report })
   } catch (error) {
     report.error = error instanceof GuardError ? error.code : 'DISPOSITION_FAILED'

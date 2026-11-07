@@ -366,3 +366,7 @@ test('restore only reopens the verified four-occurrence mixed incident and check
   assert.equal(result.result,'mixed_incident_open')
   assert.equal(result.writeAttempts,1)
 })
+
+test('scoped rule access readback contains no provider values', async () => {
+ const {inspectScopedRules}=await import('./gitguardian-37068506.mjs');const report={};await inspectScopedRules({token:'synthetic',report,fetcher:async(url,init)=>{assert.equal(init.redirect,'error');assert.equal(url,'https://dashboard.gitguardian.com/api/v1/accounts/837165/secret-pattern-exclusions/');return new Response(JSON.stringify([{value:'must-never-log',source_ids:[31236579]}]),{status:200,headers:{'content-type':'application/json'}})}});assert.equal(report.scopedRuleCount,1);assert.ok(!JSON.stringify(report).includes('must-never-log'))
+})
