@@ -26,6 +26,7 @@ A missing directory, or one outside the repository, fails the build.
 
 | Slot | Default | Props | Callers import |
 | --- | --- | --- | --- |
+| `app-frame` | 外框: the app window around every page (frame, window bar slot, the rounded card) and the icon rail; the window bar's content, the pages and the right-hand panel are not part of it | `AppFrameProps`, `IconRailProps` in `components/slots/app-frame-contract.ts`; `RAIL_ITEMS` in `components/nav/rail-items.ts`; `UpdateButton` in `components/nav/icon-rail-view.tsx`; `SETTINGS_COLORS` in `components/app-frame-view.tsx` | `AppFrame` from `@/components/app-shell`, `IconRail` from `@/components/nav/icon-rail` |
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
 | `chat-message` | today's message rows (`Message`, `Bubble`, `ReplyWaiting`) | `ChatMessageProps`, `ChatWaitingProps` in `components/slots/chat-message-contract.ts`; also exports `CHAT_SURFACE` | `coordinator-chat.tsx`, through `@ui-slot/chat-message` |
 | `chat-composer` | the Grok-style composer (attach and the model chip on the left, send or stop on the right) | `ChatComposerProps` in `components/slots/chat-composer-contract.ts`; what it does comes from `useChatComposer` (`hooks/use-chat-composer.ts`) | `ChatComposer` from `@/components/coordinator/chat-composer` |
