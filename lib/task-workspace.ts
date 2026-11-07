@@ -6,6 +6,7 @@ import { actingContext } from '@/lib/activity-actor'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { filterEnterpriseWorkspaces, requireEnterpriseWorkspace } from '@/lib/enterprise/access'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
 type Reader = string | { id: string; [tokenWorkspace]?: string; [enterprisePrincipal]?: EnterprisePrincipal }
@@ -36,7 +37,7 @@ export async function activeTaskWorkspaces(reader: Reader, requestedId?: string)
   const rows = await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(membership(scope.userId, scope.workspaceId ?? requestedId))
-  return rows
+  return filterEnterpriseWorkspaces(reader, rows)
 }
 
 /** Pin authoritative membership until the app write commits. Call outside the
@@ -52,6 +53,7 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
     const [member] = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, scope.userId), eq(workspaceMembers.status, 'active'))).for('share')
     if (!member) throw new ActionFailureError('workspaceAccessDenied')
+    await requireEnterpriseWorkspace(scope.userId, workspaceId, typeof reader === 'string' ? undefined : reader[enterprisePrincipal], tx)
     return work(workspace, tx)
   })
 }

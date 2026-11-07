@@ -19,6 +19,7 @@ import { issueDeviceToken } from '@/lib/device-link'
 import { auditAuthentication } from '@/lib/audit/authentication'
 import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop-rpc/session-cache'
+import { completeEnterpriseSignIn, enterpriseIdentityModels, enterpriseSessionFields, enterpriseSso, ssoSessionData, withEnterpriseAuthRequest } from '@/lib/enterprise/sso-plugin'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export const MOBILE_APP_ORIGIN = 'mikka://'
@@ -46,6 +47,7 @@ export const auth = betterAuth({
   database: pool,
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
+    session: { create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) } },
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
     user: { create: {
       before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }),
@@ -96,6 +98,8 @@ export const auth = betterAuth({
   // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in
   // the database, and lib/mcp/auth.ts checks them.
   plugins: [
+    enterpriseIdentityModels,
+    enterpriseSso(),
     bearer(),
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
@@ -125,6 +129,7 @@ export const auth = betterAuth({
       return email.before(ctx)
     }),
     after: createAuthMiddleware(async ctx => {
+      await completeEnterpriseSignIn(ctx)
       await auditAuthentication(ctx)
       const deviceToken = await exchangeDaemonSession({
         path: ctx.path, clientId: ctx.body?.client_id,
@@ -161,7 +166,9 @@ export const auth = betterAuth({
   },
   // Polls read the session from a signed cookie for up to 5 minutes instead of two queries each time (Alex
   // 2026-11-02). Money, permissions, credentials and deletion read it fresh (lib/fresh-session.ts).
-  session: SESSION_OPTIONS,
+  session: { ...SESSION_OPTIONS, storeSessionInDatabase: true, additionalFields: enterpriseSessionFields },
+  // Organization identity management uses the fresh-session, organization-admin route.
+  disabledPaths: ['/sso/register', '/sso/update-provider', '/sso/delete-provider', '/sso/providers', '/sso/get-provider', '/sso/request-domain-verification', '/sso/verify-domain'],
   advanced: {
     // Migrations own the schema (scripts/migrate.mjs on every deploy). Better Auth's own check reads
     // every column of every table from the catalog on each cold start, about 225 KB a time.
@@ -175,4 +182,4 @@ export const auth = betterAuth({
 
 // Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
 readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })
-auth.handler = withDesktopSessionCache(auth.handler, async () => (await auth.$context).authCookies.sessionData.name)
+auth.handler = withEnterpriseAuthRequest(withDesktopSessionCache(auth.handler, async () => (await auth.$context).authCookies.sessionData.name))

@@ -214,7 +214,8 @@
     "build:app": "node apps/frontend/scripts/build.mjs web && node apps/api/scripts/build.mjs",
     "test:api": "node --import ./tests/support/server-only.mjs --import tsx --test apps/api/src/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/agent-image-cache.test.ts && node --test apps/api/build-contract.test.mjs apps/api/runtime/*.test.mjs apps/api/scripts/*.test.mjs scripts/start-app.test.mjs scripts/test-subscription-enrollment-app.test.mjs scripts/release/build-vercel.test.mjs",
     "lint:runtime": "oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs",
-    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts"
+    "test:enterprise-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test lib/enterprise/http.db.test.ts lib/enterprise/governance.db.test.ts",
+    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts lib/enterprise/protocol.test.ts"
   },
   "dependencies": {
     "@ai-sdk/mcp": "2.0.81",
@@ -226,6 +227,7 @@
     "@better-auth/core": "1.7.12",
     "@better-auth/expo": "1.7.12",
     "@better-auth/oauth-provider": "1.7.12",
+    "@better-auth/sso": "1.7.12",
     "@chat-adapter/slack": "4.43.0",
     "@chat-adapter/state-pg": "^4.43.0",
     "@chat-adapter/telegram": "^4.43.0",

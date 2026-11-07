@@ -11,6 +11,8 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/enterprise/sso-plugin.ts', file: 'lib/enterprise/http.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/governance/organizations.ts', file: 'lib/enterprise/governance.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/governance/templates.ts', file: 'tests/team-governance-api.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/task-workspace.ts', file: 'tests/task-workspace-governance.db.test.ts', script: 'test:visibility-db' },
