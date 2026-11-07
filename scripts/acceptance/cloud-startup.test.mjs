@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
-import { alignServerTimings, cleanupCase, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
+import { alignServerTimings, cleanupCase, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
+  startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
 import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 
@@ -219,6 +220,126 @@ test('sampler IDs satisfy the installed 10% sampler, while invalid live configur
   for (const args of [['--runs', '2'], ['--origin', 'http://remote.example'], ['--mode', 'acceptance'],
     ['--device-id', deviceId, '--agent-id', agentId], ['--max-startup-ms', '0']]) assert.throws(() => options(args), /startup_/)
   assert.throws(() => createSessionClient('https://user:password@example.com'), /startup_origin_invalid/)
+})
+
+test('startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes', () => {
+  assert.equal(Object.isFrozen(STARTUP_FAILURE_CODES), true)
+  assert.equal(Object.isFrozen(STARTUP_FAILURE_PHASES), true)
+  assert.deepEqual(startupFailure(new Error('startup_http_503'), 'coordinator_stream'), { phase: 'coordinator_stream', code: 'startup_http_error', httpStatus: 503 })
+  assert.deepEqual(startupFailure(new Error('startup_http_700'), 'PRIVATE_PHASE'), { phase: 'unknown', code: 'startup_failed' })
+  assert.deepEqual(startupFailure(new Error('startup_private_credential'), 'profile_selection'), { phase: 'profile_selection', code: 'startup_failed' })
+  for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
+    const wrapped = new Error('startup_request_failed', { cause: new DOMException('PRIVATE_URL?token=PRIVATE_TOKEN', name) })
+    const failure = startupFailure(wrapped, 'coordinator_submit')
+    assert.deepEqual(failure, { phase: 'coordinator_submit', code })
+    assert.doesNotMatch(JSON.stringify(failure), /PRIVATE|token|cause|message/)
+  }
+  const cyclic = new Error('PRIVATE_ERROR'); cyclic.cause = cyclic
+  assert.deepEqual(startupFailure(cyclic, 'unknown'), { phase: 'unknown', code: 'startup_failed' })
+})
+
+const oneCodexCandidate = () => parseOptions(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
+  '--device-id', deviceId, '--agent-id', agentId, '--timeout-ms', '1000'], {})
+
+test('a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue', async () => {
+  for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream')
+      ? new Response(new ReadableStream({ start(controller) { controller.error(new DOMException('PRIVATE_READER_URL?key=PRIVATE_KEY', name)) } }), {
+        headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_FAULT' },
+      }) : original(url, init)
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
+    assert.equal(report.status, 'failed')
+    assert.equal(sample.runId, undefined); assert.equal(sample.runIdHash, undefined)
+    assert.equal(sample.error, code)
+    assert.deepEqual(sample.failure, { phase: 'coordinator_stream', code })
+    assert.equal(sample.cleanup.status, 'passed')
+    assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_READER|PRIVATE_KEY|PRIVATE_COOKIE|PRIVATE_PASSWORD/)
+  }
+})
+
+test('a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  let submitted = 0
+  io.fetchImpl = (url, init) => {
+    if (url.pathname.endsWith('/api/rpc') && JSON.parse(init.body).action === 'coordinator.sendCoordinatorMessage') {
+      submitted++; throw new DOMException('PRIVATE_AUTH_URL?token=PRIVATE_TOKEN', 'TimeoutError')
+    }
+    return original(url, init)
+  }
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+  assert.deepEqual(report.samples[0].failure, { phase: 'coordinator_submit', code: 'startup_timeout' })
+  assert.equal(submitted, 1)
+  assert.equal(report.samples[0].cleanup.status, 'passed')
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_AUTH_URL|PRIVATE_TOKEN/)
+})
+
+test('fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies', async () => {
+  const cases = [
+    { action: 'model-order.getModelOrder', phase: 'profile_selection', status: 503, code: 'startup_http_error' },
+    { path: '/api/factory/agent-profiles', phase: 'profile_create', status: 429, code: 'startup_http_error' },
+    { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { error: 'PRIVATE_API_REFUSAL' }, code: 'startup_api_refused' },
+    { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { version: 1, ok: false }, code: 'startup_rpc_refused' },
+    { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { version: 1, ok: true, result: { error: 'PRIVATE_ACTION_REFUSAL' } }, code: 'startup_action_refused' },
+    { action: 'issues.saveIssue', phase: 'issue_create', status: 403, code: 'startup_http_error' },
+    { action: 'coordinator.sendCoordinatorMessage', phase: 'coordinator_submit', status: 409, code: 'startup_http_error' },
+    { action: 'agents.pollIssueThreads', phase: 'thread_lookup', status: 502, code: 'startup_http_error' },
+  ]
+  for (const item of cases) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    let injected = false
+    io.fetchImpl = (url, init) => {
+      const path = url.pathname.replace('/mikka', ''), action = path === '/api/rpc' ? JSON.parse(init.body).action : null
+      if (!injected && (item.action ? action === item.action : path === item.path)) {
+        injected = true
+        return item.status ? new Response('PRIVATE_HTML_BODY?key=PRIVATE_KEY', { status: item.status }) : Response.json(item.body)
+      }
+      return original(url, init)
+    }
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+    assert.equal(report.status, 'failed', item.phase)
+    const failure = report.samples[0]?.failure ?? report.failure
+    assert.deepEqual(failure, { phase: item.phase, code: item.code, ...(item.status ? { httpStatus: item.status } : {}) })
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_HTML|PRIVATE_API_REFUSAL|PRIVATE_ACTION_REFUSAL|PRIVATE_KEY/)
+  }
+})
+
+test('stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes', async () => {
+  const cases = [
+    { response: () => new Response('PRIVATE_BODY', { status: 503 }), failure: { code: 'startup_http_error', httpStatus: 503 } },
+    { response: () => new Response('PRIVATE_BODY', { headers: { 'content-type': 'text/plain' } }), failure: { code: 'startup_coordinator_stream_unavailable' } },
+    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson' } }), failure: { code: 'startup_workflow_run_missing' } },
+    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_NOEVENT' } }), failure: { code: 'startup_dispatch_not_observed' } },
+  ]
+  for (const item of cases) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream') ? item.response() : original(url, init)
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
+    assert.equal(sample.status, 'failed')
+    assert.deepEqual(sample.failure, { phase: 'coordinator_stream', ...item.failure })
+    assert.equal(sample.error, item.failure.code)
+    assert.equal(sample.cleanup.status, 'passed')
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_BODY/)
+  }
+})
+
+test('profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  io.fetchImpl = async (url, init) => {
+    const response = await original(url, init)
+    if (!url.pathname.endsWith('/api/factory/agent-profiles')) return response
+    const value = await response.json(); value.profile.digest = 'PRIVATE_INVALID_PROFILE'
+    return Response.json(value)
+  }
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+  assert.deepEqual(report.samples[0].failure, { phase: 'profile_validation', code: 'startup_profile_source_mismatch' })
+  assert.equal(io.samples.length, 0)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_INVALID_PROFILE/)
+  const pinned = await runCloudStartup({ ...oneCodexCandidate(), expectedBuild: 'EXPECTED_DIFFERENT_BUILD' }, { env, ...fixture({ candidate: true }) })
+  assert.equal(pinned.samples.length, 0)
+  assert.deepEqual(pinned.failure, { phase: 'build_pin', code: 'startup_build_mismatch' })
+  assert.equal(pinned.error, 'startup_build_mismatch')
 })
 
 test('claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start', () => {

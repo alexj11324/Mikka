@@ -76,20 +76,28 @@ Node 24, pnpm 10.34.3 and PostgreSQL 17.
 | Static policy / migrations | Full code lint and migration/factory checks pass; migration regression suite 55/55. UI policy and copy checks pass. |
 | Daemon socket integration | Six relevant files, 109/109 passing in cloud Linux. The 46 subscription-resume fixtures require the existing non-root host guard; they use local fake CLI fixtures, not real subscriptions. |
 | API / CLI | 78/78 API contract tests pass after regenerating the standard route manifest; actual local `/mikka/api/version` and `/mikka/sign-in` return HTTP 200, migrations and daemon CLI `--help` exit 0. |
-| Exact-head CI | [PR #1610](https://github.com/alexj11324/Mikka/pull/1610): the initial head `faf51561db091550366dc61d8550ae6e98267a37` passed source checks and 11 independent workflows, but the main CI and Node 22 workflow failed. The follow-up corrects stale fixtures and the reported runtime regressions; the PR's current-head checks remain the release authority. |
+| Exact-head CI | [PR #1610](https://github.com/alexj11324/Mikka/pull/1610) passed its exact-head checks and merged as `4f0f68e971b2676a156a3cedd7bc97413afb2310`. [PR #1628](https://github.com/alexj11324/Mikka/pull/1628) passed all eight exact-head workflows and merged as `f811448d805e7baa7b032fd6ae62d991f59966c8`; its [main CI](https://github.com/alexj11324/Mikka/actions/runs/42356253038) passed all 12 jobs. A later correction requires its own exact-head checks. |
 | Cloud runtime unit fixtures | The initial CI exposed eight outdated SQL mocks; the updated task-lock and lifecycle receipts pass all 51 cloud-limits tests locally. |
 | Claude missing-session fallback | Both Node 22 and the main daemon CI found premature gate revocation during ordinary fallback. A direct-adapter test reproduced it; the fixed resume and provider-failure files pass 21/21, including strict question-session refusal and actual child-exit confirmation. |
 | Desktop continuation repository | The second CI passed DB shards 1/2/4 and daemon/Node 22, while three desktop-entry continuation cases exposed a dropped prior repository URL. The continuation now forwards the same admitted repository as the Coordinator/API paths; regression assertions require the original VM, device and repository. |
-| Real E2B fault injection | Prepared `scripts/e2b/thread-lifecycle-acceptance.ts`; not yet run with the provider credential. |
-| Claude subscription | Not run. Required model: `claude-haiku-5-5`. |
-| Codex subscription | Not run. Required model: `gpt-6-luna`. |
-| Production | Not deployed or accepted. Requires merged SHA, deployment READY, matching worker/template and the shared smoke account. |
+| Real E2B fault injection | On `f811448d`, [run 42360728689](https://github.com/alexj11324/Mikka/actions/runs/42360728689) passed all seven original provider/controller cases against isolated PostgreSQL and a real VM; cleanup confirmed the VM missing and database dropped. Refusal/lost-response faults were injected; a real SDK request deadline was not exercised. |
+| Claude subscription | The `f811448d` candidate gate passed official Claude Code 2.1.305 / `claude-haiku-5-5`, including the native acknowledgement, a successful tool and reply after it. The separate Owner Task case stopped at preallocation HTTP 404. |
+| Codex subscription | The same `f811448d` gate passed official Codex 0.166.0 / `gpt-6-luna` with the required execution proofs. The separate Owner Task case stopped at the same preallocation HTTP 404. |
+| Production | [Web run 42356253062](https://github.com/alexj11324/Mikka/actions/runs/42356253062) and [runtime release 42356253078](https://github.com/alexj11324/Mikka/actions/runs/42356253078) succeeded. Runtime-refresh deployment `dpl_EKh8ATho1pPt7BaCeZzCnwhUqie8` is READY; at 09:41:01 UTC on 2026-11-07 the public version returned exact `f811448d805e7baa7b032fd6ae62d991f59966c8`. Complete lifecycle acceptance remains pending. |
 
 The real-provider driver refuses deployed/remote database targets and a dirty
 or mismatched source tree. Its nonallocating `--check` validates the target;
 full execution uses one uniquely tagged disposable VM, verifies pause,
-resume, timeout, stale epoch and kill behavior, and confirms cleanup. It
-reports `subscriptionAcceptance: false` and makes no model calls.
+resume, static timeout renewal, stale epoch and kill behavior, and confirms
+cleanup. Provider-refusal and lost-response cases inject transport faults
+around real RPCs. The follow-up request-deadline case uses the actual SDK's
+one-millisecond request deadline with no automatic retries, requires the
+original native `TimeoutError`, and verifies durable backoff, no provider I/O
+on an early replay, and normal same-VM renewal recovery. A request that beats
+its deadline is inconclusive and cannot produce a passing receipt. This driver
+does not wait for natural timeout expiry, run a
+daemon, or execute a native subscription session; its report marks those
+boundaries and makes no model calls.
 
 The cloud Linux results above used a synchronized development worktree on
 `d63b5e1b2e70baa368cf42ec6f9b13691571b6e0`; they are not exact-head release
@@ -101,14 +109,145 @@ and daemon regressions. Each follow-up is verified on the new PR head; an
 earlier successful job cannot stand in for that rerun. No blocked or unstarted
 command is counted as passing.
 
-### Remaining credential boundary
+### First production runtime release
 
-The connected deployment metadata is available, but the environment-list
-connector truncates before the required E2B/smoke records. The supported
-browser fallback reaches a Vercel sign-in wall. No new identity, production
-environment mutation, private credential export or CI guard weakening has
-been used to bypass that boundary. A supported authenticated session is
-needed to complete the real-provider and shared-account acceptance.
+[Release 42350707966](https://github.com/alexj11324/Mikka/actions/runs/42350707966)
+validated the candidates' original files but failed the paired subscription
+gate: Claude passed, Codex had no accepted execution receipt. Publication was
+skipped. Cleanup confirmed all three candidate templates and the test
+instances were removed, with no cleanup errors. This passing Claude receipt
+does not make the deleted candidate publishable or prove Task VM continuity.
+
+The failed diagnostic collapsed the startup failure into `startup_failed` and
+did not retain a bound run. The follow-up preserves the actual startup phase,
+closed error code and bounded HTTP status without publishing response bodies.
+In the same deployment's acceptance window, a subscription Coordinator
+`gpt-6-luna` call (`wrun_41M6TFAQKD0GV75GBGP21WNDMG`) was rejected before any
+token or tool: the worker recorded HTTP 400 / `invalid_request_error`. This is
+not evidence of quota exhaustion or a Codex CLI failure. The old artifact does
+not directly bind that workflow to its failed candidate sample, so that final
+correlation remains unproved. A separate 300-second stream timeout in the
+window is not assigned to this call merely from timestamp proximity.
+
+### Runtime publication and the first Owner attempt
+
+On 2026-11-07, `f811448d805e7baa7b032fd6ae62d991f59966c8` completed
+[release 42356253078, attempt 1](https://github.com/alexj11324/Mikka/actions/runs/42356253078).
+Both accepted subscription receipts bind worker
+`18d86efa6f4ed740bbc86f02db2f77eecc16cff6`, the exact source and candidate:
+
+| Path | Template | Actual run |
+| --- | --- | --- |
+| Claude Code / `claude-haiku-5-5` | `g4eg9fzgm51gtgnuzvax` | `bec62916-7bb6-4a07-80d0-49f3c3347482` |
+| Codex / `gpt-6-luna` | `bihq9h4vj8gehz7pfu9k` | `a9853441-177f-4d3f-b4da-a078a159f875` |
+
+Release evidence artifact `13569215487` was independently downloaded and
+verified against SHA-256
+`bd3e6d73ba17de06da4ea9f50fe27a0d2d4f23fb8a76dead7e5514ee577ae7a4`.
+Final cleanup artifact `13570185225` has SHA-256
+`e1c3d98fb9bc1ff525cd65aa7cbe7a9e3b72e49fe5bf118c9db42ead988410d4`:
+no remaining test sandboxes or cleanup errors; the three published templates
+are retained for production and rollback. The current Codex receipt does not
+identify which parameter caused the older 4f HTTP 400.
+
+[Task evidence run 42360728689, attempt 1](https://github.com/alexj11324/Mikka/actions/runs/42360728689)
+then authenticated the same release and Web source. At 09:42:02–09:42:12 UTC,
+its provider layer passed `active-monitor`, `provider-refusal`,
+`lost-pause-response`, `resume-monitor`, `stale-epoch`, `stop-idempotence` and
+`end-idempotence`. The isolated fixture run was
+`6eadc09c-37e4-46b0-9c39-51dcc197a6d5`, with official `codex` VM
+`ipktoromeirrmaexw85e0`. Its receipt confirms `provider: confirmed_missing`
+and `database: dropped`; it makes no daemon or subscription claim.
+
+The normal Owner driver ran from 09:42:17.417 to 09:42:27.585 UTC and stopped
+before allocating either Task. Both cases reported `startup_http_404`, with
+successful account/workspace cleanup. The strict aggregate correctly failed.
+Artifact `13569761286` was verified against SHA-256
+`2189e85f9fb89409ebf0699500f4b8f6678cee8a77017e3f46e95d1c9a23cec4`.
+
+The cause is a caller contract error: `workspace-secrets.getE2BKey` is an
+exported server action but is absent from the browser RPC registry/schema.
+The registered read-only capability action is
+`workspace-secrets.getE2BKeyCapability`. Unknown RPC actions return 404 before
+the key-status function runs, so this result says nothing about whether the
+Owner has configured a personal E2B key. The correction calls the existing
+capability action and verifies every literal Owner RPC against the real
+registry and schemas; the new contract regression failed on the old caller.
+Closed failure phases preserve where a preallocation or setup failure occurred
+without exporting HTTP bodies or credential data.
+
+### Main-only acceptance delivery
+
+The interactive environment could not obtain E2B/shared-account credentials,
+and the Vercel sign-in was cancelled. The follow-up uses the existing main
+runner's Infisical workload identity; it needs no new identity, interactive
+login, private credential export or production configuration change.
+
+`Task VM question-resume evidence` runs after `E2B additive runtime
+release` completes successfully. Its first job has no OIDC permission. Before
+checkout it verifies the actual fixed workflow path/ID, repository, original
+`push` or `workflow_dispatch` event, main branch, immutable source and current
+run attempt through GitHub metadata. It checks out that exact SHA and selects
+only lifecycle/acceptance changes in the main merge's first-parent diff, or
+a release whose `validate / build` job actually succeeded. Unrelated merges
+with unchanged runtime skip active acceptance.
+
+Inside the shared smoke-account serial queue, the second job repeats the
+main/attempt checks and uses the existing Web-deploy verifier to prove the
+exact successful build, upload and public source version before credentials.
+It reads only `prod:/vercel` `E2B_API_KEY` and, after provider cleanup,
+`prod:/` `SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD`. It does not read upstream
+artifacts, accept a PR ref or allow an application-origin override.
+
+The two evidence layers run in order:
+
+1. `scripts/e2b/thread-lifecycle-acceptance.ts` runs against a disposable
+   loopback PostgreSQL 17 `*_e2e` database and one uniquely owned official
+   `codex` VM. Its result is actual provider/controller integration with
+   injected transport faults, within the narrower scope above. A case failure
+   can proceed to the independent subscription cases only when the driver's
+   cleanup has completed. Missing or failed cleanup blocks new allocations.
+2. `scripts/acceptance/thread-lifecycle.mjs` uses the normal shared Owner
+   session at `https://app.aspectlylabs.com`, in the shared team workspace.
+   It runs the official Claude Code `claude-haiku-5-5` and official Codex
+   `gpt-6-luna` cases independently, checking question/answer continuation and
+   the same VM/native-session evidence. Cleanup uses normal Owner Stop/end
+   APIs for this run's cases, including when the source changes during a case.
+
+Closed JSON evidence is written only under
+`$RUNNER_TEMP/thread-lifecycle-acceptance/` and retained as the workflow's
+seven-day evidence artifact. The provider and Owner reports remain separate;
+the aggregate's `providerIntegration` and `questionResume` pass only when the
+provider step and both fixed-model question/resume cases have their required
+evidence and confirmed cleanup on the same source. Missing provider identity,
+credentials, pause evidence or cleanup remains a nonzero failure; it is never
+an excluded requirement. No raw SDK/model/HTTP logs, credential values or
+session cookies are included. Offline guard tests run in the ordinary PR CI;
+those tests establish the wiring's refusal behavior, not live acceptance.
+
+A green evidence run covers this limited question → pause → original VM/SID
+resume → native report/marker flow. Every summary still records
+`issueAcceptance: incomplete`. The remaining issue criteria require separate
+evidence for external waiting and adjacent-stage continuity (item 6), terminal
+revocation, closed-task grace and safe retention (item 7), and measured
+pause/retirement latency and idle compute cost (section C). The aggregate only
+clears the real-provider timeout fault pending item when the same-source
+provider step, all eight ordered cases, actual SDK deadline/recovery receipt
+and cleanup succeed. The older seven-case report cannot clear that item.
+The separate Owner report makes no provider-fault claim. The reports' `pending`
+fields identify the original gaps this narrower flow does not establish.
+
+The native report and its trusted uploaded checkpoint can establish the
+delivery boundary in item 5. This driver stops at its second real Owner decision
+because the normal task API cannot fix future independent coding stages to the
+authorized small models. Final Factory submission, completion of every later
+stage, a downloaded Markdown file and waiting for natural timeout expiry are
+outside this driver's scope. They are not additional issue closure requirements.
+The new Bot uses the existing shared small-model preference for ordinary
+Coordinator turns. Coding evidence comes from the Task producer and
+continuation, with explicit fixed Profiles and real subscription receipts.
+An actual coding-model substitution invalidates that case; ordinary background
+turns retain the existing Coordinator protocol.
 
 ## Results that must still be measured
 
@@ -117,6 +256,23 @@ continuity, token revocation and final cleanup for each official subscription.
 Measure terminal-to-provider-pause latency and idle compute seconds on the
 same source. No production cost savings or latency numbers are claimed by
 the deterministic tests.
+
+The Owner driver now preserves `terminal.origin` and `terminal.continuation`
+from the exact `runId` in the already-read normal Owner thread's attempts.
+Each record includes the actual `finishedAt` when present; a missing or invalid
+timestamp remains null and does not add a new question/resume gate. A chain's
+latest completion time is never substituted for another attempt's completion.
+Provider observations retain `requestedAt` separately and take `observedAt`
+after the response or error arrives. That response time is a confirmation
+bound, not the provider's exact physical transition instant.
+
+Combine a valid attempt completion time with the matching server
+`thread_machine_lifecycle` `pause_ack` / `kill_ack`, run/VM hash and epoch when
+measuring confirmation latency. The report's Factory task hash differs from
+the server event's issue hash. A cumulative `computeSeconds` estimate includes
+productive work; it is not automatically idle compute or an actual bill.
+The first `f811448d` Owner attempt allocated no Task, so it provides no native
+terminal-to-pause timing or production cost comparison.
 
 ## Review and rollback
 

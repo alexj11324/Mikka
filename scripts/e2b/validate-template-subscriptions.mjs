@@ -5,7 +5,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot } from '../acceptance/cloud-startup.mjs'
+import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot,
+  STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from '../acceptance/cloud-startup.mjs'
 import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -21,15 +22,8 @@ const GATE_CODES = new Set([
   'device_cleanup_failed', 'sandbox_cleanup_failed', 'application_build_changed', 'sign_out_failed',
   'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required', 'workspace_restore_failed', 'shared_scope_evidence_invalid',
 ].map(code => `template_gate_${code}`))
-const STARTUP_CODES = new Set([
-  'dispatch_refused', 'dispatch_run_missing', 'dispatch_not_new', 'dispatch_device_mismatch',
-  'subscription_provenance_mismatch', 'execution_device_mismatch', 'execution_timeout', 'ended_before_execution_proof',
-  'official_agent_acceptance_missing', 'runtime_evidence_failed', 'live_disconnected', 'live_scope_missing',
-  'request_failed', 'response_invalid', 'build_mismatch', 'build_changed',
-  'cleanup_terminal_timeout',
-  'shared_subscription_identity_mismatch', 'shared_subscription_model_missing_or_ambiguous',
-  'shared_chat_model_ambiguous', 'shared_chat_model_unavailable', 'workspace_identity_mismatch', 'profile_source_mismatch',
-].map(code => `startup_${code}`))
+const STARTUP_CODES = new Set(STARTUP_FAILURE_CODES)
+const FAILURE_PHASES = new Set(STARTUP_FAILURE_PHASES)
 const safeCode = error => GATE_CODES.has(error?.message) || STARTUP_CODES.has(error?.message) ? error.message : 'template_gate_failed'
 const SAMPLE_STATUSES = new Set(['running', 'failed', 'execution_proved_awaiting_server_timing'])
 const RUN_STATUSES = new Set(['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'completed', 'stopped', 'failed', 'cancelled'])
@@ -61,8 +55,21 @@ function cleanupFailure(row) {
     ...(http ? { httpStatus: Number(http[1]) } : {}) }
 }
 
+function startupFailure(record) {
+  if (!record?.failure && !record?.error && record?.status !== 'failed') return undefined
+  const failure = record.failure
+  const rawCode = failure?.code ?? record.error
+  const http = typeof rawCode === 'string' && /^startup_http_([45][0-9]{2})$/.exec(rawCode)
+  const code = STARTUP_CODES.has(rawCode) ? rawCode : http ? 'startup_http_error' : 'startup_failed'
+  const httpStatus = http ? Number(http[1]) : failure?.httpStatus
+  return { phase: FAILURE_PHASES.has(failure?.phase) ? failure.phase : 'unknown', code,
+    ...(code === 'startup_http_error' && Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599 ? { httpStatus } : {}) }
+}
+
 function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId, { sourceCommit, cleanupDetails, passedReceipt, registeredProof }) {
   const sample = acceptance?.samples?.[0]
+  const sampleFailure = startupFailure(sample)
+  const failure = sampleFailure ?? startupFailure(acceptance)
   const harness = kind === 'claude' ? 'claude_code' : 'codex'
   const runIdHash = UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null
   const timing = runIdHash ? readRuntimeTiming(sample?.runtimeTiming, { runIdHash, harness }) : null
@@ -100,7 +107,8 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
   return { kind, stage, code: error ? safeCode(error) : 'passed',
     runIdHash,
     sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
-    sampleError: sample?.error ? STARTUP_CODES.has(sample.error) ? sample.error : 'startup_failed' : null,
+    sampleError: sampleFailure?.code ?? null,
+    ...(error && failure ? { failure } : {}),
     cleanupErrors: [...cleanup], ...(observation ? { observation } : {}), ...(fixture ? { fixture } : {}),
     ...(cleanupFailures.length ? { cleanupFailures: cleanupFailures.slice(0, 8), cleanupFailuresTruncated: cleanupFailures.length > 8 } : {}),
     // Only the existing strict candidateReceipt can populate this proof. A
