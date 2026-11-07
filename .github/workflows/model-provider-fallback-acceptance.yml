@@ -21,6 +21,7 @@ permissions:
 concurrency:
   group: production-smoke-owner-acceptance
   cancel-in-progress: false
+  queue: max
 jobs:
   acceptance:
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka' && (contains(github.event.workflow_run.head_commit.message, '(#1232)') || contains(github.event.workflow_run.pull_requests.*.number, 1232) || contains(github.event.workflow_run.head_commit.message, '(#1249)') || contains(github.event.workflow_run.pull_requests.*.number, 1249))))
