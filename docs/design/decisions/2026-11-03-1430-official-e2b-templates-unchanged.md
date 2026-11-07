@@ -34,6 +34,13 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 CLI 串行重探测。没有可复用结果或文件身份变化时仍走真实探测，不硬编码模型；
 自然刷新周期从实例接收 handoff 起算。探测不读取账号、凭证或任务，也不发模型请求。
 
+首次 handoff 可附带一次性的任务 ID 提示，通过单独的私有文件绑定本次 bootstrap
+完整字节的摘要；主 bootstrap 格式保持旧 worker 可读。提示只在内存中使用，不写入
+设备配置，也不包含任务授权或可用凭证。worker 完成真实注册后，以原有 claim 流程
+认领该任务，与首轮 heartbeat/repository 同步重叠；启动前仍等待完整仓库配置，
+并执行原有设备、凭证和 fresh policy 检查。无提示、过期或无效提示走原有发现流程，
+正常路径不增加 HTTP/数据库调用或定时轮询。
+
 同一次真实匿名探测还在 ready 前原子写入只读发布收据，绑定完整 source commit、
 worker digest、CLI manifest 和实际选择。CI 从新建的无身份候选实例读取并核对
 这些绑定与所需模型目录，不再启动第二个完整 daemon 和第二组 CLI 重做探测。
