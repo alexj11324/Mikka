@@ -12,9 +12,6 @@ import { factoryHumanStore } from "@/lib/factory/server";
 import { factoryDispatchEnabled, handleFactoryDispatch } from "@/lib/factory/dispatch-http";
 import { issueMutationsEnabled } from "@/lib/coordinator/issue-tools-enabled";
 import { factoryDispatchSchema } from '@/lib/factory/dispatch';
-import { pool } from '@/lib/db';
-import { workspacePool } from '@/lib/workspace-db';
-import { factoryIssueLiveScope } from '@/lib/live/factory';
 
 export const dynamic = "force-dynamic";
 /** GET /api/factory/tasks?issueId=...: session-owned task discovery, no writes. */
@@ -30,11 +27,9 @@ export async function GET(request: Request) {
     const readable = reader && workspaceId && issueId && z.uuid().safeParse(issueId).success && Boolean(await issueForUser(reader, issueId, false));
     const list = () => handleFactoryList(factoryHumanStore, { userId, issueId });
     const result = readable ? await singleFlight(["/api/factory/tasks", userId, workspaceId, issueId], list) : await list();
-    let liveWorkspaceId: string | null = null;
-    if (result.status === 200 && session?.user && issueId) {
-      try { liveWorkspaceId = (await factoryIssueLiveScope(pool, workspacePool, issueId, session.user.id))?.workspaceId ?? null; }
-      catch { console.warn('[live] Factory list scope unavailable'); }
-    }
+    // A successful store read reauthorized the bound issue inside this exact
+    // Workspace lease. Its live channel uses that same immutable tenant.
+    const liveWorkspaceId = result.status === 200 ? workspaceId ?? null : null;
     return NextResponse.json(result.status === 200 ? { ...(result.body as Record<string, unknown>), liveWorkspaceId } : result.body, {
       status: result.status,
       headers: { "Cache-Control": "private, no-store" },

@@ -12,7 +12,8 @@ export async function verifyWorkspaceGovernance({ accounts, pool, progress, sign
     const response = await account.request(path, { signal, ...(body === undefined ? {} : {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     }) })
-    assert.equal(response.status, expected, `governance HTTP ${body === undefined ? 'GET' : 'POST'} failed`)
+    const endpoint = /^\/api\/factory\/tasks\/[a-f0-9-]{36}$/.test(path) ? 'factory-detail' : path.startsWith('/api/factory/tasks?') ? 'factory-list' : path === '/api/factory/tasks/route' ? 'factory-route' : 'ordinary-route'
+    assert.equal(response.status, expected, `governance HTTP ${body === undefined ? 'GET' : 'POST'} ${endpoint} failed`)
     return response.json()
   }
   const rpc = async (account, action, ...args) => {
@@ -93,6 +94,8 @@ export async function verifyWorkspaceGovernance({ accounts, pool, progress, sign
     return { ...routed, request: body }
   }
   const denyFactory = async (account, routed) => {
+    const selected = (await request(account, '/api/workspace')).workspace.id
+    assert.notEqual(selected, routed.task.workspaceId, 'Factory denial must run outside the task workspace')
     const before = await factoryState(routed.taskId)
     for (const path of [`/api/factory/tasks/${routed.taskId}`, `/api/factory/tasks?issueId=${routed.task.issueId}`]) {
       assert.equal((await request(account, path, undefined, 404)).error, 'factoryNotFound')

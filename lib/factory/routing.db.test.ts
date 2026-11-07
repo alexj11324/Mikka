@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { lifecycleCases } from "./lifecycle.db-cases";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -31,6 +32,7 @@ test(
       options: `-c search_path=${schema}`,
       max: 12,
     });
+    const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     try {
       const dir = new URL("../../drizzle/", import.meta.url);
       for (const f of orderMigrations(
@@ -289,6 +291,7 @@ test(
       );
       await lifecycleCases(t,pool,authorize,fixture);
     } finally {
+      await closeWorkspace();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

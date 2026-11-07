@@ -921,7 +921,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "ca6edf2eb75bfc6332ee5e33d0b637a6b1f4874aeae042622b550a72abd921cc"
+      "sourceHash": "6c84f889ccb33e59c75cac7fc6b324e55010b6df67178aa9e7b6dfac40af0eac"
     },
     {
       "path": "/mikka/api/factory/tasks/route",
