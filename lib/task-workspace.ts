@@ -6,9 +6,10 @@ import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { actingContext } from '@/lib/activity-actor'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
+import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { filterEnterpriseWorkspaces, requireEnterpriseWorkspace } from '@/lib/enterprise/access'
+import { filterEnterpriseWorkspaceLinks, filterEnterpriseWorkspaces, requireEnterpriseWorkspace } from '@/lib/enterprise/access'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
 type Reader = string | { id: string; [tokenWorkspace]?: string; [enterprisePrincipal]?: EnterprisePrincipal }
@@ -73,13 +74,13 @@ export async function activeTaskWorkspaces(reader: Reader, requestedId?: string)
   // Other transactions cannot revoke this locked membership until the lease
   // ends. Only the exact user/tenant can reuse it; an unscoped list still reads
   // every active tenant. Keep any canonical Enterprise filter after these rows.
-  const rows: TaskWorkspace[] = selectedId && lease && leaseActive(lease)
-    && lease.userId === scope.userId && lease.workspaceId === selectedId
-    ? [{ id: lease.workspaceId, kind: lease.kind }]
-    : await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind }).from(workspaces)
-      .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-      .where(membership(scope.userId, selectedId)).orderBy(asc(workspaces.createdAt))
-  return filterEnterpriseWorkspaces(reader, rows)
+  if (selectedId && lease && leaseActive(lease) && lease.userId === scope.userId && lease.workspaceId === selectedId)
+    return filterEnterpriseWorkspaces(reader, [{ id: lease.workspaceId, kind: lease.kind }])
+  const rows = await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId }).from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .leftJoin(organizationWorkspaces, eq(organizationWorkspaces.workspaceId, workspaces.id))
+    .where(membership(scope.userId, selectedId)).orderBy(asc(workspaces.createdAt))
+  return (await filterEnterpriseWorkspaceLinks(reader, rows)).map(({ id, kind }) => ({ id, kind }))
 }
 
 /** Pin authoritative membership until the app write commits. Call outside the
