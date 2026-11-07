@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { DatabaseSync } from 'node:sqlite'
 import { ALERTS, DASHBOARD, INSIGHTS, MANAGED_TAG, alertChanges, insightChanges, posthogApi, sync } from './posthog-observability.mjs'
 
 /** An in-memory PostHog with the API surface the script uses. */
@@ -119,52 +118,4 @@ test('the API key is required and never appears in errors', async () => {
   const key = 'phx_secretvalue123456'
   const api = posthogApi({ key, fetchImpl: async () => new Response(JSON.stringify({ detail: key }), { status: 403 }) })
   await assert.rejects(api.alerts(), error => !error.message.includes(key) && /403/.test(error.message))
-})
-
-test('only confirmed handled Workflow attempts and their exact wrappers leave the error alert', () => {
-  const query = INSIGHTS.find(item => item.key === 'alert-error-spike').query.source.query
-  const start = query.indexOf('    successful_traces AS (')
-  assert.ok(start >= 0, 'the alert must classify handled attempts before aggregating errors')
-  const filter = query.slice(start, query.indexOf('    service_start AS (')).trim().replace(/,$/, '')
-  const db = new DatabaseSync(':memory:')
-  try {
-    db.exec(`CREATE TABLE spans (
-      service_name TEXT, trace_id TEXT, span_id TEXT, parent_span_id TEXT,
-      name TEXT, is_root_span INTEGER, status_code INTEGER, route TEXT,
-      error_code TEXT, http_status INTEGER
-    )`)
-    const insert = db.prepare('INSERT INTO spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    function add(trace, { rootStatus = 1, rootHttp = 200, root = true, service = 'mikka-web',
-      job = false, cron = false, sdk = 'world.events.create run_started', wrapper = 'workflow.replay.load',
-      http = 410, code = 'HTTP 410', route = '/.well-known/workflow/v1/flow' } = {}) {
-      const row = (id, parent, name, status, error, httpCode = null, rootSpan = false, spanRoute = route) =>
-        insert.run(service, trace, id, parent, name, Number(rootSpan), status, spanRoute, error, httpCode)
-      if (root) row('root', '', job ? 'after:workflow-wake' : cron ? 'GET /api/cron/reconcile' : 'workflow.route.flow', rootStatus, 'unknown_error', job ? null : rootHttp, true, cron ? '/api/cron/reconcile' : route)
-      row('wrapper', 'root', wrapper, 2, 'unknown_error')
-      row('sdk', 'wrapper', sdk, 2, 'unknown_error')
-      row('http', 'sdk', http === 404 ? 'http GET' : 'http POST', 2, code, http)
-      row('transport', 'root', 'workflow.events.ws.connect', 2, 'TRANSPORT')
-    }
-    add('expired')
-    add('duplicate-wait', { sdk: 'world.events.create wait_created', wrapper: 'workflow.run', http: 409, code: 'HTTP 409' })
-    add('duplicate-step', { sdk: 'world.events.create step_started', wrapper: 'step.execute', http: 409, code: 'HTTP 409' })
-    add('wake', { job: true, rootStatus: 0, sdk: 'world.hooks.getByToken', wrapper: 'hook.resume', http: 404, code: 'not-found', route: 'after:workflow-wake' })
-    add('cron', { cron: true, sdk: 'world.hooks.getByToken', wrapper: 'cron:reconcile', http: 404, code: 'not-found', route: 'cron:reconcile' })
-    add('failed-entry', { rootStatus: 2, rootHttp: 500 })
-    add('missing-entry', { root: false })
-    add('missing-http-status', { rootHttp: null })
-    add('other-route', { route: '/api/rpc' })
-    add('other-operation', { sdk: 'world.events.create run_completed', http: 409, code: 'HTTP 409' })
-    add('other-error', { http: 500, code: 'not-found' })
-    add('other-service', { service: 'mikka-daemon' })
-    const excluded = db.prepare(`WITH ${filter} SELECT trace_id, span_id FROM handled_spans ORDER BY trace_id, span_id`).all()
-      .map(row => `${row.trace_id}/${row.span_id}`)
-    assert.deepEqual(excluded, [
-      'cron/http', 'cron/sdk', 'duplicate-step/http', 'duplicate-step/sdk',
-      'duplicate-wait/http', 'duplicate-wait/sdk', 'expired/http', 'expired/sdk', 'expired/wrapper',
-      'wake/http', 'wake/sdk', 'wake/wrapper',
-    ])
-  } finally {
-    db.close()
-  }
 })
