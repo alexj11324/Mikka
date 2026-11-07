@@ -22,6 +22,13 @@ spec.loader.exec_module(probe)
 ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_REF': 'refs/heads/ops/1512-git-transport',
        'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '123456', 'GITHUB_RUN_ATTEMPT': '2'}
 PRIVATE = 'sk_fixture_private_value_must_not_leave_runner'
+RELEASE_COMMAND = ('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; '
+                   'python3 /opt/mikka/worker/scripts/e2b/official-files.py cli-verify '
+                   '/opt/mikka/worker/.mikka-original-cli.json --kind {kind} && '
+                   'exec /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
+VERIFIED = {'kind': 'desktop', 'files': [
+    {'harness': 'claude_code', 'bytes': 100, 'elapsedMs': 2, 'matched': True},
+    {'harness': 'codex', 'bytes': 200, 'elapsedMs': 3, 'matched': True}], 'elapsedMs': 7}
 
 
 class TimeoutException(Exception):
@@ -35,7 +42,7 @@ class Fake:
         self.built = case == 'already_exists'
         self.candidate = {'kind': 'desktop', 'name': probe.candidate_name(self.context),
                           'templateId': 'owned-template', 'buildId': 'owned-build'}
-        self.builder = SimpleNamespace(_request=self.info, build=self.build)
+        self.builder = SimpleNamespace(_request=self.info, build=self.build, MODEL_PROBE_COMMAND=RELEASE_COMMAND)
         self.cleaner = SimpleNamespace(cleanup_sandboxes=self.clean_sandboxes)
         self.sandbox = SimpleNamespace(sandbox_id='owned-sandbox',
                                       files=SimpleNamespace(write=self.write), commands=SimpleNamespace(run=self.command))
@@ -130,9 +137,12 @@ class Fake:
         assert command.endswith('/opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
         assert 'cloud-worker.js' not in command and '--probe-models' not in command
         assert '--import /tmp/mikka-i1512-probe-' in command
+        assert re.sub(r' --import /tmp/mikka-i1512-probe-[0-9]+-[0-9]+\.mjs', '', command) == RELEASE_COMMAND.format(kind='desktop')
         assert PRIVATE not in command and 'bootstrap.json' not in command
         callback = kwargs['on_stderr']
         callback(PRIVATE + '\n')
+        if self.case != 'missing_verification':
+            callback(probe.VERIFICATION_PREFIX + json.dumps(VERIFIED) + '\n')
         for phase in sorted(probe.MARKERS):
             callback(probe.PREFIX + json.dumps({'version': 1, 'phase': phase, 'elapsedMs': 4}) + '\n')
         callback(probe.PREFIX + json.dumps({'version': 1, 'phase': 'spawn', 'harness': 'codex', 'pid': 42, 'elapsedMs': 4}) + '\n')
@@ -162,6 +172,35 @@ class Guards(unittest.TestCase):
             self.assertNotIn(PRIVATE, output.read_text() + captured.getvalue())
             self.assertNotIn('fixture-project', output.read_text() + captured.getvalue())
         return fake, ledger
+
+    def test_actual_release_integrity_and_catalogue_share_one_original_command_budget(self):
+        fake, ledger = self.run_case('success')
+        self.assertEqual(ledger['version'], 6)
+        self.assertEqual(ledger['cliVerification'], VERIFIED)
+        self.assertTrue(ledger['budget']['cliIntegrityWithinCommand'])
+        commands = [call for call in fake.calls if call[0] == 'command']
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(commands[0][2]['timeout'], 45)
+        self.assertLess(commands[0][1].index(' cli-verify '), commands[0][1].index(' --import '))
+
+    def test_missing_integrity_receipt_does_not_pass_despite_successful_catalogues(self):
+        _, ledger = self.run_case('missing_verification')
+        self.assertEqual(ledger['probe']['error']['code'], 'cli_verification_missing')
+        self.assertEqual(ledger['cleanup']['status'], 'complete')
+
+    def test_integrity_receipt_is_numeric_closed_and_unique(self):
+        ledger = probe.new_ledger(probe.identity(ENV))
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()) as captured:
+            collect = probe.Collector(ledger, Path(directory) / 'receipt.json')
+            invalid = [dict(VERIFIED, path=PRIVATE), dict(VERIFIED, elapsedMs=True),
+                       dict(VERIFIED, files=[VERIFIED['files'][0]] * 2),
+                       dict(VERIFIED, files=[dict(VERIFIED['files'][0], matched=False), VERIFIED['files'][1]]),
+                       dict(VERIFIED, files=[dict(VERIFIED['files'][0], bytes=PRIVATE), VERIFIED['files'][1]])]
+            for value in [*invalid, VERIFIED, VERIFIED]:
+                collect(probe.VERIFICATION_PREFIX + json.dumps(value) + '\n')
+            self.assertEqual(ledger['cliVerification'], VERIFIED)
+            self.assertEqual(ledger['ignoredDiagnosticLines'], len(invalid) + 1)
+            self.assertNotIn(PRIVATE, json.dumps(ledger) + captured.getvalue())
 
     def test_real_ops_and_source_identities_remain_distinct_and_exact(self):
         result = probe.identity(ENV)

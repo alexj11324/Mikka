@@ -18,11 +18,12 @@ import time
 from urllib.error import HTTPError
 from urllib.parse import quote
 
-SOURCE_SHA = 'e4f05ccace3721b591b98d94821bceec9efece98'
+SOURCE_SHA = '81859e177023ad3ce445d94274e3d7632ff42190'
 REPOSITORY = 'alexj11324/Mikka'
 BRANCH = 'refs/heads/ops/1512-git-transport'
 APPLICATION = 'mikka-issue1512-desktop-probe'
 PREFIX = 'mikka-model-probe '
+VERIFICATION_PREFIX = 'mikka-cli-verification '
 PHASES = {'entry', 'spawn', 'spawn_throw', 'spawn_error', 'catalogue_received',
           'catalogue_scan_bounded', 'exit', 'close', 'deadline_snapshot',
           'parent_deadline_snapshot', 'parent_deadline_child', 'parent_exit',
@@ -56,6 +57,7 @@ CODES = {'workflow_identity_invalid', 'source_mismatch', 'ops_checkout_mismatch'
          'candidate_identity_mismatch', 'candidate_build_mismatch', 'candidate_alias_invalid', 'candidate_still_exists',
          'candidate_collision', 'candidate_identity_unresolved', 'boundary_observer_incomplete',
          'catalogue_invalid', 'catalogue_missing', 'command_failed', 'key_missing',
+         'probe_command_invalid', 'cli_verification_missing',
          'diagnostic_deadline', 'interrupted', 'cleanup_incomplete', 'operation_failed'}
 
 
@@ -114,14 +116,14 @@ def stage(ledger, path, phase):
 
 
 def new_ledger(context):
-    return {'version': 5, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
+    return {'version': 6, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
             'candidateOrigin': dict(context),
             'budget': {'candidates': 1, 'cpuCount': 2, 'memoryMiB': 4096, 'probeSandboxes': 1, 'sandboxSeconds': 60,
                        'commandSeconds': 45, 'internalProbeMilliseconds': 20000,
-                       'resourceSnapshots': 3, 'maxSnapshotProcesses': 12},
+                       'resourceSnapshots': 3, 'maxSnapshotProcesses': 12, 'cliIntegrityWithinCommand': True},
             'candidate': {'kind': 'desktop', 'name': candidate_name(context), 'absenceConfirmed': False, 'buildStarted': False},
             'candidateChecks': [],
-            'sandboxes': [], 'events': [], 'ignoredDiagnosticLines': 0,
+            'sandboxes': [], 'events': [], 'cliVerification': None, 'ignoredDiagnosticLines': 0,
             'probe': {'status': 'not_started'}, 'cleanup': {'status': 'not_started'}, 'cleanupHistory': []}
 
 
@@ -131,8 +133,8 @@ def validate_ledger(ledger, context):
     candidate = ledger.get('candidate')
     if (set(ledger) - {'version', 'diagnosticOnly', 'releaseAccepted', 'identity', 'budget', 'candidate',
                       'candidateOrigin', 'candidateChecks', 'sandboxes', 'events', 'ignoredDiagnosticLines',
-                      'probe', 'cleanup', 'cleanupHistory', 'phase'}
-            or ledger.get('version') != 5 or ledger.get('diagnosticOnly') is not True
+                      'probe', 'cleanup', 'cleanupHistory', 'phase', 'cliVerification'}
+            or ledger.get('version') != 6 or ledger.get('diagnosticOnly') is not True
             or ledger.get('releaseAccepted') is not False or ledger.get('identity') != context
             or ledger.get('candidateOrigin') != context or not isinstance(candidate, dict)
             or set(candidate) - {'kind', 'name', 'absenceConfirmed', 'buildStarted', 'templateId', 'buildId'}
@@ -145,6 +147,24 @@ def validate_ledger(ledger, context):
             or any(not isinstance(row, dict) or set(row) - {'sandboxId', 'status'}
                    or not opaque(row.get('sandboxId')) for row in ledger['sandboxes'])):
         fail('ledger_invalid')
+
+
+def closed_verification(value):
+    if (not isinstance(value, dict) or set(value) != {'kind', 'files', 'elapsedMs'}
+            or value.get('kind') != 'desktop' or not isinstance(value.get('files'), list)
+            or len(value['files']) != 2 or type(value.get('elapsedMs')) is not int
+            or not 0 <= value['elapsedMs'] <= 45000):
+        return None
+    harnesses = set()
+    for row in value['files']:
+        if (not isinstance(row, dict) or set(row) != {'harness', 'bytes', 'elapsedMs', 'matched'}
+                or row.get('harness') not in HARNESSES or row['harness'] in harnesses
+                or row.get('matched') is not True or type(row.get('bytes')) is not int
+                or not 0 < row['bytes'] <= 2**53 - 1 or type(row.get('elapsedMs')) is not int
+                or not 0 <= row['elapsedMs'] <= value['elapsedMs']):
+            return None
+        harnesses.add(row['harness'])
+    return value
 
 
 def closed_event(value):
@@ -222,6 +242,20 @@ class Collector:
         self.buffer += chunk
         while '\n' in self.buffer:
             line, self.buffer = self.buffer.split('\n', 1)
+            if line.startswith(VERIFICATION_PREFIX):
+                value = None
+                if len(line) <= 4096:
+                    try:
+                        value = closed_verification(json.loads(line[len(VERIFICATION_PREFIX):]))
+                    except (ValueError, TypeError):
+                        pass
+                if value is None or self.ledger['cliVerification'] is not None:
+                    self.ledger['ignoredDiagnosticLines'] += 1
+                    continue
+                self.ledger['cliVerification'] = value
+                save(self.output, self.ledger)
+                print(VERIFICATION_PREFIX + json.dumps(value, separators=(',', ':')), flush=True)
+                continue
             value = None
             if line.startswith(PREFIX) and len(line) <= 4096:
                 try:
@@ -438,9 +472,14 @@ def diagnose(builder, cleaner, sandbox_factory, context, api_key, hook_source, o
         stage(ledger, output, 'probing_catalogues')
         hook_path = f"/tmp/mikka-i1512-probe-{context['runId']}-{context['runAttempt']}.mjs"
         sandbox.files.write(hook_path, hook_source, user='user')
-        command = ('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; '
-                   f'/opt/mikka/runtime/node/bin/node --import {hook_path} '
-                   '/opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
+        # Use the actual reviewed release command. Integrity reads, Node startup
+        # and the live CLI exchange share its unchanged 45-second deadline.
+        command = builder.MODEL_PROBE_COMMAND.format(kind='desktop')
+        node = 'exec /opt/mikka/runtime/node/bin/node '
+        if (command.count(node) != 1 or ' cli-verify ' not in command
+                or not command.endswith('/opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')):
+            fail('probe_command_invalid')
+        command = command.replace(node, node + f'--import {hook_path} ')
         started = time.monotonic()
         try:
             result = sandbox.commands.run(command, user='user', timeout=45, on_stderr=Collector(ledger, output))
@@ -454,6 +493,8 @@ def diagnose(builder, cleaner, sandbox_factory, context, api_key, hook_source, o
             fail('catalogue_invalid')
         if not isinstance(reports, list):
             fail('catalogue_invalid')
+        if ledger['cliVerification'] is None:
+            fail('cli_verification_missing')
         counts = {}
         for harness in sorted(HARNESSES):
             row = next((row for row in reports if isinstance(row, dict) and row.get('harness') == harness and row.get('installed') is True), None)

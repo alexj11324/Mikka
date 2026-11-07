@@ -1,4 +1,4 @@
-name: Issue 1512 bounded CLI resource diagnosis
+name: Issue 1512 bounded CLI integrity and catalogue diagnosis
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
       - name: Check out the immutable reviewed source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: e4f05ccace3721b591b98d94821bceec9efece98
+          ref: 81859e177023ad3ce445d94274e3d7632ff42190
           path: source
           persist-credentials: false
       - name: Check out this diagnostic revision separately
@@ -56,7 +56,7 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Diagnose one new private desktop candidate at fixed boundaries
+      - name: Verify CLI integrity and live catalogues within one fixed command
         run: >-
           "$RUNNER_TEMP/issue1512-e2b/bin/python" ops/scripts/ops/issue1512-e2b-probe.py diagnose
           --source source --output "$RUNNER_TEMP/issue1512-e2b-probe.json"
