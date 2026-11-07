@@ -57,10 +57,12 @@ import {
   emptyRunReport,
   isTerminalRunState,
   runStateForStop,
+  runCheckpointReceiptSchema,
   type HandoffReport,
   type HeartbeatRun,
   type Harness,
   type RunCheckpoint,
+  type RunCheckpointReceipt,
   type RunPublish,
   type RunState,
   type RunSummary,
@@ -116,7 +118,7 @@ export interface SupervisorDeps {
   collectCliTiming?: boolean
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
   /** Existing authenticated checkpoint route, before terminal completion releases the lease. */
-  saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<void>
+  saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<RunCheckpointReceipt | void>
   journal: RunJournal
   /** Same adapter state root used by RunContext; never supplied by the model. */
   adapterStateDir?: string
@@ -333,7 +335,7 @@ export class RunSupervisor {
    * the next one.
    */
   async saveCheckpoints(
-    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>,
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<RunCheckpointReceipt | void>,
     now = Date.now(),
   ) {
     for (const [runId, run] of this.active) {
@@ -347,7 +349,7 @@ export class RunSupervisor {
   }
 
   private async saveCheckpoint(runId: string, run: ActiveRun,
-    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>, now = Date.now(), force = false): Promise<boolean> {
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<RunCheckpointReceipt | void>, now = Date.now(), force = false): Promise<boolean> {
     // A heartbeat may already be uploading an older tree. Its upload must
     // finish before the terminal one, so it cannot overwrite the final state.
     if (run.checkpointing) await run.checkpointing
@@ -385,19 +387,21 @@ export class RunSupervisor {
     // Even an older uploaded snapshot cannot stand in for this final tree.
     // The server may continue an unavailable one only in its original worktree.
     run.safePoint = undefined
-    let checkpointTakenAt: string | undefined
+    let receipt: RunCheckpointReceipt | undefined
     const save = this.deps.saveCheckpoint
     const ready = save && await this.saveCheckpoint(runId, run, async (id, checkpoint) => {
-      await save(id, checkpoint)
-      checkpointTakenAt = checkpoint.takenAt
+      const accepted = runCheckpointReceiptSchema.safeParse(await save(id, checkpoint))
+      if (accepted.success && accepted.data.runId === id) receipt = accepted.data
     }, Date.now(), true)
-    const checkpoint = ready && checkpointTakenAt
-      ? { checkpoint: 'ready' as const, checkpointTakenAt }
+    const checkpoint = ready && receipt
+      ? { checkpoint: 'ready' as const, checkpointTakenAt: receipt.takenAt }
       : { checkpoint: 'unavailable' as const }
     // The synthetic cancelled/error exits used to detach a stuck adapter
     // cannot establish that the native process stopped writing its workspace.
     if (finishingComplete && run.sessionExited && !this.stopping)
-      run.safePoint = { session: 'exited', observedAt: new Date().toISOString(), ...checkpoint }
+      // Native exit precedes the final upload. Its server acknowledgement
+      // establishes that order even when the device's clock is ahead or behind.
+      run.safePoint = { session: 'exited', observedAt: receipt?.takenAt ?? new Date().toISOString(), ...checkpoint }
     return checkpoint
   }
 
