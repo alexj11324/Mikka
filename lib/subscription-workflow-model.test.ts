@@ -130,3 +130,23 @@ test('only the supported Codex CPA route moves the prepared tail; Claude, API-ke
     assert.deepEqual(calls.at(-1)!.options, { prompt: withCacheBreakpoints(prompt, key) })
   }
 })
+
+test('timing reports whether the actual Codex layout was applied without changing other routes or unknown shapes', async t => {
+  const logs: { codexLayoutApplied?: boolean }[] = []
+  t.mock.method(console, 'info', (line: string) => { logs.push(JSON.parse(line)) })
+  const supported: StreamOptions['prompt'] = [...cacheableInstructions('RULEScontexttail', 12, 5) as StreamOptions['prompt'], { role: 'user', content: [{ type: 'text', text: 'fixture' }] }]
+  const cases = [
+    { frozen: { ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' as const }, prompt: supported, expected: true },
+    { frozen: { ...selection, modelId: 'gpt-6-luna', route: 'codex_cpa' as const }, prompt: [{ role: 'system' as const, content: 'legacy' }, supported.at(-1)!], expected: false },
+    { frozen: { ...selection, modelId: 'gpt-6-unknown', route: 'codex_cpa' as const }, prompt: supported, expected: false },
+    { frozen: { ...selection, modelId: 'gpt-6-luna', route: 'openai_siwc' as const }, prompt: supported, expected: undefined },
+    { frozen: selection, prompt: supported, expected: undefined },
+  ]
+  for (const sample of cases) {
+    const result = await new SubscriptionWorkflowModel(sample.frozen).doStream({ prompt: sample.prompt })
+    await result.stream.pipeTo(new WritableStream())
+    const line = logs.at(-1)!
+    assert.equal(line.codexLayoutApplied, sample.expected, 'actual_codex_layout_not_reported')
+    assert.equal(Object.hasOwn(line, 'codexLayoutApplied'), sample.expected !== undefined)
+  }
+})

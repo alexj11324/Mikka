@@ -122,6 +122,7 @@ func (e safeExecutor) HttpRequest(context.Context, *core.Auth, *http.Request) (*
 	return nil, ErrUnsupported
 }
 func (w *Worker) Refresh(ctx context.Context, expectedEpoch int64) (Metadata, error) {
+	defer timingSpan(ctx, timingRefresh)()
 	if w.ExecutionOnly || w.Secrets == nil || w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
 		return Metadata{}, ErrUnsupported
 	}
@@ -157,6 +158,7 @@ func (w *Worker) Refresh(ctx context.Context, expectedEpoch int64) (Metadata, er
 var modelPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
 func (w *Worker) readyAuth(ctx context.Context, expectedEpoch int64) (Record, *core.Auth, error) {
+	defer timingSpan(ctx, timingReadyAuth)()
 	load := func() (Record, *core.Auth, error) {
 		r, err := w.Repo.Lookup(ctx, w.Scope)
 		if err != nil {

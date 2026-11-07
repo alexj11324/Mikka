@@ -82,10 +82,15 @@ func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, err
 	if w.ExecutionOnly || w.Secrets == nil {
 		return Metadata{}, ErrUnsupported
 	}
-	if err := w.authorizeRuntime(ctx, epoch, "quota", ""); err != nil {
+	authorizeDone := timingSpan(ctx, timingAuthorize)
+	err := w.authorizeRuntime(ctx, epoch, "quota", "")
+	authorizeDone()
+	if err != nil {
 		return Metadata{}, err
 	}
+	recordDone := timingSpan(ctx, timingPrepareRecord)
 	record, err := w.Repo.Lookup(ctx, w.Scope)
+	recordDone()
 	if err != nil {
 		return Metadata{}, err
 	}
@@ -95,6 +100,8 @@ func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, err
 		if w.ExecutionOnly || w.Secrets == nil || w.AccessSecrets == nil {
 			return Metadata{}, ErrUnavailable
 		}
+		migrationDone := timingSpan(ctx, timingMigration)
+		defer migrationDone()
 		op, e := w.Repo.ClaimRefresh(ctx, w.Scope, epoch, record.Version)
 		if e != nil {
 			return Metadata{}, e
@@ -109,11 +116,16 @@ func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, err
 			_ = w.Repo.Fail(ctx, op, "projection_failed")
 			return Metadata{}, e
 		}
+		migrationDone()
 	}
 	if _, _, err := w.readyAuth(ctx, epoch); err != nil {
 		return Metadata{}, err
 	}
+	cleanupDone := timingSpan(ctx, timingCleanup)
 	_, _ = w.Cleanup(ctx)
+	cleanupDone()
+	statusDone := timingSpan(ctx, timingStatus)
+	defer statusDone()
 	return w.Status(ctx)
 }
 func (w *Worker) activeRuntime(ctx context.Context, epoch int64, model string) error {

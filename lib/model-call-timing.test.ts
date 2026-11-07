@@ -1,11 +1,45 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { timedModelStream, type ModelCallTiming } from './model-call-timing'
 import { timedTools, type ToolTiming } from './subscription-workflow-turn'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import type { TestContext } from 'node:test'
+import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client'
+import { SubscriptionCallTiming, withSubscriptionTiming } from '../packages/daemon/src/subscription-worker-timing'
 
 type Part = { type: string; [key: string]: unknown }
+
+// A real child/line transport, with in-memory provider SSE and no network/DB.
+function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2]) {
+  const dir = mkdtempSync(join(tmpdir(), 'mikka-stage-timing-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const script = join(dir, 'worker.mjs')
+  writeFileSync(script, `import {createInterface} from 'node:readline'
+let config;const lines=createInterface({input:process.stdin});lines.on('line',line=>{
+const frame=JSON.parse(line);if(!config){config=frame;return}
+const mode=${JSON.stringify(mode)};const id=mode==='wrong_id'?'different-id':frame.id;
+const timing=mode==='invalid'?{version:1,token:'fixture-private-token'}:{version:1,rpcBodyMs:7,authorizeMs:2,readCalls:1,readMs:1,accessReadBackend:'snapshot'};
+const diagnostic=mode==='missing'?{}:{timing};
+if(mode==='oversize'){console.log(JSON.stringify({id,result:'x'.repeat(262145),...diagnostic}));return}
+if(mode==='refused'){console.log(JSON.stringify({id,error:'reconnect_required',result:{mustNotWin:true},...diagnostic}));return}
+if(frame.method==='executeStream'){
+const chunk={id:'synthetic',object:'chat.completion.chunk',created:1,model:'fixture-model',choices:[{index:0,delta:{content:'fixture-private-text'},finish_reason:null}]};
+console.log(JSON.stringify({id,chunk:'data: '+JSON.stringify(chunk)+'\\n\\n'}));
+const finish={...chunk,choices:[{index:0,delta:{},finish_reason:'stop'}],usage:{prompt_tokens:10,completion_tokens:2,total_tokens:12}};
+console.log(JSON.stringify({id,chunk:'data: '+JSON.stringify(finish)+'\\n\\ndata: [DONE]\\n\\n'}));
+}
+console.log(JSON.stringify({id,result:{done:true},...diagnostic}));lines.close();
+})`)
+  return new SubscriptionWorkerClient({ binary: process.execPath, args: [script] }, {
+    scope: { ownerId: 'fixture-private-owner', workspaceId: 'fixture-private-workspace', connectionId: '00000000-0000-4000-8000-000000000001', provider: 'codex' },
+    databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture-private-project', environment: 'test', path: '/fixture-private', workloadToken: 'fixture-private-custody', accessToken: 'fixture-private-access', accessPath: '/access',
+  }, resolveIdentity)
+}
 const streamOf = (parts: Part[]) => new ReadableStream<Part>({ start(controller) { for (const part of parts) controller.enqueue(part); controller.close() } })
-async function drain(stream: ReadableStream<Part>) { const seen: Part[] = []; for await (const part of stream as unknown as AsyncIterable<Part>) seen.push(part); return seen }
+async function drain<P extends { type: string }>(stream: ReadableStream<P>) { const seen: P[] = []; for await (const part of stream as unknown as AsyncIterable<P>) seen.push(part); return seen }
 function clock(...times: number[]) { let index = 0; return () => times[Math.min(index++, times.length - 1)] }
 
 test('a model call logs when its first token, first text and end came, its token counts and tool count, never its content', async () => {
@@ -24,6 +58,7 @@ test('a model call logs when its first token, first text and end came, its token
   assert.deepEqual(lines, [{
     msg: 'model_call_timing', route: 'subscription', model: 'claude-haiku-5-5', workflowRunId: 'wrun_x', stepId: 'step_1', attempt: 1, tools: 76,
     setupMs: 300, firstTokenMs: 3_000, firstTextMs: 8_000, durationMs: 8_500, inputTokens: 18_000, cacheReadTokens: 17_500, cacheWriteTokens: 300, outputTokens: 120, toolCalls: 1, finishReason: 'tool-calls', interrupted: false,
+    rawCache: { read: { state: 'missing', tokens: null }, write: { state: 'missing', tokens: null }, creation: { state: 'missing', tokens: null } },
   }])
   assert.doesNotMatch(JSON.stringify(lines), /secret plan|已经派出去了|create_issue/, 'no prompt, reply or tool content')
 })
@@ -66,4 +101,123 @@ test('the cacheable prefix is logged as short hashes of the tools and each syste
   const lines: ModelCallTiming[] = []
   await drain(timedModelStream({ stream: streamOf([{ type: 'finish', usage: {} }]) }, { route: 'subscription', model: 'm', tools: 1, startedAt: 0, requestedAt: 0, prefix: one }, clock(1), line => lines.push(line)).stream)
   assert.deepEqual(lines[0].prefix, one)
+})
+
+test('the actual compatible SDK timing distinguishes missing, null, zero and positive raw cache counts', async t => {
+  for (const sample of [
+    { name: 'missing', details: undefined, normalized: 0, read: { state: 'missing', tokens: null } },
+    { name: 'null', details: { cached_tokens: null }, normalized: 0, read: { state: 'null', tokens: null } },
+    { name: 'zero', details: { cached_tokens: 0 }, normalized: 0, read: { state: 'number', tokens: 0 } },
+    { name: 'positive', details: { cached_tokens: 3072 }, normalized: 3072, read: { state: 'number', tokens: 3072 } },
+  ]) {
+    await t.test(sample.name, async () => {
+      let requests = 0
+      const model = createOpenAICompatible({ name: 'fixture', baseURL: 'https://fixture.invalid/v1', fetch: async () => {
+        requests++
+        const chunk = { id: 'fixture', object: 'chat.completion.chunk', created: 1, model: 'gpt-6-luna', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: {
+          prompt_tokens: 4096, completion_tokens: 1, total_tokens: 4097,
+          ...(sample.details === undefined ? {} : { prompt_tokens_details: { ...sample.details, cache_write_tokens: 0, cached_creation_tokens: 17, private_field: 'synthetic-private-usage' } }),
+          private_field: 'synthetic-private-usage',
+        } }
+        return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } })
+      } })('gpt-6-luna')
+      const result = await model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'synthetic-private-prompt' }] }] })
+      const logs: ModelCallTiming[] = []
+      const timed = timedModelStream(result, { route: 'subscription', model: 'gpt-6-luna', tools: 0, startedAt: 0, requestedAt: 1 }, () => 5, line => logs.push(line))
+      for await (const part of timed.stream) assert.notEqual(part.type, 'error')
+      assert.equal(requests, 1, 'only the injected in-memory transport is called')
+      assert.equal(logs.length, 1)
+      assert.equal(logs[0].cacheReadTokens, sample.normalized, 'the existing SDK count keeps its original meaning')
+      assert.equal(logs[0].cacheWriteTokens, null, 'a new diagnostic does not invent the SDK normalized write count')
+      assert.deepEqual(logs[0].rawCache, {
+        read: sample.read,
+        write: sample.details === undefined ? { state: 'missing', tokens: null } : { state: 'number', tokens: 0 },
+        creation: sample.details === undefined ? { state: 'missing', tokens: null } : { state: 'number', tokens: 17 },
+      }, 'raw_cache_field_presence_not_reported')
+      assert.doesNotMatch(JSON.stringify(logs), /synthetic-private|private_field|prompt_tokens_details/)
+    })
+  }
+})
+
+test('raw cache diagnostics reject malformed counts and read only own whitelisted fields', async () => {
+  for (const invalid of [undefined, 'synthetic-private', {}, [], -1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    const logs: ModelCallTiming[] = []
+    const parts = [{ type: 'finish', usage: { inputTokens: { cacheRead: 88 }, raw: {
+      prompt_tokens_details: { cached_tokens: invalid, cache_write_tokens: null, cached_creation_tokens: 0, unknown: 'synthetic-private' },
+    } } }]
+    await drain(timedModelStream({ stream: streamOf(parts) }, { route: 'subscription', model: 'fixture', tools: 0, startedAt: 0, requestedAt: 1 }, () => 5, line => logs.push(line)).stream)
+    assert.equal(logs[0].cacheReadTokens, 88)
+    assert.deepEqual(logs[0].rawCache, { read: { state: 'invalid', tokens: null }, write: { state: 'null', tokens: null }, creation: { state: 'number', tokens: 0 } })
+    assert.doesNotMatch(JSON.stringify(logs), /synthetic-private|unknown/)
+  }
+  const logs: ModelCallTiming[] = []
+  await drain(timedModelStream({ stream: streamOf([{ type: 'finish', usage: { raw: { prompt_tokens_details: Object.create({ cached_tokens: 99 }) } } }]) }, { route: 'subscription', model: 'fixture', tools: 0, startedAt: 0, requestedAt: 1 }, () => 5, line => logs.push(line)).stream)
+  assert.deepEqual(logs[0].rawCache.read, { state: 'missing', tokens: null }, 'inherited properties are not provider fields')
+})
+
+test('real worker terminal diagnostics arrive before the compatible SDK flush logs one unchanged model result', async t => {
+  const call = new SubscriptionCallTiming(), client = timingWorker(t)
+  let requests = 0
+  const model = createOpenAICompatible({ name: 'fixture', baseURL: 'https://fixture.invalid/v1', fetch: async () => {
+    requests++
+    return new Response(client.stream(1, 'fixture-model', {}), { headers: { 'content-type': 'text/event-stream' } })
+  } })('fixture-model')
+  const result = await withSubscriptionTiming(call, () => model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'fixture-private-prompt' }] }] }))
+  const logs: ModelCallTiming[] = []
+  // Consume outside ALS: client callbacks must retain the captured recorder.
+  const seen = await drain(timedModelStream(result, { route: 'subscription', model: 'fixture-model', tools: 0, startedAt: 10, requestedAt: 20, subscriptionTiming: call }, () => 40, line => logs.push(line)).stream)
+  assert.equal(requests, 1)
+  assert.equal(seen.filter(part => part.type === 'text-delta').map(part => part.delta).join(''), 'fixture-private-text')
+  assert.equal(seen.filter(part => part.type === 'finish').length, 1)
+  assert.equal(logs.length, 1)
+  assert.equal(logs[0].interrupted, false)
+  assert.equal(logs[0].setupMs, 10)
+  assert.equal(logs[0].firstTextMs, 20, 'legacy wall-clock arithmetic is unchanged')
+  const stages = logs[0].subscriptionStages!
+  assert.deepEqual(stages.workers.map(worker => [worker.ordinal, worker.method, worker.goState, worker.outcome]), [[1, 'prepare', 'reported', 'result'], [2, 'executeStream', 'reported', 'result']])
+  assert.equal(stages.workers[1].go?.rpcBodyMs, 7)
+  assert.ok(stages.streamEntryMs !== null && stages.firstIpcChunkMs !== null && stages.firstSdkTextMs !== null)
+  assert.ok(stages.firstSdkTextMs >= stages.firstIpcChunkMs)
+  assert.doesNotMatch(JSON.stringify(logs), /fixture-private|accessToken|workloadToken|databaseUrl|connectionId|different-id/)
+})
+
+test('missing or malformed optional worker timing cannot change a result or refusal and never bypasses the original frame guards', async t => {
+  for (const mode of ['missing', 'invalid', 'refused', 'wrong_id', 'oversize'] as const) {
+    await t.test(mode, async childTest => {
+      const call = new SubscriptionCallTiming(), client = timingWorker(childTest, mode)
+      const request = withSubscriptionTiming(call, () => client.call('prepare', { revision: 1 }))
+      if (mode === 'missing' || mode === 'invalid') assert.deepEqual(await request, { done: true })
+      else await assert.rejects(request, mode === 'refused' ? /reconnect_required/ : /subscription_worker_unavailable/)
+      const worker = call.snapshot().workers[0]
+      assert.equal(worker.goState, mode === 'invalid' ? 'invalid' : mode === 'refused' ? 'reported' : 'missing')
+      assert.equal(worker.outcome, mode === 'missing' || mode === 'invalid' ? 'result' : 'error')
+      assert.doesNotMatch(JSON.stringify(call.snapshot()), /fixture-private|different-id/)
+    })
+  }
+})
+
+test('cancel during identity preparation logs missing Go immediately and never starts an execution child after late resolution', async t => {
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<{ workloadToken: string }>()
+  const identities: boolean[] = []
+  const call = new SubscriptionCallTiming(), client = timingWorker(t, 'valid', executionOnly => {
+    identities.push(executionOnly); entered.resolve(); return release.promise
+  })
+  const body = withSubscriptionTiming(call, () => client.stream(1, 'fixture-model', {}))
+  await entered.promise
+  const logs: ModelCallTiming[] = []
+  const modelStream = new ReadableStream<Part>({ cancel: () => body.cancel() })
+  const timed = timedModelStream({ stream: modelStream }, { route: 'subscription', model: 'fixture-model', tools: 0, startedAt: 0, requestedAt: 1, subscriptionTiming: call }, () => 2, line => logs.push(line))
+  await timed.stream.cancel('fixture stop')
+  assert.equal(logs.length, 1)
+  assert.equal(logs[0].interrupted, true)
+  assert.equal(logs[0].subscriptionStages!.workers[0].goState, 'missing')
+  assert.equal(logs[0].subscriptionStages!.workers[0].outcome, 'pending', 'emit precedes underlying cancellation; do not invent future settlement')
+  release.resolve({ workloadToken: 'fixture-private-late' })
+  await release.promise
+  await Promise.resolve()
+  assert.deepEqual(identities, [false])
+  assert.equal(call.snapshot().workers.length, 1)
+  assert.equal(call.snapshot().workers[0].outcome, 'cancelled')
+  assert.equal(call.snapshot().workers[0].identityMs, null)
+  assert.equal(logs[0].subscriptionStages!.workers[0].outcome, 'pending', 'the emitted snapshot does not mutate')
 })

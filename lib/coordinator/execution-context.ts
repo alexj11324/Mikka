@@ -55,7 +55,7 @@ function defaultSource(userId: string, botId: string): ExecutionContextSource {
     devices: async () => (await readDevices()).map(device => ({ name: device.name, online: device.online, enabled: device.enabled, agents: device.harnesses.filter(item => item.installed).map(item => agentName(item.harness)) })),
     order: async () => {
       const [{ pool }, { dispatchOrder, orderView }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
-      const [view, devices] = await Promise.all([orderView(pool, await readScope(), readDevices), readDevices()])
+      const [view, devices] = await Promise.all([orderView(pool, await readScope(), readDevices, 'context'), readDevices()])
       const credentials = new Map(view.candidates.map(candidate => [`${candidate.source.kind}:${candidate.provider}`, { kind: candidate.source.kind, provider: candidate.provider }]))
       // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer whose daemon
       // reported it (lib/model-order-plan.ts deviceSupport). Online and 参与调度 change from turn to turn, so they are left to the tail.
