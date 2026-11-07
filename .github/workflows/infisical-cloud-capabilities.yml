@@ -44,7 +44,7 @@ jobs:
     if: >-
       github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && startsWith(github.event.head_commit.message, 'ops: prepare private cloud production')
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 12
     permissions:
       contents: read
       id-token: write

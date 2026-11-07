@@ -15,3 +15,22 @@ test('untrusted execution cannot start a release',()=>{assert.throws(()=>assertE
 // Installation inventory uses the documented account view.
 
 // Legacy Neon storage inventory is read using existing project ownership.
+
+// Existing native Sync readback never requires organization App Connection Connect.
+
+test('a configured native Sync can be read back without organization connection permissions',async()=>{
+ const {prepare}=await import('./self-hosting-release.mjs');const report={requests:[]};const source=rows();const plan=secretPlan(source);const metadata=[...source,...Object.keys(plan).map(secretKey=>({secretKey,secretPath:TARGET.path}))];const requests=[]
+ const fetcher=async(value,init={})=>{const u=new URL(value);requests.push(u.pathname);assert.ok(!u.pathname.includes('app-connections'));assert.equal(init.method??'GET',u.pathname.includes('/oidc-auth/login')?'POST':'GET');let body
+ if(u.hostname.endsWith('.actions.githubusercontent.com'))body={value:'synthetic-oidc'}
+ else if(u.pathname.endsWith('/oidc-auth/login'))body={accessToken:'synthetic-infi',tokenType:'Bearer'}
+ else if(u.pathname==='/v9/projects/'+TARGET.app)body={id:TARGET.app,accountId:TARGET.team,name:'mikka-cloud'}
+ else if(u.pathname==='/api/v4/secrets')body={secrets:metadata}
+ else if(u.pathname==='/api/v2/folders')body={folders:[{path:TARGET.path}]}
+ else if(u.pathname==='/api/v1/secret-syncs/vercel')body={secretSyncs:[{id:'existing',connection:{id:TARGET.connection},folder:{path:TARGET.path},environment:{slug:'prod'},syncOptions:{disableSecretDeletion:true,includeAllSubFolders:false},destinationConfig:{app:TARGET.app,env:'production'}}]}
+ else if(u.pathname.startsWith('/v10/projects/'))body={envs:[]}
+ else if(u.pathname==='/v1/integrations/configurations')body={configurations:[]}
+ else assert.fail('unexpected route')
+ return new Response(JSON.stringify(body),{headers:{'content-type':'application/json'}})
+ }
+ await prepare({env:{ACTIONS_ID_TOKEN_REQUEST_URL:'https://pipelines.actions.githubusercontent.com/opaque',ACTIONS_ID_TOKEN_REQUEST_TOKEN:'synthetic',VERCEL_TEAM_TOKEN:'synthetic'},fetcher,report});assert.equal(report.result,'source_and_sync_prepared');assert.equal(report.connectionConnectRequired,false);assert.deepEqual(report.createdKeys,[]);assert.equal(report.syncId,'existing')
+})
