@@ -276,6 +276,19 @@ initialize、initialized 和 tools/list；实际 tools/call 继续经过原服�
 claim 绑定同一 session 和规范 cwd，再执行原账号来源及本地有效租约检查，最后才
 发送本任务输入。初始化和接管完成都不冒充本任务的精确 ACK。
 
+启用本次诊断时，任务自己的 PreparedAgentStart 保存预热 Promise 的闭式计时，
+通过原 agent_start chunk 的 preparationTiming 字段回传。它声明
+source=prepared_agent_start，并有独立的起止时间、run/harness 绑定和单调区间；
+包含实际 cli_init.prewarm、接管后的 cli_init 与账号检查，准备总时间还包含等待
+checkout。原 startupTiming 仍只记录晚开始的 agent_start，不把此前发生的 span
+塞进该根区间，也不把两个时间轴或与 repository 的重叠相加。正式分段验证分别核对
+两个边界：预热路径必须有真实成功的预热及接管初始化，普通路径仍需原 cli_init；
+缺失、错误、截断或错绑不会用零或另一条路径替代。未启用诊断时不收集或新增字段。
+
+此修复针对 1edbeca 发布的真实 Claude 候选收据：晚阶段为 114.431ms，phases 为空，
+原因是已经开始的预热 Promise 没有继承后来的阶段 AsyncLocalStorage。它修复测量
+归属，不改变 prompt、租约、取消、CLI 或验收起止点；不从修复本身宣称启动加速。
+
 只有官方 SDK 在 claimed 阶段明确返回 project_settings_not_claimable，且没有
 发送用户输入时，才允许先关闭并等待该进程组退出，再以同一 session 走一次普通
 query；其他初始化、绑定、账号或取消错误均保留原失败。恢复、本机、旧 claim 和
