@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 const REPO = 'alexj11324/Mikka'
 const API = 'https://api.github.com/repos/' + REPO
 const BRANCH = 'refs/heads/ops/issue1415-stop-obsolete-acceptance'
-export const BINDING = Object.freeze({ runId: 42297617979, headSha: '1a70bb79d7dc4ab31418e9fa674dd39c0a1cae01' })
+export const BINDING = Object.freeze({ runId: 42321132958, headSha: '74d5758b095fd5367465bdc4b19eb5165280418d' })
 class ClosedError extends Error { constructor(code) { super(code); this.code = code } }
 function need(v, code) { if (!v) throw new ClosedError(code) }
 const started = step => ['in_progress', 'completed'].includes(step.status) && step.conclusion !== 'skipped'
