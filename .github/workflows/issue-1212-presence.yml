@@ -18,11 +18,11 @@ concurrency:
 
 jobs:
   presence:
-    if: ${{ true && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
+    if: ${{ false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      MIKKA_ACCEPTANCE_SHA: 'a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9' # Fill only with the verified final production SHA before enabling this job.
+      MIKKA_ACCEPTANCE_SHA: '' # Fill only with the verified final production SHA before enabling this job.
       MIKKA_PRESENCE_RUN_KEY: acme-1212-20261106-b
       MIKKA_PRESENCE_MODE: after
       MIKKA_PRESENCE_REPORT_DIR: presence-acceptance-report
