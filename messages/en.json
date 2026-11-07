@@ -5501,7 +5501,6 @@
     "renderHint": "Retry to reopen the view."
   },
   "Organization": {
-    "ssoRequired": "This Organization requires you to sign in with its SSO. Sign in again with the Organization's SSO.",
     "title": "Organization",
     "intro": "An Organization is a management layer over shared workspaces: one sign-in method, directory sync, resource policy and Organization audit. Organization roles only manage the Organization. They never grant access to a workspace, its tasks or content; workspace members are still managed in Members.",
     "loadFailed": "Couldn't load the Organization",

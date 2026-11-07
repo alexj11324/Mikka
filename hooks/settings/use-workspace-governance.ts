@@ -13,7 +13,7 @@ import { withBasePath } from '@/lib/base-path'
  * it; the hosted layer does (docs/ui-overlay.md, slot `settings-governance`).
  */
 
-export type GovernanceDetail = 'sso_required' | 'access_denied' | 'seat_limit' | 'feature_unavailable' | 'last_owner' | 'workspace_attached' | 'personal_workspace' | 'invalid_request' | 'template_limit' | 'not_found' | 'plan_changed'
+export type GovernanceDetail = 'access_denied' | 'seat_limit' | 'feature_unavailable' | 'last_owner' | 'workspace_attached' | 'personal_workspace' | 'invalid_request' | 'template_limit' | 'not_found' | 'plan_changed'
 export type GovernancePermissions = { install_dependency?: 'allow' | 'ask' | 'deny'; write_outside_repo?: 'ask' | 'deny'; git_push?: 'allow' | 'deny'; network?: 'allow' | 'ask' | 'deny' }
 export type GovernanceRules = { approvalMode?: 'ask' | 'read_only'; networkAllow?: string[]; permissions?: GovernancePermissions }
 export type GovernanceTemplate = { id: string; workspaceId: string; name: string; rules: GovernanceRules; createdBy: string; createdAt: string; updatedAt: string }

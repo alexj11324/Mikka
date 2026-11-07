@@ -172,19 +172,6 @@ export async function linkExistingAccount(providerId: string, callbackURL: strin
   return signInWithSso({ providerId }, callbackURL)
 }
 
-/**
- * Organizations whose workspaces this session cannot open until it signs in with
- * their SSO (#1642 follow-up). The backend has not published the signal yet; it
- * will be either `ssoRequired` on /api/workspace/switcher or a
- * `workspaceAccessDenied` with detail `sso_required`. Until one of them arrives
- * this returns nothing and no hint is shown; nothing is inferred from a plain 403.
- */
-export type SsoRequiredOrganization = { organizationId: string; name?: string; providerId?: string }
-export function ssoRequiredOrganizations(switcher: unknown): SsoRequiredOrganization[] {
-  const value = (switcher as { ssoRequired?: unknown } | null | undefined)?.ssoRequired
-  return Array.isArray(value) ? value.filter((item): item is SsoRequiredOrganization => typeof (item as { organizationId?: unknown } | null)?.organizationId === 'string') : []
-}
-export const isSsoRequired = (error: unknown) => error instanceof GovernanceRequestError && error.detail === 'sso_required'
 
 /** Which company sign-in to start: a known method, or the one registered for an email's or a domain's verified domain. */
 export type SsoTarget = { providerId: string } | { email: string } | { domain: string }
@@ -206,7 +193,7 @@ export class SsoStartError extends Error {
   constructor(public status: number) { super(status === 404 ? 'not_found' : 'failed'); this.name = 'SsoStartError' }
 }
 
-/** OIDC RP-initiated logout. `upstream` says how far it got; local sign-out has happened in every case. */
+/** OIDC RP-initiated logout for the provider of the current session (the server checks it matches). `upstream` says how far it got; local sign-out has happened in every case. */
 export async function oidcSignOut(providerId: string) {
   return send<{ localSessionRevoked: true; upstream: 'requested' | 'not_supported' | 'unavailable'; url: string }>(`/api/auth/sso/oidc/logout/${encodeURIComponent(providerId)}`, 'POST', {})
 }
