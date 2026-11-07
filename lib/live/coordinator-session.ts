@@ -8,7 +8,7 @@ type Database = Pick<PoolClient, 'query'>
  * workspace and the member who triggered a reply cannot choose its channel. */
 export async function coordinatorSessionScope(database: Database, workspaceDatabase: Database, ownerId: string, botId: string): Promise<LiveScope | null> {
   const { rows: [bot] } = await database.query<{ workspaceId: string }>(
-    'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [botId, ownerId],
+    'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, ownerId],
   )
   if (!bot) return null
   const member = await workspaceDatabase.query(

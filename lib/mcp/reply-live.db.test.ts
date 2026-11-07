@@ -22,7 +22,6 @@ import { LiveChannel } from '../live/channel'
 import { liveTicket } from '../live/scope'
 import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
 import { ScheduleError, type Definition } from '../schedules/contract'
-import { actAs } from '../acting-user'
 import { tokenWorkspace } from '../tokens/principal'
 
 const target = process.env.E2E_DATABASE_URL
@@ -121,6 +120,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
     },
   } })
   const { readCoordinatorMessages } = await import('./tools')
+  const { actAs } = await import('../acting-user')
   const request = app.createRequestDatabaseScope(target!)
   const chats: { owner: string; botId: string; workspaceId: string }[] = []
   const controllers: AbortController[] = []
@@ -359,7 +359,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
         assert.equal(deferred.length, 2, 'the main list and reply resolvers both retain the original request')
         // Simulate after() invoking a queued callback outside the originating ALS scope.
         await Promise.all(deferred.map(work => work()))
-        assert.deepEqual(deliveries.slice(before), [{ ownerId: owner, workspaceId: intended, events: [{ kind: 'coordinator_session', id: botId }] }])
+        assert.deepEqual(ordered(deliveries.slice(before)), ordered(committedChatEvents({ owner, workspaceId: intended, botId })), 'both chat and reply keys retain the original database and tenant')
         assert.equal((await independent.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [owner])).rowCount, 0)
         assert.equal((await isolated.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [owner])).rowCount, 1)
       } finally {

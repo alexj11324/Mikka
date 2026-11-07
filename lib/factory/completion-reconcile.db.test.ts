@@ -7,6 +7,7 @@ import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
+import { workspacePool } from "../workspace-db";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { adoptProviderContinuation, createFactoryStore as createCurrentFactoryStore } from "./store";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
@@ -51,13 +52,18 @@ test("run completion enters review without the Coordinator; replays do not advan
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 8 });
+  const authorityWorkspaces: string[] = [];
   const flags = { r: process.env.MIKKA_FACTORY_ROUTING_ENABLED, l: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED };
   try {
     const dir = new URL("../../drizzle/", import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','complete@example.invalid',true,now(),now())`);
-    const workspaceId = await seedFixtureWorkspace(pool, 'owner');
+    const workspaceId = await seedFixtureWorkspace(pool, 'owner', 'team');
+    // Request database scope changes APP only. Completion still checks the
+    // independent workspace authority, so both stores share this real tenant.
+    await seedFixtureWorkspace(workspacePool, 'owner', 'team', workspaceId);
+    authorityWorkspaces.push(workspaceId);
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
@@ -1121,6 +1127,10 @@ test("run completion enters review without the Coordinator; replays do not advan
   } finally {
     if (flags.r === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.r;
     if (flags.l === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.l;
+    if (authorityWorkspaces.length) {
+      await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [authorityWorkspaces]);
+      await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [authorityWorkspaces]);
+    }
     await dropTestDatabase(admin, database, pool);
     await admin.end();
   }

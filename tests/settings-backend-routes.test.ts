@@ -28,13 +28,14 @@ const workspaceBotCalls: unknown[][] = []
 let workspaceBotResult: unknown = { bots: [] }
 let workspaceBotFailure: Error | null = null
 const currentSession = new AsyncLocalStorage<string>()
+const syntheticSessionId = 'synthetic-settings-session'
 let sessionGate: Promise<void> = Promise.resolve()
 let sessionReads = 0
 
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => {
     if (sessionFailure) throw sessionFailure
-    return user ? { user } : null
+    return user ? { user, session: { id: currentSession.getStore() ?? syntheticSessionId, userId: user.id } } : null
   } } } } })
   mock.module('next-intl/server', { namedExports: { getTranslations: async () => (key: string) => key } })
   mock.module('@/lib/workspace-switcher', { namedExports: { loadWorkspaceSwitcher: async (...args: unknown[]) => {
@@ -104,7 +105,7 @@ test('workspace switcher uses the authenticated session and keeps its successful
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
   assert.deepEqual(await response.json(), switcherResult)
-  assert.deepEqual(switcherCalls, [[{ user }]])
+  assert.deepEqual(switcherCalls, [[{ user, session: { id: syntheticSessionId, userId: 'admin' } }]])
 })
 
 test('workspace switcher refuses a missing session before reading workspace data', async () => {

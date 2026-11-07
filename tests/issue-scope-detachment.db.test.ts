@@ -98,7 +98,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
     }))
   }
-  const inWorkspace = <T>(userId: string, fn: () => Promise<T>, workspaceId = workspace) => actAs({ id: userId, [tokenWorkspace]: workspaceId }, fn)
+  const inWorkspace = <T>(userId: string, fn: () => Promise<T>, workspaceId: string = workspace) => actAs({ id: userId, [tokenWorkspace]: workspaceId }, fn)
   const action = <T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) => withRequestContext(() => inWorkspace(owner, fn), beforeClose)
   const { issueForUser } = await import('../lib/issue-access')
   const { readRun, queueRun, visibleRuns } = await import('../lib/agent-runs')
@@ -243,7 +243,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     }
     return result
   }
-  const setMembership = (userId: string,status: 'active' | 'suspended',workspaceId=workspace) => pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2',[workspaceId,userId,status])
+  const setMembership = (userId: string,status: 'active' | 'suspended',workspaceId: string=workspace) => pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2',[workspaceId,userId,status])
   await seed(issue)
   const [originalLink] = await db.select().from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue))
   for (const [id,user] of [[memberRun,member],[ownerRun,owner]]) await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,\'queued\',now()+interval \'1 minute\')', [id,user,issue,user===owner?ownerAgent:agent,user===owner?ownerDevice:device,user===owner?ownerRepo:repo])
@@ -559,7 +559,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       release.resolve()
       const response=await responsePromise
       assert.deepEqual(handlerErrors,[],'the real completion handler and its after callbacks must succeed')
-      assert.equal(response.status,204)
+      assert.equal(response.status,404,'the post-body run read must hide a task whose membership was revoked')
       const row=(await pool.query('select status,scope,"workspaceId","linearSyncPolicy" from issues where id=$1',[id])).rows[0]
       assert.deepEqual(row,{status:'todo',scope:'workspace',workspaceId:workspace,linearSyncPolicy:'disabled'})
       assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'running')
@@ -571,11 +571,10 @@ test('provider policy preserves task tenancy and independent membership gates on
     const { factoryStore } = await import('../lib/factory/server')
     const { FactoryError } = await import('../lib/factory/contract')
     const id = randomUUID()
-    fixtureIds.push(id)
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Factory scope fixture\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')', [id,owner,doc,workspace])
-    const promoted = await promoteExistingIssueForUser(owner, { requestId:randomUUID(),issueId:id,revision:1,teamId:team,expectedTeamId:null })
-    assert.ok('issue' in promoted && promoted.issue)
-    const generation = promoted.issue.scopeVersion
+    await seed(id,id,false)
+    const original = await inWorkspace(owner,()=>issueScopeActions.getIssue(id))
+    assert.ok('issue' in original && original.issue)
+    const generation = original.issue.scopeVersion
     async function source(userId: string) {
       const sourceEventId = randomUUID()
       await pool.query('insert into coordinator_events (id,"userId","issueId",kind,payload,"dedupeKey") values ($1,$2,$3,\'user_message\',$4,$5)', [sourceEventId,userId,id,JSON.stringify({text:'Synthetic authorized Factory request'}),`factory-scope:${sourceEventId}`])
@@ -595,13 +594,14 @@ test('provider policy preserves task tenancy and independent membership gates on
       (select count(*)::int from factory_attempts a join factory_tasks t on t.id=a."taskId" where t."issueId"=$1) attempts,
       (select count(*)::int from factory_events e join factory_tasks t on t.id=e."taskId" where t."issueId"=$1) events,
       (select count(*)::int from agent_runs where "issueId"=$1) runs`,[id])).rows[0]
-    const retired = await changeIssueScopeLocally(owner, {id,revision:promoted.issue.revision,scope:'personal'}, {allowLinkedPersonal:false})
+    const retired = await changeIssueScopeLocally(owner, {id,revision:original.issue.revision,scope:'personal'}, {allowLinkedPersonal:false})
     assert.ok('issue' in retired && retired.issue)
     assert.equal((await factoryStore.read(member,memberTask.id)).task.id,memberTask.id)
     assert.equal((await factoryStore.read(owner,ownerTask.id)).task.id,ownerTask.id)
     const restored = await promoteExistingIssueForUser(owner, {requestId:randomUUID(),issueId:id,revision:retired.issue.revision,teamId:team,expectedTeamId:team})
     assert.ok('issue' in restored && restored.issue)
-    assert.equal(restored.issue.scopeVersion,generation,'grouping an already disabled task does not create a provider generation')
+    assert.equal(restored.issue.scopeVersion,generation+1,'disable changes provider generation once; regrouping does not change it again')
+    assert.equal((await factoryStore.read(member,memberTask.id)).task.scopeVersion,generation,'the old provider generation is not the tenant grant')
     assert.equal(restored.issue.workspaceId,workspace)
     assert.equal((await factoryStore.route(member,memberRoute)).task.id,memberTask.id)
     const before = await counts()

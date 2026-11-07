@@ -268,7 +268,7 @@ test('thread identity reads keep owner-only, live membership and checkpoint beha
           const selected = result.reads.findLast(read => read.text.includes('from "agent_runs" inner join "agents"'))
           assert.ok(selected)
           const route = '/actions/threads/' + action
-          const expectedQueries = label === 'linked' ? 7 : action === 'changes' ? 3 : 2
+          const expectedQueries = label === 'linked' ? 6 : action === 'changes' ? 3 : 2
           if (result.reads.length !== expectedQueries) sub.diagnostic(JSON.stringify({ read: 'thread-' + action + '-' + label,
             queryShapes: result.reads.map(read => ({ tables: [...read.text.matchAll(/(?:from|join)\s+"?([a-z_]+)"?/gi)].map(match => match[1]), fields: read.fields })) }))
           sub.diagnostic(JSON.stringify({ read: 'thread-' + action + '-' + label, beforeResultBytes: baseline.reads[0].bytes, resultBytes: selected.bytes,

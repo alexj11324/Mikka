@@ -373,13 +373,15 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.equal(gunzipSync(Buffer.from(recovered!.patch, 'base64')).toString(), 'same repository work')
   })
 
-  await t.test('task-free legacy checkpoints require a persisted tenant even when their owner and repository match', async () => {
+  await t.test('task-free unresolved runs cannot receive or recover checkpoints despite matching owner and repository', async () => {
     const run = await fixture(), unresolvedId = randomUUID(), boundId = randomUUID()
     // A historical task-free row may have no provable tenant. This is a legal
     // row with no lineage edge; never disable the tenant trigger to create it.
     await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","deviceRepoId",status)
       SELECT $2,"userId","agentId","deviceId","deviceRepoId",'failed' FROM agent_runs WHERE id=$1`, [run.id, unresolvedId])
-    await saveCheckpoint(unresolvedId, 'unresolved legacy checkpoint')
+    await assert.rejects(saveCheckpoint(unresolvedId, 'unresolved legacy checkpoint'), { code: '23514' })
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM run_checkpoints WHERE "runId"=$1', [unresolvedId])).rows[0].count, 0,
+      'the child-row tenant guard rejects the write without storing checkpoint bytes')
     assert.deepEqual((await pool.query('SELECT "issueId","botId","workspaceId" FROM agent_runs WHERE id=$1', [unresolvedId])).rows[0],
       { issueId: null, botId: null, workspaceId: null })
     assert.equal(await latestCheckpoint(unresolvedId), null, 'owner and repository do not infer a legacy tenant')
