@@ -38,8 +38,9 @@ the 任务 tab since [2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-i
 Lists show tasks only; a thread opens from its task's 活动, pushed over the task.
 The Bot tab's large title sits in the top bar's own row with a **+** on the right
 (新建 Bot, 新建群聊); there is no workspace menu, and workspaces switch only in
-设置 › 工作区. The 任务 tab groups its tasks 待处理 · 进行中 · 待办 · 已完成, with
-a raised hand for 待处理 and no coloured dots; its + creates a task. The
+设置 › 工作区. The 任务 tab groups its tasks 等待你 · 进行中 · 待办 · 已完成; each row carries its
+own state's icon, the raised hand only for 等你处理
+([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)), and no coloured dots; its + creates a task. The
 paragraphs below on the 对话 bar's workspace menu and on the 线程 tab and its
 segment are replaced by this. Each tab is
 its own Stack with a large title. A chat and a thread open over the tabs, so the

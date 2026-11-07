@@ -308,10 +308,13 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   each row has 删除, shown on hover or focus, and confirms first (Alex,
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
-- **R-52** Since 2026-11-07 every list is a task list, grouped 待处理 · 进行中 ·
-  待办 · 已完成 ([decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)): 等待你 and 受阻
-  below become 待处理, 空闲 becomes 待办, 已解决 becomes 已完成, and the
-  judgement below decides the group of a task's current thread. Before that,
+- **R-52** Since 2026-11-07 every list is a task list, grouped 等待你 · 进行中 ·
+  待办 · 已完成 ([decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)), and each row
+  carries its own state's icon, never its group's: the raised hand only for 等你处理, a
+  triangle for 失败, a ring for 运行中, a clock for 排队中, and the board's own icon
+  in 待办 and 已完成 ([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)). 等待你 and 受阻
+  below become 等待你, 空闲 becomes 待办, 已解决 becomes 已完成, and the
+  judgement below decides the state of a task's current thread. Before that,
   every thread list, web and phone, grouped its rows in this order:
   等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
   (Waiting for you, Running, Blocked, Idle, Resolved;
