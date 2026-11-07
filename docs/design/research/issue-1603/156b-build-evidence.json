@@ -1,0 +1,28 @@
+{
+  "source": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+  "tree": "43ddc1c57eb0fede3db6cad89d406baa02554597",
+  "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+  "typecheck": {
+    "source": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+    "command": "pnpm typecheck",
+    "exitCode": 0,
+    "durationSeconds": 39.67
+  },
+  "build": {
+    "source": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+    "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+    "command": "pnpm build:app",
+    "exitCode": 0,
+    "durationSeconds": 137.27
+  },
+  "overlayContentVerification": {
+    "officialOverlaySha": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+    "matchedBlobs": 166,
+    "checkedBlobs": 166,
+    "excludedDocumentationScreenshots": 10,
+    "mismatchCount": 0,
+    "runtimeSourceAndPublicAssets": "matches official Git tree"
+  },
+  "rendererBuild": "a60d2a8a19f33b7588ea5f4572a2b4f2c212b6a4a66843fb0375ddb5d9eb60ac",
+  "generatedRoutes": "rebuilt from canonical sources by build; generated working-tree files restored afterward; application output unchanged"
+}

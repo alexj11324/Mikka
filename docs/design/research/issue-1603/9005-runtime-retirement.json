@@ -1,0 +1,13 @@
+{
+  "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+  "runId": "issue1603-manual-0903e80b-3ae5-4876-a87d-e14de60b87da",
+  "observedAt": "2026-11-07T06:36:42.528Z",
+  "leaseState": "quarantined",
+  "leaseExpiredAt": "2026-11-07T06:20:54.197Z",
+  "cleanRelease": false,
+  "fixtureCleanup": "expired lease remained quarantined; all old fixture data removed by retirement of the whole owned database",
+  "resourceCounts": {
+    "created": 37
+  },
+  "databaseRetirement": "retired"
+}

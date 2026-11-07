@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "issue": 1372,
+  "status": "pass",
+  "environment": {
+    "id": "local-a1497a2d-302a-4d11-93ea-0b5969c7de60",
+    "origin": "http://localhost:3110",
+    "deploymentSha": "9005d8eaea561d42a59768846f6abbf46d4d5f19"
+  },
+  "runId": "read-cache-ea5ff87e-e10e-4cb1-982a-0bcce2454fa3",
+  "startedAt": "2026-11-07T05:55:25.339Z",
+  "finishedAt": "2026-11-07T05:58:03.612Z",
+  "boundaries": {
+    "businessRequestWrites": false,
+    "modelExecution": false,
+    "browserExecution": false
+  },
+  "cleanup": {
+    "fixtures": "succeeded",
+    "lease": "released-clean"
+  },
+  "readCount": 35
+}

@@ -1,0 +1,2280 @@
+{
+  "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+  "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+  "kind": "manual-local-production-ui",
+  "normalDocumentRequests": 1,
+  "status": "partial-not-final-history-and-task-draft-failures-reproduced",
+  "endedReason": "controller-session-ended-before-final-cleanup",
+  "operations": [
+    {
+      "index": 6,
+      "at": "2026-11-07T06:00:23.535Z",
+      "operation": {
+        "op": "facts",
+        "expression": "[...document.querySelectorAll('[data-slot]')].filter(n=>n.scrollHeight>n.clientHeight+50).map(n=>({slot:n.dataset.slot,role:n.getAttribute('role'),label:n.getAttribute('aria-label'),height:n.clientHeight,scrollHeight:n.scrollHeight,top:n.scrollTop}))"
+      },
+      "result": [
+        {
+          "slot": "message-scroller-viewport",
+          "role": "region",
+          "label": "Conversation with Ada",
+          "height": 834,
+          "scrollHeight": 1976,
+          "top": 1142
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "at": "2026-11-07T06:00:23.846Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Message Ada",
+        "value": "Keep this draft while opening Settings"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 8,
+      "at": "2026-11-07T06:00:24.159Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Message Ada",
+        "start": 5,
+        "end": 15
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "index": 9,
+      "at": "2026-11-07T06:00:30.879Z",
+      "operation": {
+        "op": "scroll",
+        "selector": "[data-slot=\"message-scroller-viewport\"]",
+        "top": 340
+      },
+      "result": {
+        "scrollTop": 340
+      }
+    },
+    {
+      "index": 10,
+      "at": "2026-11-07T06:00:31.176Z",
+      "operation": {
+        "op": "observe",
+        "name": "frame",
+        "selector": "[data-slot=\"app-frame-content\"]"
+      },
+      "result": {
+        "name": "frame",
+        "selector": "[data-slot=\"app-frame-content\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "index": 11,
+      "at": "2026-11-07T06:00:31.487Z",
+      "operation": {
+        "op": "observe",
+        "name": "bar",
+        "selector": "[data-slot=\"window-bar\"]"
+      },
+      "result": {
+        "name": "bar",
+        "selector": "[data-slot=\"window-bar\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 44,
+        "clientHeight": 44
+      }
+    },
+    {
+      "index": 12,
+      "at": "2026-11-07T06:00:31.691Z",
+      "operation": {
+        "op": "observe",
+        "name": "rail",
+        "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]"
+      },
+      "result": {
+        "name": "rail",
+        "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "index": 13,
+      "at": "2026-11-07T06:00:31.995Z",
+      "operation": {
+        "op": "observe",
+        "name": "chat-input",
+        "selector": "textarea"
+      },
+      "result": {
+        "name": "chat-input",
+        "selector": "textarea",
+        "sameNode": true,
+        "connected": true,
+        "focus": true,
+        "value": "Keep this draft while opening Settings",
+        "selectionStart": 5,
+        "selectionEnd": 15,
+        "scrollTop": 0,
+        "scrollHeight": 56,
+        "clientHeight": 56
+      }
+    },
+    {
+      "index": 14,
+      "at": "2026-11-07T06:00:32.294Z",
+      "operation": {
+        "op": "observe",
+        "name": "chat-scroll",
+        "selector": "[data-slot=\"message-scroller-viewport\"]"
+      },
+      "result": {
+        "name": "chat-scroll",
+        "selector": "[data-slot=\"message-scroller-viewport\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 340,
+        "scrollHeight": 1976,
+        "clientHeight": 834
+      }
+    },
+    {
+      "index": 15,
+      "at": "2026-11-07T06:00:32.592Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-chat-reading-draft"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 16,
+      "at": "2026-11-07T06:00:33.107Z",
+      "operation": {
+        "op": "media",
+        "reducedMotion": "reduce"
+      },
+      "result": {
+        "reducedMotion": "reduce"
+      }
+    },
+    {
+      "index": 17,
+      "at": "2026-11-07T06:00:33.401Z",
+      "operation": {
+        "op": "fault",
+        "id": "cold-settings",
+        "path": "/assets/settings-shell-",
+        "mode": "delay",
+        "delayMs": 8000,
+        "once": true
+      },
+      "result": {
+        "id": "cold-settings",
+        "enabled": true
+      }
+    },
+    {
+      "index": 20,
+      "at": "2026-11-07T06:00:34.361Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-settings-loading"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 21,
+      "at": "2026-11-07T06:00:34.631Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "frame",
+          "bar",
+          "rail"
+        ]
+      },
+      "result": [
+        {
+          "name": "frame",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 22,
+      "at": "2026-11-07T06:00:34.827Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({frame:document.querySelectorAll('[data-slot=app-frame-content]').length,bar:document.querySelectorAll('[data-slot=window-bar]').length,rail:document.querySelectorAll('[aria-label=\"Main navigation\"]').length,skeleton:[...document.querySelectorAll('[data-slot=skeleton]')].map(n=>getComputedStyle(n).animationName),body:document.body.innerText.slice(0,320)})"
+      },
+      "result": {
+        "frame": 1,
+        "bar": 1,
+        "rail": 1,
+        "skeleton": [
+          "none",
+          "none",
+          "none"
+        ],
+        "body": "Search bots, chats, groups, tasks, threads and projects\nCtrl\nK\nD\nDesktop acceptance\nLoading task editor"
+      }
+    },
+    {
+      "index": 26,
+      "at": "2026-11-07T06:00:49.181Z",
+      "operation": {
+        "op": "facts",
+        "expression": "[...document.querySelectorAll('[role=dialog]')].map(n=>({transform:getComputedStyle(n).transform,enterScale:getComputedStyle(n).getPropertyValue('--tw-enter-scale'),animation:getComputedStyle(n).animationName,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches}))"
+      },
+      "result": [
+        {
+          "transform": "none",
+          "enterScale": "1",
+          "animation": "enter",
+          "reduced": true
+        }
+      ]
+    },
+    {
+      "index": 27,
+      "at": "2026-11-07T06:00:49.615Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-settings-command-search"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 29,
+      "at": "2026-11-07T06:01:19.335Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {}
+    },
+    {
+      "index": 31,
+      "at": "2026-11-07T06:01:30.250Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-settings-loaded"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 32,
+      "at": "2026-11-07T06:01:30.796Z",
+      "operation": {
+        "op": "media",
+        "colorScheme": "dark"
+      },
+      "result": {
+        "colorScheme": "dark"
+      }
+    },
+    {
+      "index": 33,
+      "at": "2026-11-07T06:01:31.048Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-settings-dark"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 34,
+      "at": "2026-11-07T06:01:31.300Z",
+      "operation": {
+        "op": "media",
+        "colorScheme": "light"
+      },
+      "result": {
+        "colorScheme": "light"
+      }
+    },
+    {
+      "index": 35,
+      "at": "2026-11-07T06:01:31.520Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {}
+    },
+    {
+      "index": 37,
+      "at": "2026-11-07T06:01:32.117Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({draft:document.querySelector('textarea')?.value,scroll:document.querySelector('[data-slot=message-scroller-viewport]')?.scrollTop,timeOrigin:performance.timeOrigin})"
+      },
+      "result": {
+        "draft": "Keep this draft while opening Settings",
+        "scroll": 340,
+        "timeOrigin": 1794031210531.5
+      }
+    },
+    {
+      "index": 38,
+      "at": "2026-11-07T06:01:32.447Z",
+      "operation": {
+        "op": "forward"
+      },
+      "result": {}
+    },
+    {
+      "index": 40,
+      "at": "2026-11-07T06:01:33.076Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {}
+    },
+    {
+      "index": 42,
+      "at": "2026-11-07T06:02:20.892Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({url:location.href,main:document.querySelector('main')?.innerText.slice(0,160),textarea:document.querySelector('textarea')?.getAttribute('placeholder'),draft:document.querySelector('textarea')?.value})"
+      },
+      "result": {
+        "main": "Coordinator\n\nWhat should we review today?\n\nReview the desktop workspace, including conversations, tasks, artifacts and settings.\n\nThinking\nCoordinator\nScroll to",
+        "textarea": "Message the Coordinator",
+        "draft": ""
+      }
+    },
+    {
+      "index": 43,
+      "at": "2026-11-07T06:02:21.106Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "frame",
+          "bar",
+          "rail"
+        ]
+      },
+      "result": [
+        {
+          "name": "frame",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 46,
+      "at": "2026-11-07T06:03:22.420Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({draft:document.querySelector('textarea')?.value,scroll:document.querySelector('[data-slot=message-scroller-viewport]')?.scrollTop})"
+      },
+      "result": {
+        "draft": "Keep this draft while opening Settings",
+        "scroll": 340
+      }
+    },
+    {
+      "index": 49,
+      "at": "2026-11-07T06:03:23.655Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Message the Coordinator",
+        "value": "Separate Coordinator draft"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 52,
+      "at": "2026-11-07T06:03:24.478Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Message Ada",
+        "start": 5,
+        "end": 15
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "index": 53,
+      "at": "2026-11-07T06:03:24.661Z",
+      "operation": {
+        "op": "scroll",
+        "selector": "[data-slot=\"message-scroller-viewport\"]",
+        "top": 340
+      },
+      "result": {
+        "scrollTop": 340
+      }
+    },
+    {
+      "index": 54,
+      "at": "2026-11-07T06:03:24.965Z",
+      "operation": {
+        "op": "observe",
+        "name": "active-chat-input",
+        "selector": "textarea"
+      },
+      "result": {
+        "name": "active-chat-input",
+        "selector": "textarea",
+        "sameNode": true,
+        "connected": true,
+        "focus": true,
+        "value": "Keep this draft while opening Settings",
+        "selectionStart": 5,
+        "selectionEnd": 15,
+        "scrollTop": 0,
+        "scrollHeight": 56,
+        "clientHeight": 56
+      }
+    },
+    {
+      "index": 55,
+      "at": "2026-11-07T06:03:25.273Z",
+      "operation": {
+        "op": "observe",
+        "name": "active-chat-scroll",
+        "selector": "[data-slot=\"message-scroller-viewport\"]"
+      },
+      "result": {
+        "name": "active-chat-scroll",
+        "selector": "[data-slot=\"message-scroller-viewport\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 340,
+        "scrollHeight": 1976,
+        "clientHeight": 834
+      }
+    },
+    {
+      "index": 57,
+      "at": "2026-11-07T06:03:27.787Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 58,
+      "at": "2026-11-07T06:03:28.088Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 60,
+      "at": "2026-11-07T06:03:29.618Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "active-chat-input",
+          "active-chat-scroll",
+          "frame",
+          "bar",
+          "rail"
+        ]
+      },
+      "result": [
+        {
+          "name": "active-chat-input",
+          "selector": "textarea",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Keep this draft while opening Settings",
+          "selectionStart": 5,
+          "selectionEnd": 15,
+          "scrollTop": 0,
+          "scrollHeight": 56,
+          "clientHeight": 56
+        },
+        {
+          "name": "active-chat-scroll",
+          "selector": "[data-slot=\"message-scroller-viewport\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 340,
+          "scrollHeight": 2052,
+          "clientHeight": 788
+        },
+        {
+          "name": "frame",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 61,
+      "at": "2026-11-07T06:03:29.974Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-chat-background-arrival"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 65,
+      "at": "2026-11-07T06:04:24.331Z",
+      "operation": {
+        "op": "fault",
+        "id": "group-send",
+        "path": "/api/conversations/<group-fixture>/messages",
+        "method": "POST",
+        "mode": "response",
+        "status": 503,
+        "delayMs": 5000
+      },
+      "result": {
+        "id": "group-send",
+        "enabled": true
+      }
+    },
+    {
+      "index": 66,
+      "at": "2026-11-07T06:04:24.751Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Message Release review",
+        "value": "Keep this failed group message across navigation"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 71,
+      "at": "2026-11-07T06:04:30.595Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Message Release review",
+        "value": "Next group draft stays here"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 72,
+      "at": "2026-11-07T06:04:30.892Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Message Release review",
+        "start": 5,
+        "end": 10
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "index": 73,
+      "at": "2026-11-07T06:04:31.204Z",
+      "operation": {
+        "op": "observe",
+        "name": "group-input",
+        "selector": "textarea"
+      },
+      "result": {
+        "name": "group-input",
+        "selector": "textarea",
+        "sameNode": true,
+        "connected": true,
+        "focus": true,
+        "value": "Next group draft stays here",
+        "selectionStart": 5,
+        "selectionEnd": 10,
+        "scrollTop": 0,
+        "scrollHeight": 56,
+        "clientHeight": 56
+      }
+    },
+    {
+      "index": 74,
+      "at": "2026-11-07T06:04:31.453Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-group-inflight-return"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 75,
+      "at": "2026-11-07T06:04:31.706Z",
+      "operation": {
+        "op": "facts",
+        "expression": "[...document.querySelectorAll('main *')].filter(n=>n.scrollHeight>n.clientHeight+50&&getComputedStyle(n).overflowY!=='visible').map(n=>({tag:n.tagName,slot:n.dataset.slot,role:n.getAttribute('role'),label:n.getAttribute('aria-label'),class:n.className,height:n.clientHeight,top:n.scrollTop}))"
+      },
+      "result": [
+        {
+          "tag": "DIV",
+          "role": null,
+          "label": null,
+          "class": "min-w-0 max-h-60 overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]",
+          "height": 240,
+          "top": 0
+        }
+      ]
+    },
+    {
+      "index": 77,
+      "at": "2026-11-07T06:04:55.292Z",
+      "operation": {
+        "op": "facts",
+        "expression": "[...document.querySelectorAll('main *')].filter(n=>n.scrollHeight>n.clientHeight+50&&getComputedStyle(n).overflowY==='auto').map(n=>({tag:n.tagName,slot:n.dataset.slot,label:n.getAttribute('aria-label'),class:n.className,height:n.clientHeight,top:n.scrollTop}))"
+      },
+      "result": [
+        {
+          "tag": "DIV",
+          "label": null,
+          "class": "min-h-0 flex-1 overflow-y-auto",
+          "height": 778,
+          "top": 0
+        }
+      ]
+    },
+    {
+      "index": 78,
+      "at": "2026-11-07T06:05:13.783Z",
+      "operation": {
+        "op": "scroll",
+        "selector": "main .overflow-y-auto",
+        "top": 240
+      },
+      "result": {
+        "scrollTop": 240
+      }
+    },
+    {
+      "index": 79,
+      "at": "2026-11-07T06:05:14.080Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Message Release review",
+        "start": 5,
+        "end": 10
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "index": 80,
+      "at": "2026-11-07T06:05:14.382Z",
+      "operation": {
+        "op": "observe",
+        "name": "group-scroll",
+        "selector": "main .overflow-y-auto"
+      },
+      "result": {
+        "name": "group-scroll",
+        "selector": "main .overflow-y-auto",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 240,
+        "scrollHeight": 2848,
+        "clientHeight": 778
+      }
+    },
+    {
+      "index": 81,
+      "at": "2026-11-07T06:05:14.677Z",
+      "operation": {
+        "op": "fault",
+        "id": "group-read",
+        "path": "/api/conversations/<group-fixture>/messages",
+        "method": "GET",
+        "mode": "response",
+        "status": 503
+      },
+      "result": {
+        "id": "group-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 82,
+      "at": "2026-11-07T06:05:14.880Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 83,
+      "at": "2026-11-07T06:05:15.181Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 85,
+      "at": "2026-11-07T06:05:15.803Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "group-input",
+          "group-scroll"
+        ]
+      },
+      "result": [
+        {
+          "name": "group-input",
+          "selector": "textarea",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Next group draft stays here",
+          "selectionStart": 5,
+          "selectionEnd": 10,
+          "scrollTop": 0,
+          "scrollHeight": 56,
+          "clientHeight": 56
+        },
+        {
+          "name": "group-scroll",
+          "selector": "main .overflow-y-auto",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 240,
+          "scrollHeight": 2848,
+          "clientHeight": 778
+        }
+      ]
+    },
+    {
+      "index": 86,
+      "at": "2026-11-07T06:05:16.068Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-group-background-error"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 87,
+      "at": "2026-11-07T06:05:16.296Z",
+      "operation": {
+        "op": "fault",
+        "id": "group-read",
+        "status": 403,
+        "body": {
+          "error": "forbidden"
+        }
+      },
+      "result": {
+        "id": "group-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 90,
+      "at": "2026-11-07T06:05:57.560Z",
+      "operation": {
+        "op": "fault",
+        "id": "group-read",
+        "status": 503,
+        "body": {
+          "error": "controlled_network_failure"
+        }
+      },
+      "result": {
+        "id": "group-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 92,
+      "at": "2026-11-07T06:05:58.164Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({rows:document.querySelectorAll('[aria-label=\"Group chat messages\"] li').length,disabled:document.querySelector('textarea')?.disabled,draft:document.querySelector('textarea')?.value})"
+      },
+      "result": {
+        "rows": 0,
+        "disabled": true,
+        "draft": "Next group draft stays here"
+      }
+    },
+    {
+      "index": 93,
+      "at": "2026-11-07T06:05:58.515Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-group-denied-stays-closed"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 94,
+      "at": "2026-11-07T06:05:59.064Z",
+      "operation": {
+        "op": "fault",
+        "id": "group-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "group-read",
+        "enabled": false
+      }
+    },
+    {
+      "index": 97,
+      "at": "2026-11-07T06:06:01.082Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({rows:document.querySelectorAll('[aria-label=\"Group chat messages\"] li').length,disabled:document.querySelector('textarea')?.disabled,draft:document.querySelector('textarea')?.value})"
+      },
+      "result": {
+        "rows": 2,
+        "disabled": false,
+        "draft": "Next group draft stays here"
+      }
+    },
+    {
+      "index": 108,
+      "at": "2026-11-07T06:06:41.599Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-board-filter-list"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 113,
+      "at": "2026-11-07T06:11:53.945Z",
+      "operation": {
+        "op": "fault",
+        "id": "task-read",
+        "action": "issues.pollIssue",
+        "status": 503
+      },
+      "result": {
+        "id": "task-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 114,
+      "at": "2026-11-07T06:11:54.145Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Comment",
+        "value": "Keep this task comment while data refreshes"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 115,
+      "at": "2026-11-07T06:11:54.437Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Comment",
+        "start": 5,
+        "end": 14
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "index": 116,
+      "at": "2026-11-07T06:11:54.743Z",
+      "operation": {
+        "op": "observe",
+        "name": "task-comment",
+        "selector": "textarea[placeholder=\"Leave a comment…\"]"
+      },
+      "result": {
+        "name": "task-comment",
+        "selector": "textarea[placeholder=\"Leave a comment…\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": true,
+        "value": "Keep this task comment while data refreshes",
+        "selectionStart": 5,
+        "selectionEnd": 14,
+        "scrollTop": 0,
+        "scrollHeight": 40,
+        "clientHeight": 40
+      }
+    },
+    {
+      "index": 117,
+      "at": "2026-11-07T06:11:54.949Z",
+      "operation": {
+        "op": "observe",
+        "name": "task-editor",
+        "selector": "[role=\"textbox\"][aria-label=\"Task description\"]"
+      },
+      "result": {
+        "name": "task-editor",
+        "selector": "[role=\"textbox\"][aria-label=\"Task description\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 96,
+        "clientHeight": 96
+      }
+    },
+    {
+      "index": 118,
+      "at": "2026-11-07T06:11:55.244Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 119,
+      "at": "2026-11-07T06:11:55.446Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 120,
+      "at": "2026-11-07T06:12:22.973Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "task-comment",
+          "task-editor",
+          "frame",
+          "bar",
+          "rail"
+        ]
+      },
+      "result": [
+        {
+          "name": "task-comment",
+          "selector": "textarea[placeholder=\"Leave a comment…\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Keep this task comment while data refreshes",
+          "selectionStart": 5,
+          "selectionEnd": 14,
+          "scrollTop": 0,
+          "scrollHeight": 40,
+          "clientHeight": 40
+        },
+        {
+          "name": "task-editor",
+          "selector": "[role=\"textbox\"][aria-label=\"Task description\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 96,
+          "clientHeight": 96
+        },
+        {
+          "name": "frame",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": false,
+          "connected": false,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 0,
+          "clientHeight": 0
+        },
+        {
+          "name": "bar",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": false,
+          "connected": false,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 0,
+          "clientHeight": 0
+        },
+        {
+          "name": "rail",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": false,
+          "connected": false,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 0,
+          "clientHeight": 0
+        }
+      ]
+    },
+    {
+      "index": 121,
+      "at": "2026-11-07T06:12:23.304Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-task-background-error"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 122,
+      "at": "2026-11-07T06:12:23.566Z",
+      "operation": {
+        "op": "fault",
+        "id": "task-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "task-read",
+        "enabled": false
+      }
+    },
+    {
+      "index": 124,
+      "at": "2026-11-07T06:12:56.815Z",
+      "operation": {
+        "op": "observe",
+        "name": "frame2",
+        "selector": "[data-slot=\"app-frame-content\"]"
+      },
+      "result": {
+        "name": "frame2",
+        "selector": "[data-slot=\"app-frame-content\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "index": 125,
+      "at": "2026-11-07T06:12:57.124Z",
+      "operation": {
+        "op": "observe",
+        "name": "bar2",
+        "selector": "[data-slot=\"window-bar\"]"
+      },
+      "result": {
+        "name": "bar2",
+        "selector": "[data-slot=\"window-bar\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 44,
+        "clientHeight": 44
+      }
+    },
+    {
+      "index": 126,
+      "at": "2026-11-07T06:12:57.324Z",
+      "operation": {
+        "op": "observe",
+        "name": "rail2",
+        "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]"
+      },
+      "result": {
+        "name": "rail2",
+        "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "index": 130,
+      "at": "2026-11-07T06:13:37.683Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Tell Codex what to do next…",
+        "value": "Retain the thread reply while background reads fail"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 131,
+      "at": "2026-11-07T06:13:37.981Z",
+      "operation": {
+        "op": "select",
+        "role": "textbox",
+        "name": "Tell Codex what to do next…",
+        "start": 7,
+        "end": 17
+      },
+      "result": {
+        "selected": true
+      }
+    },
+    {
+      "index": 132,
+      "at": "2026-11-07T06:13:38.184Z",
+      "operation": {
+        "op": "observe",
+        "name": "thread-input",
+        "selector": "textarea[aria-label=\"Tell Codex what to do next…\"]"
+      },
+      "result": {
+        "name": "thread-input",
+        "selector": "textarea[aria-label=\"Tell Codex what to do next…\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": true,
+        "value": "Retain the thread reply while background reads fail",
+        "selectionStart": 7,
+        "selectionEnd": 17,
+        "scrollTop": 0,
+        "scrollHeight": 56,
+        "clientHeight": 56
+      }
+    },
+    {
+      "index": 133,
+      "at": "2026-11-07T06:13:38.494Z",
+      "operation": {
+        "op": "observe",
+        "name": "thread-list",
+        "selector": "ol[aria-label=\"Thread conversation\"]"
+      },
+      "result": {
+        "name": "thread-list",
+        "selector": "ol[aria-label=\"Thread conversation\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 86,
+        "clientHeight": 86
+      }
+    },
+    {
+      "index": 134,
+      "at": "2026-11-07T06:13:38.789Z",
+      "operation": {
+        "op": "fault",
+        "id": "thread-read",
+        "action": "agents.getIssueThread",
+        "status": 503
+      },
+      "result": {
+        "id": "thread-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 135,
+      "at": "2026-11-07T06:13:38.992Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 136,
+      "at": "2026-11-07T06:13:39.291Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 138,
+      "at": "2026-11-07T06:13:39.925Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "thread-input",
+          "thread-list",
+          "frame2",
+          "bar2",
+          "rail2"
+        ]
+      },
+      "result": [
+        {
+          "name": "thread-input",
+          "selector": "textarea[aria-label=\"Tell Codex what to do next…\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Retain the thread reply while background reads fail",
+          "selectionStart": 7,
+          "selectionEnd": 17,
+          "scrollTop": 0,
+          "scrollHeight": 56,
+          "clientHeight": 56
+        },
+        {
+          "name": "thread-list",
+          "selector": "ol[aria-label=\"Thread conversation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 86,
+          "clientHeight": 86
+        },
+        {
+          "name": "frame2",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar2",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail2",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 139,
+      "at": "2026-11-07T06:13:40.146Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-thread-background-error"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 140,
+      "at": "2026-11-07T06:13:40.405Z",
+      "operation": {
+        "op": "fault",
+        "id": "thread-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "thread-read",
+        "enabled": false
+      }
+    },
+    {
+      "index": 141,
+      "at": "2026-11-07T06:13:40.711Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 142,
+      "at": "2026-11-07T06:13:40.922Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 143,
+      "at": "2026-11-07T06:13:41.245Z",
+      "operation": {
+        "op": "viewport",
+        "width": 390,
+        "height": 844
+      },
+      "result": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "index": 144,
+      "at": "2026-11-07T06:13:41.551Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "thread-input",
+          "thread-list",
+          "frame2",
+          "bar2",
+          "rail2"
+        ]
+      },
+      "result": [
+        {
+          "name": "thread-input",
+          "selector": "textarea[aria-label=\"Tell Codex what to do next…\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": true,
+          "value": "Retain the thread reply while background reads fail",
+          "selectionStart": 7,
+          "selectionEnd": 17,
+          "scrollTop": 0,
+          "scrollHeight": 64,
+          "clientHeight": 64
+        },
+        {
+          "name": "thread-list",
+          "selector": "ol[aria-label=\"Thread conversation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 86,
+          "clientHeight": 86
+        },
+        {
+          "name": "frame2",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 844,
+          "clientHeight": 844
+        },
+        {
+          "name": "bar2",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 0,
+          "clientHeight": 0
+        },
+        {
+          "name": "rail2",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 0,
+          "clientHeight": 0
+        }
+      ]
+    },
+    {
+      "index": 145,
+      "at": "2026-11-07T06:13:41.784Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-thread-narrow-web"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 146,
+      "at": "2026-11-07T06:13:42.068Z",
+      "operation": {
+        "op": "viewport",
+        "width": 1440,
+        "height": 1000
+      },
+      "result": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "index": 150,
+      "at": "2026-11-07T06:14:00.148Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-board-detail-return"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 153,
+      "at": "2026-11-07T06:14:01.221Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({comment:document.querySelector(\"textarea[placeholder=\\\"Leave a comment…\\\"]\")?.value})"
+      },
+      "result": {}
+    },
+    {
+      "index": 157,
+      "at": "2026-11-07T06:14:27.627Z",
+      "operation": {
+        "op": "fill",
+        "role": "textbox",
+        "name": "Search apps",
+        "value": "GitHub"
+      },
+      "result": {
+        "filled": true
+      }
+    },
+    {
+      "index": 160,
+      "at": "2026-11-07T06:14:28.452Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "frame2",
+          "bar2",
+          "rail2"
+        ]
+      },
+      "result": [
+        {
+          "name": "frame2",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar2",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail2",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 161,
+      "at": "2026-11-07T06:14:28.783Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-plugin-details"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 162,
+      "at": "2026-11-07T06:14:29.346Z",
+      "operation": {
+        "op": "back"
+      },
+      "result": {}
+    },
+    {
+      "index": 166,
+      "at": "2026-11-07T06:14:52.066Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifact-list",
+        "selector": "section[aria-label=\"All\"]"
+      },
+      "result": {
+        "name": "artifact-list",
+        "selector": "section[aria-label=\"All\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 948,
+        "clientHeight": 948
+      }
+    },
+    {
+      "index": 167,
+      "at": "2026-11-07T06:14:52.358Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-list-read",
+        "action": "artifacts.listArtifacts",
+        "status": 503
+      },
+      "result": {
+        "id": "artifact-list-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 168,
+      "at": "2026-11-07T06:14:52.662Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 169,
+      "at": "2026-11-07T06:14:52.967Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 171,
+      "at": "2026-11-07T06:14:53.599Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "artifact-list",
+          "frame2",
+          "bar2",
+          "rail2"
+        ]
+      },
+      "result": [
+        {
+          "name": "artifact-list",
+          "selector": "section[aria-label=\"All\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "frame2",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar2",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail2",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 172,
+      "at": "2026-11-07T06:14:53.823Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-artifact-library-background-error"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 173,
+      "at": "2026-11-07T06:14:54.082Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-list-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "artifact-list-read",
+        "enabled": false
+      }
+    },
+    {
+      "index": 174,
+      "at": "2026-11-07T06:14:54.388Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 175,
+      "at": "2026-11-07T06:14:54.596Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 179,
+      "at": "2026-11-07T06:15:25.072Z",
+      "operation": {
+        "op": "facts",
+        "expression": "Array.from(document.querySelectorAll('[role=dialog] main *')).filter(e=>e.scrollHeight>e.clientHeight+100&&getComputedStyle(e).overflowY==='auto').map(e=>({tag:e.tagName,cls:e.className,scrollHeight:e.scrollHeight,height:e.clientHeight}))"
+      },
+      "result": [
+        {
+          "tag": "DIV",
+          "cls": "min-h-0 flex-1 overflow-y-auto",
+          "scrollHeight": 4406,
+          "height": 808
+        }
+      ]
+    },
+    {
+      "index": 180,
+      "at": "2026-11-07T06:15:40.273Z",
+      "operation": {
+        "op": "scroll",
+        "selector": "[role=\"dialog\"] main .overflow-y-auto",
+        "top": 500
+      },
+      "result": {
+        "scrollTop": 500
+      }
+    },
+    {
+      "index": 181,
+      "at": "2026-11-07T06:15:40.577Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifact-scroll",
+        "selector": "[role=\"dialog\"] main .overflow-y-auto"
+      },
+      "result": {
+        "name": "artifact-scroll",
+        "selector": "[role=\"dialog\"] main .overflow-y-auto",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 500,
+        "scrollHeight": 4406,
+        "clientHeight": 808
+      }
+    },
+    {
+      "index": 182,
+      "at": "2026-11-07T06:15:40.871Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifact-document",
+        "selector": "[data-slot=\"artifact-document\"]"
+      },
+      "result": {
+        "name": "artifact-document",
+        "selector": "[data-slot=\"artifact-document\"]",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 4204,
+        "clientHeight": 4204
+      }
+    },
+    {
+      "index": 183,
+      "at": "2026-11-07T06:15:41.191Z",
+      "operation": {
+        "op": "facts",
+        "expression": "(()=>{const p=document.querySelector(\"[data-slot=artifact-document] p\"); const s=getSelection();const r=document.createRange();r.setStart(p.firstChild,0);r.setEnd(p.firstChild,17);s.removeAllRanges();s.addRange(r);return {selected:s.toString()}})()"
+      },
+      "result": {
+        "selected": "Synthetic content"
+      }
+    },
+    {
+      "index": 184,
+      "at": "2026-11-07T06:15:41.364Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-detail-read",
+        "action": "artifacts.getArtifact",
+        "status": 503
+      },
+      "result": {
+        "id": "artifact-detail-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 185,
+      "at": "2026-11-07T06:15:41.665Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-text-read",
+        "action": "artifacts.getArtifactText",
+        "status": 503
+      },
+      "result": {
+        "id": "artifact-text-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 186,
+      "at": "2026-11-07T06:15:41.982Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 187,
+      "at": "2026-11-07T06:15:42.276Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 189,
+      "at": "2026-11-07T06:15:42.849Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "artifact-scroll",
+          "artifact-document",
+          "frame2",
+          "bar2",
+          "rail2"
+        ]
+      },
+      "result": [
+        {
+          "name": "artifact-scroll",
+          "selector": "[role=\"dialog\"] main .overflow-y-auto",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 500,
+          "scrollHeight": 4406,
+          "clientHeight": 808
+        },
+        {
+          "name": "artifact-document",
+          "selector": "[data-slot=\"artifact-document\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 4204,
+          "clientHeight": 4204
+        },
+        {
+          "name": "frame2",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar2",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail2",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 190,
+      "at": "2026-11-07T06:15:43.422Z",
+      "operation": {
+        "op": "facts",
+        "expression": "({selected:getSelection()?.toString(),documentVisible:!!document.querySelector(\"[data-slot=artifact-document]\")})"
+      },
+      "result": {
+        "selected": "Synthetic content",
+        "documentVisible": true
+      }
+    },
+    {
+      "index": 191,
+      "at": "2026-11-07T06:15:43.853Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-artifact-document-background-error"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 192,
+      "at": "2026-11-07T06:15:44.320Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-detail-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "artifact-detail-read",
+        "enabled": false
+      }
+    },
+    {
+      "index": 193,
+      "at": "2026-11-07T06:15:44.622Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-text-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "artifact-text-read",
+        "enabled": false
+      }
+    },
+    {
+      "index": 197,
+      "at": "2026-11-07T06:15:57.992Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "artifact-scroll",
+          "artifact-document"
+        ]
+      },
+      "result": [
+        {
+          "name": "artifact-scroll",
+          "selector": "[role=\"dialog\"] main .overflow-y-auto",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 500,
+          "scrollHeight": 4406,
+          "clientHeight": 808
+        },
+        {
+          "name": "artifact-document",
+          "selector": "[data-slot=\"artifact-document\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 4204,
+          "clientHeight": 4204
+        }
+      ]
+    },
+    {
+      "index": 198,
+      "at": "2026-11-07T06:15:58.425Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-artifact-document-recovered"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 202,
+      "at": "2026-11-07T06:16:00.309Z",
+      "operation": {
+        "op": "observe",
+        "name": "artifact-html",
+        "selector": "iframe"
+      },
+      "result": {
+        "name": "artifact-html",
+        "selector": "iframe",
+        "sameNode": true,
+        "connected": true,
+        "focus": false,
+        "scrollTop": 0,
+        "scrollHeight": 808,
+        "clientHeight": 808
+      }
+    },
+    {
+      "index": 203,
+      "at": "2026-11-07T06:16:00.600Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-detail-read",
+        "enabled": true
+      },
+      "result": {
+        "id": "artifact-detail-read",
+        "enabled": true
+      }
+    },
+    {
+      "index": 204,
+      "at": "2026-11-07T06:16:00.916Z",
+      "operation": {
+        "op": "offline",
+        "value": true
+      },
+      "result": {
+        "offline": true
+      }
+    },
+    {
+      "index": 205,
+      "at": "2026-11-07T06:16:01.125Z",
+      "operation": {
+        "op": "offline",
+        "value": false
+      },
+      "result": {
+        "offline": false
+      }
+    },
+    {
+      "index": 207,
+      "at": "2026-11-07T06:16:01.753Z",
+      "operation": {
+        "op": "observed",
+        "names": [
+          "artifact-html",
+          "frame2",
+          "bar2",
+          "rail2"
+        ]
+      },
+      "result": [
+        {
+          "name": "artifact-html",
+          "selector": "iframe",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 808,
+          "clientHeight": 808
+        },
+        {
+          "name": "frame2",
+          "selector": "[data-slot=\"app-frame-content\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        },
+        {
+          "name": "bar2",
+          "selector": "[data-slot=\"window-bar\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 44,
+          "clientHeight": 44
+        },
+        {
+          "name": "rail2",
+          "selector": "[role=\"navigation\"][aria-label=\"Main navigation\"]",
+          "sameNode": true,
+          "connected": true,
+          "focus": false,
+          "scrollTop": 0,
+          "scrollHeight": 948,
+          "clientHeight": 948
+        }
+      ]
+    },
+    {
+      "index": 208,
+      "at": "2026-11-07T06:16:02.153Z",
+      "operation": {
+        "op": "screenshot",
+        "name": "after-artifact-html-background-error"
+      },
+      "result": {
+        "source": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+        "overlay": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+        "documentRequests": 1
+      }
+    },
+    {
+      "index": 209,
+      "at": "2026-11-07T06:16:02.624Z",
+      "operation": {
+        "op": "fault",
+        "id": "artifact-detail-read",
+        "enabled": false
+      },
+      "result": {
+        "id": "artifact-detail-read",
+        "enabled": false
+      }
+    }
+  ]
+}

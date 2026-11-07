@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "issue": 1603,
+  "sourceSha": "9005d8eaea561d42a59768846f6abbf46d4d5f19",
+  "officialOverlaySha": "2cbb930e409ccc247f7692abc9e2dd1152a571fe",
+  "kind": "curated-manual-local-production-ui-failures",
+  "sourceLog": "operations.jsonl",
+  "operationIndices": "1-based; refer to the original 215-record 9005 manual session",
+  "manualSessionWindowUtc": {
+    "startedAt": "2026-11-07T06:00:10.649Z",
+    "lastCompletedOperationAt": "2026-11-07T06:16:05.862Z"
+  },
+  "redaction": {
+    "fixtureIdsOmitted": true,
+    "fullUrlsOmitted": true,
+    "longPageTextOmitted": true,
+    "credentialsIncluded": false
+  },
+  "failures": [
+    {
+      "id": "history-route-view-mismatch",
+      "status": "reproduced-on-9005",
+      "steps": [
+        "Open Ada and type an unsent draft",
+        "Open Settings, invoke command search, return to Settings",
+        "Back to Ada, Forward to Settings, then Back"
+      ],
+      "controlObservation": {
+        "operationIndex": 37,
+        "at": "2026-11-07T06:01:32.117Z",
+        "firstBackRestoredDraft": true,
+        "scrollTop": 340
+      },
+      "failureObservation": {
+        "operationIndex": 42,
+        "at": "2026-11-07T06:02:20.892Z",
+        "sourceKind": "DOM facts",
+        "urlStillTargetsPreviouslySelectedBot": true,
+        "expectedView": "Ada",
+        "visibleMainStartsWith": "Coordinator",
+        "composerPlaceholder": "Message the Coordinator",
+        "visibleDraftEmpty": true
+      },
+      "shellObservation": {
+        "operationIndex": 43,
+        "sameFrameBarRailNodes": true
+      },
+      "candidateFix": {
+        "sourceCommit": "b7a73ab1a0a3b393cf47c168fd6d2697cad72ef7",
+        "includedInCandidate": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+        "actualUiRecheck": "TODO"
+      }
+    },
+    {
+      "id": "task-comment-lost-after-navigation",
+      "status": "reproduced-on-9005",
+      "steps": [
+        "Type an unsent task comment",
+        "Trigger a background 503; the comment survives while mounted",
+        "Close task details and return to Board",
+        "Reopen the same task"
+      ],
+      "beforeNavigation": {
+        "operationIndices": [
+          114,
+          116,
+          120,
+          121
+        ],
+        "at": "2026-11-07T06:12:22.973Z",
+        "sourceKind": "DOM observation and screenshot",
+        "commentDraftLength": 43,
+        "sameCommentNode": true,
+        "focused": true,
+        "selection": [
+          5,
+          14
+        ],
+        "screenshot": "9005/after-task-background-error.webp"
+      },
+      "navigationOperationIndices": [
+        148,
+        151,
+        152,
+        154,
+        212,
+        213,
+        214
+      ],
+      "failureObservation": {
+        "operationIndex": 215,
+        "at": "2026-11-07T06:16:05.862Z",
+        "sourceKind": "accessibility snapshot",
+        "commentTextboxShowsNoValue": true,
+        "sendCommentDisabled": true,
+        "excerpt": [
+          "textbox \"Comment\":",
+          "  /placeholder: Leave a comment…",
+          "button \"Send comment\" [disabled]"
+        ]
+      },
+      "evidenceLimit": "Operation 153 returned an empty object after a selector lookup; it is not treated as a measured empty value. The failure above uses the later observed textbox and disabled send control, not a claimed dedicated after screenshot.",
+      "candidateFix": {
+        "sourceCommit": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+        "sameTreeAsLocallyTestedCommit": "f797671373f7b5b23a9c10ec8a27d77bf9e45da0",
+        "tree": "43ddc1c57eb0fede3db6cad89d406baa02554597",
+        "actualUiRecheck": "TODO"
+      }
+    }
+  ],
+  "manualSessionEnd": {
+    "status": "controller-ended-before-final-cleanup",
+    "closeOperationRecorded": false,
+    "fixtureCleanup": "pending-recovery",
+    "leaseRelease": "pending-confirmation"
+  },
+  "candidateUiAcceptance": "TODO: rebuild and inspect the exact 156b candidate; 9005 results are not relabeled"
+}

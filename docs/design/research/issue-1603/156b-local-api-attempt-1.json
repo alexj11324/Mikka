@@ -1,0 +1,12 @@
+{
+  "source": "156b6a2779d1ee71161b99ab47b3484e2a8b5704",
+  "jobId": "job-4c407e9accb6",
+  "status": "failed",
+  "exitCode": 1,
+  "startedAt": "2026-11-07T06:39:33.490Z",
+  "error": "Connection terminated unexpectedly",
+  "location": "pg Pool idleListener emitted an unhandled idle-client error",
+  "httpAcceptanceSummaryCreated": false,
+  "productAssertionsBypassed": false,
+  "nextStep": "diagnose temporary WSS/TLS connection lifecycle, recover the lease under existing rules, then rerun against the fixed source"
+}
