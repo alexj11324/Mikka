@@ -1,0 +1,19 @@
+✔ six fixed slots, exactly four warm slots, each must pass; fast averages cannot rescue one slow or failed slot (4.463458ms)
+✔ version failures and unsent rows cannot become a passing warm sample (0.528095ms)
+✔ preserve every retry and multiple usage records; duplicated events are annotated, never silently selected away (1.799817ms)
+✔ missing, null, invalid, numeric zero, worker overflow and partial outcomes remain distinct; unknown contents do not escape (0.692851ms)
+✔ one capture per exact run; wrong or unbound run, byte hash and deployment fail closed (1.144643ms)
+✔ a run reused by two receipt slots is ambiguous; no duplication of one run into two successes (0.300312ms)
+✔ projection association requires the full scoped stream id; multiple HTTP observations stay distinct (0.805285ms)
+✔ only explicit JSON envelopes are decoded; unsupported Markdown never invents values or completeness (0.568678ms)
+✔ two ordinary Stop receipts have a separate denominator and never affect the four warm target slots (0.557416ms)
+✔ one valid record never hides a damaged JSONL candidate, another fence, or an unclosed fence (1.496087ms)
+✔ retain producer prefix and closed model metadata without leaking invalid hashes or arbitrary strings (0.795371ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76.68184

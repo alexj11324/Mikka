@@ -1,0 +1,15 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern",
+    "one valid record never|retain producer prefix",
+    "aggregate.test.mjs"
+  ],
+  "cwd": "/vercel/recovery/cache-attribution-batch1615/v2-regression-red",
+  "startedAt": "2026-11-07T19:32:43.909125+00:00",
+  "exitCode": 1,
+  "log": "v2-red.log",
+  "logSha256": "d53360eb33efef7657041650d00666c78e8b8bda94300aa56793092743e099ef",
+  "syntheticOnly": true
+}

@@ -1,0 +1,69 @@
+{
+  "producerSourceCommit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "readOnlyGitObjects": true,
+  "sources": [
+    {
+      "path": "lib/model-call-timing.ts",
+      "blob": "f5d5a9cae9f792e2b1b4a5573abcbc7579264f12",
+      "bytes": 9727,
+      "sha256": "692abd99eba6f8566896c80fde194ddf961f5dc78543ae7bd6c6aa705b88e2cd"
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "blob": "c47738974f8692ebd30a1736e8d39ea7a35ff7f4",
+      "bytes": 3877,
+      "sha256": "877d72fefc855d033594da710323c4f499035c39b83f373fc8a712d9c79909cb"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.ts",
+      "blob": "026c8d67bc03887bfd7cb5b9b9cad1ad8a8b5a75",
+      "bytes": 8030,
+      "sha256": "bb9003eb6bd2b4378cee63a32afd83792aaf202682f3459995eb5a708d2b3a92"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "blob": "01e9ce194c44f0dde732b21f612284f256670fdd",
+      "bytes": 90721,
+      "sha256": "14dc2d37fa8775b38110f5c696dca609e0b3fcd9497270ba9a12919b389eb140"
+    },
+    {
+      "path": "lib/coordinator/stream-response.ts",
+      "blob": "b47e86076e09bc2f30713a36619a2888c91757e8",
+      "bytes": 14340,
+      "sha256": "5dbdd5ec450ceefb79351095025f7d4350ec794e83334e08aa2ca9831c898805"
+    },
+    {
+      "path": "app/api/coordinator/stream/route.ts",
+      "blob": "b99e9cacf1d23e9651a278855ceb31816e555428",
+      "bytes": 6031,
+      "sha256": "1843db486151b4f496242bd19e32b1aafb2e5ec8f6e36179689cfb51bf605f31"
+    }
+  ],
+  "receiptSources": [
+    {
+      "path": "/vercel/recovery/acceptance-four-file-recovery/base/scripts/acceptance/issue-1506-alex/continuation.mjs",
+      "bytes": 6428,
+      "sha256": "9e94d74e30db895edde000fa00ddc0898988ac74feabeffb5c3fbf67ce0853a7"
+    },
+    {
+      "path": "/vercel/recovery/acceptance-four-file-recovery/base/scripts/acceptance/issue-1506-alex/coordinator-cache-turns.mjs",
+      "bytes": 16773,
+      "sha256": "40772570d93f6ba3656ed7346fd610ae2320de61db26764da1a94213ec76e495"
+    },
+    {
+      "path": "/vercel/recovery/acceptance-four-file-recovery/base/scripts/acceptance/issue-1506-alex/coordinator-cache-completion.mjs",
+      "bytes": 11700,
+      "sha256": "213c66ff38c6c1f3a7ab5194ae50647a8f239add00117bcd91772f4d3fb44fe3"
+    },
+    {
+      "path": "/vercel/recovery/acceptance-four-file-recovery/base/scripts/acceptance/issue-1506-alex/phase1.mjs",
+      "bytes": 5117,
+      "sha256": "d08aab7fa4dc56ed99f19311816084e8107a046c1323f842000eb35c7bac8787"
+    },
+    {
+      "path": "/vercel/recovery/acceptance-four-file-recovery/candidate/scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs",
+      "bytes": 16130,
+      "sha256": "5a1b3958c03248b283d6e17fbf2c852abd420c13d2f960fd90a7d999a7c9f491"
+    }
+  ]
+}

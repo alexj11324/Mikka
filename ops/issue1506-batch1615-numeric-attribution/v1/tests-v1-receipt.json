@@ -1,0 +1,10 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "aggregate.test.mjs"
+  ],
+  "exitCode": 0,
+  "log": "tests-v1.log",
+  "sha256": "508538a333627dd8fbad8ec1e5dbed11fdce9d2d315f254d72900735eb9f0246"
+}

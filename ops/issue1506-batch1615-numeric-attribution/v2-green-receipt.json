@@ -1,0 +1,13 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "aggregate.test.mjs"
+  ],
+  "cwd": "/vercel/recovery/cache-attribution-batch1615",
+  "startedAt": "2026-11-07T19:32:44.029593+00:00",
+  "exitCode": 0,
+  "log": "v2-green.log",
+  "logSha256": "1fa8ecb155efae5079f3c0b1b851fa88710946b97a3d254f250e96960b33c58d",
+  "syntheticOnly": true
+}

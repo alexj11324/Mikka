@@ -1,0 +1,190 @@
+--- v1/aggregate.mjs
++++ v2/aggregate.mjs
+@@ -3,7 +3,7 @@
+ import { resolve, dirname } from 'node:path'
+ import { pathToFileURL } from 'node:url'
+ 
+-export const VERSION = 'batch1615-numeric-attribution-v1'
++export const VERSION = 'batch1615-numeric-attribution-v2'
+ export const PRODUCER = '0d379dd92fd2d7b3f2b307030c3bcd8234426d0e'
+ const SHA = /^[0-9a-f]{40}$/, HASH = /^[0-9a-f]{64}$/
+ const RUN = /^wrun_[A-Za-z0-9_-]{1,160}$/
+@@ -73,8 +73,22 @@
+     ...Object.fromEntries(['firstEmittedAtCommitted','firstBlockedByHoldback','quietEligible','stopped'].map(k=>[k,enumCell(r,k,[0,1])])),
+     terminal:enumCell(r,'terminal',[0,1,2,3,4])}
+ }
++function promptPrefix(p) {
++  if (p === undefined) return {state:'missing'}
++  if (p === null) return {state:'null'}
++  if (!object(p)) return {state:'invalid'}
++  const hash = (o,k) => !own(o,k)?{state:'missing'}:o[k]===null?{state:'null'}:
++    typeof o[k]==='string' && /^[0-9a-f]{12}$/.test(o[k])?{state:'value',value:o[k]}:{state:'invalid'}
++  const system=!own(p,'system')?{state:'missing'}:p.system===null?{state:'null'}:
++    !Array.isArray(p.system)?{state:'invalid'}:{state:'array',values:p.system.map((_,i)=>hash(p.system,i))}
++  return {state:'reported',tools:hash(p,'tools'),system}
++}
+ function recordModel(r) {
+   return {workflowRunId:r.workflowRunId,stepId:safeId(r.stepId),attempt:cell(r,'attempt','count'),
++    route:enumCell(r,'route',['hosted','subscription']),
++    model:enumCell(r,'model',['claude-haiku-5-5','gpt-6-luna']),
++    finishReason:enumCell(r,'finishReason',['stop','length','content-filter','tool-calls','error','other','unknown']),
++    prefix:promptPrefix(r.prefix),
+     ...cells(r,['setupMs','firstTokenMs','firstTextMs','durationMs']),
+     ...cells(r,['tools','inputTokens','cacheReadTokens','cacheWriteTokens','outputTokens','toolCalls'],'count'),
+     interrupted:cell(r,'interrupted','bool'),codexLayoutApplied:cell(r,'codexLayoutApplied','bool'),
+@@ -98,16 +112,28 @@
+       const t=x.trim()
+       if (!t) return
+       try { walk(JSON.parse(t),meta,depth+1); return } catch {}
+-      let decoded=0
+-      for (const m of t.matchAll(/(?:^|\n)\x60\x60\x60(?:json|jsonl)?\s*\n([\s\S]*?)\n\x60\x60\x60/g)) {
+-        decoded++; walk(m[1],meta,depth+1)
++      let candidates=0, fence=null
++      for (const line of t.split(/\r?\n/)) {
++        const trimmed=line.trim()
++        if (fence !== null) {
++          if (/^\x60\x60\x60\s*$/.test(trimmed)) {
++            const body=fence.join('\n').trim()
++            if (body) walk(body,meta,depth+1); else unsupported++
++            fence=null
++          } else fence.push(line)
++          continue
++        }
++        if (/^\x60\x60\x60(?:json|jsonl)?\s*$/.test(trimmed)) { candidates++; fence=[]; continue }
++        if (!/^[{\[]/.test(trimmed)) continue
++        candidates++
++        try { walk(JSON.parse(trimmed),meta,depth+1) } catch { unsupported++ }
+       }
+-      if (decoded) return
+-      for (const line of t.split(/\r?\n/)) {
+-        if (!line.trim().startsWith('{')) continue
+-        try { walk(JSON.parse(line),meta,depth+1); decoded++ } catch {}
++      if (fence !== null) {
++        unsupported++ // An unclosed explicit fence cannot establish complete evidence.
++        const body=fence.join('\n').trim()
++        if (body) walk(body,meta,depth+1)
+       }
+-      if (!decoded) unsupported++
++      if (!candidates) unsupported++
+       return
+     }
+     if (Array.isArray(x)) { for (const v of x) walk(v,meta,depth+1); return }
+--- v1/aggregate.test.mjs
++++ v2/aggregate.test.mjs
+@@ -132,3 +132,57 @@
+   assert.equal(result.warmAcceptance.passed,true)
+   assert.equal(result.ordinaryStop[0].textConsistency.matches.value,false)
+ })
++
++test('one valid record never hides a damaged JSONL candidate, another fence, or an unclosed fence',()=>{
++  const id=run('haiku',2),valid=JSON.stringify(model(id)),bad='{"msg":"model_call_timing","workflowRunId":'
++  const cases=[
++    valid+'\n'+bad,
++    '\`\`\`json\n'+valid+'\n\`\`\`\n'+bad,
++    '\`\`\`json\n'+bad+'\n\`\`\`\n\`\`\`json\n'+valid+'\n\`\`\`',
++    '\`\`\`jsonl\n'+valid+'\n'+bad+'\n\`\`\`',
++    '\`\`\`json\n'+valid,
++    valid+'\n[{"msg":'
++  ]
++  for(const raw of cases) {
++    const parsed=extractRecords(raw)
++    assert.equal(parsed.records.length,1)
++    assert.ok(parsed.unsupported>=1)
++    const i=input()
++    i.captures=[{...capture(id,[]),text:raw,sha256:sha256(raw)}]
++    const runtime=aggregate(i).cache[1].runtime
++    assert.equal(runtime.model.length,1)
++    assert.equal(runtime.complete,false)
++  }
++})
++test('retain producer prefix and closed model metadata without leaking invalid hashes or arbitrary strings',()=>{
++  const id=run('haiku',2),i=input()
++  const secret='PRIVATE_BODY_NOT_A_PREFIX'
++  const rows=[
++    model(id,1,{route:'subscription',model:'claude-haiku-5-5',finishReason:'stop',
++      prefix:{tools:'012345abcdef',system:['abcdef123456','000000000000']}}),
++    model(id,2,{route:secret,model:secret,finishReason:secret,
++      prefix:{tools:secret,system:['abcdef123456',secret,'a'.repeat(64),null]}}),
++    model(id,3,{route:null,model:null,finishReason:null,prefix:null}),
++    model(id,4,{}),
++    model(id,5,{prefix:{system:secret}}),
++    model(id,6,{prefix:{tools:null}})
++  ]
++  i.captures=[capture(id,rows)]
++  const out=aggregate(i),r=out.cache[1].runtime.model
++  assert.equal(r.length,6)
++  assert.equal(r[0].route.value,'subscription')
++  assert.equal(r[0].model.value,'claude-haiku-5-5')
++  assert.equal(r[0].finishReason.value,'stop')
++  assert.equal(r[0].prefix.tools.value,'012345abcdef')
++  assert.deepEqual(r[0].prefix.system.values.map(x=>x.value),['abcdef123456','000000000000'])
++  assert.equal(r[1].route.state,'invalid')
++  assert.equal(r[1].model.state,'invalid')
++  assert.equal(r[1].finishReason.state,'invalid')
++  assert.equal(r[1].prefix.tools.state,'invalid')
++  assert.deepEqual(r[1].prefix.system.values.map(x=>x.state),['value','invalid','invalid','null'])
++  assert.equal(r[2].prefix.state,'null');assert.equal(r[3].prefix.state,'missing')
++  assert.equal(r[4].prefix.tools.state,'missing');assert.equal(r[4].prefix.system.state,'invalid')
++  assert.equal(r[5].prefix.tools.state,'null');assert.equal(r[5].prefix.system.state,'missing')
++  assert.equal(JSON.stringify(out).includes(secret),false)
++  assert.equal(JSON.stringify(out).includes('a'.repeat(64)),false)
++})
+--- v1/README.md
++++ v2/README.md
+@@ -1,4 +1,4 @@
+-# Batch 1615 离线数值归因器 v1
++# Batch 1615 离线数值归因器 v2
+ 
+ 这是新写的离线工具，不是旧 schema3 分析器的字节恢复。它没有网络、SQL、模型、资源或验收控制能力，不导入产品运行时。生产结果仍未采集；本目录的测试全部使用合成输入。
+ 
+@@ -16,7 +16,7 @@
+ ## 日志字段与关联
+ 
+ 只识别三个实际 producer：
+-- model_call_timing：workflowRunId 必须完全相等。保留所有 stepId、attempt、interrupted、usage/rawCache 状态与 subscriptionStages；重复事件保留并标 duplicateOf，不取最快/最后一项冒充整轮。
++- model_call_timing：workflowRunId 必须完全相等。保留所有 stepId、attempt、interrupted、usage/rawCache 状态与 subscriptionStages；同时保留实际 producer 的闭集 route/model/finishReason 和严格 prefix 哈希；重复事件保留并标 duplicateOf，不取最快/最后一项冒充整轮。
+ - turn_timing：同样按 exact workflowRunId；事件钟 phase 与 Node body 时间分开。
+ - coordinator_stream_projection_timing：必须匹配完整 wrun_ID:round 格式；不按 startsWith 或时间邻近认领。requestId 只取日志 envelope；多个 HTTP 投影或缺少 requestId 保留为不唯一，不能自动挑一个对应客户端。
+ 
+@@ -26,7 +26,7 @@
+ 
+ rawCache missing 表示该 producer 最后取得的 usage 未含此字段；不是已证明 miss。null、invalid、number(0) 四种状态不同。SDK 可能已把未报告归零；多个 provider usage 在 SDK 内的覆盖不会被本工具恢复，仅保留实际已记录的所有 model 日志。
+ 
+-仅输出既有闭集数值、固定枚举和必要 ID。不输出提示词、正文、credential、digest、provider 错误文本。原件 SHA 可用于追溯失败，failurePresent 不冒充具体原因。未知 subscription 字段丢弃；不合法数值保留 invalid，missing/null 保留各自状态。最多保留 producer 合同内 16 个 worker，同时保留 overflow 和 suppliedWorkers；超合同数组标 invalid。
++仅输出既有闭集数值、固定枚举和必要 ID。不输出提示词、正文、credential、secret fingerprint digest、provider 错误文本。prefix.tools/system 仅允许实际 producer 的 12 位小写十六进制请求内容摘要；它与 secret fingerprint 无关。route 仅 hosted/subscription；model 仅实际 fixture 的 claude-haiku-5-5 / gpt-6-luna；finishReason 仅 stop、length、content-filter、tool-calls、error、other、unknown。其余值保持 invalid，不回显原字符串。prefix 整体以及 tools/system 的 missing、null、invalid 分别保留。pre-layout 哈希的变化只能识别缓存前缀变更候选，不能单独证明 hit/miss 或实际 wire 完全相同。原件 SHA 可用于追溯失败，failurePresent 不冒充具体原因。未知 subscription 字段丢弃；不合法数值保留 invalid，missing/null 保留各自状态。最多保留 producer 合同内 16 个 worker，同时保留 overflow 和 suppliedWorkers；超合同数组标 invalid。
+ 
+ ## 时钟：来源固定 0d379dd92fd2d7b3f2b307030c3bcd8234426d0e
+ 
+@@ -53,4 +53,16 @@
+ 
+ node --test aggregate.test.mjs
+ 
+-九项独立离线场景验证六槽/四 warm 门槛、失败/未发送、重试与多 usage、missing/null/invalid/overflow、不回显未知内容、重复/错误来源拒绝、完整 scoped projection、多 HTTP 歧义、未知 Markdown、普通 Stop 独立分母。原历史生产数值与旧分析器均未改写，旧测试成绩不转移到本工具。本工具无产品变更，亦无 PG 门槛；真实日志布局和真实新生产结果均尚未验证。
++十一项独立离线场景验证六槽/四 warm 门槛、失败/未发送、重试与多 usage、missing/null/invalid/overflow、不回显未知内容、重复/错误来源拒绝、完整 scoped projection、多 HTTP 歧义、未知 Markdown、普通 Stop 独立分母。原历史生产数值与旧分析器均未改写，旧测试成绩不转移到本工具。本工具无产品变更，亦无 PG 门槛；真实日志布局和真实新生产结果均尚未验证。
++
++## v2 修订与反证
++
++v1 完整冻结保存在 v1/，其 freeze-manifest.json SHA256 仍为
++927de16d61a9419e7b513a28a87a55c4a8d6e0abc941cc5caf71ca8447e003c0。
++原通过日志未覆盖。
++
++v2 仅修两处实际审阅问题：
++1. 每个显式 JSON/JSONL 候选、坏 fence 及未闭合 fence 单独计失败；一条有效记录不能掩盖旁边损坏记录。保留可解码记录，同时 complete=false。
++2. 补回上面的闭集模型元数据与 12 位 prefix 哈希；保留所有 attempt，不以任意未知字符串换取更多字段。
++
++新增两项测试先对完整 v1 源运行，均真实失败；其中 JSONL/fence 混合损坏显示旧解析会遗漏 incomplete，prefix 用例显示旧输出缺失该合同。随后最终 v2 跑原九项与新两项，共 11/11 PASS、0 skip。针对 v1 的隔离临时副本已经清理；v2-red.log 与 v2-green.log 及各自 exit receipt 保留。v2-v1.patch 给出准确修订。没有调用任何生产查询或新增模型样本。
+--- v1/source-proof.json
++++ v2/source-proof.json
+@@ -64,6 +64,12 @@
+       "path": "/vercel/recovery/acceptance-four-file-recovery/candidate/scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs",
+       "bytes": 16130,
+       "sha256": "5a1b3958c03248b283d6e17fbf2c852abd420c13d2f960fd90a7d999a7c9f491"
++    },
++    {
++      "path": "/vercel/recovery/acceptance-four-file-recovery/base/scripts/acceptance/issue-1506-alex/coordinator-fixtures.mjs",
++      "bytes": 16986,
++      "sha256": "3d03e583ca02cbede86dfb2c1cf07c6cec2ff39cdc1f5b30ba0f315a5e00334d",
++      "purpose": "Closed fixture model allowlist: claude-haiku-5-5 and gpt-6-luna"
+     }
+   ]
+ }

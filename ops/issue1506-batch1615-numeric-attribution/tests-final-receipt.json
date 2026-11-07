@@ -1,0 +1,18 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "aggregate.test.mjs"
+  ],
+  "cwd": "/vercel/recovery/cache-attribution-batch1615",
+  "startedAt": "2026-11-07T19:23:16.912595+00:00",
+  "finishedAt": "2026-11-07T19:23:17.013042+00:00",
+  "exitCode": 0,
+  "log": "tests-final.log",
+  "logSha256": "7acf7eca7ab523ef0ec4b467b288395aed926b5bc4c5844858eee29fd2413f7e",
+  "syntheticOnly": true,
+  "networkCalls": 0,
+  "sqlCalls": 0,
+  "modelCalls": 0,
+  "resourcesCreated": 0
+}

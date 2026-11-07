@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "analysisVersion": "batch1615-numeric-attribution-v2",
+  "producerSourceCommit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "actualApplicationSha": null,
+  "actualDeploymentId": null,
+  "productionSamples": 0,
+  "rootReviewRequiredBeforeGitCheckpoint": true,
+  "testExitCode": 0,
+  "testPass": 11,
+  "testSkip": 0,
+  "priorVersion": {
+    "path": "v1/freeze-manifest.json",
+    "sha256": "927de16d61a9419e7b513a28a87a55c4a8d6e0abc941cc5caf71ca8447e003c0"
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "bytes": 8262,
+      "sha256": "a7b774b64ee0446068b738239555259847f0443476c5ea3f7d7fb673208a4289"
+    },
+    {
+      "path": "aggregate.mjs",
+      "bytes": 17904,
+      "sha256": "8e9a578ffb50700a349016f2dc61131c990ac8e33f0e974ca4279f9b81861f60"
+    },
+    {
+      "path": "aggregate.test.mjs",
+      "bytes": 10803,
+      "sha256": "4c4aedf383040e4070d0494085bf3675dd38f60304ba0977d9ca10996085a570"
+    },
+    {
+      "path": "manifest.example.json",
+      "bytes": 673,
+      "sha256": "3d5d700866bb2f712a35c8f6c1ee430d62abd5a4c30f8915b4e1b3c4fbaabfff"
+    },
+    {
+      "path": "source-proof.json",
+      "bytes": 3077,
+      "sha256": "a55d359686162221e15fd4c493362d0f3038a1ee6df88f0a80021cc476f5f6eb"
+    },
+    {
+      "path": "tests-final-receipt.json",
+      "bytes": 469,
+      "sha256": "6d6b2eaa4f0a331e68af5d64562b9dd7c25577d72eba3864323333b6c6e578e4"
+    },
+    {
+      "path": "tests-final.log",
+      "bytes": 1156,
+      "sha256": "7acf7eca7ab523ef0ec4b467b288395aed926b5bc4c5844858eee29fd2413f7e"
+    },
+    {
+      "path": "tests-v1-receipt.json",
+      "bytes": 196,
+      "sha256": "f2169dc39e99883f6ec39b71c6473309d4253b6876d7b0a08bc6237273843aa7"
+    },
+    {
+      "path": "tests-v1.log",
+      "bytes": 1158,
+      "sha256": "508538a333627dd8fbad8ec1e5dbed11fdce9d2d315f254d72900735eb9f0246"
+    },
+    {
+      "path": "v2-green-receipt.json",
+      "bytes": 332,
+      "sha256": "34ae7158f8833bcb4e96a270232fff4aaf9d91ef401e333060ea0804445d65a0"
+    },
+    {
+      "path": "v2-green.log",
+      "bytes": 1386,
+      "sha256": "1fa8ecb155efae5079f3c0b1b851fa88710946b97a3d254f250e96960b33c58d"
+    },
+    {
+      "path": "v2-red-receipt.json",
+      "bytes": 428,
+      "sha256": "7ccd20130fc39dba34515f01f5f0ec6a7f3b8c55dc4ee2e5defaf84299a0e1a8"
+    },
+    {
+      "path": "v2-red.log",
+      "bytes": 1905,
+      "sha256": "d53360eb33efef7657041650d00666c78e8b8bda94300aa56793092743e099ef"
+    },
+    {
+      "path": "v2-v1.patch",
+      "bytes": 12219,
+      "sha256": "b6688d36c6bb2cb109c008138f16a2d61782e982b9349dcebcfa47fcbbcec621"
+    }
+  ]
+}

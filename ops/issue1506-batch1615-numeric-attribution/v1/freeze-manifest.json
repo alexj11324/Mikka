@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "analysisVersion": "batch1615-numeric-attribution-v1",
+  "producerSourceCommit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "actualApplicationSha": null,
+  "actualDeploymentId": null,
+  "productionSamples": 0,
+  "rootReviewRequiredBeforeGitCheckpoint": true,
+  "testExitCode": 0,
+  "artifacts": [
+    {
+      "path": "README.md",
+      "bytes": 6599,
+      "sha256": "c94e2feacb4afa7b4c7d150c2e6b7e5459286372c626c8a849cd2f00afbde054"
+    },
+    {
+      "path": "aggregate.mjs",
+      "bytes": 16557,
+      "sha256": "9c251166eff976795cb535668953e39d77b66796180bba78587be9f93661de24"
+    },
+    {
+      "path": "aggregate.test.mjs",
+      "bytes": 8188,
+      "sha256": "3fbf3467f224aacf514fd312e63c417d2e38c30316440d963d6166588e275728"
+    },
+    {
+      "path": "manifest.example.json",
+      "bytes": 673,
+      "sha256": "3d5d700866bb2f712a35c8f6c1ee430d62abd5a4c30f8915b4e1b3c4fbaabfff"
+    },
+    {
+      "path": "source-proof.json",
+      "bytes": 2746,
+      "sha256": "6df136350ee05de33189984abc62585f7d5ea29ef3075a5ad5871e55233ec9b7"
+    },
+    {
+      "path": "tests-final-receipt.json",
+      "bytes": 469,
+      "sha256": "6d6b2eaa4f0a331e68af5d64562b9dd7c25577d72eba3864323333b6c6e578e4"
+    },
+    {
+      "path": "tests-final.log",
+      "bytes": 1156,
+      "sha256": "7acf7eca7ab523ef0ec4b467b288395aed926b5bc4c5844858eee29fd2413f7e"
+    },
+    {
+      "path": "tests-v1-receipt.json",
+      "bytes": 196,
+      "sha256": "f2169dc39e99883f6ec39b71c6473309d4253b6876d7b0a08bc6237273843aa7"
+    },
+    {
+      "path": "tests-v1.log",
+      "bytes": 1158,
+      "sha256": "508538a333627dd8fbad8ec1e5dbed11fdce9d2d315f254d72900735eb9f0246"
+    }
+  ]
+}

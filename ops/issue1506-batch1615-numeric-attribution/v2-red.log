@@ -1,0 +1,42 @@
+✖ one valid record never hides a damaged JSONL candidate, another fence, or an unclosed fence (6.249635ms)
+✖ retain producer prefix and closed model metadata without leaking invalid hashes or arbitrary strings (2.461177ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 73.563293
+
+✖ failing tests:
+
+test at aggregate.test.mjs:136:1
+✖ one valid record never hides a damaged JSONL candidate, another fence, or an unclosed fence (6.249635ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(parsed.unsupported>=1)
+  
+      at TestContext.<anonymous> (file:///vercel/recovery/cache-attribution-batch1615/v2-regression-red/aggregate.test.mjs:149:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at aggregate.test.mjs:157:1
+✖ retain producer prefix and closed model metadata without leaking invalid hashes or arbitrary strings (2.461177ms)
+  TypeError [Error]: Cannot read properties of undefined (reading 'value')
+      at TestContext.<anonymous> (file:///vercel/recovery/cache-attribution-batch1615/v2-regression-red/aggregate.test.mjs:173:27)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
