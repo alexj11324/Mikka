@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-11-07T08:20:16.232160+00:00",
+  "source": "github_fetch_workflow_job_logs decoded response, inspected in memory; no raw job log persisted",
+  "workflowRun": 42352970593,
+  "job": 128344852646,
+  "sourceRevision": "93724cb909e7d8f7af075e96694c3df3f4b9a728",
+  "decodedLogCharacters": 307519,
+  "decodedLogLines": 3084,
+  "terminalObservedCode": "webDeploy:mainChanged",
+  "terminalObservedAt": "2026-11-07T08:05:26.5361685Z",
+  "terminalExpectedActualShaStrings": "GitHub masked fragments; not restored or treated as complete identifiers",
+  "actualMainAtEarlierMetadataObservation": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+  "workflowSourceCheckedAt": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+  "workflowFile": ".github/workflows/web-deploy.yml",
+  "workflowFileSha256": "74f7bdf024b370e59c900a537472f7ab9101ef084e4052984b704f2d4d4bcdf4",
+  "ordering": "step Upload the prebuilt output to production first runs node scripts/release/web-deploy.mjs main, then invokes Vercel deploy; the observed guard threw before that invocation",
+  "scope": "This classifies this one old Web job; it does not diagnose other runs, assert current deployment success, or provide provider execution evidence."
+}

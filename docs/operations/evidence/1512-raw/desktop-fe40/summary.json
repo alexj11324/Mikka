@@ -1,0 +1,784 @@
+{
+  "version": 1,
+  "provenance": {
+    "version": 1,
+    "repository": "alexj11324/Mikka",
+    "runId": 42353954570,
+    "runAttempt": 1,
+    "workflow": "Desktop shell",
+    "workflowConclusion": "failure",
+    "nativeJobId": 128348972615,
+    "nativeStep": 16,
+    "nativeConclusion": "failure",
+    "source": {
+      "sha": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+      "tree": "f5dbda3b6226018974c6a3d8f4d8d40f54b9aa47",
+      "parents": [
+        "1ac1c9554ac67eb689df854a327d1707b5ae88bd",
+        "efb95d951ddbeca1af04bc80d011ccbc2a9f0188"
+      ]
+    },
+    "harness": {
+      "sha": "823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+      "tree": "f5dbda3b6226018974c6a3d8f4d8d40f54b9aa47",
+      "parents": [
+        "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+        "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9"
+      ],
+      "sameTreeAsSource": true
+    },
+    "artifacts": [
+      {
+        "id": 13568120578,
+        "name": "desktop-native-evidence-823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+        "bytes": 14801803,
+        "sha256": "adb431bf3dafb2ae9a7f140bc313620b117e4dd78968e8a4fffe61af913b0f8e",
+        "headSha": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+        "workflowRunId": 42353954570,
+        "digestVerified": true,
+        "zipRetained": false
+      },
+      {
+        "id": 13567635790,
+        "name": "desktop-package-evidence-823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+        "bytes": 1597,
+        "sha256": "999cc7c3649f7a5e2e263b50d70725e94d23585a297c2469ef4a8d94f887d32a",
+        "headSha": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+        "workflowRunId": 42353954570,
+        "digestVerified": true,
+        "zipRetained": false
+      }
+    ],
+    "scope": "Only known JSON members were read and preserved; no PNG, API build, DMG, raw runtime log or signed download URL retained."
+  },
+  "failure": {
+    "phase": "auth-initial-document",
+    "kind": "TimeoutError",
+    "code": "other",
+    "locations": [
+      {
+        "file": "native-document.mjs",
+        "line": 11,
+        "column": 14
+      },
+      {
+        "file": "lifecycle.mjs",
+        "line": 165,
+        "column": 9
+      },
+      {
+        "file": "lifecycle.mjs",
+        "line": 351,
+        "column": 23
+      }
+    ]
+  },
+  "nativeNavigation": [
+    {
+      "mode": "bundled",
+      "launch": 1,
+      "events": [
+        {
+          "event": "domcontentloaded",
+          "document": 0,
+          "route": "bundled-root",
+          "elapsedMs": 86
+        },
+        {
+          "event": "committed",
+          "document": 1,
+          "route": "other",
+          "elapsedMs": 477
+        }
+      ],
+      "overflow": false
+    }
+  ],
+  "queryCounts": {
+    "source": {
+      "revision": "823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+      "platform": "darwin",
+      "arch": "arm64",
+      "runtime": "nitro",
+      "pid": 28982,
+      "process": "primary API shared by lifecycle bundled, hosted and Chromium"
+    },
+    "comparable": false,
+    "snapshotCount": 6,
+    "stablePid": true,
+    "stableVersion": true,
+    "allUnknownReadingsZero": true,
+    "windows": {
+      "nativeLogin": {
+        "status": "incomplete",
+        "total": null,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "startedAt": "2026-11-07T08:24:49.008Z",
+            "finishedAt": "2026-11-07T08:24:49.201Z",
+            "durationMs": 193,
+            "queryCalls": 19,
+            "pgProtocolReceiveBytes": 5805,
+            "pgProtocolSendBytes": 5248,
+            "closedConnections": 0,
+            "unknownReadings": 0
+          }
+        ]
+      },
+      "webLogin": {
+        "status": "complete",
+        "total": {
+          "startedAt": "2026-11-07T08:24:44.887Z",
+          "finishedAt": "2026-11-07T08:24:47.569Z",
+          "durationMs": 2682,
+          "queryCalls": 193,
+          "pgProtocolReceiveBytes": 44199,
+          "pgProtocolSendBytes": 126526,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "startedAt": "2026-11-07T08:24:44.887Z",
+            "finishedAt": "2026-11-07T08:24:45.072Z",
+            "durationMs": 185,
+            "queryCalls": 19,
+            "pgProtocolReceiveBytes": 5817,
+            "pgProtocolSendBytes": 5248,
+            "closedConnections": 0,
+            "unknownReadings": 0
+          },
+          {
+            "phase": "web-navigation-to-dom-content-loaded",
+            "startedAt": "2026-11-07T08:24:45.072Z",
+            "finishedAt": "2026-11-07T08:24:45.490Z",
+            "durationMs": 418,
+            "queryCalls": 0,
+            "pgProtocolReceiveBytes": 0,
+            "pgProtocolSendBytes": 0,
+            "closedConnections": 0,
+            "unknownReadings": 0
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "startedAt": "2026-11-07T08:24:45.490Z",
+            "finishedAt": "2026-11-07T08:24:47.569Z",
+            "durationMs": 2079,
+            "queryCalls": 174,
+            "pgProtocolReceiveBytes": 38382,
+            "pgProtocolSendBytes": 121278,
+            "closedConnections": 0,
+            "unknownReadings": 0
+          }
+        ]
+      },
+      "startup-bundled": {
+        "status": "unavailable"
+      },
+      "startup-hosted": {
+        "status": "unavailable"
+      }
+    },
+    "rpcActions": {
+      "version": 1,
+      "status": "incomplete",
+      "reasons": [
+        "query_window_incomplete"
+      ],
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "boundary": {
+        "assignment": "requests belong to the half-open window [startedAt, finishedAt) containing their api_request_started timestamp",
+        "counts": "RPC invocations, not SQL calls; all primary API requests are included, without user attribution",
+        "overlap": "completedInWindow includes carried-in requests; crossesStart/crossesEnd are confirmed by paired receipts and are not additive",
+        "statusCounts": "observed completions of requests intersecting the window, including completions after its end",
+        "unknown": "completionNotObserved means no completion in this one log snapshot, not proof the request is still running; without a start its window remains unknown",
+        "segments": "closed measurement phases partition a completed window; starts belong to one phase, while completions and crossings remain separate non-additive observations"
+      },
+      "windows": {
+        "nativeLogin": {
+          "status": "unavailable"
+        },
+        "webLogin": {
+          "status": "complete",
+          "startedAt": "2026-11-07T08:24:44.887Z",
+          "finishedAt": "2026-11-07T08:24:47.569Z",
+          "actions": [
+            {
+              "route": "/api/rpc",
+              "rpcAction": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "startedInWindow": 3,
+              "completedInWindow": 3,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "rpcAction": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            }
+          ],
+          "segmentStatus": "complete",
+          "segments": [
+            {
+              "phase": "common-email-authentication",
+              "startedAt": "2026-11-07T08:24:44.887Z",
+              "finishedAt": "2026-11-07T08:24:45.072Z",
+              "actions": []
+            },
+            {
+              "phase": "web-navigation-to-dom-content-loaded",
+              "startedAt": "2026-11-07T08:24:45.072Z",
+              "finishedAt": "2026-11-07T08:24:45.490Z",
+              "actions": []
+            },
+            {
+              "phase": "workspace-selection-to-usable",
+              "startedAt": "2026-11-07T08:24:45.490Z",
+              "finishedAt": "2026-11-07T08:24:47.569Z",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "issues.syncIssueList",
+                  "startedInWindow": 3,
+                  "completedInWindow": 3,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 3
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "rpcAction": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "startup-bundled": {
+          "status": "unavailable"
+        },
+        "startup-hosted": {
+          "status": "unavailable"
+        }
+      }
+    },
+    "scope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+    "exclusions": [
+      "test-account lease/session tracking and fixture SQL in the separate harness process",
+      "PostgreSQL connection handshake and TCP/TLS overhead"
+    ],
+    "background": "all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution",
+    "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint"
+  },
+  "lifecycle": {
+    "result": "failed",
+    "cleanupStages": [
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 0,
+        "device_token_devices": 0,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 0,
+        "device_tokens": 0,
+        "device_enrollments": 0,
+        "devices": 0
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "unchanged",
+      "restored": false,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": false,
+        "zhCN": true
+      },
+      "peerMatchesSealedBaseline": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    },
+    "accountObservation": {
+      "observed": true,
+      "state": "quarantined",
+      "blockedReason": "RUN_DIRTY",
+      "owner": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      }
+    }
+  },
+  "parity": {
+    "result": "passed",
+    "appRevision": "823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+    "harnessRevision": "823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+    "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+    "screenCount": 100,
+    "passedScreenCount": 100,
+    "pageErrorsCount": 0,
+    "cleanup": "passed",
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    }
+  },
+  "smoke": {
+    "result": "passed",
+    "checkCount": 10,
+    "passedCheckCount": 10,
+    "cleanupStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 0,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 0,
+        "device_tokens": 0,
+        "device_enrollments": 0,
+        "devices": 0
+      }
+    },
+    "accountObservation": {
+      "observed": true,
+      "state": "released",
+      "blockedReason": null,
+      "owner": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0,
+        "changes": []
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0,
+        "changes": []
+      }
+    }
+  },
+  "crypto": {
+    "passed": true,
+    "platform": "darwin",
+    "architecture": "arm64",
+    "revision": "823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+    "sameImmutablePackage": true,
+    "distinctProcesses": 3,
+    "cleanup": "passed"
+  },
+  "package": {
+    "passed": true,
+    "variant": "acceptance",
+    "signatureVerifiedStrictDeep": true,
+    "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+    "urlScheme": "mikka-dev-auth",
+    "architecture": "arm64",
+    "signedBundleCount": 9
+  },
+  "limits": [
+    "Native login and first startup counts are unavailable; no native versus Web total comparison is possible.",
+    "RPC counts are calls only and do not attribute PostgreSQL queries.",
+    "Repeated action names are not proof of unnecessary repetition.",
+    "All primary API background traffic remains included."
+  ]
+}

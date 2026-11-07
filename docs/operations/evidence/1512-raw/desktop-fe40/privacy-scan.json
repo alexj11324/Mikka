@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "status": "passed",
+  "scope": "known JSON reports only; email, credential patterns and credential field values; native evidence upload audit also succeeded",
+  "files": [
+    {
+      "member": "lifecycle.json",
+      "bytes": 26527,
+      "sha256": "344be3ad9bf4ee454d5bf6ee88e7a29218145213cf28d895bc79fc36a410167d",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "parity/parity.json",
+      "bytes": 106920,
+      "sha256": "5ef8135d237e9c6e6e32184eb3b14536e3c2b64ea5a4e455a47183e30b331f76",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "smoke.json",
+      "bytes": 3125,
+      "sha256": "22e9e2b0c945539376955a65c938aa524fb4299b932bf24f3d72a47a8744cfb1",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "7785b2c349115e08d72bfba43099ef7b7ff3aa8021bec4c174ceec7a53d72dfc",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "bc4e89c83713b224a19b4521ecc133043b82f2b9e22de7ac3ea5643259f75cc0",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    }
+  ]
+}

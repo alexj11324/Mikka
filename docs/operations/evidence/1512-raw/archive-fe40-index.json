@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "subject": "Issue 1512: exact fe40 CI and native Desktop failure evidence",
+  "primaryParent": "0bfd093f11ed00e5c5dff10de7a63cb3ed024265",
+  "additionalParents": [],
+  "parentPurpose": "Single-parent evidence commit. Ops transport 540e301cdb3984f8709bd7c445f5e2a6381aa174 is already retained by the parent; no duplicate parent or source tree import is needed.",
+  "source": {
+    "sha": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+    "tree": "f5dbda3b6226018974c6a3d8f4d8d40f54b9aa47",
+    "parents": [
+      "1ac1c9554ac67eb689df854a327d1707b5ae88bd",
+      "efb95d951ddbeca1af04bc80d011ccbc2a9f0188"
+    ]
+  },
+  "harness": {
+    "sha": "823645c71a7d184b9f4c3fb819c152e2ff7b3b61",
+    "tree": "f5dbda3b6226018974c6a3d8f4d8d40f54b9aa47",
+    "parents": [
+      "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+      "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9"
+    ],
+    "sameTreeAsSource": true
+  },
+  "gitIdentityVerification": "Exact source and synthetic-merge commit/tree/ordered parents were independently reread from GitHub. The harness tree equals the candidate source tree.",
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/ci/ci-fe40-final.json",
+      "bytes": 144455,
+      "sha256": "7303e457c0d3a86bf0c6f1eaef3ddd0596185590426b6a04c6e9e24290d8dc94",
+      "gitBlobSha1": "916a40a1b23b4c3faf55604513466c8440c6a941",
+      "kind": "exact_head_github_metadata_projection",
+      "localSource": "ci-fe40-final.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/lifecycle.json",
+      "bytes": 26527,
+      "sha256": "344be3ad9bf4ee454d5bf6ee88e7a29218145213cf28d895bc79fc36a410167d",
+      "gitBlobSha1": "c8d143684aa9ecde4532dc2887b6ffbfbbca16cc",
+      "kind": "original_extracted_artifact_json",
+      "localSource": "desktop-fe40/lifecycle.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/parity/parity.json",
+      "bytes": 106920,
+      "sha256": "5ef8135d237e9c6e6e32184eb3b14536e3c2b64ea5a4e455a47183e30b331f76",
+      "gitBlobSha1": "a4b0164572ae9505077d87a5a2bfa7e08ec2b39e",
+      "kind": "original_extracted_artifact_json",
+      "localSource": "desktop-fe40/parity/parity.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/smoke.json",
+      "bytes": 3125,
+      "sha256": "22e9e2b0c945539376955a65c938aa524fb4299b932bf24f3d72a47a8744cfb1",
+      "gitBlobSha1": "740410fc376e1958a17f8eb950e71a00d4049427",
+      "kind": "original_extracted_artifact_json",
+      "localSource": "desktop-fe40/smoke.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "7785b2c349115e08d72bfba43099ef7b7ff3aa8021bec4c174ceec7a53d72dfc",
+      "gitBlobSha1": "8df9b19a51f880347ad5aff3fe43190570bf1036",
+      "kind": "original_extracted_artifact_json",
+      "localSource": "desktop-fe40/native-crypto.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "bc4e89c83713b224a19b4521ecc133043b82f2b9e22de7ac3ea5643259f75cc0",
+      "gitBlobSha1": "1a029964607e535e8ad20dbe9f08a3f4cd4211d6",
+      "kind": "original_extracted_artifact_json",
+      "localSource": "desktop-fe40/mac-acceptance-package.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/summary.json",
+      "bytes": 24059,
+      "sha256": "1d7e368c09782409b3dd6606df7141c4f93edda5ef37d790da39163cfc59a285",
+      "gitBlobSha1": "a3993c3caa0c626f2d0ad441c51f5fe48ac06c64",
+      "kind": "acceptance_agent_safe_projection",
+      "localSource": "desktop-fe40/summary.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/artifact-provenance.json",
+      "bytes": 1703,
+      "sha256": "f11bee59eb4f0e246c5efe185ae183c93ffc65887084efb574738d0427190c8f",
+      "gitBlobSha1": "1d1b4376152b144d5ef3d9995260bb3608af0900",
+      "kind": "acceptance_agent_artifact_provenance",
+      "localSource": "desktop-fe40/artifact-provenance.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-fe40/privacy-scan.json",
+      "bytes": 2016,
+      "sha256": "023b8a89f6097f6a405e549d24b8e020905de813db850da1d4322277de4f2f82",
+      "gitBlobSha1": "c19c6766136584ae296b102e4a13ee312ed35860",
+      "kind": "acceptance_agent_privacy_receipt",
+      "localSource": "desktop-fe40/privacy-scan.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-26ef-compatibility-review.json",
+      "bytes": 1093,
+      "sha256": "8034ff1d9d41e0a5cff7abf29142279ecd79d15a562005485a28f7d04f5e19ed",
+      "gitBlobSha1": "6d5a856c75cd2aeaf0ec76072619d0b1e80a16b2",
+      "kind": "owner_read_only_source_review",
+      "localSource": "main-26ef-compatibility-review.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/web-937-source-guard.json",
+      "bytes": 1223,
+      "sha256": "d002392ea96f5c80d2d68be2366a7e39a5065d9525f2853c638b5c61ee05b5ee",
+      "gitBlobSha1": "a073adbc5e70508882cc173aaab8a10b8f9d0d61",
+      "kind": "owner_closed_log_observation_receipt",
+      "localSource": "web-937-source-guard.json"
+    }
+  ],
+  "ci": {
+    "workflowCount": 14,
+    "workflowConclusions": {
+      "success": 13,
+      "failure": 1
+    },
+    "checkCount": 43,
+    "checkConclusions": {
+      "success": 34,
+      "skipped": 8,
+      "failure": 1
+    },
+    "jobCount": 42,
+    "jobConclusions": {
+      "success": 33,
+      "skipped": 8,
+      "failure": 1
+    },
+    "stepCount": 523,
+    "allWorkflowsTerminal": true,
+    "allChecksTerminal": true,
+    "allJobsTerminal": true,
+    "passed": false,
+    "headSha": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+    "observedAt": "2026-11-07T08:35:28.833Z",
+    "pagination": "14 workflow runs and 43 check runs on page 1; page 2 empty for both. Fourteen exact-attempt job pages returned their full advertised totals. All 42 jobs matched a check ID and URL.",
+    "nativeRunId": 42353954570,
+    "nativeJobId": 128348972615,
+    "nativeFailedStep": 16
+  },
+  "desktopObserved": {
+    "status": "failed",
+    "failure": {
+      "phase": "auth-initial-document",
+      "kind": "TimeoutError",
+      "code": "other",
+      "locations": [
+        {
+          "file": "native-document.mjs",
+          "line": 11,
+          "column": 14
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 165,
+          "column": 9
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 351,
+          "column": 23
+        }
+      ]
+    },
+    "webLogin": {
+      "status": "complete",
+      "queryCalls": 193
+    },
+    "nativeLogin": {
+      "status": "incomplete",
+      "completedOrdinaryAuthenticationQueryCalls": 19,
+      "totalQueryCalls": null
+    },
+    "startup": {
+      "completedSamples": 0,
+      "bundledQueryCalls": null,
+      "hostedQueryCalls": null
+    },
+    "loginComparable": false,
+    "parityPassed": 100,
+    "parityCases": 100,
+    "lifecycleCleanupStages": [
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "leaseState": "quarantined",
+    "leaseBlockedReason": "RUN_DIRTY"
+  },
+  "sourceAttribution": {
+    "ci": "New metadata-only GitHub projection in the established ci-ccd format, including all jobs/steps and explicit pagination evidence. No job log or artifact was fetched to construct it.",
+    "desktopOriginals": "Five JSON files were previously extracted by the acceptance agent from GitHub artifacts; original bytes are preserved. The supplied provenance records successful ZIP digest verification and ZIP deletion. This archival pass does not redownload ZIPs.",
+    "desktopSummary": "summary.json is the acceptance agent's safe projection, not a replacement for the five original reports. Its original bytes are preserved.",
+    "compatibility": "main-26ef-compatibility-review.json is an owner read-only source review; it records no newly executed merged-candidate tests and no remote mutation.",
+    "webGuard": "web-937-source-guard.json is an owner closed log-observation receipt for run 42352970593/job 128344852646. It records webDeploy:mainChanged observed in memory and is not the original raw log. Masked expected/actual fragments are not reconstructed.",
+    "archive": "This pass validates source bytes, privacy, GitHub metadata and commit identity. It performs no model, database, CI rerun, runtime creation or product source modification."
+  },
+  "limits": [
+    "fe40 remains a real failed Desktop acceptance; 13 successful workflows do not make the full candidate pass.",
+    "Native 19 is only the completed ordinary-authentication segment. The Native total and both startup totals are unknown; no comparison against Web 193 or SQL-saving claim is valid.",
+    "Passing parity and cleanup do not turn lifecycle failure or the RUN_DIRTY quarantine into acceptance success.",
+    "The separate native-document correction still in progress is outside this archive; no unknown future test result is included.",
+    "The 937 Web source guard classifies one historic job only; it is not current production deployment or provider-execution evidence."
+  ],
+  "privacyReview": {
+    "status": "passed",
+    "jsonFilesReviewed": 11,
+    "emailMatches": 0,
+    "credentialPrefixMatches": 0,
+    "jwtMatches": 0,
+    "privateKeyMatches": 0,
+    "signedUrlMatches": 0,
+    "sensitiveValueMatches": 0,
+    "zipOrRawJobLogArchived": false
+  }
+}

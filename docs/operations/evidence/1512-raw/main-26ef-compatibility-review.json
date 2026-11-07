@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-11-07T08:17:18.453195+00:00",
+  "candidate": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+  "reviewedMain": "26ef4de15129e22503e152258ee9cb2e4aeae8bd",
+  "reviewedMainDeltaFrom": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+  "changedFiles": [
+    "app/api/workspace/switcher/route.ts",
+    "tests/settings-backend-routes.test.ts"
+  ],
+  "cleanMergeTree": "930863ead12da317a57bb77bf0f2a667575b18ed",
+  "sourceConclusion": "Only the switcher exception classification and its regression tests change. Successful getApiSession/loadWorkspaceSwitcher, no-store and withRequestLog wrapper are preserved. No trace carrier, AI generation, Replay or successful login query change. Unknown service errors now return 500 rather than 403.",
+  "policy": "CONTRIBUTING.md permits reusing a green latest-head CI for a still-mergeable PR after unrelated main changes. Issue1512 requires merge commit and waiting for main publishing to finish.",
+  "testing": "No merged candidate or new tests executed for this unrelated increment; normal fe40 CI continues.",
+  "remoteMutation": false
+}
