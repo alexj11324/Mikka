@@ -48,6 +48,17 @@ test('a Workflow stream error logs bounded diagnostics and keeps one attempt and
   assert.deepEqual(diagnostic.causes, [{ errorClass: 'Error', errorCode: 'ETIMEDOUT', statusCode: null }])
   assert.ok(!logs.join('\n').includes('fixture-private'))
 })
+test('a fixed refusal code in the cause chain becomes the detail, never the provider text', async t => {
+  t.mock.method(console, 'warn', () => {})
+  const rejected = Object.assign(new Error('codex response 400 invalid_request_error fixture-private'), { code: 'provider_request_rejected' })
+  const error = new APICallError({ message: 'fixture-private-message', url: 'https://fixture.invalid/private', requestBodyValues: {}, statusCode: 400, cause: rejected })
+  t.mock.method(WorkflowAgent.prototype, 'stream', async () => ({ error }))
+  await assert.rejects(runHostedWorkflowTurn(runtime, {}, { prompt: 'synthetic' }), (thrown: Error) => {
+    assert.equal(thrown.message, 'subscription_generation_failed (provider_request_rejected)')
+    assert.ok(!thrown.message.includes('fixture-private'))
+    return true
+  })
+})
 test('an undefined stream error or failed logger cannot turn a refusal into success or retry', async t => {
   let calls = 0, logAttempts = 0
   t.mock.method(console, 'warn', () => { logAttempts++; throw new Error('logger unavailable') })
