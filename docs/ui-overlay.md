@@ -32,6 +32,7 @@ A missing directory, or one outside the repository, fails the build.
 | `settings-sidebar` | settings section list | `SettingsSidebarProps` in `components/slots/settings-sidebar-contract.ts` | `SettingsSidebar` from `@/components/settings/settings-sidebar` |
 | `settings-content` | heading and card around a section (`AppShellContent variant="settings"`) | `SettingsContentFrameProps` in `components/slots/settings-content-contract.ts` | `SettingsView` |
 | `settings-account` | 账户 body (picture, name, email, sign-out, delete account) | `SettingsAccountProps` in `components/slots/settings-account-contract.ts` | `AccountSettings` from `@/components/settings/account-settings` |
+| `settings-memory` | 记忆与建议 body (switch, facts by kind, correct, delete) | `SettingsMemoryProps` in `components/slots/settings-memory-contract.ts` | `MemorySettings` from `@/components/settings/memory-settings` |
 | `settings-models` | 模型与订阅 body (subscriptions, API keys, fallback, model order, profiles, sharing) | `SettingsModelsProps` in `components/slots/settings-models-contract.ts` | `SettingsView` |
 | `settings-notifications` | 通知 body (push switches, when to push) | `SettingsNotificationsProps` in `components/slots/settings-notifications-contract.ts` | `NotificationSettings` from `@/components/settings/notifications-settings` |
 | `settings-preferences` | 偏好设置 body (appearance, language, task prefix, replay onboarding) | `SettingsPreferencesProps` in `components/slots/settings-preferences-contract.ts` | `SettingsView` |
