@@ -364,8 +364,13 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const before = upstreamLogoutRequests
     assert.equal((await startOidcLogout(login.jar, otherProviderId)).status, 403)
     assert.equal((await startOidcLogout(login.jar, providerId, {}, 'https://foreign.example.invalid')).status, 403)
-    for (const input of [{ post_logout_redirect_uri: 'https://foreign.example.invalid' }, { callbackURL: '//foreign.example.invalid' }, { redirectTo: `${appOrigin}/sign-in?next=external` }, { client_id: 'other-client' }, { id_token_hint: 'untrusted' }]) {
-      assert.equal((await startOidcLogout(login.jar, providerId, input)).status, 400)
+    for (const [input, status] of [
+      [{ post_logout_redirect_uri: 'https://foreign.example.invalid' }, 400],
+      // Native Origin middleware refuses this callback before strict body parsing.
+      [{ callbackURL: '//foreign.example.invalid' }, 403],
+      [{ redirectTo: `${appOrigin}/sign-in?next=external` }, 400], [{ client_id: 'other-client' }, 400], [{ id_token_hint: 'untrusted' }, 400],
+    ] as const) {
+      assert.equal((await startOidcLogout(login.jar, providerId, input)).status, status, Object.keys(input)[0])
     }
     assert.equal((await session(login.jar))?.session.id, active.session.id)
     await pool.query('update session set "enterpriseOrganizationId"=null,"enterpriseProviderId"=null,"enterpriseDirectoryUserId"=null,"enterpriseIdentityId"=null where id=$1', [active.session.id])
@@ -463,22 +468,24 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal(JSON.stringify(report.mock.calls.map(call => call.arguments)).includes('fixture-secret'), false)
     } finally { await pool.query(`alter table mikka_organization_audit_events drop constraint "${constraint}"`) }
   })
-  await t.test('OIDC logout cannot claim local revocation or request the OP when native session deletion fails', async () => {
+  await t.test('OIDC logout cannot claim local revocation or request the OP when native session deletion fails', async t => {
     const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
     const name = `oidc_logout_delete_${randomUUID().replaceAll('-', '')}`
+    const report = t.mock.method(console, 'error', () => {})
     const before = (await pool.query('select count(*) from verification where identifier like $1', [`enterprise-oidc-logout:${providerId}:%`])).rows[0].count
     await pool.query(`create function "${name}"() returns trigger language plpgsql as $$ begin
       if old.id='${active.session.id}' then raise exception 'fixture_logout_delete_refused' using errcode='23514'; end if; return old; end; $$`)
     try {
       await pool.query(`create trigger "${name}" before delete on session for each row execute function "${name}"()`)
       const refused = await startOidcLogout(login.jar)
-      assert.equal(refused.status, 500)
+      assert.equal(refused.status, 503)
       assert.equal(refused.headers.has('location'), false)
-      const body = await refused.text()
-      assert.equal(body.includes('"localSessionRevoked":true'), false)
-      assert.equal(body.includes('"upstream":"requested"'), false)
+      assert.deepEqual(await refused.json(), { code: 'ENTERPRISE_LOGOUT_UNAVAILABLE', message: 'Logout unavailable' })
       assert.equal((await pool.query('select count(*) from session where id=$1', [active.session.id])).rows[0].count, '1')
       assert.equal((await pool.query('select count(*) from verification where identifier like $1', [`enterprise-oidc-logout:${providerId}:%`])).rows[0].count, before)
+      assert.deepEqual(report.mock.calls.map(call => call.arguments), [
+        ['[enterprise] logout revocation unavailable', { name: 'error', code: '23514', constraint: null }],
+      ], 'local logout failures retain only cause classification, never provider or database error bodies')
     } finally {
       await pool.query(`drop trigger if exists "${name}" on session`)
       await pool.query(`drop function "${name}"()`)

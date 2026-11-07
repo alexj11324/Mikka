@@ -9,7 +9,7 @@ import { withBasePath } from '../base-path'
 import { identityTokenHash } from './scim-store'
 
 export type OidcLogoutProof = { organizationId: string; providerId: string; userId: string; sessionId: string }
-type LogoutReason = 'oidc_local_only' | 'oidc_provider_unavailable' | 'oidc_upstream_requested' | 'oidc_upstream_returned' | 'oidc_upstream_failed'
+type LogoutReason = 'oidc_local_failed' | 'oidc_local_only' | 'oidc_provider_unavailable' | 'oidc_upstream_requested' | 'oidc_upstream_returned' | 'oidc_upstream_failed'
 const lifetimeSeconds = 5 * 60
 const opaque = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const provider = z.string().regex(/^enterprise-[a-z0-9][a-z0-9-]{1,100}$/)
@@ -44,7 +44,14 @@ export function enterpriseOidcLogoutEndpoints(options: {
         where id=$1 and "userId"=$2 and "expiresAt">now() and "enterpriseOrganizationId" is not null`, [current.session.id, current.user.id])
       if (!proof || proof.providerId !== ctx.params.providerId)
         throw new APIError('FORBIDDEN', { code: 'ENTERPRISE_LOGOUT_SESSION_MISMATCH', message: 'Invalid logout session' })
-      await ctx.context.internalAdapter.deleteSession(current.session.token)
+      try { await ctx.context.internalAdapter.deleteSession(current.session.token) }
+      catch (error) {
+        const { auditFailureSummary } = await import('../audit/record')
+        console.error('[enterprise] logout revocation unavailable', auditFailureSummary(error))
+        options.record(proof, 'oidc_local_failed', true)
+        // error-cause: classify the DB cause above; native generic errors may log query parameters or bearer values.
+        throw new APIError('SERVICE_UNAVAILABLE', { code: 'ENTERPRISE_LOGOUT_UNAVAILABLE', message: 'Logout unavailable' })
+      }
       deleteSessionCookie(ctx)
       ctx.setHeader('cache-control', 'no-store')
       ctx.setHeader('referrer-policy', 'no-referrer')
