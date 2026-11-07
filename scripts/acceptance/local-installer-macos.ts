@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { SshInstaller, runProcess, quote, type SshInstallState } from '../../apps/desktop/src/main/ssh-install'
 import { InstallProcessError, nodeDiscoveryScript, redactInstallLog } from '../../apps/desktop/src/main/local-install'
@@ -60,6 +60,26 @@ const sanitized = (value: string) => redactInstallLog(value).replaceAll(home, '[
 const evidence = () => ({ platform: process.platform, arch: process.arch, node: process.versions.node,
   npmStarted, registrations, heartbeats, enrollments, socketPathBytes,
   states: states.map(({ step, status, error }) => ({ step, status, cause: error?.cause })) })
+async function installerDiagnostic() {
+  const path = states.at(-1)?.error?.logPath
+  if (!path) return { status: 'unavailable' }
+  try {
+    const file = await open(path, 'r')
+    try {
+      const buffer = Buffer.alloc(16_385)
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0)
+      if (bytesRead === buffer.length) return { status: 'oversized', limitBytes: 16_384 }
+      const diagnostic = buffer.subarray(0, bytesRead).toString('utf8')
+      const exitCode = /^exitCode=(-?\d+)$/m.exec(diagnostic)?.[1]
+      // stdout may contain a response body. Retain only the command's stderr,
+      // with the same credential/fixture redaction as the existing service logs.
+      const marker = '\n--- stderr ---\n', offset = diagnostic.indexOf(marker)
+      const stderr = offset < 0 ? null : sanitized(diagnostic.slice(offset + marker.length))
+      return { status: 'captured', exitCode: exitCode === undefined ? null : Number(exitCode),
+        stderr: stderr?.slice(0, 4096) ?? null, truncated: stderr !== null && stderr.length > 4096 }
+    } finally { await file.close() }
+  } catch { return { status: 'unavailable' } }
+}
 try {
   process.env.HOME = home
   if (major === 22) {
@@ -104,7 +124,6 @@ try {
     assert.equal(state.error?.remedy, 'install_node_22')
     assert.equal(npmStarted, false)
   } else {
-    if (state.status !== 'online' && state.error?.logPath) process.stderr.write(sanitized(await readFile(state.error.logPath, 'utf8')))
     assert.equal(state.status, 'online')
     assert.ok(registrations >= 1 && heartbeats >= 1 && enrollments === 1)
     const plist = JSON.parse(await runProcess('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(home, 'Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist')]))
@@ -131,7 +150,7 @@ try {
     ['service', join(home, 'Library/Logs/mikka-daemon.log')],
     ['daemon', join(dataDir, 'logs/daemon.log')],
   ].map(async ([name, path]) => [name, sanitized(await readFile(path, 'utf8').catch(() => 'unavailable'))])))
-  const result = { ...evidence(), result: 'failed', lastStatus, logs }
+  const result = { ...evidence(), result: 'failed', lastStatus, logs, installer: await installerDiagnostic() }
   await mkdir('artifacts/local-installer', { recursive: true })
   await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
   process.stderr.write(JSON.stringify(result, null, 2) + '\n')
