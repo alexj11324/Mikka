@@ -156,7 +156,24 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
         const xml = inflateRawSync(Buffer.from(url.searchParams.get('SAMLRequest')!, 'base64')).toString()
         const id = /\bID="([^"]+)"/.exec(xml)?.[1]
         assert.ok(id)
-        const response = await samlIdp.createLoginResponse(samlSp, { extract: { request: { id: mode === 'request' ? `wrong-${randomUUID()}` : id } } }, 'post', { email: samlIdentity })
+        const requestId = mode === 'request' ? `wrong-${randomUUID()}` : id
+        // samlify's default IdP template omits AuthnStatement. Sign a real,
+        // distinct SessionIndex on every login so SLO can select one root.
+        const response = await samlIdp.createLoginResponse(samlSp, { extract: { request: { id: requestId } } }, 'post', { email: samlIdentity }, {
+          customTagReplacement: (template: string) => {
+            const responseId = `_${randomUUID()}`, now = new Date().toISOString(), expires = new Date(Date.now() + 300_000).toISOString()
+            const acs = `${appOrigin}/api/auth/sso/saml2/sp/acs/${samlProviderId}`
+            const authn = '<saml:AuthnStatement AuthnInstant="{IssueInstant}" SessionIndex="{ID}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>'
+            return { id: responseId, context: saml.SamlLib.replaceTagsByValue(template.replace('{AuthnStatement}', authn), {
+              ID: responseId, AssertionID: `_${randomUUID()}`, Destination: acs, Audience: `${appOrigin}/saml-sp`,
+              EntityID: `${appOrigin}/saml-sp`, Issuer: `${idpOrigin}/saml-idp`, IssueInstant: now,
+              SubjectRecipient: acs, AssertionConsumerServiceURL: acs, StatusCode: 'urn:oasis:names:tc:SAML:2.0:status:Success',
+              ConditionsNotBefore: now, ConditionsNotOnOrAfter: expires, SubjectConfirmationDataNotOnOrAfter: expires,
+              NameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', NameID: samlIdentity,
+              InResponseTo: requestId, AttributeStatement: '',
+            }) }
+          },
+        })
         let encoded = response.context
         if (mode === 'tampered') encoded = Buffer.from(Buffer.from(encoded, 'base64').toString().replace(samlSubject, 'attacker@example.invalid')).toString('base64')
         outgoing.setHeader('content-type', 'application/json'); outgoing.end(JSON.stringify({ SAMLResponse: encoded, RelayState: url.searchParams.get('RelayState') })); return
@@ -1120,7 +1137,21 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const send = (request: string) => fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
       origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded', cookie: oidcCookies.header(),
     }, body: new URLSearchParams({ SAMLRequest: request, RelayState: `${appOrigin}/signed-out` }), redirect: 'manual' })
-    const signedRequest = (nameID: string, sessionIndex?: string) => samlIdp.createLogoutRequest(samlSp, 'post', { logoutNameID: nameID, ...(sessionIndex === undefined ? {} : { sessionIndex }) }).context
+    const signedRequest = (nameID: string, sessionIndex?: string | string[]) => {
+      if (!Array.isArray(sessionIndex)) return samlIdp.createLogoutRequest(samlSp, 'post', { logoutNameID: nameID, ...(sessionIndex === undefined ? {} : { sessionIndex }) }).context
+      return samlIdp.createLogoutRequest(samlSp, 'post', { logoutNameID: nameID }, {
+        customTagReplacement: (template: string) => {
+          const id = `_${randomUUID()}`
+          const indices = sessionIndex.map((_value, index) => `<samlp:SessionIndex>{Index${index}}</samlp:SessionIndex>`).join('')
+          return { id, context: saml.SamlLib.replaceTagsByValue(template.replace('<samlp:SessionIndex>{SessionIndex}</samlp:SessionIndex>', indices), {
+            ID: id, IssueInstant: new Date().toISOString(), Destination: `${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`,
+            Issuer: `${idpOrigin}/saml-idp`, EntityID: `${idpOrigin}/saml-idp`,
+            NameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', NameID: nameID,
+            ...Object.fromEntries(sessionIndex.map((value, index) => [`Index${index}`, value])),
+          }) }
+        },
+      }).context
+    }
     const otherSubject = `${randomUUID()}@${samlDomain}`
     assert.equal((await requestScim('Users', 'POST', { schemas: [SCIM_USER], externalId: otherSubject, userName: otherSubject, active: true }, samlConnectionId, samlBearer)).status, 201)
     try {
@@ -1139,6 +1170,12 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal((await send(oldRequest)).status, 400, 'native replay protection precedes the application callback')
       assert.equal((await send(signedRequest(samlSubject, later.snapshot.sessionIndex))).status, 200)
       assert.equal(await remaining([later.session.id]), 0, 'the later root is independently revocable without a Web clone')
+
+      const selectedA = await login(), selectedB = await login(), unselected = await login()
+      assert.ok(selectedA.snapshot.sessionIndex && selectedB.snapshot.sessionIndex)
+      assert.equal((await send(signedRequest(samlSubject, [selectedA.snapshot.sessionIndex, selectedB.snapshot.sessionIndex]))).status, 200)
+      assert.equal(await remaining([selectedA.session.id, selectedB.session.id]), 0, 'a signed multi-index request selects exactly its listed roots')
+      assert.equal(await remaining([unselected.session.id, unrelated.session.id]), 2)
 
       const groupA = await login(), groupB = await login(), groupChild = await web.handoff(groupA.token)
       assert.equal((await send(signedRequest(samlSubject))).status, 200)

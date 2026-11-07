@@ -19,7 +19,7 @@ import { currentLiveCapabilities, hasEnterpriseLiveScope, lockLiveCapability, lo
   registerEnterpriseLiveCapability, rememberEnterpriseLiveScope, revokeWorkspaceLiveCapabilities, type EnterpriseLiveCapability } from './live-store'
 
 type GatewayConfig = NonNullable<ReturnType<typeof liveGatewayConfig>>
-type TicketResult = { status: 'allowed'; ticket: ReturnType<typeof liveTicket> } | { status: 'denied' | 'pending' }
+type TicketResult = { status: 'allowed'; ticket: ReturnType<typeof liveTicket> } | { status: 'denied' } | { status: 'pending' }
 type RevokeFilter = { organizationId?: string; workspaceId?: string; userId?: string }
 const sessionReader = (userId: string, sessionId: string) => ({ id: userId, [enterprisePrincipal]: { kind: 'session' as const, sessionId } })
 

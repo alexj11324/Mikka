@@ -9,7 +9,7 @@ type Query = Pick<PoolClient, 'query'>
 export type HandoffRoot = { id: string; organizationId: string | null; providerId: string | null; identityId: string | null; expiresAt: Date }
 type Scope = { userId: string; organizationId: string; providerId: string; identityId: string }
 type Snapshot = { sessionId: string; providerId: string; nameID: string; sessionIndex?: string }
-export type VerifiedSamlLogout = { providerId: string; nameID: string; sessionIndex?: string }
+export type VerifiedSamlLogout = { providerId: string; nameID: string; sessionIndex?: string | string[] | null }
 const byId = (id: string) => `saml-session-by-id:${id}`
 const snapshotKey = (id: string) => `enterprise-saml-session:${id}`
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -96,7 +96,13 @@ export async function inheritSamlSession(tx: Query, input: Scope & { sourceSessi
  * the native single-record cleanup, including a later login's canonical key.
  * An absent SessionIndex closes all current roots for this provider+NameID. */
 export async function revokeVerifiedSamlSessions(input: VerifiedSamlLogout): Promise<true> {
-  if (typeof input.nameID !== 'string' || !input.nameID || (input.sessionIndex !== undefined && typeof input.sessionIndex !== 'string')) invalid()
+  if (typeof input.nameID !== 'string' || !input.nameID) invalid()
+  // samlify 2.15.1 returns null for no SessionIndex, a string for one,
+  // and an array for multiple elements. This input has already passed native
+  // signature, issuer, destination and one-use request validation.
+  const values = input.sessionIndex == null ? null : typeof input.sessionIndex === 'string' ? [input.sessionIndex] : input.sessionIndex
+  if (values !== null && (!Array.isArray(values) || values.length === 0 || values.some(value => typeof value !== 'string' || !value))) invalid()
+  const indices = values === null ? null : [...new Set(values)].map(hash)
   const tx = await pool.connect()
   let audited = false
   const revokedUsers = new Set<string>()
@@ -107,10 +113,10 @@ export async function revokeVerifiedSamlSessions(input: VerifiedSamlLogout): Pro
       from enterprise_saml_session_lineage lineage join session root on root.id=lineage."sessionId"
       join enterprise_sso_provider p on p."providerId"=lineage."providerId" and p."organizationScopeId"=lineage."organizationId"
       where lineage."sessionId"=lineage."rootSessionId" and lineage."providerId"=$1 and lineage."nameIdHash"=$2
-        and ($3::text is null or lineage."sessionIndexHash"=$3)
+        and ($3::text[] is null or lineage."sessionIndexHash"=any($3))
         and root."userId"=lineage."userId" and root."enterpriseOrganizationId"=lineage."organizationId"::text
         and root."enterpriseProviderId"=lineage."providerId" and root."enterpriseIdentityId"=lineage."identityId"::text
-      order by root.id for update of root`, [input.providerId, hash(input.nameID), input.sessionIndex === undefined ? null : hash(input.sessionIndex)])
+      order by root.id for update of root`, [input.providerId, hash(input.nameID), indices])
     for (const root of rows) {
       await tx.query('delete from session where id=$1', [root.id])
       await enqueueIdentityAudit(tx, { organizationId: root.organizationId, actorId: `saml:${input.providerId}`, action: 'sso.signed_out', targetId: root.id,
