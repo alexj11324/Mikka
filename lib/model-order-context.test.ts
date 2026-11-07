@@ -27,8 +27,22 @@ stub('./live/lists.ts', { runListChanged: unused })
 stub('./device-gateway-notify.ts', { runControlChanged: unused })
 stub('./due-timer.ts', { armDueTimerAfterCommit: unused })
 
+const policyWorkspaces = new Set<string>()
+const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentialSharing\",p.\"mcpSharing\",p.\"allowedModelProviders\" from mikka_workspaces w left join mikka_organization_workspaces l on l.\"workspaceId\"=w.id left join mikka_organization_resource_policies p on p.\"organizationId\"=l.\"organizationId\" where w.id=$1"
+stub('./workspace-db.ts', {
+  workspaceDb: { select: unused, transaction: unused },
+  workspacePool: { query: async (sql: string, args: unknown[]) => {
+    assert.equal(sql.replace(/\s+/g, ' ').trim(), resourcePolicySql)
+    assert.ok(args.length === 1 && typeof args[0] === 'string' && policyWorkspaces.has(args[0]), 'resource policy is scoped to a Workspace created by this fixture')
+    // The existing trace measures the injected APP executor; the separate
+    // WS executor accepts only this exact current non-Org linkage read.
+    return { rows: [{ kind: 'team', organizationId: null, modelCredentialSharing: null, mcpSharing: null, allowedModelProviders: null }], rowCount: 1 }
+  } },
+})
+
 function fixture(allowed: boolean, ownerId = 'owner-a') {
   const scope = { ownerId, workspaceId: `workspace-${ownerId}` }
+  policyWorkspaces.add(scope.workspaceId)
   const connectionId = `connection-${ownerId}`
   const key = { id: `key-${ownerId}`, ownerId, provider: 'deepseek', name: null, baseUrl: 'https://example.invalid', protocol: 'openai', last4: 'test', models: ['deepseek-flash'], modelsError: null, responsesApi: false }
   const quota = { vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date(Date.now() - 1000).toISOString(), windows: [{ kind: 'five_hour', used: 0.1, resetsAt: new Date(Date.now() + 3600000).toISOString() }] }

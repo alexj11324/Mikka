@@ -1,6 +1,6 @@
 import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import pg from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -268,5 +268,74 @@ test('held Workspace membership remains exact and expires before detached reads 
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [tenants])
     await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [tenants])
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
+  }
+})
+
+test('workspace context combines fresh membership and Org linkage while rechecking policy, directory and session authority', { skip: !enabled, timeout: 30_000 }, async () => {
+  const { pool } = await import('../lib/db')
+  const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
+  const { loadWorkspaceContext } = await import('../lib/workspace-access')
+  const { enterprisePrincipal } = await import('../lib/enterprise/principal')
+  const owner = 'context-policy-' + randomUUID(), organizationId = randomUUID(), sessionId = randomUUID()
+  const providerId = 'context-provider-' + randomUUID(), connectionId = randomUUID(), directoryId = randomUUID()
+  const hash = createHash('sha256').update(randomUUID()).digest('hex')
+  const reader = { id: owner, name: 'Context policy fixture', email: owner + '@example.invalid',
+    [enterprisePrincipal]: { kind: 'session' as const, sessionId } }
+  const tenants: string[] = []
+  try {
+    await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$2,$3,true,now(),now())', [owner, reader.name, reader.email])
+    const personal = await seedFixtureWorkspace(pool, owner)
+    const workspaceId = await seedFixtureWorkspace(pool, owner, 'team')
+    tenants.push(personal, workspaceId)
+    await pool.query('insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, randomUUID(), owner])
+    await pool.query('insert into mikka_organizations(id,name,"createdBy") values($1,\'Context policy fixture\',$2)', [organizationId, owner])
+    // Only the framework context is isolated. These are real persisted plain
+    // sessions and directory/policy rows; no SSO assurance is synthesized.
+    await withActivitySession(owner, async () => {
+      const read = () => loadWorkspaceContext(workspaceId, reader)
+      await read() // Warm the existing Personal sharing initialization.
+      const unlinked = await counted(read)
+      assert.equal(unlinked.queries, 1, 'one fresh membership read also proves the current absence of an Org link')
+      assert.equal(unlinked.value.workspace.id, workspaceId)
+      await pool.query('insert into mikka_organization_workspaces("workspaceId","organizationId") values($1,$2)', [workspaceId, organizationId])
+      await pool.query('insert into enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") values($1,false,false)', [organizationId])
+      const linked = await counted(read)
+      assert.equal(linked.queries, 2, 'the freshly linked Org adds its canonical policy read, without a second linkage query')
+      assert.equal('organizationId' in linked.value, false, 'internal linkage does not extend the public context contract')
+      assert.ok(linked.value.choices.every(choice => Object.keys(choice).sort().join(',') === 'id,kind,name'))
+      await pool.query('update enterprise_org_policy set "enforceSso"=true where "organizationId"=$1', [organizationId])
+      await assert.rejects(read, { code: 'workspaceAccessDenied' }, 'an existing plain session does not acquire SSO assurance')
+      await pool.query('update enterprise_org_policy set "enforceSso"=false,"archivedAt"=now() where "organizationId"=$1', [organizationId])
+      await assert.rejects(read, { code: 'workspaceAccessDenied' }, 'Org archival affects the next read in the same framework session')
+      await pool.query('update enterprise_org_policy set "archivedAt"=null where "organizationId"=$1', [organizationId])
+      assert.equal((await read()).workspace.id, workspaceId)
+      await pool.query('insert into enterprise_sso_provider(id,"providerId","organizationScopeId","userId",issuer,domain,"domainVerified","oidcConfig","domainTokenHash") values($1,$2,$3,$4,$5,$6,true,$7,$8)',
+        [randomUUID(), providerId, organizationId, owner, 'https://context.example.invalid', providerId + '.example.invalid', '{}', hash])
+      await pool.query('insert into enterprise_scim_connection(id,"organizationId","providerId","tokenHash") values($1,$2,$3,$4)', [connectionId, organizationId, providerId, hash])
+      await pool.query('insert into enterprise_scim_user(id,"connectionId","organizationId","externalId","userName","userId",active,document) values($1,$2,$3,$4,$5,$4,true,$6)',
+        [directoryId, connectionId, organizationId, owner, reader.email, {}])
+      assert.equal((await read()).workspace.id, workspaceId)
+      await pool.query('update enterprise_scim_user set active=false where id=$1', [directoryId])
+      await assert.rejects(read, { code: 'workspaceAccessDenied' }, 'directory suspension wins before any downstream membership delivery')
+      assert.equal((await loadWorkspaceContext(personal, reader)).workspace.id, personal)
+      await pool.query('update enterprise_scim_user set active=true where id=$1', [directoryId])
+      await pool.query('update enterprise_sso_provider set "domainVerified"=false where "providerId"=$1', [providerId])
+      await assert.rejects(read, { code: 'workspaceAccessDenied' }, 'the linked provider is checked fresh even with enforced SSO disabled')
+      await pool.query('delete from mikka_organization_workspaces where "workspaceId"=$1', [workspaceId])
+      assert.equal((await read()).workspace.id, workspaceId, 'a detached tenant no longer inherits the former Org policy')
+      await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner])
+      await assert.rejects(read, { code: 'workspaceAccessDenied' }, 'same-session membership revocation never falls back to Personal')
+    }, workspaceId)
+  } finally {
+    await pool.query('delete from enterprise_scim_user where id=$1', [directoryId])
+    await pool.query('delete from enterprise_scim_connection where id=$1', [connectionId])
+    await pool.query('delete from enterprise_sso_provider where "providerId"=$1', [providerId])
+    await pool.query('delete from enterprise_org_policy where "organizationId"=$1', [organizationId])
+    await pool.query('delete from mikka_organization_workspaces where "organizationId"=$1', [organizationId])
+    await pool.query('delete from mikka_organizations where id=$1', [organizationId])
+    await pool.query('delete from session where id=$1', [sessionId])
+    await pool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])', [tenants])
+    await pool.query('delete from mikka_workspaces where id=any($1::uuid[])', [tenants])
+    await pool.query('delete from "user" where id=$1', [owner])
   }
 })
