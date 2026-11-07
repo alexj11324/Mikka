@@ -12,9 +12,34 @@ import { after, NextRequest, NextResponse, NextURL } from '../compat/server'
 import { getLocale, getTranslations } from '../compat/intl'
 import { getPathname } from '../compat/localized-navigation'
 import type { ApiRoute } from './routes'
+import { createWebTransport } from '../../../lib/web-connection/transport'
 
 const fixture = (path: string, module: Record<string, unknown>, methods = Object.keys(module)): ApiRoute => ({ path: `/mikka/api/${path}`, template: `/api/${path}`, source: 'fixture', methods, load: async () => module })
 const request = (path = 'one', init?: RequestInit) => new Request(`https://example.test/mikka/api/${path}`, init)
+
+test('official web bearer adaptation is installed before the API scope and strips handler cookies afterward', async () => {
+  let calls = 0, revoked = false
+  const origin = 'https://app.aspectlylabs.com', authorization = `Bearer ${'s'.repeat(40)}`
+  const app = createApiHandler([fixture('write', { POST: async (input: Request) => {
+    calls++
+    assert.equal(input.headers.get('origin'), 'https://example.test')
+    assert.equal((await headers()).get('authorization'), authorization)
+    assert.equal((await headers()).has('cookie'), false)
+    ;(await cookies()).set('must-not-cross', 'cookie')
+    return Response.json({ body: await input.text() })
+  } })], undefined, createWebTransport({ env: {}, authenticate: async incoming => {
+    assert.deepEqual([...incoming], [['authorization', authorization]])
+    return revoked ? null : { user: { id: 'owner' }, session: { id: 'session' } }
+  }, scope: (_, work) => work() }))
+  const read = () => app.fetch(request('write', { method: 'POST', body: 'selected-server', headers: { origin, authorization, cookie: 'cloud=private' } }))
+  const accepted = await read()
+  assert.equal(accepted.status, 200); assert.deepEqual(await accepted.json(), { body: 'selected-server' })
+  assert.equal(accepted.headers.get('access-control-allow-origin'), origin)
+  assert.equal(accepted.headers.has('set-cookie'), false)
+  revoked = true
+  const denied = await read()
+  assert.equal(denied.status, 401); assert.equal(calls, 1)
+})
 
 test('request cookies match the installed SDK for duplicates and malformed encoding without rewriting auth headers', async () => {
   for (const cookie of [

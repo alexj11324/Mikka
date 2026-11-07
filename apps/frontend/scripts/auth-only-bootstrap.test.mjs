@@ -43,7 +43,7 @@ const fixtureModules = new Map([
   ['@/components/version-guard', 'export const VersionGuard = () => null;'],
   ['@/components/posthog-analytics', 'export const PostHogAnalytics = () => null;'],
   ['@/lib/posthog-config', 'export const posthogConfig = { token: "" };'],
-  ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } };`],
+  ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } }; export const cloudAuthClient = authClient;`],
   ['@/lib/swr/persistent-cache', `export const clearPersistentReadCaches = async () => { ${stateAccess}.cacheClears++; };`],
 ])
 const compiled = await build({
