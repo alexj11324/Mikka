@@ -1,43 +1,32 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useTheme } from 'next-themes'
 import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
-import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { AppShellContent } from '@/components/app-shell'
+import { SettingsContentFrame } from '@ui-slot/settings-content'
+import { ApiAndSubscriptions } from '@ui-slot/settings-models'
+import { SecurityAndSignIn } from '@ui-slot/settings-security'
+import { PreferencesSettings } from '@ui-slot/settings-preferences'
+import { WorkspaceGeneral } from '@ui-slot/settings-general'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ReplayOnboarding, WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
-import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
-import { SubscriptionSettings } from '@/components/settings/subscription-settings'
-import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
-import { ApiKeyFallbackSetting, useApiKeyList } from '@/components/settings/api-key-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
-import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
-import { CloudSettings, CloudModelSettings } from '@/components/settings/cloud-settings'
-import { SecuritySettings } from '@/components/settings/security-settings'
+import { CloudSettings } from '@/components/settings/cloud-settings'
+
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
-import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
-import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
-import { ModelOrderSettings } from '@/components/settings/model-order-settings'
-import { FactoryProfilesSettings } from '@/components/settings/factory-profiles-settings'
-import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { settingsHref, TEAM_ONLY_SECTIONS, type SettingsSectionId } from '@/lib/settings-sections'
 import { useRouter } from '@/i18n/navigation'
@@ -108,13 +97,14 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
 
   return <>
     <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} cloudAdmin={cloudAdmin} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
-    <AppShellContent parent={t('title')} title={title} variant="settings">
+    <SettingsContentFrame parent={t('title')} title={title}>
+
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} community={community} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
-    </AppShellContent>
+    </SettingsContentFrame>
   </>
 }
 
@@ -126,11 +116,12 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
   switch (section) {
     case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
     case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
-    case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
+    case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
+
     case 'privacy': return <PrivacySettings />
     case 'logins':
-    case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} workspace={workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} /> : waiting} />
-    case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /><ReplayOnboarding /></>
+    case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
+    case 'preferences': return <PreferencesSettings />
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
@@ -140,53 +131,9 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} /> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).
-    case 'general': return <><WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />{team && workspaceId && !preview && <ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} />}</>
+    case 'general': return <WorkspaceGeneral userKey={userKey ?? user.email} workspaceId={workspaceId} showArchived={Boolean(team && workspaceId && !preview)} />
     case 'computers': return null
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
   }
-}
-
-/**
- * 模型与订阅 (decision 2026-11-02-1400): the subscriptions and the API keys
- * (connect, status, 重新获取模型) and API-key fallback belong to the account.
- * The person's thread defaults, run location and sharing choices below are
- * scoped to the workspace open here. 付款 is under 计费 only.
- */
-function ApiAndSubscriptions({ workspaceId, workspaceName, team, cloudUserKey }: { workspaceId: string; workspaceName?: string; team: boolean; cloudUserKey?: string }) {
-  const scopeT = useTranslations('Settings.modelScope')
-  const apiKeys = useApiKeyList(workspaceId)
-  return <>
-    <section aria-labelledby="account-models-scope" className="flex flex-col gap-6">
-      <h2 id="account-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('account')}</h2>
-      {cloudUserKey && <CloudModelSettings userKey={cloudUserKey} workspaceId={workspaceId} />}
-      <SubscriptionSettings workspaceId={workspaceId} />
-      {apiKeys.section}
-      <ApiKeyFallbackSetting workspaceId={workspaceId} />
-    </section>
-    {apiKeys.dialogs}
-    <section aria-labelledby="workspace-models-scope" className="flex flex-col gap-6">
-      <h2 id="workspace-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('workspace', { name: workspaceName ?? scopeT('currentWorkspace') })}</h2>
-      <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
-      <FactoryProfilesSettings key={`profiles-${workspaceId}`} workspaceId={workspaceId} />
-      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />}
-    </section>
-  </>
-}
-
-function AppearanceSection() {
-  const t = useTranslations('Settings.appearance')
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-  return <SettingsSection id="appearance-heading" title={t('title')}>
-    <SettingRow title={t('theme')}>
-      <ToggleGroup aria-label={t('themeLabel')} variant="segment" spacing={0.5} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
-        <ToggleGroupItem value="light" aria-label={t('light')}><Sun />{t('light')}</ToggleGroupItem>
-        <ToggleGroupItem value="dark" aria-label={t('dark')}><Moon />{t('dark')}</ToggleGroupItem>
-        <ToggleGroupItem value="system" aria-label={t('systemLabel')}><Monitor />{t('system')}</ToggleGroupItem>
-      </ToggleGroup>
-    </SettingRow>
-    <SettingRow title={t('language')}><LocaleSetting /></SettingRow>
-  </SettingsSection>
 }

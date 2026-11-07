@@ -105,7 +105,8 @@ const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'compo
 export function auditSource(file, text, policy) {
   const ruleExempt = HORIZONTAL_RULE_EXEMPT_FILES.includes(file)
   // R-61/R-63 (Alex 2026-10-25): the issue page's header line and the lines inside a comment card.
-  const allowHorizontalRule = file.startsWith('components/settings/') || ISSUE_PAGE_RULES.includes(file) || ruleExempt
+  // Settings slots (components/slots/settings-*, docs/ui-overlay.md) are the settings pages' own markup, moved.
+  const allowHorizontalRule = file.startsWith('components/settings/') || file.startsWith('components/slots/settings-') || ISSUE_PAGE_RULES.includes(file) || ruleExempt
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {

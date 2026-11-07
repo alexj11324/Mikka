@@ -27,7 +27,7 @@ const reset = mock.fn(async () => {})
 const save = mock.fn(async () => ({ configured: true, lastErrorCode: null, lastErrorAt: null }))
 const unused = async () => { throw new Error('not called') }
 mock.module('@/app/actions/onboarding', { namedExports: { resetOnboarding: reset, completeOnboarding: unused } })
-mock.module('@/app/actions/workspace-settings', { namedExports: { deleteWorkspace: unused, getWorkspaceDeletionImpact: unused, getWorkspaceGeneral: unused, getWorkspaceTransferTargets: unused, transferWorkspace: unused, updateWorkspace: unused } })
+mock.module('@/app/actions/workspace-settings', { namedExports: { deleteWorkspace: unused, getWorkspaceDeletionImpact: unused, getWorkspaceGeneral: unused, getWorkspaceTransferTargets: unused, transferWorkspace: unused, updateWorkspace: unused, listArchivedBots: unused, takeOverArchivedBot: unused } })
 mock.module('@/app/actions/workspace-secrets', { namedExports: { createSecret: unused, deleteSecret: unused, importSecrets: unused, listSecrets: unused, replaceSecret: unused, getE2BKey: unused, getE2BKeyCapability: async () => capability, saveE2BKey: save, deleteE2BKey: async () => ({ removed: true }) } })
 mock.module('@/hooks/use-feature-availability', { namedExports: { useGatedFeature: () => false } })
 
