@@ -22,13 +22,13 @@ const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archiv
   description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
   skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
 function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value,
-  historicalTask = null, historicalDetail = value => value } = {}) {
+  historicalTask = null, historicalDetail = value => value, implicitDefault = false } = {}) {
   const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set(), machineEnds = new Set()
   const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
   const historical = historicalTask && { id: id(901), issueId: id(902), revision: 7, stage: 'execute', status: 'blocked',
     attemptId: id(903), candidateId: null, ...historicalTask }
   if (profileBusy) profiles.set(existingProfile.id, structuredClone(existingProfile))
-  let current = { ...original }, closed = 0, liveClosed = 0, fallback = paidFallback || failure === 'paid_fallback', concurrentEdit = false
+  let current = { ...original, ...(implicitDefault ? { chosen: false } : {}) }, storedPreference = !implicitDefault, temporarySelection, closed = 0, liveClosed = 0, fallback = paidFallback || failure === 'paid_fallback', concurrentEdit = false
   const response = (value, status = 200, headers) => Response.json(value, { status, headers })
   const runData = runId => {
     const submission = submissions.find(value => value.runs.includes(runId))
@@ -85,9 +85,29 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
     if (path === '/api/mobile/model' && method === 'GET') {
       if (failure === 'concurrent_model' && submissions.length) current = { ...original, id: id(999) }
       if (failure === 'unchosen') current.chosen = false
-      return response({ ...inventory().menu, current })
+      return response({ ...inventory().menu, current, ...(url.searchParams.get('choiceState') === '1'
+        ? { preferenceState: storedPreference ? 'present' : 'absent' } : {}) })
     }
     if (path === '/api/mobile/model' && method === 'PUT') {
+      if (body.mode === 'restore-implicit') {
+        assert.ok(temporarySelection, 'only an acknowledged temporary selection may be restored')
+        assert.deepEqual(body, { bot: botId, mode: 'restore-implicit', ...temporarySelection })
+        if (failure === 'temporary_same_value_edit') return response({ error: 'modelChanged' }, 409)
+        storedPreference = false; current = { ...original, chosen: false }
+        if (failure === 'temporary_restore_lost') throw new Error('PRIVATE_NETWORK_ERROR')
+        return response({ restored: true, preferenceState: 'absent' })
+      }
+      if (body.mode === 'temporary-if-absent') {
+        assert.equal(body.bot, botId)
+        if (failure === 'temporary_preflight_race') storedPreference = true
+        if (storedPreference) return response({ error: 'modelChanged' }, 409)
+        assert.equal(body.id, options[0].id)
+        storedPreference = true
+        temporarySelection = { bindingId: id(991), revision: '12345' }
+        current = { ...options[0], kind: 'subscription', chosen: true, available: true }
+        if (failure === 'temporary_select_lost') throw new Error('PRIVATE_NETWORK_ERROR')
+        return response({ ...inventory().menu, current, ...(failure === 'temporary_receipt_missing' ? {} : { temporarySelection }) })
+      }
       const option = [original, ...options].find(value => value.id === body.id)
       assert.ok(option)
       current = { ...option, kind: option.id === original.id ? 'hosted' : 'subscription', chosen: true, available: true }
@@ -240,7 +260,7 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
   }
   return { calls, profiles, submissions, foreignMessages, supplySubmission, fetchImpl,
     openLiveImpl: async () => ({ revision: 0, wait: async () => { throw new AcceptanceError('task_timeout') }, close: () => { liveClosed++ } }),
-    get state() { return { closed, liveClosed, current, cancelled, accepted, fallback } } }
+    get state() { return { closed, liveClosed, current, storedPreference, cancelled, accepted, fallback } } }
 }
 const run = (data, execute = false, overrides = {}, settings = {}) => runObservabilityAcceptance({ env: { ...env, ...overrides }, execute,
   fetchImpl: data.fetchImpl, openLiveImpl: data.openLiveImpl, ...settings })
@@ -652,4 +672,64 @@ test('live transport waits for actual invalidations, rejects disconnects and kee
   socket.onclose()
   await assert.rejects(live.wait(live.revision, Date.now() + 1000), /live_disconnected/)
   live.close()
+})
+
+test('implicit default preflight requires server absence evidence and never writes a preference', async () => {
+  const data = fixture({ implicitDefault: true }), report = await run(data)
+  assert.equal(report.status, 'ready', JSON.stringify(report))
+  assert.equal(data.state.storedPreference, false)
+  assert.equal(data.calls.some(call => call.path === '/mikka/api/mobile/model' && call.method !== 'GET'), false)
+  assert.ok(data.calls.some(call => call.path === '/mikka/api/mobile/model' && call.search.includes('choiceState=1')))
+  const inherited = inventory(); inherited.menu.current = { ...original, chosen: false }
+  assert.throws(() => preflightCase(CASES[0], inherited), { code: 'model_not_restorable' })
+  safe(report)
+})
+
+test('implicit default restores absence with the stored binding and revision, not the catalogue option', async () => {
+  const data = fixture({ implicitDefault: true }), report = await run(data, true)
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  assert.equal(data.state.storedPreference, false); assert.equal(data.state.current.chosen, false)
+  const writes = data.calls.filter(call => call.path === '/mikka/api/mobile/model' && call.method === 'PUT')
+  assert.deepEqual(writes.map(call => call.body), [
+    { bot: botId, id: options[0].id, mode: 'temporary-if-absent' },
+    { bot: botId, mode: 'restore-implicit', bindingId: id(991), revision: '12345' },
+  ])
+  assert.equal(report.cases[0].cleanup.modelRestored, true); safe(report)
+})
+
+test('implicit default never overwrites a preference created after preflight', async () => {
+  const data = fixture({ implicitDefault: true, failure: 'temporary_preflight_race' }), report = await run(data, true)
+  assert.equal(report.status, 'blocked'); assert.equal(data.submissions.length, 0)
+  assert.equal(data.state.storedPreference, true)
+  assert.equal(data.calls.some(call => call.body?.mode === 'restore-implicit'), false)
+  safe(report)
+})
+
+test('implicit default stops after a lost or incomplete first selection receipt without guessing ownership', async () => {
+  for (const failure of ['temporary_select_lost', 'temporary_receipt_missing']) {
+    const data = fixture({ implicitDefault: true, failure }), report = await run(data, true)
+    assert.equal(report.status, 'blocked'); assert.equal(report.cases[0].code, 'cleanup_incomplete')
+    assert.equal(data.submissions.length, 0); assert.equal(data.state.storedPreference, true)
+    assert.equal(data.calls.filter(call => call.body?.mode === 'temporary-if-absent').length, 1)
+    assert.equal(data.calls.some(call => call.body?.mode === 'restore-implicit'), false)
+    assert.equal(report.cases[0].cleanup.modelRestored, false); safe(report)
+  }
+})
+
+test('implicit default preserves a same-value concurrent rewrite when the revision no longer matches', async () => {
+  const data = fixture({ implicitDefault: true, failure: 'temporary_same_value_edit' }), report = await run(data, true)
+  assert.equal(report.status, 'blocked'); assert.equal(report.cases[0].code, 'cleanup_incomplete')
+  assert.equal(data.state.storedPreference, true); assert.equal(report.cases[0].cleanup.modelRestored, false)
+  assert.equal(data.calls.filter(call => call.body?.mode === 'restore-implicit').length, 1); safe(report)
+})
+
+test('implicit default checks absence once after a lost restoration response and does not repeat deletion', async () => {
+  const data = fixture({ implicitDefault: true, failure: 'temporary_restore_lost' }), report = await run(data, true)
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  const restore = data.calls.findIndex(call => call.body?.mode === 'restore-implicit')
+  assert.ok(restore >= 0)
+  assert.equal(data.calls.filter(call => call.body?.mode === 'restore-implicit').length, 1)
+  assert.equal(data.calls.slice(restore + 1).filter(call => call.path === '/mikka/api/mobile/model' && call.method === 'GET').length, 1)
+  assert.equal(data.state.storedPreference, false); assert.equal(report.cases[0].cleanup.modelRestored, true)
+  safe(report)
 })

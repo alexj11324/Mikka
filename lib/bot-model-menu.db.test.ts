@@ -102,6 +102,14 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(menu.current.chosen, false);
     assert.equal(menu.current.available, true);
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM bot_model_choices")).rows[0].n, 0, "reading the menu saves nothing");
+    const calls: unknown[][] = [];
+    const countedPool = { query: new Proxy(pool.query, { apply(target, _receiver, args) { calls.push(args); return Reflect.apply(target, pool, args) } }) };
+    await botModelMenu(countedPool, settings, alice, botA);
+    const ordinaryQueryCount = calls.length; calls.length = 0;
+    const inspected = await botModelMenu(countedPool, settings, alice, botA, Date.now(), true);
+    assert.equal(inspected.preferenceState, "absent");
+    assert.equal(calls.length, ordinaryQueryCount, "opt-in presence reuses the existing preference read");
+    assert.deepEqual(Object.keys(menu).sort(), ["current", "groups"], "ordinary menu wire shape stays unchanged");
     // Another person's bot is not this person's to pick for.
     await assert.rejects(settings.setBotModel(alice, bobBot, gpt), { code: "botNotFound" });
     await assert.rejects(settings.setBotModel(alice, botA, bobsModel), { code: "executionModelUnknown" });
@@ -117,6 +125,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(a.groups.flatMap((group) => group.options).filter((option) => option.modelId === "gpt-fixture").length, 1);
     const b = await botModelMenu(pool, settings, alice, botB);
     assert.deepEqual([b.current.provider, b.current.chosen], ["claude", false]);
+    assert.equal((await botModelMenu(pool, settings, alice, botA, Date.now(), true)).preferenceState, "present");
     const coordinator = await botModelMenu(pool, settings, alice, null);
     assert.deepEqual([coordinator.current.id, coordinator.current.kind, coordinator.current.chosen], [HOSTED_CHOICE, "hosted", true]);
 
@@ -403,4 +412,77 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);
     await admin.end();
   }
+});
+
+test("mobile model API keeps normal selection and authenticates every temporary branch", async () => {
+  mock.reset(); // The preceding database fixture has completed; retire its module mocks.
+  const owner = "model-route-fixture-owner", bot = "10000000-0000-4000-8000-000000000001";
+  const workspace = "10000000-0000-4000-8000-000000000002", option = "10000000-0000-4000-8000-000000000003";
+  const stored = "10000000-0000-4000-8000-000000000004";
+  const calls: { method: string; args: unknown[] }[] = [];
+  const normal = { groups: [], current: { id: option } };
+  let authenticated = true, originAllowed = true, conflict = false, restored = true;
+  const tokenWorkspace = Symbol("fixture-token-workspace");
+  const { ActionFailureError } = await import("./action-error");
+  const record = (method: string, args: unknown[]) => { calls.push({ method, args }); };
+  const mocks = [
+    mock.module(new URL("./request-log.ts", import.meta.url).href, { namedExports: { noteLogUser: () => {}, withRequestLog: (_name: string, handler: unknown) => handler } }),
+    mock.module(new URL("./mobile-api.ts", import.meta.url).href, { namedExports: {
+      mobileUser: async () => authenticated ? { id: owner, [tokenWorkspace]: workspace } : null,
+      writeAllowed: () => originAllowed, json: (value: unknown, status = 200) => Response.json(value, { status }),
+      unauthorized: () => Response.json({ error: "authRequired" }, { status: 401 }),
+      forbiddenOrigin: () => Response.json({ error: "forbiddenOrigin" }, { status: 403 }),
+    } }),
+    mock.module(new URL("./tokens/principal.ts", import.meta.url).href, { namedExports: { tokenWorkspace } }),
+    mock.module(new URL("./coordinator/coordinator-bot.ts", import.meta.url).href, { namedExports: { openChatBotId: async (_user: unknown, id: string | null) => id ?? bot } }),
+    mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool: {} } }),
+    mock.module(new URL("./execution-settings.ts", import.meta.url).href, { namedExports: { ExecutionSettings: class {
+      async setTemporaryBotModel(...args: unknown[]) { record("temporary", args); return conflict ? null : { bindingId: stored, revision: "12345" }; }
+      async restoreTemporaryBotModel(...args: unknown[]) { record("restore", args); return restored; }
+    } } }),
+    mock.module(new URL("./bot-model-menu.ts", import.meta.url).href, { namedExports: {
+      botModelScope: async (ownerId: string, botId: string, onlyWorkspace: string) => {
+        assert.deepEqual([ownerId, onlyWorkspace], [owner, workspace]);
+        if (botId !== bot) throw new ActionFailureError("botNotFound");
+        return { ownerId, workspaceId: workspace };
+      },
+      botModelMenu: async (...args: unknown[]) => { record("menu", args); return { ...normal, ...(args[5] === true ? { preferenceState: "absent" } : {}) }; },
+      chooseBotModel: async (...args: unknown[]) => { record("ordinary", args); return normal; },
+      refreshBotModelMenu: async () => normal,
+    } }),
+  ];
+  try {
+    const route = await import("../app/api/mobile/model/route");
+    const request = (body: unknown) => new Request("https://example.test/api/mobile/model", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    assert.deepEqual(await (await route.GET(new Request("https://example.test/api/mobile/model?bot=" + bot))).json(), normal);
+    assert.equal(calls.at(-1)?.args.length, 4, "ordinary GET does not opt into extra fields");
+    assert.equal((await (await route.GET(new Request("https://example.test/api/mobile/model?bot=" + bot + "&choiceState=1"))).json()).preferenceState, "absent");
+    assert.deepEqual(await (await route.PUT(request({ bot, id: option }))).json(), normal);
+    assert.equal(calls.at(-1)?.method, "ordinary");
+    assert.deepEqual(calls.at(-1)?.args.slice(2), [{ ownerId: owner, workspaceId: workspace }, bot, option]);
+
+    const temporary = { bot, id: option, mode: "temporary-if-absent" };
+    const selected = await route.PUT(request(temporary));
+    assert.equal(selected.status, 200);
+    assert.deepEqual((await selected.json()).temporarySelection, { bindingId: stored, revision: "12345" });
+    const restore = { bot, mode: "restore-implicit", bindingId: stored, revision: "12345" };
+    assert.deepEqual(await (await route.PUT(request(restore))).json(), { restored: true, preferenceState: "absent" });
+    conflict = true; assert.equal((await route.PUT(request(temporary))).status, 409); conflict = false;
+    restored = false; assert.equal((await route.PUT(request(restore))).status, 409); restored = true;
+
+    for (const body of [{ ...temporary, workspaceId: workspace }, { ...temporary, bot: null },
+      { ...temporary, id: "apikey:private" }, { ...restore, revision: "PRIVATE_BODY" }, { ...restore, unexpected: true }]) {
+      const before = calls.length;
+      assert.equal((await route.PUT(request(body))).status, 400);
+      assert.equal(calls.length, before, "invalid input never reaches storage");
+    }
+    for (const body of [temporary, restore]) {
+      authenticated = false; const before = calls.length;
+      assert.equal((await route.PUT(request(body))).status, 401); assert.equal(calls.length, before);
+      authenticated = true; originAllowed = false;
+      assert.equal((await route.PUT(request(body))).status, 403); assert.equal(calls.length, before);
+      originAllowed = true;
+      assert.equal((await route.PUT(request({ ...body, bot: stored }))).status, 404); assert.equal(calls.length, before);
+    }
+  } finally { for (const handle of mocks.reverse()) handle.restore(); }
 });
