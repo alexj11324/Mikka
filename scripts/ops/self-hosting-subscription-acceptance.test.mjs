@@ -33,3 +33,5 @@ test('independent cleanup can remove only this run exact dev folder and at most 
 })
 
 // Real core image D75 additionally passed the ordinary auth/MCP contract with zero model calls.
+
+// Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.

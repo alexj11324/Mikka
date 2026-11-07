@@ -74,3 +74,5 @@ test('community staging source guard accepts the six reviewed operations files a
 })
 
 // The isolated image contract validates real signup, signed consent and MCP without model requests.
+
+// Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.

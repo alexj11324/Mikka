@@ -89,7 +89,7 @@ export async function runCommunity(env = process.env) {
   const revision = (await execute('git', ['rev-parse', 'HEAD'], { cwd: source })).stdout.trim()
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
   const report = { kind: 'real-community-subscriptions', revision, cases: [], cleanup: {}, stage: 'source', status: 'failed',
-    credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false }
+    credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
   const name = 'mikka-community-' + env.GITHUB_RUN_ID
   const databasePassword = randomBytes(24).toString('hex'), key = randomBytes(32).toString('base64')
   const devPath = '/release-selfhost-' + env.GITHUB_RUN_ID
@@ -215,7 +215,7 @@ export async function runCommunity(env = process.env) {
     const workspace = (await community.json('/api/workspace')).workspace
     localPool = new Pool({ connectionString: `postgres://mikka:${databasePassword}@127.0.0.1:55439/community_release_e2e`, max: 2 })
     appEnv.MIKKA_SERVER_ADMIN_USER_IDS = own.id
-    await docker(['rm', '-f', name + '-app']); await startApp()
+    await docker(['rm', '-f', '-v', name + '-app']); await startApp()
     for (let i = 0; i < 30; i++) { try { if ((await community.json('/api/version')).build === revision) break } catch {} await new Promise(r => setTimeout(r, 1000)) }
     report.stage = 'normal-cloud-binding'
     await community.json('/api/cloud/connect', post({ action: 'register', name: 'Mikka community release ' + env.GITHUB_RUN_ID })); serverRegistered = true
@@ -253,8 +253,12 @@ export async function runCommunity(env = process.env) {
       const connectionId = randomUUID(), secretName = 'mikka-byos-' + randomUUID()
       const fixture = accessFixture(s.raw, s.row, { ownerId: own.id, workspaceId: workspace.id, connectionId })
       await inf('/api/v4/secrets/' + secretName, 'POST', { projectId: PROJECT, environment: 'dev', secretPath: devPath, type: 'shared', secretValue: fixture.value }); createdSecrets.push(secretName)
-      await localPool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"credentialVersion","providerSubject","accessSecretName","accessDigest","modelCatalog",quota) VALUES ($1,$2,$3,$4,'connected',1,1,$5,$6,$7,$8,$9)`,
-        [connectionId, own.id, workspace.id, s.provider, s.row.providerSubject, secretName, fixture.digest, JSON.stringify({ revision: '1', models: [s.model] }), s.row.quota])
+      // Connected metadata requires a grant reference even for this bounded
+      // access-only fixture. Its deliberately absent grant cannot resolve in
+      // the unused custody path; no canonical or refresh grant is created.
+      const absentGrant = 'mikka-byos-' + randomUUID()
+      await localPool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"credentialVersion","providerSubject","accessSecretName","accessDigest","modelCatalog",quota,"secretName","secretDigest") VALUES ($1,$2,$3,$4,'connected',1,1,$5,$6,$7,$8,$9,$10,$11)`,
+        [connectionId, own.id, workspace.id, s.provider, s.row.providerSubject, secretName, fixture.digest, JSON.stringify({ revision: '1', models: [s.model] }), s.row.quota, absentGrant, sha('absent-canonical-grant:' + connectionId)])
       await localPool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,'catalogue',$4,1,$5,$6)`, [randomUUID(), own.id, workspace.id, connectionId, s.provider + '_cpa', s.model])
       s.localConnection = connectionId; delete s.raw
     }
@@ -365,7 +369,7 @@ export async function runCommunity(env = process.env) {
     for (const client of sessions.reverse()) { try { await client.json('/api/auth/sign-out', post({})); report.cleanup.sessionsClosed = (report.cleanup.sessionsClosed ?? true) && true } catch { report.cleanup.sessionsClosed = false } }
     await privatePool?.end(); await localPool?.end()
     if (tunnel && tunnel.exitCode === null && tunnel.signalCode === null) { const exited = once(tunnel, 'exit'); tunnel.kill('SIGTERM'); await exited.catch(() => {}) }
-    for (const [kind, target] of resources.filter(([k]) => k === 'container').reverse()) { try { await docker(['rm', '-f', target]) } catch { report.cleanup.docker = false } }
+    for (const [kind, target] of resources.filter(([k]) => k === 'container').reverse()) { try { await docker(['rm', '-f', '-v', target]) } catch { report.cleanup.docker = false } }
     for (const [kind, target] of resources.filter(([k]) => k !== 'container').reverse()) { try { await docker([kind, 'rm', target]) } catch { report.cleanup.docker = false } }
     for (const name of createdSecrets) { try { await inf('/api/v4/secrets/' + name, 'DELETE', { projectId: PROJECT, environment: 'dev', secretPath: devPath, type: 'shared' }) } catch { report.cleanup.accessSecretsRemoved = false } }
     if (ownFolder) { try { await inf('/api/v2/folders/' + ownFolder, 'DELETE', { projectId: PROJECT, environment: 'dev' }); report.cleanup.ownFolderRemoved = true } catch { report.cleanup.ownFolderRemoved = false } }
