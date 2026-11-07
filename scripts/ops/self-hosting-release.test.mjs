@@ -51,3 +51,5 @@ test('readiness refuses a non-smoke account before any network request',async()=
 test('runtime log summaries expose only closed causes and public package names',async()=>{const {runtimeLogSummary}=await import('./self-hosting-release.mjs');const raw="Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'server-only' imported from /private/source.ts\nBearer private-secret-value";const v=runtimeLogSummary(raw);assert.deepEqual(v.missingPackages,['server-only']);assert.deepEqual(v.codes,['ERR_MODULE_NOT_FOUND','MODULE_NOT_FOUND']);assert.ok(!JSON.stringify(v).includes('private-secret'));assert.ok(!JSON.stringify(v).includes('/private/source'))})
 
 // Runtime diagnostics also consume the fixed deployment's documented bounded log stream.
+
+test('missing packaged auth data is classified without printing its filesystem path',async()=>{const {runtimeLogSummary}=await import('./self-hosting-release.mjs');const v=runtimeLogSummary("Error: ENOENT open '/var/task/lib/abuse/data/disposable-email-domains.txt'");assert.deepEqual(v.codes,['ENOENT']);assert.equal(v.missingAuthData,true);assert.ok(!JSON.stringify(v).includes('/var/task'))})
