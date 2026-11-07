@@ -17,6 +17,7 @@ on:
       - 'patches/**'
       - 'scripts/e2b/**'
       - 'scripts/e2b/publish-template-env.mjs'
+      - 'scripts/e2b/release-handoff.mjs'
       - 'lib/computer/official-runtime.ts'
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/e2b-template.yml'
@@ -59,7 +60,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
+      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/e2b/release-handoff.test.mjs scripts/release/web-deploy.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 scripts/e2b/official-files.test.py
       - run: python3 scripts/e2b/cleanup-template-candidates.test.py
@@ -149,8 +150,8 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      release-evidence: ${{ steps.publish.outputs.release-evidence }}
-      template-ids: ${{ steps.publish.outputs.template-ids }}
+      release-artifact-id: ${{ steps.release.outputs.artifact-id }}
+      release-report-sha256: ${{ steps.publish.outputs.report-sha256 }}
     env:
       # Existing ACME-owned workspace and dedicated test Bot, never a real task.
       MIKKA_ACCEPTANCE_WORKSPACE_ID: de300001-ece6-4021-8214-c986ea306bde
@@ -166,6 +167,13 @@ jobs:
         run: node scripts/release/web-deploy.mjs main
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Download only this run's immutable candidate artifact
+        if: needs.validate.outputs.candidate-artifact-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.validate.outputs.candidate-artifact-id }}
+          path: ${{ runner.temp }}/candidate-handoff
+          merge-multiple: true
       - name: Install only the pinned gate SDKs
         run: |
           npm install --prefix "$RUNNER_TEMP/e2b-js" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
@@ -207,18 +215,17 @@ jobs:
           include-imports: false
       - name: Require real Claude Code and Codex subscriptions on the private candidates
         run: |
-          node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
-          import { writeFileSync } from 'node:fs'
-          writeFileSync(process.argv[2], process.env.CANDIDATE_REPORT, { mode: 0o600 })
-          JS
-          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
+          node scripts/e2b/release-handoff.mjs verify-candidates "$RUNNER_TEMP/candidate-handoff"
+          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidate-handoff/report.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
         env:
-          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-report-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ needs.validate.outputs.source-sha }}
+          RUNTIME_TEMPLATE_IDS: ${{ needs.validate.outputs.template-ids }}
       - name: Preserve closed subscription gate diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: e2b-template-subscription-diagnostics
+          name: e2b-template-subscription-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/subscription-diagnostics.json
           if-no-files-found: warn
           retention-days: 7
@@ -227,14 +234,20 @@ jobs:
         run: |
           node scripts/release/web-deploy.mjs main
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --publish-verified "$RUNNER_TEMP/accepted.json" > "$RUNNER_TEMP/release.json"
-          node --input-type=module - "$RUNNER_TEMP/release.json" <<'JS'
-          import { readFileSync, appendFileSync } from 'node:fs'
-          const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
-          const ids = Object.fromEntries(Object.entries(report.templates).map(([kind, row]) => [kind, row.templateId]))
-          appendFileSync(process.env.GITHUB_OUTPUT, `release-evidence=${JSON.stringify(report)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
-          JS
+          node scripts/e2b/release-handoff.mjs pack-release "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/release-handoff" "$RUNNER_TEMP/candidate-handoff"
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-report-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ needs.validate.outputs.source-sha }}
+          RUNTIME_TEMPLATE_IDS: ${{ needs.validate.outputs.template-ids }}
+      - name: Preserve the complete verified publication evidence
+        id: release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-handoff/
+          if-no-files-found: error
+          retention-days: 7
   publish:
     needs: [validate, await-web, subscriptions]
     permissions:
@@ -244,9 +257,10 @@ jobs:
     with:
       runtime-refresh: true
       runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
-      runtime-template-models: ${{ needs.validate.outputs.template-models }}
-      runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
-      runtime-release-evidence: ${{ needs.subscriptions.outputs.release-evidence }}
+      runtime-template-ids: ${{ needs.validate.outputs.template-ids }}
+      runtime-candidate-report-sha256: ${{ needs.validate.outputs.candidate-report-sha256 }}
+      runtime-release-artifact-id: ${{ needs.subscriptions.outputs.release-artifact-id }}
+      runtime-release-report-sha256: ${{ needs.subscriptions.outputs.release-report-sha256 }}
   cleanup:
     needs: [check, validate, await-web, subscriptions, publish]
     if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.check.outputs.changed == 'true'
@@ -259,11 +273,15 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
       - name: Install the pinned cleanup SDK
         run: |
           python3 -m venv "$RUNNER_TEMP/e2b-cleanup"
           "$RUNNER_TEMP/e2b-cleanup/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
       - name: Read this release's E2B key
+        id: e2b-key
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -274,20 +292,47 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
+      - name: Download the exact candidate artifact for cleanup
+        if: always() && steps.e2b-key.outcome == 'success' && needs.validate.outputs.candidate-artifact-id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.validate.outputs.candidate-artifact-id }}
+          path: ${{ runner.temp }}/candidate-handoff
+          merge-multiple: true
       - name: Close this attempt's instances and remove only its private candidates
+        if: always() && steps.e2b-key.outcome == 'success'
         run: |
-          python3 - <<'PY'
-          import os,pathlib
-          pathlib.Path(os.environ['RUNNER_TEMP'],'cleanup-candidates.json').write_text(os.environ.get('CANDIDATE_REPORT') or '{}')
-          PY
-          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py --report "$RUNNER_TEMP/cleanup-candidates.json" --output "$RUNNER_TEMP/release-cleanup.json"
+          args=()
+          handoff_status=0
+          if [ -n "$CANDIDATE_ARTIFACT_ID" ]; then
+            if node scripts/e2b/release-handoff.mjs verify-candidates "$RUNNER_TEMP/candidate-handoff"; then
+              args+=(--report "$RUNNER_TEMP/candidate-handoff/report.json")
+            else
+              handoff_status=1
+            fi
+          elif [ -n "$RUNTIME_REPORT_SHA256" ]; then
+            handoff_status=1
+          fi
+          # A partial build has no artifact. An invalid artifact must not supply
+          # IDs, but neither case may prevent this run's existing prefix cleanup.
+          cleanup_status=0
+          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/release-cleanup.json" || cleanup_status=$?
+          if [ "$handoff_status" -ne 0 ]; then
+            echo '::error::Candidate artifact unavailable or invalid; only current-run prefix cleanup was allowed.'
+            exit 1
+          fi
+          exit "$cleanup_status"
         env:
-          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+          CANDIDATE_ARTIFACT_ID: ${{ needs.validate.outputs.candidate-artifact-id }}
+          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-report-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ needs.validate.outputs.source-sha }}
+          RUNTIME_TEMPLATE_IDS: ${{ needs.validate.outputs.template-ids }}
       - name: Preserve release cleanup receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: e2b-runtime-release-cleanup
+          name: e2b-runtime-release-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release-cleanup.json
           if-no-files-found: warn
           retention-days: 7

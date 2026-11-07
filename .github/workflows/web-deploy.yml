@@ -20,15 +20,18 @@ on:
       runtime-worker-sha:
         type: string
         default: ''
-      runtime-template-models:
+      runtime-candidate-report-sha256:
         type: string
-        default: '{}'
+        default: ''
       runtime-template-ids:
         type: string
         default: '{}'
-      runtime-release-evidence:
+      runtime-release-artifact-id:
         type: string
-        default: '{}'
+        default: ''
+      runtime-release-report-sha256:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -108,6 +111,13 @@ jobs:
       - name: Pin the private UI revision
         if: steps.skip.outputs.skip != 'true'
         run: node scripts/release/hosted-ui.mjs record .hosted-ui
+      - name: Download this run's immutable runtime publication evidence
+        if: inputs.runtime-refresh == true && inputs.runtime-release-artifact-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ inputs.runtime-release-artifact-id }}
+          path: ${{ runner.temp }}/release-handoff
+          merge-multiple: true
       - name: Read the existing Vercel runtime release token
         if: inputs.runtime-refresh == true
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
@@ -130,8 +140,9 @@ jobs:
           CODEX_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').codex }}
           SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
           MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
-          TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
-          RUNTIME_RELEASE_EVIDENCE: ${{ inputs.runtime-release-evidence }}
+          RUNTIME_RELEASE_DIRECTORY: ${{ runner.temp }}/release-handoff
+          RUNTIME_REPORT_SHA256: ${{ inputs.runtime-release-report-sha256 }}
+          RUNTIME_CANDIDATE_REPORT_SHA256: ${{ inputs.runtime-candidate-report-sha256 }}
       # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
       # Infisical source Vercel production is synced from; the next step fills only
       # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.
