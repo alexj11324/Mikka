@@ -238,6 +238,8 @@ alone: their recorded overlay SHAs may differ.
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
   source, `.map`, inline source-map directives and `sourcesContent`.
 - The desktop production renderer and main/preload emit no source maps.
+  Installers include their bundled `dist/` and package metadata, explicitly
+  excluding hoisted workspace `node_modules/` and its development source/maps.
   After signing, the complete actual ASAR is extracted and audited
   before publication. The private checkout remains outside the package.
 - Do not print environment files, credentials or private source while debugging.
