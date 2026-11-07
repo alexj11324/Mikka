@@ -72,6 +72,37 @@ export async function readAuthorizedProjection({ location, name, clientId, clien
   return secret.secretValue
 }
 
+export async function configureBoundSubscription(client, workspaceId, selected, receipt = {}) {
+  const change = async (step, value) => { receipt.modelSelectionStep = step; return client.rpc('model-order.changeModelOrder', [value, workspaceId]) }
+  await change('location', { kind: 'location', location: 'local' })
+  await change('auto-routing', { kind: 'autoRouting', enabled: false })
+  await change('preferred', { kind: 'preferred', harness: selected.harness })
+  // The first list mutation materializes every virtual default ID. Add first,
+  // then read the stored IDs before removing any other row.
+  await change('materialize', { kind: 'add', entries: [{ harness: selected.harness, model: selected.model, source: { kind: 'subscription', connectionId: selected.localConnection } }] })
+  receipt.modelSelectionStep = 'read-materialized'
+  const order = await client.rpc('model-order.getModelOrder', [workspaceId])
+  const matches = entry => entry.harness === selected.harness && entry.model === selected.model && entry.source?.kind === 'subscription' && entry.source.connectionId === selected.localConnection
+  check(order.entries.filter(matches).length === 1, 'BOUND_MODEL')
+  for (const entry of order.entries.filter(entry => !matches(entry))) await change('remove-extra', { kind: 'remove', id: entry.id })
+  receipt.modelSelectionStep = 'verify-bound'
+  const fixed = await client.rpc('model-order.getModelOrder', [workspaceId])
+  check(fixed.entries.length === 1 && matches(fixed.entries[0]) && fixed.location === 'local' && fixed.autoModelRouting === false, 'BOUND_MODEL')
+  receipt.modelSelectionVerified = true
+}
+
+export function safeThreadFailure(detail, userCodes) {
+  const extra = new Set(['binding_required','account_unavailable','binding_mismatch','stale_binding','pending_auth','reconnect_required','disconnected','quota_unknown','quota_exhausted','backend_unavailable','isolation_required','billing_unverified','subscription_rate_limited','provider_access_denied','provider_request_rejected','provider_temporarily_unavailable','invalid_credential_bundle','subscription_timeout','secret_store_unavailable','secret_not_found','credential_integrity_failed','ECONNRESET','ECONNREFUSED','ENOTFOUND','ETIMEDOUT','EPIPE'])
+  const code = value => typeof value === 'string' && (Object.hasOwn(userCodes, value) || extra.has(value)) ? value : 'OTHER'
+  const failure = detail.thread?.failureDetails
+  const names = new Set(['Error','TypeError','CodedError','RunFailureError','WorkerRefusal','SubscriptionRefusal','TimeoutError','AbortError','CommandExitError'])
+  return { status: ['queued','preparing','running','paused','waiting_input','failed','succeeded','completed','cancelled','stopped'].includes(detail.thread?.status) ? detail.thread.status : 'OTHER',
+    code: code(failure?.code ?? detail.thread?.error),
+    detail: failure?.code && userCodes[failure.code]?.includes(failure.detail) ? failure.detail : 'OTHER',
+    causes: (Array.isArray(failure?.causes) ? failure.causes : []).slice(0, 8).map(cause => ({ name: names.has(cause.name) ? cause.name : 'OTHER', code: Number.isInteger(cause.code) && cause.code >= 0 && cause.code <= 599 ? cause.code : code(cause.code) })),
+    stages: (detail.chunks ?? []).flatMap(row => { const c = row.chunk; return c?.type === 'data-run-stage' && ['repository','worktree','agent_start'].includes(c.data?.stage) && typeof c.data.ok === 'boolean' ? [{ stage: c.data.stage, ok: c.data.ok }] : [] }) }
+}
+
 // Metadata only, kept outside artifacts so an independent always() step can
 // remove exactly this run's access leaves and VMs after a driver timeout.
 export function cleanupScope(value, run) {
@@ -383,7 +414,7 @@ export async function runCommunity(env = process.env) {
     await mcp('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'mikka-community-release', version: '1.0.0' } })
     for (const s of sources.filter(source => source.ready)) {
       const row = s.receipt
-      let sandbox, deviceId, runId, issueId
+      let sandbox, deviceId, runId, issueId, executionRecord
       try {
         report.stage = 'thread-' + s.provider
         row.stage = 'source-authorization'
@@ -419,11 +450,7 @@ export async function runCommunity(env = process.env) {
         const agents = await community.rpc('agents.listAgents', []), agent = agents.find(a => a.deviceId === deviceId && a.harness === s.harness)
         check(agent, 'AGENT')
         row.stage = 'model-selection'
-        await community.rpc('model-order.changeModelOrder', [{ kind: 'location', location: 'local' }, workspace.id])
-        const order = await community.rpc('model-order.getModelOrder', [workspace.id])
-        for (const entry of order.entries) await community.rpc('model-order.changeModelOrder', [{ kind: 'remove', id: entry.id }, workspace.id])
-        await community.rpc('model-order.changeModelOrder', [{ kind: 'add', entries: [{ harness: s.harness, model: s.model, source: { kind: 'subscription', connectionId: s.localConnection } }] }, workspace.id])
-        await community.rpc('model-order.changeModelOrder', [{ kind: 'preferred', harness: s.harness }, workspace.id])
+        await configureBoundSubscription(community, workspace.id, s, row)
         const sampleId = randomUUID(), marker = 'STARTUP_OK_' + sampleId
         row.stage = 'create-issue'
         const issue = await mcp('tools/call', { name: 'create_issue', arguments: { title: 'Self-hosted ' + kind + ' release validation', body: 'Read README.md using the normal file/shell tool. Do not change any file, commit, branch or push. After the successful tool call, reply exactly ' + marker + '. This is a read-only release verification task.', priority: 'low' } })
@@ -431,7 +458,8 @@ export async function runCommunity(env = process.env) {
         row.stage = 'dispatch'
         const queued = await mcp('tools/call', { name: 'dispatch_run', arguments: { issueId, agentId: agent.id, repo: 'alexj11324/Mikka', requestKey: 'selfhost:' + sampleId, note: 'Use exactly ' + s.model + ' on this subscription. Read-only; finish with ' + marker } })
         runId = queued.runId ?? queued.thread?.runId; check(UUID.test(runId), 'RUN')
-        const record = { runId, issueId, sampleId, harness: s.harness, requireReply: true, requireReplyAfterTool: true, requireTerminal: true, minToolCalls: 1 }
+        const record = executionRecord = { runId, issueId, sampleId, harness: s.harness, requireReply: true, requireReplyAfterTool: true, requireTerminal: true, minToolCalls: 1 }
+        row.runId = runId; row.issueId = issueId
         row.stage = 'full-thread'
         await watchRun(community, record, 240000, WebSocket, Date.now)
         check(['succeeded', 'completed'].includes(record.lastStatus) && record.replyVerifiedAfterTool && record.toolCalls.some(t => t.outcome === 'ok'), 'THREAD_COMPLETE')
@@ -441,7 +469,19 @@ export async function runCommunity(env = process.env) {
           && evidence.executionIdentity?.resourceBindings?.some(r => r.kind === 'device' && r.id === deviceId), 'RUN_PROVENANCE')
         Object.assign(row, { status: 'passed', runId, issueId, successfulTool: true, replyAfterTool: true, terminal: record.lastStatus,
           credentialType: evidence.credentialType, subscriptionRoute: evidence.subscriptionRoute })
-      } catch (error) { row.code = /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_THREAD_FAILED'; row.errorClass = error?.constructor?.name === 'CommandExitError' ? 'CommandExitError' : 'Error' }
+      } catch (error) {
+        row.code = /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_THREAD_FAILED'; row.errorClass = error?.constructor?.name === 'CommandExitError' ? 'CommandExitError' : 'Error'
+        if (runId && issueId) {
+          try {
+            const { USER_ERROR_CODES } = await import(pathToFileURL(source + '/packages/protocol/src/user-error-codes.ts'))
+            row.failureReceipt = safeThreadFailure(await community.rpc('agents.getIssueThread', [issueId, runId]), USER_ERROR_CODES)
+            const frozen = (await community.json('/api/runs/' + runId + '/evidence')).run
+            row.frozenModel = ['claude-haiku-5-5','gpt-6-luna'].includes(frozen?.model) ? frozen.model : 'OTHER'
+            row.frozenCredentialType = ['subscription','api_key','unknown'].includes(frozen?.credentialType) ? frozen.credentialType : 'OTHER'
+          } catch { row.failureReceiptUnavailable = true }
+          row.observedExecution = { agentStarted: Boolean(executionRecord?.agentStart), providerChunk: Boolean(executionRecord?.firstProviderChunk), replyAfterTool: Boolean(executionRecord?.replyVerifiedAfterTool) }
+        }
+      }
       finally {
         if (!deviceId && sandbox) { try { const proof = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/device-proof.json', { user: 'root' })); if (UUID.test(proof.deviceId) && proof.harness === s.harness) deviceId = proof.deviceId } catch { /* registration may not have completed */ } }
         if (runId) { try { await community.rpc('agents.stopRun', [runId]); row.cleanup.runStopped = true } catch { row.cleanup.runStopped = false } }

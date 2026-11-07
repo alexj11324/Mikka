@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, safeThreadFailure } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -106,4 +106,38 @@ test('source projection reuses the normal custody identity for exactly one immut
   assert.equal(raw, value); assert.equal(calls.length, 2)
   for (const secret of [value, 'synthetic-derived-bearer', 'synthetic-custody-secret']) assert.ok(!JSON.stringify(report).includes(secret))
   await assert.rejects(readAuthorizedProjection({ location, name: 'canonical-grant', report, fetcher: () => assert.fail('must not request') }), /SOURCE_PROJECTION_SCOPE/)
+})
+
+
+test('model selection materializes virtual defaults before removal and binds exactly the original small subscription', async () => {
+  let customized = false, location = 'cloud', autoModelRouting = true, preferredHarness = 'claude_code'
+  const selected = { harness: 'claude_code', model: 'claude-haiku-5-5', localConnection: target.connectionId }
+  let entries = [
+    { id: 'default:claude', harness: selected.harness, model: selected.model, source: { kind: 'subscription', connectionId: selected.localConnection } },
+    { id: 'default:codex', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: row.id } },
+  ]
+  const client = { rpc: async (action, args) => {
+    if (action === 'model-order.getModelOrder') return structuredClone({ entries, location, autoModelRouting, preferredHarness })
+    const [change] = args
+    if (change.kind === 'location') { location = change.location; return }
+    if (change.kind === 'preferred') { preferredHarness = change.harness; return }
+    if (change.kind === 'autoRouting') { autoModelRouting = change.enabled; return }
+    if (!customized) {
+      const mapping = new Map(entries.map((e, i) => [e.id, 'stored-'+i])); entries = entries.map(e => ({ ...e, id: mapping.get(e.id) })); customized = true
+      if (change.kind === 'remove') change.id = mapping.get(change.id) ?? change.id
+    }
+    if (change.kind === 'remove') { assert.ok(entries.some(e => e.id === change.id), 'virtual default id became stale'); entries = entries.filter(e => e.id !== change.id) }
+    if (change.kind === 'add') for (const e of change.entries) if (!entries.some(old => old.harness === e.harness && old.model === e.model && old.source.connectionId === e.source.connectionId)) entries.push({ ...e, id: 'added' })
+  } }
+  await configureBoundSubscription(client, target.workspaceId, selected)
+  assert.equal(entries.length, 1); assert.equal(entries[0].model, selected.model); assert.equal(entries[0].source.connectionId, selected.localConnection)
+  assert.equal(location, 'local'); assert.equal(autoModelRouting, false); assert.equal(preferredHarness, selected.harness)
+})
+
+
+test('failed thread receipts retain only registered codes and stages, excluding provider text and prompts', () => {
+ const secret = 'never-return-private-bearer'
+ const out = safeThreadFailure({ thread: { status: 'failed', error: secret, failureDetails: { code: 'run_failed', detail: 'known', providerMessage: secret, causes: [{ name: 'WorkerRefusal', code: 'secret_not_found', message: secret }, { name: secret, code: secret }] } }, chunks: [{ chunk: { type: 'data-run-stage', data: { stage: 'repository', ok: false, stderr: secret } } }, { chunk: { type: 'text-delta', delta: secret } }] }, { run_failed: ['known'] })
+ assert.equal(out.code, 'run_failed'); assert.equal(out.detail, 'known'); assert.equal(out.causes[0].code, 'secret_not_found')
+ assert.deepEqual(out.stages, [{ stage: 'repository', ok: false }]); assert.ok(!JSON.stringify(out).includes(secret))
 })

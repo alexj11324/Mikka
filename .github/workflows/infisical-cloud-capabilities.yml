@@ -337,3 +337,5 @@ jobs:
 # Source projection read uses the live configured access project and existing custody identity.
 
 # Production Secret selector values stay in Infisical; Vercel supplies only named variable metadata.
+
+# Per-provider model selection verifies exactly the original small subscription before dispatch.
