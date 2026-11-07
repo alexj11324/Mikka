@@ -94,6 +94,28 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
   })
+  await t.test('without a thread, board flags and open dependencies put both list and detail in pending', async () => {
+    const groups = async () => {
+      const listBody = await (await list(new Request('https://app.test/api/mobile/tasks'))).json()
+      const row = listBody.tasks.find((item: { id: string }) => item.id === noRun)
+      const detail = await (await request(noRun)).json()
+      return [row.group, detail.task.group]
+    }
+    const metadata = async (value: unknown) => pool.query('update issues set content=$2 where id=$1', [noRun, { type: 'doc', attrs: { mikka: value } }])
+    await metadata({ block: { blocked: true, runId: null } })
+    assert.deepEqual(await groups(), ['pending', 'pending'])
+    await pool.query(`update issues set status='done' where id=$1`, [noRun])
+    assert.deepEqual(await groups(), ['done', 'done'])
+    await pool.query(`update issues set status='todo' where id=$1`, [noRun])
+    const blocker = await workspaceTask()
+    await metadata({ blockedByIds: [blocker] })
+    assert.deepEqual(await groups(), ['pending', 'pending'])
+    await pool.query(`update issues set status='done' where id=$1`, [blocker])
+    assert.deepEqual(await groups(), ['todo', 'todo'])
+    await pool.query(`update issues set status='todo' where id=$1`, [blocker])
+    await metadata({ blockedByIds: [blocker], block: { blocked: false, runId: null } })
+    assert.deepEqual(await groups(), ['todo', 'todo'], 'an explicitly cleared board block stays clear')
+  })
   await t.test('cross-workspace reads return 404 even for the same owner, and workspace tokens stay scoped', async () => {
     selectedWorkspace = own.id
     assert.equal((await request(issueId)).status, 404)
