@@ -1,3 +1,4 @@
+import { defaultModelConfigured } from '@/lib/default-model-config'
 import 'server-only'
 import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
@@ -20,12 +21,12 @@ import { deliverRunCompletion } from './run-completion-delivery'
 const recovery = createWakeRecovery(pool)
 
 /**
- * Whether the Coordinator runs here: on Vercel (the AI Gateway signs in with
- * the deployment's OIDC token) or wherever a gateway key is set. Elsewhere,
- * events still collect in the inbox and wait.
+ * Whether this chat can use a configured default or its own selected
+ * credential. Elsewhere, events still collect in the inbox and wait.
  */
-export function coordinatorEnabled(): boolean {
-  return process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY) || runTestFixture('mock') !== undefined
+export async function coordinatorEnabled(ownerId?: string, botId: string | null = null): Promise<boolean> {
+  if (runTestFixture('mock') !== undefined || defaultModelConfigured()) return true
+  return ownerId ? (await import('./model-ready')).botModelReady(ownerId, botId) : false
 }
 
 /** No answer leaves the event pending; it does not become background, result or a request for human approval. */
@@ -58,14 +59,13 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
  * repairs the commit-to-start gap and workflow infrastructure failures.
  */
 export async function wakeCoordinator(userId: string): Promise<void> {
-  if (!coordinatorEnabled()) return
   try {
     // Resolving the Coordinator first moves any of its chat still stored the old way onto its personal Coordinator.
     // A person with no workspace to resolve has no Coordinator turn to start; their bots still wake.
     await coordinatorBot(userId, null).catch(() => undefined)
     await releaseAttention(userId)
     for (const botId of await wakingChats(userId)) {
-      await wakeChat({ userId, botId })
+      if (await coordinatorEnabled(userId, botId)) await wakeChat({ userId, botId })
     }
   } catch (error) {
     // Name and code only: messages can carry chat or database content.
@@ -105,7 +105,7 @@ async function deliverClaim(claim: DeadlineWakeClaim) {
 
 /** Internal durable step: preserve the bounded batch instead of waking an unrestricted chat. */
 export async function recoverWakeDeadline(ticket: WakeDeadlineTicket): Promise<{ ticket: WakeDeadlineTicket; at: string } | null> {
-  if (!coordinatorEnabled()) return null
+  if (!await coordinatorEnabled(ticket.userId, ticket.botId)) return null
   const next = await recovery.resume(ticket)
   if (next.kind === 'obsolete') return null
   if (next.kind === 'wait') return { ticket, at: next.at }
@@ -124,7 +124,6 @@ async function noticeWakeExhausted(claim: WakeClaim) {
  * attempt/lease timestamps make overlapping sweeps converge. */
 export async function retryCoordinatorWakes(deadline = Date.now() + 45_000) {
   const counts = { due: 0, started: 0, deferred: 0, failed: 0, exhausted: 0, interrupted: 0 }
-  if (!coordinatorEnabled()) return counts
   // First, so a turn whose run ended without releasing its chat is retried in this same sweep.
   try { counts.interrupted = (await (await import('./interrupted-turns')).recoverInterruptedTurns()).recovered } catch { /* the lease expiry still frees it */ }
   const scopes = await recovery.due()
@@ -132,7 +131,11 @@ export async function retryCoordinatorWakes(deadline = Date.now() + 45_000) {
   for (const scope of scopes) {
     if (Date.now() >= deadline) { counts.deferred++; continue }
     // A wake recorded before chats had bots names none: it was the Coordinator's older chat, now the personal one's.
-    try { counts[await wakeChat({ userId: scope.userId, botId: scope.botId ?? (await coordinatorBot(scope.userId, null)).botId })]++ }
+    try {
+      const botId = scope.botId ?? (await coordinatorBot(scope.userId, null)).botId
+      if (!await coordinatorEnabled(scope.userId, botId)) { counts.deferred++; continue }
+      counts[await wakeChat({ userId: scope.userId, botId })]++
+    }
     catch { counts.failed++ }
   }
   counts.exhausted = await recovery.exhausted()

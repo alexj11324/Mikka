@@ -1,73 +1,83 @@
 import 'server-only'
 import { AwsClient } from 'aws4fetch'
+import { isCloudEdition } from '@/lib/edition'
 
-// Artifact files in Cloudflare R2, through its S3 API. Each version is one
-// immutable object. Without R2 settings (previews, tests) the file stays in
-// the version row instead; production refuses to run that way.
+// Artifact files use an administrator-owned S3-compatible bucket (including R2).
+// Each version is immutable. Community installations without a bucket retain
+// the bytes in their database; hosted production still requires object storage.
 
-interface R2Config { accountId: string; bucket: string; client: AwsClient }
+interface ObjectStorageConfig { endpoint: string; bucket: string; client: AwsClient }
 
-function r2Config(): R2Config | null {
+function objectStorageConfig(): ObjectStorageConfig | null {
+  const endpoint = process.env.S3_ENDPOINT?.trim()
+  if (endpoint || process.env.S3_BUCKET || process.env.S3_ACCESS_KEY_ID || process.env.S3_SECRET_ACCESS_KEY) {
+    const bucket = process.env.S3_BUCKET?.trim(), accessKeyId = process.env.S3_ACCESS_KEY_ID, secretAccessKey = process.env.S3_SECRET_ACCESS_KEY
+    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) throw new Error('S3 configuration is incomplete')
+    const url = new URL(endpoint)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || /[\\/]/.test(bucket)) throw new Error('S3 configuration is invalid')
+    return { endpoint: url.href.replace(/\/+$/, ''), bucket, client: new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: process.env.S3_REGION?.trim() || 'us-east-1' }) }
+  }
   const accountId = process.env.R2_ACCOUNT_ID ?? process.env.CLOUDFLARE_ACCOUNT_ID
   const accessKeyId = process.env.R2_ACCESS_KEY_ID
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
   if (!accountId || !accessKeyId || !secretAccessKey) return null
-  return { accountId, bucket: process.env.R2_ARTIFACTS_BUCKET ?? 'mikka-artifacts', client: new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' }) }
+  return { endpoint: `https://${accountId}.r2.cloudflarestorage.com`, bucket: process.env.R2_ARTIFACTS_BUCKET ?? 'mikka-artifacts', client: new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' }) }
 }
 
 /** Where files go: R2, or the database row when no bucket is configured outside production. */
 export function artifactStorage(): 'r2' | 'inline' {
-  if (r2Config()) return 'r2'
-  if (process.env.VERCEL_ENV === 'production') throw new Error('R2 is not configured: set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY')
+  // Keep the existing persisted 'r2' discriminator for every S3 transport.
+  if (objectStorageConfig()) return 'r2'
+  if (isCloudEdition() && process.env.VERCEL_ENV === 'production') throw new Error('Object storage is not configured')
   return 'inline'
 }
 
-function objectUrl(config: R2Config, key: string): string {
-  return `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
+function objectUrl(config: ObjectStorageConfig, key: string): string {
+  return `${config.endpoint}/${encodeURIComponent(config.bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
 }
 
 export async function putArtifactObject(key: string, body: string | Uint8Array<ArrayBuffer>, contentType: string): Promise<void> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
   // Next's fetch adapter can stream a signed Request and lose its implicit
   // body length. R2 rejects that transfer with 411, so carry the byte length.
   const contentLength = typeof body === 'string' ? Buffer.byteLength(body, 'utf8') : body.byteLength
-  const response = await config.client.fetch(objectUrl(config, key), { method: 'PUT', body, headers: { 'content-type': contentType, 'content-length': String(contentLength), 'if-none-match': '*' } })
+  const response = await config.client.fetch(objectUrl(config, key), { method: 'PUT', body, redirect: 'error', headers: { 'content-type': contentType, 'content-length': String(contentLength), 'if-none-match': '*' } })
   // 412: the object is already there; keys are content-addressed per version, so it is the same file.
-  if (!response.ok && response.status !== 412) throw new Error(`R2 put failed: ${response.status}`)
+  if (!response.ok && response.status !== 412) throw new Error(`Object storage put failed: ${response.status}`)
 }
 
 export async function getArtifactObject(key: string): Promise<string> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
-  const response = await config.client.fetch(objectUrl(config, key))
-  if (!response.ok) throw new Error(`R2 get failed: ${response.status}`)
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
+  const response = await config.client.fetch(objectUrl(config, key), { redirect: 'error' })
+  if (!response.ok) throw new Error(`Object storage get failed: ${response.status}`)
   return response.text()
 }
 
 /** Stream an existing immutable object without buffering a recording in the server. */
 export async function getArtifactObjectStream(key: string, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
-  const response = await config.client.fetch(objectUrl(config, key), { signal })
-  if (!response.ok || !response.body) throw new Error(`R2 get failed: ${response.status}`)
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
+  const response = await config.client.fetch(objectUrl(config, key), { signal, redirect: 'error' })
+  if (!response.ok || !response.body) throw new Error(`Object storage get failed: ${response.status}`)
   return response.body
 }
 
 /** The object's bytes, for binary files such as run captures. */
 export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<ArrayBuffer>> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
-  const response = await config.client.fetch(objectUrl(config, key))
-  if (!response.ok) throw new Error(`R2 get failed: ${response.status}`)
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
+  const response = await config.client.fetch(objectUrl(config, key), { redirect: 'error' })
+  if (!response.ok) throw new Error(`Object storage get failed: ${response.status}`)
   return new Uint8Array(await response.arrayBuffer())
 }
 
 export async function deleteArtifactObject(key: string): Promise<void> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
-  const response = await config.client.fetch(objectUrl(config, key), { method: 'DELETE' })
-  if (!response.ok && response.status !== 404) throw new Error(`R2 delete failed: ${response.status}`)
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
+  const response = await config.client.fetch(objectUrl(config, key), { method: 'DELETE', redirect: 'error' })
+  if (!response.ok && response.status !== 404) throw new Error(`Object storage delete failed: ${response.status}`)
 }
 
 /**
@@ -76,8 +86,8 @@ export async function deleteArtifactObject(key: string): Promise<void> {
  * evidence: the holder can overwrite it until the signature expires.
  */
 export async function presignArtifactPut(key: string, contentType: string, seconds: number): Promise<{ url: string; headers: Record<string, string> }> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
   const url = new URL(objectUrl(config, key))
   url.searchParams.set('X-Amz-Expires', String(seconds))
   const headers = { 'content-type': contentType }
@@ -87,8 +97,8 @@ export async function presignArtifactPut(key: string, contentType: string, secon
 
 /** Short-lived private download; large originals bypass the function response-body limit. */
 export async function presignArtifactGet(key: string, contentType: string, disposition: string, seconds = 60): Promise<string> {
-  const config = r2Config()
-  if (!config) throw new Error('R2 is not configured')
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
   const url = new URL(objectUrl(config, key))
   url.searchParams.set('X-Amz-Expires', String(seconds))
   url.searchParams.set('response-content-type', contentType)

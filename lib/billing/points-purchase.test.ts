@@ -3,7 +3,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 import { BASE_PATH } from '../base-path'
 
 const workspaceId = '11111111-1111-4111-8111-111111111111'
-const env = { STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'whsec_fixture', BETTER_AUTH_URL: 'https://app.example' }
+const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'whsec_fixture', BETTER_AUTH_URL: 'https://app.example' }
 let admin = true
 let existingCustomer: string | undefined
 let providerStatus = 200

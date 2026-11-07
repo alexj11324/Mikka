@@ -96,6 +96,6 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
  */
 export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit'])
 
-export function visibleSettingsSections({ admin, personal = false }: { admin: boolean; personal?: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)))
+export function visibleSettingsSections({ admin, personal = false, billing = true }: { admin: boolean; personal?: boolean; billing?: boolean }): SettingsSectionDef[] {
+  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)) && (billing || s.id !== 'billing'))
 }

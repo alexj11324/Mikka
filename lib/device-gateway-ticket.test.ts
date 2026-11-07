@@ -20,4 +20,5 @@ test('push authorization compares the whole bearer header', () => {
   assert.equal(bearerMatches('Bearer gateway-test-secre', secret), false)
   assert.equal(bearerMatches(null, secret), false)
   assert.equal(bearerMatches(`Bearer ${secret}`, ''), false)
+  assert.equal(bearerMatches(`Bearer ${'é'.repeat(secret.length)}`, secret), false, 'equal character counts need not have equal byte lengths')
 })

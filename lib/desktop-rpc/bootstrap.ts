@@ -10,11 +10,12 @@ import { ActionFailureError } from '@/lib/action-error'
 import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { safeDesktopSession } from './session'
 import { desktopFeatures } from './features'
+import { getEdition } from '@/lib/edition'
 import type { DesktopBootstrap, DesktopConfig } from './wire'
 
 export async function desktopConfig(userId?: string): Promise<DesktopConfig> {
   const [emailEnabled, features] = await Promise.all([emailSignInEnabled(), desktopFeatures(userId)])
-  return { googleEnabled, githubEnabled, emailEnabled, features, daemonPackageName: process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' }
+  return { edition: getEdition(), googleEnabled, githubEnabled, emailEnabled, features, daemonPackageName: process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' }
 }
 
 export async function desktopSession() {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -176,6 +176,91 @@ test('the default runner buffers a suite\'s output and reports its exit status',
   assert.deepEqual(result, { status: 3, stdout: 'out', stderr: 'err' })
   const missing = await runScript('/nonexistent/command', [], { cwd: '.', env: process.env })
   assert.equal(missing.status, null)
+})
+
+test('the CLI streams bounded attributed progress before a suite exits and retains its complete failure', { timeout: 15_000 }, async t => {
+  const fixture = runnerFixture(t, ['progress'])
+  const preload = join(fixture.root, 'mock-postgres.mjs')
+  writeFileSync(preload, `import { mock } from 'node:test';
+    class Client { async connect() {} async query() {} async end() {} }
+    mock.module(${JSON.stringify(import.meta.resolve('pg'))}, { defaultExport: { Client } });`)
+  const release = join(fixture.root, 'release')
+  const finished = join(fixture.root, 'finished')
+  const stdout = 'SUITE-LIVE-STDOUT\n::error::fixture annotation\n:::error :::injected\n##[error]fixture legacy annotation\n'
+    + '\u001b[2K\r::warning::fixture carriage return\n' + 'x'.repeat(1024) + '\n# tests 1\n# pass 0\n# fail 1\n'
+  const stderr = 'SUITE-LIVE-STDERR\n'
+  const stdoutTail = 'FINAL-FAILURE-STDOUT'
+  const stderrTail = 'FINAL-FAILURE-STDERR'
+  writeFileSync(join(fixture.root, 'pnpm'), `#!/usr/bin/env node
+    const { existsSync, watch, writeFileSync } = require('node:fs');
+    let released = false;
+    const watcher = watch(${JSON.stringify(fixture.root)}, () => {
+      if (released || !existsSync(${JSON.stringify(release)})) return;
+      released = true;
+      watcher.close();
+      clearTimeout(deadline);
+      writeFileSync(${JSON.stringify(finished)}, 'released');
+      process.stdout.write(${JSON.stringify(stdoutTail)});
+      process.stderr.write(${JSON.stringify(stderrTail)});
+      process.exitCode = 7;
+    });
+    const deadline = setTimeout(() => {
+      watcher.close();
+      process.stderr.write('fixture progress handshake timed out\\n');
+      process.exitCode = 91;
+    }, 5000);
+    process.stdout.write(${JSON.stringify(stdout)});
+    process.stderr.write(${JSON.stringify(stderr)});`, { mode: 0o755 })
+  const child = spawn(process.execPath, ['--experimental-test-module-mocks', '--import', preload,
+    fileURLToPath(new URL('./run-db-tests.mjs', import.meta.url))], {
+    cwd: fixture.root, env: { ...process.env, ...env, PATH: `${fixture.root}:${process.env.PATH}` },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  t.after(() => { if (child.exitCode === null) child.kill() })
+  const output = [], errors = []
+  let released = false, finishedBeforeRelease = false, exitedBeforeRelease = false
+  child.stdout.on('data', chunk => {
+    output.push(chunk)
+    const current = Buffer.concat(output).toString('utf8')
+    if (released || !current.includes('[db-runner test:progress-db stdout] SUITE-LIVE-STDOUT\n')
+      || !current.includes('[db-runner test:progress-db stderr] SUITE-LIVE-STDERR\n')) return
+    finishedBeforeRelease = existsSync(finished)
+    exitedBeforeRelease = child.exitCode !== null
+    released = true
+    writeFileSync(release, 'continue')
+  })
+  child.stderr.on('data', chunk => errors.push(chunk))
+  const status = await new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', resolve)
+  })
+  const actualOut = Buffer.concat(output).toString('utf8')
+  const actualErr = Buffer.concat(errors).toString('utf8')
+  assert.equal(released, true, 'both progress streams reach the caller before the child can finish')
+  assert.equal(finishedBeforeRelease, false)
+  assert.equal(exitedBeforeRelease, false)
+  assert.equal(readFileSync(finished, 'utf8'), 'released')
+  assert.equal(status, 1, 'the CLI retains its failing gate status')
+  assert.ok(actualOut.includes(stdout + stdoutTail), 'final grouped stdout remains complete')
+  assert.ok(actualErr.includes(stderr + stderrTail), 'final grouped stderr remains complete')
+  assert.match(actualErr, /::error::test:progress-db exited with 7/)
+  assert.deepEqual(parseSummary(actualOut + '\n' + actualErr), { tests: 1, pass: 0, fail: 1 }, 'progress summaries are not counted twice')
+  const progress = actualOut.split('\n').filter(line => line.startsWith('[db-runner test:progress-db '))
+  for (const line of progress) {
+    const match = line.match(/^\[db-runner test:progress-db (stdout|stderr|lifecycle)\] (.*)$/)
+    assert.ok(match, line)
+    assert.ok(line.length <= 512, 'each live line including its prefix is bounded')
+    assert.ok(!line.includes('::') && !line.includes('##['), 'progress never emits Actions command syntax')
+    assert.doesNotMatch(line, /\p{Cc}/u, 'control characters cannot erase the prefix')
+  }
+  assert.ok(progress.includes(`[db-runner test:progress-db stdout] ${stdoutTail}`), 'unterminated stdout line keeps its prefix')
+  assert.ok(progress.includes(`[db-runner test:progress-db stderr] ${stderrTail}`), 'unterminated stderr line keeps its prefix')
+  const lifecycle = progress.filter(line => line.startsWith('[db-runner test:progress-db lifecycle] '))
+  assert.deepEqual(lifecycle, [
+    '[db-runner test:progress-db lifecycle] start',
+    '[db-runner test:progress-db lifecycle] exit code=7 signal=none',
+    '[db-runner test:progress-db lifecycle] close code=7 signal=none',
+  ])
 })
 
 test('the CLI drains large failed-suite diagnostics before exiting with the failure status', t => {

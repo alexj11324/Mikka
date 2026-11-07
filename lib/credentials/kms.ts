@@ -2,9 +2,53 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { AwsClient } from 'aws4fetch'
 import { getVercelOidcToken } from '@vercel/oidc'
 import { CredentialError, type EncryptionContext, type Envelope } from './contracts'
+import { isCloudEdition } from '@/lib/edition'
 
 export type Kms = { generate(context: EncryptionContext): Promise<{ plaintext: Buffer; wrapped: string }>; decrypt(wrapped: string, context: EncryptionContext): Promise<Buffer> }
 const aad = (context: EncryptionContext, kind = 'password') => Buffer.from(JSON.stringify({ userId: context.userId, credentialId: context.credentialId, origin: context.origin, v: 1, kind }))
+
+/** Community vaults keep the existing per-secret DEK and authenticated context.
+ * Only the DEK is wrapped by the administrator's local master key. */
+export function localKms(role: 'app' | 'broker', env: Record<string, string | undefined> = process.env): Kms {
+  function master() {
+    const raw = env.CREDENTIAL_MASTER_KEY ?? ''
+    const key = Buffer.from(raw, 'base64')
+    if (key.length !== 32 || key.toString('base64') !== raw) { key.fill(0); throw new CredentialError() }
+    return key
+  }
+  return {
+    async generate(context) {
+      if (role !== 'app') throw new CredentialError()
+      const key = master(), plaintext = randomBytes(32)
+      try {
+        const nonce = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, nonce)
+        cipher.setAAD(aad(context, 'dek'))
+        const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()])
+        return { plaintext, wrapped: `local:v1:${Buffer.concat([nonce, encrypted, cipher.getAuthTag()]).toString('base64')}` }
+      // error-cause: local key wrapping has the same opaque secret boundary as AWS KMS; never retain cryptographic inputs in causes.
+      } catch { plaintext.fill(0); throw new CredentialError() } finally { key.fill(0) }
+    },
+    async decrypt(wrapped, context) {
+      if (role !== 'broker') throw new CredentialError()
+      const key = master()
+      try {
+        if (!wrapped.startsWith('local:v1:')) throw new Error()
+        const encoded = wrapped.slice('local:v1:'.length), data = Buffer.from(encoded, 'base64')
+        if (data.length !== 60 || data.toString('base64') !== encoded) throw new Error()
+        const decipher = createDecipheriv('aes-256-gcm', key, data.subarray(0, 12))
+        decipher.setAAD(aad(context, 'dek')); decipher.setAuthTag(data.subarray(-16))
+        return Buffer.concat([decipher.update(data.subarray(12, -16)), decipher.final()])
+      // error-cause: ciphertext, owner context and master-key failures must be indistinguishable outside the credential boundary.
+      } catch { throw new CredentialError() } finally { key.fill(0) }
+    },
+  }
+}
+
+/** Resolve at use time; a cloud deployment never falls back to a local key. */
+export function credentialKms(role: 'app' | 'broker'): Kms {
+  const backend = () => isCloudEdition() ? awsKms(role) : localKms(role)
+  return { generate: context => backend().generate(context), decrypt: (wrapped, context) => backend().decrypt(wrapped, context) }
+}
 
 /** No fallback to AWS access keys, instance profiles, or another project's role. */
 export async function assumeVercelRole(role: 'app' | 'broker') {
@@ -70,7 +114,7 @@ export async function seal(kms: Kms, context: EncryptionContext, plaintext: Buff
   } finally { key?.fill(0); plaintext.fill(0) }
 }
 
-/** Import only in the isolated broker deployment. Main app never calls decrypt. */
+/** Called by the isolated cloud broker or the in-process community broker. */
 export async function open(kms: Kms, context: EncryptionContext, envelope: Envelope, kind = 'password'): Promise<Buffer> {
   const key = await kms.decrypt(envelope.wrappedDek, context)
   try {
