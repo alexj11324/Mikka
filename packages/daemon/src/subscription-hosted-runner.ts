@@ -349,7 +349,8 @@ export async function createHostedBotRunner(host: {
         assignment.modelCredential || assignment.requireSessionResume || assignment.continuesRunId || assignment.resumeFrom ||
         assignment.resumeSessionId || options.continueSession || (assignment.github && !assignment.github.token))
         throw unavailable('assignment_invalid')
-      return prepareAgentStart(signal, control => start(assignment, options, control))
+      return prepareAgentStart(signal, control => start(assignment, options, control),
+        runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming) ? { runId: assignment.runId, harness: 'claude_code' } : undefined)
     },
   }
 }
