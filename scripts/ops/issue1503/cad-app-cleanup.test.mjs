@@ -23,7 +23,20 @@ function fixture(ended = false) {
       { ...run, id: FIXTURE.childRunId, status: ended ? 'stopped' : 'queued', stopReason: null, continuesRunId: FIXTURE.rootRunId }],
     profile: { id: PROFILE, ownerId: FIXTURE.ownerId, workspaceId: FIXTURE.workspaceId, historicalMatches: true,
       version: 1, digest: HASH, frozenVersion: 1, frozenDigest: HASH, archivedAt: null, fixtureTag: '1a2b3c4d' },
-    dependencies: { factoryTasks: 0, machineBindings: 0, activeBotLeases: 0, pendingCoordinatorWork: 0, otherLiveProfileRuns: 0, foreignDeviceAgents: 0 },
+    dependencies: { factoryTasks: 1, machineBindings: 0, activeBotLeases: 0, pendingCoordinatorWork: 1, otherLiveProfileRuns: 0, foreignDeviceAgents: 0 },
+    retainedHistory: {
+      task: { id: FIXTURE.factoryTaskId, userId: FIXTURE.ownerId, botId: FIXTURE.botId, issueId: FIXTURE.issueId,
+        sourceEventId: FIXTURE.factorySourceEventId, stage: 'execute', status: 'cancelled', revision: 6,
+        attemptId: FIXTURE.childAttemptId, candidateId: null, updatedAt: '2026-11-07T04:54:22.911+00:00' },
+      attempts: [{ id: FIXTURE.rootAttemptId, taskId: FIXTURE.factoryTaskId, stage: 'execute', status: 'failed',
+        runId: FIXTURE.rootRunId, candidateId: null, position: 1 },
+      { id: FIXTURE.childAttemptId, taskId: FIXTURE.factoryTaskId, stage: 'execute', status: 'cancelled',
+        runId: FIXTURE.childRunId, candidateId: null, position: 2 }],
+      candidates: 0, merges: 0, questions: 0,
+      event: { id: FIXTURE.retainedEventId, userId: FIXTURE.ownerId, botId: FIXTURE.botId, issueId: FIXTURE.issueId,
+        runId: FIXTURE.rootRunId, kind: 'run_finished', tier: null, deliveredAt: null, wakeAttempts: 8,
+        wakeLeaseUntil: null, nextWakeAt: '2026-11-07T05:42:15.385+00:00' },
+    },
   }
 }
 function fakeStore(initial, overrides = {}) {
@@ -49,6 +62,11 @@ test('normal queued-child cleanup retains failed acceptance and original run his
   assert.equal(result.acceptancePassed, false)
   assert.equal(result.after.runs[0].status, 'failed')
   assert.equal(result.after.issue.number, 51)
+  assert.equal(result.before.dependencies.factoryTasks, 1)
+  assert.equal(result.after.dependencies.pendingCoordinatorWork, 1)
+  assert.deepEqual(result.after.retainedHistory, result.before.retainedHistory)
+  assert.equal(result.retainedHistoryUnchanged, true)
+  assert.equal(result.historyDisposition.factoryTask, 'already_cancelled_before_operator')
 })
 
 test('already stopped child is observed and never attributed to this operator', async () => {
@@ -74,7 +92,7 @@ test('foreign owner, third run, wrong parent, mismatched profile and active depe
     state => { state.runs.push({ ...state.runs[1], id: '153feab4-02bb-46a8-aee4-c5a20a873791' }) },
     state => { state.runs[1].continuesRunId = state.runs[1].id },
     state => { state.runs[1].profileId = null }, state => { state.dependencies.activeBotLeases = 1 },
-    state => { state.dependencies.foreignDeviceAgents = 1 }, state => { state.dependencies.pendingCoordinatorWork = 1 },
+    state => { state.dependencies.foreignDeviceAgents = 1 }, state => { state.dependencies.pendingCoordinatorWork = 2 },
     state => { state.issue.scope = 'workspace'; state.issue.teamLink = { issueId: FIXTURE.issueId,
       userId: FIXTURE.ownerId, workspaceId: '7313fe0a-62c7-43f4-87bf-d7c0b0fc28c3' } }]
   for (const mutate of mutations) {
@@ -101,6 +119,64 @@ test('unknown timing-variable residue is retained and cannot be reported as comp
   assert.equal(result.status, 'failed')
   assert.equal(result.code, 'issue1503_cad_cleanup_timing_variable_retained')
   assert.equal(result.timingVariableReadback.mutated, false)
+})
+
+test('only the exact cancelled Factory history and exhausted event may remain', async () => {
+  const changes = [
+    state => { state.dependencies.factoryTasks = 0 }, state => { state.dependencies.factoryTasks = 2 },
+    state => { state.dependencies.pendingCoordinatorWork = 0 }, state => { state.dependencies.pendingCoordinatorWork = 2 },
+    state => { state.dependencies.machineBindings = 1 }, state => { state.dependencies.otherLiveProfileRuns = 1 },
+    state => { state.retainedHistory = null },
+    ...['id', 'userId', 'botId', 'issueId', 'sourceEventId', 'attemptId'].map(key => state => { state.retainedHistory.task[key] = PROFILE }),
+    state => { state.retainedHistory.task.revision = 7 }, state => { state.retainedHistory.task.status = 'running' },
+    state => { state.retainedHistory.task.stage = 'review' }, state => { state.retainedHistory.task.candidateId = PROFILE },
+    state => { state.retainedHistory.attempts.push({ ...state.retainedHistory.attempts[0], id: PROFILE }) },
+    state => { state.retainedHistory.attempts[1].runId = FIXTURE.rootRunId },
+    state => { state.retainedHistory.attempts[0].taskId = PROFILE },
+    state => { state.retainedHistory.attempts[1].status = 'running' },
+    ...['candidates', 'merges', 'questions'].map(key => state => { state.retainedHistory[key] = 1 }),
+    ...['id', 'userId', 'botId', 'issueId', 'runId'].map(key => state => { state.retainedHistory.event[key] = PROFILE }),
+    state => { state.retainedHistory.event.kind = 'user_message' },
+    state => { state.retainedHistory.event.tier = 'attention' },
+    state => { state.retainedHistory.event.wakeAttempts = 7 },
+    state => { state.retainedHistory.event.wakeLeaseUntil = '2026-11-07T06:00:00Z' },
+    state => { state.retainedHistory.event.deliveredAt = '2026-11-07T06:00:00Z' },
+  ]
+  for (const mutate of changes) {
+    const input = fixture(true); mutate(input)
+    const { store, calls } = fakeStore(input)
+    const result = await cleanupCadFixture(store)
+    assert.equal(result.status, 'failed')
+    assert.deepEqual(calls, [])
+  }
+})
+
+test('every business write rechecks that the retained history metadata is unchanged', async () => {
+  for (const [stage, expectedCalls] of [ ['remove_exact_device', []],
+    ['archive_exact_profile', ['remove']], ['soft_delete_exact_issue', ['remove', 'archive']] ]) {
+    const { store, calls, state } = fakeStore(fixture(true))
+    const result = await cleanupCadFixture(store, { checkpoint: async report => {
+      if (report.stage === stage && report.actions.at(-1)?.status === 'attempted')
+        state.retainedHistory.event.nextWakeAt = '2026-11-07T06:00:00+00:00'
+    } })
+    assert.equal(result.code, 'issue1503_cad_cleanup_retained_history_changed')
+    assert.deepEqual(calls, expectedCalls)
+    assert.equal(result.retainedHistoryUnchanged, undefined)
+  }
+})
+
+test('final metadata drift cannot turn completed resource operations into a passed cleanup', async () => {
+  const { store, state } = fakeStore(fixture(true)), removeIssue = store.deleteIssue
+  store.deleteIssue = async (...args) => {
+    const result = await removeIssue(...args)
+    state.retainedHistory.task.updatedAt = '2026-11-07T06:00:00+00:00'
+    return result
+  }
+  const result = await cleanupCadFixture(store)
+  assert.equal(result.status, 'failed')
+  assert.equal(result.code, 'issue1503_cad_cleanup_retained_history_changed')
+  assert.equal(result.acceptancePassed, false)
+  assert.equal(result.retainedHistoryUnchanged, undefined)
 })
 
 // These values only exercise the configuration gate. The loader is stubbed or

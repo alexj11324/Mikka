@@ -9,6 +9,9 @@ export const FIXTURE = Object.freeze({
   botId: 'bc925088-d87f-47b8-a786-c1c317ac005f', issueId: '43486283-4731-4842-bce1-fa5f1e96b8f9',
   deviceId: '09479c68-dcb4-4735-a91f-e355259c0eef', agentId: '09abf8d5-95c0-4444-9018-8f2b0772b458',
   rootRunId: 'f879d6cd-bdbd-4e62-9a17-441f1f763a25', childRunId: '5b15edaf-e179-439b-b580-ffc625384621',
+  factoryTaskId: 'c9b337ab-bacb-419a-ad68-f64985a93869', factorySourceEventId: '8c99dab0-4534-4780-a781-48667d478fbf',
+  rootAttemptId: '843e21d6-6225-45f0-b498-eb023b2fca15', childAttemptId: '5eb3baa5-6d43-40d1-ada4-b3af9f899881',
+  retainedEventId: '4d1f4e37-31c4-40b7-bd72-535b20eb4f3e',
   failedSource: 'cad613ef0a2c553a94aaf72d44d609c93a603a1b', failedWorkflowRunId: '42336625140',
 })
 const RUN_IDS = [FIXTURE.rootRunId, FIXTURE.childRunId]
@@ -23,6 +26,27 @@ const check = (value, code) => { if (!value) fail(code) }
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
 const safeCode = error => /^issue1503_cad_cleanup_[a-z_]+$/.test(error?.message ?? '')
   ? error.message : 'issue1503_cad_cleanup_operation_failed'
+
+function validateDependencies(dependencies, history) {
+  check(dependencies?.factoryTasks === 1 && dependencies.pendingCoordinatorWork === 1
+    && ['machineBindings', 'activeBotLeases', 'otherLiveProfileRuns', 'foreignDeviceAgents']
+      .every(key => dependencies[key] === 0), 'active_dependency')
+  const { task, attempts, event, candidates, merges, questions } = history ?? {}
+  check(task?.id === FIXTURE.factoryTaskId && task.userId === FIXTURE.ownerId && task.botId === FIXTURE.botId
+    && task.issueId === FIXTURE.issueId && task.sourceEventId === FIXTURE.factorySourceEventId
+    && task.status === 'cancelled' && task.stage === 'execute' && task.revision === 6
+    && task.attemptId === FIXTURE.childAttemptId && task.candidateId === null
+    && candidates === 0 && merges === 0 && questions === 0, 'retained_factory_changed')
+  check(Array.isArray(attempts) && attempts.length === 2 && new Set(attempts.map(row => row.id)).size === 2
+    && attempts.every(row => row.taskId === task.id && row.stage === 'execute' && row.candidateId === null
+      && (row.id === FIXTURE.rootAttemptId && row.runId === FIXTURE.rootRunId && row.status === 'failed'
+        || row.id === FIXTURE.childAttemptId && row.runId === FIXTURE.childRunId && row.status === 'cancelled')),
+  'retained_attempt_changed')
+  check(event?.id === FIXTURE.retainedEventId && event.userId === FIXTURE.ownerId && event.botId === FIXTURE.botId
+    && event.issueId === FIXTURE.issueId && event.runId === FIXTURE.rootRunId && event.kind === 'run_finished'
+    && event.tier === null && event.deliveredAt === null && event.wakeAttempts === 8 && event.wakeLeaseUntil === null,
+  'retained_event_changed')
+}
 
 /** Metadata guard; arbitrary caller IDs are never accepted as cleanup scope. */
 export function validateSnapshot(state) {
@@ -46,7 +70,7 @@ export function validateSnapshot(state) {
   const root = runs.find(run => run.id === FIXTURE.rootRunId), child = runs.find(run => run.id === FIXTURE.childRunId)
   check(root.status === 'failed' && root.stopReason === 'error' && root.retryOf === null && root.continuesRunId === null
     && child.continuesRunId === root.id && child.retryOf === null, 'run_history_changed')
-  check(dependencies && ['factoryTasks', 'machineBindings', 'activeBotLeases', 'pendingCoordinatorWork', 'otherLiveProfileRuns', 'foreignDeviceAgents'].every(key => dependencies[key] === 0), 'active_dependency')
+  validateDependencies(dependencies, state.retainedHistory)
   check(profile && UUID.test(profile.id ?? '') && profile.ownerId === FIXTURE.ownerId
     && profile.workspaceId === FIXTURE.workspaceId && profile.historicalMatches === true
     && Number.isInteger(profile.version) && profile.version > 0 && SHA.test(profile.digest ?? '')
@@ -68,7 +92,7 @@ function receiptSnapshot(state) {
       continuesRunId: run.continuesRunId, stopRequestedAt: iso(run.stopRequestedAt), finishedAt: iso(run.finishedAt) })),
     profile: { id: state.profile.id, version: state.profile.version, frozenVersion: state.profile.frozenVersion,
       digest: state.profile.digest, frozenDigest: state.profile.frozenDigest, archivedAt: iso(state.profile.archivedAt) },
-    dependencies: state.dependencies }
+    dependencies: state.dependencies, retainedHistory: state.retainedHistory }
 }
 
 /** No production I/O on import. A failed operation still leaves its true
@@ -76,29 +100,40 @@ function receiptSnapshot(state) {
 export async function cleanupCadFixture(store, { report = {}, checkpoint = async () => {} } = {}) {
   Object.assign(report, { version: 1, issue: 1503, phase: 'cad_app_fixture_cleanup', fixture: FIXTURE,
     startedAt: new Date().toISOString(), status: 'running', actions: [], acceptancePassed: false })
+  let retainedHistory
+  const readChecked = async () => {
+    const state = await store.read(), flags = validateSnapshot(state)
+    if (retainedHistory) check(same(state.retainedHistory, retainedHistory), 'retained_history_changed')
+    return { state, flags }
+  }
   const step = async (name, work) => {
     report.stage = name; report.actions.push({ name, status: 'attempted' }); await checkpoint(report)
+    await readChecked()
     const result = await work()
     Object.assign(report.actions.at(-1), { status: 'completed', result }); await checkpoint(report)
     return result
   }
   try {
-    let state = await store.read(); let flags = validateSnapshot(state)
+    let { state, flags } = await readChecked()
+    retainedHistory = structuredClone(state.retainedHistory)
+    report.historyDisposition = { factoryTask: 'already_cancelled_before_operator',
+      coordinatorEvent: 'exhausted_wake_retained_without_acknowledgement' }
     report.before = receiptSnapshot(state); await checkpoint(report)
     if (!flags.allRunsTerminal) {
       await step('stop_actual_chain', () => store.stop())
-      state = await store.read(); flags = validateSnapshot(state)
+      ;({ state, flags } = await readChecked())
       check(flags.allRunsTerminal, 'chain_not_terminal')
     } else report.actions.push({ name: 'stop_actual_chain', status: 'already_terminal_before_operator' })
     if (!flags.deviceRemoved) await step('remove_exact_device', () => store.removeDevice())
     else report.actions.push({ name: 'remove_exact_device', status: 'already_removed_before_operator' })
-    state = await store.read(); flags = validateSnapshot(state)
+    ;({ state, flags } = await readChecked())
     check(flags.allRunsTerminal && flags.deviceRemoved, 'device_removal_unconfirmed')
     if (!flags.profileArchived) await step('archive_exact_profile', () => store.archiveProfile(state.profile))
     else report.actions.push({ name: 'archive_exact_profile', status: 'already_archived_before_operator' })
-    if (!flags.issueDeleted) await step('soft_delete_exact_issue', () => store.deleteIssue(state.issue))
+    if (!flags.issueDeleted) await step('soft_delete_exact_issue', () => store.deleteIssue(state.issue, retainedHistory))
     else report.actions.push({ name: 'soft_delete_exact_issue', status: 'already_deleted_before_operator' })
-    report.after = receiptSnapshot(await store.read())
+    report.after = receiptSnapshot((await readChecked()).state)
+    report.retainedHistoryUnchanged = true
     check(report.after.allRunsTerminal && report.after.deviceRemoved && report.after.profileArchived && report.after.issueDeleted,
       'final_state_incomplete')
     check(report.after.issue.number === report.before.issue.number
@@ -143,8 +178,48 @@ async function createStore() {
     const { rows } = await workspacePool.query('SELECT "issueId","userId","workspaceId","teamId",number::text AS number FROM mikka_team_issues WHERE "issueId"=$1', [FIXTURE.issueId])
     check(rows.length <= 1, 'issue_workspace_changed'); return rows[0] ?? null
   }
+  // Preserve the exact cancelled task and exhausted outbox event. Read only
+  // closed metadata, never their prompts, reason text, payload or session IDs.
+  // The same query also runs on the issue-deletion transaction's executor.
+  const readDependencies = async (executor = db) => {
+    const { rows: [row] } = await executor.execute(sql`SELECT
+      (SELECT count(*)::int FROM factory_tasks t WHERE t."issueId"=${FIXTURE.issueId} OR EXISTS(
+        SELECT 1 FROM factory_attempts a WHERE a."taskId"=t.id
+          AND a."runId" IN (${FIXTURE.rootRunId}::uuid,${FIXTURE.childRunId}::uuid)) OR EXISTS(
+        SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND
+          (q."originRunId" IN (${FIXTURE.rootRunId}::uuid,${FIXTURE.childRunId}::uuid)
+            OR q."continuationRunId" IN (${FIXTURE.rootRunId}::uuid,${FIXTURE.childRunId}::uuid)))) AS "factoryTasks",
+      ((SELECT count(*) FROM thread_machines WHERE "runId" IN (${FIXTURE.rootRunId}::uuid,${FIXTURE.childRunId}::uuid)) +
+       (SELECT count(*) FROM computer_run_bindings WHERE "runId" IN (${FIXTURE.rootRunId}::uuid,${FIXTURE.childRunId}::uuid)))::int AS "machineBindings",
+      (SELECT count(*)::int FROM coordinator_sessions WHERE "botId"=${FIXTURE.botId}
+        AND "leaseHolder" IS NOT NULL AND "leaseUntil">now()) AS "activeBotLeases",
+      (SELECT count(*)::int FROM coordinator_events WHERE "botId"=${FIXTURE.botId} AND "userId"=${FIXTURE.ownerId}
+        AND "deliveredAt" IS NULL AND (kind='user_message' OR tier IS NULL OR tier<>'background' OR "wakeLeaseUntil">now())) AS "pendingCoordinatorWork",
+      (SELECT count(*)::int FROM agents WHERE "deviceId"=${FIXTURE.deviceId}
+        AND (id<>${FIXTURE.agentId} OR "userId"<>${FIXTURE.ownerId})) AS "foreignDeviceAgents",
+      (SELECT count(*)::int FROM agent_runs other WHERE other."agentDefinition"->'agentProfile'->>'profileId'=
+        (SELECT r."agentDefinition"->'agentProfile'->>'profileId' FROM agent_runs r WHERE r.id=${FIXTURE.rootRunId})
+        AND other.status IN ('queued','preparing','running','paused','waiting_input','finishing')
+        AND other.id NOT IN (${FIXTURE.rootRunId}::uuid,${FIXTURE.childRunId}::uuid)) AS "otherLiveProfileRuns",
+      jsonb_build_object(
+        'task',(SELECT to_jsonb(t) FROM (SELECT id,"userId","botId","issueId","scopeVersion","sourceEventId",
+          stage,status,revision,"attemptId","candidateId","createdAt","updatedAt"
+          FROM factory_tasks WHERE id=${FIXTURE.factoryTaskId}) t),
+        'attempts',(SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.position),'[]'::jsonb) FROM
+          (SELECT id,"taskId",stage,status,ordinal,position,"runId","candidateId","createdAt","finishedAt"
+            FROM factory_attempts WHERE "taskId"=${FIXTURE.factoryTaskId}) a),
+        'candidates',(SELECT count(*)::int FROM factory_candidates WHERE "taskId"=${FIXTURE.factoryTaskId}),
+        'merges',(SELECT count(*)::int FROM factory_merges WHERE "taskId"=${FIXTURE.factoryTaskId}),
+        'questions',(SELECT count(*)::int FROM factory_questions WHERE "taskId"=${FIXTURE.factoryTaskId}),
+        'event',(SELECT to_jsonb(e) FROM (SELECT id,"userId","botId","issueId","runId",kind,tier,
+          "deliveredAt","wakeAttempts","wakeLeaseUntil","nextWakeAt","lastTriageAttemptAt","createdAt"
+          FROM coordinator_events WHERE id=${FIXTURE.retainedEventId}) e)
+      ) AS "retainedHistory"`)
+    const { retainedHistory, ...dependencies } = row
+    return { dependencies, retainedHistory }
+  }
   const read = async () => {
-    const [devices, agents, bots, issues, runs, counts, teamLink] = await Promise.all([
+    const [devices, agents, bots, issues, runs, dependencyState, teamLink] = await Promise.all([
       pool.query('SELECT id,"ownerId",kind,enabled,"removedAt" FROM devices WHERE id=$1', [FIXTURE.deviceId]),
       pool.query('SELECT id,"userId",harness,"deviceId" FROM agents WHERE id=$1', [FIXTURE.agentId]),
       pool.query('SELECT id,"ownerId","workspaceId" FROM bots WHERE id=$1', [FIXTURE.botId]),
@@ -157,34 +232,22 @@ async function createStore() {
         "agentDefinition"->'agentProfile'->'scope'->>'workspaceId' AS "profileWorkspaceId"
         FROM agent_runs WHERE "deviceId"=$1 OR "issueId"=$2 OR id=ANY($3::uuid[]) ORDER BY id`,
       [FIXTURE.deviceId, FIXTURE.issueId, RUN_IDS]),
-      pool.query(`SELECT
-        (SELECT count(*)::int FROM factory_tasks t WHERE t."issueId"=$1 OR EXISTS(
-          SELECT 1 FROM factory_attempts a WHERE a."taskId"=t.id AND a."runId"=ANY($2::uuid[])) OR EXISTS(
-          SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=ANY($2::uuid[]) OR q."continuationRunId"=ANY($2::uuid[])))) AS "factoryTasks",
-        ((SELECT count(*) FROM thread_machines WHERE "runId"=ANY($2::uuid[])) +
-         (SELECT count(*) FROM computer_run_bindings WHERE "runId"=ANY($2::uuid[])))::int AS "machineBindings",
-        (SELECT count(*)::int FROM coordinator_sessions WHERE "botId"=$3 AND "leaseHolder" IS NOT NULL AND "leaseUntil">now()) AS "activeBotLeases",
-        (SELECT count(*)::int FROM coordinator_events WHERE "botId"=$3 AND "userId"=$6 AND "deliveredAt" IS NULL
-          AND (kind='user_message' OR tier IS NULL OR tier<>'background' OR "wakeLeaseUntil">now())) AS "pendingCoordinatorWork",
-        (SELECT count(*)::int FROM agents WHERE "deviceId"=$4 AND (id<>$5 OR "userId"<>$6)) AS "foreignDeviceAgents"`,
-      [FIXTURE.issueId, RUN_IDS, FIXTURE.botId, FIXTURE.deviceId, FIXTURE.agentId, FIXTURE.ownerId]),
+      readDependencies(),
       readTeamLink(),
     ])
     const root = runs.rows.find(run => run.id === FIXTURE.rootRunId)
     check(root && UUID.test(root.profileId ?? '') && /^[1-9][0-9]*$/.test(root.profileVersion ?? ''), 'profile_reference_missing')
     const { rows: [profile] } = await pool.query(`SELECT p.id,p."ownerId",p."workspaceId",p.version,p.digest,p."archivedAt",
       v.definition->>'name' AS name,$2::integer AS "frozenVersion",r."agentDefinition"->'agentProfile'->>'digest' AS "frozenDigest",
-      COALESCE(v.digest=r."agentDefinition"->'agentProfile'->>'digest' AND v.definition=r."agentDefinition"->'agentProfile'->'definition',false) AS "historicalMatches",
-      (SELECT count(*)::int FROM agent_runs other WHERE other."agentDefinition"->'agentProfile'->>'profileId'=p.id::text
-        AND other.status=ANY($4::text[]) AND NOT(other.id=ANY($5::uuid[]))) AS "otherLiveProfileRuns"
+      COALESCE(v.digest=r."agentDefinition"->'agentProfile'->>'digest' AND v.definition=r."agentDefinition"->'agentProfile'->'definition',false) AS "historicalMatches"
       FROM factory_agent_profiles p JOIN agent_runs r ON r.id=$3
       LEFT JOIN factory_agent_profile_versions v ON v."profileId"=p.id AND v.version=$2
         AND v."ownerId"=p."ownerId" AND v."workspaceId"=p."workspaceId"
-      WHERE p.id=$1`, [root.profileId, Number(root.profileVersion), FIXTURE.rootRunId, LIVE, RUN_IDS])
+      WHERE p.id=$1`, [root.profileId, Number(root.profileVersion), FIXTURE.rootRunId])
     if (profile) profile.fixtureTag = /^测试1505 ([a-f0-9]{8}) codex$/.exec(profile.name ?? '')?.[1] ?? null
     return { device: devices.rows[0], agent: agents.rows[0], bot: bots.rows[0], issue: issueState(issues.rows[0], teamLink),
       runs: runs.rows.map(run => ({ ...run, profileVersion: Number(run.profileVersion) })), profile,
-      dependencies: { ...counts.rows[0], otherLiveProfileRuns: profile?.otherLiveProfileRuns ?? -1 } }
+      ...dependencyState }
   }
   return {
     read,
@@ -201,7 +264,7 @@ async function createStore() {
       check(value.id === profile.id && value.archivedAt && value.enabled === false, 'profile_archive_unconfirmed')
       return { id: value.id, version: value.version, archivedAt: value.archivedAt }
     },
-    async deleteIssue(expected) {
+    async deleteIssue(expected, retainedHistory) {
       return db.transaction(async tx => {
         await tx.execute(sql`SET LOCAL lock_timeout='5s'`)
         await tx.execute(sql`SET LOCAL statement_timeout='30s'`)
@@ -211,11 +274,9 @@ async function createStore() {
         const live = await tx.select({ id: schema.agentRuns.id }).from(schema.agentRuns)
           .where(and(eq(schema.agentRuns.issueId, FIXTURE.issueId), inArray(schema.agentRuns.status, LIVE))).limit(1)
         check(live.length === 0, 'issue_has_live_run')
-        const factory = await tx.execute(sql`SELECT 1 FROM factory_tasks WHERE "issueId"=${FIXTURE.issueId} LIMIT 1`)
-        check(factory.rows.length === 0, 'issue_has_factory_task')
-        const waking = await tx.execute(sql`SELECT 1 FROM coordinator_events WHERE "botId"=${FIXTURE.botId} AND "userId"=${FIXTURE.ownerId}
-          AND "deliveredAt" IS NULL AND (kind='user_message' OR tier IS NULL OR tier<>'background' OR "wakeLeaseUntil">now()) LIMIT 1`)
-        check(waking.rows.length === 0, 'coordinator_work_changed')
+        const current = await readDependencies(tx)
+        validateDependencies(current.dependencies, current.retainedHistory)
+        check(same(current.retainedHistory, retainedHistory), 'retained_history_changed')
         const before = metadata.readIssueMetadata(row.content)
         const [saved] = await tx.update(schema.issues).set({
           content: metadata.withIssueMetadata(row.content, { ...before, deletedAt: new Date().toISOString() }),
