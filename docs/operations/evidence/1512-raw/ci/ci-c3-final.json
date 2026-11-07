@@ -1,0 +1,1112 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1518,
+  "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+  "observedAt": "2026-11-07T06:58:22.091Z",
+  "scope": {
+    "workflowRuns": "Exact head, all attempts returned by workflow_runs API",
+    "checkRuns": "Exact head, all check_runs returned by API",
+    "jobsWithSteps": "CI, Device gateway, Desktop shell job metadata only; no other job logs or artifacts included"
+  },
+  "summary": {
+    "workflowCount": 14,
+    "workflowConclusions": {
+      "success": 11,
+      "failure": 3
+    },
+    "checkCount": 43,
+    "checkConclusions": {
+      "failure": 8,
+      "success": 26,
+      "skipped": 9
+    },
+    "allWorkflowsTerminal": true,
+    "allChecksTerminal": true,
+    "passed": false
+  },
+  "runs": [
+    {
+      "id": 42347429991,
+      "workflowId": 396539695,
+      "name": "Analytics SSR",
+      "path": ".github/workflows/analytics-ssr.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:37:39Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429991"
+    },
+    {
+      "id": 42347429935,
+      "workflowId": 403212562,
+      "name": "Browser gate",
+      "path": ".github/workflows/browser-gate.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:32:02Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429935"
+    },
+    {
+      "id": 42347429920,
+      "workflowId": 391052823,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:38:45Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920"
+    },
+    {
+      "id": 42347429909,
+      "workflowId": 397567916,
+      "name": "Cloud computer backend",
+      "path": ".github/workflows/cloud-computer.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:34:46Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429909"
+    },
+    {
+      "id": 42347429859,
+      "workflowId": 401053679,
+      "name": "Desktop shell",
+      "path": ".github/workflows/desktop.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:37:13Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859"
+    },
+    {
+      "id": 42347429865,
+      "workflowId": 406308016,
+      "name": "Device gateway",
+      "path": ".github/workflows/device-gateway.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:34:23Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429865"
+    },
+    {
+      "id": 42347430016,
+      "workflowId": 405833668,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:32:32Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016"
+    },
+    {
+      "id": 42347429877,
+      "workflowId": 397613481,
+      "name": "E2B subscription custody",
+      "path": ".github/workflows/e2b-byos.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:36:08Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429877"
+    },
+    {
+      "id": 42347429928,
+      "workflowId": 409752684,
+      "name": "Local device Node 22",
+      "path": ".github/workflows/local-device-node22.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:36:01Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429928"
+    },
+    {
+      "id": 42347429884,
+      "workflowId": 403029738,
+      "name": "Mobile OTA update",
+      "path": ".github/workflows/mobile-update.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:34:27Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429884"
+    },
+    {
+      "id": 42347429968,
+      "workflowId": 408151073,
+      "name": "Read cache API acceptance",
+      "path": ".github/workflows/read-cache.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:35:12Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429968"
+    },
+    {
+      "id": 42347430031,
+      "workflowId": 397129562,
+      "name": "Site search read contract",
+      "path": ".github/workflows/site-search.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:37:59Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430031"
+    },
+    {
+      "id": 42347429921,
+      "workflowId": 402157184,
+      "name": "SSH device backend",
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:37:31Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429921"
+    },
+    {
+      "id": 42347429939,
+      "workflowId": 400369360,
+      "name": "Unattended sandbox acceptance",
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "event": "pull_request",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T06:31:57Z",
+      "updatedAt": "2026-11-07T06:34:07Z",
+      "startedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429939"
+    }
+  ],
+  "checks": [
+    {
+      "id": 128328083744,
+      "name": "GitGuardian Security Checks",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:55Z",
+      "completedAt": "2026-11-07T06:31:57Z",
+      "url": "https://github.com/alexj11324/Mikka/runs/128328083744",
+      "detailsUrl": "https://dashboard.gitguardian.com"
+    },
+    {
+      "id": 128328092542,
+      "name": "Local driver (Linux Xvfb)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:32:22Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429909/job/128328092542",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429909/job/128328092542"
+    },
+    {
+      "id": 128328092581,
+      "name": "custody",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:36:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429877/job/128328092581",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429877/job/128328092581"
+    },
+    {
+      "id": 128328092739,
+      "name": "test",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:34:22Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429865/job/128328092739",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429865/job/128328092739"
+    },
+    {
+      "id": 128328092751,
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:32:37Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429909/job/128328092751",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429909/job/128328092751"
+    },
+    {
+      "id": 128328092803,
+      "name": "backend",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:34:45Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429909/job/128328092803",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429909/job/128328092803"
+    },
+    {
+      "id": 128328092804,
+      "name": "ssh",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:37:30Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429921/job/128328092804",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429921/job/128328092804"
+    },
+    {
+      "id": 128328092973,
+      "name": "smoke",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:37:12Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328092973",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328092973"
+    },
+    {
+      "id": 128328092978,
+      "name": "EAS Update",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:34:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429884/job/128328092978",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429884/job/128328092978"
+    },
+    {
+      "id": 128328093024,
+      "name": "Browser tests (before merge)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:32:02Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429935/job/128328093024",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429935/job/128328093024"
+    },
+    {
+      "id": 128328093055,
+      "name": "Changed files",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:32:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328093055",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328093055"
+    },
+    {
+      "id": 128328093095,
+      "name": "node22-unit",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:34:35Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328093095",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328093095"
+    },
+    {
+      "id": 128328093123,
+      "name": "runtime",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:34:06Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429939/job/128328093123",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429939/job/128328093123"
+    },
+    {
+      "id": 128328093180,
+      "name": "icon",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:32:30Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328093180",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328093180"
+    },
+    {
+      "id": 128328093197,
+      "name": "checks",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:33:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328093197",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328093197"
+    },
+    {
+      "id": 128328093216,
+      "name": "package",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:32:45Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328093216",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328093216"
+    },
+    {
+      "id": 128328093247,
+      "name": "Read cache API and CLI",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:03Z",
+      "completedAt": "2026-11-07T06:35:12Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429968/job/128328093247",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429968/job/128328093247"
+    },
+    {
+      "id": 128328093407,
+      "name": "site-search",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:15Z",
+      "completedAt": "2026-11-07T06:37:58Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430031/job/128328093407",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430031/job/128328093407"
+    },
+    {
+      "id": 128328093464,
+      "name": "test",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:12Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328093464",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328093464"
+    },
+    {
+      "id": 128328093534,
+      "name": "Changed files",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:22Z",
+      "completedAt": "2026-11-07T06:32:33Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429991/job/128328093534",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429991/job/128328093534"
+    },
+    {
+      "id": 128328138878,
+      "name": "Source checks",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:19Z",
+      "completedAt": "2026-11-07T06:34:08Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138878",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138878"
+    },
+    {
+      "id": 128328138888,
+      "name": "Database checks (4/4)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:29Z",
+      "completedAt": "2026-11-07T06:36:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138888",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138888"
+    },
+    {
+      "id": 128328138896,
+      "name": "Database checks (1/4)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:36:24Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138896",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138896"
+    },
+    {
+      "id": 128328138904,
+      "name": "Core unit checks",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:33:38Z",
+      "completedAt": "2026-11-07T06:38:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138904",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138904"
+    },
+    {
+      "id": 128328138914,
+      "name": "Daemon checks",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:39Z",
+      "completedAt": "2026-11-07T06:35:36Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138914",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138914"
+    },
+    {
+      "id": 128328138955,
+      "name": "Database checks (2/4)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:34Z",
+      "completedAt": "2026-11-07T06:37:00Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138955",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138955"
+    },
+    {
+      "id": 128328138961,
+      "name": "Database checks (3/4)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:32Z",
+      "completedAt": "2026-11-07T06:36:28Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138961",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138961"
+    },
+    {
+      "id": 128328139036,
+      "name": "Integration unit checks",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:33:47Z",
+      "completedAt": "2026-11-07T06:38:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328139036",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328139036"
+    },
+    {
+      "id": 128328139845,
+      "name": "Cloud credential access (OIDC)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:10Z",
+      "completedAt": "2026-11-07T06:32:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328139845",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328139845"
+    },
+    {
+      "id": 128328221114,
+      "name": "check",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221114",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221114"
+    },
+    {
+      "id": 128328221703,
+      "name": "validate",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221703",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221703"
+    },
+    {
+      "id": 128328221796,
+      "name": "await-web",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221796",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221796"
+    },
+    {
+      "id": 128328221994,
+      "name": "subscriptions",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221994",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328221994"
+    },
+    {
+      "id": 128328222107,
+      "name": "cleanup",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328222107",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328222107"
+    },
+    {
+      "id": 128328222237,
+      "name": "publish",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:32:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328222237",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347430016/job/128328222237"
+    },
+    {
+      "id": 128328226930,
+      "name": "Analytics SSR (full)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:47Z",
+      "completedAt": "2026-11-07T06:37:32Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429991/job/128328226930",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429991/job/128328226930"
+    },
+    {
+      "id": 128328272628,
+      "name": "macos-arm (22.22.1)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:53Z",
+      "completedAt": "2026-11-07T06:36:01Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328272628",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328272628"
+    },
+    {
+      "id": 128328272666,
+      "name": "macos-arm (18.20.8)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:33:17Z",
+      "completedAt": "2026-11-07T06:35:46Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328272666",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429928/job/128328272666"
+    },
+    {
+      "id": 128328642986,
+      "name": "deploy",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:34:23Z",
+      "completedAt": "2026-11-07T06:34:22Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429865/job/128328642986",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429865/job/128328642986"
+    },
+    {
+      "id": 128329234358,
+      "name": "Production build and browser interactions",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:37:02Z",
+      "completedAt": "2026-11-07T06:37:05Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128329234358",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128329234358"
+    },
+    {
+      "id": 128329281024,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:37:12Z",
+      "completedAt": "2026-11-07T06:37:12Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128329281024",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128329281024"
+    },
+    {
+      "id": 128329355999,
+      "name": "analytics-ssr",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:37:35Z",
+      "completedAt": "2026-11-07T06:37:38Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429991/job/128329355999",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429991/job/128329355999"
+    },
+    {
+      "id": 128329598874,
+      "name": "UI policy (strict)",
+      "headSha": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:38:42Z",
+      "completedAt": "2026-11-07T06:38:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128329598874",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128329598874"
+    }
+  ],
+  "jobsWithSteps": [
+    {
+      "id": 128328092739,
+      "runId": 42347429865,
+      "runAttempt": 1,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:34:22Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429865/job/128328092739",
+      "stepCount": 14,
+      "failedSteps": [
+        {
+          "number": 10,
+          "name": "Run node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/ticket.test.ts lib/mobile-threads-presence.test.ts",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:34:18Z",
+          "completedAt": "2026-11-07T06:34:19Z"
+        }
+      ]
+    },
+    {
+      "id": 128328092973,
+      "runId": 42347429859,
+      "runAttempt": 1,
+      "name": "smoke",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:37:12Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328092973",
+      "stepCount": 24,
+      "failedSteps": [
+        {
+          "number": 17,
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:36:38Z",
+          "completedAt": "2026-11-07T06:37:07Z"
+        },
+        {
+          "number": 18,
+          "name": "Audit runtime evidence before upload",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:37:07Z",
+          "completedAt": "2026-11-07T06:37:07Z"
+        }
+      ]
+    },
+    {
+      "id": 128328093055,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:32:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328093055",
+      "stepCount": 5,
+      "failedSteps": []
+    },
+    {
+      "id": 128328093180,
+      "runId": 42347429859,
+      "runAttempt": 1,
+      "name": "icon",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:00Z",
+      "completedAt": "2026-11-07T06:32:30Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328093180",
+      "stepCount": 7,
+      "failedSteps": []
+    },
+    {
+      "id": 128328093197,
+      "runId": 42347429859,
+      "runAttempt": 1,
+      "name": "checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:31:59Z",
+      "completedAt": "2026-11-07T06:33:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128328093197",
+      "stepCount": 17,
+      "failedSteps": []
+    },
+    {
+      "id": 128328138878,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:19Z",
+      "completedAt": "2026-11-07T06:34:08Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138878",
+      "stepCount": 14,
+      "failedSteps": []
+    },
+    {
+      "id": 128328138888,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:29Z",
+      "completedAt": "2026-11-07T06:36:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138888",
+      "stepCount": 20,
+      "failedSteps": []
+    },
+    {
+      "id": 128328138896,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:31Z",
+      "completedAt": "2026-11-07T06:36:24Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138896",
+      "stepCount": 20,
+      "failedSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:34:14Z",
+          "completedAt": "2026-11-07T06:36:20Z"
+        }
+      ]
+    },
+    {
+      "id": 128328138904,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:33:38Z",
+      "completedAt": "2026-11-07T06:38:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138904",
+      "stepCount": 59,
+      "failedSteps": [
+        {
+          "number": 53,
+          "name": "Run pnpm test:lib-units",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:38:28Z",
+          "completedAt": "2026-11-07T06:38:37Z"
+        }
+      ]
+    },
+    {
+      "id": 128328138914,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:39Z",
+      "completedAt": "2026-11-07T06:35:36Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138914",
+      "stepCount": 14,
+      "failedSteps": []
+    },
+    {
+      "id": 128328138955,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:32:34Z",
+      "completedAt": "2026-11-07T06:37:00Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138955",
+      "stepCount": 20,
+      "failedSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:33:40Z",
+          "completedAt": "2026-11-07T06:36:57Z"
+        }
+      ]
+    },
+    {
+      "id": 128328138961,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T06:32:32Z",
+      "completedAt": "2026-11-07T06:36:28Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328138961",
+      "stepCount": 20,
+      "failedSteps": []
+    },
+    {
+      "id": 128328139036,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:33:47Z",
+      "completedAt": "2026-11-07T06:38:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328139036",
+      "stepCount": 37,
+      "failedSteps": [
+        {
+          "number": 12,
+          "name": "Run pnpm test:github",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:38:10Z",
+          "completedAt": "2026-11-07T06:38:22Z"
+        }
+      ]
+    },
+    {
+      "id": 128328139845,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:32:10Z",
+      "completedAt": "2026-11-07T06:32:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128328139845",
+      "stepCount": 0,
+      "failedSteps": []
+    },
+    {
+      "id": 128328642986,
+      "runId": 42347429865,
+      "runAttempt": 1,
+      "name": "deploy",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:34:23Z",
+      "completedAt": "2026-11-07T06:34:22Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429865/job/128328642986",
+      "stepCount": 0,
+      "failedSteps": []
+    },
+    {
+      "id": 128329234358,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:37:02Z",
+      "completedAt": "2026-11-07T06:37:05Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128329234358",
+      "stepCount": 3,
+      "failedSteps": [
+        {
+          "number": 2,
+          "name": "Require the full suite unless only documentation changed",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:37:03Z",
+          "completedAt": "2026-11-07T06:37:03Z"
+        }
+      ]
+    },
+    {
+      "id": 128329281024,
+      "runId": 42347429859,
+      "runAttempt": 1,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T06:37:12Z",
+      "completedAt": "2026-11-07T06:37:12Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429859/job/128329281024",
+      "stepCount": 0,
+      "failedSteps": []
+    },
+    {
+      "id": 128329598874,
+      "runId": 42347429920,
+      "runAttempt": 1,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T06:38:42Z",
+      "completedAt": "2026-11-07T06:38:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42347429920/job/128329598874",
+      "stepCount": 3,
+      "failedSteps": [
+        {
+          "number": 2,
+          "name": "Require the full suite unless only documentation changed",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T06:38:43Z",
+          "completedAt": "2026-11-07T06:38:43Z"
+        }
+      ]
+    }
+  ],
+  "closedFailureDiagnosis": {
+    "source": "Exact failing job logs projected in memory; raw logs not included",
+    "sharedCause": {
+      "name": "SyntaxError",
+      "code": "MISSING_NAMED_EXPORT",
+      "module": "lib/request-log.ts",
+      "export": "noteLogRpcAction",
+      "importer": "lib/desktop-rpc/handler.ts"
+    },
+    "jobs": [
+      {
+        "jobId": 128328092739,
+        "runId": 42347429865,
+        "files": [
+          "lib/live/ticket.test.ts"
+        ],
+        "failedTests": 5,
+        "otherFilePassed": {
+          "file": "lib/mobile-threads-presence.test.ts",
+          "tests": 4
+        }
+      },
+      {
+        "jobId": 128328138904,
+        "runId": 42347429920,
+        "files": [
+          "lib/live/ticket.test.ts"
+        ],
+        "failedTests": 5
+      },
+      {
+        "jobId": 128328139036,
+        "runId": 42347429920,
+        "files": [
+          "app/api/integrations/github/repositories/verification/route.test.ts"
+        ],
+        "failedTests": 5
+      },
+      {
+        "jobId": 128328138896,
+        "runId": 42347429920,
+        "files": [
+          "lib/computer/event-session.db.test.ts",
+          "lib/live/ticket-session.db.test.ts"
+        ],
+        "failedTests": 2
+      },
+      {
+        "jobId": 128328138955,
+        "runId": 42347429920,
+        "files": [
+          "tests/desktop-factory-flow.test.ts"
+        ],
+        "failedTests": 1
+      }
+    ],
+    "dependentGates": [
+      128329234358,
+      128329598874
+    ],
+    "desktop": {
+      "jobId": 128328092973,
+      "status": "failure",
+      "diagnosis": "Assigned separately; no Desktop logs or artifacts read for this report"
+    }
+  },
+  "privacy": {
+    "rawLogs": false,
+    "artifactsDownloaded": false,
+    "credentials": false,
+    "prompts": false,
+    "replies": false,
+    "accountData": false
+  },
+  "actions": {
+    "reruns": 0,
+    "cancellations": 0,
+    "workflowMutations": 0,
+    "resourceActions": 0
+  }
+}
+

@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "title": "Issue 1512: c3 CI failure, test-only correction and a190 release evidence",
+  "createdAt": "2026-11-07T07:05:09.285Z",
+  "evidenceScope": {
+    "repository": "alexj11324/Mikka",
+    "issue": 1512,
+    "pullRequest": 1518,
+    "baseEvidenceCommit": "6bb8377b80fa786532e0b295763546180c90d3e1",
+    "additionalHistoryParent": "7a750989b3dca410b109454a378a93ef0bd0fd68",
+    "additionalHistoryAncestor": "ab82b9b550af5e1dcf70256a6b184f5efc7cd825",
+    "treePolicy": "Add only the listed evidence paths to the existing evidence tree. The operations parent retains history without importing its working tree."
+  },
+  "originalReceipts": [
+    {
+      "file": "ci/ci-c3-final.json",
+      "kind": "exact_head_github_metadata_and_closed_failure_projection",
+      "bytes": 40785,
+      "sha256": "9aa3fe28339bc6ca04c1be347cd61103acb4960d84524d1204a86a6a4624bc2d",
+      "retention": "original bytes unchanged"
+    },
+    {
+      "file": "a190-runtime/subscription-diagnostics.json",
+      "kind": "release_subscription_diagnostics",
+      "bytes": 445,
+      "sha256": "8f97831c050d698c6beadb0b064b1f20816d2dd973b03e0ad3ed327ec7b5f8c7",
+      "retention": "original bytes unchanged"
+    },
+    {
+      "file": "a190-runtime/release-cleanup.json",
+      "kind": "release_cleanup_receipt",
+      "bytes": 639,
+      "sha256": "b43fe2f79b85055f1ffc2f192c1f256cc438ddbd5791f7332e1ca8a2689309ba",
+      "retention": "original bytes unchanged"
+    }
+  ],
+  "ci": {
+    "head": "c3ab75e8788c56630485d100be8fdec23aa4c4e9",
+    "attempt": 1,
+    "observedAt": "2026-11-07T06:58:22.091Z",
+    "workflowResults": {
+      "total": 14,
+      "success": 11,
+      "failure": 3
+    },
+    "checkResults": {
+      "total": 43,
+      "success": 26,
+      "failure": 8,
+      "skipped": 9
+    },
+    "result": "failed",
+    "sharedFailure": {
+      "name": "SyntaxError",
+      "code": "MISSING_NAMED_EXPORT",
+      "module": "lib/request-log.ts",
+      "export": "noteLogRpcAction",
+      "importer": "lib/desktop-rpc/handler.ts",
+      "affectedJobs": [
+        128328092739,
+        128328138904,
+        128328139036,
+        128328138896,
+        128328138955
+      ],
+      "independentBusinessAssertionFailureObserved": false
+    },
+    "dependentGateFailures": [
+      128329234358,
+      128329598874
+    ],
+    "desktop": {
+      "smokeJob": 128328092973,
+      "smokeStatus": "failure",
+      "nativeAcceptanceJob": 128329281024,
+      "nativeAcceptanceStatus": "skipped",
+      "queryCounts": null,
+      "queryCountStatus": "unknown",
+      "limits": "Desktop's separately investigated failure is not attributed to the shared module-mock failure. No native startup or login query-count result is claimed."
+    }
+  },
+  "correction": {
+    "commit": "dfb6699567e9f038a8f83d36a03a5b6d03a2b6b3",
+    "scope": "20 existing test module mocks only",
+    "changedFiles": 20,
+    "changedLines": {
+      "insertions": 20,
+      "deletions": 20
+    },
+    "change": "Add noteLogRpcAction: () => {} to request-log replacement mocks.",
+    "productCodeChanged": false,
+    "assertionsChanged": false,
+    "verification": {
+      "kind": "Local isolated unit checks recorded before the correction commit; not a CI result for a later candidate",
+      "groups": [
+        {
+          "files": [
+            "lib/live/ticket.test.ts",
+            "lib/mobile-threads-presence.test.ts"
+          ],
+          "passed": 9,
+          "failed": 0
+        },
+        {
+          "files": [
+            "app/api/integrations/github/repositories/verification/route.test.ts",
+            "tests/desktop-factory-flow.test.ts"
+          ],
+          "passed": 9,
+          "failed": 0,
+          "countsIncludeParentAndSubtests": true
+        }
+      ],
+      "directLint": {
+        "files": 20,
+        "exitCode": 0
+      },
+      "diffCheck": {
+        "files": 20,
+        "exitCode": 0
+      },
+      "noOpOnlyComparison": "For all 20 files, removing the single newly added no-op export reproduced the pre-correction file byte-for-byte.",
+      "databaseIntegrationRerun": false,
+      "databasesStarted": 0,
+      "servicesStarted": 0,
+      "modelCalls": 0
+    },
+    "doesNotRewriteOriginalCiResult": true
+  },
+  "a190": {
+    "sourceCommit": "a1902d720c5cd6b3ff45d94cfe1bc154d4aa38b9",
+    "workflowRunId": 42344765438,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42344765438",
+    "receiptObservation": {
+      "overallStatus": "failed",
+      "code": "template_gate_subscription_or_cleanup_failed",
+      "claude": {
+        "code": "passed",
+        "runIdHash": "7eb25aa2abc60619",
+        "sampleStatus": "execution_proved_awaiting_server_timing"
+      },
+      "codex": {
+        "code": "template_gate_execution_failed",
+        "runIdHash": null,
+        "sampleStatus": "failed",
+        "sampleError": "startup_failed"
+      }
+    },
+    "ownerReport": {
+      "url": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6703443842",
+      "projectionFile": "a190-runtime/owner-comment-6703443842.json",
+      "httpStatus": 400,
+      "stage": "coordinator_generation_before_agent_run_dispatch",
+      "closedErrorCodes": [
+        "subscription_generation_failed",
+        "subscription_upstream_failure",
+        "invalid_request_error",
+        "provider_request_rejected"
+      ]
+    },
+    "causalBoundary": "The owner reports a 400 before Codex agent-run dispatch. This is not the earlier 8e official-timing eventAt receipt-validation failure. The receipt alone does not establish a provider configuration root cause.",
+    "cleanup": {
+      "receiptReportsDeletedTemplates": 3,
+      "receiptSandboxEntries": 0,
+      "receiptErrors": 0,
+      "repeatedCloudVerification": false,
+      "newCleanupActions": 0
+    }
+  },
+  "subsequentCandidate": {
+    "identifierAtAuthorization": "e70",
+    "stateAtAuthorization": "being_imported",
+    "ciResultClaimed": false,
+    "productionAcceptanceClaimed": false
+  },
+  "archiveActions": {
+    "publicCommentReads": 1,
+    "databaseQueries": 0,
+    "productionLogReads": 0,
+    "apmQueries": 0,
+    "modelCalls": 0,
+    "vmActions": 0,
+    "ciReruns": 0
+  },
+  "privacy": {
+    "rawLogs": false,
+    "rawCommentBody": false,
+    "prompts": false,
+    "replies": false,
+    "toolInputs": false,
+    "credentials": false,
+    "authorAccountFields": false
+  }
+}

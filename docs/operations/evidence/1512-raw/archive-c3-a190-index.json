@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T07:05:55.345012Z",
+  "repository": "alexj11324/Mikka",
+  "branch": "evidence/1512-observability",
+  "primaryParent": "6bb8377b80fa786532e0b295763546180c90d3e1",
+  "baseTree": "1bc1d793299eff37eaab605e32729b5eda316709",
+  "additionalParents": [
+    "7a750989b3dca410b109454a378a93ef0bd0fd68"
+  ],
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/ci/ci-c3-final.json",
+      "bytes": 40785,
+      "sha256": "9aa3fe28339bc6ca04c1be347cd61103acb4960d84524d1204a86a6a4624bc2d",
+      "gitBlobSha1": "5ae9aaa47af87d723635b7b87f48c1772a77c9a7",
+      "origin": "original_bytes"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/a190-runtime/subscription-diagnostics.json",
+      "bytes": 445,
+      "sha256": "8f97831c050d698c6beadb0b064b1f20816d2dd973b03e0ad3ed327ec7b5f8c7",
+      "gitBlobSha1": "efa9ac16f1c34103779f53ccee51414701c3ba47",
+      "origin": "original_bytes"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/a190-runtime/release-cleanup.json",
+      "bytes": 639,
+      "sha256": "b43fe2f79b85055f1ffc2f192c1f256cc438ddbd5791f7332e1ca8a2689309ba",
+      "gitBlobSha1": "9af5521ffe584d5abb807471a205a2ca188a1e9d",
+      "origin": "original_bytes"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/a190-runtime/source-and-attribution.json",
+      "bytes": 6353,
+      "sha256": "1309c826a09de5e51910ca4ae4a2a10a2bf7f2afd6a2fec624ec273e97996f0d",
+      "gitBlobSha1": "812bc5e71ba9a906bd0cc1cd3bffc975b0fa7fda",
+      "origin": "safe_projection"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/a190-runtime/owner-comment-6703443842.json",
+      "bytes": 1543,
+      "sha256": "fec29dfad515ef3076bea9058f57f1795972fc5d1e2fc7d74787c9bb13f6dd06",
+      "gitBlobSha1": "f3c6eb519980cc022f27963474edd418d515485d",
+      "origin": "safe_projection"
+    }
+  ],
+  "indexDigestPolicy": "This index excludes its own recursive digest; its bytes, SHA256 and Git blob SHA1 are recorded in the archive verification receipt."
+}

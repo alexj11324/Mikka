@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "kind": "public_repository_owner_comment",
+    "issue": 1503,
+    "commentId": 6703443842,
+    "url": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6703443842",
+    "createdAt": "2026-11-07T06:36:21Z",
+    "updatedAt": "2026-11-07T06:36:21Z",
+    "authorAssociation": "OWNER",
+    "fetchedAt": "2026-11-07T07:05:09.285Z"
+  },
+  "projection": {
+    "workflowRunId": 42344765438,
+    "httpStatus": 400,
+    "closedErrorCodes": [
+      "subscription_generation_failed",
+      "subscription_upstream_failure",
+      "invalid_request_error",
+      "provider_request_rejected"
+    ],
+    "agentRunIdHash": null,
+    "mentionsEarlierEventAtIssue": true,
+    "literalMissingRunReceipt": true
+  },
+  "attribution": {
+    "interpretationSource": "Repository owner report and task-owner corroboration",
+    "stage": "coordinator_generation_before_agent_run_dispatch",
+    "sameCauseAsEarlier8eEventAt": false,
+    "limits": [
+      "The original release receipt reports startup_failed with runIdHash:null; it does not contain a dispatched Codex agent-run UUID.",
+      "This archive does not infer an agent run from another coordinator/workflow identifier.",
+      "No independent database, provider, model, production-log or APM query was performed for this projection."
+    ]
+  },
+  "privacy": {
+    "rawCommentBody": false,
+    "authorAccountFields": false,
+    "providerErrorMessage": false,
+    "prompts": false,
+    "replies": false,
+    "toolInputs": false,
+    "credentials": false
+  }
+}
