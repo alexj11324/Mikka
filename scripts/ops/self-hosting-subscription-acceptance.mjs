@@ -405,3 +405,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try { if (process.argv[2] === '--cleanup') await cleanupCommunity(); else if ((await runCommunity()).status !== 'passed') process.exitCode = 1 }
   catch { console.log(JSON.stringify({ status: 'failed', code: 'COMMUNITY_GUARD' })); process.exitCode = 1 }
 }
+
+// Release checkpoint: Apple status is read-only, separate from device acceptance.

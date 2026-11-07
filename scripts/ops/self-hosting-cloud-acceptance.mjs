@@ -207,3 +207,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.
 
 // Prepared release checkpoint: independent providers and existing iOS build readback.
+
+// Release checkpoint: Apple status is read-only, separate from device acceptance.

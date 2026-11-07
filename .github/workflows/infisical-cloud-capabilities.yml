@@ -154,6 +154,45 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
+      - name: Read existing ASC_API_KEY_P8 only for TestFlight status
+        if: endsWith(github.event.head_commit.message, 'public')
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: ASC_API_KEY_P8
+          recursive: false
+          include-imports: false
+      - name: Read existing ASC_API_KEY_ID only for TestFlight status
+        if: endsWith(github.event.head_commit.message, 'public')
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: ASC_API_KEY_ID
+          recursive: false
+          include-imports: false
+      - name: Read existing ASC_API_ISSUER_ID only for TestFlight status
+        if: endsWith(github.event.head_commit.message, 'public')
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: ASC_API_ISSUER_ID
+          recursive: false
+          include-imports: false
       - run: node scripts/ops/self-hosting-release.mjs --business
         env:
           GITHUB_TOKEN: ${{ github.token }}

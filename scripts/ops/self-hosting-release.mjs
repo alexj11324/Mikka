@@ -1,11 +1,11 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, createPrivateKey, sign } from 'node:crypto'
 import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync,execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
 import { businessAcceptance, acceptanceCode } from './self-hosting-cloud-acceptance.mjs'
-export const TARGET = { base: '717a24b8ce5b8e2483d81c3a8736e082d519ccbb', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: 'afac109b82f822fffe331286807a1290f57c1a12', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs','scripts/ops/self-hosting-cloud-acceptance.mjs','scripts/ops/self-hosting-subscription-acceptance.mjs','scripts/ops/self-hosting-subscription-acceptance.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -135,8 +135,32 @@ export async function requestNativeBuildReadback(env, report, fetcher = fetch) {
  report.nativeBuildReadback = { requested: true, existingBuildId: inputs.existing_build_id, source: inputs.expected_commit, submit: false, newBuildRequested: false }
 }
 
+// Official Apple endpoints: GET /v1/builds (include=buildBetaDetail).
+// Keep this separate from a successful Expo upload: VALID alone does not prove
+// TestFlight distribution or a physical-device test. No build or submit writes.
+export async function inspectExistingTestflightBuild(env, report, fetcher = fetch, now = Date.now) {
+ demand(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === TARGET.repo && env.GITHUB_REF === TARGET.ref, 'APPLE_READBACK_SCOPE')
+ demand(typeof env.ASC_API_KEY_P8 === 'string' && /^[A-Za-z0-9]{5,32}$/.test(env.ASC_API_KEY_ID ?? '') && /^[a-f0-9-]{36}$/i.test(env.ASC_API_ISSUER_ID ?? ''), 'APPLE_READBACK_INPUTS')
+ const raw = env.ASC_API_KEY_P8, pem = raw.includes('-----BEGIN') ? raw.replaceAll('\\n', '\n') : Buffer.from(raw, 'base64').toString('utf8')
+ const key = createPrivateKey(pem)
+ demand(key.asymmetricKeyType === 'ec' && key.asymmetricKeyDetails?.namedCurve === 'prime256v1', 'APPLE_READBACK_KEY')
+ const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url'), issuedAt = Math.floor(now() / 1000)
+ const unsigned = encode({ alg: 'ES256', kid: env.ASC_API_KEY_ID, typ: 'JWT' }) + '.' + encode({ iss: env.ASC_API_ISSUER_ID, iat: issuedAt, exp: issuedAt + 300, aud: 'appstoreconnect-v1', scope: ['GET /v1/builds'] })
+ const token = unsigned + '.' + sign('sha256', Buffer.from(unsigned), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url')
+ const query = new URLSearchParams({ 'filter[app]': '6829300983', 'filter[version]': '9', 'filter[preReleaseVersion.version]': '1.0.0', 'filter[preReleaseVersion.platform]': 'IOS', 'fields[builds]': 'version,processingState,expired,buildBetaDetail', include: 'buildBetaDetail', 'fields[buildBetaDetails]': 'internalBuildState,externalBuildState', limit: '2' })
+ const response = await fetcher('https://api.appstoreconnect.apple.com/v1/builds?' + query, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(20000), headers: { authorization: 'Bearer ' + token, accept: 'application/json' } })
+ ;(report.requests ??= []).push({ operation: 'apple_existing_build', status: response.status })
+ if (!response.ok) { await response.body?.cancel(); throw Error('APPLE_READBACK_HTTP') }
+ const body = await response.json()
+ demand(Array.isArray(body.data) && body.data.length === 1 && body.data[0].attributes?.version === '9' && typeof body.data[0].attributes.expired === 'boolean', 'APPLE_READBACK_BUILD')
+ const build = body.data[0], beta = body.included?.find(row => row.type === 'buildBetaDetails' && row.id === build.relationships?.buildBetaDetail?.data?.id)?.attributes
+ const states = new Set(['PROCESSING', 'FAILED', 'INVALID', 'VALID', 'PROCESSING_EXCEPTION', 'MISSING_EXPORT_COMPLIANCE', 'READY_FOR_BETA_TESTING', 'READY_FOR_BETA_SUBMISSION', 'IN_BETA_TESTING', 'EXPIRED', 'EXPORT_COMPLIANCE_REVIEW_IN_PROGRESS', 'WAITING_FOR_BETA_REVIEW', 'IN_BETA_REVIEW', 'BETA_REJECTED', 'BETA_APPROVED'])
+ const state = value => value === undefined ? 'UNAVAILABLE' : states.has(value) ? value : 'OTHER'
+ report.testflight = { appId: '6829300983', version: '1.0.0', buildNumber: '9', processingState: state(build.attributes.processingState), expired: build.attributes.expired, internalBuildState: state(beta?.internalBuildState), externalBuildState: state(beta?.externalBuildState), readOnly: true, physicalDeviceExercised: false }
+}
+
 async function main(){const report={phase:'prepare-private-cloud',result:'blocked',requests:[],applicationSecretValuesRequested:false,credentialsWrittenToGitHub:false,newIdentityCreated:false};try{
  const git=(...a)=>execFileSync('git',a,{encoding:'utf8'}).trim();const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));assertExecution(process.env,event,git('rev-parse','HEAD'),git('rev-parse','HEAD^'),git('diff','--name-only','HEAD^','HEAD').split('\n'))
- if(process.argv[2]==='--preflight')report.result='source_verified';else if(process.argv[2]==='--readiness'){report.phase='private_cloud_readiness';report.http=[];await readiness({report})}else if(process.argv[2]==='--business'){report.phase='cloud_protocol_acceptance';report.http=[];await businessAcceptance({report});if(process.env.MIKKA_CLOUD_ACCEPTANCE_PUBLIC==='1')await requestNativeBuildReadback(process.env,report)}else {demand(process.argv[2]==='--prepare','MODE');await prepare({report})}
+ if(process.argv[2]==='--preflight')report.result='source_verified';else if(process.argv[2]==='--readiness'){report.phase='private_cloud_readiness';report.http=[];await readiness({report})}else if(process.argv[2]==='--business'){report.phase='cloud_protocol_acceptance';report.http=[];await businessAcceptance({report});if(process.env.MIKKA_CLOUD_ACCEPTANCE_PUBLIC==='1'){await inspectExistingTestflightBuild(process.env,report);await requestNativeBuildReadback(process.env,report)}}else {demand(process.argv[2]==='--prepare','MODE');await prepare({report})}
  }catch(e){report.error=process.argv[2]==='--business'?acceptanceCode(e):/^[A-Z0-9_]+$/.test(e.message)?e.message:'RELEASE_PREPARATION_FAILED';process.exitCode=1}console.log(JSON.stringify(report));if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,'\n```json\n'+JSON.stringify(report)+'\n```\n')}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)await main()

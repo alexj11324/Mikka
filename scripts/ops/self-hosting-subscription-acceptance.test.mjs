@@ -51,3 +51,5 @@ test('a failed provider source or fixture preserves the independent bound model 
     assert.equal(providers[1].model, 'gpt-6-luna')
   }
 })
+
+// Release checkpoint: Apple status is read-only, separate from device acceptance.

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {secretPlan,syncBody,TARGET,REQUIRED,reference,assertExecution,requestNativeBuildReadback} from './self-hosting-release.mjs'
 import { smokeAccount, verifyDelivery, acceptanceCode } from './self-hosting-cloud-acceptance.mjs'
-import { createHmac } from 'node:crypto'
+import { createHmac, generateKeyPairSync, verify } from 'node:crypto'
 test('business acceptance refuses non-shared accounts and never projects arbitrary error text',()=>{assert.throws(()=>smokeAccount({SMOKE_OWNER_EMAIL:'someone@example.invalid',SMOKE_OWNER_PASSWORD:'fixture'}),/SMOKE_ACCOUNT_REQUIRED/);assert.equal(acceptanceCode(Error('secret-value-private')), 'ACCEPTANCE_FAILED')})
 test('webhook receipt checks raw body, registered secret and freshness',()=>{const now=1800000000000,t=now/1000,body='{"action":"created"}',secret='synthetic-only';const sig=`t=${t},v1=${createHmac('sha256',secret).update(`${t}.${body}`).digest('hex')}`;assert.equal(verifyDelivery(body,sig,secret,now),true);assert.equal(verifyDelivery(body+' ',sig,secret,now),false);assert.equal(verifyDelivery(body,sig,'wrong',now),false);assert.equal(verifyDelivery(body,sig,secret,now+301000),false)})
 const rows=()=>Object.entries(REQUIRED).map(([secretKey,secretPath])=>({secretKey:secretKey==='EXPO_ACCESS_TOKEN'?'EXPO_TOKEN':secretKey,secretPath}))
@@ -94,4 +94,41 @@ test('native dispatch denial retains the exact action and HTTP status without re
  await assert.rejects(requestNativeBuildReadback(env, report, async () => new Response(null, { status: 403 })), /NATIVE_READBACK_DISPATCH_FAILED/)
  assert.deepEqual(report.requests, [{ operation: 'native_readback_dispatch', status: 403 }])
  assert.ok(!JSON.stringify(report).includes(env.GITHUB_TOKEN))
+})
+
+test('existing TestFlight readback signs a short GET-only token and emits only fixed build states', async () => {
+ const { inspectExistingTestflightBuild } = await import('./self-hosting-release.mjs')
+ const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+ const key = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
+ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: TARGET.repo, GITHUB_REF: TARGET.ref, ASC_API_KEY_P8: key, ASC_API_KEY_ID: 'FIXTUREKEY', ASC_API_ISSUER_ID: '00000000-0000-4000-8000-000000000001' }
+ const report = {}, now = 1800000000000
+ await inspectExistingTestflightBuild(env, report, async (value, init) => {
+  const url = new URL(value), token = init.headers.authorization.slice(7), [header, payload, signature] = token.split('.')
+  assert.equal(url.origin, 'https://api.appstoreconnect.apple.com')
+  assert.equal(url.pathname, '/v1/builds')
+  assert.equal(url.searchParams.get('filter[app]'), '6829300983')
+  assert.equal(url.searchParams.get('filter[version]'), '9')
+  assert.equal(url.searchParams.get('filter[preReleaseVersion.version]'), '1.0.0')
+  assert.equal(url.searchParams.get('filter[preReleaseVersion.platform]'), 'IOS')
+  assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error')
+  assert.equal(JSON.parse(Buffer.from(header, 'base64url')).alg, 'ES256')
+  const claims = JSON.parse(Buffer.from(payload, 'base64url'))
+  assert.deepEqual(claims.scope, ['GET /v1/builds'])
+  assert.equal(claims.aud, 'appstoreconnect-v1'); assert.equal(claims.iat, now / 1000); assert.equal(claims.exp - claims.iat, 300)
+  assert.ok(verify('sha256', Buffer.from(header + '.' + payload), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url')))
+  return new Response(JSON.stringify({ data: [{ id: 'fixture-build', type: 'builds', attributes: { version: '9', processingState: 'VALID', expired: false, arbitrary: 'never-return-private' }, relationships: { buildBetaDetail: { data: { id: 'fixture-beta' } } } }], included: [{ id: 'fixture-beta', type: 'buildBetaDetails', attributes: { internalBuildState: 'IN_BETA_TESTING', externalBuildState: 'WAITING_FOR_BETA_REVIEW', privateEmail: 'do-not-return@example.invalid' } }] }), { headers: { 'content-type': 'application/json' } })
+ }, () => now)
+ assert.equal(report.testflight.processingState, 'VALID'); assert.equal(report.testflight.internalBuildState, 'IN_BETA_TESTING')
+ assert.equal(report.testflight.expired, false); assert.equal(report.testflight.physicalDeviceExercised, false)
+ for (const value of ['never-return-private', 'do-not-return', key, 'FIXTUREKEY']) assert.ok(!JSON.stringify(report).includes(value))
+ await assert.rejects(inspectExistingTestflightBuild({ ...env, GITHUB_REF: 'refs/heads/arbitrary' }, {}, () => assert.fail('must not request')), /APPLE_READBACK_SCOPE/)
+})
+
+test('Apple API denial preserves the action/status and does not parse or expose provider error bodies', async () => {
+ const { inspectExistingTestflightBuild } = await import('./self-hosting-release.mjs')
+ const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }), report = {}
+ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: TARGET.repo, GITHUB_REF: TARGET.ref, ASC_API_KEY_P8: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(), ASC_API_KEY_ID: 'FIXTUREKEY', ASC_API_ISSUER_ID: '00000000-0000-4000-8000-000000000001' }
+ await assert.rejects(inspectExistingTestflightBuild(env, report, async () => new Response('never-return-raw-provider-error', { status: 403 })), /APPLE_READBACK_HTTP/)
+ assert.deepEqual(report.requests, [{ operation: 'apple_existing_build', status: 403 }])
+ assert.ok(!JSON.stringify(report).includes('never-return'))
 })
