@@ -35,7 +35,8 @@ for (const path of ['agents/native-container.mjs', 'computer/proxy.mjs', 'comput
 }
 // run-context is bundled into each root entry; its stdio helper is standalone.
 await copyFile(resolve(root, 'src/agents/mikka-mcp.mjs'), resolve(out, 'mikka-mcp.mjs'))
-await copyFile(resolve(root, 'src/agents/mikka-mcp-backend.mjs'), resolve(out, 'mikka-mcp-backend.mjs', 'mikka-mcp-worker.mjs'))
+await copyFile(resolve(root, 'src/agents/mikka-mcp-backend.mjs'), resolve(out, 'mikka-mcp-backend.mjs'))
+await copyFile(resolve(root, 'src/agents/mikka-mcp-worker.mjs'), resolve(out, 'mikka-mcp-worker.mjs'))
 await copyFile(resolve(root, 'src/agents/capture-copy.mjs'), resolve(out, 'capture-copy.mjs'))
 await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 'github-credentials.mjs'))
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
