@@ -24,11 +24,11 @@ stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:async(.
  return result
 }})
 stub('../../workflows/coordinator/tools.ts',{coordinatorTools:(...args:unknown[])=>{record('tools')(...args);return{}}})
-stub('../../workflows/coordinator/agent-kit-steps.ts',{beginAgentExecution:async()=>null,botRuntime:async()=>({harness:'ai_sdk',model:'existing-configured-model'}),finishAgentExecution:async()=>{}})
+stub('../../workflows/coordinator/agent-kit-steps.ts',{beginAgentExecution:async()=>null,beginPreparedAgentExecution:async()=>null,botRuntime:async()=>({harness:'ai_sdk',model:'existing-configured-model'}),finishAgentExecution:async()=>{}})
 const preparePrompt=async()=>({instructions:'Existing host policy',messages:[{role:'user',content:'A stored read-only schedule is due'}]})
 stub('../../workflows/coordinator/steps.ts',{
  // The real turnSettings and prepareTurn compose these reads in one step each (workflows/coordinator/steps.ts).
- turnSettings:async()=>({computerEnabled:false,mailboxEnabled:false,writeEnabled:false,switches:{issueTools:true,factoryRouting:false,factoryLifecycle:false},coordinator:true,runtime:{harness:native?'codex':'ai_sdk'}}),
+ turnSettings:async()=>({computerEnabled:false,mailboxEnabled:false,writeEnabled:false,agentKitEnabled:false,switches:{issueTools:true,factoryRouting:false,factoryLifecycle:false},coordinator:true,runtime:{harness:native?'codex':'ai_sdk'}}),
  prepareTurn:async(_userId:string,_botId:string,_holder:string,input:{runtime:unknown})=>{if(input.runtime)throw new Error('a scheduled read stores no model-switch notice');return {mailboxTools:[],prompt:await preparePrompt()}},
  computerToolsEnabled:async()=>false,personalWriteToolsEnabled:async()=>false,coordinatorSwitches:async()=>({issueTools:true,factoryRouting:false,factoryLifecycle:false}),isCoordinatorChat:async()=>true,mailboxToolsEnabled:async()=>false,
  takeInbox:async()=>{const added=!taken;taken=true;return{held:true,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],scheduledRead}},

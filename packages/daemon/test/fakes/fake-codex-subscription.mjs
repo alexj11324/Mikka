@@ -28,6 +28,11 @@ lines.on("line", async (line) => {
   }
   if (id === undefined) return
   if (method === "initialize") {
+    if (process.env.FIXTURE_TIMING_ENV === '1') writeFileSync(join(process.env.CODEX_HOME, 'fixture-timing-env.json'), JSON.stringify({
+      logsCompression: process.env.OTEL_EXPORTER_OTLP_LOGS_COMPRESSION ?? null,
+      genericCompression: process.env.OTEL_EXPORTER_OTLP_COMPRESSION ?? null,
+      exporterConfigured: process.argv.some(arg => arg.startsWith('otel.exporter=')),
+    }))
     experimental = params.capabilities?.experimentalApi === true
     return send({ id, result: { userAgent: process.env.FAKE_CODEX_USER_AGENT ?? "codex_cli_rs/0.163.0 synthetic-fixture" } })
   }

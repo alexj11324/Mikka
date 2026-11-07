@@ -9,7 +9,7 @@ export interface SubscriptionModelBackend {
   // Server-owned implementation. Never populated from request-supplied URLs,
   // credentials or a browser's assertion of provider approval.
   access(): Promise<SubscriptionAccess>
-  model(modelId: string): Promise<Exclude<LanguageModel, string>>
+  model(modelId: string, authorized: ReturnType<typeof authorizeSubscriptionUse>): Promise<Exclude<LanguageModel, string>>
 }
 
 /** Model seam for Mikka's existing AI SDK loop; no second agent harness. */
@@ -20,8 +20,8 @@ export async function resolveSubscriptionModel(
   clock: () => number = Date.now,
 ): Promise<Exclude<LanguageModel, string>> {
   const check = async () => authorizeSubscriptionUse({ ...use, execution: 'model' }, await backend.access(), clock())
-  await check()
-  const model = await backend.model(modelId)
+  const authorized = await check()
+  const model = await backend.model(modelId, authorized)
   // streamText can invoke a model repeatedly for tool steps. Check each call,
   // so reconnect/disconnect does not leave a cached model authorized forever.
   return new Proxy(model, {

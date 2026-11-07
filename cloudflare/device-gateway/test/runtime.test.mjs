@@ -172,8 +172,9 @@ function liveChannel(owner, workspace) {
   return createHash('sha256').update(JSON.stringify([owner, workspace])).digest('hex')
 }
 
-function liveSocket(channel, exp, Client = WebSocket, version = 1) {
-  const socket = new Client(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket${version === 2 ? '?revisions=1' : ''}`, ticket(`live:${channel}`, exp))
+function liveSocket(channel, exp, Client = WebSocket, version = 1, presence = false) {
+  const query = new URLSearchParams({ ...(version === 2 ? { revisions: '1' } : {}), ...(presence ? { presence: '1' } : {}) })
+  const socket = new Client(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket${query.size ? `?${query}` : ''}`, ticket(`live:${channel}`, exp))
   sockets.add(socket)
   socket.liveReady = event(socket, 'message').then(message => {
     const value = JSON.parse(message.data)
@@ -182,8 +183,67 @@ function liveSocket(channel, exp, Client = WebSocket, version = 1) {
     assert.ok(value.kinds.includes('approved_writes') && value.kinds.includes('approved_write'))
     return value
   })
+  if (presence) socket.presenceReady = messages(socket, 1, value => value.type === 'presence_ready')
   return socket
 }
+
+function messages(socket, count, accept = () => true, timeoutMs = 5_000) {
+  return new Promise((resolve, reject) => {
+    const received = []
+    const timeout = setTimeout(() => { socket.removeEventListener('message', read); reject(Error('Timed out waiting for presence frames')) }, timeoutMs)
+    const read = event => {
+      const value = JSON.parse(event.data)
+      if (!accept(value)) return
+      received.push(value)
+      if (received.length === count) { clearTimeout(timeout); socket.removeEventListener('message', read); resolve(received) }
+    }
+    socket.addEventListener('message', read)
+  })
+}
+
+function presenceProof(channel, home, devices, expiresAt = Date.now() + 300_000) {
+  const payload = Buffer.from(JSON.stringify({ channel, home, expiresAt, devices })).toString('base64url')
+  const mac = createHmac('sha256', secret).update(`mikka-presence-v1.${payload}`).digest('hex')
+  return `${payload}.${mac}`
+}
+
+test('a real watched device disconnect and reconnect push its owner home without an HTTP heartbeat', async () => {
+  const home = 'b1c9a026-f051-4846-b9ae-0bb0866b7124', id = '66884944-5216-40a3-b050-ae4af2920d7e'
+  const channel = liveChannel('presence-owner', home)
+  const live = liveSocket(channel, undefined, WebSocket, 2, true)
+  await event(live, 'open'); await live.liveReady; await live.presenceReady
+  const device = connect(ticket(id), id); await event(device, 'open')
+  const ack = messages(live, 1, value => value.type === 'presence_ack')
+  live.send(JSON.stringify({ type: 'presence_watch', id: 'watched', token: presenceProof(channel, home, [[id, true, 0]]) }))
+  await ack
+  const expected = [{ kind: 'device_list', id: home }, { kind: 'thread_list', id: home }]
+  const offline = messages(live, 2, value => !!value.kind)
+  const closed = event(device, 'close'); device.close(1000, 'offline'); await closed
+  assert.deepEqual(await offline, expected)
+  const online = messages(live, 2, value => !!value.kind)
+  const returned = connect(ticket(id), id); await event(returned, 'open')
+  assert.deepEqual(await online, expected)
+  live.send(JSON.stringify({ type: 'presence_unwatch', id: 'watched' }))
+  live.close(1000, 'complete'); returned.close(1000, 'complete')
+})
+
+test('a real observer receives natural 90s expiry while the idle device socket remains open', { timeout: 105_000 }, async () => {
+  const home = 'bf156f6b-40e7-49e7-8dbb-0dc236e46e1e', id = '2a7d7301-402a-4b18-83f5-10001923571c'
+  const channel = liveChannel('expiry-owner', home)
+  const live = liveSocket(channel, undefined, WebSocket, 2, true)
+  await event(live, 'open'); await live.liveReady; await live.presenceReady
+  const device = connect(ticket(id), id); await event(device, 'open')
+  const connected = await status(id)
+  const ack = messages(live, 1, value => value.type === 'presence_ack')
+  live.send(JSON.stringify({ type: 'presence_watch', id: 'expiry', token: presenceProof(channel, home, [[id, true, 0]]) }))
+  await ack
+  const received = await messages(live, 2, value => !!value.kind, 100_000)
+  assert.ok(Date.now() - Date.parse(connected.lastSeenAt) >= 90_000)
+  assert.deepEqual(received, [{ kind: 'device_list', id: home }, { kind: 'thread_list', id: home }])
+  assert.equal(device.readyState, WebSocket.OPEN)
+  assert.equal((await status(id)).online, false)
+  live.close(1000, 'complete'); device.close(1000, 'complete')
+})
 
 async function pushLive(channel, events) {
   const response = await fetch(`${origin}/v1/live/${channel}/push`, {

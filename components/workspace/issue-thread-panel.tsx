@@ -5,6 +5,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { ArrowLeft, MessageSquareDiff, Square, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, getThreadChanges, getThreadInstructions, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
@@ -47,6 +48,7 @@ import { FieldError } from '@/components/ui/field'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 import { heldRevision } from '@/lib/live/revisions'
 import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
 
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
@@ -110,11 +112,29 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const { mutate: mutateCache, cache } = useSWRConfig()
   const key = ['issue-thread', issueId, runId]
   // Keep incremental chunks while shared invalidations schedule the reads.
-  const { data, error, mutate } = useSWR(key, async () => {
+  const { data: read, error, mutate } = useSWR(key, async () => {
     const held = cache.get(unstable_serialize(key))?.data as IssueThreadDetail | undefined
     const previous = held?.chunkCursor ? held : undefined
     return mergeThreadChunks(previous, await getIssueThread(issueId, runId, previous?.chunkCursor))
   }, { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
+  const [accessRejected, setAccessRejected] = useState(false)
+  // Browser RPC carries runNotFound as HTTP 400; it is still a definitive read refusal.
+  const refused = !!readAccessFailure(error) || error?.code === 'runNotFound' || error?.code === 'desktop_session_changed'
+  useEffect(() => {
+    if (refused) setAccessRejected(true)
+    else if (!error) setAccessRejected(false)
+  }, [refused, error])
+  // Observe SWR's successful read, including one started before this panel remounted.
+  const readRejected = refused || Boolean(error && accessRejected)
+  const data = readRejected ? undefined : read
+  const backgroundFailed = Boolean(error && data)
+  const readFailedMessage = t('loadFailed'), retryLabel = t('retry')
+  useEffect(() => {
+    const notice = `issue-thread-read-${runId}`
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); void mutate() } } })
+    else toast.dismiss(notice)
+    return () => { toast.dismiss(notice) }
+  }, [backgroundFailed, runId, mutate, readFailedMessage, retryLabel])
   const liveRuns = data?.live?.runs ?? [{ id: runId, workspaceId: null }]
   const liveKeys = [unstable_serialize(key)]
   // A push this thread already read is skipped; only the opened run's keys carry a revision.
@@ -124,12 +144,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
   const { tasks: acceptanceTasks, allTasks } = useAcceptanceTasks(issueId)
   // Keep the pane on the addressed producer; its status can follow an accepted continuation.
-  const acceptance = acceptanceTasks.find(task => task.candidateRunId === runId)
+  const acceptance = readRejected ? undefined : acceptanceTasks.find(task => task.candidateRunId === runId)
   const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
   const { data: changes, mutate: mutateChanges } = useSWR(bare ? null : ['thread-changes', issueId, runId], () => getThreadChanges(issueId, runId))
-  const hasChanges = !!changes && changes.state !== 'none'
+  const hasChanges = !readRejected && !!changes && changes.state !== 'none'
   const viewingChanges = hasChanges && tab === 'changes'
   const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
@@ -242,7 +262,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     }
   }
   const canStop = active && !!data?.thread.ownedByCurrentUser && !sending && !stopPending
-  const title = listedName || (detail?.name ?? t('title'))
+  const title = (!readRejected && listedName) || (detail?.name ?? t('title'))
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
@@ -254,7 +274,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       <span className="flex-1" />
       {data?.thread.ownedByCurrentUser && <ThreadExecutionIdentity runId={liveRunId} />}
       {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}
-      <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} />
+      {!readRejected && <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} />}
       {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
       {canStop && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('stop')} data-slot="thread-stop" onClick={() => { void stop() }} />}><Square data-icon="inline-start" className="fill-current" /></TooltipTrigger><TooltipContent side="bottom">{t('stop')}</TooltipContent></Tooltip>}
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
@@ -275,7 +295,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
     : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
     <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-      {error ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
+      {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

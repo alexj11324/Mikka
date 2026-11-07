@@ -1,12 +1,7 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
-import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { changePassword, revokeOtherSessions, revokeSession, setPassword, type getPasswordStatus, type listSessions } from '@/app/actions/account'
-import { settingsRead } from '@/lib/settings-read'
-import type { SignedInDevice } from '@/lib/account/sessions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -15,16 +10,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
-import { useActionError } from '@/lib/use-action-error'
 import { FieldError } from '@/components/ui/field'
+import { useSecurity } from '@/hooks/settings/use-security'
 
 /** N1: password, signed-in devices. Passkey and 2FA wait for their backend. */
 export function SecuritySettings() {
   const t = useTranslations('Settings.security')
-  const actionError = useActionError()
   const locale = useLocale()
-  const password = useSWR(settingsKeys.password(), () => settingsRead<Awaited<ReturnType<typeof getPasswordStatus>>>('password'))
-  const sessions = useSWR(settingsKeys.sessions(), () => settingsRead<Awaited<ReturnType<typeof listSessions>>>('sessions'))
+  const security = useSecurity()
+  const { passwordError, hasPassword, devices, pendingSession, signOutError } = security
   const [editing, setEditing] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -32,12 +26,6 @@ export function SecuritySettings() {
   const [revokeOthers, setRevokeOthers] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [pendingSession, setPendingSession] = useState<string | null>(null)
-  const [signOutError, setSignOutError] = useState<string | null>(null)
-
-  const passwordStatus = password.data && !('error' in password.data) ? password.data : null
-  const passwordError = password.data && 'error' in password.data ? actionError(password.data.error) : null
-  const hasPassword = passwordStatus?.hasPassword ?? false
   const mismatch = Boolean(next) && next !== again
 
   function open() {
@@ -49,69 +37,33 @@ export function SecuritySettings() {
     setSaving(true)
     setSaveError(null)
     try {
-      const result = hasPassword
-        ? await changePassword({ currentPassword: current, newPassword: next, revokeOtherSessions: revokeOthers })
-        : await setPassword({ newPassword: next })
-      if (result.error) { setSaveError(actionError(result.error)); return }
+      const error = await security.savePassword({ current, next, revokeOthers })
+      if (error) { setSaveError(error); return }
       setEditing(false)
-      void password.mutate()
-      void sessions.mutate()
-    } catch {
-      setSaveError(actionError())
     } finally {
       setSaving(false)
     }
   }
 
-  async function signOut(sessionId: string) {
-    setPendingSession(sessionId)
-    setSignOutError(null)
-    try {
-      const result = await revokeSession(sessionId)
-      if (result.error) { setSignOutError(actionError(result.error)); return }
-      void sessions.mutate()
-    } catch {
-      setSignOutError(actionError())
-    } finally {
-      setPendingSession(null)
-    }
-  }
-
-  async function signOutEverywhere() {
-    setPendingSession('all')
-    setSignOutError(null)
-    try {
-      const result = await revokeOtherSessions()
-      if (result.error) { setSignOutError(actionError(result.error)); return }
-      void sessions.mutate()
-    } catch {
-      setSignOutError(actionError())
-    } finally {
-      setPendingSession(null)
-    }
-  }
-
-  const devices: SignedInDevice[] = sessions.data && !('error' in sessions.data) ? sessions.data.sessions : []
-
   return <>
     <SettingsSection id="password-heading" title={t('signInMethods')}>
       <SettingRow title={t('password')} description={passwordError ?? (hasPassword ? undefined : t('passwordNotSet'))}>
-        <Button type="button" variant="secondary" size="sm" disabled={password.isLoading} onClick={open}>
+        <Button type="button" variant="secondary" size="sm" disabled={security.passwordLoading} onClick={open}>
           {hasPassword ? t('changePassword') : t('setPassword')}
         </Button>
       </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="devices-heading" title={t('devices')}>
-      {(sessions.error || (sessions.data && 'error' in sessions.data)) && <FieldError className="px-5 py-3">{sessions.data && 'error' in sessions.data ? actionError(sessions.data.error) : t('devicesError')}</FieldError>}
-      {!sessions.data && !sessions.error && <SettingsLoading label={t('devicesLoading')} rows={3} bare />}
+      {security.devicesError !== null && <FieldError className="px-5 py-3">{security.devicesError || t('devicesError')}</FieldError>}
+      {security.devicesLoading && <SettingsLoading label={t('devicesLoading')} rows={3} bare />}
       {devices.map(device => <SettingRow key={device.id} title={device.label ?? t('unknownDevice')} description={t('lastActive', { when: relativeTime(device.lastActiveAt, locale) })}>
         {device.current
           ? <Badge variant="secondary">{t('currentDevice')}</Badge>
-          : <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOut(device.id) }}>{pendingSession === device.id ? t('signingOut') : t('signOut')}</Button>}
+          : <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void security.signOut(device.id) }}>{pendingSession === device.id ? t('signingOut') : t('signOut')}</Button>}
       </SettingRow>)}
       {devices.length > 1 && <SettingRow title={t('otherDevices')}>
-        <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOutEverywhere() }}>{t('signOutOthers')}</Button>
+        <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void security.signOutOthers() }}>{t('signOutOthers')}</Button>
       </SettingRow>}
       {signOutError && <FieldError className="px-5 py-3">{signOutError}</FieldError>}
     </SettingsSection>

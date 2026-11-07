@@ -9,6 +9,7 @@ import { LIVE_KINDS } from '../lib/live/events'
 import type { IssueView } from '../app/actions/issues'
 import type { ActivityVersion } from '../lib/issue-activity'
 import { PersistentReadCache } from '../lib/swr/persistent-cache'
+import { ReadResponseError } from '../lib/swr/retry'
 import type { ReadStorage, StoredRead } from '../lib/swr/indexed-db'
 
 // Mount the real TaskDetail, DocumentSync, ActivityFeed, SWR and live channel.
@@ -21,6 +22,11 @@ const body = (text: string): JSONContent => ({ type: 'doc', content: [{ type: 'p
 const bodyText = (content: JSONContent) => content.content?.[0]?.content?.[0]?.text ?? ''
 const translators = new Map<string, ((key: string, values?: Record<string, unknown>) => string) & { has: () => boolean }>()
 const format = { dateTime: () => '08:07', relativeTime: () => 'now' }
+const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
+mock.module('sonner', { namedExports: { toast: {
+  error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
+  dismiss: (id: string) => { notices.delete(id) }, success: () => {},
+} } })
 mock.module('next-intl', { namedExports: {
   useTranslations: (namespace = '') => {
     if (!translators.has(namespace)) translators.set(namespace, Object.assign((key: string, values?: Record<string, unknown>) => `${namespace}.${key}${values ? ` ${Object.values(values).join(' ')}` : ''}`, { has: () => true }))
@@ -116,6 +122,8 @@ let TaskDetail: typeof import('../components/workspace/task-detail')['TaskDetail
 let root: Root, container: HTMLDivElement, cache: Map<string, State>
 let flush: (() => Promise<boolean>) | null = null
 const registerFlush = (value: typeof flush) => { flush = value }
+let dirty = false
+const recordDirty = (value: boolean) => { dirty = value }
 const noop = () => {}
 before(async () => {
   for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'HTMLTextAreaElement', 'Node', 'Element', 'getComputedStyle', 'MutationObserver', 'requestAnimationFrame', 'cancelAnimationFrame', 'matchMedia', 'ResizeObserver', 'KeyboardEvent', 'MouseEvent', 'InputEvent', 'CompositionEvent', 'FocusEvent', 'Event', 'CSS'] as const) {
@@ -133,6 +141,7 @@ function version(issue: IssueView): ActivityVersion {
   return { ...issue, id: `version-${issue.revision}`, createdAt: `2026-11-05T08:0${issue.revision}:00Z` }
 }
 beforeEach(() => {
+  notices.clear(); dirty = false
   stored = { id: issueId, userId: owner, title: 'Accepted report', content: body('Original description'), status: 'review', priority: 'normal', revision: 1,
     identifier: 'ALEX-60', metadata: {}, createdAt: new Date('2026-11-05T08:00:00Z'), updatedAt: new Date('2026-11-05T08:00:00Z') } as IssueView
   versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; flush = null; cache = new Map(); sockets.length = 0
@@ -171,7 +180,7 @@ async function renderDetail(visible: boolean) {
     {cache instanceof PersistentReadCache && <HydrateFixtureCache />}
     <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin="Tasks"
       user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
-      onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
+      onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
   </SWRConfig>))
 }
 async function mount(ready = true) {
@@ -395,6 +404,66 @@ test('a committed acceptance event refreshes the mounted task status and activit
   assert.equal(properties().getAttribute('data-revision'), '2')
   assert.ok(issueReads > before.issueReads && versionReads > before.versionReads)
   assert.equal(writes.length, 0, 'a committed live read performs no save')
+})
+
+test('a background transport failure keeps the authorized editor, unsaved text and selection through retry', { timeout: 10_000 }, async () => {
+  await mount()
+  const titleElement = title(), bodyElement = description()
+  await act(async () => { titleElement.focus(); titleElement.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })) })
+  await input(titleElement, 'Keep this unsaved title')
+  await input(bodyElement, 'Keep this unsaved description')
+  titleElement.setSelectionRange(5, 9)
+  const before = issueReads
+  readOverride = async () => { throw new TypeError('fixture offline') }
+  await emit(); await until(() => issueReads > before, 'the live detail read fails')
+  await wait()
+  assert.ok(title() === titleElement, 'a background failure must not remount the editor')
+  assert.ok(description() === bodyElement)
+  assert.equal(title().value, 'Keep this unsaved title')
+  assert.equal(description().value, 'Keep this unsaved description')
+  assert.ok(document.activeElement === titleElement)
+  assert.deepEqual([titleElement.selectionStart, titleElement.selectionEnd], [5, 9])
+  assert.equal(writes.length, 0)
+  assert.ok(flush, 'the mounted draft keeps its flush registration')
+  assert.equal(dirty, true, 'a temporary read failure must retain the unsaved-change guard')
+  const notice = notices.get(`issue-detail-read-${issueId}`)
+  assert.ok(notice?.action, 'the retained editor offers an explicit read retry')
+  readOverride = null
+  const failedReads = issueReads
+  await act(async () => notice.action!.onClick(new Event('click', { cancelable: true })))
+  await until(() => issueReads > failedReads && !notices.has(`issue-detail-read-${issueId}`), 'retry succeeds and clears the read failure')
+  assert.ok(title() === titleElement)
+  assert.ok(description() === bodyElement)
+  assert.equal(title().value, 'Keep this unsaved title')
+  assert.equal(description().value, 'Keep this unsaved description')
+  assert.equal(writes.length, 0, 'retrying a read does not submit the draft')
+})
+
+for (const refusal of ['authRequired', 'workspaceAccessDenied', 'issueNotFound', 'foreign-viewer', 401, 403, 404] as const) test(`an authorized task discards its editor after ${refusal} and a later network failure cannot restore it`, { timeout: 10_000 }, async () => {
+  await mount()
+  await act(async () => { title().focus(); title().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })) })
+  await input(title(), 'A draft whose access is about to be revoked')
+  assert.equal(dirty, true)
+  if (typeof refusal === 'number') readOverride = async () => { throw new ReadResponseError(refusal) }
+  else if (refusal === 'foreign-viewer') readViewerId = 'another-owner'
+  else readFailure = refusal
+  await emit()
+  await until(() => container.textContent?.includes('unavailableTitle') === true, 'the authorization refusal clears the task')
+  assert.equal(title(), null)
+  assert.equal(description(), null)
+  assert.equal(flush, null)
+  assert.equal(dirty, false, 'the discarded editor must not leave a dirty guard that traps navigation')
+  assert.equal(notices.size, 0)
+  readFailure = null; readViewerId = owner
+  readOverride = async () => { throw new TypeError('fixture offline after refusal') }
+  const before = issueReads
+  await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'IssueDetail.reload')!.click())
+  await until(() => issueReads > before, 'the explicit retry fails with an ordinary network error')
+  await wait()
+  assert.ok(title() === null, 'previously refused content stays hidden until a successful authorized read')
+  assert.equal(description(), null)
+  assert.equal(flush, null)
+  assert.equal(writes.length, 0)
 })
 
 test('a live acceptance keeps unsaved title and description, then saves them against the new revision without reopening the task', { timeout: 15_000 }, async () => {

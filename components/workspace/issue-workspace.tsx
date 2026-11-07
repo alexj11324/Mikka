@@ -18,6 +18,7 @@ import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/compon
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
+import { OWN_SETTINGS_FRAME, SettingsFrame } from '@ui-slot/settings-frame'
 import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
@@ -55,7 +56,7 @@ import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView, type GroupChatRequest } from './group-chat-view'
-import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
+import { WorkspaceContentLoading } from './workspace-loading'
 import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
@@ -95,10 +96,8 @@ function DetailLoading() {
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
-// Settings open through history.pushState; without their own fallback a first chunk load suspends
-// up to the route's loading boundary, which can stay stuck on the skeleton.
-const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell), { loading: WorkspaceLoading })
-const SettingsFrame = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsFrame), { loading: WorkspaceLoading })
+// Settings chunks load inside the persistent frame, leaving its navigation and providers mounted.
+const SettingsRouteContent = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsRouteContent), { loading: WorkspaceContentLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
 export function IssueWorkspace({ cacheWorkspace, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean; cacheWorkspace?: AuthorizedCacheWorkspace | null }) {
@@ -290,15 +289,18 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [typedAhead, setTypedAhead] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const search = usePresence(searchOpen)
+  const searchFromBarRef = useRef<() => void>(() => {})
   // The search pill in Settings' window bar, when Settings was opened on its own URL (R-35).
   useEffect(() => { if (takeShellSearchRequest()) setSearchOpen(true) }, [])
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
-      if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen || leaving.current) return
+      if (event.isComposing || event.keyCode === 229 || boardBusy || leaving.current) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (document.querySelector('[role="dialog"][data-open]') && !searchOpen) return
-        event.preventDefault(); setSearchOpen(value => !value)
-      } else if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey && !creating && !searchOpen && !typingOrDialog(event.target)) {
+        event.preventDefault()
+        if (inSettings.current) searchFromBarRef.current()
+        else setSearchOpen(value => !value)
+      } else if (!inSettings.current && event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey && !creating && !searchOpen && !typingOrDialog(event.target)) {
         event.preventDefault(); setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreating(true)
       }
     }
@@ -503,9 +505,6 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     : rail === 'board' ? boardLabel
     : isProjects ? scopedProjects.find(project => project.id === projectId)?.name ?? sectionTitles[section]
     : sectionTitles[section]
-  // The rail leaves routed Settings for the app page, then opens the chosen destination there.
-  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={destination => { if (pushSettingsHistory('/')) openRail(destination); else router.push('/') }}
-    onSearch={() => { if (pushSettingsHistory('/')) setSearchOpen(true); else { requestShellSearch(); router.push('/') } }} onBrowser={() => { showBrowser(true); if (!pushSettingsHistory('/')) router.push('/') }} />
   const isConversation = !selected && section === 'coordinator'
   // A group chat has its own 详情 in the right column (R-13): members, no computer.
   const groupPanel = !selected && section === 'group' && groupRequest ? groupRequest : null
@@ -531,14 +530,36 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
       onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('projects'), issue: null, project: id }); setTeamId(null); setProjectId(id) }) }} />}
   </>
-  const leaveSettings = (destination: RailDestination) => { closeSettings(); openRail(destination) }
-  if (settingsOpen) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSearch={() => { closeSettings(); setSearchOpen(true) }} onBrowser={() => { closeSettings(); showBrowser(true) }} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>
-    <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
-    {dialogs}
-  </SettingsFrame></SignOutBoundary>
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame
-    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{(isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} /><BrowserToggle open={browserShown && !threadsView} onToggle={() => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
-    rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
+  // Both Settings entry paths leave through the same mounted workspace shell.
+  const leaveSettings = (destination: RailDestination) => {
+    closeSettings()
+    if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) { router.push('/'); return }
+    openRail(destination)
+  }
+  const searchFromBar = () => {
+    if (boardBusy) return
+    if (settingsShown) closeSettings()
+    if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) { requestShellSearch(); router.push('/'); return }
+    setSearchOpen(true)
+  }
+  searchFromBarRef.current = searchFromBar
+  const browserFromSettings = () => {
+    closeSettings(); showBrowser(true)
+    if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) router.push('/')
+  }
+  const settingsContent = pathname.startsWith('/settings')
+    ? <SettingsRouteContent user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+    : <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+  // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
+  // the default keeps the workspace frame mounted around settings (#1603).
+  // Both visual frames share the workspace's pending notes and computer registry.
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && OWN_SETTINGS_FRAME
+    ? <SettingsFrame user={user} onRail={leaveSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
+    : <AppFrame settings={settingsShown}
+    bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
+    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} />}>
+    {settingsShown ? settingsContent
+      : <>
     {/* The board keeps only the rail on its left (MIK-45); a phone, with no rail, keeps the list's sheet. */}
     <BotList phoneOnly={fullPage} bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} issues={tasks} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}
@@ -572,8 +593,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: coordinatorUpdatedAt }} />
       </SheetContent>
     </Sheet>}
-    {dialogs}
     {/* One place shows the Artifact window, from the address, whichever entry opened it (R-56, R-82). */}
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
-  </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
+    </>}
+    {dialogs}
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
 }

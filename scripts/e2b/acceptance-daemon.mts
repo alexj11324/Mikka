@@ -68,7 +68,9 @@ async function main() {
     return registered
   }
   const daemon = await startDaemon({ dataDir, flavor: 'prod', link, credential, hostedSubscriptions: true,
-    harnesses: probe.reports, preloadedModels: probe, modelProbe: true })
+    // A personal candidate does not receive cloud-only repository task secrets.
+    // Opt in locally; enrollment, claim authority and the assignment stay normal.
+    collectCliTiming: true, harnesses: probe.reports, preloadedModels: probe, modelProbe: true })
   const stop = () => { void daemon.stop().then(() => process.exit(0)) }
   process.once('SIGTERM', stop)
   process.once('SIGINT', stop)

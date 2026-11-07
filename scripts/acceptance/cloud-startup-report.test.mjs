@@ -82,3 +82,29 @@ test('retains closed worker-claim phases and marks unavailable runtime proof hon
   assert.match(rendered, /\| test \| unavailable \| unavailable \| unavailable \| unavailable \|/)
   assert.match(rendered, /best_effort/)
 })
+
+test('business request output preserves actual ACK ordering and unknown child generations without claiming all HTTP coverage', () => {
+  const value = report(), sample = value.samples[0]
+  sample.runtimeTiming = { complete: true, truncated: false, agentAccepted: { kind: 'claude_user_ack', at: epoch + 3500 },
+    mcpHttpTiming: { requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: epoch + 2200,
+      endedAt: epoch + 2250, durationMs: 50, outcome: 'ok' }, { child: 1, sequence: 2, operation: 'decision_record',
+      startedAt: epoch + 4000, endedAt: null, durationMs: null, outcome: 'pending' }] } }
+  sample.runtimeEvidence = { status: 'passed', extraRemoteCalls: 0, allFirstPartyHttpComplete: false, childBusiness: {
+    status: 'observed', observedChildren: 1, closedChildren: 0, observedCatalogueSends: 1, observedDecisionSends: 1,
+    pendingObservedSends: 1, observedComplete: false, childLifecycleComplete: false, remoteMcpServerCount: 0 } }
+  const rendered = markdown(value)
+  assert.match(rendered, /generationCoverage=unverified、allFirstPartyHttpComplete=false/)
+  assert.match(rendered, /宿主收据完整/)
+  assert.match(rendered, /\| test \/ 1\.1 \| decision_catalogue .*\| 0\.050 \| -1\.300 \| ok \|/)
+  assert.match(rendered, /\| test \/ 1\.2 \| decision_record .*\| unavailable \| — \| 0\.500 \| pending \|/)
+  assert.match(rendered, /未观测世代的请求总数是 unavailable/)
+  assert.doesNotMatch(rendered, /allFirstPartyHttpComplete=true|all_mikka_http_sends_during_execution_counted/)
+  assert.match(rendered, /\| test \/ 1\.1 \| unavailable \| — \| unavailable \|/)
+  sample.runtimeTiming.mcpHttpTiming.version = 2
+  sample.runtimeTiming.mcpHttpTiming.requests[0].body = { endedAt: epoch + 2750, durationMs: 550, outcome: 'read' }
+  sample.runtimeTiming.mcpHttpTiming.requests[1].body = null
+  const bodyRendered = markdown(value)
+  assert.match(bodyRendered, /\| test \/ 1\.1 \| decision_catalogue .*\| 0\.050 \| -1\.300 \| ok \|/)
+  assert.match(bodyRendered, /\| test \/ 1\.1 \| [^|]+ \| 0\.550 \| read \|/)
+  assert.match(bodyRendered, /\| test \/ 1\.2 \| unavailable \| — \| unavailable \|/)
+})

@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from 'lucide-react'
 import { getArtifact, getArtifactText } from '@/app/actions/artifacts'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +26,7 @@ import { ArtifactFrame } from './artifact-frame'
 import { ArtifactShare } from './artifact-share'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
 
 /** Where a decision draws into the reader: its actions in the header, its report above the document (P1). */
 export interface ArtifactDecisionSlots { actions: HTMLElement | null; lead: HTMLElement | null; /** The report banner's action area, once the report lead has drawn one. */ banner?: HTMLElement | null }
@@ -84,7 +86,8 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   const info = detail?.versions.find(item => item.version === version)
   const when = (iso: string) => format.dateTime(new Date(iso), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   const markdown = detail?.kind === 'markdown'
-  const { data: text, error: textError } = useSWR(markdown ? ['artifact-text', artifactId, version] : null, () => getArtifactText(artifactId, version), { revalidateOnFocus: false })
+  const textKey = markdown ? ['artifact-text', artifactId, version] : null
+  const { data: text, error: textError, mutate: mutateText } = useSWR(textKey, () => getArtifactText(artifactId, version), { revalidateOnFocus: false })
   const { data: latestText } = useSWR(markdown && old && showDiff ? ['artifact-text', artifactId, latest] : null, () => getArtifactText(artifactId, latest), { revalidateOnFocus: false })
   const mine = useMemo(() => quotes.filter(item => item.artifactId === artifactId && item.version === version), [quotes, artifactId, version])
 
@@ -103,22 +106,47 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
     setPane('chat')
   }
 
-  const failed = error || textError || detail === null
+  const rejected = useRef(new Set<string>())
+  const detailReadKey = unstable_serialize(detailKey), textReadKey = unstable_serialize(textKey)
+  // SWR retains errors while retrying and clears them on success, even when
+  // ArtifactWindow owns the deduplicated read. A network failure after a
+  // refusal must not make its old data readable again.
+  const accessBlocked = !!readAccessFailure(error) || !!readAccessFailure(textError)
+    || Boolean(error && rejected.current.has(detailReadKey) || textError && rejected.current.has(textReadKey))
+    || detail === null || markdown && text === null
+  useEffect(() => {
+    for (const [key, failure] of [[detailReadKey, error], [textReadKey, textError]] as const) {
+      if (!key) continue
+      if (readAccessFailure(failure)) rejected.current.add(key)
+      else if (!failure) rejected.current.delete(key)
+    }
+  }, [detailReadKey, error, textReadKey, textError])
+  const failed = accessBlocked || Boolean(error && !detail || textError && text === undefined)
+  const visible = accessBlocked ? undefined : detail
+  const backgroundFailed = Boolean((error || textError) && !failed)
+  const retry = useCallback(() => { void Promise.allSettled([mutate(), ...(markdown ? [mutateText()] : [])]) }, [mutate, markdown, mutateText])
+  const readFailedMessage = t('loadError'), retryLabel = t('retry')
+  useEffect(() => {
+    const id = `artifact-read-error:${artifactId}:${version}`
+    if (backgroundFailed) toast.error(readFailedMessage, { id, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); retry() } } })
+    else toast.dismiss(id)
+    return () => { toast.dismiss(id) }
+  }, [backgroundFailed, artifactId, version, readFailedMessage, retryLabel, retry])
   // The window itself takes focus on open, so Tab runs header, then body, then chat.
   const windowRef = useRef<HTMLDivElement>(null)
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
     <DialogContent ref={windowRef} initialFocus={windowRef} instant showCloseButton={false} aria-describedby={undefined}
       className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-2xl ring-0 sm:max-w-none">
       <header className="relative flex h-13 shrink-0 items-center gap-2 px-4">
-        {detail && <ArtifactKindIcon kind={detail.kind} className="size-4 shrink-0 text-muted-foreground" />}
-        <DialogTitle className="truncate text-sm leading-5 font-medium">{title ?? detail?.title ?? ''}</DialogTitle>
-        {detail && <DropdownMenu>
+        {visible && <ArtifactKindIcon kind={visible.kind} className="size-4 shrink-0 text-muted-foreground" />}
+        <DialogTitle className="truncate text-sm leading-5 font-medium">{accessBlocked ? '' : title ?? visible?.title ?? ''}</DialogTitle>
+        {visible && <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="secondary" size="xs" className="gap-0.5 rounded-md px-1.5 font-normal text-muted-foreground" aria-label={t('versions')} />}>
             {t('version', { version })}<ChevronDown data-icon="inline-end" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-72 p-1">
             <DropdownMenuRadioGroup value={version} onValueChange={value => pickVersion(Number(value))}>
-              {[...detail.versions].reverse().map(item => <DropdownMenuRadioItem key={item.version} value={item.version} closeOnClick className="items-start gap-2.5 rounded-md py-2 pl-2">
+              {[...visible.versions].reverse().map(item => <DropdownMenuRadioItem key={item.version} value={item.version} closeOnClick className="items-start gap-2.5 rounded-md py-2 pl-2">
                 <ArtifactAuthorAvatar author={item} size="pill" />
                 <span className="flex min-w-0 flex-col">
                   <span className="flex items-center gap-1.5 text-sm font-medium">{t('version', { version: item.version })}{item.version === latest && <Badge variant="secondary" className="h-4 rounded-sm px-1">{t('current')}</Badge>}</span>
@@ -130,9 +158,9 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         </DropdownMenu>}
         <span className="flex-1" />
         {decision && <div ref={setActionsSlot} data-slot="artifact-actions" className="flex items-center gap-2 empty:hidden" />}
-        {detail && <ArtifactShare artifactId={artifactId} shared={Boolean(detail.shared)} onChange={() => { void mutate() }} />}
-        {detail?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
-        {detail?.kind === 'html' && <>
+        {visible && <ArtifactShare artifactId={artifactId} shared={Boolean(visible.shared)} onChange={() => { void mutate() }} />}
+        {visible?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
+        {visible?.kind === 'html' && <>
           {canQuote && <Button variant="ghost" size="sm" aria-pressed={selecting} onClick={() => setSelecting(on => !on)} className={cn('hidden md:inline-flex', selecting && 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground')}><SquareDashedMousePointer data-icon="inline-start" />{t('selectElement')}</Button>}
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('openInBrowser')} render={<a href={versionPath(artifactId, version, 'frame')} target="_blank" rel="noopener noreferrer" />} />}><Globe data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('openInBrowser')}</TooltipContent></Tooltip>
         </>}
@@ -140,10 +168,10 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         <Separator orientation="vertical" className="mx-1 data-vertical:h-5 data-vertical:self-center" />
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
-      {detail && decision?.({ version, latestVersion: latest, slots: { actions: actionsSlot, lead: leadSlot } })}
+      {visible && decision?.({ version, latestVersion: latest, slots: { actions: actionsSlot, lead: leadSlot } })}
       <div className="flex min-h-0 flex-1">
         <main className={cn('flex min-w-0 flex-1 flex-col bg-background', pane === 'chat' && 'hidden md:flex')}>
-          {old && info && <div role="status" className="mx-3 mt-1 flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-muted px-3 py-1.5 text-sm">
+          {visible && old && info && <div role="status" className="mx-3 mt-1 flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-muted px-3 py-1.5 text-sm">
             <History aria-hidden="true" className="size-4 text-muted-foreground" />
             <span className="shrink-0">{t('viewingOld', { version, time: when(info.createdAt) })}</span>
             <span className="flex-1" />
@@ -152,7 +180,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
             <Button variant="outline" size="sm" onClick={() => pickVersion(latest)}>{t('backToLatest', { latest })}</Button>
           </div>}
           {failed
-            ? <Empty className="flex-1"><EmptyHeader><EmptyTitle>{t('loadError')}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => void mutate()}>{t('retry')}</Button></Empty>
+            ? <Empty className="flex-1"><EmptyHeader><EmptyTitle>{t('loadError')}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={retry}>{t('retry')}</Button></Empty>
             : !detail || (markdown && text === undefined) ? <div className="flex flex-1 items-center justify-center"><Spinner /></div>
             : markdown ? <ArtifactDocument key={`${artifactId}:${version}`} title={detail.title} markdown={text ?? ''} compareWith={old && showDiff ? latestText ?? null : null}
                 author={info ?? { authorName: '', authorColor: null, authorShape: null }} meta={info ? t(old ? 'versionMeta' : 'updated', { author: info.authorName, time: when(info.createdAt) }) : ''}

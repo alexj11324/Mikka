@@ -53,8 +53,9 @@ function policyAdmins(settings, ownerId, detail) {
 /** json uses the caller's existing origin, credentials, time budget and cookie handling.
  * It returns the HTTP JSON value. No cookie is fabricated or copied by this helper.
  * Candidate query UUIDs come only from this request's authorized choices list. */
-export async function selectTeamWorkspace({ ownerId, json }) {
+export async function selectTeamWorkspace({ ownerId, json, onSelected }) {
   check(typeof ownerId === 'string' && ownerId.length > 0 && typeof json === 'function', 'owner_identity')
+  check(onSelected === undefined || typeof onSelected === 'function', 'owner_identity')
   const request = async (path, body, detail) => {
     try { return await json(path, body) }
     catch (error) { throw new TeamWorkspaceError(detail, { cause: error }) }
@@ -95,6 +96,9 @@ export async function selectTeamWorkspace({ ownerId, json }) {
   check(selectedAdmins.length === 1 && selectedAdmins[0].userId === adminId, 'workspace_changed')
   const session = await request('/mikka/api/auth/get-session', undefined, 'session_read')
   check(session?.user?.id === ownerId, 'session_changed')
+  // These private references are for in-memory authorization comparisons only;
+  // the public evidence below remains unchanged and contains no account IDs.
+  await onSelected?.({ workspaceId, adminId })
   return {
     teamWorkspaceConfirmed: true,
     teamWorkspaceHash: createHash('sha256').update('team-workspace\0' + workspaceId).digest('hex'),

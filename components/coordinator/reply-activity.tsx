@@ -4,16 +4,15 @@ import { createContext, memo, useCallback, useContext, useMemo, useState, type C
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import {
-  BellRing, BookOpen, Brain, CalendarDays, ChevronsDownUp, ChevronsUpDown, CircleAlert, CircleCheckIcon, CircleStop, Factory, FolderGit2, Power, FolderOpen, Globe, ListChecks,
-  LoaderCircleIcon, Mail, MessageSquare, MessageSquareText, Pencil, Search, Send, SquarePlus, Wrench,
+  BellRing, BookOpen, Brain, CalendarDays, ChevronsDownUp, ChevronsUpDown, CircleStop, Factory, FolderGit2, Power, FolderOpen, Globe, ListChecks,
+  Mail, MessageSquare, MessageSquareText, Pencil, Search, Send, SquarePlus, Wrench,
 } from 'lucide-react'
 import { coordinatorReasoning } from '@/app/actions/coordinator'
 import { CodeBlock, CodeBlockContent } from '@/components/ui/code-block'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/reui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GitHubIcon } from '@/components/icons/brand-icons'
-import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
+import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceLine, TraceTitle } from '@/components/ui/trace'
 import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown, type ToolAction } from '@/lib/coordinator/tool-activity'
 import { CitationChip, useAgentCitations } from '@/components/workspace/agent-citations'
 import { threadGroupOfRun } from '@/components/workspace/thread-status-icon'
@@ -21,6 +20,8 @@ import { HarnessLabel } from '@/components/labels/entity-labels'
 import { toolDetail, type ToolDetailLine } from '@/lib/coordinator/tool-detail'
 import { runThreadName } from '@/lib/coordinator/citations'
 import type { ChatTool } from '@/lib/coordinator/context'
+import { ActivityGroup, ActivityList, ActivityThinking, ActivityTool } from '@ui-slot/reply-activity'
+import type { ActivityToolView } from '@/components/slots/reply-activity-contract'
 import { cn } from '@/lib/utils'
 
 /**
@@ -54,25 +55,6 @@ const ACTION_ICONS: Record<ToolAction, ComponentType<{ className?: string }>> = 
 }
 
 /**
- * Thinking as shadcn/ui's Trace draws it (ui.shadcn.com/docs/components/base/trace, its Reasoning row): "Thinking"
- * with a spinner while the model thinks, open as the words stream in; "Thought for N seconds" with a check once it
- * stops, closed. A reader's own click wins either way. Without readable reasoning it is a line that does not open.
- */
-function ThinkingRow({ running, title, text, onOpen }: { running: boolean; title: string; text?: string; onOpen?: () => void }) {
-  const [open, setOpen] = useState<boolean>()
-  const line = <TraceLine status={running ? 'running' : undefined}>
-    <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : <CircleCheckIcon />}</TraceIcon>
-    <TraceTitle>{title}</TraceTitle>
-  </TraceLine>
-  if (text === undefined) return <div data-activity-thinking={running ? 'active' : 'done'} data-reasoning="none">{line}</div>
-  return <TraceCollapsible data-activity-thinking={running ? 'active' : 'done'} data-reasoning="readable" open={open ?? running}
-    onOpenChange={next => { setOpen(next); if (next) onOpen?.() }}>
-    <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
-    <TraceCollapsibleContent className="whitespace-pre-wrap">{text}</TraceCollapsibleContent>
-  </TraceCollapsible>
-}
-
-/**
  * A tool's name as the person reads it: its label, or its own name spelled out; never 「使用工具」 (R-83). A tool the
  * bot does not have reads 「未知步骤」, not the name the model made up.
  */
@@ -96,35 +78,34 @@ function useFailureReason() {
  * red and says why (「派发 Factory 任务 · 没有找到 Factory 任务」), also when the tool answered an error instead of
  * throwing. Its raw input and output open only from this row.
  */
-function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
+/** A tool call as the reply-activity slot draws it: label, target, reason and details worked out here. */
+function useToolView() {
   const t = useTranslations('Coordinator.activity')
-  const label = useToolLabel()(tool.name, toolUnknown(tool))
+  const toolLabel = useToolLabel()
   const reasonText = useFailureReason()
   const sources = useAgentCitations()?.sources
-  // A task or thread named by id reads as its number or name, as the chips in the words do.
-  const object = sources?.[toolObjectId(tool) ?? '']
-  const target = object ? object.kind === 'run' ? runThreadName(object) : object.identifier ?? object.title : toolTarget(tool)
-  const Icon = ACTION_ICONS[toolAction(tool.name)]
-  const running = tool.state === 'running' && live
-  // A call still running when its reply ended never finished.
-  const { failed, reason } = tool.state === 'running' ? { failed: !live, reason: null } : toolFailure(tool)
-  const why = failed ? reasonText(reason) : null
-  const line = <TraceLine status={running ? 'running' : failed ? 'error' : undefined}>
-    <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failed ? <CircleAlert /> : <Icon />}</TraceIcon>
-    <TraceTitle>
-      {running ? t('running', { tool: label }) : label}
-      {target && <span className={cn('ml-1.5', !failed && 'text-muted-foreground/70')}>{target}</span>}
-      {why && <span className="ml-1.5">· {why}</span>}
-    </TraceTitle>
-  </TraceLine>
-  if (!(tool.input || tool.output) || running) return <div data-activity-tool={running ? 'running' : failed ? 'error' : 'done'}>{line}</div>
-  return <TraceCollapsible data-activity-tool={failed ? 'error' : 'done'}>
-    <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
-    <TraceCollapsibleContent className="flex flex-col gap-2">
-      <ToolDetail tool={tool} failed={failed} />
-      <RawData tool={tool} failed={failed} />
-    </TraceCollapsibleContent>
-  </TraceCollapsible>
+  return (tool: ChatTool, live: boolean): ActivityToolView => {
+    const label = toolLabel(tool.name, toolUnknown(tool))
+    // A task or thread named by id reads as its number or name, as the chips in the words do.
+    const object = sources?.[toolObjectId(tool) ?? '']
+    const target = object ? object.kind === 'run' ? runThreadName(object) : object.identifier ?? object.title : toolTarget(tool)
+    const Icon = ACTION_ICONS[toolAction(tool.name)]
+    const running = tool.state === 'running' && live
+    // A call still running when its reply ended never finished.
+    const { failed, reason } = tool.state === 'running' ? { failed: !live, reason: null } : toolFailure(tool)
+    const why = failed ? reasonText(reason) : null
+    return {
+      key: tool.call, state: running ? 'running' : failed ? 'error' : 'done', icon: <Icon />,
+      title: running ? t('running', { tool: label }) : label, ...(target ? { target } : {}), ...(why ? { why } : {}),
+      details: <ToolDetail tool={tool} failed={failed} />, raw: <RawData tool={tool} failed={failed} />,
+      ...(tool.input ? { input: tool.input } : {}), ...(tool.output ? { output: tool.output } : {}),
+      openable: Boolean(tool.input || tool.output) && !running,
+    }
+  }
+}
+
+function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
+  return <ActivityTool tool={useToolView()(tool, live)} />
 }
 
 /**
@@ -243,22 +224,9 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
     : shown.length ? `${shown.join(t('separator'))}${parts.length > 3 ? t('more') : ''}` : failedLabels.join(t('separator'))
   // Ended without finishing: a call left running counts as failed.
   const failures = failed + unfinished.length
-  return <TraceCollapsible data-activity-group={running ? 'running' : failures ? 'error' : 'done'} open={open} onOpenChange={setOpen}>
-    <div className="group/activity flex min-w-0 items-center gap-1">
-      <TraceCollapsibleTrigger>
-        <TraceLine status={running ? 'running' : undefined}>
-          <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive-foreground" /> : <LeadIcon />}</TraceIcon>
-          <TraceTitle>{summary}</TraceTitle>
-          {/* The failure count never truncates with the summary: it is what the line must say (R-83, R-87). */}
-          {failures > 0 && !running && <Badge data-activity-failed="" variant="destructive-light" size="sm" className="shrink-0">{t('failedCount', { count: failures })}</Badge>}
-        </TraceLine>
-      </TraceCollapsibleTrigger>
-      <ExpandAllButton />
-    </div>
-    <TraceCollapsibleContent>
-      <Trace>{tools.map(tool => <ToolRow key={tool.call} tool={tool} live={live} />)}</Trace>
-    </TraceCollapsibleContent>
-  </TraceCollapsible>
+  const view = useToolView()
+  return <ActivityGroup tools={tools.map(tool => view(tool, live))} running={running} summary={summary} failures={failures} failuresLabel={t('failedCount', { count: failures })}
+    leadIcon={<LeadIcon />} open={open} onOpenChange={setOpen} expandAll={<ExpandAllButton />} />
 }
 
 /**
@@ -285,14 +253,14 @@ export const ReplyActivity = memo(function ReplyActivity({ tools, thinking, thou
   if (!tools.length && !thinking && !thought) return null
   const text = thinking?.text ?? (stored ? storedText ?? '' : undefined)
   const title = thinking?.active ? t('thinking') : thinking ? t('thought', { seconds: thinking.seconds }) : t('thoughtStored')
-  return <Trace data-reply-activity="">
-    {(thinking || thought) && <ThinkingRow running={thinking?.active ?? false} title={title} text={text} onOpen={() => setOpened(true)} />}
+  return <ActivityList data-reply-activity="">
+    {(thinking || thought) && <ActivityThinking running={thinking?.active ?? false} title={title} {...(thinking ? { seconds: thinking.seconds } : {})} text={text} onOpen={() => setOpened(true)} />}
     {tools.length === 1 ? <ToolRow tool={tools[0]} live={live} /> : tools.length > 1 && <ToolGroup tools={tools} live={live} />}
-  </Trace>
+  </ActivityList>
 })
 
 /** Before a reply has anything to show: the same Thinking row, running, as the Trace docs start a turn. */
 export function ReplyWaiting() {
   const t = useTranslations('Coordinator.activity')
-  return <Trace data-reply-waiting=""><ThinkingRow running title={t('thinking')} /></Trace>
+  return <ActivityList data-reply-waiting=""><ActivityThinking running title={t('thinking')} /></ActivityList>
 }

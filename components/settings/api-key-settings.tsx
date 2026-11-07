@@ -1,12 +1,8 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
 import { useState, type ReactNode } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { KeyRound, TriangleAlert } from 'lucide-react'
-import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
-import { settingsRead } from '@/lib/settings-read'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -17,25 +13,15 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { API_KEY_PRESETS, apiKeyProtocols, protocolHarness, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
-import { harnessName } from '@/components/labels/entity-labels'
+import { API_KEY_PRESETS, apiKeyProtocols, type ApiKeyProtocol, type ApiKeyProvider } from '@/lib/model-api-key-providers'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useActionError } from '@/lib/use-action-error'
-import { modelOrderKey } from '@/components/settings/model-order-settings'
+import { apiKeysKey, readApiKeys, useApiKeyLabels, useApiKeys, type ApiKey as Key } from '@/hooks/settings/use-api-keys'
 
-type Key = ApiKeyView & { shared: boolean }
+export { apiKeysKey, readApiKeys }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
 
-type ApiKeysT = ReturnType<typeof useTranslations<'Settings.apiKeys'>>
 /** 「Anthropic、OpenAI 协议 · 可用 Claude Code、Codex」: what a key speaks and which Agents can run it (Harness draft, Alex 2026-11-02). */
-function protocolAgents(t: ApiKeysT, protocols: readonly ApiKeyProtocol[]) {
-  return t('protocolAgents', { protocols: protocols.map(item => t(`protocolName.${item}`)).join('、'), agents: protocols.map(item => harnessName(protocolHarness(item))).join('、') })
-}
-
-export const apiKeysKey = settingsKeys.apiKeys
-/** A GET, like the other settings reads: it never waits in front of a save in the server-action queue. */
-export const readApiKeys = (workspaceId: string) => settingsRead<Awaited<ReturnType<typeof getApiKeys>>>('api-keys', { workspace: workspaceId })
 
 function ProviderIcon({ provider }: { provider: ApiKeyProvider }) {
   if (provider === 'anthropic') return <Claude className="size-5 shrink-0 text-brand-claude" />
@@ -55,44 +41,13 @@ export function useApiKeyList(workspaceId: string) {
   const t = useTranslations('Settings.apiKeys')
   const shareT = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
-  const actionError = useActionError()
-  const keys = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
-  // The workspace's own SWR cache (workspace-app.tsx), where 优先使用的模型 lives: a key change re-reads it.
-  const { mutate } = useSWRConfig()
+  const { data, loadError, pending, failed, share: saveShare, refetch, remove: removeKey, add } = useApiKeys(workspaceId)
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)
-  const [pending, setPending] = useState(false)
-  const [failed, setFailed] = useState<{ message: string; retry: () => void } | null>(null)
-  const data = keys.data && !keys.data.error ? keys.data : null
-  const title = (key: Pick<ApiKeyView, 'provider' | 'name'>) => key.provider === 'custom' ? key.name ?? t('provider.custom') : t(`provider.${key.provider}`)
-
-  async function share(key: Key, shared: boolean) {
-    setPending(true); setFailed(null)
-    try {
-      const result = await updateApiKeyShare({ id: key.id, shared }, workspaceId)
-      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void share(key, shared) }); return }
-      await keys.mutate(result, { revalidate: false })
-    } catch { setFailed({ message: actionError(), retry: () => void share(key, shared) }) } finally { setPending(false); setSharing(null) }
-  }
-  async function refetch(key: Key) {
-    setPending(true); setFailed(null)
-    try {
-      const result = await refetchApiKeyModels(key.id, workspaceId)
-      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return }
-      await keys.mutate(result, { revalidate: false })
-      void mutate(modelOrderKey(workspaceId))
-    } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }) } finally { setPending(false) }
-  }
-  async function remove(key: Key) {
-    setPending(true); setFailed(null)
-    try {
-      const result = await deleteApiKey(key.id, workspaceId)
-      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void remove(key) }); return }
-      await keys.mutate()
-      void mutate(modelOrderKey(workspaceId))
-    } catch { setFailed({ message: actionError(), retry: () => void remove(key) }) } finally { setPending(false); setRemoving(null) }
-  }
+  const { title, agents: agentsLine } = useApiKeyLabels()
+  const share = (key: Key, shared: boolean) => saveShare(key, shared).finally(() => setSharing(null))
+  const remove = (key: Key) => removeKey(key).finally(() => setRemoving(null))
 
   const modelsLine = (key: Key) => {
     const refetchButton = <Button type="button" variant="secondary" size="xs" disabled={pending} aria-label={t('refetchLabel', { name: title(key) })} onClick={() => void refetch(key)}>{t('refetch')}</Button>
@@ -102,9 +57,6 @@ export function useApiKeyList(workspaceId: string) {
     return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
   }
   // An OpenAI-protocol provider without the Responses API serves bot chats only (Codex runs on it).
-  const agentsLine = (key: Key) => key.protocol === 'openai' && !key.responsesApi && key.provider === 'custom'
-    ? t('noResponsesApi', { protocol: t('protocolName.openai') })
-    : protocolAgents(t, apiKeyProtocols(key))
   const rows: ReactNode[] = (data?.keys ?? []).map(key => <div key={key.id} id={`api-key-${key.id}`} className="scroll-mt-20"><SettingRow icon={<ProviderIcon provider={key.provider} />} title={title(key)}
     description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${agentsLine(key)}`}</span>{modelsLine(key)}</>}>
     <span className="flex items-center gap-4">
@@ -116,7 +68,7 @@ export function useApiKeyList(workspaceId: string) {
       <Button type="button" variant="ghost" size="sm" disabled={pending} aria-label={t('removeLabel', { name: title(key) })} onClick={() => setRemoving(key)}>{commonT('delete')}</Button>
     </span>
   </SettingRow></div>)
-  if (keys.data?.error) rows.push(<div key="error" className="px-5 py-4"><FieldError>{actionError(keys.data.error)}</FieldError></div>)
+  if (loadError) rows.push(<div key="error" className="px-5 py-4"><FieldError>{loadError}</FieldError></div>)
 
   const action = <Button type="button" {...settingsSectionAction} disabled={!data} onClick={() => setAdding(true)}>{t('add')}</Button>
   const section = <SettingsSection id="api-keys-heading" title={t('sectionTitle')} action={action}>
@@ -124,7 +76,7 @@ export function useApiKeyList(workspaceId: string) {
   </SettingsSection>
   const dialogs = <>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
-    {adding && <AddApiKeyDialog workspaceId={workspaceId} onClose={async added => { setAdding(false); if (added) { await keys.mutate(); void mutate(modelOrderKey(workspaceId)) } }} />}
+    {adding && <AddApiKeyDialog add={add} onClose={() => setAdding(false)} />}
     <AlertDialog open={sharing !== null} onOpenChange={open => { if (!open && !pending) setSharing(null) }}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -160,17 +112,12 @@ export function useApiKeyList(workspaceId: string) {
 export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.apiKeys')
   const commonT = useTranslations('Common')
-  const actionError = useActionError()
-  const keys = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
+  const { data, setAfterQuota } = useApiKeys(workspaceId)
   const [failed, setFailed] = useState<{ on: boolean; message: string } | null>(null)
-  const data = keys.data && !keys.data.error ? keys.data : null
   async function save(on: boolean) {
     setFailed(null)
-    try {
-      const result = await updateApiKeyAfterQuota(on, workspaceId)
-      if (result.error) { setFailed({ on, message: actionError(result.error) }); return }
-      await keys.mutate(result, { revalidate: false })
-    } catch { setFailed({ on, message: actionError() }) }
+    const message = await setAfterQuota(on)
+    if (message) setFailed({ on, message })
   }
   if (!data) return null
   return <>
@@ -184,10 +131,10 @@ export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) 
   </>
 }
 
-function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClose: (added: boolean) => void }) {
+function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>['add']; onClose: () => void }) {
   const t = useTranslations('Settings.apiKeys')
+  const { protocolAgents } = useApiKeyLabels()
   const commonT = useTranslations('Common')
-  const actionError = useActionError()
   const [provider, setProvider] = useState<ApiKeyProvider>('anthropic')
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -202,16 +149,15 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
   async function save() {
     setPending(true); setError(null)
     const list = models.split(/[\s,，]+/).map(item => item.trim()).filter(Boolean)
-    try {
-      const result = await createApiKey(custom
-        ? { provider, name: name.trim(), baseUrl: baseUrl.trim(), protocol, apiKey: apiKey.trim(), ...(list.length ? { models: list } : {}) }
-        : { provider, apiKey: apiKey.trim() }, workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose(true)
-    } catch { setError(actionError()) } finally { setPending(false) }
+    const message = await add(provider === 'custom'
+      ? { provider, name: name.trim(), baseUrl: baseUrl.trim(), protocol, apiKey: apiKey.trim(), ...(list.length ? { models: list } : {}) }
+      : { provider, apiKey: apiKey.trim() })
+    setPending(false)
+    if (message) setError(message)
+    else onClose()
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(false) }}>
+  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent className="sm:max-w-lg">
       <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
       <form onSubmit={event => { event.preventDefault(); if (ready && !pending) void save() }}>
@@ -225,7 +171,7 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
                 <RadioGroupItem value={value} />
                 <span className="shrink-0">{t(`provider.${value}`)}</span>
                 <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">
-                  {value === 'custom' ? t('customAgents') : protocolAgents(t, apiKeyProtocols({ provider: value, protocol: 'anthropic' }))}
+                  {value === 'custom' ? t('customAgents') : protocolAgents(apiKeyProtocols({ provider: value, protocol: 'anthropic' }))}
                 </span>
               </Label>)}
             </RadioGroup>
@@ -244,7 +190,7 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
               <FieldLabel id="api-key-protocol-label">{t('protocolLabel')}</FieldLabel>
               <ToggleGroup aria-labelledby="api-key-protocol-label" variant="segment" spacing={0.5} className="grid w-full grid-cols-2" value={[protocol]}
                 onValueChange={values => { const next = values[0]; if (next === 'openai' || next === 'anthropic') setProtocol(next) }}>
-                {(['openai', 'anthropic'] as const).map(value => <ToggleGroupItem key={value} value={value} className="min-w-0 text-xs">{protocolAgents(t, [value])}</ToggleGroupItem>)}
+                {(['openai', 'anthropic'] as const).map(value => <ToggleGroupItem key={value} value={value} className="min-w-0 text-xs">{protocolAgents([value])}</ToggleGroupItem>)}
               </ToggleGroup>
             </Field>
             <Field>
@@ -259,7 +205,7 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
           {error && <FieldError>{error}</FieldError>}
         </FieldGroup>
         <DialogFooter className="mt-4">
-          <Button type="button" variant="outline" disabled={pending} onClick={() => onClose(false)}>{commonT('cancel')}</Button>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onClose()}>{commonT('cancel')}</Button>
           <Button type="submit" disabled={pending || !ready}>{pending ? t('verifying') : t('addConfirm')}</Button>
         </DialogFooter>
       </form>

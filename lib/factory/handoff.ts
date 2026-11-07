@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { deploymentSwitch } from '../deployment-switches'
-import type { Pool, PoolClient } from 'pg'
+import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from 'pg'
 import type { FactoryTask } from './store'
 import { factoryEventId } from './event-id'
 import { maskFactoryNote } from './note-mask'
@@ -11,6 +11,13 @@ function sanitize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitize)
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitize(entry)]))
   return value
+}
+
+function isSelectResult(value: unknown): value is Pick<QueryResult, 'command' | 'rows'> {
+  if (!value || typeof value !== 'object') return false
+  const result = value as Partial<QueryResult>
+  return result.command === 'SELECT' && Array.isArray(result.rows)
+    && result.rows.every(row => row !== null && typeof row === 'object' && !Array.isArray(row))
 }
 
 /** Copy approved planning evidence, never the planner's session or permissions. */
@@ -42,29 +49,38 @@ async function approvedSpecificationHandoff(tx: Pick<PoolClient, 'query'>, task:
 /** A handoff is a reproducible host observation, never acceptance or authority.
  * No checkpoint bytes, secrets or native session state are copied into it. */
 export async function persistFactoryHandoff(tx: Pick<PoolClient, 'query'>, task: FactoryTask) {
-  const { rows: [source] } = await tx.query(`SELECT e.id,e."createdAt",e.payload->>'text' AS text,i.title,i.content
-    FROM coordinator_events e JOIN issues i ON i.id=$3 WHERE e.id=$1 AND e."userId"=$2`, [task.sourceEventId, task.userId, task.issueId])
-  const { rows: attempts } = await tx.query(`SELECT a.id,a.stage,a.status,a."runId",a.reason,a."candidateId",a.output->>'requestEpoch' AS "requestEpoch",
+  // One round trip, retaining PostgreSQL's original columns and type parsers.
+  // Wrapping arbitrary text in JSON would expand quotes, backslashes and newlines.
+  const taskId = escapeLiteral(task.id)
+  const userId = escapeLiteral(task.userId)
+  const issueId = escapeLiteral(task.issueId)
+  const sourceEventId = escapeLiteral(task.sourceEventId)
+  // No values array or prepared name: pg returns six native simple-query results.
+  const history: unknown = await tx.query(`SELECT e.id,e."createdAt",e.payload->>'text' AS text,i.title,i.content
+    FROM coordinator_events e JOIN issues i ON i.id=${issueId} WHERE e.id=${sourceEventId} AND e."userId"=${userId};
+  SELECT a.id,a.stage,a.status,a."runId",a.reason,a."candidateId",a.output->>'requestEpoch' AS "requestEpoch",
     a."finishedAt",r.status AS "runStatus",r."stopReason",r.error,r."deviceId",r."sessionId",
     c.sha,c.repository,c.environment,c."createdAt" AS "candidateCreatedAt",
     cp."baseCommit" AS "checkpointCommit",cp."updatedAt" AS "checkpointAt",cp.files AS "checkpointFiles",cp."unavailableReason"
-    FROM factory_attempts a LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2 AND r."issueId"=$3
+    FROM factory_attempts a LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=${userId} AND r."issueId"=${issueId}
     LEFT JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
-    LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=$2
-    WHERE a."taskId"=$1 ORDER BY a.position DESC LIMIT 20`, [task.id, task.userId, task.issueId])
-  const { rows: effects } = await tx.query(`SELECT id,status,action,target,receipt,"candidateId","finishedAt"
-    FROM factory_publications WHERE "taskId"=$1 ORDER BY (status IN ('reserved','uncertain')) DESC,"createdAt" DESC LIMIT 20`, [task.id])
-  const { rows: publications } = await tx.query(`SELECT p."runId",p.status,p."remoteKey",p.branch,p."pullRequest",p."errorCode",p."updatedAt"
-    FROM run_publications p WHERE p."userId"=$2 AND p."issueId"=$3
-      AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1 AND a."runId"=p."runId")
-    ORDER BY (p.status='processing') DESC,p."updatedAt" DESC LIMIT 20`, [task.id, task.userId, task.issueId])
-  const { rows: operations } = await tx.query(`SELECT o."operationId",o.status,o."runId",o.binding->>'action' AS action,
-    o.binding->>'target' AS target,o.receipt,o."updatedAt" FROM operation_ledger o WHERE o."ownerId"=$2
-      AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1
+    LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=${userId}
+    WHERE a."taskId"=${taskId} ORDER BY a.position DESC LIMIT 20;
+  SELECT id,status,action,target,receipt,"candidateId","finishedAt"
+    FROM factory_publications WHERE "taskId"=${taskId} ORDER BY (status IN ('reserved','uncertain')) DESC,"createdAt" DESC LIMIT 20;
+  SELECT p."runId",p.status,p."remoteKey",p.branch,p."pullRequest",p."errorCode",p."updatedAt"
+    FROM run_publications p WHERE p."userId"=${userId} AND p."issueId"=${issueId}
+      AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=${taskId} AND a."runId"=p."runId")
+    ORDER BY (p.status='processing') DESC,p."updatedAt" DESC LIMIT 20;
+  SELECT o."operationId",o.status,o."runId",o.binding->>'action' AS action,
+    o.binding->>'target' AS target,o.receipt,o."updatedAt" FROM operation_ledger o WHERE o."ownerId"=${userId}
+      AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=${taskId}
         AND (a."runId"=o."runId" OR a."runId"::text=o.binding->>'executionRunId'))
-    ORDER BY (o.status IN ('executing','uncertain')) DESC,o."updatedAt" DESC LIMIT 20`, [task.id, task.userId])
-  const { rows: dependencies } = await tx.query(`SELECT id,status,"originRunId",kind FROM factory_questions
-    WHERE "taskId"=$1 AND "userId"=$2 AND status NOT IN ('resolved','cancelled','expired','superseded') ORDER BY "createdAt" DESC LIMIT 10`, [task.id, task.userId])
+    ORDER BY (o.status IN ('executing','uncertain')) DESC,o."updatedAt" DESC LIMIT 20;
+  SELECT id,status,"originRunId",kind FROM factory_questions
+    WHERE "taskId"=${taskId} AND "userId"=${userId} AND status NOT IN ('resolved','cancelled','expired','superseded') ORDER BY "createdAt" DESC LIMIT 10`)
+  if (!Array.isArray(history) || history.length !== 6 || !history.every(isSelectResult)) throw new TypeError('Invalid Factory handoff history')
+  const [{ rows: [source] }, { rows: attempts }, { rows: effects }, { rows: publications }, { rows: operations }, { rows: dependencies }] = history
   const latest = attempts.find(a => a.runId)
   const artifact = attempts.find(a => a.sha)
   const checkpoint = attempts.find(a => a.checkpointAt)

@@ -224,6 +224,8 @@ const OPENED = 'mikkaOpenedThread'
 
 function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  // A no-op tidy during the router's render has not shown a restored address.
+  // Its pending popstate must still update the workspace's selection.
   if (href !== current) {
     const issue = (url: URL) => readLocation(url.searchParams).issue
     const mark = nextMark(readMark(window.history.state), issue(new URL(window.location.href)), issue(new URL(href, window.location.href)), mode, DOC, list)
@@ -232,8 +234,8 @@ function write(href: string, mode: 'push' | 'replace', list = false) {
     if (mode === 'push') delete state[OPENED]
     if (mode === 'push') window.history.pushState(state, '', href)
     else window.history.replaceState(state, '', href)
+    seenQuery = window.location.search
   }
-  seenQuery = window.location.search
 }
 
 /** True when the task on screen was opened from a list (the board, a list, a project): its ↑↓ step through that list. */

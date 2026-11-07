@@ -32,6 +32,8 @@ import type { QuotaSignal } from '../runs/quota-exhausted'
 export interface ExitEvent {
   type: "exit"
   outcome: "succeeded" | "failed" | "cancelled"
+  /** An adapter error may end its stream without proving the native process exited. */
+  sessionExited?: false
   /** Defaults: `turn_ended` for succeeded, `error` for failed. */
   stopReason?: StopReason
   error?: string
@@ -80,6 +82,8 @@ export interface SessionOptions {
   apps?: RunApps
   /** Trusted claimed run MCP; independent of optional app connections. */
   mcp?: import('../agents/run-apps').RunMcp
+  /** Acceptance-only host receiver, passed only to the Mikka MCP child. */
+  mcpHttpObservationUrl?: string
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */
@@ -165,6 +169,13 @@ export interface AgentSession {
    * (daemon shutdown); release processes and handles, keep it resumable.
    */
   detach?(): Promise<void>
+}
+
+/** One run's already-starting native session, with no task input released. */
+export interface PreparedAgentStart {
+  readonly ready: Promise<void>
+  start(options: StartOptions): Promise<AgentSession>
+  cancel(): Promise<void>
 }
 
 export interface AgentAdapter {

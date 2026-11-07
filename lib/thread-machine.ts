@@ -38,8 +38,11 @@ export function deviceMachineKind(device: { kind: string | null; deviceType: str
 
 const CLOUD_STATES = new Set<ThreadMachineState>(['starting', 'running', 'paused', 'ended', 'error'])
 
-/** A thread_machines state, or `error` for anything the table should never hold. */
-export function cloudMachineState(state: string): ThreadMachineState {
+/** An ended DB write fences new work before provider cleanup. Until its
+ * resource references are cleared, use the existing error state rather than
+ * presenting an unacknowledged retirement as complete. */
+export function cloudMachineState(state: string, resources?: { sandboxId?: string | null; workerLeaseId?: string | null; workerLeaseUntil?: Date | string | null }): ThreadMachineState {
+  if (state === 'ended' && (resources?.sandboxId || resources?.workerLeaseId || resources?.workerLeaseUntil)) return 'error'
   return CLOUD_STATES.has(state as ThreadMachineState) ? state as ThreadMachineState : 'error'
 }
 

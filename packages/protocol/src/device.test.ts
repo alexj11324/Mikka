@@ -21,6 +21,8 @@ describe("device online state", () => {
     expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS - 1, now)).toBe(false)
     expect(isDeviceOnline(null, now)).toBe(false)
     expect(isDeviceOnline("not a date", now)).toBe(false)
+    expect(isDeviceOnline(now + 1, now)).toBe(false)
+    expect(isDeviceOnline("2036-11-06T12:00:00Z", now)).toBe(false)
   })
 
   it("summarizes 设备 n/m 在线", () => {
@@ -76,6 +78,20 @@ describe("device link schemas", () => {
     ).toBe(false)
   })
 
+  it('retains the bounded canonical catalogue through the real assignment parser while old claims omit it', () => {
+    const base = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'codex', prompt: 'p' }
+    const authority = { url: 'https://mikka.example.invalid/api/mcp', token: 'mkw_fixture' }
+    const catalogue = { version: 1, tool: { name: 'record_decision', title: 'Record', description: 'Static tool metadata',
+      inputSchema: { type: 'object', properties: { idempotencyKey: { type: 'string' } }, required: ['idempotencyKey'] },
+      annotations: { idempotentHint: true } } }
+    expect(runAssignmentSchema.parse({ ...base, mcp: { ...authority, decisionCatalogue: catalogue } }).mcp?.decisionCatalogue).toEqual(catalogue)
+    expect(runAssignmentSchema.parse({ ...base, mcp: authority }).mcp).not.toHaveProperty('decisionCatalogue')
+    for (const changed of [{ ...catalogue, version: 2 }, { ...catalogue, extra: true },
+      { ...catalogue, tool: { ...catalogue.tool, name: 'another_tool' } },
+      { ...catalogue, tool: { ...catalogue.tool, inputSchema: { type: 'object', description: 'x'.repeat(33_000) } } }])
+      expect(runAssignmentSchema.safeParse({ ...base, mcp: { ...authority, decisionCatalogue: changed } }).success).toBe(false)
+  })
+
   it("takes one strict model credential, never with a subscription binding", () => {
     const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "claude_code", prompt: "p" }
     const provider = { kind: "provider", protocol: "anthropic", baseUrl: "https://api.deepseek.com/anthropic", key: "sk-test-0000" }
@@ -102,6 +118,9 @@ describe("device link schemas", () => {
     const subscriptionLease = { route: "claude_code_cli", modelId: "claude-haiku-5-5", revision: 1, accountId: "fixture", expiresAt: "2026-11-06T21:00:00.000Z", accessToken: "fixture-access" }
     const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "claude_code", prompt: "p", subscriptionBinding }
     expect(runAssignmentSchema.parse({ ...base, subscriptionLease }).subscriptionLease).toEqual(subscriptionLease)
+    const verifiedLease = { ...subscriptionLease, modelCatalogueVerified: true }
+    expect(runAssignmentSchema.parse({ ...base, subscriptionLease: verifiedLease }).subscriptionLease).toEqual(verifiedLease)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease: { ...subscriptionLease, modelCatalogueVerified: false } }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, subscriptionBinding: undefined }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, harness: "codex" }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease: { ...subscriptionLease, route: "codex_cli" } }).success).toBe(false)
