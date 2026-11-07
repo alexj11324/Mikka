@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "branch": "diagnostic/issue-1506-go-startup-proof-20261107-02",
+  "baseline": "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac",
+  "baselineTree": "a32509917eab6cea995d2a2401d8b984ce2b37d1",
+  "candidate": "81c98b53ce0cbe0e615199757ed91e6f2c7e8fd2",
+  "candidateTree": "214b5119e802e4728e0ef0533659331e970cb1ba",
+  "candidateParents": [
+    "b268fbdb953c70a5e0dfee2f0013bf3a81b6dfac"
+  ],
+  "mainPath": "packages/subscription-worker/cmd/mikka-subscription-worker/main.go",
+  "baselineMainSha256": "0c19b41a69bfeb136434bea87e6d6c96718dd1d91d6f831c35f1a42218a6013b",
+  "candidateMainSha256": "0f171cf2c56667c0a17e42fd39f3cf1546870a848fd023b5d6fbf914f2824aab",
+  "wirePath": "scripts/diagnostics/go-startup-pg-wire-proof.py",
+  "wireSha256": "1b062afc6ae60f3b16ba835302f00c969f2f7e365894f722add01c86b488b022",
+  "cpa": "8289ec4c71ad914d0612c2776352b76ba3d355a6",
+  "goImage": "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
+  "pgImage": "postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb",
+  "dependencySha256": {
+    "packages/subscription-worker/CPA_COMMIT": "752926809037306f0f5ff4884d0cae47547fa98d3d03992d7a312b4774da53b1",
+    "packages/subscription-worker/bootstrap.mjs": "37f36e07d88ea1342a3c323144eba71a82b7a851503bc2540bd4d384989c5015",
+    "packages/subscription-worker/go.mod": "856105c86e858918a92a6ad69851393d4209c1f722e0f910d3a9afdc60d73088",
+    "packages/subscription-worker/go.sum": "a4df9009acc94e0af2ded2516f69b094e5c4b522f49d8677b0dc495dbf117ee5",
+    "packages/subscription-worker/compat/bridge.go.txt": "cecf710f98dc2c82a33f7d2f73428228a0ba6dce60acd186964b6b0f8fc5201b",
+    "packages/subscription-worker/compat/codex-http.go.txt": "beddd86eecda56c04a3ece8745dc1aa9c08a3862d7d4d6dfce4eca6b9c4063bd",
+    "packages/subscription-worker/compat/claude-http.go.txt": "93bdaeb090f0368d580b12fe80aaff1d53579c668526cdc7d1bb6d2cd4e9c739"
+  },
+  "requiredPgTests": [
+    "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+    "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+    "TestStreamChecksAuthorizeEveryChunkWithoutFetchingUnusedCredentialRecord"
+  ],
+  "parentCancellationTest": "cancelling during preparation cannot start inference afterward",
+  "wireCaseCount": 10,
+  "jobTimeoutMinutes": 15,
+  "runtimeBudgetFromWorkflowStartSeconds": 720,
+  "productionCredentials": false,
+  "realProviderCalls": false
+}
