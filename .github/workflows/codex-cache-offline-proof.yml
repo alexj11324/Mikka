@@ -1,0 +1,88 @@
+name: Codex cache offline RED GREEN proof
+
+"on":
+  push:
+    branches:
+      - 'diagnostic/issue-1506-codex-cache-proof-20261107-02'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-cache-offline-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/diagnostic/issue-1506-codex-cache-proof-20261107-02' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Initialize evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROOF_ARTIFACTS="$RUNNER_TEMP/codex-cache-offline-proof-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf 'PROOF_ARTIFACTS=%s\n' "$PROOF_ARTIFACTS" >> "$GITHUB_ENV"
+          mkdir -p "$PROOF_ARTIFACTS"
+          printf '{"runId":"%s","attempt":"%s","helperSha":"%s"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" > "$PROOF_ARTIFACTS/workflow-start.json"
+
+      - name: Check out immutable helper commit
+        id: helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: helper
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Check out fixed RED baseline
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: '14fe545869b71c79c8bafa6254c671bad5cbdb47'
+          path: baseline
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out fixed product candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: '6adc946814f15ae2a7179226be6387ccb6cb1409'
+          path: candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Use Node for the repository CPA bootstrap
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: Run bounded real Go RED GREEN proof
+        timeout-minutes: 24
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 helper/scripts/diagnostics/codex-cache-offline-proof.py \
+            --config helper/scripts/diagnostics/codex-cache-offline-proof.json \
+            --helper helper --baseline baseline --candidate candidate \
+            --out "$PROOF_ARTIFACTS"
+
+      - name: Remove only this proof's remaining containers
+        if: always() && steps.helper.outcome == 'success'
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 helper/scripts/diagnostics/codex-cache-offline-proof.py \
+            --config helper/scripts/diagnostics/codex-cache-offline-proof.json \
+            --helper helper --baseline baseline --candidate candidate \
+            --out "$PROOF_ARTIFACTS" --cleanup-only
+
+      - name: Upload original logs and source receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codex-cache-offline-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/codex-cache-offline-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 7
