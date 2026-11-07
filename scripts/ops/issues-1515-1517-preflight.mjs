@@ -108,7 +108,7 @@ try {
         }
         const rows=await rpc('agents.listDevices')
         if(!Array.isArray(rows)) throw Error('devices_response_invalid')
-        report.account.devices={transport:'web_rpc',count:rows.length,demoPrefixCount:rows.filter(v=>/^de30000/.test(v.id??'')).length,
+        report.account.devices={transport:'web_rpc',count:rows.length,demoPrefixCount:rows.filter(v=>(v.id??'').startsWith('de30000')).length,
           futureCount:rows.filter(v=>new Date(v.lastSeenAt).getTime()>Date.now()).length,
           futureOnlineCount:rows.filter(v=>new Date(v.lastSeenAt).getTime()>Date.now()&&v.online===true).length,
           onlineCount:rows.filter(v=>v.online===true).length}
@@ -169,10 +169,9 @@ try {
     try {
       const switched=await teamJson('/mikka/api/rpc',{version:DESKTOP_RPC_VERSION,action:'workspace.switchWorkspace',args:[originalWorkspace]})
       const result=switched?.ok===true?decode(switched.result):null
-      if(result?.ok!==true || result.data?.workspaceId!==originalWorkspace) throw Error('workspace_restore_failed')
       const restored=await teamJson('/mikka/api/workspace')
-      if(restored.workspace?.id!==originalWorkspace) throw Error('workspace_restore_failed')
-      report.workspaceRestored=true
+      report.workspaceRestored=result?.ok===true && result.data?.workspaceId===originalWorkspace && restored.workspace?.id===originalWorkspace
+      if(!report.workspaceRestored){report.status='failed';report.cleanupError='workspace_restore_failed';process.exitCode=1}
     } catch { report.workspaceRestored=false;report.status='failed';report.cleanupError='workspace_restore_failed';process.exitCode=1 }
   }
   if(cookie) {

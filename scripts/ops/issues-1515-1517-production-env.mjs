@@ -47,6 +47,7 @@ function pulledDatabase(directory) {
   }
   if (values.get('VERCEL_ENV') !== 'production') fail('production_env_environment')
   const value = values.get('DATABASE_URL')
+  // eslint-disable-next-line no-control-regex -- reject whitespace and controls in the private URL
   if (!value || value !== value.trim() || /[\u0000-\u0020\u007f]/.test(value)) fail('production_env_database')
   let url
   try { url = new URL(value) } catch { fail('production_env_database') }
