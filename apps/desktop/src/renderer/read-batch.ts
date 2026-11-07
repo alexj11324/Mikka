@@ -93,13 +93,28 @@ function flush() {
   }
 }
 
-/** Only simultaneous reads join. A flush owns no response cache and schedules
- * no timer; later live invalidations still perform their normal fresh reads. */
+function scheduleFlush() {
+  scheduled = true
+  // List fetchers cross different already-resolved hydration promises. A
+  // microtask flush splits those reads even though they belong to the same
+  // browser turn. One posted task lets that turn's microtasks drain, without
+  // a timeout, polling, or retaining the channel after the flush.
+  const channel = new MessageChannel()
+  channel.port1.onmessage = () => {
+    channel.port1.close()
+    channel.port2.close()
+    flush()
+  }
+  channel.port2.postMessage(null)
+}
+
+/** Reads becoming ready in the same turn join. A flush owns no response cache
+ * or timer; later live invalidations still perform their normal fresh reads. */
 export function enqueueRead<T>(action: BatchReadAction, args: unknown[], context: ReadContext, send: Send): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const item: Pending = { ...context, action, args, generation, send, resolve: result => resolve(result as T), reject }
     if (unavailable) { void single(item); return }
     pending.push(item)
-    if (!scheduled) { scheduled = true; queueMicrotask(flush) }
+    if (!scheduled) scheduleFlush()
   })
 }

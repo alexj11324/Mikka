@@ -361,8 +361,10 @@ requires a fresh workspace bootstrap, even when the workspace selector stays
 empty; identity-only data cannot mount workspace readers. Both the existing
 owner/session fence and the current bootstrap phase reject obsolete responses.
 
-The installed renderer groups eligible workspace reads that are already queued
-in the same microtask into a bounded `desktop.readBatch`. Each item retains its
+The installed renderer groups eligible workspace reads that become ready in
+the same browser turn into a bounded `desktop.readBatch`. One posted task lets
+already-resolved hydration promises settle before the group is sent; its two
+MessageChannel ports close before the flush. Each item retains its
 registered argument schema and original authorization. Bootstrap, sign-in,
 account/workspace switches, credentials, catalog loading and explicit writes
 remain separate. The allowlisted views may perform their existing idempotent

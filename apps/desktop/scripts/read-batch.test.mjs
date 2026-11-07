@@ -10,6 +10,7 @@ async function fixture(callback) {
     export * from './apps/desktop/src/renderer/rpc.ts'
     export { getTransportState } from './apps/desktop/src/renderer/transport-state.ts'
     export { encode, decode } from './lib/desktop-rpc/wire.ts'
+    export { waitForCacheHydration, PersistentReadCache } from './lib/swr/persistent-cache.ts'
   `)
   const requests = []
   const packet = result => Response.json({ version: 1, ok: true, result: api.encode(result) })
@@ -32,7 +33,7 @@ async function fixture(callback) {
   }
 }
 
-test('Native coalesces allowed reads in one microtask with one codec pass and ordered results', () => fixture(async ({ api, requests }) => {
+test('Native coalesces allowed reads in one turn with one codec pass and ordered results', () => fixture(async ({ api, requests }) => {
   const at = new Date('2026-11-07T01:02:03.000Z')
   const literalTag = { $mikka: 'date', value: 'ordinary application data' }
   const first = api.callAction('issues.syncIssueList', [at, literalTag, undefined])
@@ -53,6 +54,27 @@ test('Native coalesces allowed reads in one microtask with one codec pass and or
   assert.deepEqual(requests[0].init.headers, { 'content-type': 'application/json', 'x-mikka-desktop-protocol': '1', 'x-mikka-locale': 'en' })
 }))
 
+test('one startup read wave stays together across the real hydration gates used by SWR and list fetchers', () => fixture(async ({ api, requests }) => {
+  const cache = new Map()
+  // SWRDefaults waits for hydration for every fetcher. Issue/thread/chat
+  // fetchers also use this same gate before consuming the recovered cursor.
+  // These already-resolved promises must not split one startup wave into
+  // separately authorized HTTP requests.
+  const read = async (action, ownHydrationGate) => {
+    await api.waitForCacheHydration(cache)
+    if (ownHydrationGate) await api.waitForCacheHydration(cache)
+    return api.callAction(action, [])
+  }
+  const actions = ['task-runs.pollTaskRuns', 'issues.syncIssueList', 'coordinator.pollBotChatSummaries', 'task-runs.syncThreadList', 'bots.pollBots', 'coordinator.syncCoordinatorChat']
+  const values = await Promise.all(actions.map((action, index) => read(action, index % 2 === 1)))
+  assert.deepEqual(values.map(value => value.action), actions)
+  assert.equal(requests.length, 1, 'all six ready reads share one ordinary authorization boundary')
+  assert.equal(requests[0].action, 'desktop.readBatch')
+  assert.equal(requests[0].args[0].length, actions.length)
+  await read('task-runs.syncThreadList', true)
+  assert.equal(requests.length, 2, 'a later live refresh still sends a fresh request')
+}))
+
 test('single reads, excluded actions and Web keep their ordinary single-request path without a read cache', () => fixture(async ({ api, requests }) => {
   const excluded = ['desktop.bootstrap', 'desktop.session', 'desktop.modelMenu', 'workspace.switchWorkspace', 'bots.updateBot', 'subscription-credentials.getSubscriptionCredential']
   await Promise.all(excluded.map(action => api.callAction(action, [])))
@@ -67,7 +89,7 @@ test('single reads, excluded actions and Web keep their ordinary single-request 
   ])
 }))
 
-test('Native splits at sixteen items and captures each locale before the microtask flush', () => fixture(async ({ api, window, requests }) => {
+test('Native splits at sixteen items and captures each locale before the posted flush', () => fixture(async ({ api, window, requests }) => {
   const pending = Array.from({ length: 18 }, (_, index) => api.callAction('projects.listProjects', [index]))
   window.location = new URL('mikka://app/mikka/')
   pending.push(api.callAction('teams.listTeams', [18]), api.callAction('teams.listTeams', [19]))
@@ -143,8 +165,10 @@ test('malformed batch item count or shape rejects every item without retrying', 
   }
 })
 
-test('scope reset rejects queued old-identity reads before any transport and admits only the new generation', () => fixture(async ({ api, requests }) => {
+test('scope reset after a microtask rejects unsent old-identity reads before the posted flush', () => fixture(async ({ api, requests }) => {
   const old = Promise.allSettled([api.callAction('projects.listProjects', ['old']), api.callAction('teams.listTeams', ['old'])])
+  await Promise.resolve()
+  assert.equal(requests.length, 0)
   api.resetReadBatchScope()
   const current = await Promise.all([api.callAction('projects.listProjects', ['current']), api.callAction('teams.listTeams', ['current'])])
   for (const outcome of await old) assert.equal(outcome.reason.code, 'desktop_session_changed')
