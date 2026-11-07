@@ -51,7 +51,8 @@ export async function routeFunctionRules(root) {
     // rou3 treats `*` as a catch-all and rejects more than one per route.
     // Named parameters retain each dynamic segment's original one-part bound.
     const pattern = route.path.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, '**').replace(/\[([^\]]+)\]/g, ':$1')
-    rules[pattern] = { maxDuration: route.maxDuration, ...(route.template === '/api/coordinator/stream' ? { supportsCancellation: true } : {}) }
+    const supportsCancellation = route.template === '/api/coordinator/stream' || route.template === '/api/mcp'
+    rules[pattern] = { maxDuration: route.maxDuration, ...(supportsCancellation ? { supportsCancellation: true } : {}) }
   }
   return rules
 }
