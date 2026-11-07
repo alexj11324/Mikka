@@ -28,6 +28,22 @@ const PURPOSE = 'thread-lifecycle-provider-acceptance'
 const owns = (metadata: Record<string, string>, acceptance: string, revision: string) =>
   metadata.purpose === PURPOSE && metadata.acceptance === acceptance && metadata.sourceCommit === revision
 
+type AcceptanceSandbox = { sandboxId: string; metadata: Record<string, string> }
+type AcceptancePages = { readonly hasNext: boolean; nextItems(): Promise<AcceptanceSandbox[]> }
+
+/** An empty discovery result cannot acknowledge an allocation whose response
+ * was lost. Keep that outcome unconfirmed rather than authorizing more work. */
+export async function discoverAcceptanceSandboxes({ ownedIds, acceptance, sourceCommit, list }: {
+  ownedIds: Set<string>; acceptance: string; sourceCommit: string; list(): AcceptancePages
+}) {
+  const pages = list()
+  while (pages.hasNext) for (const found of await pages.nextItems()) {
+    assert.ok(owns(found.metadata, acceptance, sourceCommit), 'Cleanup metadata mismatch')
+    ownedIds.add(found.sandboxId)
+  }
+  assert.ok(ownedIds.size > 0, 'acceptance_creation_cleanup_unconfirmed')
+}
+
 /** Fail before DB connections or provider calls; never return a credential. */
 export function validateThreadLifecycleTarget(env: Env, checkOnly = false) {
   assertDevLocal(env)
@@ -111,7 +127,12 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     threadMachineProvider.prepareKill = async () => kill
     restoreProvider = () => { threadMachineProvider.kill = originalKill; threadMachineProvider.prepareKill = originalPrepareKill }
 
-    stage = 'create'; cancelled.signal.throwIfAborted(); createAttempted = true
+    stage = 'create'; cancelled.signal.throwIfAborted()
+    // This closed receipt precedes provider I/O, so even a lost create response
+    // leaves the exact invocation metadata available for cleanup reconciliation.
+    console.info(JSON.stringify({ kind: 'thread-lifecycle-provider-intent', acceptance,
+      sourceCommit: release.sourceCommit, purpose: PURPOSE, observedAt: new Date().toISOString() }))
+    createAttempted = true
     let sandbox = await Sandbox.create(template, { ...connection, metadata, idempotencyKey: acceptance,
       timeoutMs: 600_000, lifecycle: { onTimeout: 'kill', autoResume: false } })
     const sandboxId = sandbox.sandboxId; ownedIds.add(sandboxId)
@@ -223,11 +244,8 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     // this invocation's random ID + exact source can authorize its cleanup.
     if (createAttempted) {
       try {
-        const pages = Sandbox.list({ ...connection, query: { metadata, state: ['running', 'paused'] } })
-        while (pages.hasNext) for (const found of await pages.nextItems()) {
-          assert.ok(owns(found.metadata, acceptance, release.sourceCommit), 'Cleanup metadata mismatch')
-          ownedIds.add(found.sandboxId)
-        }
+        await discoverAcceptanceSandboxes({ ownedIds, acceptance, sourceCommit: release.sourceCommit,
+          list: () => Sandbox.list({ ...connection, query: { metadata, state: ['running', 'paused'] } }) })
       } catch (error) { cleanupErrors.push(error) }
     }
     for (const id of ownedIds) {
