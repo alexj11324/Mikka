@@ -4,8 +4,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
-import { createHash } from 'node:crypto'
-import { runCloudStartup, createSessionClient } from '../acceptance/cloud-startup.mjs'
+import { createHash, randomUUID } from 'node:crypto'
+import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot } from '../acceptance/cloud-startup.mjs'
 import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -19,7 +19,7 @@ const GATE_CODES = new Set([
   'registration_timeout', 'registration_output_invalid', 'daemon_exited', 'daemon_failed', 'registration_invalid',
   'registered_agent_missing', 'execution_failed', 'execution_evidence_invalid', 'official_agent_acceptance_missing', 'tool_reply_evidence_missing',
   'device_cleanup_failed', 'sandbox_cleanup_failed', 'application_build_changed', 'sign_out_failed',
-  'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required',
+  'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required', 'workspace_restore_failed', 'shared_scope_evidence_invalid',
 ].map(code => `template_gate_${code}`))
 const STARTUP_CODES = new Set([
   'dispatch_refused', 'dispatch_run_missing', 'dispatch_not_new', 'dispatch_device_mismatch',
@@ -27,6 +27,8 @@ const STARTUP_CODES = new Set([
   'official_agent_acceptance_missing', 'runtime_evidence_failed', 'live_disconnected', 'live_scope_missing',
   'request_failed', 'response_invalid', 'build_mismatch', 'build_changed',
   'cleanup_terminal_timeout',
+  'shared_subscription_identity_mismatch', 'shared_subscription_model_missing_or_ambiguous',
+  'shared_chat_model_ambiguous', 'shared_chat_model_unavailable', 'workspace_identity_mismatch', 'profile_source_mismatch',
 ].map(code => `startup_${code}`))
 const safeCode = error => GATE_CODES.has(error?.message) || STARTUP_CODES.has(error?.message) ? error.message : 'template_gate_failed'
 const SAMPLE_STATUSES = new Set(['running', 'failed', 'execution_proved_awaiting_server_timing'])
@@ -49,7 +51,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     ...(cleanup.has('device_remove_failed') && UUID.test(deviceId ?? '') ? { registeredDeviceId: deviceId } : {}) }
 }
 
-export function candidateReceipt(report, kind, proof, acceptance) {
+export function candidateReceipt(report, kind, proof, acceptance, expectedScope) {
   const [, harness, model] = KINDS.find(row => row[0] === kind)
   const sample = acceptance.samples?.[0]
   check(acceptance.mode === 'candidate' && acceptance.status === 'candidate_subscription_proved' && acceptance.samples?.length === 1 && !acceptance.error
@@ -59,6 +61,17 @@ export function candidateReceipt(report, kind, proof, acceptance) {
     && sample.execution?.deviceId === proof.deviceId && sample.execution?.credentialType === 'subscription'
     && sample.credentialRoute === 'subscription' && sample.replyVerified === true
     && sample.sourceCommit === report.sourceCommit && UUID.test(sample.runId ?? ''), 'execution_evidence_invalid')
+  const scope = sample.execution.sharedScope
+  check(scope?.verified === true && scope.access === 'workspace_share' && acceptance.team?.teamWorkspaceConfirmed === true
+    && acceptance.team.teamAdminMembershipVerified === true && acceptance.cleanup.workspaceRestored === true
+    && /^[a-f0-9]{64}$/.test(scope.workspaceHash ?? '') && scope.workspaceHash === acceptance.team.teamWorkspaceHash
+    && ['requesterHash', 'payerHash', 'connectionHash', 'bindingHash'].every(key => /^[a-f0-9]{16}$/.test(scope[key] ?? ''))
+    && scope.requesterHash === acceptance.accountHash && scope.requesterHash !== scope.payerHash
+    && /^(0|[1-9][0-9]*)$/.test(scope.connectionRevision ?? '')
+    && Number.isInteger(scope.profileVersion) && scope.profileVersion > 0 && /^[a-f0-9]{64}$/.test(scope.profileDigest ?? '')
+    && (!expectedScope || scope.workspaceHash === expectedScope.evidence.teamWorkspaceHash
+      && scope.requesterHash === createHash('sha256').update(expectedScope.ownerId).digest('hex').slice(0, 16)
+      && scope.payerHash === createHash('sha256').update(expectedScope.adminId).digest('hex').slice(0, 16)), 'shared_scope_evidence_invalid')
   const tool = Array.isArray(sample.toolCalls) && sample.toolCalls.find(row => row?.outcome === 'ok' && /^[a-f0-9]{16}$/.test(row.toolCallHash ?? ''))
   check(sample.minToolCalls === 1 && sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true && tool, 'tool_reply_evidence_missing')
   const runIdHash = createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
@@ -72,6 +85,9 @@ export function candidateReceipt(report, kind, proof, acceptance) {
     replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: tool.toolCallHash, outcome: 'ok' },
     runId: sample.runId, deviceId: proof.deviceId, officialBinarySha256: proof.binarySha256,
     officialCliVersion: proof.version,
+    sharedScope: { verified: true, access: 'workspace_share', requesterHash: scope.requesterHash, payerHash: scope.payerHash,
+      workspaceHash: scope.workspaceHash, connectionHash: scope.connectionHash, bindingHash: scope.bindingHash,
+      connectionRevision: scope.connectionRevision, profileVersion: scope.profileVersion, profileDigest: scope.profileDigest },
     agentAcceptance: { runIdHash, harness, ...runtime.agentAccepted },
     runtimeAuthorization: { source: runtime.source, complete: true, truncated: false, extraRemoteCalls: authorization.extraRemoteCalls } }
 }
@@ -80,23 +96,27 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
   sandboxFactory, runAcceptance = runCloudStartup, onDiagnostic = () => {} } = {}) {
   check(/^[a-f0-9]{40}$/.test(report.sourceCommit ?? '') && /^[a-f0-9]{40}$/.test(report.workerSha ?? ''), 'source_invalid')
   check(!env.GITHUB_SHA || env.GITHUB_SHA === report.sourceCommit, 'source_mismatch')
-  check(env.ACME_DEMO_EMAIL?.toLowerCase() === 'alex@acme.aspectlylabs.com' && env.ACME_DEMO_PASSWORD, 'account_required')
-  check(UUID.test(env.MIKKA_ACCEPTANCE_WORKSPACE_ID ?? '') && UUID.test(env.MIKKA_ACCEPTANCE_BOT_ID ?? ''), 'fixtures_required')
+  let account
+  try { account = smokeAcceptanceAccount(env) } catch { fail('account_required') }
+  check((!env.MIKKA_ACCEPTANCE_WORKSPACE_ID || UUID.test(env.MIKKA_ACCEPTANCE_WORKSPACE_ID))
+    && (!env.MIKKA_ACCEPTANCE_BOT_ID || UUID.test(env.MIKKA_ACCEPTANCE_BOT_ID)), 'fixtures_required')
   const origin = 'https://app.aspectlylabs.com', client = createSessionClient(origin, fetchImpl)
   if (!sandboxFactory) {
     const { Sandbox } = await import('e2b')
     sandboxFactory = (template, options) => Sandbox.create(template, options)
   }
   const passed = {}, failures = []
-  let loggedIn = false
+  let loggedIn = false, originalWorkspaceId, ownerId, scope, bot, fatal, workspaceRestored = false
   try {
     const version = await client.json('/api/version')
     check(version.build === report.sourceCommit, 'application_build_mismatch')
-    const login = await client.request('/api/auth/sign-in/email', post({ email: env.ACME_DEMO_EMAIL, password: env.ACME_DEMO_PASSWORD }))
+    const login = await client.request('/api/auth/sign-in/email', post({ ...account, rememberMe: false }))
     check(login.ok, 'sign_in_failed'); loggedIn = true
     const identity = await client.json('/api/auth/get-session')
-    check(identity.user?.email?.toLowerCase() === env.ACME_DEMO_EMAIL.toLowerCase(), 'account_mismatch')
-    await client.rpc('workspace.switchWorkspace', [env.MIKKA_ACCEPTANCE_WORKSPACE_ID])
+    check(identity.user?.email?.toLowerCase() === account.email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'account_mismatch')
+    ownerId = identity.user.id
+    scope = await selectAcceptanceTeam(client, { ownerId, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID }, value => { originalWorkspaceId = value })
+    bot = await acceptanceBot(client, env.MIKKA_ACCEPTANCE_BOT_ID, randomUUID())
     for (const [kind, harness] of KINDS) {
       let sandbox, deviceId, acceptance, diagnosticError, enrollmentIssued = false, stage = 'candidate'
       const cleanupErrors = []
@@ -140,12 +160,12 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
           const matching = agents.filter(agent => agent.deviceId === deviceId && agent.harness === harness)
           check(matching.length === 1, 'registered_agent_missing')
           stage = 'acceptance'
-          acceptance = await runAcceptance({ origin, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID,
-            botId: env.MIKKA_ACCEPTANCE_BOT_ID, mode: 'candidate', strategy: 'derived', runs: 1, harness,
+          acceptance = await runAcceptance({ origin, workspace: scope.workspaceId,
+            botId: bot.botId, mode: 'candidate', strategy: 'derived', runs: 1, harness,
             deviceId, agentId: matching[0].id, revision: report.sourceCommit, expectedBuild: version.build,
             timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1 }, { env, fetchImpl })
           stage = 'receipt'
-          passed[kind] = candidateReceipt(report, kind, proof, acceptance)
+          passed[kind] = candidateReceipt(report, kind, proof, acceptance, scope)
         } finally { clearTimeout(timer) }
       } catch (error) { diagnosticError = error; failures.push({ kind, error }) }
       finally {
@@ -177,16 +197,25 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
       }
     }
     check((await client.json('/api/version')).build === version.build, 'application_build_changed')
-  } finally {
+  } catch (error) { fatal = error }
+  finally {
     if (loggedIn) {
-      const logout = await client.request('/api/auth/sign-out', post({}))
-      check(logout.ok, 'sign_out_failed')
+      if (originalWorkspaceId) {
+        try { await restoreAcceptanceWorkspace(client, ownerId, originalWorkspaceId); workspaceRestored = true }
+        catch (error) { failures.push({ error: Error('template_gate_workspace_restore_failed', { cause: error }) }) }
+      }
+      try { const logout = await client.request('/api/auth/sign-out', post({})); check(logout.ok, 'sign_out_failed') }
+      catch (error) { failures.push({ error: Error('template_gate_sign_out_failed', { cause: error }) }) }
     }
     client.clear()
   }
+  if (fatal) throw fatal
   if (failures.length) fail('subscription_or_cleanup_failed', new AggregateError(failures.map(row => row.error)))
   check(KINDS.every(([kind]) => passed[kind]), 'subscriptions_missing')
-  return { ...report, subscriptionAcceptance: passed }
+  return { ...report, acceptanceScope: { account: 'shared_smoke', team: scope.evidence, workspaceRestored,
+    requesterHash: createHash('sha256').update(scope.ownerId).digest('hex').slice(0, 16),
+    payerHash: createHash('sha256').update(scope.adminId).digest('hex').slice(0, 16),
+    botRetention: bot.retention, createdBotCount: Number(bot.created) }, subscriptionAcceptance: passed }
 }
 
 /** The failure artifact is a closed projection, never an exception/report dump. */

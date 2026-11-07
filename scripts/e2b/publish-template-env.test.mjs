@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { assertConservation, currentWorkerSha, pairEnv, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
+import * as runtimePublisher from './publish-template-env.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
@@ -11,10 +15,15 @@ const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [rep
 const TEMPLATES = { desktop: 'tpl-desktop', claude: 'tpl-claude', codex: 'tpl-codex' }
 const PROOF = { entries: 100, sha256: 'd'.repeat(64) }
 const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))).digest('hex')
+const SHARED = { verified: true, access: 'workspace_share', requesterHash: '1'.repeat(16), payerHash: '2'.repeat(16), workspaceHash: '3'.repeat(64),
+  connectionHash: '4'.repeat(16), bindingHash: '5'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: '6'.repeat(64) }
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
 } })
-const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
+const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'shared_smoke', workspaceRestored: true,
+  requesterHash: SHARED.requesterHash, payerHash: SHARED.payerHash,
+  team: { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamWorkspaceHash: SHARED.workspaceHash } },
+  templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
   templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
   conservation: conservation(kind), models: MODELS[kind],
 }])), subscriptionAcceptance: Object.fromEntries([['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([kind, harness, model]) => [kind, {
@@ -25,11 +34,69 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromE
   agentAcceptance: { runIdHash: createHash('sha256').update(`run-${kind}`).digest('hex').slice(0, 16), harness,
     kind: harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack', at: 1100, ms: 100 },
   runtimeAuthorization: { source: 'http_server_link', complete: true, truncated: false, extraRemoteCalls: 0 },
+  sharedScope: { ...SHARED },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
 const OLD_STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: OTHER, sourceCommit: OTHER, models: MODELS }).map(row => [row.key, row.value]))
 OLD_STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
+
+test('large complete runtime receipts cross the process boundary by file without env truncation', () => {
+  const root = mkdtempSync(join(tmpdir(), 'runtime-receipt-'))
+  try {
+    const file = join(root, 'release.json'), evidence = structuredClone(EVIDENCE)
+    evidence.templates.claude.conservation.providerManifest = Array.from({ length: 5000 }, (_, index) => ({ path: `official/file-${index}`, sha256: 'd'.repeat(64) }))
+    const bytes = JSON.stringify(evidence)
+    assert.ok(Buffer.byteLength(bytes) > 310410, 'regress the actual execve per-env limit, preserving the whole proof')
+    writeFileSync(file, bytes)
+    assert.deepEqual(runtimePublisher.readReleaseEvidenceFile(file), evidence)
+    const module = new URL('./publish-template-env.mjs', import.meta.url).href
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e',
+      `import { readReleaseEvidenceFile } from ${JSON.stringify(module)}; import { createHash } from 'node:crypto'; const data=JSON.stringify(readReleaseEvidenceFile(process.env.RUNTIME_RELEASE_EVIDENCE_FILE)); console.log(createHash('sha256').update(data).digest('hex'))`],
+    { env: { RUNTIME_RELEASE_EVIDENCE_FILE: file }, encoding: 'utf8' })
+    assert.equal(child.status, 0, child.stderr)
+    assert.equal(child.stdout.trim(), createHash('sha256').update(bytes).digest('hex'))
+    writeFileSync(file, '{private-broken-json')
+    assert.throws(() => runtimePublisher.readReleaseEvidenceFile(file), /runtime_release_file_invalid/)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('candidate, cleanup and queued Web publication all transfer full evidence through artifacts', () => {
+  const builder = readFileSync(new URL('../../.github/workflows/e2b-template.yml', import.meta.url), 'utf8')
+  const gate = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+  const web = readFileSync(new URL('../../.github/workflows/web-deploy.yml', import.meta.url), 'utf8')
+  assert.doesNotMatch(builder, /candidate-report=\$\{JSON\.stringify\(report\)\}/)
+  assert.match(builder, /candidate-report-artifact-id: \$\{\{ steps\.candidate-report\.outputs\.artifact-id \}\}/)
+  assert.equal((gate.match(/artifact-ids: \$\{\{ needs\.validate\.outputs\.candidate-report-artifact-id \}\}/g) ?? []).length, 2)
+  assert.doesNotMatch(gate, /CANDIDATE_REPORT:|process\.env\.CANDIDATE_REPORT|release-evidence=\$\{JSON\.stringify\(report\)\}/)
+  assert.match(gate, /runtime-release-evidence-artifact-id: \$\{\{ needs\.subscriptions\.outputs\.release-evidence-artifact-id \}\}/)
+  assert.match(web, /artifact-ids: \$\{\{ inputs\.runtime-release-evidence-artifact-id \}\}/)
+  assert.match(web, /RUNTIME_RELEASE_EVIDENCE_FILE: \$\{\{ runner\.temp \}\}\/runtime-release\/release\.json/)
+  assert.doesNotMatch(web, /RUNTIME_RELEASE_EVIDENCE:/)
+})
+
+test('failed artifact downloads never pass a partial JSON file into the strict cleanup parser', () => {
+  const root = mkdtempSync(join(tmpdir(), 'runtime-cleanup-transport-'))
+  try {
+    const workflow = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+    const step = workflow.split('      - name: Close this attempt\'s instances and remove only its private candidates\n')[1].split('      - name:')[0]
+    const run = /        run: (.*)/.exec(step)[1]
+    const command = run === '|' ? step.split('        run: |\n')[1].split('        env:')[0].replace(/^          /gm, '') : run.slice(1, -1)
+    const bin = join(root, 'e2b-cleanup/bin'), argsFile = join(root, 'args.json')
+    mkdirSync(bin, { recursive: true }); mkdirSync(join(root, 'runtime-candidates'))
+    writeFileSync(join(root, 'runtime-candidates/candidates.json'), '{partial')
+    writeFileSync(join(bin, 'python'), `#!${process.execPath}\nrequire('node:fs').writeFileSync(process.env.ARGS_FILE, JSON.stringify(process.argv.slice(2)))\n`, { mode: 0o700 })
+    for (const outcome of ['failure', 'skipped', 'success']) {
+      const child = spawnSync('/bin/bash', ['-e', '-c', command], { encoding: 'utf8',
+        env: { RUNNER_TEMP: root, CANDIDATE_DOWNLOAD_OUTCOME: outcome, ARGS_FILE: argsFile } })
+      assert.equal(child.status, 0, child.stderr)
+      const args = JSON.parse(readFileSync(argsFile, 'utf8'))
+      assert.equal(args.includes('--report'), outcome === 'success', `${outcome} must select the correct exact-attempt cleanup path`)
+      assert.equal(args[0], 'scripts/e2b/cleanup-template-candidates.py')
+      assert.ok(args.includes('--output'))
+    }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {
   const proof = conservation('claude')
@@ -295,6 +362,11 @@ test('GitHub-only build timeline waits for source upload before the single runti
 
 test('publication requires both real subscriptions on these exact candidates before any network request', async () => {
   for (const mutate of [
+    evidence => { delete evidence.acceptanceScope },
+    evidence => { evidence.acceptanceScope.account = 'owner_login' },
+    evidence => { evidence.acceptanceScope.workspaceRestored = false },
+    evidence => { evidence.subscriptionAcceptance.claude.sharedScope.payerHash = SHARED.requesterHash },
+    evidence => { evidence.subscriptionAcceptance.codex.sharedScope.access = 'owner' },
     value => { delete value.subscriptionAcceptance.codex },
     value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
     value => { value.subscriptionAcceptance.codex.model = 'other-model' },
