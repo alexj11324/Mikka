@@ -37,15 +37,20 @@ function fixture(reason = "quota_exhausted") {
     modelId: "chosen-model",
     route: "claude_cpa",
   });
+  const connection = (key: string) => ({
+    id: key,
+    ownerId: "alice",
+    workspaceId: id(2),
+    epoch: 1,
+    state: "connected",
+  });
   const service = {
     repository: {
       binding: async (_owner: string, key: string) => binding(key),
-      connection: async (_owner: string, key: string) => ({
-        id: key,
-        ownerId: "alice",
-        workspaceId: id(2),
-        epoch: 1,
-        state: "connected",
+      connection: async (_owner: string, key: string) => connection(key),
+      bindingConnection: async (_owner: string, key: string) => ({
+        binding: binding(key),
+        connection: connection(binding(key).connectionId),
       }),
     },
     model: async (use: { bindingId: string }) => {

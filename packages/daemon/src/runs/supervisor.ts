@@ -112,7 +112,7 @@ import { runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } 
 
 export interface SupervisorDeps {
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
-  /** Existing authenticated checkpoint route, before a provider completion releases the lease. */
+  /** Existing authenticated checkpoint route, before terminal completion releases the lease. */
   saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<void>
   journal: RunJournal
   /** Same adapter state root used by RunContext; never supplied by the model. */
@@ -209,10 +209,16 @@ interface ActiveRun {
   /** The run's trace span; its outcome is the stop reason. */
   span?: SpanHandle
   mailbox?: RunMailbox
+  mailboxPreparing?: Promise<RunMailbox | undefined>
+  mailboxAbort?: AbortController
   mailboxClosing?: Promise<void>
   session: AgentSession | null
-  /** The CLI has exited; its cancellation grace cannot cover host publication. */
+  /** Event consumption ended; cancellation grace cannot cover host publication. */
   sessionEnded?: boolean
+  /** An actual adapter exit, never an exhausted stream or forced detachment. */
+  sessionExited?: boolean
+  /** Constructed by this supervisor after finishing work and the final upload. */
+  safePoint?: HandoffReport['safePoint']
   cancelRequested: boolean
   /** Set when the watchdog or the lease stopped the run. */
   forcedStop?: StopReason
@@ -321,7 +327,7 @@ export class RunSupervisor {
     for (const [runId, run] of this.active) {
       const entry = this.deps.journal.get(runId)
       if (!entry?.worktree || !entry.baseCommit || run.checkpointing) continue
-      if (run.forcedStop || run.cancelRequested) continue
+      if (run.sessionEnded || run.forcedStop || run.cancelRequested) continue
       const since = run.lastCheckpointAt ?? run.lastProgressAt
       if (!run.checkpointDue && now - since < CHECKPOINT_EVERY_MS) continue
       await this.saveCheckpoint(runId, run, save, now)
@@ -363,11 +369,24 @@ export class RunSupervisor {
     finally { if (run.checkpointing === pending) run.checkpointing = undefined }
   }
 
-  private async saveProviderCheckpoint(runId: string, run: ActiveRun): Promise<"ready" | "unavailable"> {
+  private async saveTerminalCheckpoint(runId: string, run: ActiveRun, finishingComplete = false): Promise<Pick<NonNullable<HandoffReport['safePoint']>, 'checkpoint' | 'checkpointTakenAt'>> {
     // Even an older uploaded snapshot cannot stand in for this final tree.
     // The server may continue an unavailable one only in its original worktree.
-    return this.deps.saveCheckpoint && await this.saveCheckpoint(runId, run, this.deps.saveCheckpoint, Date.now(), true)
-      ? "ready" : "unavailable"
+    run.safePoint = undefined
+    let checkpointTakenAt: string | undefined
+    const save = this.deps.saveCheckpoint
+    const ready = save && await this.saveCheckpoint(runId, run, async (id, checkpoint) => {
+      await save(id, checkpoint)
+      checkpointTakenAt = checkpoint.takenAt
+    }, Date.now(), true)
+    const checkpoint = ready && checkpointTakenAt
+      ? { checkpoint: 'ready' as const, checkpointTakenAt }
+      : { checkpoint: 'unavailable' as const }
+    // The synthetic cancelled/error exits used to detach a stuck adapter
+    // cannot establish that the native process stopped writing its workspace.
+    if (finishingComplete && run.sessionExited && !this.stopping)
+      run.safePoint = { session: 'exited', observedAt: new Date().toISOString(), ...checkpoint }
+    return checkpoint
   }
 
   /** Lease and watchdog pass; the daemon calls it on every tick. */
@@ -391,10 +410,17 @@ export class RunSupervisor {
   }
 
   private closeMailbox(run: ActiveRun): Promise<void> {
-    if (!run.mailbox) return Promise.resolve()
+    if (!run.mailbox && !run.mailboxPreparing) return Promise.resolve()
     if (!run.mailboxClosing) {
-      try { run.mailboxClosing = run.mailbox.close() }
-      catch (error) { run.mailboxClosing = Promise.reject(error) }
+      if (run.mailboxPreparing) {
+        // Own a late handoff before closing it. Publish the drain before
+        // abort callbacks can re-enter; a failed preparation has no mailbox.
+        run.mailboxClosing = run.mailboxPreparing.then(() => run.mailbox?.close(), () => undefined)
+        run.mailboxAbort?.abort()
+      } else {
+        try { run.mailboxClosing = run.mailbox!.close() }
+        catch (error) { run.mailboxClosing = Promise.reject(error) }
+      }
     }
     return run.mailboxClosing
   }
@@ -913,9 +939,10 @@ export class RunSupervisor {
       entry.assignment.preserveQuestionWorktree = true
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
-    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
+    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, safePoint: _safePoint, ...content } = report
     report = {
       ...content,
+      ...(active?.safePoint ? { safePoint: active.safePoint } : {}),
       ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
         ? { sourceCommit: entry.baseCommit } : {}),
       ...(entry?.assignment.factoryExecuteKind === 'deliverable' && entry.deliverableCommit ? { deliverableCommit: entry.deliverableCommit } : {}),
@@ -1037,12 +1064,12 @@ export class RunSupervisor {
   }
 
   /** Waits for the run's capture uploads, but never longer than a minute. */
-  private async flushCaptures(runId: string): Promise<void> {
-    if (!this.deps.captures) return
+  private async flushCaptures(runId: string): Promise<boolean> {
+    if (!this.deps.captures) return true
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([
-      this.deps.captures.flush(runId),
-      new Promise<void>((resolve) => { timer = setTimeout(resolve, 60_000) }),
+    return Promise.race([
+      this.deps.captures.flush(runId).then(() => true),
+      new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), 60_000) }),
     ]).finally(() => clearTimeout(timer))
   }
 
@@ -1302,12 +1329,12 @@ export class RunSupervisor {
         if (this.stopping) return
         try {
           const providerFailure = run.cancelRequested ? undefined : startupProviderFailure(error)
-          const providerCheckpoint = providerFailure ? await this.saveProviderCheckpoint(runId, run) : undefined
+          const checkpoint = await this.saveTerminalCheckpoint(runId, run)
           if (this.stopping) return
           this.finish(runId,
             run.cancelRequested ? run.forcedStop ?? "cancelled" : providerFailure ? "provider_failure" : error instanceof CheckpointRecoveryError ? 'blocked' : "error",
             run.cancelRequested ? undefined : message,
-            { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint } : {}) },
+            { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint: checkpoint.checkpoint } : {}) },
           )
         } catch (finishError) {
           this.deps.log.error(
@@ -1370,6 +1397,23 @@ export class RunSupervisor {
     }
 
     const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
+    const checkMailbox = () => {
+      const lease = this.leases.get(runId)
+      const current = this.deps.journal.get(runId)
+      assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
+    }
+    if (assignment.mcp?.mailbox === true && this.deps.prepareRunMailbox) {
+      const abort = run.mailboxAbort = new AbortController()
+      const signal = AbortSignal.any([preparationSignal, abort.signal])
+      // The authorized handshake does not use the checkout. Keep its tools
+      // behind the existing join below, while clone/setup runs concurrently.
+      run.mailboxPreparing = Promise.resolve()
+        .then(() => this.deps.prepareRunMailbox!(assignment, signal, checkMailbox))
+        .then(mailbox => { run.mailbox = mailbox; return mailbox })
+      // Clone may still be pending when the handshake fails. Its join keeps
+      // the original rejection; observe it now without an unhandled rejection.
+      void run.mailboxPreparing.catch(() => undefined)
+    }
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     if (this.stopping || run.cancelRequested) {
@@ -1448,12 +1492,7 @@ export class RunSupervisor {
         throw new Error("Check assignment is missing its read-only policy")
       await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
     }
-    const checkMailbox = () => {
-      const lease = this.leases.get(runId)
-      const current = this.deps.journal.get(runId)
-      assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
-    }
-    let mailbox = await this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox)
+    let mailbox = await (run.mailboxPreparing ?? this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox))
     run.mailbox = mailbox
     // A STOP/lease transition may win the handshake's final Promise handoff.
     // Own the returned callback before refusing; never start a CLI first.
@@ -1712,6 +1751,7 @@ export class RunSupervisor {
           continue
         }
         run.sessionEnded = true
+        run.sessionExited = next !== ABORTED && !next.done && event.sessionExited !== false
         clearTimeout(run.cancelTimer)
         if (run.cancelRequested) run.abort.abort()
         const finishingSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
@@ -1774,9 +1814,10 @@ export class RunSupervisor {
           stopReason = stopReasonOf(event, run, assignment)
         }
         // Captures go up before the run reports its end; a stopping daemon does not wait for them.
-        if (!this.stopping) await this.flushCaptures(runId)
+        const capturesSaved = !this.stopping && await this.flushCaptures(runId)
         stopReason = stopReasonOf(event, run, assignment)
-        if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: await this.saveProviderCheckpoint(runId, run) }
+        const checkpoint = await this.saveTerminalCheckpoint(runId, run, capturesSaved)
+        if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: checkpoint.checkpoint }
         if (this.stopping) return
         this.finish(runId, stopReason, error ?? verifyError, report)
         log.info(

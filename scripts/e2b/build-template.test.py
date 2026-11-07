@@ -1,6 +1,8 @@
 """Publish step of build-template.py, against a fake E2B API (no network, no SDK)."""
 import importlib.util
 import io
+import copy
+from contextlib import redirect_stderr
 import hashlib
 import json
 import unittest
@@ -13,6 +15,16 @@ spec = importlib.util.spec_from_file_location('build_template', Path(__file__).w
 bt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bt)
 
+def mcp_timing(run_id, harness):
+    return {'version': 1, 'source': 'mikka_mcp_physical_fetch', 'scope': 'observed_mikka_mcp_children',
+            'generationCoverage': 'unverified', 'allFirstPartyHttpComplete': False, 'remoteMcpServerCount': 0, 'childPathAuditVersion': 1,
+            'runIdHash': hashlib.sha256(run_id.encode()).hexdigest()[:16], 'harness': harness, 'startedAt': 1010, 'endedAt': 1900,
+            'expectedChildren': 1, 'observedChildren': 1, 'closedChildren': 0, 'observedComplete': True, 'childLifecycleComplete': False,
+            'rejectedEvents': 0, 'truncated': False,
+            'children': [{'child': 1, 'startedAt': 1020, 'closedAt': None, 'lastSequence': 3, 'sent': 1, 'completed': 1, 'lost': 0}],
+            'requests': [{'child': 1, 'sequence': 1, 'operation': 'decision_catalogue', 'startedAt': 1040,
+                          'endedAt': 1050, 'durationMs': 10, 'status': 200, 'outcome': 'ok'}]}
+
 class FakeResponse(io.BytesIO):
     def __enter__(self): return self
     def __exit__(self, *_): return False
@@ -24,7 +36,123 @@ def fake(template):
         return FakeResponse(b'' if request.get_method() == 'PATCH' else json.dumps(template).encode())
     return opener, calls
 
+def model_receipt(kind='desktop'):
+    original = {'claude_code': None, 'codex': None}
+    if kind != 'desktop':
+        harness = 'claude_code' if kind == 'claude' else 'codex'
+        original[harness] = {'path': '/usr/local/bin/' + kind, 'sha256': 'a' * 64}
+    added = {harness: {'path': '/opt/mikka/harness/' + harness, 'sha256': 'b' * 64}
+             for harness, binary in original.items() if binary is None}
+    manifest = {'version': 1, 'kind': kind, 'original': original, 'added': added}
+    binaries = {harness: (original[harness] or added[harness])['path'] for harness in original}
+    return {'version': 1, 'sourceCommit': 'c' * 40, 'workerSha': 'd' * 40, 'manifest': manifest, 'binaries': binaries,
+            'reports': [{'harness': harness, 'installed': True, 'version': None, 'models': ['fixture-' + harness],
+                         'modelSlots': [{'slot': 'fixture-' + harness, 'model': 'fixture-' + harness, 'name': 'Fixture'}],
+                         'defaultModelSlot': 'fixture-' + harness} for harness in original]}
+
+
+class ModelSandbox:
+    def __init__(self, receipt):
+        self.receipt = receipt
+        self.manifest = copy.deepcopy(receipt['manifest'])
+        self.worker_sha, self.source_commit = receipt['workerSha'], receipt['sourceCommit']
+        self.commands = self.files = self
+        self.calls = []
+        self.exit_code = 0
+        self.read_error = None
+    def run(self, command, **options):
+        self.calls.append(('run', command, options))
+        return SimpleNamespace(exit_code=self.exit_code, stdout='/opt/mikka/releases/' + self.source_commit + '/source\n')
+    def read(self, path, **options):
+        self.calls.append(('read', path, options))
+        if path.endswith('worker-source-sha'): return self.worker_sha + '\n'
+        if path.endswith('.mikka-original-cli.json'): return json.dumps(self.manifest)
+        if self.read_error: raise self.read_error
+        assert path == '/home/user/.mikka/preloaded-models.json'
+        return json.dumps(self.receipt)
+    def kill(self): self.calls.append(('kill',))
+
 class Publish(unittest.TestCase):
+    def test_conservation_failure_logs_safe_metadata_before_kill_and_keeps_the_original_exception(self):
+        digest = {'entries': 5, 'sha256': 'f' * 64}
+        final = {'kind': 'codex', 'policySha256': bt.official_files_guard().finalization_policy('codex')[1],
+                 'before': digest, 'after': digest, 'originalBefore': digest, 'originalAfter': digest, 'providerChanges': []}
+        change = {'path': '/usr/local/bin/codex', 'kind': 'file',
+                  'before': {'sha256': 'a' * 64, 'mode': 0o755}, 'after': {'sha256': 'b' * 64, 'mode': 0o644}}
+        secret = 'DO-NOT-LOG-CREDENTIAL-OR-PROVIDER-TEXT'
+        failure = RuntimeError(secret)
+        failure.__cause__ = ValueError(secret)
+        failure.exit_code = 1
+        failure.stdout = secret
+        failure.stderr = secret + '\nRuntimeError: official_files_changed ' + json.dumps([change]) + '\n' + secret
+        output, killed = io.StringIO(), []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, path, **_):
+                return json.dumps(final if path.endswith('ready.json') else {'before': digest, 'after': digest})
+            def run(self, *_args, **_options): raise failure
+            def kill(self): killed.append(output.getvalue())
+        with redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+            bt.probe_conservation('candidate', secret, 'codex', lambda *_, **__: Probe())
+        self.assertIs(raised.exception, failure)
+        self.assertIs(raised.exception.__cause__, failure.__cause__)
+        self.assertEqual(len(killed), 1)
+        self.assertIn('mikka-conservation-failed ', killed[0])
+        row = json.loads(next(line.removeprefix('mikka-conservation-failed ') for line in output.getvalue().splitlines()
+                              if line.startswith('mikka-conservation-failed ')))
+        self.assertEqual(row, {'kind': 'codex', 'stage': 'fresh_scan', 'code': 'official_files_changed',
+                               'exitCode': 1, 'changes': [change]})
+        self.assertNotIn(secret, output.getvalue())
+
+    def test_conservation_diagnostics_accept_only_closed_bounded_metadata(self):
+        secret = 'DO-NOT-LOG-SECRET'
+        error = RuntimeError(secret)
+        error.exit_code, error.stdout = 137, secret
+        error.stderr = 'arbitrary stderr ' + secret
+        self.assertEqual(bt.conservation_diagnostic(error, 'desktop', 'fresh_scan'),
+                         {'kind': 'desktop', 'stage': 'fresh_scan', 'code': 'conservation_failed', 'exitCode': 137})
+        error.stderr = 'RuntimeError: official_files_removed ' + json.dumps({'path': '/usr/local/bin/claude'})
+        self.assertEqual(bt.conservation_diagnostic(error, 'claude', 'fresh_scan')['missing'], {'path': '/usr/local/bin/claude'})
+        row = {'path': '/usr/local/bin/claude', 'kind': 'file', 'before': {'sha256': 'a' * 64}, 'after': {'sha256': 'b' * 64}}
+        invalid = [
+            {'path': '/usr/local/bin/claude', 'token': secret},
+            [dict(row, token=secret)],
+            [{**row, 'before': {'token': secret}, 'after': {'token': secret}}],
+            [{**row, 'after': {'sha256': secret}}],
+            [{**row, 'resolvedSha256': None}],
+            [{**row, 'kind': secret}],
+            [{**row, 'path': '/' + 'x' * 2048}],
+            [row] * (bt.CONSERVATION_DIAGNOSTIC_MAX_CHANGES + 1),
+        ]
+        for value in invalid:
+            code = 'official_files_removed' if isinstance(value, dict) else 'official_files_changed'
+            error.stderr = 'RuntimeError: ' + code + ' ' + json.dumps(value)
+            with self.subTest(value_type=type(value).__name__):
+                actual = bt.conservation_diagnostic(error, 'desktop', 'fresh_scan')
+                self.assertEqual(actual['code'], 'conservation_metadata_invalid')
+                self.assertNotIn('changes', actual)
+                self.assertNotIn('missing', actual)
+                self.assertNotIn(secret, json.dumps(actual))
+        error.stderr = secret + 'x' * bt.CONSERVATION_DIAGNOSTIC_MAX_BYTES
+        actual = bt.conservation_diagnostic(error, 'desktop', 'fresh_scan')
+        self.assertEqual(actual['code'], 'conservation_diagnostic_too_large')
+        self.assertNotIn(secret, json.dumps(actual))
+
+    def test_conservation_receipt_validation_failures_keep_the_stage_and_cleanup(self):
+        killed = []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, *_args, **_options): return '{}'
+            def run(self, *_args, **_options): raise AssertionError('invalid build proof must stop before scanning')
+            def kill(self): killed.append(True)
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+            bt.probe_conservation('candidate', 'fixture-key', 'desktop', lambda *_, **__: Probe())
+        row = json.loads(next(line.removeprefix('mikka-conservation-failed ') for line in output.getvalue().splitlines()
+                              if line.startswith('mikka-conservation-failed ')))
+        self.assertEqual(row, {'kind': 'desktop', 'stage': 'preload_validation', 'code': 'official_conservation_invalid'})
+        self.assertEqual(killed, [True])
+
     def test_conservation_reads_build_receipts_and_rechecks_a_fresh_disposable_image(self):
         calls = []
         digest = {'entries': 5, 'sha256': 'f' * 64}
@@ -46,36 +174,220 @@ class Publish(unittest.TestCase):
         self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
 
     def test_build_name_must_be_absent_and_never_an_official_alias(self):
-        with patch.object(bt, '_request', return_value={'templateID': 'previous-version'}):
+        with patch.object(bt, '_request', return_value={'templateID': 'previous-version', 'public': False}) as request:
             with self.assertRaisesRegex(ValueError, 'template_name_already_exists'):
                 bt.assert_new_template('mikka-old-claude', 'fixture-key')
+            request.assert_called_once_with('GET', '/templates/aliases/mikka-old-claude', 'fixture-key')
         for name in ('claude', 'codex', 'desktop', '../other'):
             with self.assertRaisesRegex(ValueError, 'template_name_invalid'):
                 bt.assert_new_template(name, 'fixture-key')
-        with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/new', 404, 'Not found', {}, None)):
+        with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/aliases/new', 404, 'Not found', {}, None)) as request:
             bt.assert_new_template('mikka-new-claude', 'fixture-key')
+            request.assert_called_once_with('GET', '/templates/aliases/mikka-new-claude', 'fixture-key')
         with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/new', 503, 'Unavailable', {}, None)):
             with self.assertRaises(HTTPError):
                 bt.assert_new_template('mikka-new-claude', 'fixture-key')
 
-    def test_model_probe_requires_each_declared_harness_and_kills_only_its_sandbox(self):
-        calls = []
-        class Probe:
-            def __init__(self, reports):
-                self.commands = self
-                self.reports = reports
-            def run(self, command, **options):
-                calls.append((command, options))
-                return SimpleNamespace(exit_code=0, stdout=json.dumps(self.reports))
-            def kill(self): calls.append('killed')
-        reports = [{'harness': 'codex', 'installed': True, 'version': None, 'models': ['fixture-model']}]
-        factory = lambda *args, **kwargs: Probe(reports)
-        self.assertEqual(bt.probe_models('tpl1', 'codex', 'fixture-key', factory), reports)
-        self.assertIn('--probe-models', calls[0][0])
-        self.assertEqual(calls[-1], 'killed')
-        with self.assertRaisesRegex(RuntimeError, 'model_probe_missing claude_code'):
-            bt.probe_models('tpl1', 'desktop', 'fixture-key', factory)
-        self.assertEqual(calls[-1], 'killed')
+    def test_reads_the_completed_anonymous_probe_without_starting_another_node_or_cli(self):
+        for kind in bt.KINDS:
+            receipt = model_receipt(kind)
+            sandbox = ModelSandbox(receipt)
+            result = bt.probe_models('tpl1', kind, 'fixture-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+            expected = receipt['reports'] if kind == 'desktop' else [row for row in receipt['reports'] if row['harness'] == ('claude_code' if kind == 'claude' else 'codex')]
+            self.assertEqual(result, expected)
+            self.assertEqual([call[0] for call in sandbox.calls], ['run', 'read', 'read', 'read', 'kill'])
+            command = sandbox.calls[0][1]
+            self.assertIn(bt.ANONYMOUS_WORKER_READY, command)
+            self.assertIn('test ! -w /home/user/.mikka/preloaded-models.json', command)
+            self.assertIn('test ! -e /home/user/.mikka/worker/device.json', command)
+            self.assertNotIn('--probe-models', command)
+            self.assertNotIn('node ', command)
+
+    def test_model_receipt_rejects_wrong_release_or_selection_and_incomplete_catalogues(self):
+        original = model_receipt('claude')
+        changes = [
+            lambda row: row.update(version=2),
+            lambda row: row.update(version=True),
+            lambda row: row.update(sourceCommit='e' * 40),
+            lambda row: row.update(workerSha='e' * 40),
+            lambda row: row.update(credential='must-not-be-accepted'),
+            lambda row: row['manifest'].update(kind='desktop'),
+            lambda row: row['manifest']['original']['claude_code'].update(sha256='f' * 64),
+            lambda row: row['binaries'].update(claude_code='/opt/mikka/private-claude'),
+            lambda row: row['binaries'].pop('codex'),
+            lambda row: row['reports'].pop(),
+            lambda row: row['reports'][1].update(harness='claude_code'),
+            lambda row: row['reports'][0].update(installed=False),
+            lambda row: row['reports'][0].update(models=[]),
+            lambda row: row['reports'][0].update(modelSlots=[]),
+            lambda row: row['reports'][0]['modelSlots'][0].update(slot='not-reported'),
+            lambda row: row['reports'][0].update(defaultModelSlot='not-reported'),
+            lambda row: row['reports'][0].update(credential='must-not-be-accepted'),
+        ]
+        for change in changes:
+            invalid = copy.deepcopy(original)
+            change(invalid)
+            sandbox = ModelSandbox(original)
+            sandbox.receipt = invalid
+            with self.subTest(change=change), self.assertRaises((RuntimeError, ValueError)):
+                bt.probe_models('tpl1', 'claude', 'fixture-key', original['sourceCommit'], original['workerSha'], lambda *_, **__: sandbox)
+            self.assertEqual(sandbox.calls[-1], ('kill',))
+
+    def test_fresh_worker_and_manifest_cannot_self_attest_a_different_build(self):
+        receipt = model_receipt()
+        for field in ('source_commit', 'worker_sha'):
+            sandbox = ModelSandbox(receipt)
+            setattr(sandbox, field, 'e' * 40)
+            with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'model_receipt_worker_'):
+                bt.probe_models('tpl1', 'desktop', 'fixture-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+            self.assertEqual(sandbox.calls[-1], ('kill',))
+        sandbox = ModelSandbox(receipt)
+        sandbox.receipt = copy.deepcopy(receipt)
+        sandbox.receipt['workerSha'] = sandbox.worker_sha = 'e' * 40
+        with self.assertRaisesRegex(RuntimeError, 'model_receipt_worker_mismatch'):
+            bt.probe_models('tpl1', 'desktop', 'fixture-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+        # A matching receipt cannot replace the manifest's official CLI with a
+        # private binary, even when both files agree with one another.
+        receipt = model_receipt('claude')
+        receipt['manifest']['added']['claude_code'] = {'path': '/opt/mikka/private-claude', 'sha256': 'b' * 64}
+        sandbox = ModelSandbox(receipt)
+        with self.assertRaisesRegex(ValueError, 'official_cli_manifest_invalid'):
+            bt.probe_models('tpl1', 'claude', 'fixture-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+        self.assertEqual(sandbox.calls[-1], ('kill',))
+
+    def test_missing_or_unready_receipt_fails_without_a_cold_probe_fallback_and_still_cleans_up(self):
+        receipt = model_receipt()
+        for failure in (FileNotFoundError(), PermissionError(), 'not-ready'):
+            sandbox = ModelSandbox(receipt)
+            if failure == 'not-ready': sandbox.exit_code = 1
+            else: sandbox.read_error = failure
+            with self.subTest(failure=failure), self.assertRaises((OSError, RuntimeError)):
+                bt.probe_models('tpl1', 'desktop', 'fixture-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+            self.assertEqual(sandbox.calls[-1], ('kill',))
+            self.assertEqual(sum(call[0] == 'run' for call in sandbox.calls), 1)
+
+    def test_model_probe_timeout_records_only_safe_counts_and_preserves_the_failure(self):
+        class TimeoutException(Exception): pass
+        for stage in ('ready_check', 'receipt_read'):
+            with self.subTest(stage=stage):
+                failure = TimeoutException('private transport detail')
+                cause = OSError('private connection detail')
+                receipt = model_receipt('codex')
+                class Probe(ModelSandbox):
+                    def run(self, command, **options):
+                        result = super().run(command, **options)
+                        if stage == 'ready_check': raise failure from cause
+                        return result
+                    def read(self, path, **options):
+                        if path.endswith('preloaded-models.json'):
+                            self.calls.append(('read', path, options))
+                            raise failure from cause
+                        return super().read(path, **options)
+                sandbox = Probe(receipt)
+                def factory(*args, **options):
+                    sandbox.calls.append(('create', args, options))
+                    return sandbox
+                log = io.StringIO()
+                with patch.object(bt.time, 'monotonic', side_effect=[100, 145.25]), patch.object(bt.sys, 'stderr', log):
+                    with self.assertRaises(TimeoutException) as raised:
+                        bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], factory)
+                self.assertIs(raised.exception, failure)
+                self.assertIs(raised.exception.__cause__, cause)
+                expected_calls = ['create', 'run', 'kill'] if stage == 'ready_check' else ['create', 'run', 'read', 'read', 'read', 'kill']
+                self.assertEqual([call[0] for call in sandbox.calls], expected_calls)
+                self.assertEqual(sandbox.calls[0][2]['timeout'], 60)
+                self.assertEqual(sandbox.calls[1][2]['timeout'], 45)
+                self.assertNotIn('--probe-models', sandbox.calls[1][1])
+                self.assertNotIn('request_timeout', sandbox.calls[1][2])
+                self.assertTrue(all(call[2]['request_timeout'] == 30 for call in sandbox.calls if call[0] == 'read'))
+                self.assertEqual(json.loads(log.getvalue()), {
+                    'event': 'mikka_model_probe_failed', 'kind': 'codex', 'stage': stage, 'error': 'timeout',
+                    'bytes': {'workerIdentity': None if stage == 'ready_check' else len(receipt['workerSha'] + '\n'),
+                              'manifest': None if stage == 'ready_check' else len(json.dumps(receipt['manifest']).encode('utf-8')),
+                              'receipt': None},
+                    'elapsedMs': 45250, 'receiptJsonReceived': False,
+                })
+                self.assertNotIn('private', log.getvalue())
+
+    def test_model_probe_receipt_errors_record_only_the_completed_reads(self):
+        receipt = model_receipt('claude')
+        invalid = {**receipt, 'credential': 'private-凭证'}
+        cases = [
+            (None, RuntimeError('private read error'), 'receipt_read', 'read_failed', False),
+            ('{"private-凭证":', None, 'receipt_parse', 'invalid_json', False),
+            (json.dumps(invalid, ensure_ascii=False), None, 'receipt_validate', 'identity_invalid', True),
+            (json.dumps(receipt), RuntimeError('private validation error'), 'receipt_validate', 'unexpected', True),
+        ]
+        for raw, failure, stage, category, parsed in cases:
+            with self.subTest(stage=stage, category=category):
+                class Probe(ModelSandbox):
+                    def read(self, path, **options):
+                        if path.endswith('preloaded-models.json'):
+                            self.calls.append(('read', path, options))
+                            if raw is None: raise failure
+                            return raw
+                        return super().read(path, **options)
+                sandbox = Probe(receipt)
+                log = io.StringIO()
+                validator = bt.validate_model_receipt
+                with patch.object(bt.time, 'monotonic', side_effect=[10, 11]), patch.object(bt.sys, 'stderr', log), \
+                        patch.object(bt, 'validate_model_receipt', side_effect=failure if category == 'unexpected' else validator):
+                    with self.assertRaises((RuntimeError, json.JSONDecodeError)) as raised:
+                        bt.probe_models('private-template', 'claude', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+                if failure is not None: self.assertIs(raised.exception, failure)
+                self.assertEqual([call[0] for call in sandbox.calls], ['run', 'read', 'read', 'read', 'kill'])
+                self.assertEqual(json.loads(log.getvalue()), {
+                    'event': 'mikka_model_probe_failed', 'kind': 'claude', 'stage': stage, 'error': category,
+                    'bytes': {'workerIdentity': len(receipt['workerSha'] + '\n'),
+                              'manifest': len(json.dumps(receipt['manifest']).encode('utf-8')),
+                              'receipt': None if raw is None else len(raw.encode('utf-8'))},
+                    'elapsedMs': 1000, 'receiptJsonReceived': parsed,
+                })
+                self.assertNotIn('private', log.getvalue())
+                self.assertNotIn('凭证', log.getvalue())
+
+    def test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error(self):
+        for log_fails in (False, True):
+            with self.subTest(log_fails=log_fails):
+                failure = TimeoutError('private receipt read failure')
+                cause = OSError('private transport cause')
+                receipt = model_receipt('codex')
+                class Probe(ModelSandbox):
+                    def read(self, path, **options):
+                        if path.endswith('preloaded-models.json'):
+                            self.calls.append(('read', path, options))
+                            raise failure from cause
+                        return super().read(path, **options)
+                    def kill(self):
+                        self.calls.append(('kill',))
+                        raise RuntimeError('private cleanup failure')
+                class Log(io.StringIO):
+                    def write(self, message):
+                        if log_fails:
+                            raise OSError('private logging failure')
+                        return super().write(message)
+                log = Log()
+                sandbox = Probe(receipt)
+                with patch.object(bt.sys, 'stderr', log):
+                    with self.assertRaises(TimeoutError) as raised:
+                        bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+                self.assertIs(raised.exception, failure)
+                self.assertIs(raised.exception.__cause__, cause)
+                self.assertEqual([call[0] for call in sandbox.calls], ['run', 'read', 'read', 'read', 'kill'])
+                self.assertEqual(failure.__notes__, (['model_probe_diagnostic_failed'] if log_fails else []) + ['model_probe_cleanup_failed'])
+                self.assertNotIn('private', log.getvalue())
+
+    def test_model_probe_success_still_fails_if_its_sandbox_cannot_be_cleaned_up(self):
+        failure = RuntimeError('private cleanup failure')
+        receipt = model_receipt('codex')
+        class Probe(ModelSandbox):
+            def kill(self): raise failure
+        log = io.StringIO()
+        with patch.object(bt.sys, 'stderr', log):
+            with self.assertRaises(RuntimeError) as raised:
+                bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: Probe(receipt))
+        self.assertIs(raised.exception, failure)
+        self.assertEqual(log.getvalue(), '')
 
     def test_capability_manifest_matches_template_kinds_and_task_environment(self):
         manifest = json.loads((bt.ROOT / 'scripts/e2b/template-capabilities.json').read_text())
@@ -132,6 +444,9 @@ class Publish(unittest.TestCase):
             verify = next(i for i, command in enumerate(commands) if 'official-files.py verify' in command)
             self.assertLess(capture, install)
             self.assertLess(install, verify)
+            self.assertLess(commands.index(bt.NPM_RUNTIME_CHECK), verify)
+            self.assertNotIn('--e2b-finalization', commands[verify])
+            self.assertIn(f'--e2b-finalization {kind}', called['ready'])
             self.assertIn(' '.join(['a' * 40, 'b' * 40, kind]), commands[install])
             self.assertFalse(any('apt-get' in command or 'ln -sf' in command or 'systemctl' in command for command in commands))
             self.assertEqual(called['start'], 'bash /opt/mikka/start-prebuilt.sh')
@@ -169,7 +484,12 @@ class Publish(unittest.TestCase):
                    'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
                    'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
                                        'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
-                   'runtimeAuthorization': {'source': 'http_server_link', 'complete': True, 'truncated': False, 'extraRemoteCalls': 0},
+                   'runtimeAuthorization': {'source': 'http_server_link', 'scope': 'daemon_http_server_link_and_task_fetch',
+                                            'complete': True, 'truncated': False, 'extraRemoteCalls': 0,
+                                            'hostAuthorizationComplete': True, 'allFirstPartyHttpComplete': False,
+                                            'basis': 'host_authorization_census_and_closed_mcp_business_paths',
+                                            'mcpHttpTiming': mcp_timing('run-' + kind, harness), 'observedProviderEvents': 1,
+                                            'officialDelivery': 'best_effort_not_a_complete_call_count'},
                    'replyVerifiedAfterTool': True, 'toolEvidence': {'toolCallHash': 'd' * 16, 'outcome': 'ok'},
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
@@ -187,6 +507,37 @@ class Publish(unittest.TestCase):
         invalid['templates']['desktop']['conservation']['after']['sha256'] = 'e' * 64
         with self.assertRaisesRegex(ValueError, 'release_conservation_invalid desktop'):
             bt.verify_release_evidence(invalid)
+
+    def test_publication_keeps_child_lifecycle_unknown_and_refuses_missing_or_overstated_observations(self):
+        valid = mcp_timing('run-codex', 'codex')
+        check = lambda value: bt.observed_mcp_business_evidence(value, valid['runIdHash'], 'codex')
+        self.assertTrue(check(valid), 'a missing child close is retained; it is not an extra auth request')
+        for field, changed in [('runIdHash', 'f' * 16), ('harness', 'claude_code'), ('generationCoverage', 'complete'),
+                               ('allFirstPartyHttpComplete', True), ('remoteMcpServerCount', 1), ('remoteMcpServerCount', False),
+                               ('childPathAuditVersion', 2), ('childLifecycleComplete', True), ('truncated', True),
+                               ('rejectedEvents', 1), ('requests', []), ('observedChildren', 0)]:
+            value = copy.deepcopy(valid)
+            value[field] = changed
+            self.assertFalse(check(value), field)
+        self.assertFalse(check(None))
+        for mutate in [lambda value: value.pop('remoteMcpServerCount'),
+                       lambda value: value['children'][0].pop('closedAt'),
+                       lambda value: value['children'][0].update(lastSequence=4),
+                       lambda value: value['requests'][0].update(operation='permission_check'),
+                       lambda value: value['requests'][0].update(sequence=2),
+                       lambda value: value['requests'][0].update(status=503),
+                       lambda value: value['requests'][0].update(status=None),
+                       lambda value: value['requests'][0].pop('status'),
+                       lambda value: value['requests'].append(copy.deepcopy(value['requests'][0]))]:
+            value = copy.deepcopy(valid)
+            mutate(value)
+            self.assertFalse(check(value))
+        pending = copy.deepcopy(valid)
+        pending['observedComplete'] = False
+        pending['children'][0].update(sent=2, lastSequence=4)
+        pending['requests'].append({'child': 1, 'sequence': 2, 'operation': 'decision_record', 'startedAt': 1800,
+                                    'endedAt': None, 'durationMs': None, 'status': None, 'outcome': 'pending'})
+        self.assertTrue(check(pending), 'known pending business work cannot become a permission-only count')
 
     def test_patches_public_and_verifies_ready(self):
         opener, calls = fake({'public': True, 'buildStatus': 'ready', 'builds': [{'buildID': 'b1', 'status': 'ready'}]})

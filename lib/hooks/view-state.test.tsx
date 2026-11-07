@@ -4,6 +4,7 @@ import { act, StrictMode, useCallback, type Dispatch, type SetStateAction } from
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import { ViewStateProvider, useViewScroll, useViewState } from './view-state'
+import { clearChatDrafts } from '../chat-drafts'
 
 const browser = new Window({ url: 'https://mikka.example/en' })
 let root: Root
@@ -12,7 +13,7 @@ let createRoot: typeof import('react-dom/client')['createRoot']
 let update: Dispatch<SetStateAction<string>>
 
 before(async () => {
-  for (const key of ['window', 'document', 'HTMLElement', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
+  for (const key of ['window', 'document', 'sessionStorage', 'HTMLElement', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
 })
@@ -51,6 +52,72 @@ test('account and workspace scopes keep their state separate', async () => {
   assert.equal(container.textContent, '')
   await renderReader()
   assert.equal(container.textContent, 'private draft')
+})
+
+test('a retired account or workspace cannot write late results back into window storage', async () => {
+  await renderReader()
+  await act(async () => update('private draft'))
+  const finishPreviousScope = update
+  await renderReader('other-person:other-workspace')
+  browser.sessionStorage.removeItem('mikka:view:v1:person:workspace:draft:thread-a')
+  await act(async () => finishPreviousScope('late response from the previous scope'))
+  assert.equal(container.textContent, '')
+  assert.equal(browser.sessionStorage.getItem('mikka:view:v1:person:workspace:draft:thread-a'), null)
+  await renderReader()
+  assert.equal(container.textContent, '')
+})
+
+test('a result arriving after sign-out cannot restore erased drafts', async () => {
+  await renderReader()
+  await act(async () => update('private draft'))
+  const finishAfterSignOut = update
+  await act(async () => root.render(null))
+  clearChatDrafts()
+  await act(async () => finishAfterSignOut('late failed submission'))
+  assert.equal(browser.sessionStorage.length, 0)
+  await renderReader()
+  assert.equal(container.textContent, '')
+})
+
+test('logout cleanup removes scoped names and drafts while preserving unrelated window preferences', async () => {
+  await renderReader()
+  await act(async () => update('private draft'))
+  browser.sessionStorage.setItem('mikka:draft:person:legacy-thread', 'legacy draft')
+  browser.sessionStorage.setItem('mikka:view:v1:person:workspace:board:filters', JSON.stringify({ project: ['private project'] }))
+  browser.sessionStorage.setItem('unrelated-window-preference', 'preserved')
+  clearChatDrafts()
+  assert.equal(browser.sessionStorage.getItem('mikka:draft:person:legacy-thread'), null)
+  assert.equal(browser.sessionStorage.getItem('mikka:view:v1:person:workspace:draft:thread-a'), null)
+  assert.equal(browser.sessionStorage.getItem('mikka:view:v1:person:workspace:board:filters'), null)
+  assert.equal(browser.sessionStorage.getItem('unrelated-window-preference'), 'preserved')
+})
+
+test('logout cleanup retires a still-mounted scope before a late async setter can refill storage', async () => {
+  await renderReader()
+  await act(async () => update('private draft'))
+  const finishWhileLogoutWaits = update
+  // endSession clears these keys before awaiting persistent read cleanup and navigation.
+  clearChatDrafts()
+  await act(async () => finishWhileLogoutWaits('late result while logout waits'))
+  assert.equal(browser.sessionStorage.getItem('mikka:view:v1:person:workspace:draft:thread-a'), null)
+  await act(async () => root.render(null))
+  await renderReader()
+  assert.equal(container.textContent, '', 'a later login must not restore the previous session')
+  await act(async () => update('new session draft'))
+  assert.equal(container.textContent, 'new session draft', 'a new provider remains writable')
+})
+
+test('StrictMode effect replay leaves the current scope writable and preserves offscreen completions', async () => {
+  const render = (shown: boolean) => act(async () => root.render(<StrictMode><ViewStateProvider scope="person:workspace">{shown ? <Reader id="thread-a" /> : <span />}</ViewStateProvider></StrictMode>))
+  await render(true)
+  await act(async () => update('unsent'))
+  const finishWhileAway = update
+  await render(false)
+  await act(async () => finishWhileAway('failed while another page was open'))
+  await render(true)
+  assert.equal(container.textContent, 'failed while another page was open')
+  await act(async () => update('edited after returning'))
+  assert.equal(container.textContent, 'edited after returning')
 })
 
 test('a new object uses its own initial choice rather than the previous object default', async () => {

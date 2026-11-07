@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { createShare, listArtifacts as listOwnArtifacts, listRunArtifacts as listOwnRunArtifacts, readArtifact, readArtifactContent, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
+import { createShare, listArtifacts as listOwnArtifacts, listRunArtifacts as listOwnRunArtifacts, readArtifact, readArtifactContent, reportIssueKey, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
 async function getUserId(): Promise<string> {
@@ -33,7 +33,7 @@ export async function getArtifact(artifactId: string): Promise<(ArtifactDetail &
   // The owner's home channel carries this artifact's key (lib/live/artifacts.ts).
   if (!found) return null
   const { ownerListRead } = await import('@/lib/live/list-read-server')
-  return { ...found, live: await ownerListRead(userId) }
+  return { ...found, issueKey: await reportIssueKey(userId, found), live: await ownerListRead(userId) }
 }
 
 /** A Markdown artifact's text at `version`, for the reader. HTML is only ever served through its sandboxed frame. */

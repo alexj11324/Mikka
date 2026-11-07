@@ -5,10 +5,13 @@ import { canonicalJSON, digest, makeSnapshot, parseDefinition, type AgentDefinit
 import { platformEffectiveTools } from './builtin'
 import { compareReports, type EvalReport } from './evals'
 import { assertSafeImprovement, caseFromFailure, proposeImprovement, type FailureCode, type FailureEvidence } from './improvement'
+import type { ToolOutcome } from './instrument'
 
 export interface AgentScope { ownerId: string; botId: string | null; workspaceId: string | null }
 export interface DefinitionVersion { id: string; version: number; definition: AgentDefinition; digest: string; source: 'builtin' | 'user' | 'improvement'; base_version: string | null; created_at?: Date | string }
 export interface AgentExecution { id: string; snapshot: DefinitionSnapshot; status: 'running' | 'completed' | 'failed' }
+interface ExecutionState { id: string; status: AgentExecution['status']; tool_allowed: boolean; failure_cases: boolean; revision: number; revision_id: string }
+interface FinishedExecution { failureCases: boolean; revision: number; revisionId: string }
 export interface ImprovementProposal { id: string; baseline_id: string; candidate_id: string; evidence: FailureEvidence[]; rationale: string; status: 'proposed' | 'approved' | 'rejected' }
 export interface EvaluationRecord { id: string; proposal_id: string; mode: 'fixture' | 'live'; model: string | null; status: 'running' | 'completed' | 'failed'; reports: { baseline: EvalReport; candidate: EvalReport } | null }
 export class AgentKitError extends Error {
@@ -149,13 +152,23 @@ export class AgentKitStore {
   /** The checks a hook makes, without the snapshot. The snapshot is immutable
    * (agent_kit_snapshot_guard), so these facts are read from the row itself
    * under the same lock, never from a cached copy; status is always fresh. */
-  private async executionState(client: PoolClient, scope: AgentScope, id: string, toolName: string | null, lock = false) {
+  private executionState(client: PoolClient, scope: AgentScope, target: string, toolName: string | null, lock?: boolean): Promise<ExecutionState>
+  private executionState(client: PoolClient, scope: AgentScope, target: { executionKey: string }, toolName: null, lock: true): Promise<ExecutionState | null>
+  private async executionState(client: PoolClient, scope: AgentScope, target: string | { executionKey: string }, toolName: string | null, lock = false): Promise<ExecutionState | null> {
     await this.authority(client,scope)
-    const { rows } = await client.query<{ status: AgentExecution['status']; tool_allowed: boolean; failure_cases: boolean; revision: number; revision_id: string }>(
-      `select status,coalesce(snapshot->'effectiveTools' ? $4::text,false) as tool_allowed,coalesce(snapshot->'definition'->'hooks' ? 'failure_cases',false) as failure_cases,(snapshot->>'revision')::int as revision,snapshot->>'revisionId' as revision_id from agent_kit_executions where owner_id=$1 and bot_key=$2 and id=$3${lock ? ' for update' : ''}`,
-      [...params(scope),uuid(id),toolName ?? ''])
-    if (!rows[0]) throw new AgentKitError('agentExecutionNotFound',404)
-    return rows[0]
+    const byId = typeof target === 'string'
+    const value = byId ? uuid(target) : target.executionKey
+    // The ordinary id projection stays unchanged. Recovery selects the id in
+    // this same scoped/locked query, never by loading the immutable snapshot.
+    const query = byId
+      ? `select status,coalesce(snapshot->'effectiveTools' ? $4::text,false) as tool_allowed,coalesce(snapshot->'definition'->'hooks' ? 'failure_cases',false) as failure_cases,(snapshot->>'revision')::int as revision,snapshot->>'revisionId' as revision_id from agent_kit_executions where owner_id=$1 and bot_key=$2 and id=$3${lock ? ' for update' : ''}`
+      : "select id,status,coalesce(snapshot->'effectiveTools' ? $4::text,false) as tool_allowed,coalesce(snapshot->'definition'->'hooks' ? 'failure_cases',false) as failure_cases,(snapshot->>'revision')::int as revision,snapshot->>'revisionId' as revision_id from agent_kit_executions where owner_id=$1 and bot_key=$2 and execution_key=$3 for update"
+    const { rows } = await client.query<ExecutionState>(query,[...params(scope),value,toolName ?? ''])
+    if (!rows[0]) {
+      if (!byId) return null
+      throw new AgentKitError('agentExecutionNotFound',404)
+    }
+    return { ...rows[0], id:byId ? value : rows[0].id }
   }
   /** Whether the execution is still running, read fresh without its snapshot. */
   async executionStatus(scope: AgentScope, id: string) { return this.transaction(async client => (await this.executionState(client,scope,id,null)).status) }
@@ -168,14 +181,19 @@ export class AgentKitStore {
     }
     await client.query('insert into agent_kit_events(execution_id,owner_id,bot_key,event_key,kind,payload) values($1,$2,$3,$4,$5,$6)',[executionId,...params(scope),eventKey,kind,JSON.stringify(payload)])
   }
-  async recordTool(scope: AgentScope, executionId: string, callId: string, toolName: string, phase: 'start' | 'finish', outcome?: 'ok' | 'error' | 'approval_pending') {
+  async recordTool(scope: AgentScope, executionId: string, callId: string, toolName: string, phase: 'start' | 'finish', outcome?: ToolOutcome) {
     z.string().min(1).max(180).parse(callId)
     return this.transaction(async client => {
       const execution = await this.executionState(client,scope,executionId,toolName,true)
       if (!execution.tool_allowed) throw new AgentKitError('agentToolNotAllowed',403)
       const eventKey = `${callId}:${phase}`
       if (execution.status !== 'running') {
-        const old = await client.query('select 1 from agent_kit_events where execution_id=$1 and event_key=$2',[executionId,eventKey])
+        // 停止 closes the execution without waiting for a running tool. Its
+        // exact started call may finish auditing later; no new call can start.
+        // Fold that proof into the existing replay lookup, with no extra read.
+        const old = await client.query(`select 1 from agent_kit_events where execution_id=$1 and
+          (event_key=$2 or ($3::boolean and event_key=$4 and kind='tool_started' and payload->>'toolName'=$5)) limit 1`,
+        [executionId,eventKey,phase==='finish' && execution.status==='completed',`${callId}:start`,toolName])
         if (!old.rowCount) throw new AgentKitError('agentExecutionClosed')
       }
       await this.event(client,scope,executionId,eventKey,phase === 'start' ? 'tool_started' : 'tool_finished',{ toolName, ...(phase === 'finish' ? { outcome: outcome ?? 'error' } : {}) })
@@ -187,20 +205,32 @@ export class AgentKitStore {
     })
   }
   /** Returns what a caller needs afterwards (the failure hook and revision), so it need not read the snapshot again. */
-  async finishExecution(scope: AgentScope, executionId: string, status: 'completed' | 'failed', failure?: FailureCode): Promise<{ failureCases: boolean; revision: number; revisionId: string }> {
+  async finishExecution(scope: AgentScope, executionId: string, status: 'completed' | 'failed', failure?: FailureCode): Promise<FinishedExecution> {
     return this.transaction(async client => {
       const execution = await this.executionState(client,scope,executionId,null,true)
-      await this.event(client,scope,executionId,'finished','run_finished',{ status, failure:failure ?? null })
-      if (execution.status === 'running') await client.query('update agent_kit_executions set status=$2,finished_at=now() where id=$1',[executionId,status])
-      if (failure && execution.failure_cases) {
-        const previous = await client.query('select 1 from agent_kit_events where execution_id=$1 and event_key=$2',[executionId,'failure'])
-        if (!previous.rowCount) {
-          const evidence: FailureEvidence = { executionId,code:failure,toolName:null }
-          await this.event(client,scope,executionId,'failure','failure_case',{ evidence, testCase:caseFromFailure(evidence) })
-        }
-      }
-      return { failureCases:execution.failure_cases,revision:execution.revision,revisionId:execution.revision_id }
+      return this.finishExecutionState(client,scope,execution,status,failure)
     })
+  }
+  /** Terminal preparation recovery only: begin may have committed before its step could return an id. */
+  async failExecutionByKey(scope: AgentScope, executionKey: string): Promise<FinishedExecution | null> {
+    z.string().min(1).max(240).parse(executionKey)
+    return this.transaction(async client => {
+      const execution = await this.executionState(client,scope,{ executionKey },null,true)
+      return execution ? this.finishExecutionState(client,scope,execution,'failed','turn_failed') : null
+    })
+  }
+  private async finishExecutionState(client: PoolClient, scope: AgentScope, execution: ExecutionState, status: 'completed' | 'failed', failure?: FailureCode): Promise<FinishedExecution> {
+    const executionId = execution.id
+    await this.event(client,scope,executionId,'finished','run_finished',{ status, failure:failure ?? null })
+    if (execution.status === 'running') await client.query('update agent_kit_executions set status=$2,finished_at=now() where id=$1',[executionId,status])
+    if (failure && execution.failure_cases) {
+      const previous = await client.query('select 1 from agent_kit_events where execution_id=$1 and event_key=$2',[executionId,'failure'])
+      if (!previous.rowCount) {
+        const evidence: FailureEvidence = { executionId,code:failure,toolName:null }
+        await this.event(client,scope,executionId,'failure','failure_case',{ evidence, testCase:caseFromFailure(evidence) })
+      }
+    }
+    return { failureCases:execution.failure_cases,revision:execution.revision,revisionId:execution.revision_id }
   }
   async dataset(scope: AgentScope) {
     return this.transaction(async client => {

@@ -3,6 +3,7 @@ import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { runIdHash } from "./tracing"
 import { runRuntimeTimings } from "./run-runtime-timing"
+import { McpHttpTimingCollector, MCP_HTTP_BODY_LIMIT } from './mcp-http-timing'
 
 type Harness = "claude_code" | "codex"
 type EventName = "claude_code.api_request" | "claude_code.api_error" | "claude_code.tool_result"
@@ -14,7 +15,8 @@ type TimingEvent = { name: EventName; kind: "provider" | "tool"; receivedAt: num
 
 /** Official exporters are best effort. Neither an empty collection nor a
  * normal CLI exit proves that the exporter flushed every request. The actual
- * Mikka HTTP receipt independently covers all sends during the run. */
+ * host HTTP receipt independently covers HttpServerLink and taskFetch sends.
+ * Child business requests have a separate, explicitly observed-only receipt. */
 export type OfficialCliTiming = {
   version: 1; source: "official_cli_otlp"; runIdHash: string; harness: Harness
   startedAt: number; endedAt: number; collection: "best_effort"; flush: "not_confirmed"
@@ -93,10 +95,12 @@ export class OfficialCliTimingCollector {
     if (typeof candidate !== "string" || !EVENTS.has(candidate as EventName) || !candidate.startsWith(`${this.harness}.`)) { this.ignoredRecords++; return }
     const name = candidate as EventName, durationMs = number(fields.duration_ms, 86_400_000)
     if (durationMs === null) { this.invalidEvents++; return }
-    const nanos = typeof record?.timeUnixNano === "string" && /^\d{1,20}$/.test(record.timeUnixNano) ? record.timeUnixNano : null
+    // OTLP LogRecord uses zero for unknown time, not an event timestamp or identity.
+    const nanos = typeof record?.timeUnixNano === "string" && /^\d{1,20}$/.test(record.timeUnixNano)
+      && Number(record.timeUnixNano) > 0 ? record.timeUnixNano : null
     const timestamp = typeof fields["event.timestamp"] === "string" && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(fields["event.timestamp"])
       ? Date.parse(fields["event.timestamp"]) : NaN
-    const eventAt = Number.isFinite(timestamp) ? timestamp : nanos ? Number(nanos) / 1_000_000 : null
+    const eventAt = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : nanos ? Number(nanos) / 1_000_000 : null
     const sequence = number(fields["event.sequence"], Number.MAX_SAFE_INTEGER)
     const identity = nanos || sequence !== null ? `${name}:${nanos}:${sequence}` : null
     if (identity && this.seen.has(identity)) { this.duplicates++; return }
@@ -121,18 +125,24 @@ export class OfficialCliTimingCollector {
   }
 }
 
-/** Call only for an explicitly configured acceptance task. The receiver is
+/** Called by a trusted cloud host or an explicitly configured diagnostic task. The receiver is
  * loopback-only and adds no remote I/O or provider interception. Configuration
  * is per child process; no official CLI file or config file is modified.
  * Sources: code.claude.com/docs/en/monitoring-usage and
  * openai/codex/codex-rs/otel/{src/config.rs,src/provider.rs,README.md}. */
-export async function startCliTimingCollector({ runId, harness }: { runId: string; harness: Harness; model?: string }) {
+export async function startCliTimingCollector({ runId, harness, remoteMcpServerCount }: {
+  runId: string; harness: Harness; model?: string; remoteMcpServerCount: number
+}) {
   const collector = new OfficialCliTimingCollector(runId, harness)
+  const mcpCollector = new McpHttpTimingCollector(runId, harness, remoteMcpServerCount)
   const path = `/v1/logs/${randomBytes(16).toString("hex")}`
+  const mcpPath = `/v1/mcp-http/${randomBytes(16).toString('hex')}`
   const server = createServer({ maxHeaderSize: 8192 }, (request, response) => {
-    if (request.method !== "POST" || request.url !== path || !/^application\/json(?:;|$)/i.test(request.headers["content-type"] ?? "")
+    const target = request.url === mcpPath ? mcpCollector : collector
+    const limit = request.url === mcpPath ? MCP_HTTP_BODY_LIMIT : OFFICIAL_TIMING_BODY_LIMIT
+    if (request.method !== "POST" || ![path, mcpPath].includes(request.url ?? '') || !/^application\/json(?:;|$)/i.test(request.headers["content-type"] ?? "")
       || (request.headers["content-encoding"] && request.headers["content-encoding"] !== "identity")) {
-      collector.reject(); response.writeHead(400).end(); request.resume(); return
+      target.reject(); response.writeHead(400).end(); request.resume(); return
     }
     void (async () => {
       let bytes = 0
@@ -140,12 +150,12 @@ export async function startCliTimingCollector({ runId, harness }: { runId: strin
       try {
         for await (const chunk of request) {
           bytes += chunk.length
-          if (bytes > OFFICIAL_TIMING_BODY_LIMIT) { collector.reject(); collector.truncate(); response.writeHead(413).end(); request.destroy(); return }
+          if (bytes > limit) { target.reject(); target.truncate(); response.writeHead(413).end(); request.destroy(); return }
           chunks.push(chunk)
         }
-        const accepted = collector.accept(JSON.parse(Buffer.concat(chunks).toString("utf8")))
+        const accepted = target.accept(JSON.parse(Buffer.concat(chunks).toString("utf8")))
         response.writeHead(accepted ? 200 : 400, { "content-type": "application/json" }).end("{}")
-      } catch { collector.reject(); if (!response.writableEnded) response.writeHead(400).end() }
+      } catch { target.reject(); if (!response.writableEnded) response.writeHead(400).end() }
       finally { chunks.length = 0 }
     })()
   })
@@ -156,12 +166,15 @@ export async function startCliTimingCollector({ runId, harness }: { runId: strin
     server.once("error", reject)
     server.listen(0, "127.0.0.1", () => { server.off("error", reject); resolve() })
   })
-  server.on("error", () => collector.reject())
-  const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}${path}`
+  server.on("error", () => { collector.reject(); mcpCollector.reject() })
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  const endpoint = `${origin}${path}`
+  // Codex requires compression unset; preserve the validated Claude configuration.
   const env: Record<string, string> = {
     OTEL_METRICS_EXPORTER: "none", OTEL_TRACES_EXPORTER: "none", OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: endpoint,
-    OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "", OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: "none",
+    OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "",
+    ...(harness === "claude_code" ? { OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: "none" } : {}),
     OTEL_LOGS_EXPORT_INTERVAL: "1000", OTEL_BLRP_SCHEDULE_DELAY: "1000",
     OTEL_LOG_USER_PROMPTS: "0", OTEL_LOG_ASSISTANT_RESPONSES: "0", OTEL_LOG_TOOL_DETAILS: "0", OTEL_LOG_TOOL_CONTENT: "0", OTEL_LOG_RAW_API_BODIES: "0",
     ...(harness === "claude_code" ? { CLAUDE_CODE_ENABLE_TELEMETRY: "1" } : {}),
@@ -169,12 +182,20 @@ export async function startCliTimingCollector({ runId, harness }: { runId: strin
   const args = harness === "codex" ? ["-c", `otel.exporter={otlp-http={endpoint=${JSON.stringify(endpoint)},protocol="json",headers={}}}`,
     "-c", "otel.trace_exporter=\"none\"", "-c", "otel.metrics_exporter=\"none\"", "-c", "otel.log_user_prompt=false",
     "-c", "otel.log_agent_responses=false", "-c", "otel.log_guardian_assessments=false"] : []
+  // Rust OTLP accepts only gzip/zstd strings; both env fallbacks must be absent
+  // for its default uncompressed JSON. Apply after merging the machine env.
+  const unsetEnv = harness === "codex"
+    ? ["OTEL_EXPORTER_OTLP_LOGS_COMPRESSION", "OTEL_EXPORTER_OTLP_COMPRESSION"] : []
   let closed: Promise<void> | undefined
-  return { env, args, close: ({ cliExitObserved = false }: { cliExitObserved?: boolean } = {}) => closed ??= (async () => {
+  // Only the Mikka MCP child's private environment receives this URL. It is
+  // not an authorization token and is never placed in the task or CLI env.
+  return { env, args, unsetEnv, mcpHttpObservationUrl: `${origin}${mcpPath}`,
+    close: ({ cliExitObserved = false }: { cliExitObserved?: boolean } = {}) => closed ??= (async () => {
     await new Promise<void>(resolve => {
-      const timer = setTimeout(() => { collector.truncate(); server.closeAllConnections() }, 1000)
+      const timer = setTimeout(() => { collector.truncate(); mcpCollector.truncate(); server.closeAllConnections() }, 1000)
       server.close(() => { clearTimeout(timer); resolve() })
     })
     runRuntimeTimings.attachOfficialCliTiming(runId, collector.finish(cliExitObserved))
+    runRuntimeTimings.attachMcpHttpTiming(runId, mcpCollector.finish())
   })() }
 }

@@ -42,6 +42,21 @@ describe("run completion contract", () => {
     expect(runReport.safeParse({ ...emptyRunReport(), resetsAt: "tomorrow" }).success).toBe(false)
   })
 
+  it('binds terminal safety evidence to an acknowledged final checkpoint', () => {
+    const observedAt = '2026-11-07T12:01:00.000Z', checkpointTakenAt = '2026-11-07T12:00:00.000Z'
+    const safePoint = { session: 'exited', checkpoint: 'ready', observedAt, checkpointTakenAt }
+    expect(runCompletion.parse({ stopReason: 'asked_human', report: { ...report, safePoint } }).report.safePoint).toEqual(safePoint)
+    expect(runReport.parse({ ...report, safePoint: { session: 'exited', checkpoint: 'unavailable', observedAt } }).safePoint?.checkpoint).toBe('unavailable')
+    for (const invalid of [
+      { ...safePoint, checkpointTakenAt: undefined },
+      { ...safePoint, checkpoint: 'unavailable' },
+      { ...safePoint, observedAt: 'yesterday' },
+      { ...safePoint, observedAt: '2026-11-07T11:59:59.000Z' },
+      { ...safePoint, session: 'detached' },
+      { ...safePoint, worktree: '/private/path' },
+    ]) expect(runReport.safeParse({ ...report, safePoint: invalid }).success).toBe(false)
+  })
+
   it("preserves the daemon check receipt and exact process failure without accepting malformed SHA", () => {
     const checked = {
       ...emptyRunReport(),

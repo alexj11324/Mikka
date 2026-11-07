@@ -45,7 +45,7 @@ const report = {
   timeZone: 'UTC',
   captureClock: createCaptureClock(started, process.env.MIKKA_DESKTOP_CAPTURE_TIME),
   nativeViewports: [],
-  themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], startedAt: new Date(started).toISOString(), screens: [],
+  themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], excludedDesktopOnly: ['data-desktop-only: server row, Settings › 服务器'], startedAt: new Date(started).toISOString(), screens: [],
 }
 await mkdir(output, { recursive: true })
 let scope

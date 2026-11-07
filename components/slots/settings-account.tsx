@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { ProfileName } from '@/components/settings/profile-name'
+import { DesktopServerSettings } from '@/components/settings/desktop-server-settings'
 import { avatarImageSrc } from '@/lib/default-avatar'
 import { FieldError } from '@/components/ui/field'
 import { useAccount } from '@/hooks/settings/use-account'
@@ -48,6 +49,9 @@ export function AccountSettings({ user, onSignOut, signingOut }: SettingsAccount
       <SettingRow title={t('name')}><ProfileName name={user.name || ''} /></SettingRow>
       <SettingRow title={t('email')}><span className="break-all">{user.email}</span></SettingRow>
     </SettingsSection>
+
+    {/* Desktop only: which server this account is on (#1557). Renders nothing on the web. */}
+    <DesktopServerSettings />
 
     {/* The row names the thing, the button the action; deleting the account sits alone in 危险操作 (settings-pages). */}
     <SettingsSection id="session-heading">

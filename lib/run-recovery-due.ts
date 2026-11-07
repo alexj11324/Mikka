@@ -3,6 +3,7 @@ import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { ENDED_RUN_STATUSES } from './run-outcome'
 import { LEASED_RUN_STATUSES } from './run-retry'
 import { pendingTaskReportsSql } from './coordinator/group-factory'
+import { THREAD_MACHINE_DUE_AT_SQL } from './cloud-computer/thread-lifecycle-due'
 
 /** Mirrors OUTCOME_WINDOW_DAYS in lib/run-outcome-judge.ts (kept import-free for this query). */
 const OUTCOME_WINDOW_DAYS = 7
@@ -30,7 +31,7 @@ export const RUN_RECOVERY_DUE_SQL = `
     -- sweepExpiredRunLeases: a lease is lost once leaseExpiresAt < now.
     SELECT min("leaseExpiresAt") + interval '1 millisecond' AS at, 'leases' AS sweep FROM agent_runs WHERE status = ANY($1::text[]) AND "leaseExpiresAt" IS NOT NULL
     -- ... and a queued retry whose device stopped being seen (the gateway is asked again each minute).
-    UNION ALL SELECT min(CASE WHEN d."lastSeenAt" + $2::interval > now() THEN d."lastSeenAt" + $2::interval + interval '1 millisecond' ELSE now() + interval '${RECHECK}' END), 'leases'
+    UNION ALL SELECT min(CASE WHEN d."lastSeenAt" <= now() AND d."lastSeenAt" + $2::interval > now() THEN d."lastSeenAt" + $2::interval + interval '1 millisecond' ELSE now() + interval '${RECHECK}' END), 'leases'
       FROM agent_runs r LEFT JOIN devices d ON d.id = r."deviceId" WHERE r.status = 'queued' AND r."retryOf" IS NOT NULL
     -- reconcileCloudMachines: a running machine is checked with E2B once idle for an hour, then every MACHINE_RECHECK.
     UNION ALL SELECT min(CASE WHEN greatest("lastActiveAt" + interval '1 hour', "provisionLeaseUntil") > now()
@@ -39,10 +40,10 @@ export const RUN_RECOVERY_DUE_SQL = `
     -- judgePendingOutcomes: an ended run is judged at once, and again OUTCOME_RETRY_AT_SQL after an unanswered try.
     UNION ALL SELECT min(coalesce(${OUTCOME_RETRY_AT_SQL} + interval '1 millisecond', now())), 'outcomes' FROM agent_runs
       WHERE outcome IS NULL AND status = ANY($3::text[]) AND coalesce("finishedAt", "updatedAt") > now() - make_interval(days => ${OUTCOME_WINDOW_DAYS})
-    -- endClosedTaskMachines: a paused task sandbox whose task closed or was deleted.
-    UNION ALL SELECT now(), 'taskMachines' WHERE EXISTS (SELECT 1 FROM thread_machines m LEFT JOIN issues i ON i.id = m."issueId"
-      WHERE m.state = 'paused' AND m."issueId" IS NOT NULL
-        AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate') OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL))
+    -- Every task machine has a persisted lifecycle deadline independent of a per-run Workflow.
+    UNION ALL SELECT min(${THREAD_MACHINE_DUE_AT_SQL}), 'taskMachines'
+      FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
+      LEFT JOIN issues i ON i.id=m."issueId"
     -- retrySandboxKills: a kill that did not go through is tried again each minute.
     UNION ALL SELECT min(coalesce("lastAttemptAt", "createdAt") + interval '${RECHECK}'), 'sandboxKills' FROM sandbox_kill_retries
     -- resumePendingGroupTurns: queued or orphaned turns at the minute cadence, a pending judgment at its retry time.

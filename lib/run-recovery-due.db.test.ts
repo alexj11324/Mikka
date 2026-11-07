@@ -106,13 +106,37 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     await clear()
   })
 
-  await t.test('a paused task sandbox is due now once its task closes', async () => {
+  await t.test('a retained task machine has a deadline and task close wakes running or paused machines', async () => {
     const issue = randomUUID()
+    const runId = await run({ status: 'succeeded', outcome: 'resolved' })
+    const retention = new Date(Date.now()+7*24*60*60_000)
     await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Task','{}','todo','none')`, [issue])
-    await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId",state,"snapshotId","operationId") VALUES ($1,'owner',$2,$3,'paused','snapshot',$4)`, [randomUUID(), randomUUID(), issue, randomUUID()])
-    assert.equal(await due(), null, 'an open task keeps its paused sandbox')
+    await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId",state,"sandboxId","snapshotId","operationId",lifecycle,"lifecycleAt")
+      VALUES ($1,'owner',$2,$3,'paused','retained','snapshot',$4,'{"observedStatus":"succeeded","observedStop":false,"observedClosed":false}',$5)`, [runId, randomUUID(), issue, randomUUID(), retention])
+    assert.equal(await due(), retention.getTime(), 'paused retention remains owned after the per-run monitor exits')
     await pool.query(`UPDATE issues SET status='done'`)
     near(await due(), await dbNow())
+    await pool.query(`UPDATE thread_machines SET state='running'`)
+    near(await due(), await dbNow(), 2000)
+    await clear()
+  })
+
+  await t.test('semantic run changes wake machine recovery; heartbeats preserve the exact deadline', async () => {
+    const runId = await run({ status: 'queued' }), at = new Date(Date.now()+90_000)
+    await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId",state,"sandboxId","snapshotId","operationId",lifecycle,"lifecycleAt")
+      VALUES ($1,'owner',$2,'running','live','snapshot',$3,'{"observedStatus":"queued","observedStop":false,"observedClosed":false}',$4)`, [runId, randomUUID(), randomUUID(), at])
+    assert.equal(await due(), at.getTime())
+    await pool.query(`UPDATE agent_runs SET "updatedAt"=now()`)
+    assert.equal(await due(), at.getTime(), 'activity timestamps do not trigger a new maintenance loop')
+    await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now()`)
+    near(await due(), await dbNow())
+    await pool.query(`UPDATE agent_runs SET status='stopped',outcome='resolved'; UPDATE thread_machines SET state='ended',
+      lifecycle='{"observedStatus":"stopped","observedStop":true,"observedClosed":false,"phase":"retire_failed"}'`)
+    assert.equal(await due(), at.getTime(), 'an ended row still owns its unacknowledged provider kill')
+    await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,"lifecycleAt"=NULL`)
+    assert.equal(await due(), null, 'a confirmed retirement releases the timer')
+    await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$1,"lifecycleAt"=$2`, [randomUUID(), at])
+    assert.equal(await due(), at.getTime(), 'a legacy creation token without an expiry still requires reconciliation')
     await clear()
   })
 

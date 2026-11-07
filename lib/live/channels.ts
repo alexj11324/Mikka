@@ -1,4 +1,4 @@
-import { LiveChannel, type LiveRuntime, type LiveSubscriptionOptions } from './channel'
+import { LiveChannel, type LiveRefresh, type LiveRuntime, type LiveSubscriptionOptions } from './channel'
 import type { LiveKind } from './events'
 
 /** A page may display an owned task from another workspace. Share by its authorized scope. */
@@ -16,7 +16,7 @@ export class LiveChannels {
     return connected
   }
 
-  subscribe(workspaceId: string | null, kind: LiveKind, id: string, keys: readonly string[], refresh: (key: string) => unknown, options?: LiveSubscriptionOptions) {
+  subscribe(workspaceId: string | null, kind: LiveKind, id: string, keys: readonly string[], refresh: LiveRefresh, options?: LiveSubscriptionOptions) {
     let entry = this.channels.get(workspaceId)
     if (!entry) {
       entry = { channel: new LiveChannel(this.runtime(workspaceId)), subscribers: 0 }

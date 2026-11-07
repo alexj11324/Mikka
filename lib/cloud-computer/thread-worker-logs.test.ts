@@ -108,8 +108,12 @@ test('runtime refresh failures name their actual phase without logging provider 
         warnings.push(args)
       })
       let released = false
-      const query = async (sql: string) => {
+      const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
+          assert.deepEqual(values, [run.id, actor.userId])
+          return { rows: [{ issueId: run.issueId }], rowCount: 1 }
+        }
         if (sql.startsWith('SELECT t.* FROM factory_tasks')) return { rows: [], rowCount: 0 }
         if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run }], rowCount: 1 }
         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine }], rowCount: 1 }
@@ -182,8 +186,12 @@ test('question wake failures identify the rejecting boundary without exposing pr
         if (scenario === 'diagnostic_sink') throw new Error('PRIVATE-CREDENTIAL sink')
         warnings.push(args)
       })
-      const query = async (sql: string) => {
+      const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
+          assert.deepEqual(values, [run.id, actor.userId])
+          return { rows: [{ issueId: run.issueId }], rowCount: 1 }
+        }
         if (sql.startsWith('SELECT r.*')) return { rows: phase === 'admission' ? [] : [{ ...run,
           ...(phase === 'execution_identity' ? { agentDefinition: { executionIdentity: {} } } : {}),
         }], rowCount: phase === 'admission' ? 0 : 1 }

@@ -5,6 +5,7 @@ import { API_URL } from '@/lib/config'
 import { endLostSession } from '@/lib/session'
 import { apiCache } from './api-cache'
 import { mobileTraceHeaders } from './tracing'
+import { presenceScope } from './presence-scope'
 
 const WORKSPACE_KEY = 'mikka_workspace'
 
@@ -54,6 +55,10 @@ export const REQUEST_TIMEOUT_MS = 30_000
 export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}): Promise<T> {
   const context = apiCache.context()
   const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders() }
+  if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET') {
+    const proof = presenceScope.token(context)
+    if (proof) headers['x-mikka-presence-scope'] = proof
+  }
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? REQUEST_TIMEOUT_MS)

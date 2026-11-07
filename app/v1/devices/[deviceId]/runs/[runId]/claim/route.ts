@@ -13,7 +13,7 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
-import type { NativeLease } from '@mikka/protocol/subscription'
+import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
 import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
@@ -340,7 +340,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       if (!subscription) return undefined
       if (!leaseDevice(device, deviceId, caller.scopeDeviceId)) throw new Error('Run credential device unavailable')
       const runtime = subscriptionRuntime(true, false, { exportAccessLease: true })
-      return runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal)
+      return runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal,
+        request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1')
     }),
     cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
       if (!githubRepository || !await linkedGitHubAccountId(caller.userId)) return undefined

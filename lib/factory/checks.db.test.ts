@@ -3078,7 +3078,7 @@ test(
           }
         },
       );
-      await t.test('first-use cloud single-review flow uses fresh task capabilities without waking or installing a parent', async () => {
+      await t.test('first-use cloud single-review flow keeps its task VM without waking or installing a parent', async () => {
         const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction } = await import('./transaction');
         const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const;
         const saved = new Map(names.map(name => [name, process.env[name]]));
@@ -3158,7 +3158,10 @@ test(
             const execute = await initialDispatch(userId, { binding: factoryBinding(current.task), agentId: runtime.agentId, deviceRepoId: repository.id });
             const producerWorker = await machines.start(actor, execute.runId);
             assert.notEqual(producerWorker.deviceId, parentId);
-            await terminal(execute.runId, `producer-${issueId}`, false, report => { report.publish = { commit: sha }; });
+            await terminal(execute.runId, `producer-${issueId}`, false, report => {
+              report.publish = { commit: sha };
+              report.safePoint = { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() };
+            });
             current = await cloudStore.apply(userId, execute.binding, randomUUID(), { action: 'candidate', runId: execute.runId,
               candidate: { sha, repository: remote, environment: `device:${producerWorker.deviceId}`, scope: `issue:${issueId}` } });
             current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'Offline worker report fixture',
@@ -3232,10 +3235,16 @@ test(
               assert.equal(checkRun.kind, 'acceptance');
               assert.equal(checkRun.baseBranch, sha);
               assert.equal((attempt.output.check as { stage: string }).stage, stage);
+              // The fixture captures the durable enqueue above. Execute its
+              // real prior-stage handoff before starting the queued review.
+              await factoryAutomaticRuntime.park(db, actor, execute.runId, checkRun.id);
               const worker = await machines.start(actor, checkRun.id);
               assert.notEqual(worker.deviceId, parentId);
-              assert.notEqual(worker.deviceId, producerWorker.deviceId);
+              assert.equal(worker.deviceId, producerWorker.deviceId, 'independent stages retain their task VM');
+              assert.notEqual(worker.token, producerWorker.token, 'the next stage receives a fresh worker credential');
               await terminal(checkRun.id, `${stage}-${issueId}`);
+              assert.notEqual((await db.query('SELECT "sessionId" FROM agent_runs WHERE id=$1', [checkRun.id])).rows[0].sessionId,
+                `producer-${issueId}`, 'the independent review has its own native session on the same VM');
               await cloudReconcile.run(userId, checkRun.id);
               current = await cloudStore.read(userId, current.task.id);
               assert.equal(current.task.stage, 'approval');
@@ -3246,7 +3255,7 @@ test(
             assert.equal(current.task.route.flowVersion, 2);
             assert.equal(current.attempts.filter(attempt => attempt.stage === 'review').length, 1);
             assert.equal(current.attempts.filter(attempt => attempt.stage === 'verify').length, 0);
-            assert.deepEqual(createdTaskRuns, [execute.runId, ...queuedHandoffs], 'only the independent producer and single-review task VMs are requested');
+            assert.deepEqual(createdTaskRuns, [execute.runId], 'the producer creates one task VM and the single-review stage reuses it');
             const taskDecisions = networkRequests.slice(providerCount) as { model?: unknown }[];
             assert.ok(taskDecisions.every(request => request.model === DECISION_MODEL),
               'only the existing loopback Decision fixture runs; the global fetch guard rejects every external coding provider');

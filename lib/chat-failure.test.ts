@@ -7,6 +7,14 @@ import { failureLine } from '../apps/mobile/lib/chat-failure'
 const person = { from: 'person' }, reply = { from: 'coordinator' }, event = { from: 'event' }
 const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)'
 
+test('exhausted tool recovery has a stable friendly failure and retry',()=>{
+  const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
+  assert.deepEqual(failure,{kind:'failed',reason:'tools'})
+  assert.deepEqual(failureMessageKey(failure),{namespace:'Coordinator',key:'replyToolUnavailable'})
+  assert.deepEqual(failureLine(failure),{text:'这次回复没能完成，请重试',retry:true,recovery:null})
+  assert.equal(chatFailure({working:true,error:'model_tool_unavailable'}),null)
+})
+
 test('the observed model streaming balance refusal has safe copy and a model recovery without retry', () => {
   const failure = chatFailure({ working: false, error: balance })!
   assert.deepEqual(failure, { kind: 'failed', reason: 'balance' })

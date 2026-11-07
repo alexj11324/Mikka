@@ -15,6 +15,8 @@ import { localSetupController } from './local-setup'
 
 export interface BridgeOptions {
   appUrl: string
+  /** The current account's server (#1557); the daemon installed here registers with it. */
+  serverUrl?: () => string
   rendererUrl?: string
   /** The desktop's flavor: 添加这台电脑 installs the matching daemon. */
   flavor?: 'prod' | 'dev'
@@ -47,7 +49,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
     })
   }
 
-  const installer = sshInstaller ?? new SshInstaller(options.appUrl, options.mintEnrollment, state => {
+  const installer = sshInstaller ?? new SshInstaller(options.serverUrl ?? options.appUrl, options.mintEnrollment, state => {
     for (const contents of webContents.getAllWebContents()) {
       if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), options.rendererUrl ?? options.appUrl)) contents.send(IPC.sshChanged, state)
     }

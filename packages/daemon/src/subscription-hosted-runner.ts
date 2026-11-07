@@ -90,9 +90,14 @@ export async function createHostedBotRunner(host: {
   link: ServerLink
   journal?: Pick<RunJournal, 'get'>
   binaries?: Partial<Record<'codex' | 'claude_code', string>>
+  /** Trusted host diagnostic opt-in; never changes the assignment or its authority. */
+  collectCliTiming?: boolean
   /** Kept for old trusted worker callers; no inner container is created. */
   dockerSocket?: 'unix:///run/mikka-container/docker.sock'
   computerBroker?: ComputerBroker
+  /** Claude's shortcut menu is not exhaustive: a prepared lease may confirm
+   * its exact model through the run's current account catalogue. Codex still
+   * requires its CLI report; neither path substitutes another model. */
   reportedModels?: (harness: 'codex' | 'claude_code') => Promise<Pick<HarnessInfo, 'models' | 'modelSlots'> | null>
 }) {
   if (process.platform !== 'linux' || process.getuid?.() === 0) throw unavailable('host_unsupported')
@@ -168,18 +173,21 @@ export async function createHostedBotRunner(host: {
         if (!await gate.checkLive()) { gate.revoke(); throw unavailable('run_closed') }
         // The claim already prepared owner-bound secrets; local metadata/model
         // work may run alongside the old-server one-time lease fallback.
-        const [prepared] = await Promise.all([
+        const [prepared, report] = await Promise.all([
           selected ? prepareSubscriptionCredentials(assignment, {
             link: host.link, signal: lifetime.signal, onCredential: options.onCredential,
             onRefreshError: () => { options.log.warn({ event: 'subscription_refresh_deferred' }, 'Subscription renewal will retry in the background') },
           }) : Promise.resolve(undefined),
-          selected && host.reportedModels ? daemonTracer.span('daemon.adapter.model_report', trace, async () => {
-            const report = await host.reportedModels!(kind)
-            if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw Error('subscription_model_not_reported')
-          }) : Promise.resolve(),
+          selected && host.reportedModels ? daemonTracer.span('daemon.adapter.model_report', trace,
+            () => host.reportedModels!(kind)).catch(() => null) : Promise.resolve(undefined),
         ])
         subscription = prepared
         assertOpen()
+        if (selected && host.reportedModels && (!options.model || options.model !== subscription?.first.modelId ||
+          (!(report && harnessReportsModel(report, options.model) === true) &&
+            !(kind === 'claude_code' && subscription?.first.modelCatalogueVerified === true)))) {
+          throw Error('subscription_model_not_reported')
+        }
         const paths = runPaths(host.stateDir, assignment.runId)
         mkdirSync(paths.runDir, { recursive: true, mode: 0o700 })
         const cwd = realpathSync(options.cwd)
@@ -222,13 +230,17 @@ export async function createHostedBotRunner(host: {
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, '--captures'], env: {},
         } : undefined
-        if (assignment.taskEnv?.CLOUD_STARTUP_TIMING === '1') {
-          cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model })
+        if (host.collectCliTiming === true || assignment.taskEnv?.CLOUD_STARTUP_TIMING === '1') {
+          try {
+            cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
+              remoteMcpServerCount: options.apps?.apps.length ?? 0 })
+          } catch { /* Missing observation is unavailable evidence, not a business or authorization failure. */ }
           assertOpen()
         }
         const spawnHosted = (config: SpawnOptions, oauthToken?: string): SpawnedProcess => {
           assertOpen()
           const childEnv = { ...env, ...config.env, ...cliTiming?.env }
+          for (const key of cliTiming?.unsetEnv ?? []) delete childEnv[key]
           if (oauthToken !== undefined) {
             childEnv.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = '3'
             delete childEnv.CLAUDE_CODE_OAUTH_TOKEN
@@ -280,6 +292,7 @@ export async function createHostedBotRunner(host: {
             } } : {}),
           })
         const runtimeOptions = { ...options, env, cwd, machineEnvironment: true as const,
+          mcpHttpObservationUrl: cliTiming?.mcpHttpObservationUrl,
           credential: apiKey, ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}) }
         const session = previous && !continuation
           ? await adapter.resume(previous.sessionId, runtimeOptions) : await adapter.start(runtimeOptions)

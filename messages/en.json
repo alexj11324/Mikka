@@ -873,7 +873,6 @@
     "setup": "Set up repository and agent",
     "offlineSince": "Offline · {time}",
     "noAgent": "No agent found",
-    "sandboxBlocked": "{agents} found, sandbox unavailable",
     "sandboxMissing": "This device could not install {packages}. Install them with the system package manager and it recovers on its own.",
     "sandboxRefused": "This machine does not let regular users create a sandbox. An administrator needs to enable user namespaces.",
     "sandboxUserns": "Ubuntu stops regular users from creating the sandbox here (AppArmor's user namespace restriction). Lift it on this device and the agents come back on their own.",
@@ -945,9 +944,12 @@
       "cancelled": "Cancelled",
       "manual": "Connect manually"
     },
-    "runsModels": "Runs {models}",
-    "runsCount": "{count, plural, one {Runs # preferred model} other {Runs # preferred models}}",
-    "runsNone": "Runs no preferred model",
+    "computers": "Computers",
+    "noRuns": "{reason} · gets no runs",
+    "noSubscriptionRuns": "{reason} · gets no subscription runs",
+    "notScheduling": "Not taking part",
+    "needsUpdate": "Mikka needs an update",
+    "sandboxUnavailable": "Sandbox unavailable",
     "offlineNoRuns": "Offline · gets no runs",
     "local": {
       "adding": "Adding this computer",
@@ -3231,6 +3233,7 @@
     },
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "replyToolUnavailable": "This reply could not be completed. Please try again.",
     "apiBalance": "Insufficient API balance",
     "subscriptionRefusal": {
       "unavailable": "Chosen subscription unavailable",
@@ -3473,6 +3476,7 @@
       "separator": " · ",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all",
+      "card": {"thinkingDone": "Done thinking", "finished": "{tool} finished", "failed": "Failed", "args": "Arguments", "result": "Result", "waiting": "Waiting for result…", "empty": "No arguments or result", "usedTools": "Used {count, plural, one {# tool} other {# tools}}", "usingTools": "Using tools…", "showAll": "Show all", "showLess": "Show less"},
       "detail": {
         "handedTo": "Handed to",
         "query": "Query",
@@ -4728,6 +4732,7 @@
     "mergeConfirm": "Merge"
   },
   "ArtifactReview": {
+    "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · Made when the thread finishes",
       "preparing": "Artifact · Preparing the PR",
@@ -5060,6 +5065,19 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "installer_failed": {
+      "default": "Mikka could not install. Open the local installation log for details.",
+      "node_required": "Install Node.js 22 or newer, then retry.",
+      "unsupported_os": "Use a Linux or macOS computer.",
+      "npm_permission": "Mikka cannot write its install directory. Check your user directory permissions, then retry.",
+      "npm_cache_permission": "Mikka cannot write its npm cache. Check your user directory permissions, then retry.",
+      "cancelled": "Installation was cancelled. You can retry.",
+      "timeout": "Installation timed out. Check the connection and retry.",
+      "service_failed": "The Mikka service could not start. Open the installation log and retry.",
+      "connection_failed": "The device could not connect to the signed-in account. Check your connection and retry.",
+      "command_failed": "An installation command failed. Open the installation log for the full error."
+    },
+    "model_tool_unavailable": { "default": "This reply could not be completed. Please try again." },
     "desktop_client_update_required": { "default": "Update Mikka to continue" },
     "desktop_session_expired": { "default": "Sign in to Mikka again" },
     "desktop_session_changed": { "default": "The account or workspace changed. Try again" },
@@ -5304,6 +5322,34 @@
       "providerOn": "{on}/{total} on",
       "firstModel": "Tasks start with",
       "keyProvider": "Provider"
+    }
+  },
+  "DesktopServer": {
+    "title": "Choose a server",
+    "server": "Server",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "Self-hosted server",
+    "address": "Server address",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "change": "Change",
+    "switch": "Switch",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect {name} and sign out of its accounts?",
+    "version": "Version {version}",
+    "errors": {
+      "invalidAddress": "This address isn't valid",
+      "httpsRequired": "The address must start with https://",
+      "unreachable": "Can't reach this server",
+      "notMikka": "This address isn't a Mikka server",
+      "serverUpdate": "This server runs {version}, which is too old. Update the server to the latest version",
+      "serverUpdateUnknown": "This server is too old. Update the server to the latest version",
+      "appUpdate": "Update Mikka to {version} or later",
+      "appUpdateUnknown": "Update Mikka to the latest version",
+      "failed": "That didn't work"
     }
   }
 }

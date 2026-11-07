@@ -15,6 +15,15 @@ import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
+type UploadedFile = { path: string; data: string };
+function uploadedFiles(path: string | UploadedFile[], body?: unknown): UploadedFile[] {
+  return typeof path === 'string' ? [{ path, data: typeof body === 'string' ? body : '' }] : path;
+}
+function uploadedBootstrap(path: string | UploadedFile[], body?: unknown): { deviceId: string; credential: string } | undefined {
+  const file = uploadedFiles(path, body).find(file => /^\/run\/mikka-viewer\/thread-[\w-]+\.json$/.test(file.path));
+  return file ? JSON.parse(file.data) : undefined;
+}
+
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
   const u = new URL(url);
@@ -39,7 +48,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     process.env.E2B_CODEX_TEMPLATE = 'codex'; // The fixture agent runs Codex (decision 2026-11-01-2335).
     const db = await import("../db");
     appPool = db.pool;
-    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineAction, threadMachineProvider, RetainedTaskMachineUnavailable } = await import("./thread-machines");
+    const { ensureThreadMachine, parkThreadMachine, retainThreadMachineForHandoff, endClosedTaskMachines, keepTailBeforeKill, threadMachineAction, threadMachineProvider, RetainedTaskMachineUnavailable } = await import("./thread-machines");
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), otherBot = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), otherRepo = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-task@example.invalid',true,now(),now())`, [owner]);
@@ -182,7 +191,15 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(warnings.map(line => JSON.parse(line)), [{ event: 'thread_runtime_start_failed', runId: f.next,
         phase: 'connect', errorClass: 'Error', errorCode: 'unknown', status: 503 }]);
       assert.doesNotMatch(warnings.join('\n'), /PRIVATE-CREDENTIAL|original-native-session/);
-      assert.deepEqual(await history(), before, 'only the temporary wake lease is acquired and released; no answer, VM or native session changes');
+      const after = await history();
+      assert.deepEqual(after.runs, before.runs);
+      assert.deepEqual(after.question, before.question);
+      const withoutLifecycle = (rows: Record<string, unknown>[]) => rows.map(({ lifecycle: _lifecycle, lifecycleAt: _at, epoch: _epoch, ...identity }) => identity);
+      assert.deepEqual(withoutLifecycle(after.machines), withoutLifecycle(before.machines), 'no answer, VM or native session changes');
+      const wake = after.machines.find(row => row.runId === f.next)!;
+      assert.equal(wake.epoch, before.machines.find(row => row.runId === f.next)!.epoch + 1, 'a failed wake still fences older maintenance');
+      assert.equal(wake.lifecycle.owner, 'run-recovery');
+      assert.ok(wake.lifecycleAt, 'failure leaves durable recovery responsibility');
       assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
     });
     await t.test('a resumed provider VM with paused DB placement retries bootstrap instead of falsely returning ready', async () => {
@@ -206,7 +223,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       try {
         fixture.provider.connect=async id=>{
           fixture.calls.push(`connect:${id}`);
-          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string,body:string)=>{if(path.startsWith('/run/mikka-viewer/thread-'))bootstrap=JSON.parse(body);}},
+          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string|UploadedFile[],body:unknown)=>{bootstrap=uploadedBootstrap(path,body)??bootstrap;}},
             commands:{run:async(command:string)=>{
               if(command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')){
                 assert.ok(bootstrap);assert.equal(bootstrap.deviceId,f.prior.device);
@@ -369,9 +386,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         fixture.calls.push(`connect:${id}`);
         return {
           sandboxId: id,
-          files: { read: async () => sha, write: async (path: string, body: string) => {
-            assert.match(path, /^\/run\/mikka-viewer\/thread-/);
-            bootstrap = JSON.parse(body);
+          files: { read: async () => sha, write: async (path: string | UploadedFile[], body: unknown) => {
+            bootstrap = uploadedBootstrap(path,body);
+            assert.ok(bootstrap);
           } },
           commands: { run: async (command: string) => {
             let stdout = '';
@@ -1150,18 +1167,29 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
       try {
         const runId = await run(await task()), fixture = fake();
-        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0;
+        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0;
         fixture.provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
           files: {
             read: async () => 'a'.repeat(40),
-            write: async (path: string, body: string) => {
-              if (path.startsWith('/run/mikka-viewer/thread-')) bootstrap = JSON.parse(body);
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              uploads++;
+              const files = uploadedFiles(path,body), primary = files.find(file => file.path.endsWith('.json'));
+              bootstrap = uploadedBootstrap(path,body);
+              assert.ok(primary); assert.ok(bootstrap);
+              assert.deepEqual(body, { user: 'root', useOctetStream: false });
+              const locator = files.find(file => file.path === primary.path + '.run');
+              assert.ok(locator);
+              assert.deepEqual(JSON.parse(locator.data), { version: 1, runId, bootstrapSha256: createHash('sha256').update(primary.data).digest('hex') });
+              assert.ok(!locator.data.includes(bootstrap.credential));
+              assert.equal('initialRunId' in JSON.parse(primary.data), false, 'old strict bootstrap consumers retain the original schema');
             },
           },
           commands: { run: async (command: string) => {
             if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap);
+              assert.equal(uploads, 1, 'the optional locator shares the existing upload RPC');
+              assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
               await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
@@ -1205,9 +1233,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
           sandboxId: `sandbox-${op}`,
           files: {
             read: async () => 'a'.repeat(40),
-            write: async (path: string, body: string) => {
-              if (path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
-              files.set(path, body);
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              for (const file of uploadedFiles(path,body)) {
+                if (file.path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
+                files.set(file.path, file.data);
+              }
             },
           },
           commands: { run: async (command: string) => {
@@ -1245,7 +1275,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         } };
         provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
-          files: { read: async () => 'a'.repeat(40), write: async (path: string) => { if (path.startsWith('/run/mikka-viewer/thread-')) throw new Error('fixture reached worker handoff'); } },
+          files: { read: async () => 'a'.repeat(40), write: async (path: string | UploadedFile[]) => { if (uploadedFiles(path).some(file => file.path.startsWith('/run/mikka-viewer/thread-'))) throw new Error('fixture reached worker handoff'); } },
           commands,
         }) as never;
         await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /fixture reached worker handoff/);
@@ -1336,13 +1366,14 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(await machine(before.runId), { state: "paused", sandboxId: before.sandboxId, deviceId: before.device, issueId }, "the other harness's machine stays parked for the task");
     });
 
-    await t.test("a sandbox whose run has not ended is never taken over", async () => {
+    await t.test("a sandbox whose run has not ended is neither taken over nor replaced", async () => {
       const issueId = await task();
       const before = await parked(issueId, { status: "queued" });
       const next = await run(issueId);
       const { calls, provider } = fake();
-      await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
-      assert.deepEqual(calls, ["create"]);
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider), /maintenance in progress/);
+      assert.deepEqual(calls, []);
+      assert.equal(await machine(next), undefined);
       assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
     });
 
@@ -1366,7 +1397,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       } finally { await pool.query('UPDATE device_repos SET "remoteUrl"=$2 WHERE id=$1', [repoId, 'https://github.com/acme/app.git']); }
     });
 
-    await t.test("a finished run parks its sandbox: paused, tokens revoked, device kept; a refused pause records nothing", async () => {
+    await t.test("a finished run parks its sandbox; a refused pause retains a durable retry without claiming it paused", async () => {
       const issueId = await task();
       const runId = await run(issueId, { status: "succeeded" });
       const device = randomUUID();
@@ -1375,6 +1406,10 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'Thread worker',$3,$4,now()+interval '1 day')`, [randomUUID(), owner, randomUUID(), device]);
       await assert.rejects(parkThreadMachine(pool, actor, runId, async () => { throw new Error("503 pause refused"); }, async () => null));
       assert.equal((await machine(runId)).state, "running", "a refused pause leaves the row as it was");
+      const failed = (await pool.query('SELECT lifecycle,"lifecycleAt" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+      assert.equal(failed.lifecycle.phase, 'pause_failed');
+      assert.ok(failed.lifecycleAt, 'the durable recovery timer must retain responsibility after provider refusal');
+      assert.equal(failed.lifecycle.failures, 1);
       const paused: string[] = [];
       await parkThreadMachine(pool, actor, runId, async (id) => { paused.push(id); }, async () => "worker: run finished");
       assert.equal((await pool.query('SELECT "logTail" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0].logTail, "worker: run finished", "the worker's last output is kept before the pause");
@@ -1382,6 +1417,361 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(await machine(runId), { state: "paused", sandboxId: "sandbox-live", deviceId: device, issueId });
       assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [device])).rows[0].revokedAt);
       assert.equal((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [device])).rows[0].removedAt, null);
+    });
+
+    await t.test('parking refuses an active execution lease before touching the provider', async () => {
+      const issueId = await task(), before = await parked(issueId);
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '2 minutes' WHERE id=$1`, [before.runId]);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      let calls = 0;
+      await assert.rejects(parkThreadMachine(pool, actor, before.runId, async () => { calls++; }, async () => null));
+      assert.equal(calls, 0);
+      assert.equal((await machine(before.runId)).state, 'running');
+    });
+
+    await t.test('an immediate owner continuation transfers its safely exited running VM before the timer parks it', async () => {
+      const issueId = await task(), before = await parked(issueId), next = await run(issueId), tokenId = randomUUID();
+      await pool.query('UPDATE agent_runs SET report=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL WHERE id=$1', [before.runId,
+        JSON.stringify({ safePoint: { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() } })]);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now(),"lifecycleAt"=now()+interval '2 minutes' WHERE "runId"=$1`, [before.runId]);
+      await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'Old worker',$3,$4,now()+interval '1 day')`, [tokenId, owner, randomUUID(), before.device]);
+      const oldEpoch = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].epoch;
+      const fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider));
+      assert.deepEqual(fixture.calls, [`connect:${before.sandboxId}`], 'the already admitted next run reuses the VM without a pause or create');
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+      assert.equal((await machine(next)).deviceId, before.device);
+      assert.equal((await machine(before.runId)).sandboxId, null);
+      assert.ok((await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [next])).rows[0].epoch > oldEpoch);
+      assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt,
+        'the previous worker loses authority in the same transfer transaction');
+    });
+
+    await t.test('immediate continuation cannot bypass a native exit, lease, reconciliation or stop fence', async () => {
+      for (const blocked of ['native_exit', 'execution_lease', 'bootstrap_lease', 'reconciliation', 'pause_requested', 'retire_requested', 'stop_requested', 'other_handoff']) {
+        const issueId = await task(), before = await parked(issueId), next = await run(issueId), tokenId = randomUUID();
+        await pool.query('UPDATE agent_runs SET report=$2,"finishedAt"=now() WHERE id=$1', [before.runId,
+          JSON.stringify(blocked === 'native_exit' ? {} : { safePoint: { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() } })]);
+        await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+        if (blocked === 'execution_lease') await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'2 minutes\' WHERE id=$1', [before.runId]);
+        if (blocked === 'bootstrap_lease') await pool.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'2 minutes\' WHERE "runId"=$1', [before.runId, randomUUID()]);
+        if (blocked === 'reconciliation') await pool.query('UPDATE thread_machines SET lifecycle=$2 WHERE "runId"=$1', [before.runId, JSON.stringify({ reconcileId: randomUUID(), reconcileUntil: Date.now() + 120_000 })]);
+        if (blocked === 'pause_requested' || blocked === 'retire_requested') await pool.query('UPDATE thread_machines SET lifecycle=$2 WHERE "runId"=$1', [before.runId, JSON.stringify({ phase: blocked })]);
+        if (blocked === 'stop_requested') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [before.runId]);
+        if (blocked === 'other_handoff') await pool.query('UPDATE thread_machines SET lifecycle=$2 WHERE "runId"=$1', [before.runId, JSON.stringify({ phase: 'handoff', handoffRunId: randomUUID() })]);
+        await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'Current worker',$3,$4,now()+interval '1 day')`, [tokenId, owner, randomUUID(), before.device]);
+        const original = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+        const fixture = fake();
+        await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /provisioning in progress|runtime is busy/, blocked);
+        assert.deepEqual(fixture.calls, [], blocked);
+        assert.equal(await machine(next), undefined, blocked);
+        assert.deepEqual((await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0], original, blocked);
+        assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt, null, blocked);
+      }
+    });
+
+    await t.test('an admitted adjacent stage keeps the same live VM and fences old lifecycle callbacks', async () => {
+      const issueId = await task(), before = await parked(issueId), next = await run(issueId);
+      await pool.query(`UPDATE agent_runs SET report='{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [before.runId]);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now(),"computeSeconds"=43200 WHERE "runId"=$1`, [before.runId]);
+      const oldEpoch = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].epoch;
+      assert.equal(await retainThreadMachineForHandoff(pool, actor, before.runId, next), true);
+      let pauses = 0;
+      await parkThreadMachine(pool, actor, before.runId, async () => { pauses++; }, async () => null, undefined, { epoch: oldEpoch, sandboxId: before.sandboxId });
+      assert.equal(pauses, 0, 'an observation before the admitted handoff cannot pause the new epoch');
+      const provider = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider.provider));
+      assert.deepEqual(provider.calls, [`connect:${before.sandboxId}`]);
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+      assert.equal(Number((await pool.query('SELECT "computeSeconds" FROM thread_machines WHERE "runId"=$1', [next])).rows[0].computeSeconds), 0,
+        'an admitted new run has its own execution budget; prior compute remains on the historical row');
+      assert.equal((await machine(before.runId)).sandboxId, null);
+      assert.equal((await pool.query('SELECT "lifecycleAt" FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].lifecycleAt, null);
+    });
+
+    await t.test('an adjacent stage with another harness or repository cannot retain a running VM', async () => {
+      for (const mismatch of ['harness', 'repository']) {
+        const issueId = await task(), before = await parked(issueId), next = await run(issueId, mismatch === 'repository' ? { repo: otherRepo } : {});
+        await pool.query(`UPDATE agent_runs SET report='{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [before.runId]);
+        await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+        if (mismatch === 'harness') await pool.query(`UPDATE agent_runs SET "agentDefinition"='{"harness":"claude_code"}' WHERE id=$1`, [next]);
+        const priorEpoch = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].epoch;
+        assert.equal(await retainThreadMachineForHandoff(pool, actor, before.runId, next), false, mismatch);
+        const retained = (await pool.query('SELECT state,epoch,lifecycle FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+        assert.equal(retained.state, 'running');
+        assert.equal(retained.epoch, priorEpoch);
+        assert.equal(retained.lifecycle.handoffRunId, undefined);
+      }
+    });
+
+    await t.test('a stop that did not acknowledge is frozen after its grace, with bytes retained and claims fenced', async () => {
+      const issueId = await task(), before = await parked(issueId);
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '2 minutes',"stopRequestedAt"=now() WHERE id=$1`, [before.runId]);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      const epoch = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].epoch;
+      const fence = { epoch, sandboxId: before.sandboxId, suspendAfterStop: true };
+      let pauses = 0;
+      const pause = async () => { pauses++; };
+      await assert.rejects(parkThreadMachine(pool, actor, before.runId, pause, async () => null, undefined, fence));
+      assert.equal(pauses, 0, 'a new stop allows the worker to upload its checkpoint first');
+      await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now()-interval '31 seconds' WHERE id=$1`, [before.runId]);
+      await parkThreadMachine(pool, actor, before.runId, pause, async () => null, undefined, fence);
+      assert.equal(pauses, 1);
+      assert.equal((await machine(before.runId)).state, 'paused');
+      assert.equal((await machine(before.runId)).sandboxId, before.sandboxId, 'forced suspension never destroys the sole filesystem');
+    });
+
+    const frozenStop = async () => {
+      const issueId = await task(), before = await parked(issueId);
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '2 minutes',"stopRequestedAt"=now()-interval '31 seconds' WHERE id=$1`, [before.runId]);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      const epoch = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].epoch;
+      const fence = { epoch, sandboxId: before.sandboxId, suspendAfterStop: true };
+      return { issueId, before, fence };
+    };
+
+    await t.test('a frozen unacknowledged stop blocks another run from adopting or replacing its VM', async () => {
+      for (const repo of [repoId, otherRepo]) {
+        const { issueId, before, fence } = await frozenStop();
+        await parkThreadMachine(pool, actor, before.runId, async () => {}, async () => null, undefined, fence);
+        const next = await run(issueId, { repo }), fixture = fake();
+        await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /busy|maintenance in progress|provisioning in progress/);
+        assert.deepEqual(fixture.calls, [], 'a frozen native process still owns this task, even after its bootstrap lease was cleared');
+        assert.equal(await machine(next), undefined);
+        assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+      }
+    });
+
+    await t.test('a host terminal status cannot unfreeze a stopped VM without native exit evidence', async () => {
+      const { issueId, before, fence } = await frozenStop();
+      await parkThreadMachine(pool, actor, before.runId, async () => {}, async () => null, undefined, fence);
+      // Lease recovery can finish the DB row without hearing from its daemon.
+      await pool.query(`UPDATE agent_runs SET status='stopped',"leaseExpiresAt"=NULL,"finishedAt"=now() WHERE id=$1`, [before.runId]);
+      await pool.query(`UPDATE thread_machines SET lifecycle=lifecycle||'{"phase":"paused","reason":"retained"}'::jsonb WHERE "runId"=$1`, [before.runId]);
+      const next = await run(issueId), fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /busy|maintenance in progress/);
+      assert.deepEqual(fixture.calls, []);
+      assert.equal(await machine(next), undefined);
+      assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+      await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [before.runId,
+        JSON.stringify({ safePoint: { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() } })]);
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider));
+      assert.deepEqual(fixture.calls, [`connect:${before.sandboxId}`], 'native exit permits reuse without claiming a durable archive exists');
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+      assert.equal((await machine(before.runId)).sandboxId, null);
+    });
+
+    await t.test('a host stop terminalized before suspension still needs native exit before reuse', async () => {
+      for (const needsPause of [true, false]) {
+        const { issueId, before } = await frozenStop();
+        // The lease sweep can win before park, or the provider can already be paused.
+        await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='device_lost',"leaseExpiresAt"=NULL,"finishedAt"=now() WHERE id=$1`, [before.runId]);
+        if (needsPause) await parkThreadMachine(pool, actor, before.runId, async () => {}, async () => null);
+        else await pool.query(`UPDATE thread_machines SET state='paused' WHERE "runId"=$1`, [before.runId]);
+        const next = await run(issueId), fixture = fake();
+        await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /maintenance in progress/);
+        assert.deepEqual(fixture.calls, []);
+        assert.equal(await machine(next), undefined);
+        assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+      }
+    });
+
+    await t.test('device-lost terminalization requires native exit only when the run had actually claimed', async () => {
+      for (const claim of ['startedAt', 'sessionId', 'deviceTokenId', null]) {
+        const issueId = await task(), before = await parked(issueId, { status: 'failed' });
+        await pool.query(`UPDATE agent_runs r SET "stopReason"='device_lost',"startedAt"=$2,"sessionId"=$3,"deviceTokenId"=$4,
+          "deviceId"=m."deviceId","deviceRepoId"=m."repoId" FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`,
+          [before.runId, claim === 'startedAt' ? new Date() : null, claim === 'sessionId' ? 'native-session' : null, claim === 'deviceTokenId' ? randomUUID() : null]);
+        const fixture = fake();
+        if (claim) {
+          await assert.rejects(ensureThreadMachine(pool, actor, before.runId, fixture.provider, undefined, true), /runtime is busy/);
+          const next = await run(issueId, claim === 'deviceTokenId' ? { repo: otherRepo } : {});
+          await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /maintenance in progress|provisioning in progress/);
+          assert.deepEqual(fixture.calls, [], claim);
+          assert.equal(await machine(next), undefined);
+          assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+        } else {
+          const next = await run(issueId);
+          await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider));
+          assert.deepEqual(fixture.calls, [`connect:${before.sandboxId}`], 'an unclaimed host failure does not invent a running native process');
+        }
+      }
+    });
+
+    await t.test('runtime refresh cannot resume a frozen stop after host-only terminalization', async () => {
+      const { before, fence } = await frozenStop();
+      await parkThreadMachine(pool, actor, before.runId, async () => {}, async () => null, undefined, fence);
+      await pool.query(`UPDATE agent_runs r SET status='stopped',"leaseExpiresAt"=NULL,"finishedAt"=now(),"deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`, [before.runId]);
+      const fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, before.runId, fixture.provider, undefined, true), /runtime is busy/);
+      assert.deepEqual(fixture.calls, []);
+      assert.equal((await machine(before.runId)).state, 'paused');
+    });
+
+    await t.test('stop suspension commits its native exit barrier before provider I/O and keeps it after a lost response', async () => {
+      const { before, fence } = await frozenStop();
+      await assert.rejects(parkThreadMachine(pool, actor, before.runId, async () => {
+        const committed = (await pool.query('SELECT lifecycle FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].lifecycle;
+        assert.equal(committed.requiresNativeExit, true);
+        throw new Error('lost stop pause response');
+      }, async () => null, undefined, fence), /lost stop pause response/);
+      let saved = (await pool.query('SELECT lifecycle FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].lifecycle;
+      assert.equal(saved.requiresNativeExit, true);
+      assert.equal(saved.phase, 'pause_failed');
+      await pool.query(`UPDATE agent_runs SET status='stopped',"leaseExpiresAt"=NULL WHERE id=$1`, [before.runId]);
+      await pool.query(`UPDATE thread_machines SET state='paused' WHERE "runId"=$1`, [before.runId]);
+      await parkThreadMachine(pool, actor, before.runId, async () => { assert.fail('an observed paused VM must not be connected or paused again'); });
+      saved = (await pool.query('SELECT lifecycle FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].lifecycle;
+      assert.equal(saved.requiresNativeExit, true, 'later terminal status and pause reconciliation cannot erase the native exit requirement');
+    });
+
+    await t.test('automatic retirement refuses a reopened task or an unverified final archive', async () => {
+      const issueId = await task(), before = await parked(issueId);
+      const epoch = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].epoch;
+      const fence = { epoch, sandboxId: before.sandboxId, requireClosedTask: true, requireArchived: true };
+      assert.equal((await threadMachineAction(pool, actor, before.runId, 'end', fence)).state, 'paused');
+      await pool.query(`UPDATE issues SET status='done' WHERE id=$1`, [issueId]);
+      assert.equal((await threadMachineAction(pool, actor, before.runId, 'end', fence)).state, 'paused');
+      assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+      const takenAt = new Date(Date.now() - 60_000).toISOString();
+      await pool.query('INSERT INTO run_checkpoints ("runId","userId","baseCommit",patch,files,"takenAt") VALUES ($1,$2,$3,$4,0,$5)',
+        [before.runId, owner, 'a'.repeat(40), Buffer.alloc(0), takenAt]);
+      for (const observedAt of [new Date(Date.now() + 60_000).toISOString(), new Date(Date.now() - 120_000).toISOString()]) {
+        await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [before.runId,
+          JSON.stringify({ safePoint: { session: 'exited', checkpoint: 'ready', checkpointTakenAt: takenAt, observedAt } })]);
+        assert.equal((await threadMachineAction(pool, actor, before.runId, 'end', fence)).state, 'paused');
+      }
+    });
+
+    await t.test('an expired creation with a lost response recovers its exact provider identity and parks without waking it', async () => {
+      const { reconcileThreadMachine } = await import('./thread-lifecycle');
+      const issueId = await task(), before = await parked(issueId, { status: 'queued' });
+      const operationId = (await pool.query('SELECT "operationId" FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].operationId;
+      await pool.query(`UPDATE thread_machines SET state='starting',"sandboxId"=NULL,"workerLeaseId"=$2,
+        "workerLeaseUntil"=now()-interval '1 second',"lastActiveAt"=now()-interval '3 minutes',
+        lifecycle='{"phase":"create_requested","owner":"run-recovery"}',"lifecycleAt"=now() WHERE "runId"=$1`, [before.runId, randomUUID()]);
+      let pauses = 0, lookups = 0;
+      const provider = {
+        findCreated: async (id: string, workspace: string, operation: string, user: string) => {
+          assert.deepEqual([id, workspace, operation, user], [before.runId, workspaceId, operationId, owner]);
+          lookups++;
+          return { sandboxId: before.sandboxId, state: 'running' as const, startedAt: Date.now()-180_000, endAt: Date.now()+720_000 };
+        },
+        info: async () => ({ state: 'running' as const, endAt: Date.now()+720_000 }),
+        keepAlive: async () => { assert.fail('an expired unclaimed allocation has no authority to renew'); },
+      };
+      const park: NonNullable<Parameters<typeof reconcileThreadMachine>[3]>['park'] = (p, a, id, fence) =>
+        parkThreadMachine(p, a, id, async vm => { assert.equal(vm, before.sandboxId); pauses++; }, async () => null, undefined, fence);
+      await reconcileThreadMachine(pool, actor, before.runId, { provider, park });
+      assert.equal(lookups, 1);
+      assert.equal(pauses, 1);
+      assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+      assert.equal((await machine(before.runId)).state, 'paused');
+      assert.equal((await pool.query('SELECT "workerLeaseUntil" FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].workerLeaseUntil, null);
+    });
+
+    await t.test('a cancelled creation with a lost response is found and killed before its provider reference is cleared', async () => {
+      const { reconcileThreadMachine } = await import('./thread-lifecycle');
+      const issueId = await task(), before = await parked(issueId, { status: 'stopped' });
+      await pool.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL,"workerLeaseUntil"=now()-interval '1 second',
+        lifecycle='{"phase":"retire_requested","owner":"run-recovery"}',"lifecycleAt"=now() WHERE "runId"=$1`, [before.runId]);
+      const killed: string[] = [];
+      const kill = mock.method(threadMachineProvider, 'kill', async (id: string) => {
+        assert.equal((await machine(before.runId)).sandboxId, id, 'the recovered reference must commit before kill');
+        killed.push(id);
+      });
+      try {
+        await reconcileThreadMachine(pool, actor, before.runId, { provider: {
+          findCreated: async () => ({ sandboxId: before.sandboxId, state: 'paused', startedAt: Date.now()-900_000, endAt: null }),
+          info: async () => ({ state: 'paused', endAt: null }),
+          keepAlive: async () => { assert.fail('cancelled creation must not renew'); },
+        } });
+        assert.deepEqual(killed, [before.sandboxId]);
+        const retired = (await pool.query('SELECT "sandboxId","lifecycleAt",lifecycle FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+        assert.equal(retired.sandboxId, null);
+        assert.equal(retired.lifecycleAt, null);
+        assert.equal(retired.lifecycle.phase, 'retired');
+      } finally { kill.mock.restore(); }
+    });
+
+    await t.test('a stale lost-create lookup cannot attach or operate on a newer epoch', async () => {
+      const { reconcileThreadMachine } = await import('./thread-lifecycle');
+      const issueId = await task(), before = await parked(issueId, { status: 'queued' });
+      await pool.query(`UPDATE thread_machines SET state='starting',"sandboxId"=NULL,"workerLeaseUntil"=now()-interval '1 second',
+        lifecycle='{"phase":"create_requested"}',"lifecycleAt"=now() WHERE "runId"=$1`, [before.runId]);
+      await reconcileThreadMachine(pool, actor, before.runId, { provider: {
+        findCreated: async () => {
+          await pool.query(`UPDATE thread_machines SET epoch=epoch+1,"sandboxId"='newer-owned-vm',state='running',
+            lifecycle=lifecycle-'reconcileId'-'reconcileUntil' WHERE "runId"=$1`, [before.runId]);
+          return { sandboxId: before.sandboxId, state: 'paused', startedAt: Date.now()-900_000, endAt: null };
+        },
+        info: async () => { assert.fail('the old lookup must yield before provider maintenance'); },
+        keepAlive: async () => { assert.fail('an old allocation cannot renew a newer owner'); },
+      }, park: async () => { assert.fail('an old allocation cannot park a newer owner'); }, end: async () => { assert.fail('an old allocation cannot retire a newer owner'); } });
+      assert.equal((await machine(before.runId)).sandboxId, 'newer-owned-vm');
+    });
+
+    await t.test('the durable controller reconciles a refused/lost pause with real PG and revokes the retained device', async () => {
+      const { reconcileThreadMachine } = await import('./thread-lifecycle');
+      const issueId = await task(), before = await parked(issueId);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      const token = randomUUID();
+      await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'Lost pause',$3,$4,now()+interval '1 day')`, [token, owner, randomUUID(), before.device]);
+      let providerState: 'running' | 'paused' = 'running', first = true;
+      const provider = { info: async () => ({ state: providerState, endAt: Date.now()+900_000 }), keepAlive: async () => { assert.fail('terminal work must not renew compute'); } };
+      const park: NonNullable<Parameters<typeof reconcileThreadMachine>[3]>['park'] = (p, a, id, fence) => parkThreadMachine(p, a, id, async () => {
+        providerState = 'paused';
+        if (first) { first = false; throw new Error('provider completed pause but the response was lost'); }
+      }, async () => null, undefined, fence);
+      const retry = await reconcileThreadMachine(pool, actor, before.runId, { provider, park });
+      assert.equal(typeof retry, 'number');
+      assert.equal((await machine(before.runId)).state, 'running', 'unknown provider outcome is never reported as a successful pause');
+      await pool.query('UPDATE thread_machines SET "lifecycleAt"=now() WHERE "runId"=$1', [before.runId]);
+      await reconcileThreadMachine(pool, actor, before.runId, { provider, park });
+      assert.equal((await machine(before.runId)).state, 'paused');
+      assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [token])).rows[0].revokedAt);
+      const saved = (await pool.query('SELECT lifecycle,"lifecycleAt" FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+      assert.equal(saved.lifecycle.owner, 'run-recovery');
+      assert.equal(saved.lifecycle.phase, 'paused');
+      assert.equal(saved.lifecycle.reconcileId, undefined);
+      assert.ok(saved.lifecycleAt);
+    });
+
+    await t.test('a renewed execution lease during provider observation cannot be stopped from an expired snapshot', async () => {
+      const { reconcileThreadMachine } = await import('./thread-lifecycle');
+      const issueId = await task(), before = await parked(issueId, { status: 'running' });
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [before.runId]);
+      const provider = {
+        info: async () => {
+          await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '2 minutes' WHERE id=$1`, [before.runId]);
+          return { state: 'running' as const, endAt: Date.now()+900_000 };
+        },
+        keepAlive: async () => { assert.fail('a stale decision must yield to a fresh read'); },
+      };
+      const next = await reconcileThreadMachine(pool, actor, before.runId, { provider, recover: async () => {} });
+      assert.equal(typeof next, 'number');
+      assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [before.runId])).rows[0].stopRequestedAt, null);
+      const lifecycle = (await pool.query('SELECT lifecycle FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0].lifecycle;
+      assert.equal(lifecycle.observedStop, false);
+      assert.equal(lifecycle.reconcileId, undefined);
+    });
+
+    await t.test('a task reopened during provider observation cannot be stopped by the stale closure', async () => {
+      const { reconcileThreadMachine } = await import('./thread-lifecycle');
+      const issueId = await task('done'), before = await parked(issueId, { status: 'running' });
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '2 minutes' WHERE id=$1`, [before.runId]);
+      const provider = {
+        info: async () => {
+          await pool.query(`UPDATE issues SET status='doing' WHERE id=$1`, [issueId]);
+          return { state: 'running' as const, endAt: Date.now()+900_000 };
+        },
+        keepAlive: async () => { assert.fail('a stale decision must yield to a fresh read'); },
+      };
+      assert.equal(typeof await reconcileThreadMachine(pool, actor, before.runId, { provider }), 'number');
+      assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [before.runId])).rows[0].stopRequestedAt, null);
     });
 
     await t.test('concurrent lifecycle and Factory parking cannot suspend or revoke the next stage', async () => {

@@ -51,12 +51,20 @@ test('routing settings default on, preserve saved lists and isolate owner/worksp
   await changeOrder(pool, scope, { kind: 'autoRouting', enabled: true })
   assert.deepEqual((await readOrder(pool, scope, candidates)).entries, initial.entries, 'default IDs and order survive the toggle')
 
+  const catalogue = ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1']
+    .map(model => ({ harness: 'claude_code' as const, model, name: model, source, provider: 'claude' }))
+  assert.deepEqual((await readOrder(pool, scope, catalogue)).entries.map(entry => entry.model), ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'])
+  const futureCatalogue = [...catalogue, { ...catalogue[0], model: 'claude-opus-6', name: 'claude-opus-6' }]
+  assert.deepEqual((await readOrder(pool, scope, futureCatalogue)).entries.map(entry => entry.model), ['claude-opus-6', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'])
+  assert.equal(catalogue.length, 6, 'the complete manual catalogue is untouched')
+
   const entryId = randomUUID()
   await pool.query('UPDATE model_order_settings SET customized=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, first.id])
   await pool.query(`INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId")
-    VALUES ($1,$2,$3,0,'claude_code','reported-standard','subscription',$4)`, [entryId, ownerId, first.id, connectionId])
+    VALUES ($1,$2,$3,0,'claude_code','claude-opus-5','subscription',$4)`, [entryId, ownerId, first.id, connectionId])
   const customized = await readOrder(pool, scope, candidates)
-  assert.deepEqual(customized.entries.map(entry => entry.model), ['reported-standard'])
+  assert.deepEqual(customized.entries.map(entry => entry.model), ['claude-opus-5'])
+  assert.deepEqual((await readOrder(pool, scope, futureCatalogue)).entries, customized.entries, 'a new release never rewrites a manual historical choice')
   await changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
   await changeOrder(pool, scope, { kind: 'location', location: 'local' })
   await changeOrder(pool, scope, { kind: 'autoRouting', enabled: true })
