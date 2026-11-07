@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
@@ -70,6 +71,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/reconcile.ts', file: 'lib/computer/reconcile.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/computer/event-log.ts', file: 'lib/computer/event-log.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/builtin-gateway/postgres.ts', file: 'lib/builtin-gateway/postgres.db.test.ts', script: 'test:live-db' },
+  { marker: 'lib/live/session-ticket.ts', file: 'lib/builtin-gateway/session-revocation.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/computer/event-writers.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },

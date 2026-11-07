@@ -19,7 +19,7 @@ const { NodeRequest } = await import(pathToFileURL(nitroRequire.resolve('srvx/no
 
 test('real Nitro Node WebSocket adapter retains authenticated hooks through the HTTP security wrapper', async t => {
   const bus: GatewayBus = { async publish() {}, subscribe() { return () => {} } }
-  const hub = new GatewayHub(bus)
+  const hub = new GatewayHub(bus, Date.now, '', async sessionId => sessionId === 'runtime-test-session')
   const server = createServer((_request, response) => { response.writeHead(404); response.end() })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const port = (server.address() as { port: number }).port
@@ -39,7 +39,7 @@ test('real Nitro Node WebSocket adapter retains authenticated hooks through the 
     await new Promise<void>(resolve => server.close(() => resolve()))
   })
   const scope = { ownerId: 'selfhost-owner', workspaceId: 'aab15455-984d-4a05-a5eb-e367214e10b8' }
-  const ticket = liveTicket(scope, builtinGatewayConfig(env)!)
+  const ticket = liveTicket(scope, builtinGatewayConfig(env)!, Date.now(), 'runtime-test-session')
   const socket = new WebSocket(`${ticket.url}?revisions=1`, ['other', ticket.protocol])
   sockets.push(socket)
   const ready = received(socket)
