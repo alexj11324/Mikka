@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { candidateReceipt, validateTemplateSubscriptions, validateSubscriptionFiles } from './validate-template-subscriptions.mjs'
+import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -201,6 +202,8 @@ test('a real receipt rejection persists its run hash and reason without provider
         value.samples[0].providerText = secret
         value.cause = { message: secret, token: secret }
       }
+      const sample = value.samples[0]
+      sample.runtimeEvidence = runtimeEvidence(readRuntimeTiming(sample.runtimeTiming, sample.runtimeTiming), { requireOfficial: true })
       return value
     })
     const input = join(root, 'candidate.json'), output = join(root, 'accepted.json'), diagnostics = join(root, 'diagnostics.json')
@@ -211,12 +214,65 @@ test('a real receipt rejection persists its run hash and reason without provider
     assert.equal(value.code, 'template_gate_subscription_or_cleanup_failed')
     assert.deepEqual(value.candidates[0], { kind: 'claude', stage: 'receipt', code: 'template_gate_official_agent_acceptance_missing',
       runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16),
-      sampleStatus: 'execution_proved_awaiting_server_timing', sampleError: 'startup_failed', cleanupErrors: [] })
+      sampleStatus: 'execution_proved_awaiting_server_timing', sampleError: 'startup_failed',
+      runtimeEvidence: { status: 'unavailable', reason: 'official_agent_acceptance_missing' }, cleanupErrors: [] })
     assert.equal(value.candidates[1].code, 'passed')
+    assert.deepEqual(value.candidates[1].runtimeEvidence, { status: 'passed', reason: null })
     for (const forbidden of [secret, RUN, DEVICE, 'session=fixture', 'fixture-one-use', 'providerText', 'cause']) assert.ok(!raw.includes(forbidden))
     await assert.rejects(stat(output), { code: 'ENOENT' })
     assert.equal((await stat(diagnostics)).mode & 0o777, 0o600)
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('a failed runtime evidence check keeps its closed reason while the other candidate and cleanup still run', async () => {
+  const cases = [
+    { expected: { status: 'unavailable', reason: 'official_provider_timings_missing' }, mutate: timing => { delete timing.officialCliTiming } },
+    { expected: { status: 'failed', reason: 'extra_runtime_authorization_or_proxy' }, mutate: timing => {
+      timing.requests.push({ sequence: 1, endpoint: 'permission_check', phase: 'executing', method: 'POST', shared: false,
+        startMs: 200, endMs: 210, ms: 10, outcome: 'ok' })
+      timing.counts.push({ endpoint: 'permission_check', phase: 'executing', shared: false, started: 1, completed: 1, errors: 0, ms: 10 })
+    } },
+  ]
+  for (const { expected, mutate } of cases) {
+    const diagnostics = []
+    const fixture = candidateFixture(async options => {
+      const value = accepted(options.harness), sample = value.samples[0]
+      if (options.harness === 'codex') {
+        mutate(sample.runtimeTiming)
+        value.status = 'failed'; sample.status = 'failed'; sample.error = 'startup_runtime_evidence_failed'
+      }
+      sample.runtimeEvidence = runtimeEvidence(readRuntimeTiming(sample.runtimeTiming, sample.runtimeTiming), { requireOfficial: true })
+      return value
+    })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }), /template_gate_subscription_or_cleanup_failed/)
+    assert.equal(diagnostics[0].code, 'passed')
+    assert.deepEqual(diagnostics[0].runtimeEvidence, { status: 'passed', reason: null })
+    assert.equal(diagnostics[1].code, 'template_gate_execution_failed')
+    assert.equal(diagnostics[1].sampleError, 'startup_runtime_evidence_failed')
+    assert.deepEqual(diagnostics[1].runtimeEvidence, expected)
+    assert.deepEqual(diagnostics.map(row => row.cleanupErrors), [[], []])
+    assert.deepEqual(fixture.events, ['created-bot', 'created-claude_code', 'tested-claude_code', 'removed', 'killed-claude_code',
+      'created-codex', 'tested-codex', 'removed', 'killed-codex', 'restored-workspace', 'signed-out'])
+  }
+})
+
+test('runtime evidence diagnostics drop unknown statuses, reasons and private fields', async () => {
+  const secret = 'private-runtime-receipt-and-credential'
+  for (const [evidence, expected] of [
+    [{ status: secret, reason: 'official_provider_timings_missing' }, null],
+    [{ status: 'unavailable', reason: secret, providerReply: secret }, { status: 'unavailable', reason: null }],
+    [{ status: 'failed', reason: 'future_unknown_reason' }, { status: 'failed', reason: null }],
+  ]) {
+    const diagnostics = [], fixture = candidateFixture(async options => {
+      const value = accepted(options.harness)
+      value.samples[0].status = 'failed'
+      value.samples[0].runtimeEvidence = evidence
+      return value
+    })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }), /template_gate_subscription_or_cleanup_failed/)
+    assert.deepEqual(diagnostics.map(row => row.runtimeEvidence), [expected, expected])
+    assert.doesNotMatch(JSON.stringify(diagnostics), /private-runtime-receipt-and-credential|providerReply|future_unknown_reason/)
+  }
 })
 
 test('failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code', async () => {
@@ -233,7 +289,8 @@ test('failure diagnostics retain only fixed cleanup outcomes and unknown excepti
   }, secret)
   await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }), /template_gate_subscription_or_cleanup_failed/)
   assert.deepEqual(diagnostics[0], { kind: 'claude', stage: 'acceptance', code: 'template_gate_failed',
-    runIdHash: null, sampleStatus: 'unavailable', sampleError: null, cleanupErrors: ['device_remove_failed', 'sandbox_kill_failed'], registeredDeviceId: DEVICE })
+    runIdHash: null, sampleStatus: 'unavailable', sampleError: null, runtimeEvidence: null,
+    cleanupErrors: ['device_remove_failed', 'sandbox_kill_failed'], registeredDeviceId: DEVICE })
   assert.equal(diagnostics[1].code, 'template_gate_execution_failed')
   assert.equal(diagnostics[1].sampleError, 'startup_execution_timeout')
   assert.deepEqual(diagnostics[1].cleanupErrors, ['device_remove_failed', 'sandbox_kill_failed', 'acceptance_cleanup_failed', 'terminal_timeout'])

@@ -32,9 +32,18 @@ const STARTUP_CODES = new Set([
 ].map(code => `startup_${code}`))
 const safeCode = error => GATE_CODES.has(error?.message) || STARTUP_CODES.has(error?.message) ? error.message : 'template_gate_failed'
 const SAMPLE_STATUSES = new Set(['running', 'failed', 'execution_proved_awaiting_server_timing'])
+const RUNTIME_STATUSES = new Set(['passed', 'failed', 'unavailable'])
+// Closed results from runtimeEvidence/mcpBusinessEvidence; never persist the receipt body.
+const RUNTIME_REASONS = new Set([
+  'runtime_receipt_incomplete', 'official_agent_acceptance_missing', 'extra_runtime_authorization_or_proxy',
+  'execution_cycle_missing', 'official_provider_timings_missing', 'host_http_scope_unverified',
+  'mcp_http_observation_missing', 'mcp_http_observation_invalid', 'remote_mcp_scope_uncovered',
+  'mcp_http_observation_incomplete', 'mcp_http_sequence_invalid', 'mcp_catalogue_observation_missing',
+])
 
 function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId) {
   const sample = acceptance?.samples?.[0]
+  const evidence = sample?.runtimeEvidence
   const cleanup = new Set(cleanupErrors)
   if (acceptance?.cleanup?.errors?.length || sample?.cleanup?.errors?.length || sample?.cleanup?.status === 'failed') cleanup.add('acceptance_cleanup_failed')
   if (sample?.cleanup?.errors?.some(row => row?.code === 'startup_cleanup_terminal_timeout')) cleanup.add('terminal_timeout')
@@ -47,6 +56,8 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     runIdHash: UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null,
     sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
     sampleError: sample?.error ? STARTUP_CODES.has(sample.error) ? sample.error : 'startup_failed' : null,
+    runtimeEvidence: RUNTIME_STATUSES.has(evidence?.status)
+      ? { status: evidence.status, reason: RUNTIME_REASONS.has(evidence.reason) ? evidence.reason : null } : null,
     cleanupErrors: [...cleanup], ...(retainedFixture ? { retainedFixture } : {}),
     ...(cleanup.has('device_remove_failed') && UUID.test(deviceId ?? '') ? { registeredDeviceId: deviceId } : {}) }
 }
