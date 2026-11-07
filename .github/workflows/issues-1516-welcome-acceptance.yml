@@ -91,12 +91,12 @@ jobs:
           recursive: false
           include-imports: false
       - name: Verify the bounded production acceptance driver
-        run: node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs --self-test
+        run: node --import tsx scripts/ops/issues-1516-welcome-acceptance.mjs --self-test
       - name: Exercise the real fresh Coordinator welcome through the normal account
         env:
           APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
           ACCEPTANCE_CASES: ${{ inputs.acceptance_cases }}
-        run: MIKKA_OPS_DEPENDENCIES="${{ github.workspace }}" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
+        run: MIKKA_OPS_DEPENDENCIES="${{ github.workspace }}" node --import tsx scripts/ops/issues-1516-welcome-acceptance.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
