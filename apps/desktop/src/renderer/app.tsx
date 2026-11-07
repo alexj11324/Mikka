@@ -34,10 +34,11 @@ import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
 const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
+const GitHubHandoff = lazy(() => import('@/components/plugins/github-settings').then(module => ({ default: module.GitHubSettings })))
+
 type ApplicationBootstrap =
   | { scope: 'authentication'; value: AuthenticationBootstrap }
   | { scope: 'workspace'; workspace: string | null; value: DesktopBootstrap }
-const GitHubHandoff = lazy(() => import('@/components/plugins/github-settings').then(module => ({ default: module.GitHubSettings })))
 
 /** Runtime-specific composition only. The application surfaces below are the
  * exact same components, data hooks and lazy chunks as the web application. */

@@ -149,7 +149,7 @@ business requests target a selected self-hosted backend. Refresh the page to the
 deployed revision, then open New task outside a project page.
 Choose its Coordinator, explicitly choose Mikka Cloud,
 select the temporary Profile named by marker, paste input unchanged, and click
-Send once before expiresAt. The deadline includes this waiting time. The driver
+Create task once before expiresAt. The deadline includes this waiting time. The driver
 does not inject a browser cookie or invoke an API message submission in this mode.
 
 The driver accepts only one exact new human message after its baseline, using the
