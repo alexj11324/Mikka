@@ -1,5 +1,6 @@
 // Real PostgreSQL, model preference admission, completion and claim. Only the
-// provider catalogue and Next's request-scoped `after` are replaced. Provider
+// provider catalogue and Next's request-scoped `after` are replaced; Coordinator
+// wakes are observed without running a separate inbox consumer. Provider
 // signals stand for terminal adapter events after their native short retries;
 // this suite never sends a paid model request or fabricates a worker snapshot.
 import assert from 'node:assert/strict'
@@ -15,6 +16,7 @@ import { recordPushGrant } from './support/github-app-stub'
 import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
 import type { DecisionAnswer } from '../lib/coordinator/decision'
 import { MODEL_ROUTING_TIERS, modelTier } from '../lib/model-routing'
+import { isolateCoordinatorWakes } from './support/coordinator-wake'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
@@ -28,6 +30,7 @@ test('provider failure continues the same task through its authorized preferred 
   mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
     after: (work: () => Promise<void>) => { captureAfter?.push(work) },
   } })
+  const coordinator = await isolateCoordinatorWakes(t)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
@@ -45,6 +48,7 @@ test('provider failure continues the same task through its authorized preferred 
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
   t.after(async () => {
+    await coordinator.flush()
     for (const name of names) {
       const value = saved.get(name)
       if (value === undefined) delete process.env[name]; else process.env[name] = value
@@ -775,7 +779,7 @@ test('provider failure continues the same task through its authorized preferred 
       if (events.length) sent.push({ path: target.pathname, events })
       return new Response(null, { status: 204 })
     })
-    const drain = async () => { await Promise.all(scheduled.splice(0).map(work => work())) }
+    const drain = async () => { await coordinator.flush(); await Promise.all(scheduled.splice(0).map(work => work())) }
     // A normal admission remains intact. This lifecycle-only fixture is the
     // durable crash boundary: completion committed pending, then the host died
     // before recoverProviderFailure. No provider call or worker success is faked.
@@ -787,7 +791,7 @@ test('provider failure continues the same task through its authorized preferred 
       const source = await row(runId)
       await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='provider_failure',"finishedAt"=now(),report=$2 WHERE id=$1`,
         [runId, JSON.stringify({ ...emptyRunReport(), providerFailure: balance, modelFallback: pendingProviderFallback(source, balance) })])
-      scheduled.length = 0; sent.length = 0
+      await drain(); sent.length = 0
       const { runLiveTargets } = await import('../lib/live/panels')
       assert.deepEqual(await runLiveTargets(appPool, workspacePool, runId, 'run'), [{
         scope: { ownerId: setup.p.id, workspaceId: home.id }, events: [{ kind: 'run', id: runId }],

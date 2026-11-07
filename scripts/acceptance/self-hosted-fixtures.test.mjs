@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
+import { createServer } from 'node:http'
 import test from 'node:test'
-import { assertFixtureEnvironment } from './self-hosted-services.mjs'
+import { assertFixtureEnvironment, fixtureHttp } from './self-hosted-services.mjs'
 import { createModelFixture } from './self-hosted-model.mjs'
 
 const fixture = {
@@ -26,6 +27,31 @@ test('the mutating driver refuses public origins, remote databases, cloud creden
     { MIKKA_DEFAULT_MODEL_API_KEY: 'real-key' }, { VERCEL: '1' }, { AI_GATEWAY_API_KEY: 'real-key' },
     { GITHUB_APP_PRIVATE_KEY: 'real-key' }, { DEVICE_GATEWAY_URL: 'https://gateway.example.test' },
   ]) assert.throws(() => assertFixtureEnvironment({ ...fixture, ...overrides }))
+})
+
+test('replica requests preserve the canonical authority, individual cookies and manual redirects', async t => {
+  const seen = []
+  const server = createServer(async (request, response) => {
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    seen.push({ host: request.headers.host, origin: request.headers.origin, cookie: request.headers.cookie,
+      method: request.method, path: request.url, body: Buffer.concat(chunks).toString() })
+    response.writeHead(302, { location: '/must-not-follow', 'set-cookie': ['session=first; HttpOnly', 'verified=yes; SameSite=Lax'] })
+    response.end('verification accepted')
+  }).listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  t.after(() => { server.closeAllConnections(); server.close() })
+  const response = await fixtureHttp(`http://127.0.0.1:${server.address().port}/mikka/api/auth/verify-email`, {
+    method: 'POST', headers: { host: 'localhost:3000', origin: 'http://localhost:3000', cookie: 'previous=kept' },
+    body: 'synthetic request', signal: AbortSignal.timeout(5_000),
+  })
+  assert.equal(response.status, 302)
+  assert.equal(response.headers.get('location'), '/must-not-follow')
+  assert.deepEqual(response.headers.getSetCookie(), ['session=first; HttpOnly', 'verified=yes; SameSite=Lax'])
+  assert.equal(await response.text(), 'verification accepted')
+  assert.deepEqual(seen, [{ host: 'localhost:3000', origin: 'http://localhost:3000', cookie: 'previous=kept',
+    method: 'POST', path: '/mikka/api/auth/verify-email', body: 'synthetic request' }])
+  assert.throws(() => fixtureHttp('https://example.test/mikka/'), /HTTP_FIXTURE_PROTOCOL/)
 })
 
 test('the isolated model supports ordinary and streaming OpenAI requests with explicit synthetic receipts', async t => {

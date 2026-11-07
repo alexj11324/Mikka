@@ -17,17 +17,27 @@ const translator = (namespace: string) => (key: string) => {
 }
 mock.module('next-intl', { namedExports: { useTranslations: translator } })
 let data: CloudConnectionView
+let readError: Error | undefined
+let read: () => Promise<CloudConnectionView>
 const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
 const snapshot = () => data
-const mutate = async (value: CloudConnectionView) => { data = value; for (const listener of listeners) listener(); return data }
-mock.module('swr', { defaultExport: () => ({ data: useSyncExternalStore(subscribe, snapshot), mutate }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+const mutate = async (value?: CloudConnectionView) => {
+  data = value ?? await read(); readError = undefined
+  for (const listener of listeners) listener()
+  return data
+}
+mock.module('swr', { defaultExport: (_key: unknown, fetcher: typeof read) => {
+  read = fetcher
+  return { data: useSyncExternalStore(subscribe, snapshot), error: readError, mutate }
+}, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: () => undefined } })
 
 const browser = new Window({ url: 'https://fixture.example/mikka/settings?section=account' })
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let CloudSettings: typeof import('./cloud-settings')['CloudSettings']
+let CloudModelSettings: typeof import('./cloud-settings')['CloudModelSettings']
 let response: Response
 const requests: Array<{ url: string; method: string | undefined; body: unknown }> = []
 before(async () => {
@@ -38,15 +48,16 @@ before(async () => {
     if (value !== undefined) Object.defineProperty(globalThis, key, { configurable: true, value: typeof value === 'function' && /^[a-z]/.test(key) ? (value as (...args: unknown[]) => unknown).bind(browser) : value })
   }
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ CloudSettings } = await import('./cloud-settings'))
+  ;({ CloudSettings, CloudModelSettings } = await import('./cloud-settings'))
 })
 beforeEach(() => {
   data = { registered: true, serverId: null, serviceUrl: 'https://cloud.example/mikka/cloud', administrator: false, pushContent: 'full',
     personal: { connected: false, revoked: true, scopes: ['models'] }, team: { connected: true, scopes: ['models'] } }
   requests.length = 0
+  readError = undefined
   response = Response.json({ ...data, personal: { connected: false, revoked: false, scopes: [] } })
   mock.method(globalThis, 'fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
-    requests.push({ url: String(url), method: init?.method, body: JSON.parse(String(init?.body)) })
+    requests.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined })
     return response
   })
   container = browser.document.createElement('div') as unknown as HTMLDivElement
@@ -55,7 +66,39 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); mock.restoreAll() })
 after(() => browser.close())
 const button = (label: string) => [...container.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
-const render = async () => { await act(async () => root.render(<CloudSettings personal userKey="fixture-user" workspaceId="fixture-workspace" />)) }
+const render = async (personal = true) => { await act(async () => root.render(<CloudSettings personal={personal} userKey="fixture-user" workspaceId="fixture-workspace" />)) }
+
+for (const personal of [false, true]) {
+  test(`${personal ? 'personal' : 'server'} cloud settings can recover from a failed read without a reload or a write`, async () => {
+    data = { ...data, administrator: true }
+    response = Response.json(data)
+    readError = new Error('offline')
+    await render(personal)
+    assert.ok(container.textContent?.includes(zh.RunErrors.cloud_unavailable.default))
+    assert.deepEqual(requests, [], 'a failed read does not start polling')
+    const retry = button(zh.Common.retry)
+    assert.ok(retry, 'the error state must offer a recovery action')
+    await act(async () => retry.click())
+    assert.deepEqual(requests, [{ url: '/mikka/api/cloud/status', method: undefined, body: undefined }])
+    assert.equal(button(zh.Common.retry), undefined)
+    assert.ok(button(zh.Settings.cloud.disconnect))
+    if (personal) assert.ok(!container.textContent?.includes(zh.Settings.cloud.teamBilling), 'retry keeps revoked personal authorization ahead of the team binding')
+  })
+}
+
+test('the cloud model read error can recover to the authorized model and billing link', async () => {
+  data = { ...data, personal: { connected: true, revoked: false, scopes: ['models'] } }
+  response = Response.json(data)
+  readError = new Error('offline')
+  await act(async () => root.render(<CloudModelSettings userKey="fixture-user" workspaceId="fixture-workspace" />))
+  assert.ok(container.textContent?.includes(zh.RunErrors.cloud_unavailable.default))
+  const retry = button(zh.Common.retry)
+  assert.ok(retry)
+  await act(async () => retry.click())
+  assert.deepEqual(requests, [{ url: '/mikka/api/cloud/status', method: undefined, body: undefined }])
+  assert.ok(container.textContent?.includes(zh.Settings.cloud.defaultModel))
+  assert.equal(container.querySelector('a')?.getAttribute('href'), '/mikka/api/cloud/models/billing?redirect=1')
+})
 
 test('a revoked personal binding can be explicitly removed before team billing becomes available', async () => {
   await render()

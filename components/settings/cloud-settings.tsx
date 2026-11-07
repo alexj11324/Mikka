@@ -21,9 +21,10 @@ import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 /** Uses the established settings rows; only the current page reads its state. */
 export function CloudSettings({ personal = false, userKey, workspaceId }: { personal?: boolean; userKey: string; workspaceId?: string }) {
   const t = useTranslations('Settings.cloud')
+  const commonT = useTranslations('Common')
   const errors = useTranslations('RunErrors')
   const key = ['settings:cloud', userKey] as const
-  const { data, error, mutate } = useSWR(key, () => fetchSettingsData<CloudConnectionView>('/api/cloud/status'), settingsReadOptions)
+  const { data, error, mutate, isValidating } = useSWR(key, () => fetchSettingsData<CloudConnectionView>('/api/cloud/status'), settingsReadOptions)
   useLiveKey('model_settings', workspaceId, [unstable_serialize(key)], workspaceId)
   const [pending, setPending] = useState(false), [failure, setFailure] = useState<string | null>(null)
   const [serverName, setServerName] = useState('Mikka'), [serverKey, setServerKey] = useState('')
@@ -51,7 +52,10 @@ export function CloudSettings({ personal = false, userKey, workspaceId }: { pers
     finally { setPending(false) }
   }
 
-  if (error) return <SettingsSection id="cloud-heading" title={t('title')}><FieldError className="px-5 py-3">{errorCopy(error instanceof SettingsReadError ? error.message : null)}</FieldError></SettingsSection>
+  if (error) return <SettingsSection id={personal ? 'personal-cloud-heading' : 'cloud-heading'} title={t('title')}
+    action={<Button variant="outline" size="sm" disabled={isValidating} onClick={() => { void mutate() }}>{commonT('retry')}</Button>}>
+    <FieldError className="px-5 py-3">{errorCopy(error instanceof SettingsReadError ? error.message : null)}</FieldError>
+  </SettingsSection>
   if (!data) return <SettingsLoading label={t('loading')} />
   if (!personal && !data.administrator) return null
   const connected = personal ? data.personal.connected : data.registered
@@ -110,11 +114,14 @@ export function CloudSettings({ personal = false, userKey, workspaceId }: { pers
 /** Models and subscriptions lists this option only for the effective models
  * binding. It shares the existing status key and live invalidation. */
 export function CloudModelSettings({ userKey, workspaceId }: { userKey: string; workspaceId: string }) {
-  const t = useTranslations('Settings.cloud'), errors = useTranslations('RunErrors')
+  const t = useTranslations('Settings.cloud'), errors = useTranslations('RunErrors'), commonT = useTranslations('Common')
   const key = ['settings:cloud', userKey] as const
-  const { data, error } = useSWR(key, () => fetchSettingsData<CloudConnectionView>('/api/cloud/status'), settingsReadOptions)
+  const { data, error, mutate, isValidating } = useSWR(key, () => fetchSettingsData<CloudConnectionView>('/api/cloud/status'), settingsReadOptions)
   useLiveKey('model_settings', workspaceId, [unstable_serialize(key)], workspaceId)
-  if (error) return <FieldError>{errors('cloud_unavailable.default')}</FieldError>
+  if (error) return <SettingsSection id="cloud-models-heading" title={t('scopes.models')}
+    action={<Button variant="outline" size="sm" disabled={isValidating} onClick={() => { void mutate() }}>{commonT('retry')}</Button>}>
+    <FieldError className="px-5 py-3">{errors('cloud_unavailable.default')}</FieldError>
+  </SettingsSection>
   if (!data) return <SettingsLoading label={t('loading')} rows={1} />
   const binding = data.personal.connected || data.personal.revoked ? data.personal : data.team
   if (!data.registered || !binding.connected || !binding.scopes.includes('models')) return null

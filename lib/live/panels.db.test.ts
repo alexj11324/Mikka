@@ -11,6 +11,7 @@ import { observePoolCommits, databaseCommitScope, captureDatabaseQuery } from '.
 import { documentLiveTargets, runLiveTargets, runChanged, threadLiveReferences } from './panels'
 import type { LiveInvalidation } from './events'
 import { liveChannelId, type LiveScope } from './scope'
+import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
@@ -23,6 +24,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { pending.push(work) },
   } })
+  const coordinator = await isolateCoordinatorWakes(t)
   // The same writers also refresh owner/workspace lists; lists.db.test.ts covers
   // those keys. Here count task/thread panel keys only.
   const lists = await import('./lists')
@@ -92,7 +94,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     const taskFree = await run(null, 'owner', bot)
     const legacyTaskFree = await run(null)
     await databasePool.query('INSERT INTO computer_run_bindings("runId","botId","ownerId","workspaceId") VALUES($1,$2,\'owner\',$3)', [legacyTaskFree, bot, b])
-    const drain = async () => { await Promise.all(pending.splice(0).map(work => work())) }
+    const drain = async () => { await coordinator.flush(); await Promise.all(pending.splice(0).map(work => work())) }
 
     await t.test('private document content has one owner; workspace documents notify only active authorized members', async () => {
       assert.deepEqual(await documentLiveTargets(databasePool, databasePool, personalIssue), [{
@@ -268,19 +270,11 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       await databasePool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='peer'`, [a])
     })
 
-    await t.test('Factory question-only writes notify once after commit, and a rolled-back settlement stays silent', async st => {
+    await t.test('Factory question-only writes notify once after commit, and a rolled-back settlement stays silent', async () => {
       const { createFactoryStore } = await import('../factory/store')
       const { createFactoryDispatch, factoryBinding } = await import('../factory/dispatch')
       const { factoryCheckIndependent } = await import('../factory/check-independence')
       const { createFactoryQuestions } = await import('../factory/questions/store')
-      const { coordinatorWakeTransport } = await import('../coordinator/wake-after-commit')
-      const previousWake = coordinatorWakeTransport.wake
-      const wakes: string[] = []
-      coordinatorWakeTransport.wake = async ownerId => { wakes.push(ownerId) }
-      st.after(() => {
-        if (previousWake === undefined) delete coordinatorWakeTransport.wake
-        else coordinatorWakeTransport.wake = previousWake
-      })
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = agentIds.get('owner')!
       await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await databasePool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
@@ -303,7 +297,10 @@ test('panel notifications follow actual committed writes and persisted owner/wor
           const { runId } = await dispatch('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId })
           await databasePool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='session:'||id,"startedAt"=now(),"finishedAt"=now(),report=$2 WHERE id=$1`, [runId, JSON.stringify({ summary: 'Fixture hand-in', openQuestions: ['Which context?'], question: { questionId, kind: 'context', question: 'Which context?', options: [] } })])
           await questions.record('owner', runId)
-          pending.length = 0; sent.length = 0
+          // Finish the preparation commit, including its asynchronously
+          // registered inbox wake, before observing the escalation commit.
+          await drain()
+          sent.length = 0; coordinator.calls.length = 0
           return { issueId, questionId, runId }
         }
         const first = await asked()
@@ -315,12 +312,14 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         const reference = (await questions.read('owner', first.questionId)).reference
         const escalation = { reference, eventId: randomUUID(), reason: 'Context requires the owner' }
         assert.equal((await questions.escalate('owner', escalation)).status, 'waiting_user')
-        assert.equal(pending.length, 3, 'question escalation schedules its inbox wake and Factory/project-map readers after commit')
+        await coordinator.flush()
+        assert.equal(pending.length, 2, 'only Factory/project-map live notifications enter the delivery queue')
         await questions.read('owner', first.questionId)
         await questions.escalate('owner', escalation)
-        assert.equal(pending.length, 3, 'reads and an idempotent replay add nothing')
+        await coordinator.flush()
+        assert.equal(pending.length, 2, 'reads and an idempotent replay add nothing')
         await drain()
-        assert.deepEqual(wakes.splice(0), ['owner'], 'the committed question wakes its owner once')
+        assert.deepEqual(coordinator.calls.splice(0), ['owner'], 'the committed question wakes its owner once')
         assert.ok(sent.some(target => target.events.some(event => event.kind === 'factory_issue' && event.id === first.issueId)))
         sent.length = 0
         await databasePool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, [first.questionId])

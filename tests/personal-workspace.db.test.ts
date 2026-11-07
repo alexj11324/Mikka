@@ -362,8 +362,10 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
       assert.equal(await coordinatorEnabled(owner, bot), false, 'paused, disconnected and obsolete bindings never enable chat')
       await pool.query(`UPDATE byos_connections SET paused=false,state='connected',epoch=1 WHERE id=$1`, [connection])
     }
-    await pool.query(`UPDATE byos_bindings SET route='openai_siwc' WHERE "connectionId"=$1`, [connection])
-    assert.equal(await coordinatorEnabled(owner, bot), false, 'an unsupported chat route cannot enable the bot')
+    // This native route is valid in the stored binding CHECK, but is excluded
+    // by executionModelOptions from the bot-chat catalogue.
+    await pool.query(`UPDATE byos_bindings SET route='claude_code_cli' WHERE "connectionId"=$1`, [connection])
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'a native-only binding cannot enable a bot chat')
     await pool.query(`UPDATE byos_bindings SET route='claude_cpa' WHERE "connectionId"=$1`, [connection])
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify(quota(1))])
     assert.equal(await coordinatorEnabled(owner, bot), false, 'a known exhausted selected model remains unavailable')

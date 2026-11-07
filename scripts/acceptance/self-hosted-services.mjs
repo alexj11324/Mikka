@@ -1,5 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
+import { request as httpRequest } from 'node:http'
+import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 
 const origin = 'http://localhost:3000'
@@ -10,6 +12,23 @@ const bucket = 'mikka-selfhost-ci'
 const sender = 'login@selfhost.example.test'
 const check = (condition, code) => { if (!condition) throw new Error(`SELF_HOSTED_${code}`) }
 const hash = value => createHash('sha256').update(value).digest('hex')
+
+/** Reach either replica as the reverse proxy would: a different TCP endpoint
+ * with the same configured Host. Node's fetch replaces a supplied Host with
+ * the URL authority, so it cannot represent this two-replica request. */
+export function fixtureHttp(url, { method = 'GET', headers = {}, body, signal } = {}) {
+  check(new URL(url).protocol === 'http:', 'HTTP_FIXTURE_PROTOCOL')
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(url, { method, headers, signal }, response => {
+      const responseHeaders = new Headers()
+      for (let index = 0; index < response.rawHeaders.length; index += 2) responseHeaders.append(response.rawHeaders[index], response.rawHeaders[index + 1])
+      const status = response.statusCode ?? 500
+      resolve(new Response([204, 205, 304].includes(status) ? null : Readable.toWeb(response), { status, headers: responseHeaders }))
+    })
+    request.once('error', reject)
+    request.end(body)
+  })
+}
 
 /** This driver deliberately has no arbitrary target URL option. It can mutate
  * only the disposable Compose network and its test database. */
@@ -87,7 +106,7 @@ export async function runAcceptance(env = process.env) {
   const cookies = new Map(), sockets = []
   const request = async (path, { target = origin, method = 'GET', body, binary = false, expected = [200] } = {}) => {
     check([origin, second].includes(target) && path.startsWith('/mikka/'), 'REQUEST_TARGET')
-    const response = await fetch(`${target}${path}`, { method, redirect: 'manual', signal: AbortSignal.timeout(30_000),
+    const response = await fixtureHttp(`${target}${path}`, { method, signal: AbortSignal.timeout(30_000),
       headers: { host: 'localhost:3000', origin, ...(cookies.size ? { cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') } : {}),
         ...(body !== undefined ? { 'content-type': binary ? 'application/octet-stream' : 'application/json' } : {}) },
       ...(body !== undefined ? { body: binary ? body : JSON.stringify(body) } : {}) })
@@ -101,7 +120,9 @@ export async function runAcceptance(env = process.env) {
   try {
     const version = await (await request('/mikka/api/version')).json()
     check(version.build === env.MIKKA_EXPECTED_REVISION, 'REVISION_MISMATCH')
+    report.stage = 'replica-version'
     check((await (await request('/mikka/api/version', { target: second })).json()).build === version.build, 'REPLICA_REVISION_MISMATCH')
+    report.stage = 'minio-bucket'
     await createFixtureBucket(env)
 
     report.stage = 'smtp-and-auth'
