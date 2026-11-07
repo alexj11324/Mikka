@@ -51,12 +51,16 @@ export async function lockCliTaskScope(tx: PoolClient, userId: string, issueId: 
 
 async function validateCliTaskScope(userId: string, issueId: string, task: CliTaskRow | undefined): Promise<CliTaskScope> {
   if (!task || task.ownershipState !== 'bound' || !task.workspaceId || readIssueMetadata(task.content).deletedAt) throw new Error('agentPolicyUnavailable')
-  try { await requireTaskWorkspace(userId, task.workspaceId) }
+  await requirePolicyWorkspace(userId, task.workspaceId)
+  return { issueId, scopeVersion: task.scopeVersion, workspaceId: task.workspaceId }
+}
+
+async function requirePolicyWorkspace(userId: string, workspaceId: string) {
+  try { await requireTaskWorkspace(userId, workspaceId) }
   catch (error) {
     if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied') throw new Error('agentPolicyUnavailable', { cause: error })
     throw error
   }
-  return { issueId, scopeVersion: task.scopeVersion, workspaceId: task.workspaceId }
 }
 
 export type CliMembershipGuard = (workspaceId: string, userId: string, signal: AbortSignal) => Promise<MailboxTransactionLease>
@@ -75,17 +79,17 @@ const mergeCliPolicyValues = (base: CliPolicyValues, next: CliPolicyValues): Cli
 const rank = { deny: 0, ask: 1, allow: 2 } as const
 /** Caller identity is authenticated by the host. Workspace membership is
  * separately pinned by cliAgentPolicyGuard through transaction commit. */
-export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId: string, botId: string | null, task?: CliTaskScope) {
+export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId: string, botId: string | null, task?: CliTaskScope, runWorkspaceId?: string) {
   let workspaceId: string | null = null
   if (botId) {
     const bot = await tx.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 FOR SHARE', [botId,userId])
     if (!bot.rows[0]) throw new Error('agentPolicyUnavailable')
     workspaceId = bot.rows[0].workspaceId
   }
-  if (workspaceId && task?.workspaceId && workspaceId !== task.workspaceId) throw new Error('agentPolicyUnavailable')
   const scope = { botId, workspaceId, agentId }
-  const workspaceIds = [...new Set([workspaceId, task?.workspaceId].filter((id): id is string => !!id))].sort()
-  const primaryWorkspaceId = workspaceId ?? task?.workspaceId ?? null
+  const workspaceIds = [...new Set([workspaceId, task?.workspaceId, runWorkspaceId].filter((id): id is string => !!id))].sort()
+  if (workspaceIds.length > 1) throw new Error('agentPolicyUnavailable')
+  const primaryWorkspaceId = runWorkspaceId ?? workspaceId ?? task?.workspaceId ?? null
   const key = scope.botId ?? 'coordinator'
   // One statement, the same locks in the same order: agent, worker, then each
   // workspace in UUID order (a function scan returns unnest's rows in order).
@@ -149,7 +153,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     defaultSources.push({ scope, scopeId, defaults: layer.defaults })
   }
   // The Bot and task share one tenant; optional team/project policies narrow it.
-  for (const id of new Set([workspaceId, task?.workspaceId].filter((id): id is string => !!id))) inherit('workspace', id, workspaceById.get(id))
+  for (const id of workspaceIds) inherit('workspace', id, workspaceById.get(id))
   if (hierarchy) {
     inherit('team', hierarchy.teamId, scopeLayers.team)
     if (hierarchy.projectId) inherit('project', hierarchy.projectId, scopeLayers.project)
@@ -182,15 +186,18 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
 export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: string, options: { freezeHierarchy?: boolean } = {}) {
   // Policy must precede Factory/task/run locks. Read the task with the run,
   // then freeze any new hierarchy only after acquiring the policy locks.
-  const result = await tx.query<CliTaskRow & { botId: string | null; agentId: string; issueId: string | null; policyCeiling: unknown; hierarchy: unknown }>(`SELECT "botId","agentId","issueId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",
-    r.cli_policy_hierarchy AS hierarchy,i."workspaceId",i."ownershipState",i."scopeVersion",
+  const result = await tx.query<CliTaskRow & { botId: string | null; agentId: string; issueId: string | null; runWorkspaceId: string | null; policyCeiling: unknown; hierarchy: unknown }>(`SELECT "botId","agentId","issueId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",
+    r.cli_policy_hierarchy AS hierarchy,r."workspaceId" AS "runWorkspaceId",i."workspaceId",i."ownershipState",i."scopeVersion",
     CASE WHEN jsonb_typeof(i.content)='object' THEN jsonb_build_object('attrs',i.content->'attrs') ELSE i.content END AS content
     FROM agent_runs r LEFT JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`, [runId,userId])
   const run = result.rows[0]
-  if (!run) throw new Error('agentPolicyUnavailable')
+  if (!run?.runWorkspaceId) throw new Error('agentPolicyUnavailable')
   const task = run.issueId ? await validateCliTaskScope(userId,run.issueId,run) : undefined
+  if (task && task.workspaceId !== run.runWorkspaceId) throw new Error('agentPolicyUnavailable')
+  if (!task && run.hierarchy != null) throw new Error('agentPolicyUnavailable')
+  if (!task) await requirePolicyWorkspace(userId, run.runWorkspaceId)
   if (task) { const hierarchy = await cliHierarchy(task,run.hierarchy); if (hierarchy) task.hierarchy = hierarchy }
-  const current = await lockCliAgentPolicy(tx,userId,run.agentId,run.botId,task)
+  const current = await lockCliAgentPolicy(tx,userId,run.agentId,run.botId,task,run.runWorkspaceId)
   if (options.freezeHierarchy !== false && task?.hierarchy && run.hierarchy == null) {
     // Concurrent first readers may agree on the snapshot, but one may never
     // overwrite a different admitted hierarchy after waiting on the row lock.

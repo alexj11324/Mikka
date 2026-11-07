@@ -65,8 +65,11 @@ FOR EACH ROW EXECUTE FUNCTION advance_issue_scope_generation();
 -- A run is admitted to the task's frozen tenant. Checking only its owner's id
 -- used to allow the same account to dispatch a task through a foreign Bot.
 CREATE FUNCTION require_run_task_workspace() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE tenant uuid; task_tenant uuid; bot_tenant uuid; frozen text;
+DECLARE tenant uuid; task_tenant uuid; bot_tenant uuid; frozen text; origin text; parents uuid[];
 BEGIN
+  IF TG_OP = 'UPDATE' AND NEW."userId" IS DISTINCT FROM OLD."userId" THEN
+    RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+  END IF;
   IF TG_OP = 'UPDATE' AND OLD."workspaceId" IS NOT NULL AND NEW."workspaceId" IS DISTINCT FROM OLD."workspaceId" THEN
     RAISE EXCEPTION 'taskWorkspaceTransferDenied' USING ERRCODE = '23514';
   END IF;
@@ -75,6 +78,8 @@ BEGIN
   IF TG_OP = 'UPDATE' AND NEW.status IN ('cancelled','stopped','failed','succeeded')
     AND NEW."issueId" IS NOT DISTINCT FROM OLD."issueId" AND NEW."botId" IS NOT DISTINCT FROM OLD."botId"
     AND NEW."agentDefinition" IS NOT DISTINCT FROM OLD."agentDefinition"
+    AND NEW."retryOf" IS NOT DISTINCT FROM OLD."retryOf" AND NEW."continuesRunId" IS NOT DISTINCT FROM OLD."continuesRunId"
+    AND NEW."questionContinuation" IS NOT DISTINCT FROM OLD."questionContinuation"
     AND NEW."workspaceId" IS NOT DISTINCT FROM OLD."workspaceId" THEN RETURN NEW; END IF;
   tenant := NEW."workspaceId";
   IF NEW."issueId" IS NOT NULL THEN
@@ -97,11 +102,27 @@ BEGIN
     END IF;
     tenant := frozen::uuid;
   END IF;
+  -- New lineage never grants a different owner's or tenant's execution. A
+  -- metadata-only tenant backfill may encounter its parent later in the same
+  -- batch; unchanged historical edges are fenced by every chain read instead.
+  IF TG_OP = 'INSERT' OR (NEW."retryOf" IS NOT NULL AND NEW."retryOf" IS DISTINCT FROM OLD."retryOf")
+    OR (NEW."continuesRunId" IS NOT NULL AND NEW."continuesRunId" IS DISTINCT FROM OLD."continuesRunId")
+    OR (NEW."questionContinuation" IS NOT NULL AND NEW."questionContinuation" IS DISTINCT FROM OLD."questionContinuation")
+    OR NEW."agentDefinition" IS DISTINCT FROM OLD."agentDefinition"
+    OR (NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('queued','preparing','running','waiting_input','finishing','paused')) THEN
+    origin := NEW."questionContinuation"->>'originRunId';
+    parents := ARRAY[NEW."retryOf", NEW."continuesRunId",
+      CASE WHEN origin ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN origin::uuid END];
+    IF EXISTS (SELECT 1 FROM unnest(parents) p(id) LEFT JOIN agent_runs r ON r.id=p.id
+      WHERE p.id IS NOT NULL AND (r.id IS NULL OR tenant IS NULL OR r."workspaceId" IS DISTINCT FROM tenant OR r."userId" IS DISTINCT FROM NEW."userId")) THEN
+      RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+    END IF;
+  END IF;
   NEW."workspaceId" := tenant;
   RETURN NEW;
 END;
 $$;
-CREATE TRIGGER require_run_task_workspace BEFORE INSERT OR UPDATE OF "workspaceId", "issueId", "botId", "agentDefinition", status ON agent_runs
+CREATE TRIGGER require_run_task_workspace BEFORE INSERT OR UPDATE OF "workspaceId", "issueId", "botId", "agentDefinition", status, "userId", "retryOf", "continuesRunId", "questionContinuation" ON agent_runs
 FOR EACH ROW EXECUTE FUNCTION require_run_task_workspace();
 -- Scope now controls provider publication only. Shared tasks need no Team link.
 DROP TRIGGER IF EXISTS require_run_issue_scope ON agent_runs;

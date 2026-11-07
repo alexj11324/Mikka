@@ -51,7 +51,7 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
   // The team link is needed for the caller's team id or a token's workspace check; a plain session read skips it.
   const access = withTeam || workspaceId ? await issueTeamAccess(id, userId) : null
-  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: [id] })
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: [id], withTeamLinks: false })
   const [row] = withoutBody
     ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
     : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)

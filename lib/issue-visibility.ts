@@ -14,12 +14,14 @@ export async function issueVisibility(reader: IssueReader, includeDeleted = fals
   onlyIssueIds?: readonly string[]
   teams?: readonly TeamScope[]
   withTaskNumbers?: boolean
+  /** Pure authorization reads do not need synchronization metadata. */
+  withTeamLinks?: boolean
 } = {}) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const workspaces = await activeTaskWorkspaces(reader, workspaceId)
   const workspaceIds = workspaces.map(workspace => workspace.id)
   // Team relations remain for numbering and grouping, never for tenant inference.
-  const links = (await issueTeamScope(userId, [], { onlyIssueIds: options.onlyIssueIds, teams: options.teams, withTaskNumbers: options.withTaskNumbers }))
+  const links = options.withTeamLinks === false ? [] : (await issueTeamScope(userId, [], { onlyIssueIds: options.onlyIssueIds, teams: options.teams, withTaskNumbers: options.withTaskNumbers }))
     .filter(link => workspaceIds.includes(link.workspaceId))
   const allowedIds = links.map(link => link.issueId)
   return { predicate: issueVisibilityPredicate(userId, { allowedIds, workspaceIds }, includeDeleted), allowedIds, links, workspaceIds }

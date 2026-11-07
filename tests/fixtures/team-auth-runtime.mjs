@@ -3,10 +3,12 @@
 import { registerHooks } from 'node:module'
 registerHooks({
   resolve(specifier,context,next) {
+    if(specifier==='next-intl/server') return {url:'team-auth-fixture:intl',shortCircuit:true}
     if(specifier==='next/headers') return {url:'team-auth-fixture:headers',shortCircuit:true}
     return next(specifier,context)
   },
   load(url,context,next) {
+    if(url==='team-auth-fixture:intl') return {format:'module',source:'export async function getLocale(){return "en"} export async function getTranslations(){return Object.assign(key=>key,{has:()=>true})}',shortCircuit:true}
     if(url==='team-auth-fixture:headers') return {format:'module',source:'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}',shortCircuit:true}
     return next(url,context)
   },

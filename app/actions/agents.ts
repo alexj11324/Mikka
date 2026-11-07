@@ -42,7 +42,7 @@ import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionR
 import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
 import { runIsActive } from '@/lib/issue-run-conversation'
 import { issueThreadListText } from '@/lib/issue-thread-list-projection'
-import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
+import { listIssueRunChains, readRunChain, readRunChainCheckpoint } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 import { threadPromptView } from '@/lib/thread-prompt'
@@ -317,9 +317,16 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 
 async function readThreadIssue(runId: string): Promise<{ issueId: string | null } | null> {
   if (!z.uuid().safeParse(runId).success) return null
-  const [run] = await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
+  const [run] = await db.select({ ...threadIdentityColumns, issueId: agentRuns.issueId, workspaceId: agentRuns.workspaceId })
+    .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, runId)).limit(1)
   if (!run) return null
   try {
+    if (run.issueId === null) {
+      const user = await getWorkspaceReader()
+      // The first read already has the task-free identity. Authorization still
+      // selects the current workspace and checks active membership on every call.
+      return run.userId === user.id && run.workspaceId === user[tokenWorkspace] ? { issueId: null } : null
+    }
     await readableThread(run.issueId, runId, threadIdentityColumns)
     return { issueId: run.issueId }
   } catch { return null }
@@ -514,10 +521,7 @@ export async function getThreadChanges(issueId: string | null, runId: string): P
 
 async function readThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
   const { row } = await readableThread(issueId, runId, threadIdentityColumns)
-  const chain = await readRunChain(pool, row.userId, row.id)
-  const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
-  const { rows: [checkpoint] } = await pool.query<{ patch: Buffer; unavailableReason: string | null }>(
-    'SELECT patch,"unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY "updatedAt" DESC LIMIT 1', [runIds])
+  const { runIds, checkpoint } = await readRunChainCheckpoint(pool, row.userId, row.id)
   if (!checkpoint) return { state: 'none' }
   if (checkpoint.unavailableReason) return { state: 'tooLarge' }
   let text: string

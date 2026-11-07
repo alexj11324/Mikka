@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
@@ -20,9 +21,10 @@ test('checkpoint recovery availability persists through the actual authenticated
   const { issueDeviceToken } = await import('../lib/device-link')
   const userId = `checkpoint-${randomUUID()}`, runId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID()
   await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
+  const workspaceId = await seedFixtureWorkspace(pool, userId)
   await pool.query('INSERT INTO devices (id,"ownerId",name) VALUES ($1,$2,\'Checkpoint fixture\')', [deviceId, userId])
   await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Checkpoint worker\')', [agentId, userId, deviceId])
-  await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,\'running\',$5)', [runId, userId, agentId, deviceId, new Date(Date.now() + 300_000)])
+  await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$6,\'running\',$5)', [runId, userId, agentId, deviceId, new Date(Date.now() + 300_000), workspaceId])
   const token = await issueDeviceToken(userId)
   t.after(async () => { await pool.end(); await (await import('../lib/db')).pool.end() })
   const checkpoint = { baseCommit: 'a'.repeat(40), patch: gzipSync(Buffer.from('initial patch fixture\n')).toString('base64'), files: 1, takenAt: '2099-01-01T00:00:00Z' }

@@ -11,7 +11,7 @@ import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeamScopes } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
 import { agents, issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
@@ -117,7 +117,12 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId, number: teamIssues.number, key: localTeams.identifier }).from(teamIssues)
     .leftJoin(localTeams, eq(localTeams.id, teamIssues.teamId))
     .where(and(eq(teamIssues.workspaceId, context.workspace.id), or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined))), workspaceDb)
-  const visibility = await issueVisibility(userId, false, context.workspace.id, db, { teams, withTaskNumbers: true })
+  // This operation already authorized the selected tenant in loadWorkspaceContext.
+  // Keep that fresh membership result instead of loading it a second time.
+  const visibility = {
+    predicate: issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [context.workspace.id] }),
+    links: await issueTeamScope(userId, [], { teams, withTaskNumbers: true }),
+  }
   const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
   // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
   // Qualified by alias: drizzle renders columns bare here, and a bare "userId" inside

@@ -112,9 +112,9 @@ test('real PG: lists retain their reader scope and publish only the originating 
     await t.test('run lists use their persisted tenant; account-wide lists retain the verified home', async () => {
       assert.deepEqual(await runListTargets(database, database, runId), [{ scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'thread_list', id: team }, { kind: 'task_run_list', id: team }] }])
       assert.deepEqual(await runListTargets(database, database, foreignRunId), [{ scope: { ownerId: 'foreign', workspaceId: team }, events: [{ kind: 'thread_list', id: team }, { kind: 'task_run_list', id: team }] }])
-      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"='owner'`, [team])
+      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
       try { assert.deepEqual(await runListTargets(database, database, runId), [], 'revoked membership never falls back to the owner personal channel') }
-      finally { await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE \"workspaceId\"=$1 AND \"userId\"='owner'`, [team]) }
+      finally { await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team]) }
       const before = (await database.query('SELECT count(*)::integer AS n FROM mikka_workspaces')).rows[0].n
       assert.deepEqual(await ownerListTargets(database, 'no-home', ['thread_list']), [])
       assert.deepEqual(await ownerListTargets(database, 'inactive', ['bot_chat_list']), [])
