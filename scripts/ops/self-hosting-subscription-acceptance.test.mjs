@@ -63,3 +63,5 @@ test('a failed provider source or fixture preserves the independent bound model 
 // YAML mode expressions use block scalars because the commit prefix contains a colon.
 
 // PR comments use explicit Pull requests write; Apple/EAS readbacks run independently of protocol completion.
+
+// Apple readback JWT scope includes the exact fixed build filters and sparse fields; no native redispatch.

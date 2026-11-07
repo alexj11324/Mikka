@@ -113,7 +113,7 @@ test('existing TestFlight readback signs a short GET-only token and emits only f
   assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error')
   assert.equal(JSON.parse(Buffer.from(header, 'base64url')).alg, 'ES256')
   const claims = JSON.parse(Buffer.from(payload, 'base64url'))
-  assert.deepEqual(claims.scope, ['GET /v1/builds'])
+  assert.deepEqual(claims.scope, ['GET ' + url.pathname + url.search])
   assert.equal(claims.aud, 'appstoreconnect-v1'); assert.equal(claims.iat, now / 1000); assert.equal(claims.exp - claims.iat, 300)
   assert.ok(verify('sha256', Buffer.from(header + '.' + payload), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url')))
   return new Response(JSON.stringify({ data: [{ id: 'fixture-build', type: 'builds', attributes: { version: '9', processingState: 'VALID', expired: false, arbitrary: 'never-return-private' }, relationships: { buildBetaDetail: { data: { id: 'fixture-beta' } } } }], included: [{ id: 'fixture-beta', type: 'buildBetaDetails', attributes: { internalBuildState: 'IN_BETA_TESTING', externalBuildState: 'WAITING_FOR_BETA_REVIEW', privateEmail: 'do-not-return@example.invalid' } }] }), { headers: { 'content-type': 'application/json' } })
@@ -124,7 +124,7 @@ test('existing TestFlight readback signs a short GET-only token and emits only f
  await assert.rejects(inspectExistingTestflightBuild({ ...env, GITHUB_REF: 'refs/heads/arbitrary' }, {}, () => assert.fail('must not request')), /APPLE_READBACK_SCOPE/)
 })
 
-test('Apple API denial preserves the action/status and does not parse or expose provider error bodies', async () => {
+test('Apple API denial preserves action/status without exposing raw provider error bodies', async () => {
  const { inspectExistingTestflightBuild } = await import('./self-hosting-release.mjs')
  const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }), report = {}
  const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: TARGET.repo, GITHUB_REF: TARGET.ref, ASC_API_KEY_P8: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(), ASC_API_KEY_ID: 'FIXTUREKEY', ASC_API_ISSUER_ID: '00000000-0000-4000-8000-000000000001' }

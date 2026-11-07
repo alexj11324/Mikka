@@ -157,7 +157,7 @@ jobs:
           include-imports: false
       - name: Read existing ASC_API_KEY_P8 only for TestFlight status
         if: >-
-          startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
+          (startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public') || startsWith(github.event.head_commit.message, 'ops: inspect private cloud production testflight'))
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -171,7 +171,7 @@ jobs:
           include-imports: false
       - name: Read existing ASC_API_KEY_ID only for TestFlight status
         if: >-
-          startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
+          (startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public') || startsWith(github.event.head_commit.message, 'ops: inspect private cloud production testflight'))
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -185,7 +185,7 @@ jobs:
           include-imports: false
       - name: Read existing ASC_API_ISSUER_ID only for TestFlight status
         if: >-
-          startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
+          (startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public') || startsWith(github.event.head_commit.message, 'ops: inspect private cloud production testflight'))
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -198,6 +198,8 @@ jobs:
           recursive: false
           include-imports: false
       - run: node scripts/ops/self-hosting-release.mjs --business
+        if: >-
+          startsWith(github.event.head_commit.message, 'ops: inspect private cloud production testflight') == false
         env:
           GITHUB_TOKEN: ${{ github.token }}
           MIKKA_METERING_ONLY: >-
@@ -210,6 +212,11 @@ jobs:
         run: node scripts/ops/self-hosting-release.mjs --clients-readback
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Read only the fixed TestFlight build with an exact request-scoped JWT
+        if: >-
+          always() && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production testflight')
+        run: node scripts/ops/self-hosting-release.mjs --testflight-readback
 
   community-subscriptions:
     if: >-
