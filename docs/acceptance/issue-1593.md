@@ -289,6 +289,64 @@ protocol fields or the no-per-tool-remote-check contract. This runtime change
 requires new candidate conservation and both official subscription gates;
 the earlier unchanged-worker proof cannot stand in for those gates.
 
+### Checkpoint confirmation and automatic retirement
+
+The item 7 audit found a separate concrete contract mismatch. The daemon
+created `checkpoint.takenAt` from its device clock, while the authenticated
+upload route persisted `clock_timestamp()` and returned only HTTP 204. The
+terminal report retained the device timestamp. Both the lifecycle decision
+and the final locked retirement guard correctly require the report to match
+the uploaded row, so ordinary successful uploads could not establish that
+proof. Existing daemon fixtures kept the supplied time; existing database
+retirement fixtures supplied equal times manually. Neither exercised the
+actual upload-to-retirement boundary.
+
+The upload now returns a strict optional `{ runId, takenAt }` receipt from
+the same admitted database write. New workers bind final checkpoint evidence
+to that server timestamp; a confirmed native exit precedes the final upload,
+so its safe-point observation uses the same acknowledged time. Old workers
+ignore the new successful JSON body. A new worker receiving an old HTTP 204
+retains the workspace but cannot certify an archive for automatic retirement.
+The server upload clock, final-write ordering, exact checkpoint match, task
+closure, epoch and ownership guards stay authoritative. No tolerance window,
+data migration or client-supplied retirement timestamp is introduced.
+
+The legacy empty-acknowledgement case failed against the old supervisor and
+passed after the change. The two complete terminal-checkpoint/HTTP test files
+pass 52/52 locally; protocol tests pass 24/24. The new PostgreSQL cases consume
+the real POST receipt, persist completion, park and run the actual controller
+and end guard. They require a current receipt to permit retirement, reject a
+replaced receipt or no receipt, and preserve the uploaded bytes and history.
+These database cases require the follow-up head's CI; they were not executed
+against a local database in this interactive environment.
+
+The guarded provider driver also strengthens `end-idempotence`. Its same
+single disposable VM contains a known Git base and a real changed file. The
+file must survive actual pause/resume, and its actual Git diff goes through
+the authenticated checkpoint handler in the isolated database. The runner
+reconstructs the base and recovers the saved bytes independently before and
+after the VM is killed. Only fixture `pausedAt` deadlines advance: an open
+task after seven days, a closed task inside its one-hour grace, and a closed
+task without final archive proof must all retain the VM. A valid receipt then
+allows the real controller to call fenced automatic end; repeated end must
+not kill twice, and task/run/checkpoint history must remain unchanged.
+The result carries a closed `retirement` receipt, and aggregation rejects
+missing restore, retention-refusal, token-revocation, kill or history evidence.
+The one-hour and seven-day clocks start at `lifecycle.pausedAt`, not at the
+time the Task is closed. This is a controlled clock/provider test with no
+native session; it does not claim a natural seven-day wait or replace Owner
+subscription acceptance. Its real-provider result is still pending execution
+on the follow-up merge source.
+
+Item 6 gains a separate controlled PostgreSQL case for external PR waiting:
+the actual lifecycle/park path pauses a terminal producer while Factory waits
+for approval; the normal publication and merged-event writers complete the
+Task and deliver committed live invalidations without starting compute.
+Duplicate events cannot create another run or provider action. Provider and
+live transports are explicit fixtures. Existing signed-webhook admission and
+the full adjacent-stage Factory dispatch/handoff tests provide the other
+controlled boundaries. The new joint database case also awaits exact-head CI.
+
 ### Main-only acceptance delivery
 
 The interactive environment could not obtain E2B/shared-account credentials,
