@@ -5283,8 +5283,6 @@
     "label": "Workspace",
     "createIn": "Create in {name}",
     "fixed": "Fixed when the task was created. A task can't move to another workspace.",
-    "personal": "Personal",
-    "shared": "Shared",
     "otherWorkspace": "Another workspace"
   },
   "HostedSettings": {

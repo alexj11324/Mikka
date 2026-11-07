@@ -5283,8 +5283,6 @@
     "label": "工作区",
     "createIn": "创建到 {name}",
     "fixed": "任务创建时已确定归属，不能转到其他工作区。",
-    "personal": "个人",
-    "shared": "共享",
     "otherWorkspace": "其他工作区"
   },
   "HostedSettings": {
