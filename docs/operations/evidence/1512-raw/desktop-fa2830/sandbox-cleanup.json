@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "kind": "artifact_recovery_sandbox_cleanup",
+  "sessionId": "sbx_qQGifiIeruuYmiJn6l3zA83kcjlk",
+  "status": "stopped",
+  "startedAt": 1794095039215,
+  "requestedStopAt": 1794095357867,
+  "stoppedAt": 1794095358094,
+  "durationMs": 318879,
+  "activeCpuDurationMs": 7469,
+  "timeoutMs": 600000,
+  "vcpus": 1,
+  "memoryMiB": 2048,
+  "persistent": false,
+  "publicPortsRequested": [],
+  "routesObserved": 0,
+  "networkAllowlist": [
+    "sdmntprsouthcentralus.oaiusercontent.com",
+    "sdmntpreastus3.oaiusercontent.com"
+  ],
+  "explicitStop": true,
+  "separateGetReadback": true,
+  "all16RecoveredFilesVerifiedBeforeStop": true,
+  "compressedReadback": {
+    "encoding": "lzw16be",
+    "parts": 124,
+    "chunkBytes": 900,
+    "compressedBytes": 111164,
+    "compressedSha256": "ddd275aa32969cb16aa9ed897b3caf07c2595c807d411b2edc38074dc83beb78",
+    "bytes": 588043,
+    "sha256": "c8cf5dec2ed96e2d7ca83ce1fc5305e38e843c3b4d1dae69c3f3861eec2214e1",
+    "fileCount": 16,
+    "originalJsonCount": 6
+  },
+  "originalJsonCount": 6,
+  "downloadScript": {
+    "bytes": 4678,
+    "sha256": "45df0c64f0c94b1bd117994f4e88d64270e27019e9483dffad654470a4ece6a9"
+  },
+  "readerScript": {
+    "bytes": 3740,
+    "sha256": "e8fbaee901deb08f473c6ccddb61a3e5c8ea945615076381c4c2afd674b23749"
+  },
+  "initialCommandNotStarted": {
+    "code": "command_failed",
+    "reason": "requested working directory did not yet exist",
+    "resourcesOrDownloadsStarted": false
+  },
+  "actualDownloadCommand": {
+    "id": "cmd_a41ed360414a4290b0d40146c804",
+    "exitCode": 0
+  },
+  "readerCommand": {
+    "id": "cmd_6b57c76812e74737a9ce975f0c28",
+    "exitCode": 0
+  },
+  "signedUrlsSavedToFiles": false,
+  "signedUrlReferencesClearedAfterRecovery": true,
+  "zipFilesPersisted": false,
+  "imagesOrPackagesExtracted": false,
+  "providerCalls": 0,
+  "productionCredentialsLoaded": false,
+  "databasesStarted": 0,
+  "browsersStarted": 0
+}

@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "revision": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "preset": "node-server",
+  "node": "v24.22.2",
+  "basePath": "/mikka",
+  "appBuild": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "testDeploymentSha": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "lockSha256": "916b7b20b1da44670882894f628b2a7dfb98fc6bc7ffaee310ec4fa5afe13e62",
+  "routesSha256": "1b8e2538ee6ae9abda9d1ef0200b6688421a820c46aa9f1e8af751629385dbc8",
+  "tracingSha256": "d1cd9a5304057777b634dd02c726dd13823541e585cd046f6ebf368ca36c0473",
+  "resources": [
+    {
+      "path": "lib/abuse/data/disposable-email-domains.txt",
+      "bytes": 146220,
+      "sha256": "698469ed3129ff82950e28cb8ec1c64bf142acbc1e84abe9f2391396a962c5ff"
+    },
+    {
+      "path": "packages/subscription-worker/CPA_COMMIT",
+      "bytes": 41,
+      "sha256": "752926809037306f0f5ff4884d0cae47547fa98d3d03992d7a312b4774da53b1"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "bytes": 11656,
+      "sha256": "c3b071a59d67a72f2a08ea41906f9143a58b8c738fb4d3ca520ab18902188751"
+    },
+    {
+      "path": "packages/daemon/scripts/refresh-cloud-worker.py",
+      "bytes": 10673,
+      "sha256": "8c51f2efdba116d4f61b54562476c1e7bd098dd282068a48edbd00fdcbf47d6f"
+    },
+    {
+      "path": "scripts/e2b/bootstrap-desktop.sh",
+      "bytes": 1255,
+      "sha256": "85982ecc028557c128275a8453071c3fb3efa904e6e20e658b33417e5a533510"
+    },
+    {
+      "path": "scripts/e2b/bootstrap.sh",
+      "bytes": 1186,
+      "sha256": "3d7b388e3d2b8f2c7bec9a21cabfc96095a27fe54c965bf6fd70cb4e64eddd44"
+    },
+    {
+      "path": "scripts/e2b/broker-websocket.test.py",
+      "bytes": 24507,
+      "sha256": "92da48a5cf169ea63e2e0722b616035dc610b3db98658cafbf2157322ee3c58a"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "bytes": 52122,
+      "sha256": "506a779375e088a62b3a795862228f9e606443e09d468efd4a2047c8e1c72dae"
+    },
+    {
+      "path": "scripts/e2b/build-template.test.py",
+      "bytes": 53537,
+      "sha256": "700dfa03ddb73f105343e1235c60d35b36602fe2812a0719c64a367c4c924200"
+    },
+    {
+      "path": "scripts/e2b/cleanup-template-candidates.py",
+      "bytes": 7437,
+      "sha256": "893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d"
+    },
+    {
+      "path": "scripts/e2b/cleanup-template-candidates.test.py",
+      "bytes": 16915,
+      "sha256": "826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1"
+    },
+    {
+      "path": "scripts/e2b/cloud-acceptance-release.mjs",
+      "bytes": 2827,
+      "sha256": "81e0baf662a88d3723eed53a43fbae25405d54be631a507576ad15ae30b8df21"
+    },
+    {
+      "path": "scripts/e2b/cloud-acceptance-release.test.mjs",
+      "bytes": 3602,
+      "sha256": "6bfc58c37b2e3216955691adea436cd87ac9a418986bc6e78244018d846fa314"
+    },
+    {
+      "path": "scripts/e2b/cloud-local-acceptance.mjs",
+      "bytes": 25253,
+      "sha256": "af93c0b56574941aa2d1532e3d2455f0e7447d0dee3b01f9a20db4229790bd30"
+    },
+    {
+      "path": "scripts/e2b/desktop-probe.mjs",
+      "bytes": 2811,
+      "sha256": "4db23d2d1b93a1a6211f871cd6807a8e133823a5a5e04879415d00a396f5d0e5"
+    },
+    {
+      "path": "scripts/e2b/inspect-retained-deliverable.mjs",
+      "bytes": 9074,
+      "sha256": "27a7f6a2a266f674cf6ba5aa919479b45bf8c2326389942d7e1b7d50af44656b"
+    },
+    {
+      "path": "scripts/e2b/lease-driver.py",
+      "bytes": 1487,
+      "sha256": "758a4d09458dc80efc27b9903348cf992d4e6a8312f2a257abc2cf9638253cbe"
+    },
+    {
+      "path": "scripts/e2b/lease-driver.test.py",
+      "bytes": 1765,
+      "sha256": "e47b19c5eb83a2f270f944aae0413c8ccec4f9bdb8b9934f035cdb9e07721cf9"
+    },
+    {
+      "path": "scripts/e2b/local-api-relay.mjs",
+      "bytes": 10530,
+      "sha256": "ee25f008bed13416dc423a44174875956210e4f22c11e9a01b60d3cd4d7e721e"
+    },
+    {
+      "path": "scripts/e2b/local-api-relay.py",
+      "bytes": 11483,
+      "sha256": "7e0df10a42e9922230aeef8a806c2721db0d267f6d958bb209329cf88c93de64"
+    },
+    {
+      "path": "scripts/e2b/local-api-relay.test.mjs",
+      "bytes": 5212,
+      "sha256": "a729023636918d4edc9bb0a3a6de0bf0e987e8b24cd2b4b84e4bac56ff514d07"
+    },
+    {
+      "path": "scripts/e2b/local-api-relay.test.py",
+      "bytes": 13912,
+      "sha256": "65eb0eb5e5dc540ecab3eb488bfe9b69da4c71c3c6ced3ffef6163a58090f718"
+    },
+    {
+      "path": "scripts/e2b/measure-thread-start.py",
+      "bytes": 5939,
+      "sha256": "d2c93dd0f2b09f5dedf95348f72e5022a267579c0d6af53163599ba9a2836cf2"
+    },
+    {
+      "path": "scripts/e2b/mock-device-server.py",
+      "bytes": 4382,
+      "sha256": "c3b90a610ca366e3c6711f06e295d4a0e668d85a3df3ffd1c53625014f6198f7"
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "bytes": 21236,
+      "sha256": "6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe"
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "bytes": 35004,
+      "sha256": "973c9e7b699032526052f48b4326ef26b0bb7e9db621dd1910a5d00ca0a23c10"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "bytes": 17711,
+      "sha256": "1c046b8e589c0f66c3301f3c008bb796db9ffefdc5b904d1e350b10516b12e0c"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "bytes": 31712,
+      "sha256": "e322dadc118e2749fb448adea21d0b1cecae92d9d0778c06f5111e99a9c43c00"
+    },
+    {
+      "path": "scripts/e2b/runtime-report.mjs",
+      "bytes": 6202,
+      "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3"
+    },
+    {
+      "path": "scripts/e2b/runtime-report.test.mjs",
+      "bytes": 14223,
+      "sha256": "7504bd7e45958089b086eec0ae707142873bc9a29db04631ffa55552284ce367"
+    },
+    {
+      "path": "scripts/e2b/screen-capture.sh",
+      "bytes": 2674,
+      "sha256": "579eb44ec0ab5eafd032339e42c1c63d1a744712deb81ab0ec19212c57b55f04"
+    },
+    {
+      "path": "scripts/e2b/start-desktop.sh",
+      "bytes": 2033,
+      "sha256": "e4927bf802b2245c9cc6c2016c775187841a32c2ecd4d07d938a511bb1aa8580"
+    },
+    {
+      "path": "scripts/e2b/start-prebuilt.sh",
+      "bytes": 929,
+      "sha256": "36e6dd8a960ba870cb9c6ec57f8e00c35cf212cc430580631be42ef8124e5165"
+    },
+    {
+      "path": "scripts/e2b/subagent-cdp.mjs",
+      "bytes": 2363,
+      "sha256": "b2c9366ccde04b52d393ca42795c46ef198310aa8161e684dc75b71d9758c25a"
+    },
+    {
+      "path": "scripts/e2b/subagent-gateway.py",
+      "bytes": 43174,
+      "sha256": "39c76a51c096e8264ac727a1d1e662ee198e127c4bf5310066bcc2b3d2c6abf6"
+    },
+    {
+      "path": "scripts/e2b/subagent-guard-browser.test.mjs",
+      "bytes": 2027,
+      "sha256": "a144ce1c50d48a1df95e5fa90782d866154fd59c6e0e88a5cc2f12440b9d441d"
+    },
+    {
+      "path": "scripts/e2b/subagent-guard.test.py",
+      "bytes": 10231,
+      "sha256": "42967c62524b298decabd426107f13ebd326c52fcd76f979910ac1543f02bad0"
+    },
+    {
+      "path": "scripts/e2b/subagent-live-acceptance.py",
+      "bytes": 5841,
+      "sha256": "be9bf8fa0cf6e12cc41497f5d3e534c74caedb5c7e012202e38b26f190364b2c"
+    },
+    {
+      "path": "scripts/e2b/subagent-visual-browser.test.py",
+      "bytes": 7993,
+      "sha256": "cc055dbdca09e7facdf205c4d16e0787eb623bc7e6c59925fb28c70084a982b5"
+    },
+    {
+      "path": "scripts/e2b/validate-official-instances.py",
+      "bytes": 3809,
+      "sha256": "74319603ac577b87b16eae35010ad3bcd65e049316f72f8f18669a63d036c74d"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "bytes": 25190,
+      "sha256": "b323f6650186d483bad07100f5131dc147239ff6bafceda1c4f89bdc3a6f1d77"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "bytes": 38410,
+      "sha256": "6b7081e380bfe1042436529a60a1080b653726bf72b301070f81e05191107640"
+    },
+    {
+      "path": "scripts/e2b/viewer-gateway.py",
+      "bytes": 4062,
+      "sha256": "452adba01d6109aa56f51031c108b6418bce22b2df343a0abfe9cd04303c6d2b"
+    },
+    {
+      "path": "scripts/e2b/viewer-probe.py",
+      "bytes": 4364,
+      "sha256": "980e8966e9d75dcf9049d6b6e54804941447fc27d2f09a03717fc57c20e86b80"
+    }
+  ],
+  "functions": [],
+  "docker": {
+    "entry": "server/mikka-docker.mjs",
+    "application": "server/docker-entry.mjs",
+    "entrySha256": "caff5648e73c7b52b37300dfa72b0a5eb43875a9378f00b80ae3e80f3195dfd8",
+    "applicationSha256": "53cea7a380fbaa235f549343ae847a6ff12e9d14bf66a43749bfea1315b19ee8",
+    "trustProxy": false
+  }
+}

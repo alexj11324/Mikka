@@ -1,0 +1,266 @@
+{
+  "version": 1,
+  "kind": "issue1512_actual_native_evidence_index",
+  "createdAt": "2026-11-07 23:52:12 UTC",
+  "repository": "alexj11324/Mikka",
+  "pr": 1675,
+  "runId": 42424186827,
+  "attempt": 1,
+  "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "actualSource": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "parents": [
+    "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "fa2830e0576233d8de54f72eec56ec74b4ca95d1"
+  ],
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "sourceKeys": 78,
+  "sourceTableSha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+  "counterImplementationSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+  "status": "actual_budget_passed_for_this_fixed_source_and_first_startup_pair",
+  "ci": {
+    "workflow": "success",
+    "jobs": 4,
+    "allJobsSuccess": true,
+    "actualNativeStartedAt": "2026-11-07T23:32:02Z",
+    "actualNativeEndedAt": "2026-11-07T23:41:14Z",
+    "fourActualCheckoutsVerified": true,
+    "separateMainCanonicalReceipt": "root-owned",
+    "macPostgresSeparateStopReceipt": "not_reported"
+  },
+  "budgets": {
+    "loginNativeVsWeb": {
+      "first": 210,
+      "second": 210,
+      "difference": 0,
+      "firstNotAboveSecond": true
+    },
+    "startupBundledVsHosted": {
+      "first": 181,
+      "second": 194,
+      "difference": -13,
+      "firstNotAboveSecond": true
+    }
+  },
+  "conservation": {
+    "checkpoints": 12,
+    "segments": 8,
+    "totals": 4,
+    "operationKeys": 17,
+    "sourceKeys": 78,
+    "sourceRefinementRows": 24,
+    "samePid": 27734,
+    "unknownReadings": 0,
+    "otherScopedAndNoScopeZeroForAllWindowTotalsAndSegments": true,
+    "passed": true
+  },
+  "rpc": {
+    "physical": {
+      "nativeLogin": 9,
+      "webLogin": 17,
+      "startupBundled": 6,
+      "startupHosted": 19
+    },
+    "logical": {
+      "nativeLogin": 21,
+      "webLogin": 17,
+      "startupBundled": 19,
+      "startupHosted": 19
+    },
+    "allCrossesStart": 0,
+    "allCrossesEnd": 0,
+    "allCompletionNotObserved": 0,
+    "allCompletionWithoutStart": 0,
+    "duplicateRecords": 0,
+    "conflictingInvocations": 0,
+    "raw401ActionIsNull": true,
+    "raw401ActionPhase": "common-email-authentication",
+    "unknownActionRetained": true
+  },
+  "validations": {
+    "lifecycle": "8/8",
+    "parity": "100/100",
+    "smoke": "10/10",
+    "crypto": "passed",
+    "package": "passed",
+    "readerIssueCount": 0
+  },
+  "cleanup": {
+    "allLifecycleAndSmokeStagesPassed": true,
+    "nativeResourcesCleaned": true,
+    "leaseState": "released",
+    "ownerAndPeerBaselineAfter": true,
+    "workspaceNamePhase": "unchanged",
+    "legacyAggregateCleanupField": "unknown_when_absent",
+    "recoverySandboxStopped": true,
+    "separateStopReadback": true
+  },
+  "productionAcceptance": null,
+  "historical75ReportsUnmodified": true,
+  "wholeWindowsUnchanged": true,
+  "subtractPkceOrBackground": false,
+  "zipAndOriginalDigestsVerified": true,
+  "originalJsonCount": 6,
+  "payloadCount": 20,
+  "payloadBytes": 679179,
+  "allPayloadGitBlobsExactRemoteReadback": true,
+  "allPayloadsUnreferenced": true,
+  "refsUpdatedByRecovery": false,
+  "resources": {
+    "sandboxId": "sbx_qQGifiIeruuYmiJn6l3zA83kcjlk",
+    "status": "stopped",
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "durationMs": 318879,
+    "activeCpuMs": 7469,
+    "providerCalls": 0,
+    "dbStarted": 0,
+    "browserStarted": 0
+  },
+  "readerReferences": [
+    {
+      "path": "desktop-native-summary.mjs",
+      "gitBlob": "dad196c96077ab1504fd8858343d31b00cf0da3a"
+    },
+    {
+      "path": "desktop-query-operations-summary.mjs",
+      "gitBlob": "17a54954b618fc3373715dbc73fa86669c2aa739"
+    },
+    {
+      "path": "desktop-unattributed-sources-78-summary.mjs",
+      "gitBlob": "1a334ba3e881b0b163b09c4d490b5aca3d2f459b"
+    },
+    {
+      "path": "desktop-query-unattributed-sources-78.cjs",
+      "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+    }
+  ],
+  "files": [
+    {
+      "path": "lifecycle.json",
+      "bytes": 272230,
+      "sha256": "476f1bc40d57df853a173be5fd22b42eec31ed49260a56c55011abbeeb292bf2",
+      "gitBlob": "445a490ed039114c0a41cea9c5d3dc873e075085"
+    },
+    {
+      "path": "parity/parity.json",
+      "bytes": 106244,
+      "sha256": "a7ea0967daaaff8d7daf4c2336e4ee4353cbc51d87d45ad144bc71c427d48c1d",
+      "gitBlob": "a36a09e52e46387dba5d1b36aca7079f50677299"
+    },
+    {
+      "path": "smoke.json",
+      "bytes": 3105,
+      "sha256": "98358f57dfdc1ab32da06cf768259edd90cb0647d07b0ffcd427a0ba42b3f621",
+      "gitBlob": "bf222a6767a338d02686324185660b60d6e13895"
+    },
+    {
+      "path": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "8914fd36566a939b7f2db31fee0d6cef2db3114dd4c5cf2ef64f24311f8d30c6",
+      "gitBlob": "c840683929d00a4ebaa18b475c95b56eb82d9687"
+    },
+    {
+      "path": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "39889908f398138e31b756146dae749dd2288f932214f557fa9ffb9b72eef7b1",
+      "gitBlob": "a147485a4c92fbde7755beaf5644f56659d9bdc8"
+    },
+    {
+      "path": "compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "4bcb90ea56be076624d7d0c7ac32cdc9141bc0de341470cb57966acc3a3fe8c9",
+      "gitBlob": "9e4989a6573d57513b78f9c7570281951ce4482d"
+    },
+    {
+      "path": "download-validation.json",
+      "bytes": 3770,
+      "sha256": "56191ee6f92bdf354efced01710a5fbeaea2df7e9a06cae17f40312781c801ec",
+      "gitBlob": "e08574164807f464b7d586da39480970540da926"
+    },
+    {
+      "path": "privacy.json",
+      "bytes": 1517,
+      "sha256": "2b156de25e8018451d63bcdfdd83d647564ec6c5035bf2c149dc6690e139c388",
+      "gitBlob": "c07c4bb72d20a7063dec5eb537c25d164c47e195"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 101955,
+      "sha256": "40e9acbd27b1541303b9aa42cd34a88211f2eb9e6bec1b508574b013e3997bf5",
+      "gitBlob": "6bbbedcc0be945d3de9c0ed67d9579c02a68b728"
+    },
+    {
+      "path": "query-operations.json",
+      "bytes": 14792,
+      "sha256": "6b8cb91369c244b4a112a98fa2f09ca14340f1c10dea2fc9f3f2f1ddfe2dcf00",
+      "gitBlob": "10fd68c4d347ae19cae9843913346e93586795ff"
+    },
+    {
+      "path": "unattributed-sources.json",
+      "bytes": 16498,
+      "sha256": "38c9eed5ca8c9dbf5573c35a5db884c80e36b185bab005947029e16f92d3c330",
+      "gitBlob": "58616877d94819bd31469f257fe40d83dbce7b79"
+    },
+    {
+      "path": "summary.stdout.json",
+      "bytes": 588,
+      "sha256": "933ca6edda0ff9127117f15f966fa4df65b649f189755d9811db10424e6f26bf",
+      "gitBlob": "bc61502d6510c3270c745446bfcba07dd3351b20"
+    },
+    {
+      "path": "query-operations.stdout.json",
+      "bytes": 401,
+      "sha256": "c4edaddf70d8c1ef28c8a794414296b6269419dd9d130b12fadd75ef7f4341a4",
+      "gitBlob": "3834e1781b4ff2967c49d1926cb16a564bc94098"
+    },
+    {
+      "path": "unattributed-sources.stdout.json",
+      "bytes": 423,
+      "sha256": "2c91e354fc9c2dfa284e308ccb60d0e6ca66032e67e1160081a2b11cdeb19438",
+      "gitBlob": "28440364ccae56bf06e44363ba9c0163274ccde7"
+    },
+    {
+      "path": "reader-execution.json",
+      "bytes": 411,
+      "sha256": "2b6ca10aba27254dde3a18ba60192b0d19b5507aca04e174a41152c800d6d0fd",
+      "gitBlob": "e6b788e9bcbdbe8e2394bdddf103af61341585d5"
+    },
+    {
+      "path": "closed-diagnostic.json",
+      "bytes": 105880,
+      "sha256": "07e8edf56046b1a45a9c23c4a7ec4d1437841c7208352f09898275676ef8c666",
+      "gitBlob": "0c09c964312bed4a3901089781797f0f1f6d8ee5"
+    },
+    {
+      "path": "source-binding.json",
+      "bytes": 7178,
+      "sha256": "277af2bd709f692ad4f5032c7761b18ef0686523608bb06d810e71b174ed1bd4",
+      "gitBlob": "74cb493a75c282ed1a9a77b979e53da69a63d5f2"
+    },
+    {
+      "path": "ci-final.json",
+      "bytes": 23556,
+      "sha256": "bf34400b6b7b03412f73f198e1f7db3a5b911be357fd1c4b874b95646b0ba83f",
+      "gitBlob": "744ea866d4162373acdd771c770275f80b75c40f"
+    },
+    {
+      "path": "integration.json",
+      "bytes": 6454,
+      "sha256": "d15e8c5f47fbe5aa224f92cb88bab84c17f4d0360279f30ec840d84d22452a24",
+      "gitBlob": "0b4a04788d4921e71bdd0a1257d93b9423a6a383"
+    },
+    {
+      "path": "sandbox-cleanup.json",
+      "bytes": 1921,
+      "sha256": "5d3dcbdecabc7ef3fc0974d6cc014e2f3f5d1fb5bfc76953fed6ccf40ec642bd",
+      "gitBlob": "eb3af289c85e6566645ac9fd3efd031f179d28e2"
+    }
+  ],
+  "limitations": [
+    "No transfer of observed counts to a future candidate or to another startup pair.",
+    "All windows include their original authentication/background work; no SQL count is inferred from RPC calls.",
+    "The one raw null action remains unknown.",
+    "Actual PostHog, model, Replay and final production acceptance remain separate."
+  ]
+}

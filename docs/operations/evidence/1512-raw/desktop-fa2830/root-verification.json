@@ -1,0 +1,241 @@
+{
+  "kind": "root-independent-native-fa283-raw-reconciliation",
+  "createdAt": "2026-11-07 23:53:05 UTC",
+  "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "expectedActualSource": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "windowScope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+  "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint",
+  "windows": [
+    {
+      "name": "webLogin",
+      "queryCalls": 210,
+      "phases": [
+        {
+          "phase": "common-email-authentication",
+          "queries": 19
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queries": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queries": 191
+        }
+      ],
+      "checkpointCount": 4,
+      "operationSum": 210,
+      "unattributedQueryCount": 46,
+      "operationKeys": 17,
+      "sourceKeys": 78,
+      "allChecksPassed": true,
+      "pair": null
+    },
+    {
+      "name": "nativeLogin",
+      "queryCalls": 210,
+      "phases": [
+        {
+          "phase": "common-email-authentication",
+          "queries": 19
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queries": 13
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queries": 178
+        }
+      ],
+      "checkpointCount": 4,
+      "operationSum": 210,
+      "unattributedQueryCount": 48,
+      "operationKeys": 17,
+      "sourceKeys": 78,
+      "allChecksPassed": true,
+      "pair": null
+    },
+    {
+      "name": "startup-bundled",
+      "queryCalls": 181,
+      "phases": [
+        {
+          "phase": "launch-to-usable",
+          "queries": 181
+        }
+      ],
+      "checkpointCount": 2,
+      "operationSum": 181,
+      "unattributedQueryCount": 48,
+      "operationKeys": 17,
+      "sourceKeys": 78,
+      "allChecksPassed": true,
+      "pair": 1
+    },
+    {
+      "name": "startup-hosted",
+      "queryCalls": 194,
+      "phases": [
+        {
+          "phase": "launch-to-usable",
+          "queries": 194
+        }
+      ],
+      "checkpointCount": 2,
+      "operationSum": 194,
+      "unattributedQueryCount": 43,
+      "operationKeys": 17,
+      "sourceKeys": 78,
+      "allChecksPassed": true,
+      "pair": 1
+    }
+  ],
+  "process": {
+    "pid": 27734,
+    "start": 1794094323824,
+    "checkpoints": 12,
+    "samePidAndStart": true,
+    "cumulativeQueryCountsNondecreasing": true
+  },
+  "cleanup": {
+    "stages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleaned": true,
+    "leaseState": "released",
+    "ownerBaselineAfter": true,
+    "peerBaselineAfter": true,
+    "aggregateLegacyFieldPresent": false,
+    "macPostgresExplicitStop": "not independently reported",
+    "recoverySandbox": "stopped"
+  },
+  "readback": {
+    "time": "2026-11-07 23:52:30 UTC",
+    "paths": 20,
+    "unique": 20,
+    "passed": 20,
+    "errors": []
+  },
+  "notes": [
+    "All original full windows are used with no PKCE/background subtraction.",
+    "otherScoped/noScope are zero window and segment deltas; their earlier cumulative counts are not claimed zero.",
+    "Physical/logical RPC are independent from SQL counts; one original null/401 action is retained.",
+    "Counts prove this exact source and first startup pair only; future source and production observability remain separate."
+  ],
+  "rpc": {
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 9,
+        "completedInWindow": 9,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 6,
+        "completedInWindow": 6,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 21,
+        "completedInWindow": 21,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "exactSqlWindows": true,
+    "unknownNull401ActionRetained": true,
+    "duplicateRecords": 0,
+    "conflictingInvocations": 0
+  },
+  "budgets": {
+    "login": {
+      "native": 210,
+      "web": 210,
+      "pass": true
+    },
+    "firstStartup": {
+      "native": 181,
+      "web": 194,
+      "pass": true
+    }
+  },
+  "recoveryGet": {
+    "status": "stopped",
+    "startedAt": 1794095039215,
+    "stoppedAt": 1794095358094,
+    "routes": 0
+  }
+}

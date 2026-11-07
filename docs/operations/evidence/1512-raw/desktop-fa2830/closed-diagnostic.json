@@ -1,0 +1,3319 @@
+{
+  "version": 1,
+  "kind": "desktop_actual_native_closed_diagnostic",
+  "runId": 42424186827,
+  "attempt": 1,
+  "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "sourceKeys": 78,
+  "windowScope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+  "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint",
+  "wholeWindowsUnchanged": true,
+  "subtractPkceOrBackground": false,
+  "startupScope": "first_pair_only",
+  "windows": {
+    "webLogin": {
+      "status": "complete",
+      "startedAt": "2026-11-07T23:39:49.082Z",
+      "finishedAt": "2026-11-07T23:39:51.503Z",
+      "queryCalls": 210,
+      "unknownReadings": 0,
+      "pgProtocolReceiveBytes": 46738,
+      "pgProtocolSendBytes": 130573,
+      "queryOperations": {
+        "/api/auth/[...all]": 22,
+        "/api/desktop/begin": 0,
+        "/api/desktop/return": 0,
+        "/api/desktop/exchange": 0,
+        "/api/desktop/rpc": 0,
+        "/api/rpc": 36,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 8,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 44,
+        "/actions/coordinator/summaries": 10,
+        "/actions/threads/poll": 10,
+        "/actions/task-runs/read": 0,
+        "/actions/issues/poll": 16,
+        "/actions/projects/list": 2,
+        "unattributed": 46
+      },
+      "sourceNonzero": {
+        "/api/agent/sessions": 2,
+        "/api/conversations": 10,
+        "/api/conversations/[id]/read": 11,
+        "/api/approved-writes": 20,
+        "/api/mobile/reactions": 1,
+        "/api/pending-actions": 2
+      },
+      "otherScoped": 0,
+      "noScope": 0,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "startedAt": "2026-11-07T23:39:49.082Z",
+          "finishedAt": "2026-11-07T23:39:49.235Z",
+          "queryCalls": 19,
+          "queryOperations": {
+            "/api/auth/[...all]": 19,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          },
+          "sourceNonzero": {},
+          "otherScoped": 0,
+          "noScope": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "startedAt": "2026-11-07T23:39:49.235Z",
+          "finishedAt": "2026-11-07T23:39:49.718Z",
+          "queryCalls": 0,
+          "queryOperations": {
+            "/api/auth/[...all]": 0,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          },
+          "sourceNonzero": {},
+          "otherScoped": 0,
+          "noScope": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "startedAt": "2026-11-07T23:39:49.718Z",
+          "finishedAt": "2026-11-07T23:39:51.503Z",
+          "queryCalls": 191,
+          "queryOperations": {
+            "/api/auth/[...all]": 3,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 36,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 8,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 44,
+            "/actions/coordinator/summaries": 10,
+            "/actions/threads/poll": 10,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 16,
+            "/actions/projects/list": 2,
+            "unattributed": 46
+          },
+          "sourceNonzero": {
+            "/api/agent/sessions": 2,
+            "/api/conversations": 10,
+            "/api/conversations/[id]/read": 11,
+            "/api/approved-writes": 20,
+            "/api/mobile/reactions": 1,
+            "/api/pending-actions": 2
+          },
+          "otherScoped": 0,
+          "noScope": 0
+        }
+      ]
+    },
+    "nativeLogin": {
+      "status": "complete",
+      "startedAt": "2026-11-07T23:39:53.337Z",
+      "finishedAt": "2026-11-07T23:39:57.129Z",
+      "queryCalls": 210,
+      "unknownReadings": 0,
+      "pgProtocolReceiveBytes": 48222,
+      "pgProtocolSendBytes": 136740,
+      "queryOperations": {
+        "/api/auth/[...all]": 21,
+        "/api/desktop/begin": 1,
+        "/api/desktop/return": 2,
+        "/api/desktop/exchange": 8,
+        "/api/desktop/rpc": 36,
+        "/api/rpc": 0,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 4,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 41,
+        "/actions/coordinator/summaries": 6,
+        "/actions/threads/poll": 6,
+        "/actions/task-runs/read": 6,
+        "/actions/issues/poll": 14,
+        "/actions/projects/list": 1,
+        "unattributed": 48
+      },
+      "sourceNonzero": {
+        "/api/agent/sessions": 2,
+        "/api/conversations": 10,
+        "/api/conversations/[id]/read": 9,
+        "/api/approved-writes": 20,
+        "/api/mobile/reactions": 1,
+        "/api/pending-actions": 2,
+        "/api/settings/preferences": 1,
+        "/api/devices/enrollment": 3
+      },
+      "otherScoped": 0,
+      "noScope": 0,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "startedAt": "2026-11-07T23:39:53.337Z",
+          "finishedAt": "2026-11-07T23:39:53.669Z",
+          "queryCalls": 19,
+          "queryOperations": {
+            "/api/auth/[...all]": 19,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          },
+          "sourceNonzero": {},
+          "otherScoped": 0,
+          "noScope": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "startedAt": "2026-11-07T23:39:53.669Z",
+          "finishedAt": "2026-11-07T23:39:55.127Z",
+          "queryCalls": 13,
+          "queryOperations": {
+            "/api/auth/[...all]": 2,
+            "/api/desktop/begin": 1,
+            "/api/desktop/return": 2,
+            "/api/desktop/exchange": 8,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 0,
+            "/api/workspace": 0,
+            "/api/workspace/switcher": 0,
+            "/api/live/ticket": 0,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 0,
+            "/actions/coordinator/summaries": 0,
+            "/actions/threads/poll": 0,
+            "/actions/task-runs/read": 0,
+            "/actions/issues/poll": 0,
+            "/actions/projects/list": 0,
+            "unattributed": 0
+          },
+          "sourceNonzero": {},
+          "otherScoped": 0,
+          "noScope": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "startedAt": "2026-11-07T23:39:55.127Z",
+          "finishedAt": "2026-11-07T23:39:57.129Z",
+          "queryCalls": 178,
+          "queryOperations": {
+            "/api/auth/[...all]": 0,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 36,
+            "/api/rpc": 0,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 4,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 41,
+            "/actions/coordinator/summaries": 6,
+            "/actions/threads/poll": 6,
+            "/actions/task-runs/read": 6,
+            "/actions/issues/poll": 14,
+            "/actions/projects/list": 1,
+            "unattributed": 48
+          },
+          "sourceNonzero": {
+            "/api/agent/sessions": 2,
+            "/api/conversations": 10,
+            "/api/conversations/[id]/read": 9,
+            "/api/approved-writes": 20,
+            "/api/mobile/reactions": 1,
+            "/api/pending-actions": 2,
+            "/api/settings/preferences": 1,
+            "/api/devices/enrollment": 3
+          },
+          "otherScoped": 0,
+          "noScope": 0
+        }
+      ]
+    },
+    "startup-bundled": {
+      "status": "complete",
+      "startedAt": "2026-11-07T23:40:13.631Z",
+      "finishedAt": "2026-11-07T23:40:17.257Z",
+      "queryCalls": 181,
+      "unknownReadings": 0,
+      "pgProtocolReceiveBytes": 40101,
+      "pgProtocolSendBytes": 155555,
+      "queryOperations": {
+        "/api/auth/[...all]": 0,
+        "/api/desktop/begin": 0,
+        "/api/desktop/return": 0,
+        "/api/desktop/exchange": 0,
+        "/api/desktop/rpc": 34,
+        "/api/rpc": 0,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 4,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 46,
+        "/actions/coordinator/summaries": 6,
+        "/actions/threads/poll": 6,
+        "/actions/task-runs/read": 6,
+        "/actions/issues/poll": 14,
+        "/actions/projects/list": 1,
+        "unattributed": 48
+      },
+      "sourceNonzero": {
+        "/api/agent/sessions": 2,
+        "/api/conversations": 10,
+        "/api/conversations/[id]/read": 9,
+        "/api/approved-writes": 20,
+        "/api/mobile/reactions": 1,
+        "/api/pending-actions": 2,
+        "/api/settings/preferences": 1,
+        "/api/devices/enrollment": 3
+      },
+      "otherScoped": 0,
+      "noScope": 0,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "startedAt": "2026-11-07T23:40:13.631Z",
+          "finishedAt": "2026-11-07T23:40:17.257Z",
+          "queryCalls": 181,
+          "queryOperations": {
+            "/api/auth/[...all]": 0,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 34,
+            "/api/rpc": 0,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 4,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 46,
+            "/actions/coordinator/summaries": 6,
+            "/actions/threads/poll": 6,
+            "/actions/task-runs/read": 6,
+            "/actions/issues/poll": 14,
+            "/actions/projects/list": 1,
+            "unattributed": 48
+          },
+          "sourceNonzero": {
+            "/api/agent/sessions": 2,
+            "/api/conversations": 10,
+            "/api/conversations/[id]/read": 9,
+            "/api/approved-writes": 20,
+            "/api/mobile/reactions": 1,
+            "/api/pending-actions": 2,
+            "/api/settings/preferences": 1,
+            "/api/devices/enrollment": 3
+          },
+          "otherScoped": 0,
+          "noScope": 0
+        }
+      ]
+    },
+    "startup-hosted": {
+      "status": "complete",
+      "startedAt": "2026-11-07T23:40:18.107Z",
+      "finishedAt": "2026-11-07T23:40:21.669Z",
+      "queryCalls": 194,
+      "unknownReadings": 0,
+      "pgProtocolReceiveBytes": 43019,
+      "pgProtocolSendBytes": 124876,
+      "queryOperations": {
+        "/api/auth/[...all]": 3,
+        "/api/desktop/begin": 0,
+        "/api/desktop/return": 0,
+        "/api/desktop/exchange": 0,
+        "/api/desktop/rpc": 0,
+        "/api/rpc": 36,
+        "/api/workspace": 10,
+        "/api/workspace/switcher": 8,
+        "/api/live/ticket": 6,
+        "/actions/coordinator/chat": 0,
+        "/actions/coordinator/poll": 46,
+        "/actions/coordinator/summaries": 10,
+        "/actions/threads/poll": 8,
+        "/actions/task-runs/read": 6,
+        "/actions/issues/poll": 16,
+        "/actions/projects/list": 2,
+        "unattributed": 43
+      },
+      "sourceNonzero": {
+        "/api/agent/sessions": 2,
+        "/api/conversations": 10,
+        "/api/conversations/[id]/read": 4,
+        "/api/approved-writes": 20,
+        "/api/mobile/reactions": 1,
+        "/api/pending-actions": 2,
+        "/api/settings/preferences": 1,
+        "/api/devices/enrollment": 3
+      },
+      "otherScoped": 0,
+      "noScope": 0,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "startedAt": "2026-11-07T23:40:18.107Z",
+          "finishedAt": "2026-11-07T23:40:21.669Z",
+          "queryCalls": 194,
+          "queryOperations": {
+            "/api/auth/[...all]": 3,
+            "/api/desktop/begin": 0,
+            "/api/desktop/return": 0,
+            "/api/desktop/exchange": 0,
+            "/api/desktop/rpc": 0,
+            "/api/rpc": 36,
+            "/api/workspace": 10,
+            "/api/workspace/switcher": 8,
+            "/api/live/ticket": 6,
+            "/actions/coordinator/chat": 0,
+            "/actions/coordinator/poll": 46,
+            "/actions/coordinator/summaries": 10,
+            "/actions/threads/poll": 8,
+            "/actions/task-runs/read": 6,
+            "/actions/issues/poll": 16,
+            "/actions/projects/list": 2,
+            "unattributed": 43
+          },
+          "sourceNonzero": {
+            "/api/agent/sessions": 2,
+            "/api/conversations": 10,
+            "/api/conversations/[id]/read": 4,
+            "/api/approved-writes": 20,
+            "/api/mobile/reactions": 1,
+            "/api/pending-actions": 2,
+            "/api/settings/preferences": 1,
+            "/api/devices/enrollment": 3
+          },
+          "otherScoped": 0,
+          "noScope": 0
+        }
+      ]
+    }
+  },
+  "rpc": {
+    "physical": {
+      "status": "complete",
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "windows": {
+        "nativeLogin": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 9,
+            "completedInWindow": 9,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/desktop/rpc",
+              "action": null,
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 401,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "desktop.readBatch",
+              "startedInWindow": 4,
+              "completedInWindow": 4,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 4
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "desktop.session",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "common-email-authentication",
+              "actions": [
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": null,
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 401,
+                      "count": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "phase": "native-pkce-and-automatic-renderer-to-public-session",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "action": "desktop.session",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "phase": "workspace-selection-to-usable",
+              "actions": [
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "desktop.readBatch",
+                  "startedInWindow": 4,
+                  "completedInWindow": 4,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 4
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "webLogin": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 17,
+            "completedInWindow": 17,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "issues.syncIssueList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "common-email-authentication",
+              "actions": []
+            },
+            {
+              "phase": "web-navigation-to-dom-content-loaded",
+              "actions": []
+            },
+            {
+              "phase": "workspace-selection-to-usable",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "issues.syncIssueList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "startup-bundled": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 6,
+            "completedInWindow": 6,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/desktop/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "desktop.readBatch",
+              "startedInWindow": 3,
+              "completedInWindow": 3,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "task-runs.pollTaskRuns",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "launch-to-usable",
+              "actions": [
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "desktop.readBatch",
+                  "startedInWindow": 3,
+                  "completedInWindow": 3,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 3
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "task-runs.pollTaskRuns",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "startup-hosted": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "issues.syncIssueList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "task-runs.pollTaskRuns",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "launch-to-usable",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "issues.syncIssueList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "task-runs.pollTaskRuns",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "logical": {
+      "status": "complete",
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "windows": {
+        "nativeLogin": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 21,
+            "completedInWindow": 21,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/desktop/rpc",
+              "action": null,
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 401,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "issues.syncIssueList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "task-runs.pollTaskRuns",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "desktop.session",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "common-email-authentication",
+              "actions": [
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": null,
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 401,
+                      "count": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "phase": "native-pkce-and-automatic-renderer-to-public-session",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "action": "desktop.session",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "phase": "workspace-selection-to-usable",
+              "actions": [
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "issues.syncIssueList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "task-runs.pollTaskRuns",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "webLogin": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 17,
+            "completedInWindow": 17,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "issues.syncIssueList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "common-email-authentication",
+              "actions": []
+            },
+            {
+              "phase": "web-navigation-to-dom-content-loaded",
+              "actions": []
+            },
+            {
+              "phase": "workspace-selection-to-usable",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "issues.syncIssueList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "startup-bundled": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/desktop/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "issues.syncIssueList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "task-runs.pollTaskRuns",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/desktop/rpc",
+              "action": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "launch-to-usable",
+              "actions": [
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "issues.syncIssueList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "task-runs.pollTaskRuns",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/desktop/rpc",
+                  "action": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "startup-hosted": {
+          "status": "complete",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "actions": [
+            {
+              "route": "/api/rpc",
+              "action": "bots.pollBots",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.pollBotChatSummaries",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "coordinator.syncCoordinatorChat",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "desktop.bootstrap",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "execution-settings.getBotModelMenu",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "issues.syncIssueList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "projects.listProjects",
+              "startedInWindow": 1,
+              "completedInWindow": 1,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "task-runs.pollTaskRuns",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "task-runs.syncThreadList",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "team-relations.listProjectTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "route": "/api/rpc",
+              "action": "teams.listTeams",
+              "startedInWindow": 2,
+              "completedInWindow": 2,
+              "crossesStart": 0,
+              "crossesEnd": 0,
+              "completionNotObserved": 0,
+              "completionWithoutStart": 0,
+              "statusCounts": [
+                {
+                  "status": 200,
+                  "count": 2
+                }
+              ]
+            }
+          ],
+          "segments": [
+            {
+              "phase": "launch-to-usable",
+              "actions": [
+                {
+                  "route": "/api/rpc",
+                  "action": "bots.pollBots",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.pollBotChatSummaries",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "coordinator.syncCoordinatorChat",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "desktop.bootstrap",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "execution-settings.getBotModelMenu",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "issues.syncIssueList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "projects.listProjects",
+                  "startedInWindow": 1,
+                  "completedInWindow": 1,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "task-runs.pollTaskRuns",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "task-runs.syncThreadList",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "team-relations.listProjectTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "route": "/api/rpc",
+                  "action": "teams.listTeams",
+                  "startedInWindow": 2,
+                  "completedInWindow": 2,
+                  "crossesStart": 0,
+                  "crossesEnd": 0,
+                  "completionNotObserved": 0,
+                  "completionWithoutStart": 0,
+                  "statusCounts": [
+                    {
+                      "status": 200,
+                      "count": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "sqlNotAttributedFromRpc": true,
+  "unknownAction": {
+    "retained": true,
+    "rawField": "rpcAction",
+    "rawValue": null,
+    "window": "nativeLogin",
+    "phase": "common-email-authentication",
+    "route": "/api/desktop/rpc",
+    "status": 401,
+    "physicalCount": 1,
+    "logicalCount": 1,
+    "basis": "Original JSON contains null; reader preserves it without assigning a registered action."
+  },
+  "conservation": {
+    "counter": {
+      "expectedCheckpointCount": 12,
+      "observedCheckpointCount": 12,
+      "pid": 27734,
+      "pidConsistent": true,
+      "processStartConsistent": true,
+      "runtimeConsistent": true,
+      "cumulativeQueriesNondecreasing": true,
+      "unknownReadingsAllZero": true
+    },
+    "operations": {
+      "expectedCheckpointCount": 12,
+      "observedCheckpointCount": 12,
+      "pid": 27734,
+      "pidConsistent": true,
+      "processStartConsistent": true,
+      "runtimeConsistent": true,
+      "cumulativeQueriesNondecreasing": true,
+      "unknownReadingsAllZero": true,
+      "cumulativeOperationsNondecreasing": true
+    },
+    "sources": {
+      "baseValid": true,
+      "counterIdentityMatched": true,
+      "snapshots": 12,
+      "segments": 8,
+      "totals": 4,
+      "originalCumulativeNondecreasing": true,
+      "sourceCumulativeNondecreasing": true,
+      "refinementRowsPresent": 24,
+      "refinementRowsExpected": 24
+    },
+    "allReaderIssues": [],
+    "allWindowOtherScopedAndNoScopeZero": true
+  },
+  "reports": {
+    "lifecycle": {
+      "result": "passed",
+      "checks": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "unknown": 0
+      },
+      "cleanup": {
+        "result": "unknown",
+        "stages": [
+          {
+            "stage": "browser-close",
+            "result": "passed"
+          },
+          {
+            "stage": "daemon-drain",
+            "result": "passed"
+          },
+          {
+            "stage": "native-resources",
+            "result": "passed"
+          },
+          {
+            "stage": "fixtures",
+            "result": "passed"
+          },
+          {
+            "stage": "workspace-generated-name",
+            "result": "passed"
+          },
+          {
+            "stage": "lease-release",
+            "result": "passed"
+          }
+        ],
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": true,
+          "state": "released",
+          "blocked": false,
+          "ownerBeforeMatchesBaseline": false,
+          "ownerAfterMatchesBaseline": true,
+          "peerBeforeMatchesBaseline": false,
+          "peerAfterMatchesBaseline": true
+        }
+      }
+    },
+    "parity": {
+      "result": "passed",
+      "total": 100,
+      "passed": 100,
+      "pageErrorCount": 0,
+      "cleanup": {
+        "result": "passed",
+        "stages": null,
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": null,
+          "state": "unknown",
+          "blocked": null,
+          "ownerBeforeMatchesBaseline": null,
+          "ownerAfterMatchesBaseline": null,
+          "peerBeforeMatchesBaseline": null,
+          "peerAfterMatchesBaseline": null
+        }
+      }
+    },
+    "smoke": {
+      "result": "passed",
+      "checks": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "unknown": 0
+      },
+      "cleanup": {
+        "result": "unknown",
+        "stages": [
+          {
+            "stage": "browser-close",
+            "result": "passed"
+          },
+          {
+            "stage": "electron-close",
+            "result": "passed"
+          },
+          {
+            "stage": "daemon-drain",
+            "result": "passed"
+          },
+          {
+            "stage": "native-resources",
+            "result": "passed"
+          },
+          {
+            "stage": "workspace-generated-name",
+            "result": "passed"
+          },
+          {
+            "stage": "lease-release",
+            "result": "passed"
+          }
+        ],
+        "nativeCleaned": true,
+        "reportedResourceCounts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 0,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 0,
+          "device_tokens": 0,
+          "device_enrollments": 0,
+          "devices": 0
+        },
+        "workspaceName": {
+          "captured": true,
+          "restored": false,
+          "ownerMatchesSealedBaseline": true,
+          "peerMatchesSealedBaseline": true
+        },
+        "accountObservation": {
+          "observed": true,
+          "state": "released",
+          "blocked": false,
+          "ownerBeforeMatchesBaseline": true,
+          "ownerAfterMatchesBaseline": true,
+          "peerBeforeMatchesBaseline": true,
+          "peerAfterMatchesBaseline": true
+        }
+      }
+    },
+    "nativeCrypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "cleanupInterpretation": {
+    "aggregateField": "Legacy reader reports cleanup.result unknown when original aggregate field is absent.",
+    "actualEvidence": "All lifecycle and smoke cleanup stages pass; native resource cleanup and released account observations pass; parity and crypto have their own passed cleanup.",
+    "workspaceNameExplicitRestoration": false,
+    "ownerAndPeerMatchBaselineAfter": true,
+    "workspaceNameCleanupPhase": "unchanged"
+  },
+  "productionAcceptance": null
+}

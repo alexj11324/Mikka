@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "feature": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "parents": [
+    "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "fa2830e0576233d8de54f72eec56ec74b4ca95d1"
+  ],
+  "algorithm": "sha256 of ordered exact UTF8 file bytes, no separator, as parity.mjs harnessSha256 expression",
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "files": [
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "bytes": 34879,
+      "sha256": "bf48c1be5105e0e98f1143e225e6372a7741b186463bd1faa7388539df4d4a1a",
+      "gitBlob": "23f93e8e0fdde8d3d6426450ed0208e4091d1589"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "bytes": 15162,
+      "sha256": "99941a8ab30a471030b0000089ab7fd920ef6dda7786501ea6aab88a1732ba6d",
+      "gitBlob": "6f773394dee20cd247daffc152b781423b37a900"
+    },
+    {
+      "path": "apps/desktop/test/generated-workspace-name.mjs",
+      "bytes": 8508,
+      "sha256": "d0a99fe6ff036fca9fca55a18adab96ea40cbe117400ce11585909c3aad5481c",
+      "gitBlob": "1c5c05d753a284e4833b241218ad7de17d97771f"
+    },
+    {
+      "path": "apps/desktop/test/parity-images.mjs",
+      "bytes": 5493,
+      "sha256": "57147e1f1cb5eb2bdb70879bb99acf0b82737057ddfbf8261edb42386189cedc",
+      "gitBlob": "873befeef9c6246a2e640786e9a5f45b91381c15"
+    },
+    {
+      "path": "apps/desktop/test/parity-clock.mjs",
+      "bytes": 1771,
+      "sha256": "ded3031029e0793a3436c385bae34a6d8b380196216c3bbbd56ba80fd0699d3f",
+      "gitBlob": "0fa02f04de614d40c1d52d364c89a2a173b1fe29"
+    },
+    {
+      "path": "apps/desktop/test/native-viewport.mjs",
+      "bytes": 3346,
+      "sha256": "291cc975f1970a4e7cc392a8fbfc1a87352ad614efd7553a683c7adb715dc496",
+      "gitBlob": "d4e52fc817f463d7c7382ee8246ff5522463ede1"
+    },
+    {
+      "path": "apps/desktop/test/native-auth-diagnostics.mjs",
+      "bytes": 21444,
+      "sha256": "78398dcd6eb48983a7bb3a128e0756a088cf3b5f9eec17de954f8d32433024af",
+      "gitBlob": "4a37b4b6c250e550492c1b8ba49cde1e5443d200"
+    },
+    {
+      "path": "apps/desktop/test/parity-reader-defaults.mjs",
+      "bytes": 3446,
+      "sha256": "ac5d8ee6887454a65830d80c5cf37ffd7df584da999e1905d040b3a391ebd5a2",
+      "gitBlob": "61892d691e38f3a35dae7de2a701da5bd8ac1b35"
+    },
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "bytes": 13784,
+      "sha256": "d014eeb8d83d13cd449418b112f9777b7c38da919e5006666bd9fdab6fce1db4",
+      "gitBlob": "0cad9c428f3fc790d65b68923699dbe97b2178a7"
+    },
+    {
+      "path": "apps/desktop/test/parity-settings-ready.mjs",
+      "bytes": 10358,
+      "sha256": "52dde7b6c6b6f892a6d5c161ca23190ddbb139dd14c6d0bf9b164ce480e8d3f7",
+      "gitBlob": "d7197691d9f304095859c1a3b4f327e1705c102d"
+    },
+    {
+      "path": "apps/desktop/test/native-device-ready.mjs",
+      "bytes": 10502,
+      "sha256": "9b7c98ce34e617d324a28f99fe24eb43700b9e999c21bcfa6a88699df5e53264",
+      "gitBlob": "367fa22e671d688347916cd94d46974d13050732"
+    },
+    {
+      "path": "scripts/acceptance/read-action-transport.mjs",
+      "bytes": 3915,
+      "sha256": "126fead63e72d8d835dde62bda48927176399936ce7499fda39c52350b16e8b8",
+      "gitBlob": "ef8f9c901a257e78db7241b3b386d9b7f1f5afee"
+    }
+  ],
+  "basis": "Exact frozen harness/counter/source/projector blobs are preserved through the complete 75-file upstream merge delta and 17-file candidate delta; synthetic Git tree matches candidate. Four actual job checkout logs, original app/harness reports, compiled manifest and all reader identity checks now match.",
+  "actualNativeCheckoutVerified": true,
+  "artifactVerified": true,
+  "sourceTable": {
+    "keys": 78,
+    "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c",
+    "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+  },
+  "counter": {
+    "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+    "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9"
+  },
+  "projector": {
+    "sha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+    "gitBlob": "ecc5c28718320893bb96c5902cf3cae0dd965b5b"
+  },
+  "kind": "actual_native_source_binding",
+  "runId": 42424186827,
+  "attempt": 1,
+  "actualCheckoutEvidence": [
+    {
+      "job": "checks",
+      "jobId": 128558896846,
+      "actualCheckoutHashes": [
+        "b7a4f22fde3107471ba8ff68b121ee87c18682d9"
+      ],
+      "expected": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+      "matched": true,
+      "basis": "decoded job log git log -1 --format=%H",
+      "rawLogsSaved": false,
+      "rawLogsRetained": false
+    },
+    {
+      "job": "icon",
+      "jobId": 128558897173,
+      "actualCheckoutHashes": [
+        "b7a4f22fde3107471ba8ff68b121ee87c18682d9"
+      ],
+      "expected": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+      "matched": true,
+      "basis": "decoded job log git log -1 --format=%H",
+      "rawLogsSaved": false,
+      "rawLogsRetained": false
+    },
+    {
+      "job": "smoke",
+      "jobId": 128558896899,
+      "actualCheckoutHashes": [
+        "b7a4f22fde3107471ba8ff68b121ee87c18682d9"
+      ],
+      "expected": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+      "matched": true,
+      "basis": "decoded job log git log -1 --format=%H",
+      "testAuthCommandObserved": true,
+      "rawLogsSaved": false,
+      "rawLogsRetained": false
+    },
+    {
+      "job": "mac",
+      "jobId": 128560760688,
+      "rawBytes": 243426,
+      "rawSha256": "ffdb2f26f87718d1656055ee2d0df8f5f93bb90b039a46bc5c78ee4178ffedbf",
+      "actualCheckouts": [
+        "b7a4f22fde3107471ba8ff68b121ee87c18682d9"
+      ],
+      "rawLogsPersisted": false
+    }
+  ],
+  "actualAppAndHarness": {
+    "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "harnessRevision": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+    "identityMatched": true
+  },
+  "compiled": {
+    "revision": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "appBuild": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "testDeploymentSha": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "preset": "node-server",
+    "node": "v24.22.2",
+    "lockSha256": "916b7b20b1da44670882894f628b2a7dfb98fc6bc7ffaee310ec4fa5afe13e62",
+    "routesSha256": "1b8e2538ee6ae9abda9d1ef0200b6688421a820c46aa9f1e8af751629385dbc8",
+    "tracingSha256": "d1cd9a5304057777b634dd02c726dd13823541e585cd046f6ebf368ca36c0473"
+  },
+  "actualCounter": {
+    "revision": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "platform": "darwin",
+    "arch": "arm64",
+    "runtime": "nitro",
+    "pid": 27734,
+    "process": "primary API shared by lifecycle bundled, hosted and Chromium"
+  },
+  "platform": "darwin",
+  "arch": "arm64",
+  "compiledOriginal": {
+    "path": "compiled/mikka-build.json",
+    "sha256": "4bcb90ea56be076624d7d0c7ac32cdc9141bc0de341470cb57966acc3a3fe8c9",
+    "gitBlob": "9e4989a6573d57513b78f9c7570281951ce4482d"
+  },
+  "actualDaemonProductionVersion": "not asserted by this desktop source binding",
+  "productionAcceptance": null
+}

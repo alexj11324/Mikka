@@ -1,0 +1,258 @@
+{
+  "version": 1,
+  "kind": "native_actual_gate_summary",
+  "repository": "alexj11324/Mikka",
+  "pr": 1675,
+  "runId": 42424186827,
+  "attempt": 1,
+  "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+  "tree": "231f78d0a4b4076217adc952e01142a602534e5c",
+  "parents": [
+    "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "fa2830e0576233d8de54f72eec56ec74b4ca95d1"
+  ],
+  "ci": {
+    "desktop": "success",
+    "jobs": 4,
+    "allJobsPassed": true,
+    "actualNativeAttempt": true,
+    "nativeStartedAt": "2026-11-07T23:32:02Z",
+    "nativeCompletedAt": "2026-11-07T23:41:14Z",
+    "mainCanonical": "separate root-owned receipt"
+  },
+  "budgets": {
+    "loginNativeVsWeb": {
+      "first": 210,
+      "second": 210,
+      "difference": 0,
+      "firstNotAboveSecond": true
+    },
+    "startupBundledVsHosted": {
+      "first": 181,
+      "second": 194,
+      "difference": -13,
+      "firstNotAboveSecond": true
+    }
+  },
+  "phases": {
+    "webLogin": {
+      "total": 210,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 191
+        }
+      ]
+    },
+    "nativeLogin": {
+      "total": 210,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 13
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 178
+        }
+      ]
+    },
+    "startup-bundled": {
+      "total": 181,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 181
+        }
+      ]
+    },
+    "startup-hosted": {
+      "total": 194,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 194
+        }
+      ]
+    }
+  },
+  "rpcCounts": {
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 9,
+        "completedInWindow": 9,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 6,
+        "completedInWindow": 6,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 21,
+        "completedInWindow": 21,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    }
+  },
+  "rawNullActionPreserved": true,
+  "unknownActionCount": {
+    "physical": 1,
+    "logical": 1
+  },
+  "counts": {
+    "checkpointCount": 12,
+    "segments": 8,
+    "totals": 4,
+    "operationKeys": 17,
+    "sourceKeys": 78,
+    "sourceRefinementRows": 24,
+    "samePid": 27734,
+    "unknownReadings": 0,
+    "otherScoped": 0,
+    "noScope": 0,
+    "allConservationPassed": true
+  },
+  "validations": {
+    "lifecycle": {
+      "passed": 8,
+      "total": 8
+    },
+    "parity": {
+      "passed": 100,
+      "total": 100,
+      "pageErrors": 0
+    },
+    "smoke": {
+      "passed": 10,
+      "total": 10
+    },
+    "crypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "cleanup": {
+    "lifecycleStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleaned": true,
+    "leaseState": "released",
+    "blockedReason": null,
+    "ownerMatchesBaselineAfter": true,
+    "peerMatchesBaselineAfter": true,
+    "workspaceGeneratedNamePhase": "unchanged",
+    "workspaceGeneratedNameRestored": false,
+    "aggregateLegacyField": "unknown_when_not_reported",
+    "recoverySandboxStopped": true
+  },
+  "originalJsonCount": 6,
+  "zipDigestsVerified": true,
+  "sourceAndHarnessMatched": true,
+  "readersUnmodified": true,
+  "allReaderIssues": [],
+  "status": "actual_budget_passed_for_this_fixed_source_and_first_startup_pair",
+  "limitations": [
+    "Exact observed source only; does not transfer to a future carrier or browser actor patch.",
+    "Original complete measurement windows retained; no PKCE/background query subtraction and no completion-boundary adjustment.",
+    "RPC action counts are independent from SQL query counts.",
+    "A null pre-authentication action is preserved as unknown.",
+    "No claim about production model paths, E2B release, PostHog ingestion or Replay is made."
+  ],
+  "productionAcceptance": null,
+  "recoveryResources": 0,
+  "generatedAt": "2026-11-07 23:51:23 UTC"
+}
