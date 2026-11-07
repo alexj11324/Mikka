@@ -11,6 +11,7 @@ import type { FactoryTask } from '../lib/factory/store'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { ALLOWED_MODEL, seedAllowedModel } from './support/allowed-model'
 import { liveChannelId } from '../lib/live/scope'
+import { isolateCoordinatorWakes } from './support/coordinator-wake'
 
 const connection = process.env.E2E_DATABASE_URL
 const enabled = disposableDatabase()
@@ -30,6 +31,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const priorByos = process.env.MIKKA_BYOS_ENABLED
   process.env.MIKKA_BYOS_ENABLED = '1'
   t.after(() => { if (priorByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = priorByos })
+  // Admission owns these deliberately bot-less historical fixtures. Its inbox
+  // writes still commit, but a separate Coordinator runtime must not backfill
+  // their Bot identity or acquire Factory locks while this suite measures them.
+  // wake-event-driven.db.test.ts covers the real after-COMMIT wake contract.
+  const coordinator = await isolateCoordinatorWakes(t)
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { readOrder } = await import('../lib/model-order')
@@ -181,6 +187,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const { rows: children } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])
       assert.equal(children.length, 1, 'an admitted native run must have one actual B retry, not an auto-repair queued on offline A')
       const child = children[0]
+      assert.equal(child.botId, before.botId, 'recovery preserves the admitted Bot scope')
       assert.equal(child.deviceId, deviceB)
       assert.equal(child.agentId, agentB)
       assert.equal(child.attempt, 2)
@@ -565,6 +572,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await rowsFor(f)).runs, 2)
     })
   } finally {
+    await coordinator.flush()
     // Keep immutable audit fixtures, but leave no queued execution authority.
     if (fixtures.length) await pool.query('UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",now()) WHERE "userId"=any($1::text[])', [fixtures.map(f => f.userId)])
     await pool.end()

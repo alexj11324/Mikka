@@ -1,29 +1,33 @@
 import type { ServerRequest } from 'srvx'
 import { CodedError } from '@mikka/protocol/coded-error'
 import { pageRedirect } from './http-policy.mjs'
+import { isLoopbackHost } from '../../../lib/loopback'
 
 type Handler = (request: ServerRequest) => Response | Promise<Response>
-type Configuration = { origin: string | undefined; deploymentHost?: string; productionHost?: string }
+type Configuration = { origin: string | undefined; deploymentHost?: string; productionHost?: string; legacyHost?: string }
 type ConfigurationDetail = 'missing_origin' | 'invalid_origin' | 'invalid_platform_host'
 const invalid = (detail: ConfigurationDetail, cause?: unknown): never => {
   throw new CodedError('API_VERCEL_AUTHORITY_CONFIG_INVALID', { detail, ...(cause === undefined ? {} : { cause }) })
 }
 
-function httpsOrigin(value: string | undefined): URL {
+function configuredOrigin(value: string | undefined, allowLoopback = false): URL {
   if (!value) return invalid('missing_origin')
   let url: URL
   try { url = new URL(value) } catch (error) { return invalid('invalid_origin', error) }
-  if (url.protocol !== 'https:' || url.origin !== value) return invalid('invalid_origin')
+  if ((url.protocol !== 'https:' && !(allowLoopback && url.protocol === 'http:' && isLoopbackHost(url.hostname))) || url.origin !== value) return invalid('invalid_origin')
   return url
 }
 
 function platformOrigin(host: string): URL {
-  const url = httpsOrigin(`https://${host}`)
+  const url = configuredOrigin(`https://${host}`)
   if (url.host !== host || url.port) return invalid('invalid_platform_host')
   return url
 }
 
-const rejected = () => new Response(null, { status: 400, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
+const rejected = () => Object.assign(new Response(null, { status: 400, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } }), {
+  // Nitro's crossws adapter resolves hooks even when fetch returned HTTP 400.
+  crossws: { upgrade() { throw new Response(null, { status: 400 }) } },
+})
 
 /** Vercel supplies Host as visited, X-Forwarded-Host as the same host and a
  * forwarded scheme. Its Nitro Node adapter currently leaves srvx trustProxy
@@ -36,14 +40,25 @@ const rejected = () => new Response(null, { status: 400, headers: { 'cache-contr
  * Origin and the resulting URL against its separate configured app origin.
  * https://vercel.com/docs/headers/request-headers */
 export function withVercelRequestAuthority(fetch: Handler, configuration: Configuration): Handler {
-  const canonical = httpsOrigin(configuration.origin)
+  return withConfiguredAuthority(fetch, configuration)
+}
+
+/** A self-hosted reverse proxy supplies the configured Host. No incoming proxy
+ * header can invent an origin; plain HTTP is supported only on loopback. */
+export function withNodeRequestAuthority(fetch: Handler, configuration: Pick<Configuration, 'origin' | 'legacyHost'>): Handler {
+  return withConfiguredAuthority(fetch, configuration, true)
+}
+
+function withConfiguredAuthority(fetch: Handler, configuration: Configuration, allowLoopback = false): Handler {
+  const canonical = configuredOrigin(configuration.origin, allowLoopback)
   const origins = new Map([[canonical.host, canonical.origin]])
   for (const host of [configuration.deploymentHost, configuration.productionHost]) {
     if (host) { const value = platformOrigin(host); origins.set(value.host, value.origin) }
   }
   // This legacy domain has one existing fixed 308 destination, never a route
   // into application data. Preserve that redirect without adding an auth host.
-  const legacy = canonical.origin === 'https://app.aspectlylabs.com' ? 'mikka.aspectlylabs.com' : undefined
+  const legacy = configuration.legacyHost ? platformOrigin(configuration.legacyHost).host : undefined
+  if (legacy && origins.has(legacy)) return invalid('invalid_platform_host')
 
   return request => {
     const node = request.runtime?.node
@@ -64,7 +79,7 @@ export function withVercelRequestAuthority(fetch: Handler, configuration: Config
     const host = critical.get('host')
     if (!host || (host !== legacy && !origins.has(host)) || request.headers.get('host') !== host
       || (critical.has('x-forwarded-host') && critical.get('x-forwarded-host') !== host)
-      || (critical.has('x-forwarded-proto') && critical.get('x-forwarded-proto') !== 'https')) return rejected()
+      || (critical.has('x-forwarded-proto') && critical.get('x-forwarded-proto') !== (host === legacy ? 'https' : new URL(origins.get(host)!).protocol.slice(0, -1)))) return rejected()
     const target = node.req.url
     // Authority is selected above, solely by exact configured Host. Never let
     // an absolute-form, network-path or backslash target choose another one.
@@ -75,7 +90,7 @@ export function withVercelRequestAuthority(fetch: Handler, configuration: Config
     // Request reads anything; preserve the same body, abort, req/res and waitUntil.
     request._url = absolute
     if (request.url !== absolute.href) return rejected()
-    if (host === legacy) return pageRedirect(request) ?? rejected()
+    if (host === legacy) return pageRedirect(request, { legacyHost: legacy, origin: canonical.origin }) ?? rejected()
     return fetch(request)
   }
 }

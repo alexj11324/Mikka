@@ -24,6 +24,9 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.
@@ -143,6 +146,8 @@ jobs:
       - run: pnpm test:factory-monitor
       - run: pnpm test:execution-rules
       - run: pnpm test:abuse
+      - run: pnpm test:self-hosting
+      - run: pnpm test:self-hosted-byok
       - run: pnpm test:hosted-usage
       - run: pnpm test:model-admission
       - run: pnpm test:audit
@@ -282,6 +287,8 @@ jobs:
       - run: pnpm --filter @mikka/frontend test
         if: always()
       - run: pnpm typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         if: always()
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck

@@ -27,7 +27,7 @@ export function validateConfig(text) {
     || !/^\d{4}-\d{2}-\d{2}$/.test(config.compatibility_date ?? '')
     || config.workers_dev !== false || config.preview_urls !== false
     || JSON.stringify(config.triggers) !== JSON.stringify({ crons: ['* * * * *'] })
-    || JSON.stringify(config.vars) !== JSON.stringify({ MIKKA_URL })
+    || JSON.stringify(config.vars) !== JSON.stringify({})
     || JSON.stringify(config.observability) !== JSON.stringify({ enabled: true })) fail('cron_resource_change_refused')
   return config
 }
@@ -166,7 +166,7 @@ async function wranglerDeploy(sourceCommit) {
     const env = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'NODE_EXTRA_CA_CERTS', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN']
       .filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]]))
     const result = await execute(process.execPath, [fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js', import.meta.url)),
-      'deploy', '--config', CONFIG, '--keep-vars', '--message', 'Mikka minute Worker ' + sourceCommit],
+      'deploy', '--config', CONFIG, '--var', 'MIKKA_URL:' + MIKKA_URL, '--keep-vars', '--message', 'Mikka minute Worker ' + sourceCommit],
     { cwd: ROOT, env: { ...env, CI: 'true', NO_COLOR: '1', WRANGLER_SEND_METRICS: 'false' }, timeout: 180_000, maxBuffer: 2_000_000 })
     stdout = result.stdout
   } catch { fail('cron_deploy_failed_or_uncertain') }

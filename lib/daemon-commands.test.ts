@@ -12,10 +12,10 @@ test('installation and login use the exact Preview origin and base path', () => 
   assert.equal(noPrefix.login, "mikka daemon login --server 'https://preview.example'")
 })
 
-test('the production default does not need a server flag', () => {
+test('even the official origin is explicit so copied commands cannot retain another server', () => {
   const commands = daemonCommands({ origin: 'https://app.aspectlylabs.com', basePath: '/mikka', packageName: '@mikka/daemon' })
-  assert.equal(commands.login, 'mikka daemon login')
-  assert.equal(commands.start, 'mikka daemon')
+  assert.equal(commands.login, "mikka daemon login --server 'https://app.aspectlylabs.com/mikka'")
+  assert.equal(commands.start, "mikka daemon --server 'https://app.aspectlylabs.com/mikka'")
 })
 
 test('copyable commands reject shell syntax and non-origin configuration', () => {

@@ -7,6 +7,7 @@ import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates } from '@/lib/device-presence'
+import { gatewayConfig } from '@/lib/builtin-gateway/config'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -122,7 +123,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
-    const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
+    const queuedDevices = gatewayConfig()
       ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
         .where(and(eq(agentRuns.userId, session.user.id), eq(devices.ownerId, session.user.id),

@@ -29,6 +29,8 @@
  */
 
 type Env = Record<string, string | undefined>
+import { posthogConfig } from './posthog-config'
+import { isCloudEdition } from './edition'
 
 export interface Switch {
   /** The PostHog flag. */
@@ -93,6 +95,16 @@ export const DEPLOYMENT_SWITCHES = {
 
 export type DeploymentSwitch = keyof typeof DEPLOYMENT_SWITCHES
 
+/** Matches deployed capabilities, while retaining explicit local overrides.
+ * The cloud deployment keeps its existing remote/legacy rollout behavior. */
+export const PRODUCTION_SWITCH_DEFAULTS: Readonly<Record<DeploymentSwitch, boolean>> = {
+  credentialVault: true, agentKit: true, agentKitLiveEval: false, cloudComputerTasks: true,
+  issueTools: true, factoryRouting: true, factoryLifecycle: true, personalMailbox: true, personalWrites: true,
+  skillModelEvaluation: false, proactiveProfile: false, groupContribution: true,
+  byos: true, byosClaudeOAuth: true, byosCodexOAuth: true, byosEnrollment: true,
+  factoryVercelPublication: false, factoryVercelProduction: false, deviceUnitFence: true, dbEgressSample: true,
+}
+
 /**
  * Which deployment asks (production, preview or local), sent as the person
  * property `deployment` so one PostHog project can hold a flag on for
@@ -121,7 +133,8 @@ function answered(entry: Switch, answers: Answers): boolean | undefined {
 export function deploymentSwitch(name: DeploymentSwitch, env: Env = process.env, now = Date.now()): boolean {
   const entry: Switch = DEPLOYMENT_SWITCHES[name]
   if (env === process.env) scheduleRefresh(now)
-  return testOverrides()?.get(name) ?? answered(entry, state.answers) ?? entry.legacy?.(env) ?? entry.fallback
+  return testOverrides()?.get(name) ?? answered(entry, state.answers) ?? entry.legacy?.(env)
+    ?? (!isCloudEdition(env) && !env.NEXT_PUBLIC_POSTHOG_KEY ? PRODUCTION_SWITCH_DEFAULTS[name] : entry.fallback)
 }
 
 /** Kept on globalThis so every copy of this module a test loads sees the same overrides. */
@@ -157,7 +170,7 @@ function scheduleRefresh(now: number) {
  * A flag it does not have, or a multivariate one, gets no answer.
  */
 async function evaluate(token: string, distinctId: string, flags: readonly string[], fetcher: typeof fetch, timeoutMs: number, personProperties?: Record<string, string>): Promise<Answers | null> {
-  const response = await fetcher('https://us.i.posthog.com/flags?v=2', {
+  const response = await fetcher(`${posthogConfig.apiHost}/flags?v=2`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'user-agent': 'posthog-node/mikka-deployment-switches' },
     body: JSON.stringify({ api_key: token, distinct_id: distinctId, flag_keys_to_evaluate: flags, ...(personProperties ? { person_properties: personProperties } : {}) }),

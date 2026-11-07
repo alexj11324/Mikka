@@ -11,7 +11,7 @@ test('exhausted tool recovery has a stable friendly failure and retry',()=>{
   const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
   assert.deepEqual(failure,{kind:'failed',reason:'tools',raw:'model_tool_unavailable'})
   assert.deepEqual(failureMessageKey(failure),{namespace:'Coordinator',key:'replyToolUnavailable'})
-  assert.deepEqual(failureLine(failure),{text:'这次回复没能完成，请重试',retry:true,recovery:null})
+  assert.deepEqual(failureLine(failure),{text:'回复未完成，请重试',retry:true,recovery:null})
   assert.equal(chatFailure({working:true,error:'model_tool_unavailable'}),null)
 })
 

@@ -7,11 +7,12 @@ import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { resolveSubagentBrowserTarget, resolveThreadBrowserTarget } from '@/lib/cloud-computer/subagent-browser'
 import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts'
-import { awsKms } from './kms'
+import { credentialKms } from './kms'
+import { isCloudEdition } from '@/lib/edition'
 import { CredentialStore, type BrowserTarget } from './store'
 import { credentialVaultEnabled } from './feature'
 
-export const credentialStore = new CredentialStore(pool, awsKms('app'))
+export const credentialStore = new CredentialStore(pool, credentialKms('app'))
 export async function credentialActor(request: Request) {
   if (!credentialVaultEnabled()) throw new CredentialError()
   const session = await auth.api.getSession({ headers: request.headers })
@@ -58,6 +59,13 @@ async function brokerErrorCode(response: Response): Promise<unknown> {
 }
 
 export async function executeCredentialLease(lease: string, origin: string, scope: LiveScope) {
+  if (!isCloudEdition()) {
+    const { fillCredential } = await import('./broker')
+    const result = await fillCredential(pool, lease, { kms: credentialKms('broker') })
+    if (result.origin !== origin) throw new CredentialError('credential_outcome_unknown', 409)
+    if (result.status !== 'guarded') notifySubagentEvents(scope)
+    return result
+  }
   const broker = new URL(process.env.CREDENTIAL_BROKER_URL ?? '')
   if (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash) throw new CredentialError()
   let dispatched = false, responseReceived = false

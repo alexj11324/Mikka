@@ -17,6 +17,7 @@ import { coordinatorStopToken, lastAssistantText, stoppedMessages, untilStopped 
 import type { ModelMessage } from 'ai'
 import { promptOptions } from '@/lib/prompt-cache'
 import { isWelcomeOnlyTurn } from '@/lib/agent-welcome'
+import { finishCoordinatorTurn } from './finish-turn'
 export { coordinatorTools } from './tools'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -191,5 +192,5 @@ export async function coordinatorTurn(userId: string, botId: string) {
       throw error
     }
   }
-  await steps.releaseLease(userId,holder,botId)
+  await finishCoordinatorTurn(userId,holder,botId)
 }

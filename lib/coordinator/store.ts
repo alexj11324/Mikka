@@ -584,17 +584,33 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
-  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
+    .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
-  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
+  const messagesRead = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage.as('message'), createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(messagesOf(userId, botId), window.after === undefined ? undefined : gt(coordinatorMessages.position, window.after), window.through === undefined ? undefined : sql`${coordinatorMessages.position} <= ${window.through}`))
-    .orderBy(desc(coordinatorMessages.position)).limit(limit + 1)
+    .orderBy(desc(coordinatorMessages.position)).limit(limit + 1).as('chat_messages')
+  type MessageRow = { id: string; position: number; message: Record<string, unknown>; createdAt: string }
+  const storedRead = db.select({ rows: sql<MessageRow[]>`coalesce(jsonb_agg(to_jsonb(${sql.identifier('chat_messages')}) order by ${messagesRead.position} desc), '[]'::jsonb)`.as('rows') })
+    .from(messagesRead).as('chat_stored')
+  const waitingRead = db.select({ kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts,
+    wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError, issueId: coordinatorEvents.issueId,
+    runId: coordinatorEvents.runId, payload: coordinatorEvents.payload, createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
+    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), window.through === undefined ? undefined : sql`false`))
+    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH).as('chat_waiting')
+  type WaitingRow = Pick<typeof coordinatorEvents.$inferSelect, 'kind' | 'tier' | 'wakeAttempts' | 'wakeLastError' | 'issueId' | 'runId' | 'payload'> & { wakeLeaseUntil: string | null; createdAt: string }
+  // Claiming an inbox atomically changes all three tables. A session read from
+  // before that commit with messages/inbox from after it invents a failed turn.
+  // One bounded statement keeps their snapshot together without a held lock.
+  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, rows: storedRead.rows,
+    waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
+  }).from(storedRead).leftJoin(sessionRead, sql`true`)
+  const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt }
+  const rows = snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) }))
   const hasMore = rows.length > limit
   rows.splice(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
-  const waiting = window.through !== undefined ? [] : await db.select().from(coordinatorEvents)
-    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
-    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+  const waiting = snapshot.waiting.map(event => ({ ...event, createdAt: new Date(event.createdAt), wakeLeaseUntil: event.wakeLeaseUntil ? new Date(event.wakeLeaseUntil) : null }))
   const last = rows[0]?.position ?? window.after ?? 0
   const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}), createdAt: rows[0].createdAt }
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
@@ -658,7 +674,9 @@ export async function chatUpdate(userId: string, botId: string, continuation?: N
     if (continuation.cursor <= latest.cursor) {
       const tail = await chatView(userId, 200, botId, { after: continuation.after })
       // A reconnect after a long absence must not silently skip a window of messages.
-      if (!tail.historyBefore) return { ...tail, streamRunId: latest.streamRunId, working: latest.working, error: latest.error, after: continuation.after, baseCursor: continuation.cursor,
+      // The tail carries its own coherent state. The earlier version read may
+      // predate an inbox claim and must not overwrite a now-running tail.
+      if (!tail.historyBefore) return { ...tail, after: continuation.after, baseCursor: continuation.cursor,
         ...(prefix.rows ? { toolMetadata: { baseCursor: continuation.cursor, prefix: continuation.prefix, rows: prefix.rows } } : {}) }
     }
   }
@@ -691,19 +709,27 @@ export async function chatVersion(userId: string, limit = 200, botId: string): P
 }
 
 export async function chatVersionState(userId: string, limit = 200, botId: string): Promise<ChatVersionState> {
-  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
+    .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
-  const [stored] = await db.select({
-    last: sql<number>`coalesce(max(${latest.position}), 0)::int`,
-    hash: sql<string>`md5(coalesce(string_agg(${latest.id}::text || ':' || md5(${latest.message}::text), ',' order by ${latest.position}), ''))`,
-    role: sql<string | null>`(array_agg(${latest.message}->>'role' order by ${latest.position} desc))[1]`,
-    streamId: sql<string | null>`(array_agg(${latest.message}->>'mikkaStreamId' order by ${latest.position} desc))[1]`,
-    createdAt: sql<string | null>`(array_agg(${latest.createdAt} order by ${latest.position} desc))[1]`,
-  }).from(latest)
-  const waiting = await db.select({ id: coordinatorEvents.id, payloadVersion: sql<string>`md5(${coordinatorEvents.payload}::text)`, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError, createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
+  const storedRead = db.select({
+    last: sql<number>`coalesce(max(${latest.position}), 0)::int`.as('last'),
+    hash: sql<string>`md5(coalesce(string_agg(${latest.id}::text || ':' || md5(${latest.message}::text), ',' order by ${latest.position}), ''))`.as('hash'),
+    role: sql<string | null>`(array_agg(${latest.message}->>'role' order by ${latest.position} desc))[1]`.as('role'),
+    streamId: sql<string | null>`(array_agg(${latest.message}->>'mikkaStreamId' order by ${latest.position} desc))[1]`.as('streamId'),
+    createdAt: sql<string | null>`(array_agg(${latest.createdAt} order by ${latest.position} desc))[1]`.as('createdAt'),
+  }).from(latest).as('chat_stored')
+  const waitingRead = db.select({ id: coordinatorEvents.id, payloadVersion: sql<string>`md5(${coordinatorEvents.payload}::text)`.as('payloadVersion'), kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError, createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
-    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH).as('chat_waiting')
+  type WaitingRow = Pick<typeof coordinatorEvents.$inferSelect, 'id' | 'kind' | 'tier' | 'wakeAttempts' | 'wakeLastError'> & { payloadVersion: string; wakeLeaseUntil: string | null; createdAt: string }
+  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt,
+    stored: { last: storedRead.last, hash: storedRead.hash, role: storedRead.role, streamId: storedRead.streamId, createdAt: storedRead.createdAt },
+    waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
+  }).from(storedRead).leftJoin(sessionRead, sql`true`)
+  const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt }, stored = snapshot.stored
+  const waiting = snapshot.waiting.map(event => ({ ...event, createdAt: new Date(event.createdAt), wakeLeaseUntil: event.wakeLeaseUntil ? new Date(event.wakeLeaseUntil) : null }))
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}), ...(stored.createdAt ? { createdAt: new Date(stored.createdAt) } : {}) } : undefined
   const now = new Date()
   return {

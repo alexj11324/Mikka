@@ -8,7 +8,7 @@ import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
-import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
+import { authOAuthProxyOptions, authEffectiveTrustedOrigins, authSignInMethods } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
@@ -21,10 +21,13 @@ import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop-rpc/session-cache'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
-export const MOBILE_APP_ORIGIN = 'mikka://'
+export { MOBILE_APP_ORIGIN } from '@/lib/auth-config'
 
-export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
-export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+export const { github: githubEnabled, google: googleEnabled } = authSignInMethods(process.env)
+/** Includes the explicitly opted-in deployment GitHub App OAuth client. */
+export async function githubSignInEnabled(): Promise<boolean> {
+  return (await auth.$context).socialProviders.some(provider => provider.id === 'github')
+}
 export const authBaseURL = appOrigin
 const proxyOptions = authOAuthProxyOptions(process.env)
 export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
@@ -84,13 +87,7 @@ export const auth = betterAuth({
   emailAndPassword: email.emailAndPassword,
   emailVerification: email.emailVerification,
   rateLimit: { ...email.rateLimit, customRules: { ...email.rateLimit.customRules, ...localSignUpRateRules(process.env) }, storage: 'database' },
-  trustedOrigins: [
-    ...authTrustedOrigins(process.env),
-    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
-    // The iOS app's deep link (apps/mobile app.json scheme); Expo Go uses exp:// while developing.
-    MOBILE_APP_ORIGIN,
-    ...(process.env.NODE_ENV === 'development' ? ['exp://'] : []),
-  ],
+  trustedOrigins: authEffectiveTrustedOrigins(process.env),
   // Makes the app an OAuth 2.1 server so agents (Claude Code, Codex…) can sign
   // in to the MCP server at /api/mcp as the person. Clients register
   // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in

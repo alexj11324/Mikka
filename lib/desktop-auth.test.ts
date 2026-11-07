@@ -2,9 +2,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { withBasePath } from '@/lib/base-path'
-import { SELECT_ACCOUNT_PARAMS, desktopAuthCallbackPath, desktopAuthReturnPath, desktopAuthState, desktopBrowserStep, desktopLoopbackCallback } from './desktop-auth'
+import { SELECT_ACCOUNT_PARAMS, desktopAuthCallbackPath, desktopAuthReturnPath, desktopAuthState, desktopBrowserStep, desktopLoopbackCallback, desktopSameOriginRequest } from './desktop-auth'
 
 const state = 'a'.repeat(48)
+
+test('native handoff origin checks work on any exact server origin and reject cross-site browser traffic', () => {
+  for (const origin of ['https://self.example.test', 'http://localhost:3030', 'https://app.aspectlylabs.com']) {
+    const request = (headers: Record<string, string>) => new Request(`${origin}/mikka/api/desktop/begin`, { headers })
+    assert.equal(desktopSameOriginRequest(request({ origin, 'sec-fetch-site': 'same-origin' })), true)
+    assert.equal(desktopSameOriginRequest(request({})), true)
+    for (const headers of [{ origin: 'https://attacker.example' }, { origin: 'null' }, { origin, 'sec-fetch-site': 'cross-site' }, { origin, 'sec-fetch-site': 'same-site' }] as Record<string, string>[]) {
+      assert.equal(desktopSameOriginRequest(request(headers)), false)
+    }
+  }
+})
 
 test('the OAuth callback is a base-path-free API path', () => {
   const path = desktopAuthCallbackPath(state, '/')
