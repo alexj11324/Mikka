@@ -33,27 +33,38 @@ export function useOwnE2BKey(enabled = true) {
   return { configured: status?.configured, mutate: swr.mutate }
 }
 
-export function E2BKeyDialog({ workspaceId, configured, onClose, open = true, onOpenChangeComplete }: { workspaceId?: string; configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
-  const t = useTranslations('Settings.secrets.e2b')
-  const commonT = useTranslations('Common')
+
+/**
+ * Saving or removing the person's E2B key: the dialog here and the hosted layer
+ * draw it each in their own look (docs/ui-overlay.md). `run` is true once saved.
+ */
+export function useE2BKeyEditor(workspaceId?: string) {
   const actionError = useActionError()
-  const [apiKey, setApiKey] = useState('')
   const [pending, setPending] = useState<'save' | 'delete' | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  async function run(kind: 'save' | 'delete') {
+  async function run(kind: 'save' | 'delete', apiKey = ''): Promise<boolean> {
     setPending(kind)
     setError(null)
     try {
       const result = kind === 'save' ? await saveE2BKey({ apiKey: apiKey.trim() }, workspaceId) : await deleteE2BKey(workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose(true)
+      if (result.error) { setError(actionError(result.error)); return false }
+      return true
     } catch {
       setError(actionError())
+      return false
     } finally {
       setPending(null)
     }
   }
+  return { pending, error, run }
+}
+
+export function E2BKeyDialog({ workspaceId, configured, onClose, open = true, onOpenChangeComplete }: { workspaceId?: string; configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
+  const t = useTranslations('Settings.secrets.e2b')
+  const commonT = useTranslations('Common')
+  const [apiKey, setApiKey] = useState('')
+  const { pending, error, run: runEdit } = useE2BKeyEditor(workspaceId)
+  const run = async (kind: 'save' | 'delete') => { if (await runEdit(kind, apiKey)) onClose(true) }
 
   return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(false) }}>
     <DialogContent>

@@ -1,17 +1,12 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
-import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { getSubscriptionShare, updateSubscriptionShare } from '@/app/actions/personal-policy'
+import { useSubscriptionShare } from '@/hooks/settings/use-subscription-share'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { FieldError } from '@/components/ui/field'
-import { useActionError } from '@/lib/use-action-error'
-
-type Change = { shared: boolean; allowOthers?: boolean }
 
 /**
  * 分享给团队成员: a member's own subscriptions always serve their own bots in
@@ -27,29 +22,10 @@ type Change = { shared: boolean; allowOthers?: boolean }
 export function SubscriptionShareSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
-  const actionError = useActionError()
-  const share = useSWR(settingsKeys.subscriptionShare(workspaceId), () => getSubscriptionShare(workspaceId))
-  const [pending, setPending] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [failed, setFailed] = useState<{ change: Change; message: string } | null>(null)
-  const data = share.data && !share.data.error ? share.data : null
+  const { data, loadError, pending, failed, change } = useSubscriptionShare(workspaceId, () => setConfirming(false))
 
-  async function change(next: Change) {
-    setPending(true)
-    setFailed(null)
-    try {
-      const result = await updateSubscriptionShare(next, workspaceId)
-      if (result.error) { setFailed({ change: next, message: actionError(result.error) }); return }
-      await share.mutate(result, { revalidate: false })
-    } catch {
-      setFailed({ change: next, message: actionError() })
-    } finally {
-      setPending(false)
-      setConfirming(false)
-    }
-  }
-
-  if (share.data?.error) return <FieldError>{actionError(share.data.error)}</FieldError>
+  if (loadError) return <FieldError>{loadError}</FieldError>
   if (!data || data.personal) return null
   const othersOn = data.shared && data.allowOthers
   const ownName = data.own.length

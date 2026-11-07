@@ -636,6 +636,53 @@ with fixture.root_file_metadata():
                                     'endedAt': None, 'durationMs': None, 'status': None, 'outcome': 'pending'})
         self.assertTrue(check(pending), 'known pending business work cannot become a permission-only count')
 
+    def test_publication_requires_observed_matching_claim_catalogue_for_zero_startup_http(self):
+        value = mcp_timing('run-codex', 'codex')
+        value.update(version=3, childPathAuditVersion=2, expectedCatalogueSha256='b' * 64, requests=[])
+        value['children'][0].update(sent=0, completed=0, lastSequence=2,
+                                   catalogue={'source': 'claim', 'sha256': 'b' * 64, 'readyAt': 1040})
+        check = lambda row: bt.observed_mcp_business_evidence(row, value['runIdHash'], 'codex')
+        self.assertTrue(check(value))
+        for mutate in [lambda row: row.pop('expectedCatalogueSha256'),
+                       lambda row: row.update(expectedCatalogueSha256=None),
+                       lambda row: row.update(childPathAuditVersion=1),
+                       lambda row: row['children'][0].pop('catalogue'),
+                       lambda row: row['children'][0]['catalogue'].update(sha256='c' * 64),
+                       lambda row: row['children'][0]['catalogue'].update(text='PRIVATE'),
+                       lambda row: row['children'][0]['catalogue'].update(readyAt=1000),
+                       lambda row: row['children'][0].update(catalogue=None, lastSequence=1)]:
+            invalid = copy.deepcopy(value); mutate(invalid)
+            self.assertFalse(check(invalid))
+        conflict = copy.deepcopy(value)
+        request = mcp_timing('run-codex', 'codex')['requests'][0]
+        conflict['requests'] = [{**request, 'body': None}]
+        conflict['children'][0].update(sent=1, completed=1, lastSequence=4)
+        self.assertFalse(check(conflict))
+
+    def test_publication_accepts_body_terminal_evidence_without_reinterpreting_legacy_headers(self):
+        legacy = mcp_timing('run-codex', 'codex')
+        check = lambda value: bt.observed_mcp_business_evidence(value, legacy['runIdHash'], 'codex')
+        self.assertTrue(check(legacy))
+        value = copy.deepcopy(legacy)
+        value['version'] = 2
+        request = value['requests'][0]
+        request['body'] = {'endedAt': request['endedAt'] + 100, 'durationMs': request['durationMs'] + 100, 'outcome': 'read'}
+        value['children'][0]['lastSequence'] += 1
+        self.assertTrue(check(value))
+        for mutate in [lambda row: row['requests'][0].pop('body'),
+                       lambda row: row['requests'][0]['body'].update(outcome=['read']),
+                       lambda row: row['requests'][0]['body'].update(endedAt=request['endedAt'] - 1),
+                       lambda row: row['requests'][0]['body'].update(durationMs=request['durationMs'] - 1),
+                       lambda row: row['requests'][0]['body'].update(durationMs=True),
+                       lambda row: row['requests'][0]['body'].update(content='PRIVATE_BODY'),
+                       lambda row: row['children'][0].update(lastSequence=3)]:
+            invalid = copy.deepcopy(value)
+            mutate(invalid)
+            self.assertFalse(check(invalid))
+        value['requests'][0]['body'] = None
+        value['children'][0]['lastSequence'] -= 1
+        self.assertTrue(check(value), 'no body observation remains unknown, not a second send or a zero duration')
+
     def test_patches_public_and_verifies_ready(self):
         opener, calls = fake({'public': True, 'buildStatus': 'ready', 'builds': [{'buildID': 'b1', 'status': 'ready'}]})
         self.assertEqual(bt.publish('tpl1', 'b1', 'k', opener), {'public': True, 'buildStatus': 'ready'})

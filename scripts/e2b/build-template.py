@@ -696,11 +696,13 @@ def observed_mcp_business_evidence(value, run_hash, harness):
     def duration(number):
         return type(number) in (int, float) and math.isfinite(number) and 0 <= number <= 86_400_000
 
-    if (not isinstance(value, dict) or type(value.get('version')) is not int or value['version'] != 1
+    if (not isinstance(value, dict) or type(value.get('version')) is not int or value['version'] not in (1, 2, 3)
             or value.get('source') != 'mikka_mcp_physical_fetch' or value.get('scope') != 'observed_mikka_mcp_children'
             or value.get('generationCoverage') != 'unverified' or value.get('allFirstPartyHttpComplete') is not False
             or type(value.get('remoteMcpServerCount')) is not int or value['remoteMcpServerCount'] != 0
-            or type(value.get('childPathAuditVersion')) is not int or value['childPathAuditVersion'] != 1
+            or type(value.get('childPathAuditVersion')) is not int or value['childPathAuditVersion'] != (2 if value['version'] == 3 else 1)
+            or value['version'] == 3 and ('expectedCatalogueSha256' not in value or not (value['expectedCatalogueSha256'] is None
+                or isinstance(value['expectedCatalogueSha256'], str) and re.fullmatch(r'[a-f0-9]{64}', value['expectedCatalogueSha256'])))
             or value.get('runIdHash') != run_hash or value.get('harness') != harness
             or not epoch(value.get('startedAt')) or not epoch(value.get('endedAt')) or value['endedAt'] < value['startedAt']
             or type(value.get('expectedChildren')) is not int or value['expectedChildren'] != 1
@@ -719,6 +721,15 @@ def observed_mcp_business_evidence(value, run_hash, harness):
                 or not all(count(child.get(key)) for key in ('lastSequence', 'sent', 'completed', 'lost'))
                 or child['lastSequence'] < 1 or child['completed'] > child['sent'] or child['lost'] != 0):
             return False
+        if value['version'] == 3:
+            if 'catalogue' not in child:
+                return False
+            catalogue = child['catalogue']
+            if catalogue is not None and (not isinstance(catalogue, dict) or set(catalogue) != {'source', 'sha256', 'readyAt'}
+                    or catalogue['source'] != 'claim' or value['expectedCatalogueSha256'] is None
+                    or catalogue['sha256'] != value['expectedCatalogueSha256'] or not epoch(catalogue['readyAt'])
+                    or not child['startedAt'] <= catalogue['readyAt'] <= (child['closedAt'] or value['endedAt'])):
+                return False
     if sum(child['closedAt'] is not None for child in children) != value['closedChildren']:
         return False
     for request in requests:
@@ -741,16 +752,31 @@ def observed_mcp_business_evidence(value, run_hash, harness):
               or not duration(request.get('durationMs'))
               or request['outcome'] != ('ok' if type(request['status']) is int and 200 <= request['status'] < 300 else 'error')):
             return False
+        if value['version'] >= 2:
+            if 'body' not in request:
+                return False
+            body = request['body']
+            if body is not None and (not isinstance(body, dict) or set(body) != {'endedAt', 'durationMs', 'outcome'}
+                    or request['endedAt'] is None or request['status'] is None
+                    or not epoch(body.get('endedAt')) or not request['endedAt'] <= body['endedAt'] <= (child['closedAt'] or value['endedAt'])
+                    or not duration(body.get('durationMs')) or body['durationMs'] < request['durationMs']
+                    or body.get('outcome') not in ('read', 'error')):
+                return False
     for child in children:
         observed = sorted((request for request in requests if request['child'] == child['child']), key=lambda row: row['sequence'])
         if (len(observed) != child['sent'] or sum(row['outcome'] != 'pending' for row in observed) != child['completed']
                 or child['lastSequence'] != 1 + child['sent'] + child['completed'] + int(child['closedAt'] is not None)
+                    + (sum(row.get('body') is not None for row in observed) if value['version'] >= 2 else 0)
+                    + int(value['version'] == 3 and child.get('catalogue') is not None)
                 or any(row['sequence'] != index + 1 for index, row in enumerate(observed))):
             return False
     observed_complete = all(row['outcome'] != 'pending' for row in requests)
     if ((value['observedComplete'] and not observed_complete)
             or (value['childLifecycleComplete'] and not (observed_complete and value['closedChildren'] == len(children)))):
         return False
+    remote_catalogue = any(row['operation'] == 'decision_catalogue' for row in requests)
+    if value['version'] == 3 and value['expectedCatalogueSha256'] is not None:
+        return not remote_catalogue and any(child['catalogue'] is not None for child in children)
     return any(row['operation'] == 'decision_catalogue' and row['outcome'] != 'pending' for row in requests)
 
 

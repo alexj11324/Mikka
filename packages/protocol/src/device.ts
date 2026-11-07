@@ -26,9 +26,24 @@ import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
 import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
+import { mailboxCatalogueSchema } from './mailbox'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
+
+/** Static canonical tool metadata, prepared in the existing authorized claim.
+ * A schema is not an authorization grant and contains no task data or token. */
+export const runDecisionCatalogueSchema = z.object({
+  version: z.literal(1),
+  tool: z.object({
+    name: z.literal('record_decision'),
+    title: z.string().min(1).max(200),
+    description: z.string().min(1).max(2000),
+    inputSchema: z.object({ type: z.literal('object') }).passthrough(),
+    annotations: z.object({ idempotentHint: z.literal(true) }).strict(),
+  }).strict(),
+}).strict().refine(value => new TextEncoder().encode(JSON.stringify(value)).length <= 32_768,
+  { message: 'Prepared decision catalogue is bounded' })
 
 /**
  * A device counts as online while its last heartbeat is younger than this.
@@ -444,6 +459,8 @@ export const runAssignmentSchema = z.object({
    */
   mcp: z.object({
     url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional(),
+    decisionCatalogue: runDecisionCatalogueSchema.optional(),
+    mailboxCatalogue: mailboxCatalogueSchema.optional(),
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
   }).optional(),

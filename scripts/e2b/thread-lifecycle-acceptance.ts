@@ -1,5 +1,6 @@
-/** Real E2B provider integration + disposable PostgreSQL, with injected transport
- * faults. No model, subscription, API-server or daemon acceptance is implied.
+/** Real E2B provider integration + disposable PostgreSQL, with a real SDK request
+ * deadline and injected transport faults. No model, subscription, API-server or
+ * daemon acceptance is implied.
  *
  * NODE_ENV=test node --import ./scripts/server-test.mjs --import tsx \
  *   scripts/e2b/thread-lifecycle-acceptance.ts [--check]
@@ -60,6 +61,25 @@ export function validateThreadLifecycleTarget(env: Env, checkOnly = false) {
 function missing(error: unknown) {
   return error instanceof NotFoundError || error instanceof SandboxNotFoundError
     || Boolean(error && typeof error === 'object' && 'status' in error && error.status === 404)
+}
+
+type ProviderRenew = (id: string, owner: string, timeoutMs: number) => Promise<void>
+
+/** Observe the SDK's actual abort reason while handing that same error to the
+ * controller. A request that beats its deadline cannot prove timeout recovery. */
+export async function observeProviderRequestDeadline(request: ProviderRenew,
+  reconcile: (renew: ProviderRenew) => Promise<false | number>) {
+  let attempts = 0, rejected = false, failure: unknown
+  const retryAt = await reconcile(async (...args) => {
+    attempts++
+    try { await request(...args) }
+    catch (error) { rejected = true; failure = error; throw error }
+  })
+  assert.equal(attempts, 1, 'acceptance_request_deadline_attempt_count')
+  if (!rejected) throw new Error('acceptance_request_deadline_inconclusive')
+  if (!(failure instanceof DOMException) || failure.name !== 'TimeoutError')
+    throw new Error('acceptance_request_deadline_unexpected_error', { cause: failure })
+  return { retryAt, errorName: 'TimeoutError' as const }
 }
 
 export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
@@ -172,6 +192,34 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     assert.ok((await row()).lifecycleAt && (await info(sandboxId)).endAt! > Date.now())
     passed.push(stage)
 
+    stage = 'provider-request-deadline'
+    const active = await row(), beforeDeadline = { ...counters }
+    assert.ok(beforeDeadline.info > 0 && beforeDeadline.keepAlive > 0)
+    await makeDue()
+    const deadline = await observeProviderRequestDeadline(async (id, _owner, timeoutMs) => {
+      owned(id); counters.keepAlive++
+      await Sandbox.setTimeout(id, timeoutMs, { ...connection, requestTimeoutMs: 1, retries: 0 })
+    }, keepAlive => reconcileThreadMachine(pool!, actor, runId, { ...dependencies, provider: { ...provider, keepAlive } }))
+    const retry = await row(), retryAt = new Date(retry.lifecycleAt).getTime()
+    assert.equal(retry.sandboxId, sandboxId); assert.equal(retry.epoch, active.epoch); assert.equal(retry.state, 'running')
+    assert.equal(retry.lifecycle.phase, 'needs_reconciliation'); assert.equal(retry.lifecycle.reason, 'operation_failed')
+    assert.equal(retry.lifecycle.failures, 1); assert.equal(deadline.retryAt, retryAt); assert.ok(retryAt > Date.now())
+    assert.deepEqual(counters, { ...beforeDeadline, info: beforeDeadline.info + 1, keepAlive: beforeDeadline.keepAlive + 1 })
+    const beforeDeadlineReplay = { ...counters }
+    assert.equal(await reconcile(), retryAt); assert.deepEqual(counters, beforeDeadlineReplay)
+    assert.equal((await info(sandboxId)).state, 'running')
+    const beforeDeadlineRecovery = { ...counters }
+    await makeDue(); await reconcile()
+    const recovered = await row()
+    assert.equal(recovered.sandboxId, sandboxId); assert.equal(recovered.epoch, active.epoch); assert.equal(recovered.state, 'running')
+    assert.equal(recovered.lifecycle.phase, 'active'); assert.equal(recovered.lifecycle.reason, 'active_run')
+    assert.equal(recovered.lifecycle.owner, 'run-recovery'); assert.equal(recovered.lifecycle.failures, 0)
+    assert.ok(new Date(recovered.lifecycleAt).getTime() > Date.now())
+    assert.deepEqual(counters, { ...beforeDeadlineRecovery, info: beforeDeadlineRecovery.info + 1, keepAlive: beforeDeadlineRecovery.keepAlive + 1 })
+    const requestDeadline = { operation: 'setTimeout', requestTimeoutMs: 1, retries: 0,
+      errorName: deadline.errorName, earlyReplayIo: 0, recovered: true }
+    passed.push(stage)
+
     // Synthetic terminal receipt: no native model/session was ever started.
     await pool.query(`UPDATE agent_runs SET status='succeeded',"leaseExpiresAt"=NULL,report=$2 WHERE id=$1`,
       [runId, JSON.stringify({ safePoint: { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() } })])
@@ -236,7 +284,8 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     assert.equal((await info(sandboxId)).state, 'missing'); assert.equal(await reconcile(), false)
     passed.push(stage)
     result = { kind: PURPOSE, status: 'passed', acceptance, ...release, template, sandboxId, runId, cases: passed,
-      subscriptionAcceptance: false, modelCalls: 0, resumeScope: 'provider-resume-to-controller-monitor', counters }
+      subscriptionAcceptance: false, modelCalls: 0, resumeScope: 'provider-resume-to-controller-monitor',
+      requestDeadlineScope: 'sdk-request-deadline-to-controller-recovery', requestDeadline, counters }
   } catch (error) { failed = true; failure = error }
   finally {
     restoreProvider?.()
