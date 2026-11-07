@@ -3,13 +3,15 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { dbUrl, seedAgent, seedRun, seedUser } from './support/workspace-admin-db'
 
+mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+
 test('thread waiting device uses the same private queue projection as visibleRuns', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const fixtures = new Pool({ connectionString: dbUrl })
   const owner = await seedUser(fixtures, 'thread-owner'), other = await seedUser(fixtures, 'thread-other')
   let actor = owner
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor } }) } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor, name: 'Waiting fixture', email: `${actor}@example.invalid`, image: null }, session: { id: 'waiting-fixture-session' } }) } } } })
   const { listThreads } = await import('../app/actions/task-runs')
   const { visibleRuns } = await import('../lib/agent-runs')
   const { pool } = await import('../lib/db')

@@ -76,7 +76,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Admission CI worker\')', [identity.agentId, userId, identity.deviceId])
     const { workspaceId } = await seedAllowedModel(pool, userId, { deviceIds: [identity.deviceId] })
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,null)', [identity.repoId, identity.deviceId, userId, identity.remoteKey, remoteUrl])
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Synthetic admission task\',$3,\'todo\',\'normal\',\'personal\')', [identity.issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] })])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId","ownershipState",title,content,status,priority,scope,"linearSyncPolicy","linearSyncBlocked") VALUES ($1,$2,$4,\'bound\',\'Synthetic admission task\',$3,\'todo\',\'normal\',\'workspace\',\'disabled\',true)', [identity.issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] }), workspaceId])
     const eventId = await addEvent(identity, { destination: options.destination === 'selected' ? { kind: 'device', deviceId: identity.deviceId } : options.destination, delivered: options.delivered })
     const routed = await factoryStore.route(userId, { issueId: identity.issueId, eventId: randomUUID(), sourceEventId: eventId, rationale: 'Synthetic requested implementation' })
     const f = { ...identity, workspaceId, eventId, task: routed.task }
@@ -99,21 +99,28 @@ test('real Factory admission preserves host scope, policy and transaction owners
     }
     assert.fail('the real competing transaction must wait on the held policy lock')
   }
-  async function scopeRoundTrip(f: Fixture) {
+  async function changePublicationGeneration(f: Fixture) {
     const workspaceId = randomUUID(), teamId = randomUUID()
     await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,\'Synthetic admission workspace\')', [workspaceId, f.userId])
     await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,\'Synthetic owner\',$3,\'member\',\'active\')', [workspaceId, f.userId, `${f.userId}@example.invalid`])
     await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,\'Admission team\',\'FADM\')', [teamId, workspaceId, f.userId])
     const current = (await pool.query('SELECT revision FROM issues WHERE id=$1', [f.issueId])).rows[0]
     const promoted = await promoteExistingIssueForUser(f.userId, { requestId: randomUUID(), issueId: f.issueId, revision: current.revision, teamId, expectedTeamId: null })
-    assert.ok('issue' in promoted && promoted.issue?.scope === 'workspace', JSON.stringify(promoted))
+    assert.ok('error' in promoted)
+    assert.equal(promoted.error, 'teamIssueAccessDenied', 'a Team in another workspace cannot move the task')
+    // A historical explicit publication policy is a separate generation from
+    // task tenancy. Keep publication blocked, then use the real local disable
+    // action; the test performs no provider I/O and never moves the tenant.
+    await pool.query('UPDATE issues SET "linearSyncPolicy"=\'explicit\',"linearSyncBlocked"=true WHERE id=$1', [f.issueId])
     const preview = await previewPersonalScope(f.userId, f.issueId)
     assert.ok('preview' in preview && preview.preview)
-    assert.equal(preview.preview.externalCopyPossible, false, 'the explicit team promotion does not infer an external publication')
+    assert.equal(preview.preview.externalCopyPossible, false, 'no external publication was recorded')
     // Use the exact store contract behind confirmIssuePersonalScope, including
     // its preview digest and linked-publication rejection. No trigger override.
     const retired = await changeIssueScopeLocally(f.userId, { id: f.issueId, revision: preview.preview.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: preview.preview.confirmation })
-    assert.ok('issue' in retired && retired.issue?.scope === 'personal', JSON.stringify(retired))
+    assert.ok('issue' in retired && retired.issue?.linearSyncPolicy === 'disabled', JSON.stringify(retired))
+    assert.deepEqual((await pool.query('SELECT "workspaceId",scope FROM issues WHERE id=$1', [f.issueId])).rows,
+      [{ workspaceId: f.workspaceId, scope: 'workspace' }], 'publication policy changes retain the task tenant')
   }
 
   try {
@@ -356,8 +363,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
 
     await t.test('gateway wake belongs to the outer commit, including a host that starts lifecycle work immediately', async () => {
       const f = await fixture({ destination: 'selected' })
-      // This legacy null-Bot task uses the owner's personal scope for browser updates.
-      await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [f.workspaceId])
+      // The botless task keeps its explicit workspace for browser updates.
       const pending: Promise<unknown>[] = []
       const received: string[] = []
       const browserReceived: { kind: string; id: string }[][] = []
@@ -483,9 +489,15 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await rowsFor(f)).runs, 1)
     })
 
-    await t.test('real question continuations acquire policy and repository locks before their origin run', async () => {
-      for (const held of ['policy', 'repository'] as const) {
+    await t.test('real question continuations acquire policy before Factory and origin locks, with or without a Team hierarchy', async () => {
+      for (const grouped of [false, true]) {
         const f = await fixture({ destination: 'selected' })
+        if (grouped) {
+          const { seedTeam } = await import('./support/workspace-admin-db')
+          const team = await seedTeam(pool, f.workspaceId, f.userId)
+          await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)',
+            [f.issueId, team.id, f.workspaceId, f.userId])
+        }
         const origin = await dispatch(f)
         const questionId = randomUUID(), originSessionId = `synthetic-question:${origin.runId}`
         await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,"startedAt"=now(),"finishedAt"=now(),report=$3 WHERE id=$1`,
@@ -498,13 +510,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
         try {
           await locker.query('BEGIN')
           const pid = (await locker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
-          if (held === 'policy') await lockCliAgentPolicy(locker, f.userId, f.agentId, null)
-          else await locker.query('SELECT 1 FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2 FOR UPDATE', [f.userId, f.remoteKey])
+          await lockCliAgentPolicy(locker, f.userId, f.agentId, null)
           pending = factoryQuestions.answer({ source: 'orchestrator', userId: f.userId }, input)
           settled = pending.then(() => ({ accepted: true }), error => ({ accepted: false, error }))
           await waitBlockedBy(pid)
-          if (held === 'policy') await locker.query('SELECT id FROM factory_tasks WHERE id=$1 FOR UPDATE NOWAIT', [f.task.id])
-          else assert.equal((await locker.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS available', [JSON.stringify(['dispatch-issue', f.userId, f.issueId])])).rows[0].available, true, 'question continuation must wait for the GitHub App grant before holding dispatch-issue')
+          await locker.query('SELECT id FROM factory_tasks WHERE id=$1 FOR UPDATE NOWAIT', [f.task.id])
           await locker.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [origin.runId])
           await locker.query('COMMIT')
           const outcome = await settled
@@ -536,7 +546,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await rowsFor(f)).runs, 1)
     })
 
-    await t.test('replay cannot move between Bot scopes or survive a task scope round trip', async () => {
+    await t.test('replay cannot change Bot scope; a Linear publication generation change preserves its task tenant and receipt', async () => {
       const f = await fixture()
       const input = publicInput(f, `scope:${randomUUID()}`)
       const first = await queueRun(f.userId, input)
@@ -544,14 +554,17 @@ test('real Factory admission preserves host scope, policy and transaction owners
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Synthetic scoped Bot\')', [botId, f.userId, workspaceId])
       await assert.rejects(queueRun(f.userId, input, botId), /runDispatchKeyConflict/)
       const oldScope = (await pool.query('SELECT "scopeVersion" FROM run_publications WHERE "runId"=$1', [first.runId])).rows[0].scopeVersion
-      await scopeRoundTrip(f)
+      await changePublicationGeneration(f)
       assert.ok((await pool.query('SELECT "scopeVersion" FROM issues WHERE id=$1', [f.issueId])).rows[0].scopeVersion > oldScope)
-      await assert.rejects(queueRun(f.userId, input), /runDispatchKeyConflict/)
+      assert.deepEqual(await queueRun(f.userId, input), { runId: first.runId, status: 'queued', replayed: true })
       assert.equal((await rowsFor(f)).runs, 1)
       assert.equal((await pool.query('SELECT "scopeVersion" FROM run_publications WHERE "runId"=$1', [first.runId])).rows[0].scopeVersion, oldScope)
+      const persisted = (await pool.query('SELECT "workspaceId","agentDefinition" FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+      assert.equal(persisted.workspaceId, f.workspaceId)
+      assert.equal(persisted.agentDefinition.executionIdentity.workspaceId, f.workspaceId)
     })
 
-    await t.test('Skill continuations inherit the existing origin and reject revoked generations', async () => {
+    await t.test('Skill continuations retain the admitted tenant and origin when Linear publication is disabled', async () => {
       const f = await fixture({ destination: 'selected' })
       const origin = await dispatch(f)
       await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now(),"sessionId"=\'synthetic-completed-source\' WHERE id=$1', [origin.runId])
@@ -560,9 +573,14 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal(child.botId, null)
       assert.equal(child.agentDefinition.repositoryAdmission.requestEventId, f.eventId)
       assert.equal(await acceptedEventStillMatches(child.agentDefinition.repositoryAdmission, null), true)
-      await scopeRoundTrip(f)
-      await assert.rejects(transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId)), /runInvalid/)
-      assert.equal((await rowsFor(f)).runs, 2)
+      await changePublicationGeneration(f)
+      await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [next.runId])
+      const continued = await transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
+      const persisted = (await pool.query('SELECT "workspaceId","agentDefinition" FROM agent_runs WHERE id=$1', [continued.runId])).rows[0]
+      assert.equal(persisted.workspaceId, f.workspaceId)
+      assert.equal(persisted.agentDefinition.executionIdentity.workspaceId, f.workspaceId)
+      assert.equal(persisted.agentDefinition.repositoryAdmission.requestEventId, f.eventId)
+      assert.equal((await rowsFor(f)).runs, 3)
     })
   } finally {
     // Keep immutable audit fixtures, but leave no queued execution authority.

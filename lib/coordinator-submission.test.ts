@@ -17,7 +17,7 @@ const dialect = new PgDialect()
 type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination; profileId?: string; humanSessionId?: string } }
 function fixture() {
   const rows = new Map<string, Stored>()
-  const botRows = new Map<string, { id: string; name: string; ownerId: string }>([[COORDINATOR_BOT, { id: COORDINATOR_BOT, name: 'Coordinator', ownerId: 'owner' }]])
+  const botRows = new Map<string, { id: string; name: string; ownerId: string; workspaceId: string; coordinator?: boolean }>([[COORDINATOR_BOT, { id: COORDINATOR_BOT, name: 'Coordinator', ownerId: 'owner', workspaceId: PROFILE_WORKSPACE, coordinator: true }]])
   const deviceRows = new Map<string, { id: string; ownerId: string; kind: string; enabled: boolean }>()
   const trace: string[] = []
   const state: { insertError?: Error; selectError?: Error; arbitrate?: (event: Stored) => Promise<void>; missingRead?: boolean } = {}
@@ -41,7 +41,7 @@ function fixture() {
       return { where(condition: SQL) {
         const query = dialect.sqlToQuery(condition)
         if (table === coordinatorEvents) assert.match(query.sql, /"coordinator_events"\."dedupeKey"/)
-        else if (table === bots) { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/) }
+        else if (table === bots) { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/); assert.match(query.sql, /"bots"\."workspaceId"/) }
         else { assert.match(query.sql, /"devices"\."id"/); assert.match(query.sql, /"devices"\."ownerId"/); assert.match(query.sql, /"devices"\."kind"/); assert.match(query.sql, /"devices"\."enabled"/) }
         return { async limit(count: number) {
           assert.equal(count, 1)
@@ -49,7 +49,7 @@ function fixture() {
           if (state.selectError) throw state.selectError
           if (state.missingRead) return []
           const row = table === coordinatorEvents ? rows.get(query.params[0] as string)
-            : table === bots ? [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId))
+            : table === bots ? [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId) && query.params.includes(bot.workspaceId))
               : [...deviceRows.values()].find(device => query.params.includes(device.id) && query.params.includes(device.ownerId) && query.params.includes(device.kind) && query.params.includes(device.enabled))
           return row ? [structuredClone(row)] : []
         } }
@@ -201,6 +201,10 @@ let dismissError: Error | null = null
 let transactionTail: Promise<unknown> = Promise.resolve()
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'synthetic-browser-session' } } : null } } } })
+  mock.module('@/lib/workspace-access', { namedExports: { loadWorkspaceContext: async (_requested: unknown, user: { id: string }) => {
+    assert.equal(user.id, userId)
+    return { workspace: { id: PROFILE_WORKSPACE } }
+  } } })
   // A transaction runs on the same in-memory executor; the real one rolls back when the callback throws.
   mock.module('@/lib/execution-settings', { namedExports: { executionWorkspace: async (owner: string, botId: string) => { assert.equal(owner, userId); assert.equal(botId, COORDINATOR_BOT); return PROFILE_WORKSPACE } } })
   mock.module('@/lib/db', { namedExports: { pool: { async query(sql: string, params: string[]) {
@@ -265,10 +269,12 @@ test('shared full chat reads do not guess a live workspace when the owned home i
   } finally { chatHome = CHAT_HOME }
 })
 
-test('both chat readers reject foreign bots and anonymous requests before resolving live scope', async () => {
+test('both chat readers reject foreign bots, other workspaces and anonymous requests before resolving live scope', async () => {
   current = fixture(); userId = 'owner'; chatReadTrace.length = 0
   const foreign = 'b4000000-0000-4000-8000-000000000099'
-  current.botRows.set(foreign, { id: foreign, name: 'Other Bot', ownerId: 'foreign' })
+  current.botRows.set(foreign, { id: foreign, name: 'Other Bot', ownerId: 'foreign', workspaceId: PROFILE_WORKSPACE })
+  for (const read of [() => getCoordinatorChat(foreign), () => pollCoordinatorChat(foreign)]) await assert.rejects(read)
+  current.botRows.set(foreign, { id: foreign, name: 'Other workspace Bot', ownerId: 'owner', workspaceId: CHAT_HOME })
   for (const read of [() => getCoordinatorChat(foreign), () => pollCoordinatorChat(foreign)]) await assert.rejects(read)
   userId = null
   try {
@@ -346,7 +352,7 @@ test('legacy HTTP and action calls without IDs remain valid separate submissions
 test('action checks actual Bot ownership before new submissions and duplicate retries', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const botId = 'b4000000-0000-4000-8000-000000000002'
-  current.botRows.set(botId, { id: botId, name: 'Synthetic Bot', ownerId: 'foreign' })
+  current.botRows.set(botId, { id: botId, name: 'Synthetic Bot', ownerId: 'foreign', workspaceId: PROFILE_WORKSPACE })
   assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'botNotFound', params: undefined })
   assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
   current.botRows.get(botId)!.ownerId = 'owner'

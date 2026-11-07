@@ -62,12 +62,12 @@ test('an artifact key reaches only its owner home, after the real artifact write
     for (const [id, owner, kind] of [[home, 'owner', 'personal'], [team, 'owner', 'team'], [peerHome, 'peer', 'personal']]) {
       await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    for (const [workspace, userId] of [[home, 'owner'], [home, 'peer'], [team, 'owner'], [team, 'peer'], [peerHome, 'peer']]) {
+    for (const [workspace, userId] of [[home, 'owner'], [team, 'owner'], [team, 'peer'], [peerHome, 'peer']]) {
       await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`, [workspace, userId])
     }
     const { submitArtifact, createShare, revokeShares } = await import('../artifacts/store')
     const { deleteOwnArtifact } = await import('../artifacts/delete')
-    const submit = (artifactId?: string) => submitArtifact({ userId: 'owner', runId: null, issueId: null, authorName: 'Fixture' },
+    const submit = (artifactId?: string) => submitArtifact({ userId: 'owner', workspaceId: home, runId: null, issueId: null, authorName: 'Fixture' },
       { title: 'Release notes', kind: 'markdown', content: `# Notes ${randomUUID()}`, ...(artifactId ? { artifactId } : {}) })
     const ownerHome = (id: string) => [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'artifact', id }] }]
 
@@ -108,7 +108,8 @@ test('an artifact key reaches only its owner home, after the real artifact write
       await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
       assert.deepEqual(await deliveries(), [], 'a home lost between COMMIT and delivery receives nothing')
       await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
-      assert.deepEqual(await artifactTargets(database, database, 'owner', artifactId), ownerHome(artifactId), 'a deleted artifact still reaches its owner, so the open reader learns it is gone')
+      assert.deepEqual(await artifactTargets(database, database, 'owner', artifactId), [], 'a missing row is not evidence of a tenant')
+      assert.deepEqual(await artifactTargets(database, database, 'owner', artifactId, home), ownerHome(artifactId), 'a deletion retains its previously authorized tenant for the open reader')
       assert.deepEqual(unexpected, [])
     })
   } finally {

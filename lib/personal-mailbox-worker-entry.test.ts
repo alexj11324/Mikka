@@ -106,6 +106,7 @@ mock.module(new URL('./mcp/auth.ts', import.meta.url).href, { namedExports: {
   mcpUserId: () => { throw Error('OAuth tool outside worker fixture') },
   mcpActor: () => { throw Error('OAuth tool outside worker fixture') },
 } })
+mock.module(new URL('./mcp/workspace.ts', import.meta.url).href, { namedExports: { withMcpWorkspace: () => { throw Error('OAuth workspace tools are outside the worker mailbox fixture') } } })
 for (const path of ['./mcp/actions.ts', './mcp/tools.ts', './mcp/artifacts.ts']) mock.module(new URL(path, import.meta.url).href, { namedExports: {} })
 mock.module(new URL('./composio.ts', import.meta.url).href, { namedExports: { runComposioAction: () => { throw Error('Provider forbidden') } } })
 let POST: typeof import('../app/v1/mailbox/route').POST

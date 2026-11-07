@@ -7,6 +7,7 @@ import { automaticFactoryDispatch } from './automatic-dispatch'
 import type { PoolClient } from 'pg';
 import { pool, withDatabaseClient } from '@/lib/db';
 import { issueForUser } from '@/lib/issue-access';
+import { factoryWorkspaceReader } from './workspace-reader';
 import { queueFactoryRun } from '@/lib/agent-runs';
 import { lockCliAgentPolicy } from '@/lib/agent-tool-approval/policy-store';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '@/lib/agent-kit/worker';
@@ -32,7 +33,7 @@ export function factoryLifecycleEnabled() {
   return deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle');
 }
 export const factoryAuthorize = (userId: string, issueId: string, tx: PoolClient) =>
-  withDatabaseClient(tx, async () => Boolean(await issueForUser(userId, issueId)));
+  withDatabaseClient(tx, async () => Boolean(await issueForUser(await factoryWorkspaceReader(userId), issueId)));
 /** Consumer owners supply actual validators/configurators. Sixth argument is host-only recovery I/O, never tool input. Text observations need no images. */
 export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLifecycle = {}, configure: FactoryDispatchAdapters['configure'] = {}, validateCheck?: Parameters<typeof createFactoryClaim>[2], consumers: Parameters<typeof createFactoryReconciler>[3] = {}, recovery: FactoryCheckRecoveryDependencies = {}) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable');

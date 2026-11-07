@@ -7,7 +7,9 @@ import { issues, issueVersions, linearIssueLinks, linearIssuePublications, linea
 import { activityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import type { TaskScope } from '@/lib/task-identifier'
-import { documentScopesBeforeChange, documentScopeChanged } from '@/lib/live/panels'
+import { issueForUser } from '@/lib/issue-access'
+import { ActionFailureError } from '@/lib/action-error'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -16,24 +18,28 @@ async function personalPreview(tx: Transaction, issue: typeof issues.$inferSelec
   const publications = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.issueId, issue.id)).orderBy(linearIssuePublications.id)
   const jobs = await tx.select().from(linearSyncOutbox).where(eq(linearSyncOutbox.issueId, issue.id)).orderBy(linearSyncOutbox.id)
   const externalCopyPossible = links.length > 0 || publications.length > 0 || jobs.some(job => ['queued','processing','failed'].includes(job.status))
-  const confirmation = createHash('sha256').update(JSON.stringify({ id: issue.id, owner: issue.userId, revision: issue.revision, scope: issue.scope, scopeVersion: issue.scopeVersion, links, publications, jobs })).digest('hex')
+  const confirmation = createHash('sha256').update(JSON.stringify({ id: issue.id, owner: issue.userId, workspaceId: issue.workspaceId, linearSyncPolicy: issue.linearSyncPolicy, revision: issue.revision, scope: issue.scope, scopeVersion: issue.scopeVersion, links, publications, jobs })).digest('hex')
   return { revision: issue.revision, scope: issue.scope, scopeVersion: issue.scopeVersion, hasLinearLink: links.length > 0, hasRetainedPublication: publications.length > 0, externalCopyPossible, confirmation }
 }
 
 export async function previewPersonalScope(userId: string, issueId: string) {
-  return db.transaction(async tx => {
+  const accessible = await issueForUser(userId, issueId)
+  if (!accessible?.workspaceId) throw new ActionFailureError('issueNotFound')
+  return withTaskWorkspace(userId, accessible.workspaceId, () => db.transaction(async tx => {
     const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
     if (!issue || issue.userId !== userId) return { error: 'issueScopeOwnerOnly' as const }
     return { preview: await personalPreview(tx, issue) }
-  })
+  }))
 }
 
 /** The DB trigger detaches the old link, queues its frozen archive request,
- * cancels ordinary outgoing sync and revokes other people's runs atomically.
+ * and cancels outgoing sync. Task ownership and admitted runs stay in place.
  * Provider IO stays in the existing outbox worker, after this transaction. */
 export async function changeIssueScopeLocally(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean; confirmation?: string }) {
+  const accessible = await issueForUser(userId, input.id)
+  if (!accessible?.workspaceId) throw new ActionFailureError('issueNotFound')
   for (let attempt = 0; ; attempt++) {
-    try { return await changeScopeTransaction(userId, input, options) }
+    try { return await withTaskWorkspace(userId, accessible.workspaceId, () => changeScopeTransaction(userId, input, options)) }
     catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error
       const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : null
@@ -69,12 +75,10 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     // above prove no recorded or uncertain external publication. A preview
     // digest, when supplied, still has to match the current state.
     if (options.allowLinkedPersonal) await tx.execute(sql`select set_config('mikka.personal_scope_request', ${latest.id}, true)`)
-    const previousScopes = latest.scope !== input.scope ? await documentScopesBeforeChange(latest) : null
     const previousLists = await issueListScopesBeforeChange(latest)
-    const [saved] = await tx.update(issues).set({ scope: input.scope, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
+    const [saved] = await tx.update(issues).set({ linearSyncPolicy: 'disabled', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
       .where(and(eq(issues.id, latest.id), eq(issues.userId, userId), eq(issues.revision, input.revision))).returning()
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
-    if (previousScopes) await documentScopeChanged(tx, saved.id, previousScopes)
     await issueListScopeChanged(tx, saved.id, previousLists)
     return { issue: await issueView(saved, tx) }
   })

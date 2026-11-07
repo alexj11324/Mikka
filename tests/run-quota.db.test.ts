@@ -60,8 +60,8 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const models = (ids: string[]) => (async () => Response.json({ data: ids.map(id => ({ id })) })) as unknown as typeof fetch
   const addKey = (ownerId: string, provider: 'anthropic' | 'openai', listed: string[]) =>
     keys.addApiKey(pool, ownerId, { provider, apiKey: `sk-${randomBytes(16).toString('hex')}` }, { env: process.env, fetch: models(listed) })
-  const task = async (ownerId: string) => {
-    const issueId = await seedIssue(pool, ownerId)
+  const task = async (ownerId: string, workspaceId: string) => {
+    const issueId = await seedIssue(pool, ownerId, workspaceId)
     await pool.query(`UPDATE issues SET content=$2 WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1e6) + 1 } } })])
     return issueId
   }
@@ -95,7 +95,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   }
   /** A run dispatched the ordinary way, then running on the device with a session, as a claim leaves it. */
   const running = async (p: Person, harness: 'claude_code' | 'codex', model?: string) => {
-    const { runId } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote, model: model ?? (harness === 'claude_code' ? 'subscription-model' : 'gpt-fixture') }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: await task(p.id, p.workspaceId), agentId: p.agents[harness], repo: p.remote, model: model ?? (harness === 'claude_code' ? 'subscription-model' : 'gpt-fixture') }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"='/tmp/wt',"startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`])
     return runId
   }

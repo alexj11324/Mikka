@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -21,12 +22,14 @@ test('detail and activity revalidate current access while returning only changed
   const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, promoteIssueToTeam } = await import('../app/actions/issues')
   const { syncCoordinatorChat } = await import('../app/actions/coordinator')
   const owner = `detail-cache-${randomUUID()}`, stranger = `detail-stranger-${randomUUID()}`
-  const workspaceId = randomUUID(), teamId = randomUUID(), botId = randomUUID()
-  const read = <T>(work: () => Promise<T>) => actAs(owner, work)
+  const workspaceId = randomUUID(), personalWorkspaceId = randomUUID(), teamId = randomUUID(), botId = randomUUID()
+  const read = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), personalWorkspaceId) as Promise<T>
+  const readShared = <T>(work: () => Promise<T>) => withActivitySession(stranger, () => actAs(stranger, work), workspaceId) as Promise<T>
   const readChat = (...args: Parameters<typeof syncCoordinatorChat>): ReturnType<typeof syncCoordinatorChat> => withActivitySession(stranger, () => syncCoordinatorChat(...args), workspaceId)
   const content = { type: 'doc', content: Array.from({ length: 70 }, (_, index) => ({ type: 'paragraph', content: [{ type: 'text', text: `Paragraph ${index}: ${'private history body '.repeat(20)}` }] })) }
   try {
     for (const id of [owner, stranger]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [id, `${id}@example.invalid`])
+    await seedFixtureWorkspace(pool, owner, 'personal', personalWorkspaceId)
     const saved = successful(await read(() => saveIssue({ title: 'Cached task', content, status: 'todo', priority: 'normal' })))
     assert.ok(saved.issue)
     const id = saved.issue.id
@@ -99,31 +102,39 @@ test('detail and activity revalidate current access while returning only changed
     for (const userId of [owner, stranger]) await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)',
       [workspaceId, userId, `${userId}@example.invalid`, userId === owner ? 'admin' : 'member'])
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [teamId, workspaceId, owner, 'Cache fixture', 'CACHE'])
-    // The real human promotion writes the team receipt and passes the database
-    // scope guard; a fixture must not bypass the same authorization boundary.
-    const promotion = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision: 51, teamId, expectedTeamId: null }), workspaceId)
+    const transfer = await read(() => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision: 51, teamId, expectedTeamId: null }))
+    assert.equal(transfer.error, 'teamIssueAccessDenied', 'team metadata cannot transfer the existing personal task')
+    assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [id])).rows[0].workspaceId, personalWorkspaceId)
+    const createdShared = successful(await withActivitySession(owner, () => saveIssue({ title: 'Shared cached task', content, status: 'todo', priority: 'normal' }), workspaceId))
+    assert.ok(createdShared.issue)
+    const sharedId = createdShared.issue.id
+    const promotion = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: sharedId, revision: 1, teamId, expectedTeamId: null }), workspaceId)
     assert.ok('issue' in promotion && promotion.issue, JSON.stringify(promotion))
-    assert.equal(promotion.issue.scope, 'workspace')
-    const shared = successful(await actAs(stranger, () => pollIssue(id)))
+    assert.equal(promotion.issue.workspaceId, workspaceId)
+    const shared = successful(await readShared(() => pollIssue(sharedId)))
     assert.ok(shared.issue)
-    const sharedHistory = successful(await actAs(stranger, () => pollIssueVersionSummaries(id)))
+    const sharedHistory = successful(await readShared(() => pollIssueVersionSummaries(sharedId)))
     assert.ok(sharedHistory.snapshot && !('unchanged' in sharedHistory.snapshot))
     const sharedSnapshot = sharedHistory.snapshot
     await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [botId, stranger, workspaceId, 'Citation cache fixture'])
     await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,1,$4)',
-      [randomUUID(), stranger, botId, JSON.stringify({ role: 'assistant', content: `Read [[issue:${id}]]` })])
+      [randomUUID(), stranger, botId, JSON.stringify({ role: 'assistant', content: `Read [[issue:${sharedId}]]` })])
     const chat = successful(await readChat(botId))
     assert.ok(chat.chat && !('unchanged' in chat.chat))
     const previousChat = chat.chat
-    assert.equal(previousChat.sources[id]?.kind, 'issue')
-    const continuation = { ...previousChat.continuation!, sourceIds: [id], artifactIds: [] }
+    assert.equal(previousChat.sources[sharedId]?.kind, 'issue')
+    const continuation = { ...previousChat.continuation!, sourceIds: [sharedId], artifactIds: [] }
+    // Removing a citation source refreshes metadata even when no chat message changes.
+    await pool.query('update issues set content=jsonb_set(content,\'{attrs}\',$2::jsonb) where id=$1', [sharedId, JSON.stringify({ mikka: { deletedAt: new Date().toISOString() } })])
+    const deletedChat = successful(await readChat(botId, previousChat.version, continuation))
+    assert.ok(deletedChat.chat && 'unchanged' in deletedChat.chat)
+    assert.deepEqual(deletedChat.chat.metadata?.sources, {})
+    assert.deepEqual(mergeChat(previousChat, deletedChat.chat)?.sources, {})
+    await pool.query('update issues set content=$2 where id=$1', [sharedId, JSON.stringify(createdShared.issue.content)])
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, stranger])
-    assert.equal((await actAs(stranger, () => pollIssue(id, shared.version))).error, 'issueNotFound')
-    assert.equal((await actAs(stranger, () => pollIssueVersionSummaries(id, sharedSnapshot.version, sharedSnapshot.positions))).error, 'issueNotFound')
-    const revokedChat = successful(await readChat(botId, previousChat.version, continuation))
-    assert.ok(revokedChat.chat && 'unchanged' in revokedChat.chat, 'the conversation itself did not change')
-    assert.deepEqual(revokedChat.chat.metadata?.sources, {}, 'an unchanged message version cannot retain a revoked task title')
-    assert.deepEqual(mergeChat(previousChat, revokedChat.chat)?.sources, {})
+    assert.equal((await readShared(() => pollIssue(sharedId, shared.version))).error, 'issueNotFound')
+    assert.equal((await readShared(() => pollIssueVersionSummaries(sharedId, sharedSnapshot.version, sharedSnapshot.positions))).error, 'issueNotFound')
+    assert.equal((await readChat(botId, previousChat.version, continuation)).error, 'botNotFound', 'revoked workspace membership denies the chat and its cached citations')
     assert.equal((await syncCoordinatorChat(botId)).error, 'authRequired', 'expected auth failures survive the Server Action boundary')
     await pool.query('delete from bots where id=$1', [botId])
     assert.equal((await readChat(botId, previousChat.version, continuation)).error, 'botNotFound')

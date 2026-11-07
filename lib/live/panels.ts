@@ -17,11 +17,9 @@ async function sourceScopes(workspaceDatabase: Database, sources: Source[]): Pro
   const { rows } = await workspaceDatabase.query<{ id: string; ownerId: string; workspaceId: string }>(
     `SELECT s.id,s."userId" AS "ownerId",w.id AS "workspaceId"
      FROM jsonb_to_recordset($1::jsonb) AS s(id uuid,"userId" text,"issueId" uuid,"botId" uuid,scope text,"workspaceId" uuid)
-     JOIN mikka_workspaces w ON w.id=CASE
-       WHEN s."issueId" IS NOT NULL AND s.scope='workspace' THEN (SELECT "workspaceId" FROM mikka_team_issues WHERE "issueId"=s."issueId")
-       WHEN s."issueId" IS NULL AND s."botId" IS NOT NULL THEN s."workspaceId"
-       ELSE (SELECT id FROM mikka_workspaces WHERE "userId"=s."userId" AND kind='personal' LIMIT 1) END
-     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=s."userId" AND m.status='active'`,
+     JOIN mikka_workspaces w ON w.id=s."workspaceId"
+     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=s."userId" AND m.status='active'
+     WHERE w.kind='team' OR w."userId"=s."userId"`,
     [JSON.stringify(sources)],
   )
   return new Map(rows.map(row => [row.id, { ownerId: row.ownerId, workspaceId: row.workspaceId }]))
@@ -30,7 +28,7 @@ async function sourceScopes(workspaceDatabase: Database, sources: Source[]): Pro
 export async function threadLiveReferences(database: Database, workspaceDatabase: Database, runIds: string[], ownerId: string): Promise<ThreadLiveReference[]> {
   if (!runIds.length) return []
   const { rows } = await database.query<Source>(
-    `SELECT r.id,r."userId",r."issueId",b.id AS "botId",i.scope,b."workspaceId" FROM agent_runs r
+    `SELECT r.id,r."userId",r."issueId",b.id AS "botId",i.scope,r."workspaceId" FROM agent_runs r
      LEFT JOIN issues i ON i.id=r."issueId"
      LEFT JOIN bots b ON b.id=coalesce(
        (SELECT owned.id FROM computer_run_bindings crb JOIN bots owned ON owned.id=crb."botId" AND owned."ownerId"=crb."ownerId"
@@ -39,7 +37,10 @@ export async function threadLiveReferences(database: Database, workspaceDatabase
        (SELECT owned.id FROM bot_cloud_runtimes runtime JOIN bots owned ON owned.id=runtime."botId" AND owned."ownerId"=runtime."ownerId"
          WHERE runtime."agentId"=r."agentId" AND runtime."ownerId"=r."userId" LIMIT 1))
      WHERE r.id=ANY($1::uuid[]) AND r."userId"=$2
-       AND (r."issueId" IS NULL OR i.scope='workspace' OR i."userId"=r."userId")
+       AND (r."issueId" IS NULL OR i."ownershipState"='bound')
+       AND r."workspaceId" IS NOT NULL
+       AND (r."issueId" IS NULL OR i."workspaceId"=r."workspaceId")
+       AND (b."workspaceId" IS NULL OR r."workspaceId"=b."workspaceId")
        AND (r."botId" IS NULL OR b.id IS NOT NULL)`, [runIds, ownerId],
   )
   const scopes = await sourceScopes(workspaceDatabase, rows)
@@ -49,8 +50,8 @@ export async function threadLiveReferences(database: Database, workspaceDatabase
 /** Body visibility follows issueVisibilityPredicate: a personal body's owner,
  * or active members of the linked workspace. Legacy invitations grant nothing. */
 export async function documentLiveTargets(database: Database, workspaceDatabase: Database, issueId: string, viewerId: string | null = null) {
-  const { rows: [issue] } = await database.query<{ userId: string; scope: string }>(
-    `SELECT "userId",scope FROM issues WHERE id=$1
+  const { rows: [issue] } = await database.query<{ userId: string; scope: string; workspaceId: string | null }>(
+    `SELECT "userId",scope,"workspaceId" FROM issues WHERE id=$1 AND "ownershipState"='bound'
        AND coalesce(content->'attrs'->'mikka',content->'attrs'->'orvilo')->>'deletedAt' IS NULL`, [issueId],
   )
   if (!issue) return []
@@ -58,13 +59,12 @@ export async function documentLiveTargets(database: Database, workspaceDatabase:
   return scopes.map(scope => ({ scope, events: [{ kind: 'issue_document', id: issueId }] as LiveInvalidation[] }))
 }
 
-async function documentScopes(workspaceDatabase: Database, issueId: string, issue: { userId: string; scope: string }, viewerId: string | null = null) {
+async function documentScopes(workspaceDatabase: Database, issueId: string, issue: { userId: string; scope: string; workspaceId: string | null }, viewerId: string | null = null) {
   const { rows } = await workspaceDatabase.query<LiveScope>(
     `SELECT m."userId" AS "ownerId",w.id AS "workspaceId" FROM mikka_workspaces w
      JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m.status='active'
-     WHERE w.id=CASE WHEN $2='workspace' THEN (SELECT "workspaceId" FROM mikka_team_issues WHERE "issueId"=$3)
-       ELSE (SELECT id FROM mikka_workspaces WHERE "userId"=$1 AND kind='personal' LIMIT 1) END
-       AND ($2='workspace' OR m."userId"=$1) AND ($4::text IS NULL OR m."userId"=$4)`, [issue.userId, issue.scope, issueId, viewerId],
+     WHERE w.id=$1 AND (w.kind='team' OR w."userId"=m."userId")
+       AND ($2::text IS NULL OR m."userId"=$2)`, [issue.workspaceId, viewerId],
   )
   return rows
 }
@@ -159,7 +159,7 @@ export const threadChanged = (executor: object, runId: string) => changed(execut
 
 /** Capture only from the writer's locked issue, before its scope changes. An
  * invalidation contains the already-known ID, never the old or new body. */
-export async function documentScopesBeforeChange(issue: { id: string; userId: string; scope: string }): Promise<LiveScope[]> {
+export async function documentScopesBeforeChange(issue: { id: string; userId: string; scope: string; workspaceId: string | null }): Promise<LiveScope[]> {
   if (!liveGatewayConfig(process.env)) return []
   try {
     const { workspacePool } = await import('../workspace-db')

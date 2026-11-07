@@ -31,7 +31,7 @@ before(async () => {
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
   const intl = await import('next-intl/server')
   mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` } } : null } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` }, session: { id: 'activity-fixture-session' } } : null } } } })
   // Saving seals with KMS; the fixture key never leaves this process and no AWS call is made.
   const kmsModule = await import('../lib/credentials/kms')
   const { randomBytes } = await import('node:crypto')

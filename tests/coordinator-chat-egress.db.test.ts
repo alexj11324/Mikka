@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { Socket } from 'node:net'
@@ -21,7 +22,7 @@ test('the chat\'s first read is one page and the bot list reads a summary, not t
   const store = await import('../lib/coordinator/store')
   const owner = `chat-egress-${randomUUID()}`, botId = randomUUID()
   await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
-  await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [botId, owner, randomUUID(), 'Coordinator'])
+  await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [botId, owner, await seedFixtureWorkspace(pool, owner), 'Coordinator'])
   // 200 turns of about 1.5 KB each, alternating person and Coordinator.
   for (let position = 1; position <= 200; position++) {
     const text = `Turn ${position}: ${'a long report line '.repeat(80)}`

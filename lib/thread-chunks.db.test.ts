@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { Socket } from 'node:net'
@@ -35,7 +36,8 @@ test('a thread read with a cursor returns only later chunks, and reads everythin
   try {
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [user, `${user}@example.invalid`])
     await pool.query('insert into agents (id,"userId",harness,name) values ($1,$2,\'codex\',\'Chunks\')', [agent, user])
-    await pool.query('insert into agent_runs (id,"userId","agentId",status,"createdAt") values ($1,$3,$4,\'running\',now()-interval \'1 minute\'),($2,$3,$4,\'queued\',now())', [first, second, user, agent])
+    const workspaceId = await seedFixtureWorkspace(pool, user)
+    await pool.query('insert into agent_runs (id,"userId","agentId","workspaceId",status,"createdAt") values ($1,$3,$4,$5,\'running\',now()-interval \'1 minute\'),($2,$3,$4,$5,\'queued\',now())', [first, second, user, agent, workspaceId])
     // 200 chunks of about 1 KB, with seq 150 held back: a batch stored after later ones.
     await insert(first, seqs(0, 200).filter(seq => seq !== 150))
 

@@ -3,7 +3,7 @@ import { getLocale } from 'next-intl/server'
 import 'server-only'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
@@ -51,7 +51,8 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
   const cookieStore = await cookies()
   const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt))
+    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'),
+      or(eq(workspaces.kind, 'team'), eq(workspaces.userId, user.id)))).orderBy(asc(workspaces.createdAt))
 
   let choices = await readChoices()
   // Every person has one personal workspace, including people whose first workspace came from an invite.

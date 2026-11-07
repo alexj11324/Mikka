@@ -132,12 +132,15 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     assert.equal(readIssueMetadata((await latest(root.id)).content).assignee?.id, member)
     assert.deepEqual(await actAs(owner, () => removeMember(root.id, member)), { success: true })
     await history(root.id, 'user', owner)
-    // Root was shared above; flipping it back to personal is the scope writer
-    // under test here, and it immediately gates the former viewer's history read.
+    // Scope changes only the Linear publication policy. History remains in the
+    // frozen workspace until authoritative workspace membership is revoked.
     const personalPreview = await actAs(owner, () => previewIssuePersonalScope(root.id))
     assert.ok('preview' in personalPreview && personalPreview.preview)
     saved = expectIssue(await actAs(owner, async () => confirmIssuePersonalScope({ id: root.id, revision: (await latest(root.id)).revision, confirmation: personalPreview.preview.confirmation })))
     await history(root.id, 'user', owner)
+    assert.equal(saved.workspaceId, workspace)
+    assert.ok((await actAs(member, () => listIssueVersions(root.id))).length > 0)
+    await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace, member])
     await assert.rejects(actAs(member, () => listIssueVersions(root.id)), { code: 'issueNotFound' })
     const agentId = randomUUID()
     const agent = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'user', actorId: 'spoof' } as Parameters<typeof saveIssue>[0]), agentActor(agentId)))
@@ -146,7 +149,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     await history(agent.id, 'agent', agentId)
     // Linear import/update exercise the actual local synchronization writers;
     // no remote API, token or customer data is involved.
-    const [team] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, linearTeamId: randomUUID(), linearTeamKey: 'ACT', linearTeamName: 'Actor fixture' }).returning()
+    const [team] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId: workspace, linearTeamId: randomUUID(), linearTeamKey: 'ACT', linearTeamName: 'Actor fixture' }).returning()
     const remote = { id: randomUUID(), identifier: 'ACT-1', title: 'Remote fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: team.linearTeamId, key: 'ACT', name: team.linearTeamName }, assignee: null, labels: [] }
     const imported = await createAppIssueFromLinear(team, remote)
     assert.ok(imported)

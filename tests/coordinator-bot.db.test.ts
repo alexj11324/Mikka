@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { ModelMessage } from 'ai'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 const SECRET = 'isolated-ci-coordinator-backfill-fixture-key-0000'
 
@@ -25,6 +25,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     if (previousSecret === undefined) delete process.env.BETTER_AUTH_SECRET
     else process.env.BETTER_AUTH_SECRET = previousSecret
     for (const statement of [
+      'DELETE FROM factory_tasks WHERE "userId" = ANY($1)',
       'DELETE FROM coordinator_messages WHERE "userId" = ANY($1)', 'DELETE FROM coordinator_sessions WHERE "userId" = ANY($1)',
       'DELETE FROM coordinator_events WHERE "userId" = ANY($1)', 'DELETE FROM agent_runs WHERE "userId" = ANY($1)',
       'DELETE FROM agents WHERE "userId" = ANY($1)', 'DELETE FROM issues WHERE "userId" = ANY($1)',
@@ -40,10 +41,8 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const person = async (label: string) => {
     const id = await seedUser(pool, label)
     users.push(id)
-    const workspace = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // Their own workspace: the personal one, where work with no workspace of its own goes.
-    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [workspace.id])
-    return { id, workspaceId: workspace.id }
+    const workspaceId = await seedPersonalWorkspace(pool, id)
+    return { id, workspaceId }
   }
   const messageRows = (userId: string) => pool.query<{ botId: string | null; position: number; text: string }>(
     `SELECT "botId",position,message->>'content' AS text FROM coordinator_messages WHERE "userId"=$1 ORDER BY "botId" NULLS FIRST,position`, [userId])
@@ -109,6 +108,58 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
     assert.deepEqual((await messageRows(p.id)).rows.map(row => [row.botId, row.position, row.text]).at(-1), [coordinator.botId, 4, 'late reply'])
     assert.equal(Number((await pool.query('SELECT count(*) FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL', [p.id])).rows[0].count), 0)
+  })
+
+  await t.test('personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules', async () => {
+    const p = await person('backfill-tenants')
+    const shared = await seedWorkspace(pool, p.id, [{ userId: p.id, role: 'admin' }])
+    const agentId = await seedAgent(pool, p.id)
+    const sharedIssue = await seedIssue(pool, p.id, shared.id)
+    const personalIssue = await seedIssue(pool, p.id, p.workspaceId)
+    const pendingIssue = randomUUID()
+    await pool.query(`INSERT INTO issues (id,"userId",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+      VALUES ($1,$2,'personal','disabled',true,'Unresolved task','{"type":"doc"}','todo','normal')`, [pendingIssue, p.id])
+    const sharedRun = await seedRun(pool, { userId: p.id, agentId, issueId: sharedIssue })
+    const personalRun = await seedRun(pool, { userId: p.id, agentId, issueId: personalIssue })
+    const event = async (issueId: string | null, runId: string | null) => {
+      const id = randomUUID()
+      await pool.query(`INSERT INTO coordinator_events (id,"userId","issueId","runId",kind,"dedupeKey",payload)
+        VALUES ($1,$2,$3,$4,'user_message',$5,'{}')`, [id, p.id, issueId, runId, `backfill-tenant:${id}`])
+      return id
+    }
+    const sharedTaskEvent = await event(sharedIssue, null)
+    const sharedRunEvent = await event(null, sharedRun)
+    const pendingEvent = await event(pendingIssue, null)
+    const sourceEvent = await event(null, null)
+    const personalEvent = await event(personalIssue, personalRun)
+    const taskId = randomUUID()
+    await pool.query(`WITH task AS (
+      INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+      VALUES ($1,$2,$3,$4,'{}','execute','running',$5,'Backfill tenant fixture') RETURNING id)
+      INSERT INTO factory_attempts (id,"taskId",stage,status,ordinal,position,reason)
+      SELECT $5,id,'execute','running',1,1,'Backfill tenant fixture' FROM task`,
+      [taskId, p.id, sharedIssue, sourceEvent, randomUUID()])
+    const schedules = [randomUUID(), randomUUID()]
+    const definition = { title: 'Shared reminder', timezone: 'UTC', timing: { kind: 'once', at: '2030-01-01T09:00:00Z' }, task: { kind: 'reminder', text: 'x' }, misfire: 'skip', maxLatenessMinutes: 60 }
+    for (const [index, workspaceId] of [shared.id, null].entries()) {
+      await pool.query(`INSERT INTO user_schedules (id,owner_id,workspace_id,source_event_id,request_id,definition,request_definition,status,next_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$6,'active','2030-01-01T09:00:00Z')`, [schedules[index], p.id, workspaceId, sourceEvent, randomUUID(), definition])
+    }
+
+    const personal = await bots.coordinatorBot(p.id, p.workspaceId, { backfill: false })
+    await bots.backfillCoordinatorChat(appPool, p.id, personal)
+    const events = (await pool.query('SELECT id,"botId" FROM coordinator_events WHERE "userId"=$1', [p.id])).rows
+    assert.deepEqual(Object.fromEntries(events.map(row => [row.id, row.botId])), {
+      [sharedTaskEvent]: null, [sharedRunEvent]: null, [pendingEvent]: null, [sourceEvent]: null, [personalEvent]: personal.botId,
+    })
+    assert.deepEqual((await pool.query('SELECT "workspaceId","botId" FROM agent_runs WHERE id=$1', [sharedRun])).rows,
+      [{ workspaceId: shared.id, botId: null }])
+    assert.deepEqual((await pool.query('SELECT "workspaceId","botId" FROM factory_tasks WHERE id=$1', [taskId])).rows,
+      [{ workspaceId: shared.id, botId: null }])
+    for (const [index, workspaceId] of [shared.id, null].entries()) {
+      assert.deepEqual((await pool.query('SELECT workspace_id,bot_id FROM user_schedules WHERE id=$1', [schedules[index]])).rows,
+        [{ workspace_id: workspaceId, bot_id: null }])
+    }
   })
 
   await t.test('a new Coordinator message and a run use the real bot id, stored where they enter', async () => {
@@ -205,8 +256,8 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const id = await seedUser(pool, 'per-workspace')
     users.push(id)
     const team = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    const personal = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    await pool.query(`UPDATE mikka_workspaces SET kind='personal', "createdAt"=now()+interval '1 minute' WHERE id=$1`, [personal.id])
+    const personal = { id: await seedPersonalWorkspace(pool, id) }
+    await pool.query(`UPDATE mikka_workspaces SET "createdAt"=now()+interval '1 minute' WHERE id=$1`, [personal.id])
     await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,NULL,1,'{"role":"user","content":"older chat"}')`, [randomUUID(), id])
 
     // The team's is resolved first; the older bot-less chat still moves to the personal Coordinator.
@@ -225,17 +276,23 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     await assert.rejects(bots.coordinatorBot(id, stranger.id), { code: 'workspaceAccessDenied' })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM coordinator_bots WHERE "workspaceId"=$1', [stranger.id])).rows[0].n, 0)
 
-    // An MCP client names no workspace: its notes are the personal Coordinator's, not the team's.
+    // An authenticated MCP client pins its workspace; an unscoped call has no authority.
     const mcp = await import('../lib/mcp/actions')
-    await mcp.remember(id, 'ships on Fridays')
+    const { actAs } = await import('../lib/acting-user')
+    const { tokenWorkspace } = await import('../lib/tokens/principal')
+    await assert.rejects(mcp.remember(id, 'unscoped'), { code: 'workspaceAccessDenied' })
+    const asPersonal = <T>(work: () => Promise<T>) => actAs({ id, [tokenWorkspace]: personal.id }, work)
+    await asPersonal(() => mcp.remember(id, 'ships on Fridays'))
     const memory = async (botId: string) => (await pool.query('SELECT memory FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [id, botId])).rows[0]?.memory ?? ''
     assert.match(await memory(own.botId), /ships on Fridays/)
     assert.doesNotMatch(await memory(inTeam.botId), /ships on Fridays/)
-    assert.match((await mcp.readMemory(id)).memory, /ships on Fridays/)
+    assert.match((await asPersonal(() => mcp.readMemory(id))).memory, /ships on Fridays/)
   })
 
   await t.test('a leaving member\'s Coordinator is paused with their bots and never transferred', async () => {
-    const admin = await person('transfer-admin')
+    const adminId = await seedUser(pool, 'transfer-admin')
+    users.push(adminId)
+    const admin = { id: adminId, workspaceId: (await seedWorkspace(pool, adminId, [{ userId: adminId, role: 'admin' }])).id }
     const leaving = await seedUser(pool, 'transfer-leaving')
     users.push(leaving)
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [admin.workspaceId, leaving, `${leaving}@example.invalid`])

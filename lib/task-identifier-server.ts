@@ -60,7 +60,7 @@ export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db,
 }
 
 /** An issue row as the client sees it: metadata plus its display identifier. */
-export async function issueView<T extends { id: string; userId: string; scope: TaskScope; content: JSONContent }>(issue: T, executor: Executor = db) {
+export async function issueView<T extends { id: string; userId: string; scope: TaskScope; content: JSONContent; linearSyncPolicy?: string }>(issue: T, executor: Executor = db) {
   const view = issueWithMetadata(issue)
   // The assignee is a snapshot from when they were assigned; show the person as they are now (R-36: one avatar per person).
   const assignee = view.metadata.assignee
@@ -69,7 +69,7 @@ export async function issueView<T extends { id: string; userId: string; scope: T
     if (person) view.metadata.assignee = { ...assignee, name: person.name, image: person.image }
   }
   const identifiers = await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: view.metadata.number }], executor)
-  const [verified] = issue.scope === 'workspace' ? await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks)
+  const [verified] = issue.linearSyncPolicy === 'explicit' ? await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks)
     .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
   return { ...view, identifier: identifiers.get(issue.id) ?? null, linearTargetVerified: Boolean(verified) }
 }

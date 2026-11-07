@@ -9,11 +9,7 @@ export function monitorWorkspacePartition(input: {
   linearTeamSyncId: string | null;
 }) {
   if (input.workspaceId) return `workspace:${input.workspaceId}`;
-  if (input.issueScope === "workspace")
-    return input.linearTeamSyncId
-      ? `linear-team:${input.linearTeamSyncId}`
-      : `unlinked-workspace-issue:${input.issueId}`;
-  return `personal:${input.userId}`;
+  return `unresolved-issue:${input.issueId}`;
 }
 
 /** Only the digest leaves this function. Never persist or echo raw failure output. */

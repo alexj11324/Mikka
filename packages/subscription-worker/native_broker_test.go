@@ -207,7 +207,7 @@ func TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads(t *testing.T) {
 	if _, err := w.NativeContext(context.Background(), initial.Revision); err != nil {
 		t.Fatal(err)
 	}
-	for _, update := range []string{`"leaseExpiresAt"=now()-interval '1 second'`, `"leaseExpiresAt"=now()+interval '1 minute',"stopRequestedAt"=now()`, `"stopRequestedAt"=null,status='succeeded'`, `status='running',"userId"='another-owner'`} {
+	for _, update := range []string{`"leaseExpiresAt"=now()-interval '1 second'`, `"leaseExpiresAt"=now()+interval '1 minute',"stopRequestedAt"=now()`, `"stopRequestedAt"=null,status='succeeded'`} {
 		if _, err := db.Exec(`update agent_runs set `+update+` where id=$1`, run); err != nil {
 			t.Fatal(err)
 		}
@@ -215,6 +215,22 @@ func TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads(t *testing.T) {
 		if _, err := w.NativeContext(context.Background(), initial.Revision); err != ErrUnavailable || access.reads != before {
 			t.Fatal("invalid run reached vault", err)
 		}
+	}
+	// Owners are immutable in the task ledger. Keep the runtime negative case by
+	// selecting a separate foreign run with the same consumer and binding.
+	foreignRun := newID()
+	if _, err := db.Exec(`insert into agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt","workspaceId")
+		select $1,'another-owner',"agentId","deviceId",'running',now()+interval '1 minute',"workspaceId" from agent_runs where id=$2`, foreignRun, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec(`delete from agent_runs where id=$1`, foreignRun) })
+	if _, err := db.Exec(`insert into byos_native_runs("runId","bindingId") values($1,$2)`, foreignRun, w.Use.BindingID); err != nil {
+		t.Fatal(err)
+	}
+	w.Use.RunID = foreignRun
+	before := access.reads
+	if _, err := w.NativeContext(context.Background(), initial.Revision); err != ErrUnavailable || access.reads != before {
+		t.Fatal("foreign run reached vault", err)
 	}
 }
 

@@ -131,7 +131,7 @@ export async function backfillCoordinatorChat(pool: Pick<Pool, 'connect'>, owner
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat:${ownerId}:${bot.botId}`])
     const owned = await client.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botId"=$3', [ownerId, bot.workspaceId, bot.botId])
     if (!owned.rowCount) throw new Error('coordinatorBotMissing')
-    await moveChat(client, ownerId, bot.botId)
+    await moveChat(client, ownerId, bot.botId, bot.workspaceId)
     await moveKeyedRows(client, ownerId, bot)
     await client.query('COMMIT')
   } catch (error) {
@@ -140,7 +140,7 @@ export async function backfillCoordinatorChat(pool: Pick<Pool, 'connect'>, owner
   } finally { client.release() }
 }
 
-async function moveChat(client: PoolClient, ownerId: string, botId: string) {
+async function moveChat(client: PoolClient, ownerId: string, botId: string, workspaceId: string) {
   await client.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND ("botId" IS NULL OR "botId"=$2) FOR UPDATE', [ownerId, botId])
   const target = (await client.query<{ last: number }>('SELECT coalesce(max(position),0)::int AS last FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2', [ownerId, botId])).rows[0].last
   // Positions stay as they were when the row holds no messages yet, so the session's summaryThrough still points at the same message.
@@ -164,11 +164,18 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
       await client.query('DELETE FROM coordinator_sessions WHERE "userId"=$1 AND "botId" IS NULL', [ownerId])
     }
   }
-  await client.query('UPDATE coordinator_events SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
-  // The Coordinator's threads: every run of the person's with no bot (an MCP client's too), except a group chat's own.
+  // A botless event can already name a task/run (or be a Factory source) in
+  // another tenant. Personal chat backfill cannot reattribute that work.
+  await client.query(`UPDATE coordinator_events e SET "botId"=$2 WHERE e."userId"=$1 AND e."botId" IS NULL
+      AND (e."issueId" IS NULL OR EXISTS (SELECT 1 FROM issues i WHERE i.id=e."issueId" AND i."workspaceId"=$3))
+      AND (e."runId" IS NULL OR EXISTS (SELECT 1 FROM agent_runs r WHERE r.id=e."runId" AND r."workspaceId"=$3))
+      AND NOT EXISTS (SELECT 1 FROM factory_tasks t WHERE t."sourceEventId"=e.id AND t."workspaceId" IS DISTINCT FROM $3::uuid)`, [ownerId, botId, workspaceId])
+  // Legacy bot attribution cannot move a task across tenants or change a
+  // host-frozen execution identity. Unresolved/shared runs stay as they are.
   const runs = await client.query(`UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL
+      AND r."workspaceId"=$3 AND r."agentDefinition"->'executionIdentity' IS NULL
       AND r.kind <> 'group_chat'
-      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId])
+      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, workspaceId])
   if (messages.rowCount || old) await botChatChanged(client, ownerId, botId)
   if (runs.rowCount) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
 }
@@ -195,8 +202,10 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
       ON CONFLICT ("userId","chatKey") DO NOTHING`, [ownerId, botId])
   await client.query(`DELETE FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator'`, [ownerId])
   await client.query(`UPDATE user_schedules s SET bot_id=$2, workspace_id=$3 WHERE s.owner_id=$1 AND s.bot_id IS NULL
+      AND (s.workspace_id=$3 OR (s.workspace_id IS NULL AND EXISTS (
+        SELECT 1 FROM coordinator_events e WHERE e.id=s.source_event_id AND e."userId"=$1 AND e."botId"=$2)))
       AND NOT EXISTS (SELECT 1 FROM user_schedules o WHERE o.owner_id=$1 AND o.bot_id=$2 AND o.request_id=s.request_id)`, [ownerId, botId, workspaceId])
-  await client.query('UPDATE factory_tasks SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
+  await client.query('UPDATE factory_tasks SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL AND "workspaceId"=$3', [ownerId, botId, workspaceId])
   await client.query('UPDATE suggestions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await client.query('UPDATE pending_actions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await copyAgentHead(client, ownerId, botId, workspaceId)

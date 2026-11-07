@@ -116,7 +116,7 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
     workspaces.push(workspace.id)
     const actor = { userId, workspaceId: workspace.id }
-    const botId = await seedBot(pool, workspace.id, userId), issueId = await seedIssue(pool, userId)
+    const botId = await seedBot(pool, workspace.id, userId), issueId = await seedIssue(pool, userId, workspace.id)
     const scope = { ownerId: userId, workspaceId: workspace.id, botId }
     await setE2BKey(userId, workspace.id, { apiKey: `e2b-fixture-${randomUUID()}` }, { verify: async () => ({ ok: true }) })
     const addKey = (provider: 'anthropic' | 'openai', model: string) => keys.addApiKey(pool, userId,
@@ -374,7 +374,7 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     assert.equal(selected.apiKeyId, next.id)
     assert.equal(selected.modelDispatch?.mode, 'preference')
     assert.equal(selected.modelDispatch?.location, 'cloud')
-    const issueId = await seedIssue(pool, f.actor.userId)
+    const issueId = await seedIssue(pool, f.actor.userId, f.actor.workspaceId)
     const queued = await queueCloudRun(pool, f.actor, { botId: f.botId, issueId, agentId: current.agentId,
       deviceRepoId: current.repoId, title: 'Read a small fixture file', body: 'Read-only follow-up task.', readOnly: true, ...selected })
     const frozen = await row(queued.runId)

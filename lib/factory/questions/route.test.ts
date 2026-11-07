@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mock, test } from "node:test";
 
 let enabled = false, sessions = 0, reads = 0;
-mock.module("@/lib/auth", { namedExports: { auth: { api: { getSession: async () => { sessions++; return { user: { id: "owner" } }; } } } } });
+mock.module("@/lib/auth", { namedExports: { auth: { api: { getSession: async () => { sessions++; return { user: { id: "owner" }, session: { id: "question-fixture-session" } }; } } } } });
 mock.module("@/lib/factory/runtime", { namedExports: {
   factoryLifecycleEnabled: () => enabled,
   factoryRuntimeForBot: () => ({ questions: { pending: async () => { reads++; return []; }, list: async () => { reads++; return []; } } }),

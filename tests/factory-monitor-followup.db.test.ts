@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -18,6 +19,7 @@ test('completed deliveries create one private regression issue in the incident t
   await pool.query(await readFile(new URL('../drizzle/20261031060510_monitor_followup_issues.sql',import.meta.url),'utf8'))
   const owner=`monitor-followup-${randomUUID()}`
   await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',[owner,`${owner}@example.invalid`])
+  const workspaceId=await seedFixtureWorkspace(pool,owner)
   const agentId=randomUUID()
   await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,\'Monitor fixture\',\'codex\')',[agentId,owner])
   async function seed(status='done'){
@@ -25,7 +27,7 @@ test('completed deliveries create one private regression issue in the incident t
     const tx=await pool.connect()
     try{
       await tx.query('BEGIN')
-      await tx.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'PRIVATE SOURCE TITLE\',$3,$4,\'normal\',\'personal\')',[issueId,owner,JSON.stringify({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'PRIVATE SOURCE LOG token=fixture-private'}]}]}),status])
+      await tx.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") VALUES($1,$2,\'PRIVATE SOURCE TITLE\',$3,$4,\'normal\',\'personal\',$5,\'bound\')',[issueId,owner,JSON.stringify({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'PRIVATE SOURCE LOG token=fixture-private'}]}]}),status,workspaceId])
       await tx.query('INSERT INTO agent_runs(id,"userId","issueId","agentId",status,"sessionId") VALUES($1,$2,$3,$4,\'succeeded\',$5)',[runId,owner,issueId,agentId,`monitor:${runId}`])
       await tx.query('INSERT INTO factory_tasks(id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason) VALUES($1,$2,$3,$4,\'{}\',\'monitor\',\'running\',$5,\'Trusted monitor fixture\')',[taskId,owner,issueId,randomUUID(),attemptId])
       await tx.query('INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES($1,$2,repeat(\'a\',40),\'v2/github.com/mikka-ci/followup\',\'device:fixture\',\'fixture\',$3)',[candidateId,taskId,runId])
@@ -50,6 +52,7 @@ test('completed deliveries create one private regression issue in the incident t
     assert.ok(incident.followupIssueId)
     assert.notEqual(incident.followupIssueId,input.issueId)
     const followup=(await pool.query('SELECT * FROM issues WHERE id=$1',[incident.followupIssueId])).rows[0]
+    assert.equal(followup.workspaceId,workspaceId);assert.equal(followup.ownershipState,'bound')
     assert.equal(followup.userId,owner);assert.equal(followup.scope,'personal');assert.equal(followup.status,'todo');assert.equal(followup.linearSyncBlocked,true)
     assert.ok(JSON.stringify(followup.content).includes(input.issueId));assert.ok(JSON.stringify(followup.content).includes(input.candidateId))
     assert.equal(JSON.stringify(followup).includes('PRIVATE SOURCE'),false)

@@ -119,7 +119,7 @@ test('group chat keys reach only current members, after the actual writer commit
       await drain(); assert.deepEqual(sent, [])
     })
 
-    await t.test('a reaction in a bot chat goes to its owner home as that chat’s key', async () => {
+    await t.test('a reaction in a bot chat goes to its owner in the bot tenant as that chat’s key', async () => {
       const { setReaction } = await import('../reactions')
       const bot = randomUUID(), botMessage = randomUUID()
       await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Scout')`, [bot, team])
@@ -127,7 +127,7 @@ test('group chat keys reach only current members, after the actual writer commit
       sent.length = 0
       assert.equal(await scope.run(() => setReaction('owner', botMessage, '❤️')), true)
       await drain()
-      assert.deepEqual(sent, [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'bot_chat', id: bot }] }])
+      assert.deepEqual(sent, [{ scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'bot_chat', id: bot }] }])
     })
 
     await t.test('停止 ends who is answering: pushed after COMMIT, nothing on rollback', async () => {

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -49,8 +50,8 @@ test(
       approvalId = randomUUID(),
       publicationId = randomUUID();
     await pool.query(
-      `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic activation transaction fixture','{}','todo','normal')`,
-      [issueId, userId],
+      `INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Synthetic activation transaction fixture','{}','todo','normal')`,
+      [issueId, userId, await seedFixtureWorkspace(pool, userId)],
     );
     await pool.query(
       `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey","issueId",payload) VALUES($1,$2,'user_message',$3,$4,'{}')`,

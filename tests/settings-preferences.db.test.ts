@@ -31,8 +31,8 @@ async function load() {
 before(async () => {
   if (!databaseUrl) return
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: sessionUser } : null } } } })
-  mock.module('@/lib/session', { namedExports: { getSession: async () => sessionUser ? { user: sessionUser } : null } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } } } })
+  mock.module('@/lib/session', { namedExports: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } })
   mock.module('@/lib/suggestions/sources', { namedExports: { connectedComposioApps: async () => connected } })
   m = await load()
   const { db, drizzle: { sql } } = m

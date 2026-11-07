@@ -19,7 +19,7 @@ export function dispatchLinearIssueSync(issueId: string) {
       if (!await linearSyncEnabled()) return
       // A delayed callback must recheck the task and its per-task destination.
       const [eligible] = await db.select({ id: issues.id }).from(issues).innerJoin(linearIssueLinks, eq(linearIssueLinks.issueId, issues.id)).innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
-        .where(and(eq(issues.id, issueId), eq(issues.scope, 'workspace'), eq(issues.linearSyncBlocked, false), eq(linearIssueLinks.ownerId, issues.userId), eq(linearIssueLinks.externalTargetVerified, true), eq(linearTeamSyncs.ownerId, issues.userId), eq(linearTeamSyncs.active, true))).limit(1)
+        .where(and(eq(issues.id, issueId), eq(issues.ownershipState, 'bound'), eq(issues.linearSyncPolicy, 'explicit'), eq(issues.linearSyncBlocked, false), eq(linearIssueLinks.ownerId, issues.userId), eq(linearIssueLinks.externalTargetVerified, true), eq(linearTeamSyncs.ownerId, issues.userId), eq(linearTeamSyncs.workspaceId, issues.workspaceId), eq(linearTeamSyncs.active, true))).limit(1)
       if (eligible) await processLinearIssueOutbox(issueId)
     }
     catch { console.error('Linear background issue sync could not start') }

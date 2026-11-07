@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import { isolatedPostgresURL } from './helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
@@ -45,8 +46,8 @@ test('real Postgres dispatch transactions and recovery', {
   const deviceId = randomUUID(), agentId = randomUUID(), deviceRepoId = randomUUID()
   const brief = { deviceId, baseBranch: 'main', prompt: 'Controlled dispatch acceptance; no external actions.' }
   async function task(userId = owner): Promise<DispatchInput> {
-    const issueId = randomUUID()
-    await db.insert(issues).values({ id: issueId, userId, title: 'Dispatch acceptance fixture', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
+    const issueId = randomUUID(), workspaceId = await seedFixtureWorkspace(client, userId)
+    await db.insert(issues).values({ id: issueId, userId, workspaceId, title: 'Dispatch acceptance fixture', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
     return { issueId, agentId, deviceRepoId }
   }
   const isFailure = (code: string) => (error: unknown) => error instanceof ActionFailureError && error.code === code

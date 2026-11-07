@@ -20,8 +20,10 @@ import { withDevicePresence } from '@/lib/live/presence-read'
 import type { PresenceDevice } from '@/lib/live/presence'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
-import { beginOwnerListRead } from '@/lib/live/revision-read'
+import { beginWorkspaceListRead } from '@/lib/live/revision-read'
 import { issueShortTitle } from '@/lib/short-title-sql'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { issueVisibility } from '@/lib/issue-visibility'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -52,8 +54,10 @@ export async function pollTaskRuns() {
 async function readTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
+  const context = await loadWorkspaceContext(undefined, session.user)
+  const visibility = await issueVisibility(session.user, false, context.workspace.id)
   const observedAt = Date.now()
-  const begun = await beginOwnerListRead(session.user.id, ['task_run_list'])
+  const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
@@ -64,7 +68,7 @@ async function readTaskRuns() {
     expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`,
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
-    .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+    .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), visibility.predicate, isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
   const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
   const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
@@ -118,14 +122,15 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
   return withDatabaseOperation('/actions/threads/poll', async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
+    const context = await loadWorkspaceContext(undefined, session.user)
     const observedAt = Date.now()
-    const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
+    const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
     const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
       ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
-        .where(and(eq(agentRuns.userId, session.user.id), eq(devices.ownerId, session.user.id),
+        .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), eq(devices.ownerId, session.user.id),
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
           sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       : []
@@ -150,10 +155,10 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
-      .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
     const signature = await queryVersion(snapshot)
-    const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
+    const version = createHash('sha256').update(JSON.stringify([session.user.id, context.workspace.id, signature])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
     const live = withDevicePresence(await ownerListRead(session.user.id, [expiry?.at], observedAt, begun), presenceDevices, process.env, observedAt)
@@ -167,7 +172,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const positions = manifest.map(row => ({ id: row.id, version: createHash('sha256').update(`${session.user.id}:${row.version}`).digest('hex').slice(0, 32) }))
     // Auth, current version and the full deletion/expiry manifest belong to
     // each request. Only identical changed-row reads can join after that proof.
-    return singleFlight(['/actions/threads/poll', session.user.id, version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
+    return singleFlight(['/actions/threads/poll', session.user.id, context.workspace.id, version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
       const changedIds = changedListIds(positions, previous)
       const rows = changedIds.length ? await db.select().from(visible).where(inArray(visible.id, changedIds))
         .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id)) : []
