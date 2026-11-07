@@ -117,7 +117,18 @@ async function main() {
       delete window.__selfHostedAcceptance
     })
     await page.goto(`mikka://app/mikka/en/?bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
-    await page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first().waitFor({ state: 'visible' })
+    // A newly registered community account still has the ordinary first-run
+    // overlay. A DOM-visible chat underneath it is not screenshot evidence.
+    // Complete the real Skip setup action; never hide or remove the overlay.
+    phase = 'first_run_and_visible_chat'
+    const skipSetup = page.getByRole('button', { name: 'Skip setup', exact: true })
+    await skipSetup.waitFor({ state: 'visible' })
+    await skipSetup.click()
+    await skipSetup.waitFor({ state: 'hidden' })
+    const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
+    await reply.waitFor({ state: 'visible' })
+    await reply.scrollIntoViewIfNeeded()
+    passed('normal_first_run_dismissed_and_reply_visible')
     await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())
