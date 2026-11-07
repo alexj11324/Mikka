@@ -104,7 +104,7 @@ export function GroupChatView({ group, userId, people }: {
   // Keep its retry outside document flow so reading history does not jump.
   useEffect(() => {
     const id = `group-read-error:${userId}:${group.id}`
-    if (backgroundFailed) toast.error(t('loadError'), { id, duration: Infinity, action: { label: t('retry'), onClick: () => { void mutate() } } })
+    if (backgroundFailed) toast.error(t('loadError'), { id, duration: Infinity, action: { label: t('retry'), onClick: event => { event.preventDefault(); void mutate() } } })
     else toast.dismiss(id)
     return () => { toast.dismiss(id) }
   }, [backgroundFailed, userId, group.id, t, mutate])

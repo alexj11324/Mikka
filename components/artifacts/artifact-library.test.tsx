@@ -10,11 +10,11 @@ import type { ArtifactListItem } from '@/lib/artifacts/types'
 
 const at = (path: string) => new URL(path, import.meta.url).href
 const browser = new Window({ url: 'https://fixture.example/' })
-const notices = new Map<string, { action?: { onClick: () => void } }>()
+const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
 const translate = (namespace: string) => (key: string) => `${namespace}.${key}`
 mock.module('next-intl', { namedExports: { useTranslations: translate, useFormatter: () => ({ relativeTime: () => 'now' }), useNow: () => new Date('2026-11-07T00:00:00Z') } })
 mock.module('sonner', { namedExports: { toast: {
-  error: (_message: string, options: { id: string; action?: { onClick: () => void } }) => { notices.set(options.id, options) },
+  error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) },
 } } })
 const item = { id: 'fixture-artifact', title: 'Retained artifact', kind: 'markdown', updatedAt: '2026-11-07T00:00:00Z', authorName: 'Fixture', issueKey: null } as ArtifactListItem
@@ -79,7 +79,7 @@ test('a background artifact read failure retains the same row, category and scro
   assert.ok(notice?.action)
   failure = null
   const before = reads
-  await act(async () => notice.action!.onClick())
+  await act(async () => notice.action!.onClick(new Event('click', { cancelable: true })))
   for (let attempt = 0; attempt < 50 && notices.size; attempt++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
   assert.ok(reads > before)
   assert.equal(notices.size, 0)

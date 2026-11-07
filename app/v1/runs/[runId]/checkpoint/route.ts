@@ -1,7 +1,7 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
-import { RUN_CHECKPOINT_MAX_BYTES, runCheckpointSchema } from '@mikka/protocol/device'
+import { RUN_CHECKPOINT_MAX_BYTES, runCheckpointReceiptSchema, runCheckpointSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
@@ -43,7 +43,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   }
   // Keep the authority row locked through the write. A STOP, takeover or
   // expired lease during masking cannot overwrite the last admitted snapshot.
-  const saved = await pool.query(`WITH admitted AS (
+  const saved = await pool.query<{ runId: string; takenAt: Date }>(`WITH admitted AS (
     SELECT r.id,r."userId" FROM agent_runs r JOIN devices d ON d.id=r."deviceId"
     WHERE r.id=$1 AND r."userId"=$2 AND d."ownerId"=$2
       AND ($3::uuid IS NULL OR r."deviceId"=$3) AND r.status=ANY($4::text[])
@@ -53,9 +53,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
     SELECT id,"userId",$5,$6,$7,clock_timestamp(),clock_timestamp(),$8 FROM admitted
     ON CONFLICT ("runId") DO UPDATE SET "baseCommit"=EXCLUDED."baseCommit",patch=EXCLUDED.patch,
       files=EXCLUDED.files,"takenAt"=EXCLUDED."takenAt","updatedAt"=EXCLUDED."updatedAt","unavailableReason"=EXCLUDED."unavailableReason"
-    RETURNING "runId"`, [run.id, caller.userId, caller.scopeDeviceId ?? null, [...LEASED_RUN_STATUSES], parsed.data.baseCommit, masked.patch, masked.files, parsed.data.unavailableReason ?? null])
+    RETURNING "runId","takenAt"`, [run.id, caller.userId, caller.scopeDeviceId ?? null, [...LEASED_RUN_STATUSES], parsed.data.baseCommit, masked.patch, masked.files, parsed.data.unavailableReason ?? null])
   if (!saved.rowCount) return NextResponse.json({ error: 'Run is not running on this device.' }, { status: 409 })
-  return new NextResponse(null, { status: 204 })
+  return NextResponse.json(runCheckpointReceiptSchema.parse({ runId: saved.rows[0].runId, takenAt: saved.rows[0].takenAt.toISOString() }))
 }
 
 export const POST = withDeviceRoute(handlePOST)

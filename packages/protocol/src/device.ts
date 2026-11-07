@@ -297,6 +297,14 @@ export const runCheckpointSchema = z.object({
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
+/** The authenticated upload's persisted server time, never the device clock.
+ * Older servers return no receipt; that cannot certify a final archive. */
+export const runCheckpointReceiptSchema = z.object({
+  runId: id,
+  takenAt: z.iso.datetime({ precision: 3 }),
+}).strict()
+export type RunCheckpointReceipt = z.infer<typeof runCheckpointReceiptSchema>
+
 // --- Repository settings ---------------------------------------------------
 
 export const setupRecipeSchema = z.object({
